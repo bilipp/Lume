@@ -52,6 +52,18 @@ Lume is an IPTV player for iOS, tvOS and macOS. It supports xtream playlists, EP
 - On play, the app will check, if the movie or show is available in the xtream playlist, and if it is, the stream will start playing. If the movie or show is not available in the xtream playlist, a message will be shown to the user. If multiple streams are available, the user will be able to choose which stream to play (different qualities, etc.). The movie or show details view will also have a section for related movies or shows (similar movies or shows based on genre, etc.) and a section for recommended movies or shows (based on watch history, etc. - future feature).
 - For shows: Selection of season and episode, with the same features as movies (checking availability in the xtream playlist, etc.)
 
+##### View
+- Icons at the header: Back button on the left. Option to mark the movie or show as watched (eye icon) and favorite (heart icon) on the right.
+- Poster
+- Title of the movie/show. Sometimes the movie has a logo. If available, the logo will be shown instead of the title.
+- Play button
+- Year and Duration
+- Description
+- Section for ratings (IMDB, Rotten Tomatoes, etc.) (Future feature)
+- Section for trailers (Future feature)
+- Section for cast (Future feature)
+- Section for related movies/shows (Future feature)
+
 ### Settings
 In the settings, users will be able to manage their xtream playlist (credentials and other information from the server information like active connections and expiration date), customize player settings (aspect ratio, subtitles, etc.), manage their content (refresh interval, hide/show categories, reorder categories or channels, etc.) and customize the appearance of the app (dark mode, etc.).
 
@@ -79,6 +91,8 @@ There are a lot of ideas for the future of the app, but the main focus will be o
 - [ ] m3u support
 - [ ] Genre categorization for movies and TV shows
 - [ ] Multiple players support (AVPlayer, VLC, etc.) with automatic fallback and preference settings (separate settings for live TV and movies/TV shows)
+- [ ] Display trailers on movie/show details
+- [ ] Display cast on movie/show details, with the option to view their other movies/shows
 - [ ] Ratings on single views (IMDB, Rotten Tomatoes, etc.)
 - [ ] Parental controls
 - [ ] Airplay / Chromecast support (depends on player engine support)
