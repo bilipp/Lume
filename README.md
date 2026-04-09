@@ -77,6 +77,7 @@ There are a lot of ideas for the future of the app, but the main focus will be o
 ### Enhancements / Settings
 - [ ] iCloud sync for user data (settings, playlist information, watch history, watchlist, favorites, etc.)
 - [ ] m3u support
+- [ ] Genre categorization for movies and TV shows
 - [ ] Multiple players support (AVPlayer, VLC, etc.) with automatic fallback and preference settings (separate settings for live TV and movies/TV shows)
 - [ ] Ratings on single views (IMDB, Rotten Tomatoes, etc.)
 - [ ] Parental controls
