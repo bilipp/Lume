@@ -53,7 +53,7 @@ Lume is an IPTV player for iOS, tvOS and macOS. It supports xtream playlists, EP
 - For shows: Selection of season and episode, with the same features as movies (checking availability in the xtream playlist, etc.)
 
 ### Settings
-In the settings, users will be able to add their xtream playlist, customize player settings (aspect ratio, subtitles, etc.), manage their content (refresh interval, hide/show categories, reorder categories or channels, etc.) and customize the appearance of the app (dark mode, etc.).
+In the settings, users will be able to manage their xtream playlist (credentials and other information from the server information like active connections and expiration date), customize player settings (aspect ratio, subtitles, etc.), manage their content (refresh interval, hide/show categories, reorder categories or channels, etc.) and customize the appearance of the app (dark mode, etc.).
 
 ## Content indexing
 The app will index the content from the xtream playlist and EPG data, allowing for fast and efficient searching and browsing. The indexed data will be stored locally on the device using SwiftData, providing offline access to the content.
@@ -83,3 +83,6 @@ There are a lot of ideas for the future of the app, but the main focus will be o
 - [ ] Airplay / Chromecast support (depends on player engine support)
 - [ ] Picture-in-picture mode
 - [ ] Option to hide content (categories or specific channels)
+
+## Xtream Codes API Documentation
+For more information on the Xtream Codes API, please refer to the [Xtream Codes API Documentation](XtreamAPI.md) file, which provides detailed information on the available endpoints, authentication, and response formats for retrieving server information, live streams, video-on-demand content, series, and EPG data.
