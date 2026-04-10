@@ -1,9 +1,9 @@
 import Foundation
 
 // MARK: - Server & User Info
-public struct XtreamAuthResponse: Decodable {
-    public let userInfo: XtreamUserInfo
-    public let serverInfo: XtreamServerInfo
+struct XtreamAuthResponse: Decodable {
+    let userInfo: XtreamUserInfo
+    let serverInfo: XtreamServerInfo
     
     enum CodingKeys: String, CodingKey {
         case userInfo = "user_info"
@@ -11,13 +11,13 @@ public struct XtreamAuthResponse: Decodable {
     }
 }
 
-public struct XtreamUserInfo: Decodable {
-    public let username: String?
-    public let status: String?
-    public let expDate: String?
-    public let isTrial: String?
-    public let activeCons: String?
-    public let maxConnections: String?
+struct XtreamUserInfo: Decodable {
+    let username: String?
+    let status: String?
+    let expDate: String?
+    let isTrial: String?
+    let activeCons: String?
+    let maxConnections: String?
     
     enum CodingKeys: String, CodingKey {
         case username, status
@@ -28,14 +28,14 @@ public struct XtreamUserInfo: Decodable {
     }
 }
 
-public struct XtreamServerInfo: Decodable {
-    public let url: String?
-    public let port: String?
-    public let httpsPort: String?
-    public let serverProtocol: String?
-    public let timezone: String?
-    public let timestampNow: Int?
-    public let timeNow: String?
+struct XtreamServerInfo: Decodable {
+    let url: String?
+    let port: String?
+    let httpsPort: String?
+    let serverProtocol: String?
+    let timezone: String?
+    let timestampNow: Int?
+    let timeNow: String?
     
     enum CodingKeys: String, CodingKey {
         case url, port, timezone
@@ -47,10 +47,10 @@ public struct XtreamServerInfo: Decodable {
 }
 
 // MARK: - Categories
-public struct XtreamCategory: Decodable {
-    public let categoryId: String
-    public let categoryName: String
-    public let parentId: Int?
+struct XtreamCategory: Decodable {
+    let categoryId: String
+    let categoryName: String
+    let parentId: Int?
     
     enum CodingKeys: String, CodingKey {
         case categoryId = "category_id"
@@ -60,19 +60,19 @@ public struct XtreamCategory: Decodable {
 }
 
 // MARK: - Live Streams
-public struct XtreamLiveStream: Decodable {
-    public let num: Int?
-    public let name: String?
-    public let streamType: String?
-    public let streamId: Int?
-    public let streamIcon: String?
-    public let epgChannelId: String?
-    public let added: String?
-    public let isAdult: Int?
-    public let categoryId: String?
-    public let customSid: String?
-    public let tvArchive: Int?
-    public let tvArchiveDuration: Int?
+struct XtreamLiveStream: Decodable {
+    let num: Int?
+    let name: String?
+    let streamType: String?
+    let streamId: Int?
+    let streamIcon: String?
+    let epgChannelId: String?
+    let added: String?
+    let isAdult: Int?
+    let categoryId: String?
+    let customSid: String?
+    let tvArchive: Int?
+    let tvArchiveDuration: Int?
     
     enum CodingKeys: String, CodingKey {
         case num, name
@@ -88,7 +88,7 @@ public struct XtreamLiveStream: Decodable {
         case tvArchiveDuration = "tv_archive_duration"
     }
     
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.num = try? container.decodeIfPresent(Int.self, forKey: .num)
         self.name = try? container.decodeIfPresent(String.self, forKey: .name)
@@ -135,19 +135,19 @@ public struct XtreamLiveStream: Decodable {
 }
 
 // MARK: - VOD Streams
-public struct XtreamVODStream: Decodable {
-    public let num: Int?
-    public let name: String?
-    public let streamType: String?
-    public let streamId: Int?
-    public let streamIcon: String?
-    public let rating: Double?
-    public let rating5Based: Double?
-    public let added: String?
-    public let isAdult: Int?
-    public let categoryId: String?
-    public let containerExtension: String?
-    public let tmdb: String?
+struct XtreamVODStream: Decodable {
+    let num: Int?
+    let name: String?
+    let streamType: String?
+    let streamId: Int?
+    let streamIcon: String?
+    let rating: Double?
+    let rating5Based: Double?
+    let added: String?
+    let isAdult: Int?
+    let categoryId: String?
+    let containerExtension: String?
+    let tmdb: String?
     
     enum CodingKeys: String, CodingKey {
         case num, name
@@ -163,7 +163,7 @@ public struct XtreamVODStream: Decodable {
         case tmdb
     }
     
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.num = try? container.decodeIfPresent(Int.self, forKey: .num)
         self.name = try? container.decodeIfPresent(String.self, forKey: .name)
@@ -218,9 +218,9 @@ public struct XtreamVODStream: Decodable {
 }
 
 // MARK: - VOD Info
-public struct XtreamVODInfo: Decodable {
-    public let info: XtreamVODMetadata?
-    public let movieData: XtreamVODStreamData?
+struct XtreamVODInfo: Decodable {
+    let info: XtreamVODMetadata?
+    let movieData: XtreamVODStreamData?
     
     enum CodingKeys: String, CodingKey {
         case info
@@ -228,18 +228,18 @@ public struct XtreamVODInfo: Decodable {
     }
 }
 
-public struct XtreamVODMetadata: Decodable {
-    public let tmdbId: String?
-    public let name: String?
-    public let movieImage: String?
-    public let releaseDate: String?
-    public let durationSecs: Int?
-    public let youtubeTrailer: String?
-    public let director: String?
-    public let actors: String?
-    public let description: String?
-    public let plot: String?
-    public let genre: String?
+struct XtreamVODMetadata: Decodable {
+    let tmdbId: String?
+    let name: String?
+    let movieImage: String?
+    let releaseDate: String?
+    let durationSecs: Int?
+    let youtubeTrailer: String?
+    let director: String?
+    let actors: String?
+    let description: String?
+    let plot: String?
+    let genre: String?
     
     enum CodingKeys: String, CodingKey {
         case tmdbId = "tmdb_id"
@@ -251,7 +251,7 @@ public struct XtreamVODMetadata: Decodable {
         case director, actors, description, plot, genre
     }
     
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.name = try? container.decodeIfPresent(String.self, forKey: .name)
         self.movieImage = try? container.decodeIfPresent(String.self, forKey: .movieImage)
@@ -281,9 +281,9 @@ public struct XtreamVODMetadata: Decodable {
     }
 }
 
-public struct XtreamVODStreamData: Decodable {
-    public let streamId: Int?
-    public let containerExtension: String?
+struct XtreamVODStreamData: Decodable {
+    let streamId: Int?
+    let containerExtension: String?
     
     enum CodingKeys: String, CodingKey {
         case streamId = "stream_id"
@@ -292,21 +292,21 @@ public struct XtreamVODStreamData: Decodable {
 }
 
 // MARK: - Series
-public struct XtreamSeries: Decodable {
-    public let num: Int?
-    public let name: String?
-    public let seriesId: Int?
-    public let cover: String?
-    public let plot: String?
-    public let cast: String?
-    public let director: String?
-    public let genre: String?
-    public let releaseDate: String?
-    public let lastModified: String?
-    public let rating: String?
-    public let rating5Based: String?
-    public let categoryId: String?
-    public let tmdb: String?
+struct XtreamSeries: Decodable {
+    let num: Int?
+    let name: String?
+    let seriesId: Int?
+    let cover: String?
+    let plot: String?
+    let cast: String?
+    let director: String?
+    let genre: String?
+    let releaseDate: String?
+    let lastModified: String?
+    let rating: String?
+    let rating5Based: String?
+    let categoryId: String?
+    let tmdb: String?
     
     enum CodingKeys: String, CodingKey {
         case num, name
@@ -320,7 +320,7 @@ public struct XtreamSeries: Decodable {
         case tmdb
     }
     
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.num = try? container.decodeIfPresent(Int.self, forKey: .num)
         self.name = try? container.decodeIfPresent(String.self, forKey: .name)
@@ -354,22 +354,22 @@ public struct XtreamSeries: Decodable {
 }
 
 // MARK: - Series Info
-public struct XtreamSeriesInfoResponse: Decodable {
-    public let info: XtreamSeriesInfo?
-    public let episodes: [String: [XtreamEpisode]]?
+struct XtreamSeriesInfoResponse: Decodable {
+    let info: XtreamSeriesInfo?
+    let episodes: [String: [XtreamEpisode]]?
 }
 
-public struct XtreamSeriesInfo: Decodable {
-    public let name: String?
-    public let cover: String?
-    public let plot: String?
-    public let cast: String?
-    public let director: String?
-    public let genre: String?
-    public let releaseDate: String?
-    public let lastModified: String?
-    public let rating: String?
-    public let tmdb: String?
+struct XtreamSeriesInfo: Decodable {
+    let name: String?
+    let cover: String?
+    let plot: String?
+    let cast: String?
+    let director: String?
+    let genre: String?
+    let releaseDate: String?
+    let lastModified: String?
+    let rating: String?
+    let tmdb: String?
     
     enum CodingKeys: String, CodingKey {
         case name, cover, plot, cast, director, genre
@@ -379,16 +379,16 @@ public struct XtreamSeriesInfo: Decodable {
     }
 }
 
-public struct XtreamEpisode: Decodable {
-    public let id: String?
-    public let episodeNum: Int?
-    public let title: String?
-    public let containerExtension: String?
-    public let customSid: String?
-    public let added: String?
-    public let season: Int?
-    public let directSource: String?
-    public let info: XtreamEpisodeInfo?
+struct XtreamEpisode: Decodable {
+    let id: String?
+    let episodeNum: Int?
+    let title: String?
+    let containerExtension: String?
+    let customSid: String?
+    let added: String?
+    let season: Int?
+    let directSource: String?
+    let info: XtreamEpisodeInfo?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -401,7 +401,7 @@ public struct XtreamEpisode: Decodable {
         case info
     }
     
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.episodeNum = try? container.decodeIfPresent(Int.self, forKey: .episodeNum)
         self.title = try? container.decodeIfPresent(String.self, forKey: .title)
@@ -430,11 +430,11 @@ public struct XtreamEpisode: Decodable {
     }
 }
 
-public struct XtreamEpisodeInfo: Decodable {
-    public let airDate: String?
-    public let movieImage: String?
-    public let durationSecs: Int?
-    public let rating: Double?
+struct XtreamEpisodeInfo: Decodable {
+    let airDate: String?
+    let movieImage: String?
+    let durationSecs: Int?
+    let rating: Double?
     
     enum CodingKeys: String, CodingKey {
         case airDate = "air_date"
@@ -443,7 +443,7 @@ public struct XtreamEpisodeInfo: Decodable {
         case rating
     }
     
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.airDate = try? container.decodeIfPresent(String.self, forKey: .airDate)
         self.movieImage = try? container.decodeIfPresent(String.self, forKey: .movieImage)
@@ -467,9 +467,9 @@ public struct XtreamEpisodeInfo: Decodable {
 }
 
 // MARK: - EPG
-public struct XtreamShortEPG: Decodable {
-    public let start: String?
-    public let end: String?
-    public let title: String?
-    public let description: String?
+struct XtreamShortEPG: Decodable {
+    let start: String?
+    let end: String?
+    let title: String?
+    let description: String?
 }

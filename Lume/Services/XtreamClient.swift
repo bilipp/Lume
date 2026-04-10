@@ -1,6 +1,6 @@
 import Foundation
 
-public enum XtreamError: Error {
+enum XtreamError: Error {
     case invalidURL
     case authenticationFailed
     case networkError(Error)
@@ -9,10 +9,10 @@ public enum XtreamError: Error {
     case serverError(Int)
 }
 
-public class XtreamClient {
+class XtreamClient {
     private let urlSession: URLSession
     
-    public init(urlSession: URLSession = .shared) {
+    init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
     }
     
@@ -58,7 +58,7 @@ public class XtreamClient {
     // MARK: - API Methods
     
     /// 1. Get Server and User Info
-    public func getInfo(playlist: Playlist) async throws -> XtreamAuthResponse {
+    func getInfo(playlist: Playlist) async throws -> XtreamAuthResponse {
         let queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password)
@@ -72,7 +72,7 @@ public class XtreamClient {
     }
     
     /// 2. Get Live Categories
-    public func getLiveCategories(playlist: Playlist) async throws -> [XtreamCategory] {
+    func getLiveCategories(playlist: Playlist) async throws -> [XtreamCategory] {
         let queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),
@@ -87,7 +87,7 @@ public class XtreamClient {
     }
     
     /// 3. Get Live Streams
-    public func getLiveStreams(playlist: Playlist, categoryId: String? = nil) async throws -> [XtreamLiveStream] {
+    func getLiveStreams(playlist: Playlist, categoryId: String? = nil) async throws -> [XtreamLiveStream] {
         var queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),
@@ -105,7 +105,7 @@ public class XtreamClient {
     }
     
     /// 4. Get VOD Categories
-    public func getVODCategories(playlist: Playlist) async throws -> [XtreamCategory] {
+    func getVODCategories(playlist: Playlist) async throws -> [XtreamCategory] {
         let queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),
@@ -120,7 +120,7 @@ public class XtreamClient {
     }
     
     /// 5. Get VOD Streams
-    public func getVODStreams(playlist: Playlist, categoryId: String? = nil) async throws -> [XtreamVODStream] {
+    func getVODStreams(playlist: Playlist, categoryId: String? = nil) async throws -> [XtreamVODStream] {
         var queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),
@@ -138,7 +138,7 @@ public class XtreamClient {
     }
     
     /// 6. Get VOD Info
-    public func getVODInfo(playlist: Playlist, vodId: Int) async throws -> XtreamVODInfo {
+    func getVODInfo(playlist: Playlist, vodId: Int) async throws -> XtreamVODInfo {
         let queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),
@@ -154,7 +154,7 @@ public class XtreamClient {
     }
     
     /// 7. Get Series Categories
-    public func getSeriesCategories(playlist: Playlist) async throws -> [XtreamCategory] {
+    func getSeriesCategories(playlist: Playlist) async throws -> [XtreamCategory] {
         let queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),
@@ -169,7 +169,7 @@ public class XtreamClient {
     }
     
     /// 8. Get Series
-    public func getSeries(playlist: Playlist, categoryId: String? = nil) async throws -> [XtreamSeries] {
+    func getSeries(playlist: Playlist, categoryId: String? = nil) async throws -> [XtreamSeries] {
         var queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),
@@ -187,7 +187,7 @@ public class XtreamClient {
     }
     
     /// 9. Get Series Info
-    public func getSeriesInfo(playlist: Playlist, seriesId: Int) async throws -> XtreamSeriesInfoResponse {
+    func getSeriesInfo(playlist: Playlist, seriesId: Int) async throws -> XtreamSeriesInfoResponse {
         let queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),
@@ -203,7 +203,7 @@ public class XtreamClient {
     }
     
     /// 11. Get Short EPG
-    public func getShortEPG(playlist: Playlist, streamId: Int, limit: Int? = nil) async throws -> [XtreamShortEPG] {
+    func getShortEPG(playlist: Playlist, streamId: Int, limit: Int? = nil) async throws -> [XtreamShortEPG] {
         var queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password),

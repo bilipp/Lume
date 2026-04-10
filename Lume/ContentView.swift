@@ -1,58 +1,50 @@
-//
-//  ContentView.swift
-//  Lume
-//
-//  Created by Philipp Bischoff on 09.04.26.
-//
-
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Query private var playlists: [Playlist]
 
     var body: some View {
-        NavigationViewWrapper {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        if playlists.isEmpty {
+            LoginView()
+        } else {
+            NavigationViewWrapper {
+                List {
+                    ForEach(playlists) { playlist in
+                        NavigationLink {
+                            Text("Playlist: \(playlist.name)")
+                        } label: {
+                            Text(playlist.name)
+                        }
                     }
+                    .onDelete(perform: deletePlaylists)
                 }
-                .onDelete(perform: deleteItems)
-            }
 #if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 200)
 #endif
-            .toolbar {
+                .toolbar {
 #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        EditButton()
+                    }
 #endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    ToolbarItem {
+                        Button(action: {
+                            // TODO: Show LoginView modally
+                        }) {
+                            Label("Add Playlist", systemImage: "plus")
+                        }
                     }
                 }
             }
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
+    private func deletePlaylists(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
-                modelContext.delete(items[index])
+                modelContext.delete(playlists[index])
             }
         }
     }
@@ -66,7 +58,7 @@ fileprivate struct NavigationViewWrapper<Content: View>: View {
         NavigationSplitView {
             content()
         } detail: {
-            Text("Select an item")
+            Text("Select a playlist")
         }
 #else
         content()
@@ -76,5 +68,5 @@ fileprivate struct NavigationViewWrapper<Content: View>: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: Playlist.self, inMemory: true)
 }
