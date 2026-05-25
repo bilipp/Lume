@@ -2,7 +2,8 @@
 //  LiveTVView.swift
 //  Lume
 //
-//  Main view for browsing live TV channels
+//  Main view for browsing live TV channels — categories sidebar; channels
+//  for the selected category are loaded lazily via @Query.
 //
 
 import SwiftUI
@@ -57,9 +58,10 @@ struct LiveTVView: View {
 
                         Divider()
 
-                        // Channels list
+                        // Channels list (lazy-loaded by category)
                         if let category = selectedCategory {
                             ChannelsList(category: category)
+                                .id(category.id)
                         } else {
                             ContentUnavailableView(
                                 "Select a Category",
@@ -142,15 +144,9 @@ struct CategorySidebar: View {
 
     var body: some View {
         List(categories, selection: $selectedCategory) { category in
-            VStack(alignment: .leading, spacing: 4) {
-                Text(category.name)
-                    .font(.headline)
-
-                Text("\(category.liveStreams.count) channels")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .tag(category as Category?)
+            Text(category.name)
+                .font(.headline)
+                .tag(category as Category?)
         }
         .listStyle(.sidebar)
     }
@@ -160,18 +156,28 @@ struct CategorySidebar: View {
 
 struct ChannelsList: View {
     let category: Category
+    @Query private var streams: [LiveStream]
+
+    init(category: Category) {
+        self.category = category
+        let categoryId = category.id
+        _streams = Query(
+            filter: #Predicate<LiveStream> { $0.categoryId == categoryId },
+            sort: \LiveStream.num
+        )
+    }
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                if category.liveStreams.isEmpty {
+                if streams.isEmpty {
                     ContentUnavailableView(
                         "No Channels",
                         systemImage: "antenna.radiowaves.left.and.right",
                         description: Text("This category has no channels")
                     )
                 } else {
-                    ForEach(sortedStreams) { stream in
+                    ForEach(streams) { stream in
                         NavigationLink(value: stream) {
                             LiveStreamCardView(stream: stream)
                                 .padding(.horizontal)
@@ -183,15 +189,6 @@ struct ChannelsList: View {
                     }
                 }
             }
-        }
-    }
-
-    private var sortedStreams: [LiveStream] {
-        category.liveStreams.sorted { stream1, stream2 in
-            if let order1 = stream1.customOrder, let order2 = stream2.customOrder {
-                return order1 < order2
-            }
-            return stream1.num < stream2.num
         }
     }
 }

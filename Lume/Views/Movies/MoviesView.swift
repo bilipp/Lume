@@ -2,7 +2,8 @@
 //  MoviesView.swift
 //  Lume
 //
-//  Main view for browsing movies
+//  Main view for browsing movies. Each category shows a preview row;
+//  "Show All" navigates to the full category view.
 //
 
 import SwiftUI
@@ -15,9 +16,11 @@ struct MoviesView: View {
     private var categories: [Category]
 
     @State private var selectedPlaylist: Playlist?
-    @State private var isSyncing = false
-    @State private var syncError: String?
     @State private var showingSync = false
+
+    /// How many movies to render inline per category. The full list is reachable
+    /// via the per-row "Show All" link.
+    private let previewLimit = 20
 
     var body: some View {
         NavigationStack {
@@ -51,7 +54,7 @@ struct MoviesView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             ForEach(sortedCategories) { category in
-                                CategorySection(category: category)
+                                MovieCategoryPreview(category: category, limit: previewLimit)
                             }
                         }
                         .padding(.vertical)
@@ -83,10 +86,6 @@ struct MoviesView: View {
 
                 ToolbarItem(placement: .automatic) {
                     HStack {
-                        if isSyncing {
-                            ProgressView()
-                        }
-
                         Button {
                             showingSync = true
                         } label: {
@@ -111,6 +110,9 @@ struct MoviesView: View {
                     SyncProgressView(playlist: playlist, isPresented: $showingSync)
                 }
             }
+            .navigationDestination(for: Category.self) { category in
+                MovieCategoryView(category: category)
+            }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie)
             }
@@ -122,28 +124,50 @@ struct MoviesView: View {
     }
 }
 
-// MARK: - Category Section
+// MARK: - Category Preview Row
 
-struct CategorySection: View {
+/// One category row on the main view: shows up to `limit` movies inline.
+/// Uses a fetch-limited `@Query` parameterized on `categoryId` so each row pulls
+/// only its own slice — never the full category contents.
+struct MovieCategoryPreview: View {
     let category: Category
+    @Query private var movies: [Movie]
+
+    init(category: Category, limit: Int) {
+        self.category = category
+        let categoryId = category.id
+        var descriptor = FetchDescriptor<Movie>(
+            predicate: #Predicate<Movie> { $0.categoryId == categoryId },
+            sortBy: [SortDescriptor(\.num)]
+        )
+        descriptor.fetchLimit = limit
+        _movies = Query(descriptor)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Category header
-            Text(category.name)
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
+            HStack {
+                Text(category.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
 
-            // Movies scroll view
-            if category.movies.isEmpty {
+                Spacer()
+
+                NavigationLink(value: category) {
+                    Text("Show All")
+                        .font(.subheadline)
+                }
+            }
+            .padding(.horizontal)
+
+            if movies.isEmpty {
                 Text("No movies in this category")
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 16) {
-                        ForEach(category.movies.sorted(by: { $0.num < $1.num })) { movie in
+                        ForEach(movies) { movie in
                             NavigationLink(value: movie) {
                                 MovieCardView(movie: movie)
                             }
@@ -158,117 +182,45 @@ struct CategorySection: View {
     }
 }
 
-// MARK: - Sync Progress View
+// MARK: - Full Category View (Show All)
 
-struct SyncProgressView: View {
-    let playlist: Playlist
-    @Binding var isPresented: Bool
+struct MovieCategoryView: View {
+    let category: Category
+    @Query private var movies: [Movie]
 
-    @Environment(\.modelContext) private var modelContext
-    @State private var isSyncing = false
-    @State private var syncError: String?
-    @State private var progress: Double = 0
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                if isSyncing {
-                    ProgressView(value: progress) {
-                        Text("Syncing...")
-                            .font(.headline)
-                    }
-                    .progressViewStyle(.linear)
-                    .padding()
-
-                    Text("This may take a few minutes")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if let error = syncError {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 50))
-                            .foregroundStyle(.red)
-
-                        Text("Sync Failed")
-                            .font(.headline)
-
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-
-                        Button {
-                            syncError = nil
-                            startSync()
-                        } label: {
-                            Text("Try Again")
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                } else {
-                    VStack(spacing: 16) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 50))
-                            .foregroundStyle(.blue)
-
-                        Text("Ready to Sync")
-                            .font(.headline)
-
-                        Text("This will download all categories and content from your playlist")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding()
-
-                        Button {
-                            startSync()
-                        } label: {
-                            Text("Start Sync")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .padding(.horizontal)
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle("Sync Playlist")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
-                    .disabled(isSyncing)
-                }
-            }
-        }
+    init(category: Category) {
+        self.category = category
+        let categoryId = category.id
+        _movies = Query(
+            filter: #Predicate<Movie> { $0.categoryId == categoryId },
+            sort: \Movie.num
+        )
     }
 
-    private func startSync() {
-        isSyncing = true
-        syncError = nil
-        progress = 0
+    private let columns = [GridItem(.adaptive(minimum: 140), spacing: 16)]
 
-        Task {
-            do {
-                let syncManager = ContentSyncManager(modelContainer: modelContext.container)
-                try await syncManager.syncPlaylist(playlist, full: true)
-
-                await MainActor.run {
-                    isSyncing = false
-                    isPresented = false
+    var body: some View {
+        ScrollView {
+            if movies.isEmpty {
+                ContentUnavailableView(
+                    "No Movies",
+                    systemImage: "film.stack",
+                    description: Text("This category has no movies")
+                )
+                .padding(.top, 40)
+            } else {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(movies) { movie in
+                        NavigationLink(value: movie) {
+                            MovieCardView(movie: movie)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-            } catch {
-                await MainActor.run {
-                    isSyncing = false
-                    syncError = error.localizedDescription
-                }
+                .padding()
             }
         }
+        .navigationTitle(category.name)
     }
 }
 

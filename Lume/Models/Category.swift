@@ -21,10 +21,6 @@ final class Category {
     var customIcon: String?
     var lastRefreshed: Date?
 
-    @Relationship(deleteRule: .cascade) var liveStreams: [LiveStream] = []
-    @Relationship(deleteRule: .cascade) var movies: [Movie] = []
-    @Relationship(deleteRule: .cascade) var series: [Series] = []
-
     init(apiId: String, name: String, parentId: Int, typeRaw: String, playlist: Playlist? = nil) {
         self.id = "\(playlist?.id.uuidString ?? "unknown")-\(typeRaw)-\(apiId)"
         self.apiId = apiId

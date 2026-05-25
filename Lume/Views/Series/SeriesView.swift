@@ -2,7 +2,8 @@
 //  SeriesView.swift
 //  Lume
 //
-//  Main view for browsing TV series
+//  Main view for browsing TV series. Each category shows a preview row;
+//  "Show All" navigates to the full category view.
 //
 
 import SwiftUI
@@ -16,6 +17,8 @@ struct SeriesView: View {
 
     @State private var selectedPlaylist: Playlist?
     @State private var showingSync = false
+
+    private let previewLimit = 20
 
     var body: some View {
         NavigationStack {
@@ -49,7 +52,7 @@ struct SeriesView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             ForEach(sortedCategories) { category in
-                                SeriesCategorySection(category: category)
+                                SeriesCategoryPreview(category: category, limit: previewLimit)
                             }
                         }
                         .padding(.vertical)
@@ -105,6 +108,9 @@ struct SeriesView: View {
                     SyncProgressView(playlist: playlist, isPresented: $showingSync)
                 }
             }
+            .navigationDestination(for: Category.self) { category in
+                SeriesCategoryView(category: category)
+            }
             .navigationDestination(for: Series.self) { series in
                 SeriesDetailView(series: series)
             }
@@ -116,30 +122,49 @@ struct SeriesView: View {
     }
 }
 
-// MARK: - Series Category Section
+// MARK: - Category Preview Row
 
-struct SeriesCategorySection: View {
+struct SeriesCategoryPreview: View {
     let category: Category
+    @Query private var series: [Series]
+
+    init(category: Category, limit: Int) {
+        self.category = category
+        let categoryId = category.id
+        var descriptor = FetchDescriptor<Series>(
+            predicate: #Predicate<Series> { $0.categoryId == categoryId },
+            sortBy: [SortDescriptor(\.num)]
+        )
+        descriptor.fetchLimit = limit
+        _series = Query(descriptor)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Category header
-            Text(category.name)
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
+            HStack {
+                Text(category.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
 
-            // Series scroll view
-            if category.series.isEmpty {
+                Spacer()
+
+                NavigationLink(value: category) {
+                    Text("Show All")
+                        .font(.subheadline)
+                }
+            }
+            .padding(.horizontal)
+
+            if series.isEmpty {
                 Text("No series in this category")
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 16) {
-                        ForEach(category.series.sorted(by: { $0.num < $1.num })) { series in
-                            NavigationLink(value: series) {
-                                SeriesCardView(series: series)
+                        ForEach(series) { item in
+                            NavigationLink(value: item) {
+                                SeriesCardView(series: item)
                             }
                             .buttonStyle(.plain)
                         }
@@ -149,6 +174,48 @@ struct SeriesCategorySection: View {
                 .frame(height: 220)
             }
         }
+    }
+}
+
+// MARK: - Full Category View (Show All)
+
+struct SeriesCategoryView: View {
+    let category: Category
+    @Query private var series: [Series]
+
+    init(category: Category) {
+        self.category = category
+        let categoryId = category.id
+        _series = Query(
+            filter: #Predicate<Series> { $0.categoryId == categoryId },
+            sort: \Series.num
+        )
+    }
+
+    private let columns = [GridItem(.adaptive(minimum: 140), spacing: 16)]
+
+    var body: some View {
+        ScrollView {
+            if series.isEmpty {
+                ContentUnavailableView(
+                    "No Series",
+                    systemImage: "tv.fill",
+                    description: Text("This category has no series")
+                )
+                .padding(.top, 40)
+            } else {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(series) { item in
+                        NavigationLink(value: item) {
+                            SeriesCardView(series: item)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding()
+            }
+        }
+        .navigationTitle(category.name)
     }
 }
 

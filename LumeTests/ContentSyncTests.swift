@@ -78,6 +78,11 @@ struct ContentSyncTests {
                     movie.num = movieDTO.num ?? 0
                     movie.isAdult = movieDTO.isAdult ?? 0
 
+                    // Foreign key — same shape as ContentSyncManager produces.
+                    if let catIdStr = movieDTO.categoryId {
+                        movie.categoryId = "\(playlistId.uuidString)-vod-\(catIdStr)"
+                    }
+
                     if let tmdbString = movieDTO.tmdb, let tmdbInt = Int(tmdbString) {
                         movie.tmdbId = tmdbInt
                     }

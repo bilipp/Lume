@@ -18,7 +18,7 @@ final class Series {
     var tmdb: String?
     var num: Int
 
-    var category: Category?
+    var categoryId: String?
     @Relationship(deleteRule: .cascade) var episodes: [Episode] = []
 
     var isFavorite: Bool = false
@@ -42,7 +42,7 @@ final class Series {
         rating5Based: String? = nil,
         tmdb: String? = nil,
         num: Int = 0,
-        category: Category? = nil
+        categoryId: String? = nil
     ) {
         self.id = id
         self.seriesId = seriesId
@@ -58,6 +58,6 @@ final class Series {
         self.rating5Based = rating5Based
         self.tmdb = tmdb
         self.num = num
-        self.category = category
+        self.categoryId = categoryId
     }
 }
