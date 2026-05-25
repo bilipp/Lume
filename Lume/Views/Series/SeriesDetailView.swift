@@ -186,20 +186,21 @@ struct SeriesDetailView: View {
                     // Episodes List
                     if series.episodes.isEmpty {
                         VStack(spacing: 16) {
-                            Text("No episodes loaded")
-                                .foregroundStyle(.secondary)
+                            if isLoadingEpisodes {
+                                ProgressView()
+                                Text("Loading episodes…")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("No episodes available")
+                                    .foregroundStyle(.secondary)
 
-                            Button {
-                                loadEpisodes()
-                            } label: {
-                                HStack {
-                                    if isLoadingEpisodes {
-                                        ProgressView()
-                                    }
-                                    Text("Load Episodes")
+                                Button {
+                                    loadEpisodes()
+                                } label: {
+                                    Text("Retry")
                                 }
+                                .buttonStyle(.bordered)
                             }
-                            .buttonStyle(.bordered)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -225,6 +226,11 @@ struct SeriesDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .task {
+            if series.episodes.isEmpty && !isLoadingEpisodes {
+                loadEpisodes()
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button {

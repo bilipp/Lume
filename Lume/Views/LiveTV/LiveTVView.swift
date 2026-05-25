@@ -143,10 +143,24 @@ struct CategorySidebar: View {
     @Binding var selectedCategory: Category?
 
     var body: some View {
-        List(categories, selection: $selectedCategory) { category in
-            Text(category.name)
-                .font(.headline)
-                .tag(category as Category?)
+        List(categories) { category in
+            Button {
+                selectedCategory = category
+            } label: {
+                HStack {
+                    Text(category.name)
+                        .font(.headline)
+                        .foregroundStyle(selectedCategory?.id == category.id ? Color.accentColor : Color.primary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(
+                selectedCategory?.id == category.id
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear
+            )
         }
         .listStyle(.sidebar)
     }
