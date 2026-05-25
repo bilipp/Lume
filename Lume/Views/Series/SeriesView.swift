@@ -18,6 +18,17 @@ struct SeriesView: View {
     @State private var selectedPlaylist: Playlist?
     @State private var showingSync = false
 
+    @AppStorage(SortStorageKey.seriesCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
+    @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+
+    private var categorySort: CategorySortOption {
+        CategorySortOption(rawValue: categorySortRaw) ?? .playlist
+    }
+
+    private var contentSort: ContentSortOption {
+        ContentSortOption(rawValue: contentSortRaw) ?? .playlist
+    }
+
     private let previewLimit = 20
 
     var body: some View {
@@ -52,7 +63,8 @@ struct SeriesView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             ForEach(sortedCategories) { category in
-                                SeriesCategoryPreview(category: category, limit: previewLimit)
+                                SeriesCategoryPreview(category: category, limit: previewLimit, sort: contentSort)
+                                    .id("\(category.id)-\(contentSort.rawValue)")
                             }
                         }
                         .padding(.vertical)
@@ -83,6 +95,13 @@ struct SeriesView: View {
                 }
 
                 ToolbarItem(placement: .automatic) {
+                    SortMenu(
+                        categorySortRaw: $categorySortRaw,
+                        contentSortRaw: $contentSortRaw
+                    )
+                }
+
+                ToolbarItem(placement: .automatic) {
                     HStack {
                         Button {
                             showingSync = true
@@ -109,7 +128,7 @@ struct SeriesView: View {
                 }
             }
             .navigationDestination(for: Category.self) { category in
-                SeriesCategoryView(category: category)
+                SeriesCategoryView(category: category, sort: contentSort)
             }
             .navigationDestination(for: Series.self) { series in
                 SeriesDetailView(series: series)
@@ -118,7 +137,7 @@ struct SeriesView: View {
     }
 
     private var sortedCategories: [Category] {
-        categories.sorted { ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name) }
+        categorySort.sort(categories)
     }
 }
 
@@ -128,12 +147,12 @@ struct SeriesCategoryPreview: View {
     let category: Category
     @Query private var series: [Series]
 
-    init(category: Category, limit: Int) {
+    init(category: Category, limit: Int, sort: ContentSortOption) {
         self.category = category
         let categoryId = category.id
         var descriptor = FetchDescriptor<Series>(
             predicate: #Predicate<Series> { $0.categoryId == categoryId },
-            sortBy: [SortDescriptor(\.num)]
+            sortBy: sort.seriesDescriptors
         )
         descriptor.fetchLimit = limit
         _series = Query(descriptor)
@@ -183,12 +202,12 @@ struct SeriesCategoryView: View {
     let category: Category
     @Query private var series: [Series]
 
-    init(category: Category) {
+    init(category: Category, sort: ContentSortOption) {
         self.category = category
         let categoryId = category.id
         _series = Query(
             filter: #Predicate<Series> { $0.categoryId == categoryId },
-            sort: \Series.num
+            sort: sort.seriesDescriptors
         )
     }
 

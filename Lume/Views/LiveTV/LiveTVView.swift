@@ -19,6 +19,17 @@ struct LiveTVView: View {
     @State private var selectedCategory: Category?
     @State private var showingSync = false
 
+    @AppStorage(SortStorageKey.liveCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
+    @AppStorage(SortStorageKey.liveContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+
+    private var categorySort: CategorySortOption {
+        CategorySortOption(rawValue: categorySortRaw) ?? .playlist
+    }
+
+    private var contentSort: ContentSortOption {
+        ContentSortOption(rawValue: contentSortRaw) ?? .playlist
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -60,8 +71,8 @@ struct LiveTVView: View {
 
                         // Channels list (lazy-loaded by category)
                         if let category = selectedCategory {
-                            ChannelsList(category: category)
-                                .id(category.id)
+                            ChannelsList(category: category, sort: contentSort)
+                                .id("\(category.id)-\(contentSort.rawValue)")
                         } else {
                             ContentUnavailableView(
                                 "Select a Category",
@@ -93,6 +104,13 @@ struct LiveTVView: View {
                             }
                         }
                     }
+                }
+
+                ToolbarItem(placement: .automatic) {
+                    SortMenu(
+                        categorySortRaw: $categorySortRaw,
+                        contentSortRaw: $contentSortRaw
+                    )
                 }
 
                 ToolbarItem(placement: .automatic) {
@@ -132,7 +150,7 @@ struct LiveTVView: View {
     }
 
     private var sortedCategories: [Category] {
-        categories.sorted { ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name) }
+        categorySort.sort(categories)
     }
 }
 
@@ -172,12 +190,12 @@ struct ChannelsList: View {
     let category: Category
     @Query private var streams: [LiveStream]
 
-    init(category: Category) {
+    init(category: Category, sort: ContentSortOption) {
         self.category = category
         let categoryId = category.id
         _streams = Query(
             filter: #Predicate<LiveStream> { $0.categoryId == categoryId },
-            sort: \LiveStream.num
+            sort: sort.liveStreamDescriptors
         )
     }
 

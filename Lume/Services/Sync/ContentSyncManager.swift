@@ -145,10 +145,11 @@ actor ContentSyncManager {
             FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
         ).first else { return }
 
-        for categoryDTO in dtos {
+        for (index, categoryDTO) in dtos.enumerated() {
             if let existingCat = categoryLookup[categoryDTO.categoryId] {
                 existingCat.name = categoryDTO.categoryName
                 existingCat.parentId = categoryDTO.parentId ?? 0
+                existingCat.sortOrder = index
                 existingCat.lastRefreshed = Date()
             } else {
                 let category = Category(
@@ -158,6 +159,7 @@ actor ContentSyncManager {
                     type: type,
                     playlist: playlist
                 )
+                category.sortOrder = index
                 category.lastRefreshed = Date()
                 context.insert(category)
             }

@@ -18,6 +18,17 @@ struct MoviesView: View {
     @State private var selectedPlaylist: Playlist?
     @State private var showingSync = false
 
+    @AppStorage(SortStorageKey.movieCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
+    @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+
+    private var categorySort: CategorySortOption {
+        CategorySortOption(rawValue: categorySortRaw) ?? .playlist
+    }
+
+    private var contentSort: ContentSortOption {
+        ContentSortOption(rawValue: contentSortRaw) ?? .playlist
+    }
+
     /// How many movies to render inline per category. The full list is reachable
     /// via the per-row "Show All" link.
     private let previewLimit = 20
@@ -54,7 +65,8 @@ struct MoviesView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             ForEach(sortedCategories) { category in
-                                MovieCategoryPreview(category: category, limit: previewLimit)
+                                MovieCategoryPreview(category: category, limit: previewLimit, sort: contentSort)
+                                    .id("\(category.id)-\(contentSort.rawValue)")
                             }
                         }
                         .padding(.vertical)
@@ -85,6 +97,13 @@ struct MoviesView: View {
                 }
 
                 ToolbarItem(placement: .automatic) {
+                    SortMenu(
+                        categorySortRaw: $categorySortRaw,
+                        contentSortRaw: $contentSortRaw
+                    )
+                }
+
+                ToolbarItem(placement: .automatic) {
                     HStack {
                         Button {
                             showingSync = true
@@ -111,7 +130,7 @@ struct MoviesView: View {
                 }
             }
             .navigationDestination(for: Category.self) { category in
-                MovieCategoryView(category: category)
+                MovieCategoryView(category: category, sort: contentSort)
             }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie)
@@ -120,7 +139,7 @@ struct MoviesView: View {
     }
 
     private var sortedCategories: [Category] {
-        categories.sorted { ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name) }
+        categorySort.sort(categories)
     }
 }
 
@@ -133,12 +152,12 @@ struct MovieCategoryPreview: View {
     let category: Category
     @Query private var movies: [Movie]
 
-    init(category: Category, limit: Int) {
+    init(category: Category, limit: Int, sort: ContentSortOption) {
         self.category = category
         let categoryId = category.id
         var descriptor = FetchDescriptor<Movie>(
             predicate: #Predicate<Movie> { $0.categoryId == categoryId },
-            sortBy: [SortDescriptor(\.num)]
+            sortBy: sort.movieDescriptors
         )
         descriptor.fetchLimit = limit
         _movies = Query(descriptor)
@@ -188,12 +207,12 @@ struct MovieCategoryView: View {
     let category: Category
     @Query private var movies: [Movie]
 
-    init(category: Category) {
+    init(category: Category, sort: ContentSortOption) {
         self.category = category
         let categoryId = category.id
         _movies = Query(
             filter: #Predicate<Movie> { $0.categoryId == categoryId },
-            sort: \Movie.num
+            sort: sort.movieDescriptors
         )
     }
 
