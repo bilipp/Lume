@@ -21,6 +21,7 @@ struct HomeView: View {
     #endif
 
     @Query private var playlists: [Playlist]
+    @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
 
     // Recently watched (capped — watch history is naturally bounded).
     @Query private var watchedMovies: [Movie]
@@ -119,13 +120,18 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("Home")
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    PlaylistSwitcher(playlists: playlists, selectedPlaylistID: $selectedPlaylistID)
+                }
+            }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie)
             }
             .navigationDestination(for: Series.self) { series in
                 SeriesDetailView(series: series)
             }
-            .task(id: playlists.count) {
+            .task(id: "\(playlists.count)-\(selectedPlaylistID)") {
                 await loadTrending()
             }
             #if os(iOS)
@@ -136,12 +142,32 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Playlist scoping
+
+    /// The playlist whose content is currently shown, resolved from the global
+    /// selection. Falls back to the first playlist until the user picks one.
+    private var activePlaylist: Playlist? {
+        playlists.active(for: selectedPlaylistID)
+    }
+
+    /// The id prefix every Movie/Series/LiveStream belonging to the active
+    /// playlist shares (ids are stored as `"\(playlistID)-…"`). The `@Query`
+    /// results span all playlists, so this scopes them in-memory.
+    private var playlistPrefix: String? {
+        activePlaylist.map { "\($0.id.uuidString)-" }
+    }
+
+    private func belongsToActivePlaylist(_ id: String) -> Bool {
+        guard let prefix = playlistPrefix else { return true }
+        return id.hasPrefix(prefix)
+    }
+
     // MARK: - Derived content
 
     private var recentlyWatched: [HomeMediaItem] {
-        let items = watchedMovies.map(HomeMediaItem.movie)
-            + watchedSeries.map(HomeMediaItem.series)
-            + watchedStreams.map(HomeMediaItem.live)
+        let items = watchedMovies.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.movie)
+            + watchedSeries.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.series)
+            + watchedStreams.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.live)
         return items
             .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
             .prefix(20)
@@ -149,9 +175,9 @@ struct HomeView: View {
     }
 
     private var favorites: [HomeMediaItem] {
-        favoriteMovies.map(HomeMediaItem.movie)
-            + favoriteSeries.map(HomeMediaItem.series)
-            + favoriteStreams.map(HomeMediaItem.live)
+        favoriteMovies.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.movie)
+            + favoriteSeries.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.series)
+            + favoriteStreams.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.live)
     }
 
     /// Truly empty home — only show the empty state once trending has settled
@@ -203,21 +229,21 @@ struct HomeView: View {
     }
 
     private func fetchMovie(tmdbId: Int) -> Movie? {
-        var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
-        descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
+        let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
+        let matches = (try? modelContext.fetch(descriptor)) ?? []
+        return matches.first { belongsToActivePlaylist($0.id) }
     }
 
     private func fetchSeries(tmdbId: Int) -> Series? {
-        var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
-        descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
+        let descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
+        let matches = (try? modelContext.fetch(descriptor)) ?? []
+        return matches.first { belongsToActivePlaylist($0.id) }
     }
 
     // MARK: - Playback
 
     private func playChannel(_ stream: LiveStream) {
-        guard let playlist = playlists.first,
+        guard let playlist = activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
         #if os(macOS)
         openWindow(id: "player", value: media)
@@ -227,7 +253,7 @@ struct HomeView: View {
     }
 
     private func playMovie(_ movie: Movie) {
-        guard let playlist = playlists.first,
+        guard let playlist = activePlaylist,
               let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
         #if os(macOS)
         openWindow(id: "player", value: media)

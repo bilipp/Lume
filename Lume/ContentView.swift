@@ -29,6 +29,9 @@ struct ContentView: View {
             password: "testpass"
         )
         modelContext.insert(playlist)
+        // Persist immediately so a separate ModelContext (e.g. the sync actor)
+        // can see the seeded playlist without waiting for autosave.
+        try? modelContext.save()
     }
 }
 

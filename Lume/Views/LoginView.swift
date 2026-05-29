@@ -119,6 +119,11 @@ struct LoginView: View {
                     playlist.expDate = info.userInfo.expDate
 
                     modelContext.insert(playlist)
+                    // Persist immediately so the ContentSyncManager actor's
+                    // separate ModelContext can fetch the playlist. Without this
+                    // the autosave is deferred and the sync's fresh context
+                    // fetches nil, silently completing without syncing.
+                    try? modelContext.save()
                     isLoading = false
                     // Only dismiss when presented (e.g. the Settings sheet). On
                     // first run LoginView is the window's root content, where

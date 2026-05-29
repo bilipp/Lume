@@ -15,7 +15,7 @@ struct SeriesView: View {
     @Query(filter: #Predicate<Category> { $0.typeRaw == "series" && $0.isHidden == false })
     private var categories: [Category]
 
-    @State private var selectedPlaylist: Playlist?
+    @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @State private var showingSync = false
 
     @AppStorage(SortStorageKey.seriesCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
@@ -40,7 +40,7 @@ struct SeriesView: View {
                         systemImage: "tv",
                         description: Text("Add a playlist in Settings to start browsing series")
                     )
-                } else if categories.isEmpty {
+                } else if sortedCategories.isEmpty {
                     VStack(spacing: 20) {
                         ContentUnavailableView(
                             "No Series",
@@ -48,9 +48,9 @@ struct SeriesView: View {
                             description: Text("Sync your playlist to load TV series")
                         )
 
-                        if let playlist = playlists.first {
+                        if let playlist = activePlaylist {
                             Button {
-                                selectedPlaylist = playlist
+                                selectedPlaylistID = playlist.id.uuidString
                                 showingSync = true
                             } label: {
                                 Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
@@ -74,24 +74,7 @@ struct SeriesView: View {
             .navigationTitle("Series")
             .toolbar {
                 ToolbarItem(placement: .automatic) {
-                    if let playlist = playlists.first {
-                        Menu {
-                            ForEach(playlists) { p in
-                                Button {
-                                    selectedPlaylist = p
-                                } label: {
-                                    Label(p.name, systemImage: selectedPlaylist?.id == p.id ? "checkmark" : "")
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text(selectedPlaylist?.name ?? playlist.name)
-                                    .font(.headline)
-                                Image(systemName: "chevron.down")
-                                    .font(.caption)
-                            }
-                        }
-                    }
+                    PlaylistSwitcher(playlists: playlists, selectedPlaylistID: $selectedPlaylistID)
                 }
 
                 ToolbarItem(placement: .automatic) {
@@ -117,13 +100,8 @@ struct SeriesView: View {
                     }
                 }
             }
-            .task {
-                if selectedPlaylist == nil, let first = playlists.first {
-                    selectedPlaylist = first
-                }
-            }
             .sheet(isPresented: $showingSync) {
-                if let playlist = selectedPlaylist ?? playlists.first {
+                if let playlist = activePlaylist {
                     SyncProgressView(playlist: playlist, isPresented: $showingSync)
                 }
             }
@@ -136,8 +114,19 @@ struct SeriesView: View {
         }
     }
 
+    /// The playlist whose content is currently shown, resolved from the global
+    /// selection. Falls back to the first playlist until the user picks one.
+    private var activePlaylist: Playlist? {
+        playlists.active(for: selectedPlaylistID)
+    }
+
+    /// Categories scoped to the active playlist. The `@Query` fetches every
+    /// playlist's categories (SwiftData can't parameterize a `@Query` on view
+    /// state), so we isolate by the playlist-prefixed category `id` here.
     private var sortedCategories: [Category] {
-        categorySort.sort(categories)
+        guard let playlistId = activePlaylist?.id else { return [] }
+        let prefix = "\(playlistId.uuidString)-"
+        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) })
     }
 }
 

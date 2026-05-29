@@ -18,7 +18,7 @@ struct LiveTVView: View {
     @Query(filter: #Predicate<Category> { $0.typeRaw == "live" && $0.isHidden == false })
     private var categories: [Category]
 
-    @State private var selectedPlaylist: Playlist?
+    @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @State private var selectedCategory: Category?
     @State private var showingSync = false
     @State private var playingMedia: PlayableMedia?
@@ -51,9 +51,9 @@ struct LiveTVView: View {
                             description: Text("Sync your playlist to load live TV channels")
                         )
 
-                        if let playlist = playlists.first {
+                        if let playlist = activePlaylist {
                             Button {
-                                selectedPlaylist = playlist
+                                selectedPlaylistID = playlist.id.uuidString
                                 showingSync = true
                             } label: {
                                 Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
@@ -92,24 +92,7 @@ struct LiveTVView: View {
             .navigationTitle("Live TV")
             .toolbar {
                 ToolbarItem(placement: .automatic) {
-                    if let playlist = playlists.first {
-                        Menu {
-                            ForEach(playlists) { p in
-                                Button {
-                                    selectedPlaylist = p
-                                } label: {
-                                    Label(p.name, systemImage: selectedPlaylist?.id == p.id ? "checkmark" : "")
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text(selectedPlaylist?.name ?? playlist.name)
-                                    .font(.headline)
-                                Image(systemName: "chevron.down")
-                                    .font(.caption)
-                            }
-                        }
-                    }
+                    PlaylistSwitcher(playlists: playlists, selectedPlaylistID: $selectedPlaylistID)
                 }
 
                 ToolbarItem(placement: .automatic) {
@@ -136,15 +119,18 @@ struct LiveTVView: View {
                 }
             }
             .task {
-                if selectedPlaylist == nil, let first = playlists.first {
-                    selectedPlaylist = first
-                }
                 if selectedCategory == nil, let first = sortedCategories.first {
                     selectedCategory = first
                 }
             }
+            .onChange(of: selectedPlaylistID) {
+                // Switching playlists invalidates the current category selection,
+                // which belongs to the previous playlist. Reset to the new
+                // playlist's first category so the channel list stays in sync.
+                selectedCategory = sortedCategories.first
+            }
             .sheet(isPresented: $showingSync) {
-                if let playlist = selectedPlaylist ?? playlists.first {
+                if let playlist = activePlaylist {
                     SyncProgressView(playlist: playlist, isPresented: $showingSync)
                 }
             }
@@ -156,12 +142,23 @@ struct LiveTVView: View {
         }
     }
 
+    /// The playlist whose content is currently shown, resolved from the global
+    /// selection. Falls back to the first playlist until the user picks one.
+    private var activePlaylist: Playlist? {
+        playlists.active(for: selectedPlaylistID)
+    }
+
+    /// Categories scoped to the active playlist. The `@Query` fetches every
+    /// playlist's categories (SwiftData can't parameterize a `@Query` on view
+    /// state), so we isolate by the playlist-prefixed category `id` here.
     private var sortedCategories: [Category] {
-        categorySort.sort(categories)
+        guard let playlistId = activePlaylist?.id else { return [] }
+        let prefix = "\(playlistId.uuidString)-"
+        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) })
     }
 
     private func playChannel(_ stream: LiveStream) {
-        guard let playlist = selectedPlaylist ?? playlists.first,
+        guard let playlist = activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
         #if os(macOS)
         openWindow(id: "player", value: media)

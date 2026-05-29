@@ -44,7 +44,13 @@ actor ContentSyncManager {
                 statusContext.autosaveEnabled = false
                 guard let pl = try statusContext.fetch(
                     FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
-                ).first else { return }
+                ).first else {
+                    // The playlist isn't visible in this context's view of the
+                    // store. Surface it as an error rather than silently logging
+                    // a successful completion (which masks the real failure).
+                    Logger.database.error("Sync aborted: playlist \(playlistId) not found in store")
+                    throw SyncError.playlistNotFound
+                }
 
                 pl.syncStatus = .syncing
                 try statusContext.save()
@@ -433,6 +439,7 @@ actor ContentSyncManager {
 
 enum SyncError: LocalizedError {
     case syncInProgress
+    case playlistNotFound
     case invalidCredentials
     case networkError(Error)
     case databaseError(Error)
@@ -441,6 +448,8 @@ enum SyncError: LocalizedError {
         switch self {
         case .syncInProgress:
             return "A sync is already in progress for this playlist"
+        case .playlistNotFound:
+            return "The playlist could not be found"
         case .invalidCredentials:
             return "Invalid username or password"
         case .networkError(let error):
