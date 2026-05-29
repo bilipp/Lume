@@ -33,6 +33,7 @@ struct HomeView: View {
     @Query private var favoriteStreams: [LiveStream]
 
     @State private var trending: [HomeMediaItem] = []
+    @State private var heroMovies: [HeroMovie] = []
     @State private var trendingState: LoadState = .idle
     @State private var playingMedia: PlayableMedia?
 
@@ -100,6 +101,9 @@ struct HomeView: View {
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 28) {
+                            if !heroMovies.isEmpty {
+                                HomeHeroCarousel(movies: heroMovies, onPlay: playMovie)
+                            }
                             if !recentlyWatched.isEmpty {
                                 HomeRow(title: "Recently Watched", items: recentlyWatched, onPlayLive: playChannel)
                             }
@@ -169,14 +173,20 @@ struct HomeView: View {
         }
         trendingState = .loading
         do {
-            async let movieIDs = client.trendingIDs(.movie)
+            async let movieTitles = client.trending(.movie)
             async let tvIDs = client.trendingIDs(.tv)
-            let (movies, tv) = try await (movieIDs, tvIDs)
+            let (movies, tv) = try await (movieTitles, tvIDs)
 
             var items: [HomeMediaItem] = []
-            for id in movies {
-                if let movie = fetchMovie(tmdbId: id) {
+            var heroes: [HeroMovie] = []
+            for title in movies {
+                if let movie = fetchMovie(tmdbId: title.id) {
                     items.append(.movie(movie))
+                    heroes.append(HeroMovie(
+                        movie: movie,
+                        backdropURL: TMDBClient.backdropURL(title.backdropPath),
+                        overview: title.overview
+                    ))
                 }
             }
             for id in tv {
@@ -185,6 +195,7 @@ struct HomeView: View {
                 }
             }
             trending = Array(items.prefix(20))
+            heroMovies = Array(heroes.prefix(6))
             trendingState = .loaded
         } catch {
             trendingState = .failed
@@ -208,6 +219,16 @@ struct HomeView: View {
     private func playChannel(_ stream: LiveStream) {
         guard let playlist = playlists.first,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+        #if os(macOS)
+        openWindow(id: "player", value: media)
+        #else
+        playingMedia = media
+        #endif
+    }
+
+    private func playMovie(_ movie: Movie) {
+        guard let playlist = playlists.first,
+              let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
         #if os(macOS)
         openWindow(id: "player", value: media)
         #else

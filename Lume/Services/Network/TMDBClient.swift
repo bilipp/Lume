@@ -36,6 +36,7 @@ struct TMDBClient {
     }
 
     private let baseURL = "https://api.themoviedb.org/3"
+    private static let imageBaseURL = "https://image.tmdb.org/t/p/"
     private let session: URLSession
     private let token: String?
 
@@ -61,6 +62,27 @@ struct TMDBClient {
     func trendingIDs(_ media: MediaType, timeWindow: TimeWindow = .week) async throws -> [Int] {
         let response: TrendingResponse = try await get("/trending/\(media.rawValue)/\(timeWindow.rawValue)")
         return response.results.map(\.id)
+    }
+
+    /// Returns trending titles enriched with the artwork and copy the home hero
+    /// carousel needs (backdrop, title, overview), in popularity order.
+    func trending(_ media: MediaType, timeWindow: TimeWindow = .week) async throws -> [TrendingTitle] {
+        let response: TrendingResponse = try await get("/trending/\(media.rawValue)/\(timeWindow.rawValue)")
+        return response.results.map {
+            TrendingTitle(
+                id: $0.id,
+                title: $0.title ?? $0.name ?? "",
+                overview: $0.overview ?? "",
+                backdropPath: $0.backdropPath
+            )
+        }
+    }
+
+    /// Builds a full image URL from a TMDB relative path (e.g. `/abc.jpg`).
+    /// `w1280` is the widescreen backdrop size used by the hero carousel.
+    static func backdropURL(_ path: String?, size: String = "w1280") -> URL? {
+        guard let path, !path.isEmpty else { return nil }
+        return URL(string: imageBaseURL + size + path)
     }
 
     // MARK: - Networking
@@ -90,11 +112,30 @@ struct TMDBClient {
     }
 }
 
+// MARK: - Public types
+
+/// A trending title with the metadata the home hero carousel renders.
+struct TrendingTitle: Sendable, Identifiable, Hashable {
+    let id: Int
+    let title: String
+    let overview: String
+    let backdropPath: String?
+}
+
 // MARK: - DTOs
 
 private struct TrendingResponse: Decodable {
     struct Item: Decodable {
         let id: Int
+        let title: String?
+        let name: String?
+        let overview: String?
+        let backdropPath: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, title, name, overview
+            case backdropPath = "backdrop_path"
+        }
     }
     let results: [Item]
 }

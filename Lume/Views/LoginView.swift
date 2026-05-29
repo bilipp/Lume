@@ -3,6 +3,7 @@ import SwiftData
 
 struct LoginView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
     @Environment(\.modelContext) private var modelContext
 
     @State private var name = ""
@@ -119,7 +120,14 @@ struct LoginView: View {
 
                     modelContext.insert(playlist)
                     isLoading = false
-                    dismiss()
+                    // Only dismiss when presented (e.g. the Settings sheet). On
+                    // first run LoginView is the window's root content, where
+                    // dismiss() would close the window on macOS and leave the app
+                    // with no visible window. Inserting the playlist already swaps
+                    // the root over to MainTabView via ContentView's @Query.
+                    if isPresented {
+                        dismiss()
+                    }
                 }
             } catch {
                 await MainActor.run {
