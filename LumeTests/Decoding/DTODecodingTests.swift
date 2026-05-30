@@ -96,6 +96,26 @@ struct DTODecodingTests {
         #expect(withIntTmdb != nil)
     }
 
+    @Test func movieTmdbIdFallbackKey() throws {
+        // Playlist variant that uses "tmdb_id" (Int) instead of "tmdb".
+        let json = """
+        [{
+            "num": 1,
+            "name": "Mob Land",
+            "stream_type": "movie",
+            "stream_id": 389912,
+            "tmdb_id": 979275,
+            "rating": "6",
+            "rating_5based": 3,
+            "category_id": "126",
+            "container_extension": "mkv"
+        }]
+        """.data(using: .utf8)!
+        let movies = try JSONDecoder().decode([XtreamVODStream].self, from: json)
+        let first = try #require(movies.first)
+        #expect(first.tmdb == "979275")
+    }
+
     // MARK: - Movie Info
 
     @Test func decodeMovieInfo() async throws {
@@ -135,6 +155,24 @@ struct DTODecodingTests {
         #expect(sample.categoryId == "209")
         // tmdb comes as String
         #expect(sample.tmdb == "278113")
+    }
+
+    @Test func seriesTmdbIdFallbackKey() throws {
+        // Playlist variant that uses "tmdb_id" (Int) instead of "tmdb".
+        let json = """
+        [{
+            "num": 1,
+            "name": "Due spicci – Das nötige Kleingeld",
+            "series_id": 480899,
+            "tmdb_id": 304597,
+            "rating": "9",
+            "rating_5based": 4.5,
+            "category_id": "369"
+        }]
+        """.data(using: .utf8)!
+        let series = try JSONDecoder().decode([XtreamSeries].self, from: json)
+        let first = try #require(series.first)
+        #expect(first.tmdb == "304597")
     }
 
     @Test func seriesCategoryIdTypeCoercion() async throws {
