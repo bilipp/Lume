@@ -321,7 +321,21 @@ struct MovieDetailView: View {
 
 #Preview("With TMDB") {
     let container = previewContainer()
-    let movie = PreviewData.sampleMovieWithTMDB
+    let movie = PreviewData.sampleMovie
+    movie.plot = "A computer hacker learns about the true nature of reality."
+    movie.genre = "Action, Sci-Fi"
+    movie.releaseDate = "1999-03-31"
+    movie.durationSecs = 8160
+    movie.director = "Lana Wachowski, Lilly Wachowski"
+    movie.actors = "Keanu Reeves, Laurence Fishburne, Carrie-Anne Moss"
+    movie.youtubeTrailer = "d6j_wN1QO7s"
+    movie.backdropPath = "/fNG7i7RqM1T0sP1vQmRIqRnW.jpg"
+    movie.tagline = "Welcome to the Real World."
+    movie.contentRating = "R"
+    movie.tmdbId = 603
+    movie.tmdb = "603"
+    movie.tmdbEnrichedAt = Date().addingTimeInterval(-3600)
+    movie.isFavorite = true
     return NavigationStack {
         MovieDetailView(movie: movie)
     }
@@ -330,7 +344,17 @@ struct MovieDetailView: View {
 
 #Preview("Watched") {
     let container = previewContainer()
-    let movie = PreviewData.sampleMovieWatched
+    let movie = PreviewData.sampleMovie
+    movie.name = "Inception"
+    movie.streamId = 2
+    movie.plot = "A thief who steals corporate secrets through dream-sharing technology."
+    movie.genre = "Action, Sci-Fi, Thriller"
+    movie.releaseDate = "2010-07-16"
+    movie.durationSecs = 8880
+    movie.director = "Christopher Nolan"
+    movie.actors = "Leonardo DiCaprio, Joseph Gordon-Levitt, Elliot Page"
+    movie.isWatched = true
+    movie.watchProgress = 8880
     return NavigationStack {
         MovieDetailView(movie: movie)
     }
@@ -352,8 +376,11 @@ struct MovieDetailView: View {
 
 #Preview("Favorite") {
     let container = previewContainer()
-    let movie = PreviewData.sampleMovieWithTMDB
+    let movie = PreviewData.sampleMovie
     movie.isFavorite = true
+    movie.backdropPath = "/fNG7i7RqM1T0sP1vQmRIqRnW.jpg"
+    movie.tagline = "Welcome to the Real World."
+    movie.tmdbId = 603
     return NavigationStack {
         MovieDetailView(movie: movie)
     }

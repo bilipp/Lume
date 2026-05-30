@@ -494,7 +494,14 @@ private struct EpisodeCard: View {
 
 #Preview("With TMDB + Episodes") {
     let container = previewContainer()
-    let series = PreviewData.sampleSeriesWithTMDB
+    let series = PreviewData.sampleSeries
+    series.backdropPath = "/abc123backdrop.jpg"
+    series.tagline = "I am the one who knocks."
+    series.contentRating = "TV-MA"
+    series.tmdbId = 1396
+    series.tmdb = "1396"
+    series.tmdbEnrichedAt = Date().addingTimeInterval(-3600)
+    series.isFavorite = true
     return NavigationStack {
         SeriesDetailView(series: series)
     }
@@ -503,7 +510,7 @@ private struct EpisodeCard: View {
 
 #Preview("No Episodes") {
     let container = previewContainer()
-    let series = PreviewData.sampleSeriesWithoutEpisodes
+    let series = PreviewData.sampleSeries
     return NavigationStack {
         SeriesDetailView(series: series)
     }
@@ -524,7 +531,11 @@ private struct EpisodeCard: View {
 
 #Preview("Favorite") {
     let container = previewContainer()
-    let series = PreviewData.sampleSeriesWithTMDB
+    let series = PreviewData.sampleSeries
+    series.backdropPath = "/abc123backdrop.jpg"
+    series.tagline = "I am the one who knocks."
+    series.tmdbId = 1396
+    series.isFavorite = true
     return NavigationStack {
         SeriesDetailView(series: series)
     }
