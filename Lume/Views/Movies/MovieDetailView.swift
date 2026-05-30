@@ -2,11 +2,20 @@
 //  MovieDetailView.swift
 //  Lume
 //
-//  Detailed view for a movie with metadata and actions
+//  Apple TV-style movie detail screen: a full-bleed backdrop hero, a metadata
+//  line, a prominent Play button, secondary actions, an expandable synopsis,
+//  a cast row with photos and a "You May Also Like" strip. TMDB enrichment is
+//  fetched lazily on appear and persisted, so revisits are instant.
 //
 
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 struct MovieDetailView: View {
     let movie: Movie
@@ -19,201 +28,72 @@ struct MovieDetailView: View {
     @Query private var playlists: [Playlist]
 
     @State private var playingMedia: PlayableMedia?
+    @State private var similar: [HomeMediaItem] = []
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header with poster
-                HStack(alignment: .top, spacing: 20) {
-                    // Poster
-                    AsyncImage(url: URL(string: movie.streamIcon ?? "")) { phase in
-                        switch phase {
-                        case .empty:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .overlay {
-                                    ProgressView()
-                                }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .overlay {
-                                    Image(systemName: "film")
-                                        .foregroundStyle(.secondary)
-                                        .font(.system(size: 40))
-                                }
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                    .frame(width: 150, height: 225)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(radius: 4)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Title
-                        Text(movie.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-
-                        // Year and Duration
-                        if let releaseDate = movie.releaseDate {
-                            Text(releaseDate)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if let duration = movie.durationSecs {
-                            Text(formatDuration(duration))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        // Rating
-                        if movie.rating > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(.yellow)
-                                Text(String(format: "%.1f", movie.rating))
-                                    .fontWeight(.semibold)
-                                Text("/ 10")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .font(.subheadline)
-                        }
-
-                        // Genre
-                        if let genre = movie.genre {
-                            Text(genre)
-                                .font(.caption)
-                                .foregroundStyle(.blue)
-                        }
-                    }
-                }
-                .padding()
-
-                // Play Button
-                Button {
-                    startPlayback()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "play.fill")
-                        Text(movie.watchProgress > 1 ? "Resume" : "Play")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-                .controlSize(.large)
-                .padding(.horizontal)
-                .disabled(playlists.first == nil)
-
-                // Action Buttons
-                HStack(spacing: 16) {
-                    ActionButton(
-                        icon: movie.isFavorite ? "heart.fill" : "heart",
-                        title: "Favorite",
-                        isActive: movie.isFavorite,
-                        action: { toggleFavorite() }
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: DetailMetrics.sectionSpacing) {
+                    DetailHero(
+                        title: movie.name,
+                        backdropURL: TMDBClient.backdropURL(movie.backdropPath),
+                        posterFallbackURL: URL(string: movie.streamIcon ?? ""),
+                        tagline: movie.tagline,
+                        metadata: metadata,
+                        height: DetailMetrics.heroHeight(for: proxy.size),
+                        fallbackSymbol: "film"
                     )
 
-                    ActionButton(
-                        icon: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle",
-                        title: "Watched",
-                        isActive: movie.isWatched,
-                        action: { toggleWatched() }
-                    )
+                    actions
+                        .padding(.horizontal, DetailMetrics.contentPadding)
 
-                    ActionButton(
-                        icon: "square.and.arrow.down",
-                        title: "Download",
-                        isActive: false,
-                        action: { /* TODO */ }
-                    )
-                }
-                .padding(.horizontal)
-
-                Divider()
-                    .padding(.horizontal)
-
-                // Description
-                if let plot = movie.plot, !plot.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Description")
-                            .font(.headline)
-                        Text(plot)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+                    if let plot = movie.plot, !plot.isEmpty {
+                        ExpandableText(text: plot)
+                            .padding(.horizontal, DetailMetrics.contentPadding)
                     }
-                    .padding(.horizontal)
-                }
 
-                // Cast and Crew
-                if let actors = movie.actors, !actors.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Cast")
-                            .font(.headline)
-                        Text(actors)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal)
-                }
-
-                if let director = movie.director, !director.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Director")
-                            .font(.headline)
-                        Text(director)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal)
-                }
-
-                // Trailer
-                if let trailer = movie.youtubeTrailer, !trailer.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Trailer")
-                            .font(.headline)
+                    if let trailer = movie.youtubeTrailer, !trailer.isEmpty {
                         Button {
-                            // Open YouTube trailer
-                            if let url = URL(string: "https://www.youtube.com/watch?v=\(trailer)") {
-                                #if os(iOS)
-                                UIApplication.shared.open(url)
-                                #endif
-                            }
+                            openTrailer(trailer)
                         } label: {
-                            HStack {
-                                Image(systemName: "play.rectangle.fill")
-                                Text("Watch Trailer")
-                            }
-                            .foregroundStyle(.red)
+                            Label("Watch Trailer", systemImage: "play.rectangle")
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.horizontal, DetailMetrics.contentPadding)
+                    }
+
+                    if !movie.orderedCast.isEmpty {
+                        section(title: "Cast") {
+                            CastRow(cast: movie.orderedCast)
                         }
                     }
-                    .padding(.horizontal)
+
+                    information
+                        .padding(.horizontal, DetailMetrics.contentPadding)
+
+                    if !similar.isEmpty {
+                        section(title: "You May Also Like") {
+                            SimilarRow(items: similar)
+                        }
+                    }
                 }
+                .padding(.bottom, 32)
             }
-            .padding(.vertical)
+            .scrollIndicators(.hidden)
+            .ignoresSafeArea(edges: .top)
         }
+        .background(backgroundColor)
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
+        .navigationBarBackButtonHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
         #endif
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    movie.isFavorite.toggle()
-                } label: {
-                    Image(systemName: movie.isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(movie.isFavorite ? .red : .primary)
-                }
-            }
+        .toolbar { toolbarContent }
+        .task(id: movie.id) {
+            await enrichIfNeeded()
+            resolveSimilar()
         }
+        .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
         #if os(iOS)
         .fullScreenCover(item: $playingMedia) { media in
             FullScreenPlayerView(media: media)
@@ -221,8 +101,176 @@ struct MovieDetailView: View {
         #endif
     }
 
+    // MARK: - Sections
+
+    @ViewBuilder
+    private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            DetailSectionHeader(title: title)
+                .padding(.horizontal, DetailMetrics.contentPadding)
+            content()
+        }
+    }
+
+    private var actions: some View {
+        PrimaryPlayButton(
+            title: movie.watchProgress > 1 ? "Resume" : "Play",
+            isEnabled: moviePlaylist != nil,
+            action: startPlayback
+        )
+    }
+
+    @ViewBuilder
+    private var information: some View {
+        let rows = informationRows
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                DetailSectionHeader(title: "Information")
+                ForEach(rows, id: \.label) { row in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(row.value)
+                            .font(.callout)
+                    }
+                }
+            }
+        }
+    }
+
+    private var informationRows: [(label: String, value: String)] {
+        var rows: [(String, String)] = []
+        if let director = movie.director, !director.isEmpty {
+            rows.append(("Director", director))
+        }
+        if let genre = movie.genre, !genre.isEmpty {
+            rows.append(("Genre", genre))
+        }
+        if let actors = movie.actors, !actors.isEmpty, movie.orderedCast.isEmpty {
+            rows.append(("Cast", actors))
+        }
+        return rows
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        #if os(iOS)
+        ToolbarItem(placement: .topBarLeading) {
+            GlassIconButton(systemImage: "chevron.left", accessibilityLabel: "Back") {
+                dismiss()
+            }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 10) {
+                GlassIconButton(
+                    systemImage: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle",
+                    accessibilityLabel: movie.isWatched ? "Mark as unwatched" : "Mark as watched"
+                ) { toggleWatched() }
+
+                GlassIconButton(
+                    systemImage: movie.isFavorite ? "heart.fill" : "heart",
+                    accessibilityLabel: movie.isFavorite ? "Remove from favorites" : "Add to favorites"
+                ) { toggleFavorite() }
+            }
+        }
+        #else
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                toggleWatched()
+            } label: {
+                Image(systemName: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
+            }
+            .help(movie.isWatched ? "Mark as Unwatched" : "Mark as Watched")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                toggleFavorite()
+            } label: {
+                Image(systemName: movie.isFavorite ? "heart.fill" : "heart")
+                    .foregroundStyle(movie.isFavorite ? .red : .primary)
+            }
+            .help(movie.isFavorite ? "Remove from Favorites" : "Add to Favorites")
+        }
+        #endif
+    }
+
+    // MARK: - Derived data
+
+    private var metadata: DetailMetadata {
+        DetailMetadata(
+            genre: movie.genre,
+            year: DetailFormat.year(from: movie.releaseDate),
+            duration: DetailFormat.duration(movie.durationSecs),
+            seasonInfo: nil,
+            rating: movie.rating > 0 ? movie.rating : nil,
+            contentRating: movie.contentRating
+        )
+    }
+
+    private var backgroundColor: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(uiColor: .systemBackground)
+        #endif
+    }
+
+    /// The playlist this movie actually belongs to (ids are `"<playlistUUID>-…"`),
+    /// so playback uses the correct credentials. Falls back to the first.
+    private var moviePlaylist: Playlist? {
+        playlists.first { movie.id.hasPrefix($0.id.uuidString) } ?? playlists.first
+    }
+
+    // MARK: - Enrichment
+
+    private func enrichIfNeeded() async {
+        guard let tmdbId = movie.tmdbId else { return }
+        // Skip if enriched recently; backdrop/cast/similar rarely change.
+        if let enrichedAt = movie.tmdbEnrichedAt,
+           Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600 {
+            return
+        }
+        let manager = ContentSyncManager(modelContainer: modelContext.container)
+        try? await manager.enrichMovie(id: movie.id, tmdbId: tmdbId)
+    }
+
+    private func resolveSimilar() {
+        let ids = movie.similarTMDBIds
+        guard !ids.isEmpty else { similar = []; return }
+
+        // Scope to the same playlist this movie belongs to.
+        let playlistPrefix = movie.id.components(separatedBy: "-movie-").first
+        func owned(_ id: String) -> Bool {
+            guard let prefix = playlistPrefix else { return true }
+            return id.hasPrefix(prefix)
+        }
+
+        var resolved: [HomeMediaItem] = []
+        for tmdbId in ids {
+            let movieMatches = (try? modelContext.fetch(
+                FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
+            )) ?? []
+            if let match = movieMatches.first(where: { owned($0.id) && $0.id != movie.id }) {
+                resolved.append(.movie(match))
+                continue
+            }
+            let seriesMatches = (try? modelContext.fetch(
+                FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
+            )) ?? []
+            if let match = seriesMatches.first(where: { owned($0.id) }) {
+                resolved.append(.series(match))
+            }
+        }
+        similar = Array(resolved.prefix(12))
+    }
+
+    // MARK: - Actions
+
     private func startPlayback() {
-        guard let playlist = playlists.first,
+        guard let playlist = moviePlaylist,
               let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
         #if os(macOS)
         openWindow(id: "player", value: media)
@@ -231,18 +279,18 @@ struct MovieDetailView: View {
         #endif
     }
 
-    private func formatDuration(_ seconds: Int) -> String {
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        } else {
-            return "\(minutes)m"
-        }
+    private func openTrailer(_ trailer: String) {
+        guard let url = URL(string: "https://www.youtube.com/watch?v=\(trailer)") else { return }
+        #if os(iOS)
+        UIApplication.shared.open(url)
+        #elseif os(macOS)
+        NSWorkspace.shared.open(url)
+        #endif
     }
 
     private func toggleFavorite() {
         movie.isFavorite.toggle()
+        movie.addedToWatchlistDate = movie.isFavorite ? Date() : nil
     }
 
     private func toggleWatched() {
@@ -250,30 +298,6 @@ struct MovieDetailView: View {
         if movie.isWatched {
             movie.watchProgress = Double(movie.durationSecs ?? 0)
         }
-    }
-}
-
-// MARK: - Action Button
-
-struct ActionButton: View {
-    let icon: String
-    let title: String
-    let isActive: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title2)
-                Text(title)
-                    .font(.caption)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-        }
-        .buttonStyle(.bordered)
-        .tint(isActive ? .blue : nil)
     }
 }
 

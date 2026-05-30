@@ -2,16 +2,25 @@
 //  SeriesDetailView.swift
 //  Lume
 //
-//  Detailed view for a series with season/episode selection
+//  Apple TV-style series detail screen. Shares the hero / metadata / cast /
+//  similar layout with MovieDetailView, adding a season picker and redesigned
+//  episode cards. TMDB enrichment and episodes are loaded lazily on appear.
 //
 
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 struct SeriesDetailView: View {
     let series: Series
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -20,211 +29,65 @@ struct SeriesDetailView: View {
     @State private var selectedSeason: Int = 1
     @State private var isLoadingEpisodes = false
     @State private var playingMedia: PlayableMedia?
+    @State private var similar: [HomeMediaItem] = []
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header with cover
-                HStack(alignment: .top, spacing: 20) {
-                    // Cover
-                    AsyncImage(url: URL(string: series.cover ?? "")) { phase in
-                        switch phase {
-                        case .empty:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .overlay {
-                                    ProgressView()
-                                }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .overlay {
-                                    Image(systemName: "tv")
-                                        .foregroundStyle(.secondary)
-                                        .font(.system(size: 40))
-                                }
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                    .frame(width: 150, height: 225)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(radius: 4)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Title
-                        Text(series.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-
-                        // Release Date
-                        if let releaseDate = series.releaseDate {
-                            Text(releaseDate)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        // Rating
-                        if let ratingString = series.rating, let rating = Double(ratingString), rating > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(.yellow)
-                                Text(String(format: "%.1f", rating))
-                                    .fontWeight(.semibold)
-                                Text("/ 10")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .font(.subheadline)
-                        }
-
-                        // Genre
-                        if let genre = series.genre {
-                            Text(genre)
-                                .font(.caption)
-                                .foregroundStyle(.blue)
-                        }
-                    }
-                }
-                .padding()
-
-                // Action Buttons
-                HStack(spacing: 16) {
-                    ActionButton(
-                        icon: series.isFavorite ? "heart.fill" : "heart",
-                        title: "Favorite",
-                        isActive: series.isFavorite,
-                        action: { toggleFavorite() }
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: DetailMetrics.sectionSpacing) {
+                    DetailHero(
+                        title: series.name,
+                        backdropURL: TMDBClient.backdropURL(series.backdropPath),
+                        posterFallbackURL: URL(string: series.cover ?? ""),
+                        tagline: series.tagline,
+                        metadata: metadata,
+                        height: DetailMetrics.heroHeight(for: proxy.size),
+                        fallbackSymbol: "tv"
                     )
 
-                    ActionButton(
-                        icon: "square.and.arrow.down",
-                        title: "Download",
-                        isActive: false,
-                        action: { /* TODO */ }
-                    )
-                }
-                .padding(.horizontal)
+                    actions
+                        .padding(.horizontal, DetailMetrics.contentPadding)
 
-                Divider()
-                    .padding(.horizontal)
-
-                // Description
-                if let plot = series.plot, !plot.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Description")
-                            .font(.headline)
-                        Text(plot)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+                    if let plot = series.plot, !plot.isEmpty {
+                        ExpandableText(text: plot)
+                            .padding(.horizontal, DetailMetrics.contentPadding)
                     }
-                    .padding(.horizontal)
-                }
 
-                // Cast and Crew
-                if let cast = series.cast, !cast.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Cast")
-                            .font(.headline)
-                        Text(cast)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal)
-                }
+                    episodesSection
 
-                if let director = series.director, !director.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Director")
-                            .font(.headline)
-                        Text(director)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal)
-                }
-
-                Divider()
-                    .padding(.horizontal)
-
-                // Episodes Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Episodes")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    // Season Picker
-                    if !availableSeasons.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(availableSeasons, id: \.self) { season in
-                                    seasonButton(for: season)
-                                }
-                            }
-                            .padding(.horizontal)
+                    if !series.orderedCast.isEmpty {
+                        section(title: "Cast") {
+                            CastRow(cast: series.orderedCast)
                         }
                     }
 
-                    // Episodes List
-                    if series.episodes.isEmpty {
-                        VStack(spacing: 16) {
-                            if isLoadingEpisodes {
-                                ProgressView()
-                                Text("Loading episodes…")
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text("No episodes available")
-                                    .foregroundStyle(.secondary)
+                    information
+                        .padding(.horizontal, DetailMetrics.contentPadding)
 
-                                Button {
-                                    loadEpisodes()
-                                } label: {
-                                    Text("Retry")
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                    } else {
-                        LazyVStack(spacing: 0) {
-                            ForEach(seasonEpisodes) { episode in
-                                EpisodeRow(episode: episode) {
-                                    playEpisode(episode)
-                                }
-
-                                if episode.id != seasonEpisodes.last?.id {
-                                    Divider()
-                                        .padding(.leading, 100)
-                                }
-                            }
+                    if !similar.isEmpty {
+                        section(title: "You May Also Like") {
+                            SimilarRow(items: similar)
                         }
                     }
                 }
+                .padding(.bottom, 32)
             }
-            .padding(.vertical)
+            .scrollIndicators(.hidden)
+            .ignoresSafeArea(edges: .top)
         }
+        .background(backgroundColor)
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
+        .navigationBarBackButtonHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
         #endif
-        .task {
-            if series.episodes.isEmpty && !isLoadingEpisodes {
-                loadEpisodes()
-            }
+        .toolbar { toolbarContent }
+        .task(id: series.id) {
+            await loadEpisodesIfNeeded()
+            await enrichIfNeeded()
+            resolveSimilar()
         }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    series.isFavorite.toggle()
-                } label: {
-                    Image(systemName: series.isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(series.isFavorite ? .red : .primary)
-                }
-            }
-        }
+        .onChange(of: series.similarTMDBIds) { resolveSimilar() }
         #if os(iOS)
         .fullScreenCover(item: $playingMedia) { media in
             FullScreenPlayerView(media: media)
@@ -232,19 +95,179 @@ struct SeriesDetailView: View {
         #endif
     }
 
-    private func playEpisode(_ episode: Episode) {
-        guard let playlist = playlists.first,
-              let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
-        #if os(macOS)
-        openWindow(id: "player", value: media)
+    // MARK: - Sections
+
+    @ViewBuilder
+    private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            DetailSectionHeader(title: title)
+                .padding(.horizontal, DetailMetrics.contentPadding)
+            content()
+        }
+    }
+
+    private var actions: some View {
+        PrimaryPlayButton(
+            title: playTitle,
+            isEnabled: nextEpisode != nil && seriesPlaylist != nil,
+            action: { if let episode = nextEpisode { playEpisode(episode) } }
+        )
+    }
+
+    @ViewBuilder
+    private var episodesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                DetailSectionHeader(title: "Episodes")
+                Spacer()
+                if availableSeasons.count > 1 {
+                    seasonMenu
+                }
+            }
+            .padding(.horizontal, DetailMetrics.contentPadding)
+
+            if series.episodes.isEmpty {
+                episodesPlaceholder
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            } else {
+                LazyVStack(spacing: 16) {
+                    ForEach(seasonEpisodes) { episode in
+                        EpisodeCard(episode: episode) { playEpisode(episode) }
+                    }
+                }
+                .padding(.horizontal, DetailMetrics.contentPadding)
+            }
+        }
+    }
+
+    private var seasonMenu: some View {
+        Menu {
+            ForEach(availableSeasons, id: \.self) { season in
+                Button {
+                    selectedSeason = season
+                } label: {
+                    if season == selectedSeason {
+                        Label("Season \(season)", systemImage: "checkmark")
+                    } else {
+                        Text("Season \(season)")
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text("Season \(selectedSeason)")
+                    .font(.subheadline.weight(.semibold))
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.quaternary, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var episodesPlaceholder: some View {
+        if isLoadingEpisodes {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Loading episodes…").foregroundStyle(.secondary)
+            }
+        } else {
+            VStack(spacing: 12) {
+                Text("No episodes available").foregroundStyle(.secondary)
+                Button("Retry") {
+                    Task { await loadEpisodes() }
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var information: some View {
+        let rows = informationRows
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                DetailSectionHeader(title: "Information")
+                ForEach(rows, id: \.label) { row in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(row.value)
+                            .font(.callout)
+                    }
+                }
+            }
+        }
+    }
+
+    private var informationRows: [(label: String, value: String)] {
+        var rows: [(String, String)] = []
+        if let director = series.director, !director.isEmpty {
+            rows.append(("Director", director))
+        }
+        if let genre = series.genre, !genre.isEmpty {
+            rows.append(("Genre", genre))
+        }
+        if let cast = series.cast, !cast.isEmpty, series.orderedCast.isEmpty {
+            rows.append(("Cast", cast))
+        }
+        return rows
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        #if os(iOS)
+        ToolbarItem(placement: .topBarLeading) {
+            GlassIconButton(systemImage: "chevron.left", accessibilityLabel: "Back") {
+                dismiss()
+            }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            GlassIconButton(
+                systemImage: series.isFavorite ? "heart.fill" : "heart",
+                accessibilityLabel: series.isFavorite ? "Remove from favorites" : "Add to favorites"
+            ) { toggleFavorite() }
+        }
         #else
-        playingMedia = media
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                toggleFavorite()
+            } label: {
+                Image(systemName: series.isFavorite ? "heart.fill" : "heart")
+                    .foregroundStyle(series.isFavorite ? .red : .primary)
+            }
+            .help(series.isFavorite ? "Remove from Favorites" : "Add to Favorites")
+        }
         #endif
     }
 
+    // MARK: - Derived data
+
+    private var metadata: DetailMetadata {
+        let ratingValue = series.rating.flatMap(Double.init)
+        return DetailMetadata(
+            genre: series.genre,
+            year: DetailFormat.year(from: series.releaseDate),
+            duration: nil,
+            seasonInfo: availableSeasons.isEmpty ? nil : seasonCountLabel,
+            rating: (ratingValue ?? 0) > 0 ? ratingValue : nil,
+            contentRating: series.contentRating
+        )
+    }
+
+    private var seasonCountLabel: String {
+        availableSeasons.count == 1 ? "1 Season" : "\(availableSeasons.count) Seasons"
+    }
+
     private var availableSeasons: [Int] {
-        let seasons = Set(series.episodes.map { $0.seasonNum })
-        return seasons.sorted()
+        Set(series.episodes.map(\.seasonNum)).sorted()
     }
 
     private var seasonEpisodes: [Episode] {
@@ -253,153 +276,195 @@ struct SeriesDetailView: View {
             .sorted { $0.episodeNum < $1.episodeNum }
     }
 
+    /// The episode the Play button starts: the earliest partially-watched
+    /// episode, otherwise the first episode of the selected season.
+    private var nextEpisode: Episode? {
+        let inProgress = series.episodes
+            .filter { $0.watchProgress > 1 && !$0.isWatched }
+            .sorted { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
+            .first
+        return inProgress ?? seasonEpisodes.first ?? series.episodes.sorted {
+            ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum)
+        }.first
+    }
+
+    private var playTitle: String {
+        guard let episode = nextEpisode else { return "Play" }
+        let prefix = (episode.watchProgress > 1) ? "Resume" : "Play"
+        return "\(prefix) S\(episode.seasonNum) E\(episode.episodeNum)"
+    }
+
+    private var backgroundColor: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(uiColor: .systemBackground)
+        #endif
+    }
+
+    private var seriesPlaylist: Playlist? {
+        playlists.first { series.id.hasPrefix($0.id.uuidString) } ?? playlists.first
+    }
+
+    // MARK: - Loading & enrichment
+
+    private func loadEpisodesIfNeeded() async {
+        if series.episodes.isEmpty {
+            await loadEpisodes()
+        }
+        if !availableSeasons.contains(selectedSeason), let first = availableSeasons.first {
+            selectedSeason = first
+        }
+    }
+
+    private func loadEpisodes() async {
+        guard let playlist = seriesPlaylist, !isLoadingEpisodes else { return }
+        isLoadingEpisodes = true
+        defer { isLoadingEpisodes = false }
+        let manager = ContentSyncManager(modelContainer: modelContext.container)
+        try? await manager.syncEpisodes(for: series, playlist: playlist)
+        if !availableSeasons.contains(selectedSeason), let first = availableSeasons.first {
+            selectedSeason = first
+        }
+    }
+
+    private func enrichIfNeeded() async {
+        guard let tmdbId = series.tmdbId else { return }
+        if let enrichedAt = series.tmdbEnrichedAt,
+           Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600 {
+            return
+        }
+        let manager = ContentSyncManager(modelContainer: modelContext.container)
+        try? await manager.enrichSeries(id: series.id, tmdbId: tmdbId)
+    }
+
+    private func resolveSimilar() {
+        let ids = series.similarTMDBIds
+        guard !ids.isEmpty else { similar = []; return }
+
+        let playlistPrefix = series.id.components(separatedBy: "-series-").first
+        func owned(_ id: String) -> Bool {
+            guard let prefix = playlistPrefix else { return true }
+            return id.hasPrefix(prefix)
+        }
+
+        var resolved: [HomeMediaItem] = []
+        for tmdbId in ids {
+            let seriesMatches = (try? modelContext.fetch(
+                FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
+            )) ?? []
+            if let match = seriesMatches.first(where: { owned($0.id) && $0.id != series.id }) {
+                resolved.append(.series(match))
+                continue
+            }
+            let movieMatches = (try? modelContext.fetch(
+                FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
+            )) ?? []
+            if let match = movieMatches.first(where: { owned($0.id) }) {
+                resolved.append(.movie(match))
+            }
+        }
+        similar = Array(resolved.prefix(12))
+    }
+
+    // MARK: - Actions
+
+    private func playEpisode(_ episode: Episode) {
+        guard let playlist = seriesPlaylist,
+              let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
+        #if os(macOS)
+        openWindow(id: "player", value: media)
+        #else
+        playingMedia = media
+        #endif
+    }
+
     private func toggleFavorite() {
         series.isFavorite.toggle()
-    }
-
-    @ViewBuilder
-    private func seasonButton(for season: Int) -> some View {
-        if season == selectedSeason {
-            Button {
-                selectedSeason = season
-            } label: {
-                Text("Season \(season)")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.blue)
-            .controlSize(.small)
-        } else {
-            Button {
-                selectedSeason = season
-            } label: {
-                Text("Season \(season)")
-                    .font(.subheadline)
-                    .fontWeight(.regular)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-    }
-
-    private func loadEpisodes() {
-        guard let playlist = playlists.first else { return }
-
-        isLoadingEpisodes = true
-
-        Task {
-            do {
-                let syncManager = ContentSyncManager(modelContainer: modelContext.container)
-                try await syncManager.syncEpisodes(for: series, playlist: playlist)
-
-                await MainActor.run {
-                    isLoadingEpisodes = false
-                }
-            } catch {
-                await MainActor.run {
-                    isLoadingEpisodes = false
-                }
-            }
-        }
+        series.addedToWatchlistDate = series.isFavorite ? Date() : nil
     }
 }
 
-// MARK: - Episode Row
+// MARK: - Episode card
 
-struct EpisodeRow: View {
+/// A wide episode row: 16:9 still on the left, title / runtime / synopsis on the
+/// right, a resume progress bar and a play affordance.
+private struct EpisodeCard: View {
     let episode: Episode
     let onPlay: () -> Void
 
     var body: some View {
         Button(action: onPlay) {
-            HStack(spacing: 12) {
-                // Episode thumbnail
-                if let imageURL = episode.movieImage {
-                    AsyncImage(url: URL(string: imageURL)) { phase in
-                        switch phase {
-                        case .empty:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .overlay {
-                                    ProgressView()
-                                }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .overlay {
-                                    Image(systemName: "tv")
-                                        .foregroundStyle(.secondary)
-                                }
-                        @unknown default:
-                            EmptyView()
-                        }
+            HStack(alignment: .top, spacing: 14) {
+                thumbnail
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("E\(episode.episodeNum)" + (episode.title.isEmpty ? "" : " · \(episode.title)"))
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+
+                    if let minutes = DetailFormat.minutes(episode.durationSecs) {
+                        Text(minutes)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .frame(width: 120, height: 68)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 120, height: 68)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    if let plot = episode.plot, !plot.isEmpty {
+                        Text(plot)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+
+                    if let progress = resumeFraction {
+                        ProgressView(value: progress)
+                            .progressViewStyle(.linear)
+                            .tint(.accentColor)
+                            .padding(.top, 2)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var thumbnail: some View {
+        ZStack {
+            AsyncImage(url: URL(string: episode.movieImage ?? "")) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                case .empty where episode.movieImage != nil:
+                    Rectangle().fill(Color.gray.opacity(0.25)).overlay { ProgressView() }
+                default:
+                    Rectangle().fill(Color.gray.opacity(0.25))
                         .overlay {
                             Text("E\(episode.episodeNum)")
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
                         }
                 }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("E\(episode.episodeNum): \(episode.title)")
-                        .font(.headline)
-                        .lineLimit(2)
-
-                    if let duration = episode.durationSecs {
-                        Text(formatDuration(duration))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // Progress bar
-                    if episode.watchProgress > 0 {
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(height: 3)
-
-                                if let duration = episode.durationSecs, duration > 0 {
-                                    Rectangle()
-                                        .fill(Color.blue)
-                                        .frame(
-                                            width: geometry.size.width * (episode.watchProgress / Double(duration)),
-                                            height: 3
-                                        )
-                                }
-                            }
-                        }
-                        .frame(height: 3)
-                    }
-                }
-
-                Spacer()
-
-                Image(systemName: "play.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.blue)
             }
-            .padding()
+            .frame(width: 142, height: 80)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            Image(systemName: "play.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.white)
+                .shadow(radius: 4)
+                .opacity(0.9)
         }
-        .buttonStyle(.plain)
     }
 
-    private func formatDuration(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        return "\(minutes)m"
+    private var resumeFraction: Double? {
+        guard episode.watchProgress > 0,
+              let duration = episode.durationSecs, duration > 0,
+              !episode.isWatched else { return nil }
+        return min(episode.watchProgress / Double(duration), 1)
     }
 }
 

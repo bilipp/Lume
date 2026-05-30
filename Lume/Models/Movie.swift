@@ -23,6 +23,19 @@ final class Movie {
     var durationSecs: Int?
     var youtubeTrailer: String?
 
+    // MARK: TMDB enrichment (lazy-fetched on the detail screen)
+    /// Wide landscape artwork path used for the detail hero (e.g. `/abc.jpg`).
+    var backdropPath: String?
+    var tagline: String?
+    /// Localized content rating (e.g. "PG-13", "16").
+    var contentRating: String?
+    /// When the title was last enriched from TMDB; nil means never.
+    var tmdbEnrichedAt: Date?
+    /// TMDB ids of similar titles, in TMDB's order, for "You May Also Like".
+    var similarTMDBIds: [Int] = []
+    @Relationship(deleteRule: .cascade, inverse: \CastMember.movie)
+    var castMembers: [CastMember] = []
+
     var categoryId: String?
 
     var isFavorite: Bool = false
@@ -76,6 +89,11 @@ enum DownloadStatus: String, Codable {
 }
 
 extension Movie {
+    /// Cast in TMDB billing order (top-billed first).
+    var orderedCast: [CastMember] {
+        castMembers.sorted { $0.order < $1.order }
+    }
+
     var downloadStatus: DownloadStatus? {
         get {
             guard let raw = downloadStatusRaw else { return nil }

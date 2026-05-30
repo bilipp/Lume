@@ -85,6 +85,31 @@ struct TMDBClient {
         return URL(string: imageBaseURL + size + path)
     }
 
+    /// Builds a full cast-profile image URL from a TMDB relative path.
+    static func profileURL(_ path: String?, size: String = "w185") -> URL? {
+        guard let path, !path.isEmpty else { return nil }
+        return URL(string: imageBaseURL + size + path)
+    }
+
+    // MARK: - Title details
+
+    /// Full detail payload for a movie, with credits, similar titles and the
+    /// US content rating folded in via `append_to_response`.
+    func movieDetails(_ id: Int) async throws -> TMDBTitleDetails {
+        let response: TitleDetailsResponse = try await get(
+            "/movie/\(id)?append_to_response=credits,similar,release_dates"
+        )
+        return response.normalized(isMovie: true)
+    }
+
+    /// Full detail payload for a TV series.
+    func tvDetails(_ id: Int) async throws -> TMDBTitleDetails {
+        let response: TitleDetailsResponse = try await get(
+            "/tv/\(id)?append_to_response=credits,similar,content_ratings"
+        )
+        return response.normalized(isMovie: false)
+    }
+
     // MARK: - Networking
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
@@ -122,6 +147,30 @@ struct TrendingTitle: Sendable, Identifiable, Hashable {
     let backdropPath: String?
 }
 
+/// Normalized TMDB detail payload shared by movies and series. Empty/absent
+/// fields are represented as nil / empty arrays so callers can fill gaps in
+/// provider metadata without special-casing the media type.
+struct TMDBTitleDetails: Sendable {
+    var backdropPath: String?
+    var tagline: String?
+    var overview: String?
+    var voteAverage: Double?
+    var runtimeMinutes: Int?
+    var genreNames: [String]
+    var contentRating: String?
+    var cast: [TMDBCastMember]
+    var similarIDs: [Int]
+}
+
+/// One billed performer from TMDB credits.
+struct TMDBCastMember: Sendable, Hashable {
+    let tmdbPersonId: Int
+    let name: String
+    let character: String?
+    let profilePath: String?
+    let order: Int
+}
+
 // MARK: - DTOs
 
 private struct TrendingResponse: Decodable {
@@ -138,4 +187,116 @@ private struct TrendingResponse: Decodable {
         }
     }
     let results: [Item]
+}
+
+/// Decodes `/movie/{id}` and `/tv/{id}` responses (with `credits`, `similar`
+/// and certifications appended). Every field is optional so a single shape
+/// works for both endpoints.
+private struct TitleDetailsResponse: Decodable {
+    let backdropPath: String?
+    let tagline: String?
+    let overview: String?
+    let voteAverage: Double?
+    let runtime: Int?               // movies
+    let episodeRunTime: [Int]?      // tv
+    let genres: [Genre]?
+    let credits: Credits?
+    let similar: Similar?
+    let releaseDates: Results<ReleaseDatesEntry>?   // movies
+    let contentRatings: Results<ContentRatingEntry>? // tv
+
+    struct Genre: Decodable { let name: String }
+    struct Credits: Decodable { let cast: [Cast]? }
+    struct Cast: Decodable {
+        let id: Int
+        let name: String
+        let character: String?
+        let profilePath: String?
+        let order: Int?
+        enum CodingKeys: String, CodingKey {
+            case id, name, character, order
+            case profilePath = "profile_path"
+        }
+    }
+    struct Similar: Decodable {
+        struct Item: Decodable { let id: Int }
+        let results: [Item]
+    }
+    struct Results<Entry: Decodable>: Decodable { let results: [Entry] }
+    struct ReleaseDatesEntry: Decodable {
+        let iso3166_1: String
+        let releaseDates: [ReleaseDate]
+        struct ReleaseDate: Decodable { let certification: String? }
+        enum CodingKeys: String, CodingKey {
+            case iso3166_1 = "iso_3166_1"
+            case releaseDates = "release_dates"
+        }
+    }
+    struct ContentRatingEntry: Decodable {
+        let iso3166_1: String
+        let rating: String?
+        enum CodingKeys: String, CodingKey {
+            case iso3166_1 = "iso_3166_1"
+            case rating
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case tagline, overview, runtime, genres, credits, similar
+        case backdropPath = "backdrop_path"
+        case voteAverage = "vote_average"
+        case episodeRunTime = "episode_run_time"
+        case releaseDates = "release_dates"
+        case contentRatings = "content_ratings"
+    }
+
+    func normalized(isMovie: Bool) -> TMDBTitleDetails {
+        let cast = (credits?.cast ?? [])
+            .sorted { ($0.order ?? .max) < ($1.order ?? .max) }
+            .prefix(20)
+            .map {
+                TMDBCastMember(
+                    tmdbPersonId: $0.id,
+                    name: $0.name,
+                    character: $0.character?.isEmpty == true ? nil : $0.character,
+                    profilePath: $0.profilePath,
+                    order: $0.order ?? 0
+                )
+            }
+
+        return TMDBTitleDetails(
+            backdropPath: backdropPath,
+            tagline: (tagline?.isEmpty == true) ? nil : tagline,
+            overview: (overview?.isEmpty == true) ? nil : overview,
+            voteAverage: voteAverage,
+            runtimeMinutes: isMovie ? runtime : episodeRunTime?.first,
+            genreNames: genres?.map(\.name) ?? [],
+            contentRating: isMovie ? movieCertification() : tvRating(),
+            cast: Array(cast),
+            similarIDs: similar?.results.map(\.id) ?? []
+        )
+    }
+
+    /// Picks a US certification, falling back to the first non-empty one.
+    private func movieCertification() -> String? {
+        let entries = releaseDates?.results ?? []
+        func cert(for code: String) -> String? {
+            entries.first { $0.iso3166_1 == code }?
+                .releaseDates.compactMap { $0.certification }
+                .first { !$0.isEmpty }
+        }
+        if let us = cert(for: "US") { return us }
+        for entry in entries {
+            if let c = entry.releaseDates.compactMap({ $0.certification }).first(where: { !$0.isEmpty }) {
+                return c
+            }
+        }
+        return nil
+    }
+
+    private func tvRating() -> String? {
+        let entries = contentRatings?.results ?? []
+        if let us = entries.first(where: { $0.iso3166_1 == "US" })?.rating, !us.isEmpty { return us }
+        return entries.compactMap { $0.rating }.first { !$0.isEmpty }
+    }
 }
