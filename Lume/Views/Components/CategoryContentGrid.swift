@@ -18,6 +18,7 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
     let emptyTitle: String
     let emptyIcon: String
     let emptyDescription: String
+    @Binding var sortRaw: String
     @ViewBuilder let card: (Item) -> Card
 
     private let columns = [GridItem(.adaptive(minimum: 100), spacing: 16)]
@@ -45,6 +46,11 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
             }
         }
         .navigationTitle(title)
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                ContentSortMenu(sortRaw: $sortRaw)
+            }
+        }
     }
 }
 
@@ -100,17 +106,15 @@ struct CategoryPreviewRow<Item: Identifiable & Hashable, Card: View>: View {
 
 struct MovieCategoryView: View {
     let category: Category
-    @Query private var movies: [Movie]
     var animationNamespace: Namespace.ID?
+    @Environment(\.modelContext) private var modelContext
 
-    init(category: Category, sort: ContentSortOption, animationNamespace: Namespace.ID? = nil) {
-        self.category = category
-        self.animationNamespace = animationNamespace
-        let categoryId = category.id
-        _movies = Query(
-            filter: #Predicate<Movie> { $0.categoryId == categoryId },
-            sort: sort.movieDescriptors
-        )
+    @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+
+    @State private var movies: [Movie] = []
+
+    private var contentSort: ContentSortOption {
+        ContentSortOption(rawValue: contentSortRaw) ?? .playlist
     }
 
     var body: some View {
@@ -121,8 +125,17 @@ struct MovieCategoryView: View {
             emptyTitle: "No Movies",
             emptyIcon: "film.stack",
             emptyDescription: "This category has no movies",
+            sortRaw: $contentSortRaw,
             card: { MovieCardView(movie: $0) }
         )
+        .task(id: contentSortRaw) {
+            let categoryId = category.id
+            var descriptor = FetchDescriptor<Movie>(
+                predicate: #Predicate { $0.categoryId == categoryId },
+                sortBy: contentSort.movieDescriptors
+            )
+            movies = (try? modelContext.fetch(descriptor)) ?? []
+        }
     }
 }
 
@@ -160,17 +173,15 @@ struct MovieCategoryPreview: View {
 
 struct SeriesCategoryView: View {
     let category: Category
-    @Query private var series: [Series]
     var animationNamespace: Namespace.ID?
+    @Environment(\.modelContext) private var modelContext
 
-    init(category: Category, sort: ContentSortOption, animationNamespace: Namespace.ID? = nil) {
-        self.category = category
-        self.animationNamespace = animationNamespace
-        let categoryId = category.id
-        _series = Query(
-            filter: #Predicate<Series> { $0.categoryId == categoryId },
-            sort: sort.seriesDescriptors
-        )
+    @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+
+    @State private var series: [Series] = []
+
+    private var contentSort: ContentSortOption {
+        ContentSortOption(rawValue: contentSortRaw) ?? .playlist
     }
 
     var body: some View {
@@ -181,8 +192,17 @@ struct SeriesCategoryView: View {
             emptyTitle: "No Series",
             emptyIcon: "tv.fill",
             emptyDescription: "This category has no series",
+            sortRaw: $contentSortRaw,
             card: { SeriesCardView(series: $0) }
         )
+        .task(id: contentSortRaw) {
+            let categoryId = category.id
+            var descriptor = FetchDescriptor<Series>(
+                predicate: #Predicate { $0.categoryId == categoryId },
+                sortBy: contentSort.seriesDescriptors
+            )
+            series = (try? modelContext.fetch(descriptor)) ?? []
+        }
     }
 }
 
@@ -223,7 +243,7 @@ struct SeriesCategoryPreview: View {
     let categories = try! container.mainContext.fetch(FetchDescriptor<Category>())
     let category = categories.first { $0.typeRaw == "vod" } ?? categories[0]
     return NavigationStack {
-        MovieCategoryView(category: category, sort: .playlist, animationNamespace: nil)
+        MovieCategoryView(category: category, animationNamespace: nil)
     }
     .modelContainer(container)
 }
@@ -232,7 +252,7 @@ struct SeriesCategoryPreview: View {
     let container = previewContainer()
     let emptyCategory = Category(apiId: "999", name: "Empty Category", parentId: 0, type: .vod, playlist: PreviewData.samplePlaylist)
     return NavigationStack {
-        MovieCategoryView(category: emptyCategory, sort: .playlist, animationNamespace: nil)
+        MovieCategoryView(category: emptyCategory, animationNamespace: nil)
     }
     .modelContainer(container)
 }
@@ -242,7 +262,7 @@ struct SeriesCategoryPreview: View {
     let categories = try! container.mainContext.fetch(FetchDescriptor<Category>())
     let category = categories.first { $0.typeRaw == "series" } ?? categories[0]
     return NavigationStack {
-        SeriesCategoryView(category: category, sort: .playlist, animationNamespace: nil)
+        SeriesCategoryView(category: category, animationNamespace: nil)
     }
     .modelContainer(container)
 }
@@ -251,7 +271,7 @@ struct SeriesCategoryPreview: View {
     let container = previewContainer()
     let emptyCategory = Category(apiId: "998", name: "Empty Series", parentId: 0, type: .series, playlist: PreviewData.samplePlaylist)
     return NavigationStack {
-        SeriesCategoryView(category: emptyCategory, sort: .playlist, animationNamespace: nil)
+        SeriesCategoryView(category: emptyCategory, animationNamespace: nil)
     }
     .modelContainer(container)
 }

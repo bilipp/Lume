@@ -84,7 +84,7 @@ struct SeriesView: View {
                 activePlaylist: activePlaylist
             )
             .navigationDestination(for: Category.self) { category in
-                SeriesCategoryView(category: category, sort: contentSort, animationNamespace: animationNamespace)
+                SeriesCategoryView(category: category, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: Series.self) { series in
                 SeriesDetailView(series: series, animationNamespace: animationNamespace)

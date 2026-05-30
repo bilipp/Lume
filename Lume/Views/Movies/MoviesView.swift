@@ -86,7 +86,7 @@ struct MoviesView: View {
                 activePlaylist: activePlaylist
             )
             .navigationDestination(for: Category.self) { category in
-                MovieCategoryView(category: category, sort: contentSort, animationNamespace: animationNamespace)
+                MovieCategoryView(category: category, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
