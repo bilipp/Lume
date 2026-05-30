@@ -70,6 +70,7 @@ struct SeriesDetailView: View {
                         }
                     }
                 }
+                .frame(width: proxy.size.width, alignment: .leading)
                 .padding(.bottom, 32)
             }
             .scrollIndicators(.hidden)

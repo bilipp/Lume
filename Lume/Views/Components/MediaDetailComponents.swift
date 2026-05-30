@@ -94,6 +94,7 @@ struct DetailHero: View {
                     .lineLimit(3)
                     .minimumScaleFactor(0.7)
                     .shadow(radius: 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let tagline, !tagline.isEmpty {
                     Text(tagline)
@@ -101,15 +102,17 @@ struct DetailHero: View {
                         .foregroundStyle(.white.opacity(0.85))
                         .lineLimit(2)
                         .shadow(radius: 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 MetadataLineView(metadata: metadata, tint: .white.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .shadow(radius: 4)
             }
-            .frame(maxWidth: 720, alignment: .leading)
             .padding(.horizontal, DetailMetrics.contentPadding)
             .padding(.bottom, 20)
         }
+        .frame(maxWidth: .infinity)
         .frame(height: height)
         .clipped()
     }
@@ -170,6 +173,7 @@ struct MetadataLineView: View {
             if !textPieces.isEmpty {
                 Text(textPieces.joined(separator: "  ·  "))
                     .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if let rating = metadata.rating, rating > 0 {
