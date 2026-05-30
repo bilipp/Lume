@@ -21,8 +21,8 @@ struct LiveTVView: View {
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @State private var selectedCategory: Category?
     @State private var showingSync = false
-    @State private var showingSearch = false
     @State private var playingMedia: PlayableMedia?
+    @State private var showingSettings = false
 
     @AppStorage(SortStorageKey.liveCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.liveContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
@@ -112,9 +112,9 @@ struct LiveTVView: View {
                         }
 
                         Button {
-                            showingSearch = true
+                            showingSettings = true
                         } label: {
-                            Image(systemName: "magnifyingglass")
+                            Image(systemName: "gear")
                         }
                     }
                 }
@@ -130,13 +130,13 @@ struct LiveTVView: View {
                 // playlist's first category so the channel list stays in sync.
                 selectedCategory = sortedCategories.first
             }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
             .sheet(isPresented: $showingSync) {
                 if let playlist = activePlaylist {
                     SyncProgressView(playlist: playlist, isPresented: $showingSync)
                 }
-            }
-            .sheet(isPresented: $showingSearch) {
-                SearchView()
             }
             #if os(iOS)
             .fullScreenCover(item: $playingMedia) { media in

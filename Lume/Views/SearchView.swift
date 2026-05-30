@@ -71,6 +71,7 @@ struct SearchView: View {
             }
             .navigationTitle("Search")
             .searchable(text: $searchText, prompt: "Movies, Series, Live TV...")
+            .searchToolbarBehavior(.minimize)
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
                     .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))

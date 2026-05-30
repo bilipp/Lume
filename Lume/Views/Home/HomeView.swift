@@ -41,7 +41,7 @@ struct HomeView: View {
     @State private var trendingState: LoadState = .idle
     @State private var playingMedia: PlayableMedia?
     @State private var showingSync = false
-    @State private var showingSearch = false
+    @State private var showingSettings = false
 
     init() {
         // Recently watched: non-nil lastWatchedDate, newest first.
@@ -152,20 +152,20 @@ struct HomeView: View {
                         }
 
                         Button {
-                            showingSearch = true
+                            showingSettings = true
                         } label: {
-                            Image(systemName: "magnifyingglass")
+                            Image(systemName: "gear")
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
             .sheet(isPresented: $showingSync) {
                 if let activePlaylist {
                     SyncProgressView(playlist: activePlaylist, isPresented: $showingSync)
                 }
-            }
-            .sheet(isPresented: $showingSearch) {
-                SearchView()
             }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
