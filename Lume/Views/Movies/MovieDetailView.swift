@@ -29,6 +29,7 @@ struct MovieDetailView: View {
 
     @State private var playingMedia: PlayableMedia?
     @State private var similar: [HomeMediaItem] = []
+    @State private var refreshToken: UUID = UUID()
 
     var body: some View {
         GeometryReader { proxy in
@@ -95,6 +96,7 @@ struct MovieDetailView: View {
             resolveSimilar()
         }
         .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
+        .onChange(of: refreshToken) { resolveSimilar() }
         #if os(iOS)
         .fullScreenCover(item: $playingMedia) { media in
             FullScreenPlayerView(media: media)
@@ -236,6 +238,12 @@ struct MovieDetailView: View {
         }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
         try? await manager.enrichMovie(id: movie.id, tmdbId: tmdbId)
+        // Force the view's context to pick up TMDB enrichment data written
+        // on the background context (backdrop, cast, tagline, etc.).
+        await MainActor.run {
+            modelContext.processPendingChanges()
+            refreshToken = UUID()
+        }
     }
 
     private func resolveSimilar() {

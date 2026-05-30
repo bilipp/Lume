@@ -40,26 +40,29 @@ struct BackdropImage: View {
     var fallbackSymbol: String = "film"
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .empty:
-                Rectangle().fill(Color.gray.opacity(0.25))
-                    .overlay { ProgressView() }
-            case .success(let image):
-                image.resizable().aspectRatio(contentMode: .fill)
-            case .failure:
-                Rectangle().fill(Color.gray.opacity(0.25))
-                    .overlay {
-                        Image(systemName: fallbackSymbol)
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                    }
-            @unknown default:
-                EmptyView()
+        GeometryReader { geo in
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    Rectangle().fill(Color.gray.opacity(0.25))
+                        .overlay { ProgressView() }
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                case .failure:
+                    Rectangle().fill(Color.gray.opacity(0.25))
+                        .overlay {
+                            Image(systemName: fallbackSymbol)
+                                .font(.largeTitle)
+                                .foregroundStyle(.secondary)
+                        }
+                @unknown default:
+                    EmptyView()
+                }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
     }
 }
 
@@ -87,12 +90,12 @@ struct DetailHero: View {
             )
             .allowsHitTesting(false)
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.largeTitle.weight(.heavy))
                     .foregroundStyle(.white)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.7)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
                     .shadow(radius: 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -100,7 +103,7 @@ struct DetailHero: View {
                     Text(tagline)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.white.opacity(0.85))
-                        .lineLimit(2)
+                        .lineLimit(1)
                         .shadow(radius: 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -110,7 +113,7 @@ struct DetailHero: View {
                     .shadow(radius: 4)
             }
             .padding(.horizontal, DetailMetrics.contentPadding)
-            .padding(.bottom, 20)
+            .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity)
         .frame(height: height)
@@ -172,7 +175,8 @@ struct MetadataLineView: View {
 
             if !textPieces.isEmpty {
                 Text(textPieces.joined(separator: "  ·  "))
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
