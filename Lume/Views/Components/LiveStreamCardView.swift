@@ -10,6 +10,21 @@ import SwiftUI
 struct LiveStreamCardView: View {
     let stream: LiveStream
 
+    private var now: Date {
+        Date()
+    }
+
+    private var currentEPG: EPGListing? {
+        stream.epgListings.first { $0.start <= now && now < $0.end }
+    }
+
+    private var nextEPG: EPGListing? {
+        stream.epgListings
+            .filter { $0.start > now }
+            .sorted { $0.start < $1.start }
+            .first
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             // Channel logo
@@ -44,10 +59,42 @@ struct LiveStreamCardView: View {
                     .font(.headline)
                     .lineLimit(1)
 
-                // EPG info would go here (current and next show)
-                Text("Live")
-                    .font(.caption)
+                if let current = currentEPG {
+                    Text(current.title)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Text(current.start, style: .time)
+                        Text("-")
+                        Text(current.end, style: .time)
+                    }
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+
+                    if let next = nextEPG {
+                        HStack(spacing: 4) {
+                            Text("Next:")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(next.title)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Text(next.start, style: .time)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                } else if stream.epgChannelId != nil {
+                    Text("No EPG data")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                } else {
+                    Text("Live")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 if stream.tvArchive > 0 {
                     HStack(spacing: 4) {

@@ -20,6 +20,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
     case movies
     case series
     case liveStreams
+    case epg
 
     var id: Int {
         rawValue
@@ -34,6 +35,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         case .movies: "Movies"
         case .series: "Series"
         case .liveStreams: "Live TV channels"
+        case .epg: "TV guide"
         }
     }
 
@@ -46,6 +48,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         case .movies: "film.stack"
         case .series: "tv"
         case .liveStreams: "antenna.radiowaves.left.and.right"
+        case .epg: "list.clipboard"
         }
     }
 }

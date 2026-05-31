@@ -14,8 +14,8 @@ import SwiftData
 actor ContentSyncManager {
     // MARK: - Properties
 
-    private let modelContainer: ModelContainer
-    private let xtreamClient: XtreamClient
+    let modelContainer: ModelContainer
+    let xtreamClient: XtreamClient
     private var activeSyncTasks: [UUID: Task<Void, Error>] = [:]
 
     /// Number of items to process before saving and resetting the context.
@@ -85,6 +85,7 @@ actor ContentSyncManager {
         try await syncSeries(for: playlist, playlistId: playlistId, progress: progress)
         try await Task.sleep(for: .seconds(2))
         try await syncLiveStreams(for: playlist, playlistId: playlistId, progress: progress)
+        try await syncEPG(for: playlist, playlistId: playlistId, progress: progress)
 
         let doneContext = ModelContext(modelContainer)
         doneContext.autosaveEnabled = false
@@ -399,6 +400,123 @@ actor ContentSyncManager {
         Logger.database.info("Completed syncing \(totalCount) live streams")
         await progress?.complete(.liveStreams)
     }
+
+    /// Syncs EPG data for all live streams using a single XMLTV
+    /// (`/xmltv.php`) request, then processes results in memory-bounded batches.
+    private func syncEPG(for playlist: Playlist, playlistId _: UUID, progress: SyncProgress? = nil) async throws {
+        await progress?.start(.epg)
+
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        let allStreams = try context.fetch(FetchDescriptor<LiveStream>())
+
+        guard !allStreams.isEmpty else {
+            Logger.database.info("No live streams found, skipping EPG sync")
+            await progress?.complete(.epg)
+            return
+        }
+
+        var byStreamID: [Int: LiveStream] = [:]
+        var byEPGChannelID: [String: LiveStream] = [:]
+        for stream in allStreams {
+            byStreamID[stream.streamId] = stream
+            if let epgId = stream.epgChannelId {
+                byEPGChannelID[epgId] = stream
+            }
+        }
+
+        Logger.database.info("Fetching XMLTV EPG data")
+        let epgEntries = try await xtreamClient.getXMLTV(playlist: playlist)
+        let totalEntries = epgEntries.count
+        Logger.database.info("Fetched \(totalEntries) EPG entries")
+
+        var streamEPG: [String: [XtreamDataTableEPG]] = [:]
+        for entry in epgEntries {
+            guard let stream = EPGHelper.match(entry, byStreamID: byStreamID, byEPGChannelID: byEPGChannelID)
+            else { continue }
+            streamEPG[stream.id, default: []].append(entry)
+        }
+
+        let totalCount = streamEPG.count
+        Logger.database.info("Matched EPG for \(totalCount) live streams")
+        await progress?.update(detail: "0 of \(totalCount)", fraction: 0)
+
+        let matchedStreamIDs = Array(streamEPG.keys)
+
+        try await processEPGBatches(
+            streamIDs: matchedStreamIDs,
+            streamEPG: streamEPG,
+            totalCount: streamEPG.count,
+            totalEntries: totalEntries,
+            progress: progress
+        )
+    }
+
+    private func processEPGBatches(
+        streamIDs: [String],
+        streamEPG: [String: [XtreamDataTableEPG]],
+        totalCount: Int,
+        totalEntries: Int,
+        progress: SyncProgress?
+    ) async throws {
+        var processedCount = 0
+
+        for batchStart in stride(from: 0, to: streamIDs.count, by: batchSize) {
+            let batchEnd = min(batchStart + batchSize, streamIDs.count)
+
+            try autoreleasepool {
+                let batchIDs = streamIDs[batchStart ..< batchEnd]
+                let batchContext = ModelContext(modelContainer)
+                batchContext.autosaveEnabled = false
+
+                for streamID in batchIDs {
+                    guard
+                        let entries = streamEPG[streamID],
+                        let stream = try batchContext.fetch(FetchDescriptor<LiveStream>(
+                            predicate: #Predicate { $0.id == streamID }
+                        )).first
+                    else { continue }
+
+                    for existing in stream.epgListings {
+                        batchContext.delete(existing)
+                    }
+                    stream.epgListings.removeAll()
+
+                    for dto in entries {
+                        guard
+                            let startDate = EPGHelper.parseEPGDate(dto.start ?? dto.startTimestamp),
+                            let endDate = EPGHelper.parseEPGDate(dto.end ?? dto.endTimestamp),
+                            let title = dto.title,
+                            !title.isEmpty
+                        else { continue }
+
+                        let listingId = "\(stream.id)-epg-\(Int(startDate.timeIntervalSince1970))"
+                        let listing = EPGListing(
+                            id: listingId,
+                            epgId: stream.epgChannelId ?? "",
+                            title: title,
+                            listingDescription: dto.description ?? "",
+                            start: startDate,
+                            end: endDate,
+                            liveStream: stream
+                        )
+                        batchContext.insert(listing)
+                    }
+                }
+
+                try batchContext.save()
+            }
+
+            processedCount += batchEnd - batchStart
+            Logger.database.info("Processed EPG for \(processedCount) of \(totalCount) matched streams")
+            await progress?.update(
+                detail: "\(min(processedCount, totalCount)) of \(totalCount)",
+                fraction: totalCount == 0 ? 1 : Double(min(processedCount, totalCount)) / Double(totalCount)
+            )
+        }
+
+        Logger.database.info("Completed EPG sync (\(totalEntries) entries for \(totalCount) streams)")
+    }
 }
 
 // MARK: - Sync Error
@@ -426,159 +544,37 @@ enum SyncError: LocalizedError {
     }
 }
 
-// MARK: - TMDB Enrichment
+// MARK: - EPG Helpers
 
-extension ContentSyncManager {
-    /// Enriches a movie with TMDB detail data (backdrop, tagline, content
-    /// rating, billed cast and similar titles), filling any gaps the Xtream
-    /// provider left in the core metadata. Writes on a background context;
-    /// the detail view observes the change through its `@Query`-backed model.
-    func enrichMovie(id: String, tmdbId: Int) async throws {
-        let client = TMDBClient.shared
-        guard client.isConfigured else { return }
-        let details = try await client.movieDetails(tmdbId)
-
-        let context = ModelContext(modelContainer)
-        context.autosaveEnabled = false
-        guard let movie = try context.fetch(
-            FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
-        ).first else { return }
-
-        movie.backdropPath = details.backdropPath ?? movie.backdropPath
-        movie.tagline = details.tagline ?? movie.tagline
-        movie.contentRating = details.contentRating ?? movie.contentRating
-        movie.similarTMDBIds = details.similarIDs
-
-        if (movie.plot ?? "").isEmpty, let overview = details.overview {
-            movie.plot = overview
+private enum EPGHelper {
+    static func match(
+        _ entry: XtreamDataTableEPG,
+        byStreamID: [Int: LiveStream],
+        byEPGChannelID: [String: LiveStream]
+    ) -> LiveStream? {
+        if let sidString = entry.streamId ?? entry.epgId ?? entry.id,
+           let sidInt = Int(sidString),
+           let stream = byStreamID[sidInt]
+        {
+            return stream
         }
-        if (movie.genre ?? "").isEmpty, !details.genreNames.isEmpty {
-            movie.genre = details.genreNames.joined(separator: ", ")
+        if let cid = entry.channelId, let stream = byEPGChannelID[cid] {
+            return stream
         }
-        if (movie.durationSecs ?? 0) == 0, let mins = details.runtimeMinutes, mins > 0 {
-            movie.durationSecs = mins * 60
-        }
-        if movie.rating == 0, let vote = details.voteAverage, vote > 0 {
-            movie.rating = vote
-        }
-
-        replaceCast(of: movie.castMembers, with: details.cast, ownerId: id, context: context) { castMember in
-            castMember.movie = movie
-        }
-
-        movie.tmdbEnrichedAt = Date()
-        try context.save()
+        return nil
     }
 
-    /// Enriches a series with TMDB detail data. Mirrors `enrichMovie`, adapting
-    /// to the series model's `String` rating and lack of a runtime field.
-    func enrichSeries(id: String, tmdbId: Int) async throws {
-        let client = TMDBClient.shared
-        guard client.isConfigured else { return }
-        let details = try await client.tvDetails(tmdbId)
-
-        let context = ModelContext(modelContainer)
-        context.autosaveEnabled = false
-        guard let series = try context.fetch(
-            FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
-        ).first else { return }
-
-        series.backdropPath = details.backdropPath ?? series.backdropPath
-        series.tagline = details.tagline ?? series.tagline
-        series.contentRating = details.contentRating ?? series.contentRating
-        series.similarTMDBIds = details.similarIDs
-
-        if (series.plot ?? "").isEmpty, let overview = details.overview {
-            series.plot = overview
+    static func parseEPGDate(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        if let unix = TimeInterval(value) {
+            return Date(timeIntervalSince1970: unix)
         }
-        if (series.genre ?? "").isEmpty, !details.genreNames.isEmpty {
-            series.genre = details.genreNames.joined(separator: ", ")
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) {
+            return date
         }
-        if (series.cast ?? "").isEmpty, !details.cast.isEmpty {
-            series.cast = details.cast.prefix(6).map(\.name).joined(separator: ", ")
-        }
-        let currentRating = series.rating.flatMap(Double.init) ?? 0
-        if currentRating == 0, let vote = details.voteAverage, vote > 0 {
-            series.rating = String(format: "%.1f", vote)
-        }
-
-        replaceCast(of: series.castMembers, with: details.cast, ownerId: id, context: context) { castMember in
-            castMember.series = series
-        }
-
-        series.tmdbEnrichedAt = Date()
-        try context.save()
-    }
-
-    /// Deletes the existing cast for a title and inserts the fresh TMDB billing,
-    /// wiring each new member to its owner via `assign`.
-    private func replaceCast(
-        of existing: [CastMember],
-        with cast: [TMDBCastMember],
-        ownerId: String,
-        context: ModelContext,
-        assign: (CastMember) -> Void
-    ) {
-        for member in existing {
-            context.delete(member)
-        }
-        for member in cast {
-            let castMember = CastMember(
-                id: "\(ownerId)-cast-\(member.order)-\(member.tmdbPersonId)",
-                tmdbPersonId: member.tmdbPersonId,
-                name: member.name,
-                role: member.character,
-                profilePath: member.profilePath,
-                order: member.order
-            )
-            context.insert(castMember)
-            assign(castMember)
-        }
-    }
-}
-
-// MARK: - Helper Methods
-
-extension ContentSyncManager {
-    private func markPlaylistError(playlistId: UUID) {
-        let errContext = ModelContext(modelContainer)
-        errContext.autosaveEnabled = false
-        if let epl = try? errContext.fetch(
-            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
-        ).first {
-            epl.syncStatus = .error
-            try? errContext.save()
-        }
-    }
-
-    private func updatePlaylistInfo(_ playlistId: UUID, with authResponse: XtreamAuthResponse) {
-        let context = ModelContext(modelContainer)
-        context.autosaveEnabled = false
-        guard let playlist = try? context.fetch(
-            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
-        ).first else { return }
-
-        playlist.userStatus = authResponse.userInfo.status
-        playlist.maxConnections = authResponse.userInfo.maxConnections
-        playlist.activeConnections = authResponse.userInfo.activeCons
-        playlist.expDate = authResponse.userInfo.expDate
-        playlist.serverTimezone = authResponse.serverInfo.timezone
-        playlist.lastUpdated = Date()
-        try? context.save()
-    }
-
-    private func buildExistingCategoryLookup(context: ModelContext, playlistId: UUID, type: CategoryType) -> [String: Category] {
-        let prefix = "\(playlistId.uuidString)-\(type.rawValue)-"
-        let typeRaw = type.rawValue
-        let descriptor = FetchDescriptor<Category>(
-            predicate: #Predicate { $0.typeRaw == typeRaw }
-        )
-        guard let allCategories = try? context.fetch(descriptor) else { return [:] }
-        var lookup: [String: Category] = [:]
-        lookup.reserveCapacity(allCategories.count)
-        for category in allCategories where category.id.hasPrefix(prefix) {
-            lookup[category.apiId] = category
-        }
-        return lookup
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
     }
 }

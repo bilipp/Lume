@@ -365,6 +365,36 @@ class XtreamClient: APIClient {
         }
     }
 
+    /// 11. Get XMLTV — full EPG for all channels in XMLTV format.
+    func getXMLTV(playlist: Playlist) async throws -> [XtreamDataTableEPG] {
+        let queryItems = [
+            URLQueryItem(name: "username", value: playlist.username),
+            URLQueryItem(name: "password", value: playlist.password)
+        ]
+
+        guard let url = buildURL(serverURL: playlist.serverURL, path: "xmltv.php", queryItems: queryItems) else {
+            throw XtreamError.invalidURL
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(from: url)
+        } catch {
+            throw XtreamError.networkError(error)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw XtreamError.invalidResponse
+        }
+
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
+            throw XtreamError.serverError(httpResponse.statusCode)
+        }
+
+        return XMLTVParser.parse(data: data)
+    }
+
     // MARK: - Stream URL Building
 
     /// Builds a playback URL for a movie
@@ -389,6 +419,87 @@ class XtreamClient: APIClient {
         let timestamp = Int(startTime.timeIntervalSince1970)
         let durationInt = Int(duration)
         return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationInt)/\(timestamp)/\(stream.streamId).m3u8")
+    }
+}
+
+// MARK: - XMLTV Parser
+
+final class XMLTVParser: NSObject, XMLParserDelegate {
+    private var programmes: [XtreamDataTableEPG] = []
+    private var currentStart: String?
+    private var currentStop: String?
+    private var currentChannel: String?
+    private var currentTitle: String?
+    private var currentDesc: String?
+    private var currentText: String = ""
+
+    private static let xmltvDateFormatter: DateFormatter = {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMddHHmmss Z"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        return dateFormatter
+    }()
+
+    static func parse(data: Data) -> [XtreamDataTableEPG] {
+        let parser = XMLTVParser()
+        let xmlParser = XMLParser(data: data)
+        xmlParser.delegate = parser
+        xmlParser.parse()
+        return parser.programmes
+    }
+
+    func parser(_: XMLParser, didStartElement elementName: String, namespaceURI _: String?, qualifiedName _: String?, attributes attributeDict: [String: String] = [:]) {
+        currentText = ""
+
+        if elementName == "programme" {
+            currentStart = attributeDict["start"]
+            currentStop = attributeDict["stop"]
+            currentChannel = attributeDict["channel"]
+            currentTitle = nil
+            currentDesc = nil
+        }
+    }
+
+    func parser(_: XMLParser, foundCharacters string: String) {
+        currentText += string
+    }
+
+    func parser(_: XMLParser, didEndElement elementName: String, namespaceURI _: String?, qualifiedName _: String?) {
+        if elementName == "programme" {
+            let startUnix = Self.xmltvDateToUnix(currentStart)
+            let endUnix = Self.xmltvDateToUnix(currentStop)
+
+            if let startUnix, let endUnix, let title = currentTitle, !title.isEmpty {
+                programmes.append(XtreamDataTableEPG(
+                    epgId: nil,
+                    title: title,
+                    description: currentDesc,
+                    startTimestamp: nil,
+                    endTimestamp: nil,
+                    start: startUnix,
+                    end: endUnix,
+                    channelId: currentChannel,
+                    streamId: nil,
+                    id: nil
+                ))
+            }
+
+            currentStart = nil
+            currentStop = nil
+            currentChannel = nil
+            currentTitle = nil
+            currentDesc = nil
+        } else if elementName == "title" {
+            currentTitle = (currentTitle ?? "") + currentText
+        } else if elementName == "desc" {
+            currentDesc = (currentDesc ?? "") + currentText
+        }
+    }
+
+    private static func xmltvDateToUnix(_ dateString: String?) -> String? {
+        guard let dateString, !dateString.isEmpty else { return nil }
+        guard let date = xmltvDateFormatter.date(from: dateString) else { return nil }
+        return String(Int(date.timeIntervalSince1970))
     }
 }
 

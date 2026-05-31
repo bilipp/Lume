@@ -491,3 +491,29 @@ struct XtreamShortEPG: Decodable {
     let title: String?
     let description: String?
 }
+
+// MARK: - Bulk EPG (get_simple_data_table)
+
+struct XtreamDataTableEPG: Decodable {
+    let epgId: String?
+    let title: String?
+    let description: String?
+    let startTimestamp: String?
+    let endTimestamp: String?
+    let start: String?
+    let end: String?
+    let channelId: String?
+    let streamId: String?
+    let id: String?
+
+    enum CodingKeys: String, CodingKey {
+        case epgId = "epg_id"
+        case title, description
+        case startTimestamp = "start_timestamp"
+        case endTimestamp = "end_timestamp"
+        case start, end
+        case channelId = "channel_id"
+        case streamId = "stream_id"
+        case id
+    }
+}
