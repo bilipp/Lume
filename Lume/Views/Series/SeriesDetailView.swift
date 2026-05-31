@@ -299,6 +299,8 @@ struct SeriesDetailView: View {
     private var backgroundColor: Color {
         #if os(macOS)
             Color(nsColor: .windowBackgroundColor)
+        #elseif os(tvOS)
+            Color.black
         #else
             Color(uiColor: .systemBackground)
         #endif

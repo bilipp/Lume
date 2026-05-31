@@ -14,7 +14,7 @@ struct AVPlayerEngineView: View {
     @Binding var duration: TimeInterval
 
     var body: some View {
-        #if os(iOS) || os(visionOS) || targetEnvironment(macCatalyst)
+        #if os(iOS) || os(visionOS) || os(tvOS) || targetEnvironment(macCatalyst)
             AVPlayerControllerHost(media: media, currentTime: $currentTime, duration: $duration)
         #else
             AVPlayerVideoHost(media: media, currentTime: $currentTime, duration: $duration)
@@ -122,7 +122,7 @@ final class PlayerObservation {
 
 // MARK: - iOS / visionOS / Mac Catalyst
 
-#if os(iOS) || os(visionOS) || targetEnvironment(macCatalyst)
+#if os(iOS) || os(visionOS) || os(tvOS) || targetEnvironment(macCatalyst)
     private struct AVPlayerControllerHost: UIViewControllerRepresentable {
         let media: PlayableMedia
         @Binding var currentTime: TimeInterval
@@ -134,13 +134,15 @@ final class PlayerObservation {
 
         func makeUIViewController(context: Context) -> AVPlayerViewController {
             let controller = AVPlayerViewController()
+            #if !os(tvOS)
+                controller.canStartPictureInPictureAutomaticallyFromInline = true
+                controller.entersFullScreenWhenPlaybackBegins = false
+                controller.exitsFullScreenWhenPlaybackEnds = false
+                controller.updatesNowPlayingInfoCenter = true
+            #endif
             controller.allowsPictureInPicturePlayback = true
-            controller.canStartPictureInPictureAutomaticallyFromInline = true
-            controller.entersFullScreenWhenPlaybackBegins = false
-            controller.exitsFullScreenWhenPlaybackEnds = false
             controller.showsPlaybackControls = true
             controller.videoGravity = .resizeAspect
-            controller.updatesNowPlayingInfoCenter = true
             controller.player = context.coordinator.observation.player
 
             context.coordinator.observation.onTime = { currentTime = $0 }

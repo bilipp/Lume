@@ -203,7 +203,9 @@ struct CategorySidebar: View {
                     : Color.clear
             )
         }
+        #if !os(tvOS)
         .listStyle(.sidebar)
+        #endif
     }
 }
 

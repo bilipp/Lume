@@ -1,6 +1,7 @@
 import SwiftUI
 
 #if canImport(KSPlayer)
+    import Combine
     import KSPlayer
 
     /// KSPlayer-backed video host with custom Apple-style controls.
@@ -17,6 +18,7 @@ import SwiftUI
         @State private var isControlsVisible = true
         @State private var isSeeking = false
         @State private var seekPosition: TimeInterval = 0
+        @State private var isPipActive = false
         @State private var hideTask: Task<Void, Never>?
         @State private var hoverHideTask: Task<Void, Never>?
 
@@ -56,6 +58,7 @@ import SwiftUI
                     }
                 }
                 scheduleHide()
+                observePipState()
             }
             .onDisappear {
                 hideTask?.cancel()
@@ -97,6 +100,133 @@ import SwiftUI
         // MARK: - Controls Overlay
 
         private var controlsOverlay: some View {
+            KSPlayerControlsOverlay(
+                coordinator: coordinator,
+                media: media,
+                isPlaying: $isPlaying,
+                isSeeking: $isSeeking,
+                seekPosition: $seekPosition,
+                currentTime: $currentTime,
+                duration: $duration,
+                isPipActive: $isPipActive,
+                hideTask: $hideTask,
+                onClose: { closePlayer() },
+                onTogglePlay: { togglePlay() },
+                onResetHideTimer: { resetHideTimer() },
+                onScheduleHide: { scheduleHide() }
+            )
+        }
+
+        // MARK: - Actions
+
+        private func togglePlay() {
+            if isPlaying {
+                coordinator.playerLayer?.pause()
+            } else {
+                coordinator.playerLayer?.play()
+            }
+            resetHideTimer()
+        }
+
+        private func toggleControls() {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isControlsVisible.toggle()
+            }
+            if isControlsVisible {
+                scheduleHide()
+            }
+        }
+
+        private func resetHideTimer() {
+            hideTask?.cancel()
+            if isControlsVisible {
+                scheduleHide()
+            }
+        }
+
+        private func scheduleHide() {
+            hideTask?.cancel()
+            guard isPlaying else { return }
+            hideTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
+                guard !Task.isCancelled, isPlaying else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isControlsVisible = false
+                }
+            }
+        }
+
+        private func closePlayer() {
+            #if os(macOS)
+                if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) {
+                    window.toggleFullScreen(nil)
+                }
+                dismissWindow(id: "player")
+            #else
+                dismiss()
+            #endif
+        }
+
+        // MARK: - PiP
+
+        private func observePipState() {
+            // Poll until playerLayer is available, then observe its published isPipActive
+            Task { @MainActor in
+                // Wait for playerLayer to initialize
+                var attempts = 0
+                while coordinator.playerLayer == nil, attempts < 50 {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    attempts += 1
+                }
+                guard let playerLayer = coordinator.playerLayer else { return }
+                // Observe changes via Combine
+                for await active in playerLayer.$isPipActive.values {
+                    isPipActive = active
+                }
+            }
+        }
+
+        // MARK: - Options
+
+        private func makeOptions() -> KSOptions {
+            KSOptions.secondPlayerType = KSMEPlayer.self
+            KSOptions.isAutoPlay = true
+            KSOptions.isPipPopViewController = false
+
+            let options = KSOptions()
+            options.canStartPictureInPictureAutomaticallyFromInline = true
+            options.preferredForwardBufferDuration = media.isLive ? 4 : 8
+            if !media.isLive, media.startTime > 1 {
+                options.startPlayTime = media.startTime
+            }
+            #if os(macOS)
+                options.automaticWindowResize = false
+            #endif
+            return options
+        }
+    }
+
+    // MARK: - Controls Overlay (extracted)
+
+    /// Extracted controls overlay to keep `KSPlayerEngineView` under the
+    /// SwiftLint `type_body_length` threshold.
+    @available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
+    private struct KSPlayerControlsOverlay: View {
+        @ObservedObject var coordinator: KSVideoPlayer.Coordinator
+        let media: PlayableMedia
+        @Binding var isPlaying: Bool
+        @Binding var isSeeking: Bool
+        @Binding var seekPosition: TimeInterval
+        @Binding var currentTime: TimeInterval
+        @Binding var duration: TimeInterval
+        @Binding var isPipActive: Bool
+        @Binding var hideTask: Task<Void, Never>?
+        var onClose: () -> Void
+        var onTogglePlay: () -> Void
+        var onResetHideTimer: () -> Void
+        var onScheduleHide: () -> Void
+
+        var body: some View {
             VStack(spacing: 0) {
                 topBar
                 Spacer()
@@ -124,7 +254,7 @@ import SwiftUI
         private var topBar: some View {
             HStack(spacing: 12) {
                 Button {
-                    closePlayer()
+                    onClose()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .bold))
@@ -134,7 +264,9 @@ import SwiftUI
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close player")
-                .keyboardShortcut(.escape, modifiers: [])
+                #if !os(tvOS)
+                    .keyboardShortcut(.escape, modifiers: [])
+                #endif
 
                 Spacer()
             }
@@ -148,7 +280,7 @@ import SwiftUI
         private var centerPlayButton: some View {
             if !isPlaying {
                 Button {
-                    togglePlay()
+                    onTogglePlay()
                 } label: {
                     Image(systemName: "play.fill")
                         .font(.system(size: 32))
@@ -216,29 +348,44 @@ import SwiftUI
         // MARK: - Time Slider
 
         private var timeSliderView: some View {
-            Slider(
-                value: Binding(
-                    get: { isSeeking ? seekPosition : (currentTime.isFinite ? currentTime : 0) },
-                    set: { seekPosition = $0 }
-                ),
-                in: 0 ... max(duration.isFinite ? duration : 1, 1),
-                onEditingChanged: { editing in
-                    isSeeking = editing
-                    if editing {
-                        hideTask?.cancel()
-                        coordinator.playerLayer?.pause()
-                    } else {
-                        coordinator.seek(time: seekPosition)
-                        currentTime = seekPosition
-                        if isPlaying {
-                            coordinator.playerLayer?.play()
-                        }
-                        scheduleHide()
-                    }
+            #if os(tvOS)
+                Slider(
+                    value: Binding<Float>(
+                        get: { Float(isSeeking ? seekPosition : (currentTime.isFinite ? currentTime : 0)) },
+                        set: { seekPosition = TimeInterval($0) }
+                    ),
+                    in: 0 ... Float(max(duration.isFinite ? duration : 1, 1)),
+                    onEditingChanged: { onSliderEditingChanged(editing: $0) }
+                )
+                .tint(.white)
+                .disabled(media.isLive)
+            #else
+                Slider(
+                    value: Binding<TimeInterval>(
+                        get: { isSeeking ? seekPosition : (currentTime.isFinite ? currentTime : 0) },
+                        set: { seekPosition = $0 }
+                    ),
+                    in: 0 ... max(duration.isFinite ? duration : 1, 1),
+                    onEditingChanged: { onSliderEditingChanged(editing: $0) }
+                )
+                .tint(.white)
+                .disabled(media.isLive)
+            #endif
+        }
+
+        private func onSliderEditingChanged(editing: Bool) {
+            isSeeking = editing
+            if editing {
+                hideTask?.cancel()
+                coordinator.playerLayer?.pause()
+            } else {
+                coordinator.seek(time: seekPosition)
+                currentTime = seekPosition
+                if isPlaying {
+                    coordinator.playerLayer?.play()
                 }
-            )
-            .tint(.white)
-            .disabled(media.isLive)
+                onScheduleHide()
+            }
         }
 
         // MARK: - Transport Controls
@@ -248,7 +395,7 @@ import SwiftUI
                 skipButton(seconds: -15, symbol: "gobackward.15")
 
                 Button {
-                    togglePlay()
+                    onTogglePlay()
                 } label: {
                     Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 20))
@@ -266,7 +413,7 @@ import SwiftUI
         private func skipButton(seconds: Int, symbol: String) -> some View {
             Button {
                 coordinator.skip(interval: seconds)
-                resetHideTimer()
+                onResetHideTimer()
             } label: {
                 Image(systemName: symbol)
                     .font(.system(size: 17))
@@ -283,8 +430,27 @@ import SwiftUI
             HStack(spacing: 12) {
                 playbackRateMenu
                 subtitleMenu
+                pipButton
                 contentModeButton
             }
+        }
+
+        @ViewBuilder
+        private var pipButton: some View {
+            #if os(iOS) || os(macOS)
+                Button {
+                    coordinator.playerLayer?.isPipActive.toggle()
+                    onResetHideTimer()
+                } label: {
+                    Image(systemName: isPipActive ? "pip.exit" : "pip.enter")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isPipActive ? "Exit Picture in Picture" : "Picture in Picture")
+            #endif
         }
 
         private var playbackRateMenu: some View {
@@ -292,7 +458,7 @@ import SwiftUI
                 ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
                     Button {
                         coordinator.playbackRate = rate
-                        resetHideTimer()
+                        onResetHideTimer()
                     } label: {
                         if abs(coordinator.playbackRate - rate) < 0.01 {
                             Label("\(rate, specifier: "%.2g")x", systemImage: "checkmark")
@@ -318,7 +484,7 @@ import SwiftUI
                 Menu {
                     Button {
                         coordinator.subtitleModel.selectedSubtitleInfo = nil
-                        resetHideTimer()
+                        onResetHideTimer()
                     } label: {
                         if coordinator.subtitleModel.selectedSubtitleInfo == nil {
                             Label("Off", systemImage: "checkmark")
@@ -329,7 +495,7 @@ import SwiftUI
                     ForEach(coordinator.subtitleModel.subtitleInfos, id: \.subtitleID) { track in
                         Button {
                             coordinator.subtitleModel.selectedSubtitleInfo = track
-                            resetHideTimer()
+                            onResetHideTimer()
                         } label: {
                             if coordinator.subtitleModel.selectedSubtitleInfo?.subtitleID == track.subtitleID {
                                 Label(track.name, systemImage: "checkmark")
@@ -352,7 +518,7 @@ import SwiftUI
         private var contentModeButton: some View {
             Button {
                 coordinator.isScaleAspectFill.toggle()
-                resetHideTimer()
+                onResetHideTimer()
             } label: {
                 Image(systemName: coordinator.isScaleAspectFill ? "rectangle.fill" : "rectangle.arrowtriangle.2.inward")
                     .font(.system(size: 13))
@@ -362,58 +528,6 @@ import SwiftUI
             }
             .buttonStyle(.plain)
         }
-
-        // MARK: - Actions
-
-        private func togglePlay() {
-            if isPlaying {
-                coordinator.playerLayer?.pause()
-            } else {
-                coordinator.playerLayer?.play()
-            }
-            resetHideTimer()
-        }
-
-        private func toggleControls() {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isControlsVisible.toggle()
-            }
-            if isControlsVisible {
-                scheduleHide()
-            }
-        }
-
-        private func resetHideTimer() {
-            hideTask?.cancel()
-            if isControlsVisible {
-                scheduleHide()
-            }
-        }
-
-        private func scheduleHide() {
-            hideTask?.cancel()
-            guard isPlaying else { return }
-            hideTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
-                guard !Task.isCancelled, isPlaying else { return }
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isControlsVisible = false
-                }
-            }
-        }
-
-        private func closePlayer() {
-            #if os(macOS)
-                if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) {
-                    window.toggleFullScreen(nil)
-                }
-                dismissWindow(id: "player")
-            #else
-                dismiss()
-            #endif
-        }
-
-        // MARK: - Helpers
 
         private func timeString(from time: TimeInterval) -> String {
             guard time.isFinite, time >= 0 else { return "0:00" }
@@ -426,23 +540,6 @@ import SwiftUI
             } else {
                 return String(format: "%d:%02d", minutes, seconds)
             }
-        }
-
-        // MARK: - Options
-
-        private func makeOptions() -> KSOptions {
-            KSOptions.secondPlayerType = KSMEPlayer.self
-            KSOptions.isAutoPlay = true
-
-            let options = KSOptions()
-            options.preferredForwardBufferDuration = media.isLive ? 4 : 8
-            if !media.isLive, media.startTime > 1 {
-                options.startPlayTime = media.startTime
-            }
-            #if os(macOS)
-                options.automaticWindowResize = false
-            #endif
-            return options
         }
     }
 

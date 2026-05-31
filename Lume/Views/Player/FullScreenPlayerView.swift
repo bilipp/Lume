@@ -89,7 +89,9 @@ struct FullScreenPlayerView: View {
         .buttonStyle(.plain)
         .padding(12)
         .accessibilityLabel("Close player")
-        .keyboardShortcut(.escape, modifiers: [])
+        #if !os(tvOS)
+            .keyboardShortcut(.escape, modifiers: [])
+        #endif
     }
 
     private func closePlayer() {
