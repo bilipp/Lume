@@ -17,8 +17,8 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .ksPlayer: "FFmpeg-backed. Recommended for IPTV streams."
-        case .avPlayer: "Native Apple player. Best for HLS and MP4."
+        case .ksPlayer: "KSPlayer is a powerful third-party player that supports a wide range of formats, including those commonly used in IPTV streams."
+        case .avPlayer: "Native Apple player. Best for HLS and MP4. But does not support many formats used in IPTV streams."
         }
     }
 
