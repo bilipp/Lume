@@ -365,8 +365,9 @@ class XtreamClient: APIClient {
         }
     }
 
-    /// 11. Get XMLTV — full EPG for all channels in XMLTV format.
-    func getXMLTV(playlist: Playlist) async throws -> [XtreamDataTableEPG] {
+    /// 11. Get XMLTV — download to temp file, then stream-parse in batches.
+    /// Returns the local file URL so the caller can parse incrementally.
+    func downloadXMLTV(playlist: Playlist) async throws -> URL {
         let queryItems = [
             URLQueryItem(name: "username", value: playlist.username),
             URLQueryItem(name: "password", value: playlist.password)
@@ -376,10 +377,10 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        let data: Data
+        let tempURL: URL
         let response: URLResponse
         do {
-            (data, response) = try await session.data(from: url)
+            (tempURL, response) = try await session.download(from: url)
         } catch {
             throw XtreamError.networkError(error)
         }
@@ -392,7 +393,12 @@ class XtreamClient: APIClient {
             throw XtreamError.serverError(httpResponse.statusCode)
         }
 
-        return XMLTVParser.parse(data: data)
+        // Move to a stable location before the system cleans it up
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".xmltv")
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: tempURL, to: destination)
+        return destination
     }
 
     // MARK: - Stream URL Building
@@ -424,8 +430,22 @@ class XtreamClient: APIClient {
 
 // MARK: - XMLTV Parser
 
+/// A parsed XMLTV programme ready for direct insertion.
+struct ParsedProgramme {
+    let channelId: String
+    let title: String
+    let description: String
+    let start: Date
+    let end: Date
+}
+
+/// Streaming SAX parser that yields batches via a callback to keep memory flat.
 final class XMLTVParser: NSObject, XMLParserDelegate {
-    private var programmes: [XtreamDataTableEPG] = []
+    private var batch: [ParsedProgramme] = []
+    private let batchSize: Int
+    private let onBatch: ([ParsedProgramme]) -> Void
+    private(set) var totalCount: Int = 0
+
     private var currentStart: String?
     private var currentStop: String?
     private var currentChannel: String?
@@ -434,23 +454,32 @@ final class XMLTVParser: NSObject, XMLParserDelegate {
     private var currentText: String = ""
 
     private static let xmltvDateFormatter: DateFormatter = {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyyMMddHHmmss Z"
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        return dateFormatter
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMddHHmmss Z"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
     }()
 
-    static func parse(data: Data) -> [XtreamDataTableEPG] {
-        let parser = XMLTVParser()
-        let xmlParser = XMLParser(data: data)
-        xmlParser.delegate = parser
+    init(batchSize: Int = 2000, onBatch: @escaping ([ParsedProgramme]) -> Void) {
+        self.batchSize = batchSize
+        self.onBatch = onBatch
+    }
+
+    /// Parse an XMLTV file from disk, calling `onBatch` for every `batchSize` programmes.
+    static func parse(fileURL: URL, batchSize: Int = 2000, onBatch: @escaping ([ParsedProgramme]) -> Void) -> Int {
+        guard let xmlParser = XMLParser(contentsOf: fileURL) else { return 0 }
+        let delegate = XMLTVParser(batchSize: batchSize, onBatch: onBatch)
+        xmlParser.delegate = delegate
         xmlParser.parse()
-        return parser.programmes
+        // Flush remaining
+        if !delegate.batch.isEmpty {
+            onBatch(delegate.batch)
+        }
+        return delegate.totalCount
     }
 
     func parser(_: XMLParser, didStartElement elementName: String, namespaceURI _: String?, qualifiedName _: String?, attributes attributeDict: [String: String] = [:]) {
         currentText = ""
-
         if elementName == "programme" {
             currentStart = attributeDict["start"]
             currentStop = attributeDict["stop"]
@@ -466,24 +495,25 @@ final class XMLTVParser: NSObject, XMLParserDelegate {
 
     func parser(_: XMLParser, didEndElement elementName: String, namespaceURI _: String?, qualifiedName _: String?) {
         if elementName == "programme" {
-            let startUnix = Self.xmltvDateToUnix(currentStart)
-            let endUnix = Self.xmltvDateToUnix(currentStop)
-
-            if let startUnix, let endUnix, let title = currentTitle, !title.isEmpty {
-                programmes.append(XtreamDataTableEPG(
-                    epgId: nil,
+            if let startDate = Self.xmltvDate(currentStart),
+               let endDate = Self.xmltvDate(currentStop),
+               let channel = currentChannel,
+               let title = currentTitle, !title.isEmpty
+            {
+                batch.append(ParsedProgramme(
+                    channelId: channel,
                     title: title,
-                    description: currentDesc,
-                    startTimestamp: nil,
-                    endTimestamp: nil,
-                    start: startUnix,
-                    end: endUnix,
-                    channelId: currentChannel,
-                    streamId: nil,
-                    id: nil
+                    description: currentDesc ?? "",
+                    start: startDate,
+                    end: endDate
                 ))
-            }
+                totalCount += 1
 
+                if batch.count >= batchSize {
+                    onBatch(batch)
+                    batch.removeAll(keepingCapacity: true)
+                }
+            }
             currentStart = nil
             currentStop = nil
             currentChannel = nil
@@ -496,10 +526,9 @@ final class XMLTVParser: NSObject, XMLParserDelegate {
         }
     }
 
-    private static func xmltvDateToUnix(_ dateString: String?) -> String? {
+    private static func xmltvDate(_ dateString: String?) -> Date? {
         guard let dateString, !dateString.isEmpty else { return nil }
-        guard let date = xmltvDateFormatter.date(from: dateString) else { return nil }
-        return String(Int(date.timeIntervalSince1970))
+        return xmltvDateFormatter.date(from: dateString)
     }
 }
 

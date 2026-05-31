@@ -156,33 +156,31 @@ struct ModelTests {
         let end = start.addingTimeInterval(3600)
         let listing = EPGListing(
             id: "epg-1",
-            epgId: "channel-1",
+            channelId: "channel-1",
             title: "News at Six",
             listingDescription: "The evening news broadcast",
             start: start,
             end: end
         )
         #expect(listing.id == "epg-1")
-        #expect(listing.epgId == "channel-1")
+        #expect(listing.channelId == "channel-1")
         #expect(listing.title == "News at Six")
         #expect(listing.listingDescription == "The evening news broadcast")
         #expect(listing.start == start)
         #expect(listing.end == end)
-        #expect(listing.liveStream == nil)
     }
 
-    @Test func `epg listing links to live stream`() {
-        let stream = LiveStream(id: "l-1", streamId: 1, name: "Channel")
+    @Test func `epg listing channelId matches stream`() {
+        let stream = LiveStream(id: "l-1", streamId: 1, name: "Channel", epgChannelId: "channel-1")
         let listing = EPGListing(
             id: "epg-1",
-            epgId: "channel-1",
+            channelId: "channel-1",
             title: "News",
             listingDescription: "",
             start: Date(),
-            end: Date().addingTimeInterval(3600),
-            liveStream: stream
+            end: Date().addingTimeInterval(3600)
         )
-        #expect(listing.liveStream?.id == "l-1")
+        #expect(listing.channelId == stream.epgChannelId)
     }
 
     // MARK: - CastMember
@@ -263,7 +261,6 @@ struct ModelTests {
     @Test func `live stream default values`() {
         let stream = LiveStream(id: "l-1", streamId: 1, name: "Channel")
         #expect(stream.isFavorite == false)
-        #expect(stream.epgListings.isEmpty)
         #expect(stream.tvArchive == 0)
         #expect(stream.tvArchiveDuration == 0)
     }

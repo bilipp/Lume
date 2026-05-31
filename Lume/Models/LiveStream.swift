@@ -16,7 +16,6 @@ final class LiveStream {
     var num: Int
 
     var categoryId: String?
-    @Relationship(deleteRule: .cascade) var epgListings: [EPGListing] = []
 
     var isFavorite: Bool = false
     var lastWatchedDate: Date?

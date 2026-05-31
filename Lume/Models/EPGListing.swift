@@ -4,29 +4,28 @@ import SwiftData
 @Model
 final class EPGListing {
     @Attribute(.unique) var id: String
-    var epgId: String
+
+    /// The XMLTV channel ID this listing belongs to.
+    /// LiveStreams reference the same value via their `epgChannelId`.
+    var channelId: String
     var title: String
     var listingDescription: String
     var start: Date
     var end: Date
 
-    var liveStream: LiveStream?
-
     init(
         id: String,
-        epgId: String,
+        channelId: String,
         title: String,
         listingDescription: String,
         start: Date,
-        end: Date,
-        liveStream: LiveStream? = nil
+        end: Date
     ) {
         self.id = id
-        self.epgId = epgId
+        self.channelId = channelId
         self.title = title
         self.listingDescription = listingDescription
         self.start = start
         self.end = end
-        self.liveStream = liveStream
     }
 }

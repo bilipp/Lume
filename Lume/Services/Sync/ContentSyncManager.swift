@@ -20,7 +20,6 @@ actor ContentSyncManager {
 
     /// Number of items to process before saving and resetting the context.
     private let batchSize = 2000
-    private let epgBatchSize = 500
 
     // MARK: - Initialization
 
@@ -402,127 +401,95 @@ actor ContentSyncManager {
         await progress?.complete(.liveStreams)
     }
 
-    /// Syncs EPG data for all live streams using a single XMLTV
-    /// (`/xmltv.php`) request, then processes results in memory-bounded batches.
+    /// Syncs EPG data using a streaming pipeline:
+    /// 1. Download XMLTV to a temp file (no in-memory blob).
+    /// 2. Collect the set of channel IDs that any LiveStream actually references.
+    /// 3. Bulk-delete all existing EPGListings in one pass.
+    /// 4. SAX-parse the file in batches, inserting only programmes whose
+    ///    channelId matches a known stream — directly into SwiftData.
+    ///
+    /// Memory stays flat regardless of EPG size because:
+    /// - The file is on disk, not in RAM.
+    /// - Only one batch of ParsedProgramme structs lives in memory at a time.
+    /// - EPGListing is keyed by channelId (no 1:N duplication per stream).
     private func syncEPG(for playlist: Playlist, playlistId _: UUID, progress: SyncProgress? = nil) async throws {
         await progress?.start(.epg)
 
-        var byStreamID: [Int: String] = [:]
-        var byEPGChannelID: [String: [String]] = [:]
+        // 1. Build a set of channel IDs we care about
+        let knownChannelIDs: Set<String>
         do {
             let context = ModelContext(modelContainer)
             context.autosaveEnabled = false
-            let allStreams = try context.fetch(FetchDescriptor<LiveStream>())
-
-            guard !allStreams.isEmpty else {
-                Logger.database.info("No live streams found, skipping EPG sync")
-                await progress?.complete(.epg)
-                return
-            }
-
-            for stream in allStreams {
-                byStreamID[stream.streamId] = stream.id
-                if let epgId = stream.epgChannelId {
-                    byEPGChannelID[epgId, default: []].append(stream.id)
-                }
-            }
+            var descriptor = FetchDescriptor<LiveStream>()
+            descriptor.propertiesToFetch = [\.epgChannelId]
+            let streams = try context.fetch(descriptor)
+            knownChannelIDs = Set(streams.compactMap(\.epgChannelId))
         }
 
-        Logger.database.info("Fetching XMLTV EPG data")
-        let epgEntries = try await xtreamClient.getXMLTV(playlist: playlist)
-        let totalEntries = epgEntries.count
-        Logger.database.info("Fetched \(totalEntries) EPG entries")
-
-        var streamEPG: [String: [XtreamDataTableEPG]] = [:]
-        for entry in epgEntries {
-            let streamIDs = EPGHelper.match(entry, byStreamID: byStreamID, byEPGChannelID: byEPGChannelID)
-            for sid in streamIDs {
-                streamEPG[sid, default: []].append(entry)
-            }
+        guard !knownChannelIDs.isEmpty else {
+            Logger.database.info("No live streams with EPG channel IDs, skipping EPG sync")
+            await progress?.complete(.epg)
+            return
         }
 
-        byStreamID = [:]
-        byEPGChannelID = [:]
+        Logger.database.info("Found \(knownChannelIDs.count) unique EPG channel IDs")
 
-        let totalCount = streamEPG.count
-        Logger.database.info("Matched EPG for \(totalCount) live streams")
-        await progress?.update(detail: "0 of \(totalCount)", fraction: 0)
+        // 2. Download XMLTV to temp file
+        Logger.database.info("Downloading XMLTV EPG data")
+        let fileURL = try await xtreamClient.downloadXMLTV(playlist: playlist)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        let matchedStreamIDs = Array(streamEPG.keys)
+        // 3. Bulk-delete all existing EPG listings
+        do {
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+            try context.delete(model: EPGListing.self)
+            try context.save()
+        }
 
-        try await processEPGBatches(
-            streamIDs: matchedStreamIDs,
-            streamEPG: streamEPG,
-            totalCount: streamEPG.count,
-            totalEntries: totalEntries,
-            progress: progress
-        )
+        // 4. Stream-parse and insert in batches
+        Logger.database.info("Parsing XMLTV and inserting EPG listings")
+        var insertedCount = 0
+        let container = modelContainer
+
+        let totalCount = XMLTVParser.parse(fileURL: fileURL, batchSize: 2000) { batch in
+            insertedCount += Self.insertEPGBatch(batch, knownChannelIDs: knownChannelIDs, into: container)
+        }
+
+        Logger.database.info("Completed EPG sync (\(totalCount) parsed, \(insertedCount) inserted for \(knownChannelIDs.count) channels)")
+        await progress?.complete(.epg)
     }
 
-    private func processEPGBatches(
-        streamIDs: [String],
-        streamEPG: [String: [XtreamDataTableEPG]],
-        totalCount: Int,
-        totalEntries: Int,
-        progress: SyncProgress?
-    ) async throws {
-        var processedCount = 0
+    /// Filters a parsed batch to known channels and inserts into a fresh context.
+    /// Returns the number of listings inserted.
+    private static func insertEPGBatch(
+        _ batch: [ParsedProgramme],
+        knownChannelIDs: Set<String>,
+        into container: ModelContainer
+    ) -> Int {
+        let relevant = batch.filter { knownChannelIDs.contains($0.channelId) }
+        guard !relevant.isEmpty else { return 0 }
 
-        for batchStart in stride(from: 0, to: streamIDs.count, by: epgBatchSize) {
-            let batchEnd = min(batchStart + epgBatchSize, streamIDs.count)
+        autoreleasepool {
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
 
-            try autoreleasepool {
-                let batchIDs = streamIDs[batchStart ..< batchEnd]
-                let batchContext = ModelContext(modelContainer)
-                batchContext.autosaveEnabled = false
-
-                for streamID in batchIDs {
-                    guard
-                        let entries = streamEPG[streamID],
-                        let stream = try batchContext.fetch(FetchDescriptor<LiveStream>(
-                            predicate: #Predicate { $0.id == streamID }
-                        )).first
-                    else { continue }
-
-                    for existing in stream.epgListings {
-                        batchContext.delete(existing)
-                    }
-                    stream.epgListings.removeAll()
-
-                    for dto in entries {
-                        guard
-                            let startDate = EPGHelper.parseEPGDate(dto.start ?? dto.startTimestamp),
-                            let endDate = EPGHelper.parseEPGDate(dto.end ?? dto.endTimestamp),
-                            let title = dto.title,
-                            !title.isEmpty
-                        else { continue }
-
-                        let listingId = "\(stream.id)-epg-\(Int(startDate.timeIntervalSince1970))"
-                        let listing = EPGListing(
-                            id: listingId,
-                            epgId: stream.epgChannelId ?? "",
-                            title: title,
-                            listingDescription: dto.description ?? "",
-                            start: startDate,
-                            end: endDate,
-                            liveStream: stream
-                        )
-                        batchContext.insert(listing)
-                    }
-                }
-
-                try batchContext.save()
+            for programme in relevant {
+                let listingId = "\(programme.channelId)-\(Int(programme.start.timeIntervalSince1970))"
+                let listing = EPGListing(
+                    id: listingId,
+                    channelId: programme.channelId,
+                    title: programme.title,
+                    listingDescription: programme.description,
+                    start: programme.start,
+                    end: programme.end
+                )
+                context.insert(listing)
             }
 
-            processedCount += batchEnd - batchStart
-            Logger.database.info("Processed EPG for \(processedCount) of \(totalCount) matched streams")
-            await progress?.update(
-                detail: "\(min(processedCount, totalCount)) of \(totalCount)",
-                fraction: totalCount == 0 ? 1 : Double(min(processedCount, totalCount)) / Double(totalCount)
-            )
+            try? context.save()
         }
-
-        Logger.database.info("Completed EPG sync (\(totalEntries) entries for \(totalCount) streams)")
+        return relevant.count
     }
 }
 
@@ -548,40 +515,5 @@ enum SyncError: LocalizedError {
         case let .databaseError(error):
             "Database error: \(error.localizedDescription)"
         }
-    }
-}
-
-// MARK: - EPG Helpers
-
-private enum EPGHelper {
-    static func match(
-        _ entry: XtreamDataTableEPG,
-        byStreamID: [Int: String],
-        byEPGChannelID: [String: [String]]
-    ) -> [String] {
-        if let sidString = entry.streamId ?? entry.epgId ?? entry.id,
-           let sidInt = Int(sidString),
-           let sid = byStreamID[sidInt]
-        {
-            return [sid]
-        }
-        if let cid = entry.channelId, let sids = byEPGChannelID[cid] {
-            return sids
-        }
-        return []
-    }
-
-    static func parseEPGDate(_ value: String?) -> Date? {
-        guard let value, !value.isEmpty else { return nil }
-        if let unix = TimeInterval(value) {
-            return Date(timeIntervalSince1970: unix)
-        }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) {
-            return date
-        }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: value)
     }
 }
