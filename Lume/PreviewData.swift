@@ -99,6 +99,12 @@ func previewContainer() -> ModelContainer {
 }
 
 private func insertMovies(into container: ModelContainer, categories: [Category]) {
+    insertBasicMovie(into: container, categories: categories)
+    insertTMDBMovie(into: container, categories: categories)
+    insertWatchedMovie(into: container, categories: categories)
+}
+
+private func insertBasicMovie(into container: ModelContainer, categories: [Category]) {
     let movie = PreviewData.sampleMovie
     movie.plot = "A computer hacker learns about the true nature of reality and his role in the war against its controllers."
     movie.genre = "Action, Sci-Fi"
@@ -109,7 +115,9 @@ private func insertMovies(into container: ModelContainer, categories: [Category]
     movie.youtubeTrailer = "d6j_wN1QO7s"
     movie.categoryId = categories[0].id
     container.mainContext.insert(movie)
+}
 
+private func insertTMDBMovie(into container: ModelContainer, categories: [Category]) {
     let movieTMDB = PreviewData.sampleMovie
     movieTMDB.id = "\(PreviewData.samplePlaylistID)-movie-tmdb"
     movieTMDB.name = "The Matrix"
@@ -142,7 +150,9 @@ private func insertMovies(into container: ModelContainer, categories: [Category]
         container.mainContext.insert(cast)
     }
     container.mainContext.insert(movieTMDB)
+}
 
+private func insertWatchedMovie(into container: ModelContainer, categories: [Category]) {
     let movieWatched = PreviewData.sampleMovie
     movieWatched.id = "\(PreviewData.samplePlaylistID)-movie-2"
     movieWatched.name = "Inception"

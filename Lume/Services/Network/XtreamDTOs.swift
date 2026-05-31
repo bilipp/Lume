@@ -175,55 +175,53 @@ struct XtreamVODStream: Decodable {
         streamType = try? container.decodeIfPresent(String.self, forKey: .streamType)
         streamId = try? container.decodeIfPresent(Int.self, forKey: .streamId)
         streamIcon = try? container.decodeIfPresent(String.self, forKey: .streamIcon)
-
-        if let rDouble = try? container.decodeIfPresent(Double.self, forKey: .rating) {
-            rating = rDouble
-        } else if let rString = try? container.decodeIfPresent(String.self, forKey: .rating) {
-            rating = Double(rString)
-        } else {
-            rating = 0.0
-        }
-
-        if let rDouble = try? container.decodeIfPresent(Double.self, forKey: .rating5Based) {
-            rating5Based = rDouble
-        } else if let rString = try? container.decodeIfPresent(String.self, forKey: .rating5Based) {
-            rating5Based = Double(rString)
-        } else {
-            rating5Based = 0.0
-        }
-
+        rating = Self.decodeDouble(from: container, forKey: .rating) ?? 0
+        rating5Based = Self.decodeDouble(from: container, forKey: .rating5Based) ?? 0
         added = try? container.decodeIfPresent(String.self, forKey: .added)
-
-        if let isAdultInt = try? container.decodeIfPresent(Int.self, forKey: .isAdult) {
-            isAdult = isAdultInt
-        } else if let isAdultString = try? container.decodeIfPresent(String.self, forKey: .isAdult) {
-            isAdult = Int(isAdultString)
-        } else {
-            isAdult = 0
-        }
-
-        if let catIdStr = try? container.decodeIfPresent(String.self, forKey: .categoryId) {
-            categoryId = catIdStr
-        } else if let catIdInt = try? container.decodeIfPresent(Int.self, forKey: .categoryId) {
-            categoryId = String(catIdInt)
-        } else {
-            categoryId = nil
-        }
-
+        isAdult = Self.decodeInt(from: container, forKey: .isAdult) ?? 0
+        categoryId = Self.decodeCategoryID(from: container, forKey: .categoryId)
         containerExtension = try? container.decodeIfPresent(String.self, forKey: .containerExtension)
+        tmdb = Self.decodeTMDB(from: container)
+    }
 
-        // Some playlists use "tmdb", others "tmdb_id"; accept either as String or Int.
-        if let tmdbStr = try? container.decodeIfPresent(String.self, forKey: .tmdb) {
-            tmdb = tmdbStr
-        } else if let tmdbInt = try? container.decodeIfPresent(Int.self, forKey: .tmdb) {
-            tmdb = String(tmdbInt)
-        } else if let tmdbStr = try? container.decodeIfPresent(String.self, forKey: .tmdbId) {
-            tmdb = tmdbStr
-        } else if let tmdbInt = try? container.decodeIfPresent(Int.self, forKey: .tmdbId) {
-            tmdb = String(tmdbInt)
-        } else {
-            tmdb = nil
+    private static func decodeDouble(from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Double? {
+        if let value = try? container.decodeIfPresent(Double.self, forKey: key) {
+            return value
+        } else if let str = try? container.decodeIfPresent(String.self, forKey: key) {
+            return Double(str)
         }
+        return nil
+    }
+
+    private static func decodeInt(from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Int? {
+        if let value = try? container.decodeIfPresent(Int.self, forKey: key) {
+            return value
+        } else if let str = try? container.decodeIfPresent(String.self, forKey: key) {
+            return Int(str)
+        }
+        return nil
+    }
+
+    private static func decodeCategoryID(from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> String? {
+        if let str = try? container.decodeIfPresent(String.self, forKey: key) {
+            return str
+        } else if let int = try? container.decodeIfPresent(Int.self, forKey: key) {
+            return String(int)
+        }
+        return nil
+    }
+
+    private static func decodeTMDB(from container: KeyedDecodingContainer<CodingKeys>) -> String? {
+        if let str = try? container.decodeIfPresent(String.self, forKey: .tmdb) {
+            return str
+        } else if let int = try? container.decodeIfPresent(Int.self, forKey: .tmdb) {
+            return String(int)
+        } else if let str = try? container.decodeIfPresent(String.self, forKey: .tmdbId) {
+            return str
+        } else if let int = try? container.decodeIfPresent(Int.self, forKey: .tmdbId) {
+            return String(int)
+        }
+        return nil
     }
 }
 

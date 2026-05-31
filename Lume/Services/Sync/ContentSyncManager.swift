@@ -40,56 +40,9 @@ actor ContentSyncManager {
 
         let task = Task {
             do {
-                let statusContext = ModelContext(modelContainer)
-                statusContext.autosaveEnabled = false
-                guard let playlist = try statusContext.fetch(
-                    FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
-                ).first else {
-                    // The playlist isn't visible in this context's view of the
-                    // store. Surface it as an error rather than silently logging
-                    // a successful completion (which masks the real failure).
-                    Logger.database.error("Sync aborted: playlist \(playlistId) not found in store")
-                    throw SyncError.playlistNotFound
-                }
-
-                playlist.syncStatus = .syncing
-                try statusContext.save()
-
-                await progress?.start(.authenticating)
-                let authResponse = try await xtreamClient.getInfo(playlist: playlist)
-                updatePlaylistInfo(playlistId, with: authResponse)
-                await progress?.complete(.authenticating)
-
-                try await syncAllCategories(for: playlist, playlistId: playlistId, progress: progress, full: full)
-
-                try await syncMovies(for: playlist, playlistId: playlistId, progress: progress)
-                // Brief pause so the provider can release the connection slot
-                // used by the large movie transfer before the next heavy fetch.
-                // Many Xtream accounts cap concurrent connections and otherwise
-                // reject the immediately-following get_series with 401/403.
-                try await Task.sleep(for: .seconds(2))
-                try await syncSeries(for: playlist, playlistId: playlistId, progress: progress)
-                try await Task.sleep(for: .seconds(2))
-                try await syncLiveStreams(for: playlist, playlistId: playlistId, progress: progress)
-
-                let doneContext = ModelContext(modelContainer)
-                doneContext.autosaveEnabled = false
-                if let dpl = try doneContext.fetch(
-                    FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
-                ).first {
-                    dpl.syncStatus = .idle
-                    dpl.lastSyncDate = Date()
-                    try doneContext.save()
-                }
+                try await performSync(playlistId: playlistId, progress: progress, full: full)
             } catch {
-                let errContext = ModelContext(modelContainer)
-                errContext.autosaveEnabled = false
-                if let epl = try? errContext.fetch(
-                    FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
-                ).first {
-                    epl.syncStatus = .error
-                    try? errContext.save()
-                }
+                markPlaylistError(playlistId: playlistId)
                 throw error
             }
         }
@@ -105,6 +58,43 @@ actor ContentSyncManager {
 
         activeSyncTasks.removeValue(forKey: playlistId)
         Logger.database.info("Completed sync for playlist \(playlistId)")
+    }
+
+    private func performSync(playlistId: UUID, progress: SyncProgress?, full: Bool) async throws {
+        let statusContext = ModelContext(modelContainer)
+        statusContext.autosaveEnabled = false
+        guard let playlist = try statusContext.fetch(
+            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
+        ).first else {
+            Logger.database.error("Sync aborted: playlist \(playlistId) not found in store")
+            throw SyncError.playlistNotFound
+        }
+
+        playlist.syncStatus = .syncing
+        try statusContext.save()
+
+        await progress?.start(.authenticating)
+        let authResponse = try await xtreamClient.getInfo(playlist: playlist)
+        updatePlaylistInfo(playlistId, with: authResponse)
+        await progress?.complete(.authenticating)
+
+        try await syncAllCategories(for: playlist, playlistId: playlistId, progress: progress, full: full)
+
+        try await syncMovies(for: playlist, playlistId: playlistId, progress: progress)
+        try await Task.sleep(for: .seconds(2))
+        try await syncSeries(for: playlist, playlistId: playlistId, progress: progress)
+        try await Task.sleep(for: .seconds(2))
+        try await syncLiveStreams(for: playlist, playlistId: playlistId, progress: progress)
+
+        let doneContext = ModelContext(modelContainer)
+        doneContext.autosaveEnabled = false
+        if let dpl = try doneContext.fetch(
+            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
+        ).first {
+            dpl.syncStatus = .idle
+            dpl.lastSyncDate = Date()
+            try doneContext.save()
+        }
     }
 
     func syncAllCategories(for playlist: Playlist, playlistId: UUID, progress: SyncProgress? = nil, full _: Bool = false) async throws {
@@ -192,7 +182,7 @@ actor ContentSyncManager {
         let movieDTOs = try await xtreamClient.getVODStreams(playlist: playlist)
         let totalCount = movieDTOs.count
         // swiftformat:disable:next self
-        Logger.database.info("Fetched \(totalCount) movies, syncing in batches of \(batchSize)")
+        Logger.database.info("Fetched \(totalCount) movies, syncing in batches of \(self.batchSize)")
         await progress?.update(detail: "0 of \(totalCount)", fraction: 0)
 
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.vod.rawValue)-"
@@ -251,7 +241,7 @@ actor ContentSyncManager {
         let seriesDTOs = try await xtreamClient.getSeries(playlist: playlist)
         let totalCount = seriesDTOs.count
         // swiftformat:disable:next self
-        Logger.database.info("Fetched \(totalCount) series, syncing in batches of \(batchSize)")
+        Logger.database.info("Fetched \(totalCount) series, syncing in batches of \(self.batchSize)")
         await progress?.update(detail: "0 of \(totalCount)", fraction: 0)
 
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.series.rawValue)-"
@@ -362,7 +352,7 @@ actor ContentSyncManager {
         let streamDTOs = try await xtreamClient.getLiveStreams(playlist: playlist)
         let totalCount = streamDTOs.count
         // swiftformat:disable:next self
-        Logger.database.info("Fetched \(totalCount) live streams, syncing in batches of \(batchSize)")
+        Logger.database.info("Fetched \(totalCount) live streams, syncing in batches of \(self.batchSize)")
         await progress?.update(detail: "0 of \(totalCount)", fraction: 0)
 
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.live.rawValue)-"
@@ -550,6 +540,17 @@ extension ContentSyncManager {
 // MARK: - Helper Methods
 
 extension ContentSyncManager {
+    private func markPlaylistError(playlistId: UUID) {
+        let errContext = ModelContext(modelContainer)
+        errContext.autosaveEnabled = false
+        if let epl = try? errContext.fetch(
+            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
+        ).first {
+            epl.syncStatus = .error
+            try? errContext.save()
+        }
+    }
+
     private func updatePlaylistInfo(_ playlistId: UUID, with authResponse: XtreamAuthResponse) {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false

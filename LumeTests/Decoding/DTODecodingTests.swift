@@ -97,7 +97,7 @@ struct DTODecodingTests {
 
     @Test func movieTmdbIdFallbackKey() throws {
         // Playlist variant that uses "tmdb_id" (Int) instead of "tmdb".
-        let json = """
+        let json = Data("""
         [{
             "num": 1,
             "name": "Mob Land",
@@ -109,7 +109,7 @@ struct DTODecodingTests {
             "category_id": "126",
             "container_extension": "mkv"
         }]
-        """.data(using: .utf8)!
+        """.utf8)
         let movies = try JSONDecoder().decode([XtreamVODStream].self, from: json)
         let first = try #require(movies.first)
         #expect(first.tmdb == "979275")
@@ -158,7 +158,7 @@ struct DTODecodingTests {
 
     @Test func seriesTmdbIdFallbackKey() throws {
         // Playlist variant that uses "tmdb_id" (Int) instead of "tmdb".
-        let json = """
+        let json = Data("""
         [{
             "num": 1,
             "name": "Due spicci – Das nötige Kleingeld",
@@ -168,7 +168,7 @@ struct DTODecodingTests {
             "rating_5based": 4.5,
             "category_id": "369"
         }]
-        """.data(using: .utf8)!
+        """.utf8)
         let series = try JSONDecoder().decode([XtreamSeries].self, from: json)
         let first = try #require(series.first)
         #expect(first.tmdb == "304597")

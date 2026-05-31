@@ -74,7 +74,7 @@ struct SeriesView: View {
                 }
             }
             .navigationTitle("Series")
-            .libraryToolbar(
+            .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,
                 categorySortRaw: $categorySortRaw,
@@ -82,7 +82,7 @@ struct SeriesView: View {
                 showingSync: $showingSync,
                 showingSettings: $showingSettings,
                 activePlaylist: activePlaylist
-            )
+            ))
             .navigationDestination(for: Category.self) { category in
                 SeriesCategoryView(category: category, animationNamespace: animationNamespace)
             }

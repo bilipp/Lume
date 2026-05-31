@@ -138,7 +138,7 @@ struct APIClientTests {
         #expect(NetworkError.invalidURL.isRetriable == false)
         #expect(NetworkError.authenticationFailed.isRetriable == false)
         #expect(NetworkError.invalidResponse.isRetriable == false)
-        #expect(NetworkError.decodingError(NSError()).isRetriable == false)
+        #expect(NetworkError.decodingError(NSError(domain: "test", code: 0, userInfo: nil)).isRetriable == false)
         #expect(NetworkError.serverError(400).isRetriable == false)
         #expect(NetworkError.unknown.isRetriable == false)
     }

@@ -100,7 +100,7 @@ struct XtreamClientURLTests {
         let client = makeClient()
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-2", streamId: 666, name: "TS Channel")
-        let url = client.buildLiveStreamURL(for: stream, playlist: playlist, format: .ts)
+        let url = client.buildLiveStreamURL(for: stream, playlist: playlist, format: .tsStream)
         let expected = URL(string: "http://example.com:8080/live/testuser/testpass/666.ts")
         #expect(url == expected)
     }

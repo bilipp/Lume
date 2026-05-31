@@ -131,7 +131,7 @@ struct HomeView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(.hidden, for: .navigationBar)
             #endif
-                .libraryToolbar(
+                .libraryToolbar(config: LibraryToolbarConfiguration(
                     playlists: playlists,
                     selectedPlaylistID: $selectedPlaylistID,
                     categorySortRaw: $categorySortRaw,
@@ -139,7 +139,7 @@ struct HomeView: View {
                     showingSync: $showingSync,
                     showingSettings: $showingSettings,
                     activePlaylist: activePlaylist
-                )
+                ))
                 .navigationDestination(for: Movie.self) { movie in
                     MovieDetailView(movie: movie, animationNamespace: animationNamespace)
                     #if os(iOS)

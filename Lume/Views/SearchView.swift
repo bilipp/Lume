@@ -88,7 +88,6 @@ struct SearchView: View {
                 }
                 .navigationDestination(for: LiveStream.self) { stream in
                     Text("Live Stream: \(stream.name)")
-                    // TODO: Live stream detail view
                 }
                 .onChange(of: searchText) { _, newValue in
                     searchTask?.cancel()

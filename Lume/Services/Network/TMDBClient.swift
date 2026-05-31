@@ -173,20 +173,20 @@ struct TMDBCastMember: Hashable {
 // MARK: - DTOs
 
 private struct TrendingResponse: Decodable {
-    struct Item: Decodable {
-        let id: Int
-        let title: String?
-        let name: String?
-        let overview: String?
-        let backdropPath: String?
+    let results: [TrendingItem]
+}
 
-        enum CodingKeys: String, CodingKey {
-            case id, title, name, overview
-            case backdropPath = "backdrop_path"
-        }
+private struct TrendingItem: Decodable {
+    let id: Int
+    let title: String?
+    let name: String?
+    let overview: String?
+    let backdropPath: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, name, overview
+        case backdropPath = "backdrop_path"
     }
-
-    let results: [Item]
 }
 
 /// Decodes `/movie/{id}` and `/tv/{id}` responses (with `credits`, `similar`
@@ -206,44 +206,9 @@ private struct TitleDetailsResponse: Decodable {
     let contentRatings: Results<ContentRatingEntry>? // tv
 
     struct Genre: Decodable { let name: String }
-    struct Credits: Decodable { let cast: [Cast]? }
-    struct Cast: Decodable {
-        let id: Int
-        let name: String
-        let character: String?
-        let profilePath: String?
-        let order: Int?
-        enum CodingKeys: String, CodingKey {
-            case id, name, character, order
-            case profilePath = "profile_path"
-        }
-    }
-
-    struct Similar: Decodable {
-        struct Item: Decodable { let id: Int }
-        let results: [Item]
-    }
-
+    struct Credits: Decodable { let cast: [TMDBCastMemberDTO]? }
+    struct Similar: Decodable { let results: [SimilarItem] }
     struct Results<Entry: Decodable>: Decodable { let results: [Entry] }
-    struct ReleaseDatesEntry: Decodable {
-        let countryCode: String
-        let releaseDates: [ReleaseDate]
-        struct ReleaseDate: Decodable { let certification: String? }
-        enum CodingKeys: String, CodingKey {
-            case countryCode = "iso_3166_1"
-            case releaseDates = "release_dates"
-        }
-    }
-
-    struct ContentRatingEntry: Decodable {
-        let countryCode: String
-        let rating: String?
-        enum CodingKeys: String, CodingKey {
-            case countryCode = "iso_3166_1"
-            case rating
-        }
-    }
-
     enum CodingKeys: String, CodingKey {
         case tagline, overview, runtime, genres, credits, similar
         case backdropPath = "backdrop_path"
@@ -252,7 +217,43 @@ private struct TitleDetailsResponse: Decodable {
         case releaseDates = "release_dates"
         case contentRatings = "content_ratings"
     }
+}
 
+private struct ReleaseDatesEntry: Decodable {
+    let countryCode: String
+    let releaseDates: [ReleaseDateEntry]
+    enum CodingKeys: String, CodingKey {
+        case countryCode = "iso_3166_1"
+        case releaseDates = "release_dates"
+    }
+}
+
+private struct ContentRatingEntry: Decodable {
+    let countryCode: String
+    let rating: String?
+    enum CodingKeys: String, CodingKey {
+        case countryCode = "iso_3166_1"
+        case rating
+    }
+}
+
+private struct TMDBCastMemberDTO: Decodable {
+    let id: Int
+    let name: String
+    let character: String?
+    let profilePath: String?
+    let order: Int?
+    enum CodingKeys: String, CodingKey {
+        case id, name, character, order
+        case profilePath = "profile_path"
+    }
+}
+
+private struct SimilarItem: Decodable { let id: Int }
+
+private struct ReleaseDateEntry: Decodable { let certification: String? }
+
+extension TitleDetailsResponse {
     func normalized(isMovie: Bool) -> TMDBTitleDetails {
         let cast = (credits?.cast ?? [])
             .sorted { ($0.order ?? .max) < ($1.order ?? .max) }

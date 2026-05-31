@@ -76,7 +76,7 @@ struct MoviesView: View {
                 }
             }
             .navigationTitle("Movies")
-            .libraryToolbar(
+            .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,
                 categorySortRaw: $categorySortRaw,
@@ -84,7 +84,7 @@ struct MoviesView: View {
                 showingSync: $showingSync,
                 showingSettings: $showingSettings,
                 activePlaylist: activePlaylist
-            )
+            ))
             .navigationDestination(for: Category.self) { category in
                 MovieCategoryView(category: category, animationNamespace: animationNamespace)
             }

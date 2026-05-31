@@ -91,7 +91,7 @@ struct LiveTVView: View {
                 }
             }
             .navigationTitle("Live TV")
-            .libraryToolbar(
+            .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,
                 categorySortRaw: $categorySortRaw,
@@ -99,7 +99,7 @@ struct LiveTVView: View {
                 showingSync: $showingSync,
                 showingSettings: $showingSettings,
                 activePlaylist: activePlaylist
-            )
+            ))
             .task {
                 if selectedCategory == nil, let first = sortedCategories.first {
                     selectedCategory = first

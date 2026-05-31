@@ -49,24 +49,26 @@ struct LibraryToolbarModifier: ViewModifier {
     }
 }
 
+struct LibraryToolbarConfiguration {
+    let playlists: [Playlist]
+    @Binding var selectedPlaylistID: String
+    @Binding var categorySortRaw: String
+    @Binding var contentSortRaw: String
+    @Binding var showingSync: Bool
+    @Binding var showingSettings: Bool
+    let activePlaylist: Playlist?
+}
+
 extension View {
-    func libraryToolbar(
-        playlists: [Playlist],
-        selectedPlaylistID: Binding<String>,
-        categorySortRaw: Binding<String>,
-        contentSortRaw: Binding<String>,
-        showingSync: Binding<Bool>,
-        showingSettings: Binding<Bool>,
-        activePlaylist: Playlist?
-    ) -> some View {
+    func libraryToolbar(config: LibraryToolbarConfiguration) -> some View {
         modifier(LibraryToolbarModifier(
-            playlists: playlists,
-            selectedPlaylistID: selectedPlaylistID,
-            categorySortRaw: categorySortRaw,
-            contentSortRaw: contentSortRaw,
-            showingSync: showingSync,
-            showingSettings: showingSettings,
-            activePlaylist: activePlaylist
+            playlists: config.playlists,
+            selectedPlaylistID: config.$selectedPlaylistID,
+            categorySortRaw: config.$categorySortRaw,
+            contentSortRaw: config.$contentSortRaw,
+            showingSync: config.$showingSync,
+            showingSettings: config.$showingSettings,
+            activePlaylist: config.activePlaylist
         ))
     }
 }
