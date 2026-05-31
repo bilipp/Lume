@@ -57,12 +57,6 @@ struct TMDBClient {
         return raw?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Returns the TMDB IDs of trending titles in popularity order.
-    func trendingIDs(_ media: MediaType, timeWindow: TimeWindow = .week) async throws -> [Int] {
-        let response: TrendingResponse = try await get("/trending/\(media.rawValue)/\(timeWindow.rawValue)")
-        return response.results.map(\.id)
-    }
-
     /// Returns trending titles enriched with the artwork and copy the home hero
     /// carousel needs (backdrop, title, overview), in popularity order.
     func trending(_ media: MediaType, timeWindow: TimeWindow = .week) async throws -> [TrendingTitle] {
