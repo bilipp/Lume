@@ -20,6 +20,7 @@ actor ContentSyncManager {
 
     /// Number of items to process before saving and resetting the context.
     private let batchSize = 2000
+    private let epgBatchSize = 500
 
     // MARK: - Initialization
 
@@ -406,22 +407,24 @@ actor ContentSyncManager {
     private func syncEPG(for playlist: Playlist, playlistId _: UUID, progress: SyncProgress? = nil) async throws {
         await progress?.start(.epg)
 
-        let context = ModelContext(modelContainer)
-        context.autosaveEnabled = false
-        let allStreams = try context.fetch(FetchDescriptor<LiveStream>())
+        var byStreamID: [Int: String] = [:]
+        var byEPGChannelID: [String: [String]] = [:]
+        do {
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+            let allStreams = try context.fetch(FetchDescriptor<LiveStream>())
 
-        guard !allStreams.isEmpty else {
-            Logger.database.info("No live streams found, skipping EPG sync")
-            await progress?.complete(.epg)
-            return
-        }
+            guard !allStreams.isEmpty else {
+                Logger.database.info("No live streams found, skipping EPG sync")
+                await progress?.complete(.epg)
+                return
+            }
 
-        var byStreamID: [Int: LiveStream] = [:]
-        var byEPGChannelID: [String: LiveStream] = [:]
-        for stream in allStreams {
-            byStreamID[stream.streamId] = stream
-            if let epgId = stream.epgChannelId {
-                byEPGChannelID[epgId] = stream
+            for stream in allStreams {
+                byStreamID[stream.streamId] = stream.id
+                if let epgId = stream.epgChannelId {
+                    byEPGChannelID[epgId, default: []].append(stream.id)
+                }
             }
         }
 
@@ -432,10 +435,14 @@ actor ContentSyncManager {
 
         var streamEPG: [String: [XtreamDataTableEPG]] = [:]
         for entry in epgEntries {
-            guard let stream = EPGHelper.match(entry, byStreamID: byStreamID, byEPGChannelID: byEPGChannelID)
-            else { continue }
-            streamEPG[stream.id, default: []].append(entry)
+            let streamIDs = EPGHelper.match(entry, byStreamID: byStreamID, byEPGChannelID: byEPGChannelID)
+            for sid in streamIDs {
+                streamEPG[sid, default: []].append(entry)
+            }
         }
+
+        byStreamID = [:]
+        byEPGChannelID = [:]
 
         let totalCount = streamEPG.count
         Logger.database.info("Matched EPG for \(totalCount) live streams")
@@ -461,8 +468,8 @@ actor ContentSyncManager {
     ) async throws {
         var processedCount = 0
 
-        for batchStart in stride(from: 0, to: streamIDs.count, by: batchSize) {
-            let batchEnd = min(batchStart + batchSize, streamIDs.count)
+        for batchStart in stride(from: 0, to: streamIDs.count, by: epgBatchSize) {
+            let batchEnd = min(batchStart + epgBatchSize, streamIDs.count)
 
             try autoreleasepool {
                 let batchIDs = streamIDs[batchStart ..< batchEnd]
@@ -549,19 +556,19 @@ enum SyncError: LocalizedError {
 private enum EPGHelper {
     static func match(
         _ entry: XtreamDataTableEPG,
-        byStreamID: [Int: LiveStream],
-        byEPGChannelID: [String: LiveStream]
-    ) -> LiveStream? {
+        byStreamID: [Int: String],
+        byEPGChannelID: [String: [String]]
+    ) -> [String] {
         if let sidString = entry.streamId ?? entry.epgId ?? entry.id,
            let sidInt = Int(sidString),
-           let stream = byStreamID[sidInt]
+           let sid = byStreamID[sidInt]
         {
-            return stream
+            return [sid]
         }
-        if let cid = entry.channelId, let stream = byEPGChannelID[cid] {
-            return stream
+        if let cid = entry.channelId, let sids = byEPGChannelID[cid] {
+            return sids
         }
-        return nil
+        return []
     }
 
     static func parseEPGDate(_ value: String?) -> Date? {
