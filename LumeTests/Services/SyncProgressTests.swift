@@ -3,7 +3,7 @@ import Foundation
 import Testing
 
 struct SyncProgressTests {
-    @Test func initialState() {
+    @Test func `initial state`() {
         let progress = SyncProgress()
         #expect(progress.currentStep == nil)
         #expect(progress.completedSteps.isEmpty)
@@ -11,7 +11,7 @@ struct SyncProgressTests {
         #expect(progress.stepFraction == 0)
     }
 
-    @Test func startStepMakesItCurrent() {
+    @Test func `start step makes it current`() {
         let progress = SyncProgress()
         progress.start(.authenticating)
         #expect(progress.currentStep == .authenticating)
@@ -19,7 +19,7 @@ struct SyncProgressTests {
         #expect(progress.stepFraction == 0)
     }
 
-    @Test func completeStepMarksItDone() {
+    @Test func `complete step marks it done`() {
         let progress = SyncProgress()
         progress.start(.movies)
         progress.complete(.movies)
@@ -27,13 +27,13 @@ struct SyncProgressTests {
         #expect(progress.currentStep == nil)
     }
 
-    @Test func completeUnstartedStepStillMarksItDone() {
+    @Test func `complete unstarted step still marks it done`() {
         let progress = SyncProgress()
         progress.complete(.series)
         #expect(progress.completedSteps.contains(.series))
     }
 
-    @Test func stateMachineTransitions() {
+    @Test func `state machine transitions`() {
         let progress = SyncProgress()
 
         #expect(progress.state(for: .authenticating) == .pending)
@@ -45,7 +45,7 @@ struct SyncProgressTests {
         #expect(progress.state(for: .authenticating) == .completed)
     }
 
-    @Test func updateStoresDetailAndFraction() {
+    @Test func `update stores detail and fraction`() {
         let progress = SyncProgress()
         progress.start(.movies)
         progress.update(detail: "500 of 5000", fraction: 0.1)
@@ -53,12 +53,12 @@ struct SyncProgressTests {
         #expect(progress.stepFraction == 0.1)
     }
 
-    @Test func overallFractionStartsAtZero() {
+    @Test func `overall fraction starts at zero`() {
         let progress = SyncProgress()
         #expect(progress.overallFraction == 0)
     }
 
-    @Test func overallFractionIncreasesWithCompletedSteps() {
+    @Test func `overall fraction increases with completed steps`() {
         let progress = SyncProgress()
         let totalSteps = Double(SyncStep.allCases.count)
 
@@ -69,7 +69,7 @@ struct SyncProgressTests {
         #expect(progress.overallFraction == 2.0 / totalSteps)
     }
 
-    @Test func overallFractionAllCompleted() {
+    @Test func `overall fraction all completed`() {
         let progress = SyncProgress()
         for step in SyncStep.allCases {
             progress.complete(step)
@@ -77,7 +77,7 @@ struct SyncProgressTests {
         #expect(progress.overallFraction == 1.0)
     }
 
-    @Test func overallFractionWithActiveStep() {
+    @Test func `overall fraction with active step`() {
         let progress = SyncProgress()
         progress.complete(.authenticating)
         progress.complete(.movieCategories)
@@ -89,19 +89,19 @@ struct SyncProgressTests {
         #expect(progress.overallFraction == expected)
     }
 
-    @Test func allStepsHaveTitles() {
+    @Test func `all steps have titles`() {
         for step in SyncStep.allCases {
             #expect(!step.title.isEmpty)
         }
     }
 
-    @Test func allStepsHaveSystemImages() {
+    @Test func `all steps have system images`() {
         for step in SyncStep.allCases {
             #expect(!step.systemImage.isEmpty)
         }
     }
 
-    @Test func stepOrderIsCorrect() {
+    @Test func `step order is correct`() {
         let ordered = SyncStep.allCases
         #expect(ordered[0] == .authenticating)
         #expect(ordered[1] == .movieCategories)

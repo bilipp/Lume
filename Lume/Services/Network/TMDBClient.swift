@@ -280,12 +280,12 @@ extension TitleDetailsResponse {
         let entries = releaseDates?.results ?? []
         func cert(for code: String) -> String? {
             entries.first { $0.countryCode == code }?
-                .releaseDates.compactMap { $0.certification }
+                .releaseDates.compactMap(\.certification)
                 .first { !$0.isEmpty }
         }
         if let usCert = cert(for: "US") { return usCert }
         for entry in entries {
-            if let cert = entry.releaseDates.compactMap({ $0.certification }).first(where: { !$0.isEmpty }) {
+            if let cert = entry.releaseDates.compactMap(\.certification).first(where: { !$0.isEmpty }) {
                 return cert
             }
         }
@@ -295,6 +295,6 @@ extension TitleDetailsResponse {
     private func tvRating() -> String? {
         let entries = contentRatings?.results ?? []
         if let usRating = entries.first(where: { $0.countryCode == "US" })?.rating, !usRating.isEmpty { return usRating }
-        return entries.compactMap { $0.rating }.first { !$0.isEmpty }
+        return entries.compactMap(\.rating).first { !$0.isEmpty }
     }
 }

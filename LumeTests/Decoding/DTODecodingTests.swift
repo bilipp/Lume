@@ -5,7 +5,7 @@ import Testing
 struct DTODecodingTests {
     // MARK: - Auth Response
 
-    @Test func decodeAccountInfo() throws {
+    @Test func `decode account info`() throws {
         let response: XtreamAuthResponse = try loadExampleJSON("AccountInfo.json")
         #expect(response.userInfo.username == "1234567890")
         #expect(response.userInfo.status == "Active")
@@ -15,14 +15,14 @@ struct DTODecodingTests {
 
     // MARK: - Categories
 
-    @Test func decodeLiveCategories() throws {
+    @Test func `decode live categories`() throws {
         let categories: [XtreamCategory] = try loadExampleJSON("LiveCategories.json")
         #expect(categories.count == 48, "Expected 48 live categories")
-        #expect(!categories.allSatisfy { $0.categoryId.isEmpty })
-        #expect(!categories.allSatisfy { $0.categoryName.isEmpty })
+        #expect(!categories.allSatisfy(\.categoryId.isEmpty))
+        #expect(!categories.allSatisfy(\.categoryName.isEmpty))
     }
 
-    @Test func decodeMovieCategories() throws {
+    @Test func `decode movie categories`() throws {
         let categories: [XtreamCategory] = try loadExampleJSON("MovieCategories.json")
         #expect(categories.count == 27, "Expected 27 movie categories")
         let first = try #require(categories.first)
@@ -31,14 +31,14 @@ struct DTODecodingTests {
         #expect(first.parentId == 0)
     }
 
-    @Test func decodeSeriesCategories() throws {
+    @Test func `decode series categories`() throws {
         let categories: [XtreamCategory] = try loadExampleJSON("SeriesCategories.json")
         #expect(categories.count == 19, "Expected 19 series categories")
     }
 
     // MARK: - Live Streams
 
-    @Test func decodeLiveStreams() throws {
+    @Test func `decode live streams`() throws {
         let streams: [XtreamLiveStream] = try loadExampleJSON("LiveStreams.json")
         #expect(streams.count == 2568, "Expected 2568 live streams")
         let first = try #require(streams.first)
@@ -47,7 +47,7 @@ struct DTODecodingTests {
         #expect(first.categoryId == "1339")
     }
 
-    @Test func liveStreamTypeCoercion() throws {
+    @Test func `live stream type coercion`() throws {
         let streams: [XtreamLiveStream] = try loadExampleJSON("LiveStreams.json")
         let sample = try #require(streams.first)
         #expect(sample.isAdult == 0)
@@ -57,12 +57,12 @@ struct DTODecodingTests {
 
     // MARK: - Movies
 
-    @Test func decodeMoviesCount() throws {
+    @Test func `decode movies count`() throws {
         let movies: [XtreamVODStream] = try loadExampleJSON("Movies.json")
         #expect(movies.count > 10000, "Expected at least 10,000 movies")
     }
 
-    @Test func decodeFirstMovie() throws {
+    @Test func `decode first movie`() throws {
         let movies: [XtreamVODStream] = try loadExampleJSON("Movies.json")
         let first = try #require(movies.first)
         #expect(first.streamId == 2_001_952)
@@ -71,7 +71,7 @@ struct DTODecodingTests {
         #expect(first.containerExtension == "mkv")
     }
 
-    @Test func movieTypeCoercion() throws {
+    @Test func `movie type coercion`() throws {
         let movies: [XtreamVODStream] = try loadExampleJSON("Movies.json")
         let first = try #require(movies.first)
         // rating comes as String "6.406" — should decode as Double
@@ -88,14 +88,14 @@ struct DTODecodingTests {
         #expect(first.added == "1779391620")
     }
 
-    @Test func movieTmdbTypeCoercion() throws {
+    @Test func `movie tmdb type coercion`() throws {
         let movies: [XtreamVODStream] = try loadExampleJSON("Movies.json")
         // Some tmdb values might be Int — the DTO handles both
         let withIntTmdb = movies.first { $0.tmdb == "25641" }
         #expect(withIntTmdb != nil)
     }
 
-    @Test func movieTmdbIdFallbackKey() throws {
+    @Test func `movie tmdb id fallback key`() throws {
         // Playlist variant that uses "tmdb_id" (Int) instead of "tmdb".
         let json = Data("""
         [{
@@ -117,7 +117,7 @@ struct DTODecodingTests {
 
     // MARK: - Movie Info
 
-    @Test func decodeMovieInfo() throws {
+    @Test func `decode movie info`() throws {
         let info: XtreamVODInfo = try loadExampleJSON("MovieInfo.json")
         let metadata = try #require(info.info)
         #expect(metadata.name == "Harry Potter and the Chamber of Secrets")
@@ -132,12 +132,12 @@ struct DTODecodingTests {
 
     // MARK: - Series
 
-    @Test func decodeSeriesCount() throws {
+    @Test func `decode series count`() throws {
         let series: [XtreamSeries] = try loadExampleJSON("Series.json")
         #expect(series.count == 2215, "Expected 2215 series")
     }
 
-    @Test func decodeFirstSeries() throws {
+    @Test func `decode first series`() throws {
         let series: [XtreamSeries] = try loadExampleJSON("Series.json")
         let first = try #require(series.first)
         #expect(first.seriesId == 46567)
@@ -145,7 +145,7 @@ struct DTODecodingTests {
         #expect(first.categoryId == "817")
     }
 
-    @Test func seriesTypeCoercion() throws {
+    @Test func `series type coercion`() throws {
         let series: [XtreamSeries] = try loadExampleJSON("Series.json")
         let sample = try #require(series.first { $0.seriesId == 46565 })
         // rating comes as String "8"
@@ -156,7 +156,7 @@ struct DTODecodingTests {
         #expect(sample.tmdb == "278113")
     }
 
-    @Test func seriesTmdbIdFallbackKey() throws {
+    @Test func `series tmdb id fallback key`() throws {
         // Playlist variant that uses "tmdb_id" (Int) instead of "tmdb".
         let json = Data("""
         [{
@@ -174,7 +174,7 @@ struct DTODecodingTests {
         #expect(first.tmdb == "304597")
     }
 
-    @Test func seriesCategoryIdTypeCoercion() throws {
+    @Test func `series category id type coercion`() throws {
         let series: [XtreamSeries] = try loadExampleJSON("Series.json")
         // All category_id values in the real data should be strings
         for serie in series.prefix(100) {
@@ -184,7 +184,7 @@ struct DTODecodingTests {
 
     // MARK: - Series Info
 
-    @Test func decodeSeriesInfo() throws {
+    @Test func `decode series info`() throws {
         let info: XtreamSeriesInfoResponse = try loadExampleJSON("SeriesInfo.json")
         let metadata = try #require(info.info)
         #expect(metadata.name == "Breaking Bad")
@@ -195,7 +195,7 @@ struct DTODecodingTests {
         #expect(episodes["2"]?.count == 13, "Season 2 should have 13 episodes")
     }
 
-    @Test func decodeEpisodeFromSeriesInfo() throws {
+    @Test func `decode episode from series info`() throws {
         let info: XtreamSeriesInfoResponse = try loadExampleJSON("SeriesInfo.json")
         let episodes = try #require(info.episodes)
         let firstEp = try #require(episodes["1"]?.first)

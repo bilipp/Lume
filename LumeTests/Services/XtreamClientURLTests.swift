@@ -24,7 +24,7 @@ struct XtreamClientURLTests {
 
     // MARK: - Movie URL
 
-    @Test func buildMovieURLStandard() {
+    @Test func `build movie URL standard`() {
         let client = makeClient()
         let playlist = makePlaylist()
         let movie = Movie(id: "t-123", streamId: 123, name: "Test", containerExtension: "mp4")
@@ -33,7 +33,7 @@ struct XtreamClientURLTests {
         #expect(url == expected)
     }
 
-    @Test func buildMovieURLDefaultExtension() {
+    @Test func `build movie URL default extension`() {
         let client = makeClient()
         let playlist = makePlaylist()
         let movie = Movie(id: "t-456", streamId: 456, name: "No Ext")
@@ -42,7 +42,7 @@ struct XtreamClientURLTests {
         #expect(url == expected)
     }
 
-    @Test func buildMovieURLSpecialChars() {
+    @Test func `build movie URL special chars`() {
         let client = makeClient(serverURL: "http://example.com:8080")
         let playlist = makePlaylist(username: "user@name", password: "p@ss!word")
         let movie = Movie(id: "t-789", streamId: 789, name: "Test", containerExtension: "mkv")
@@ -53,7 +53,7 @@ struct XtreamClientURLTests {
 
     // MARK: - Episode URL
 
-    @Test func buildEpisodeURL() {
+    @Test func `build episode URL`() {
         let client = makeClient()
         let playlist = makePlaylist()
         let episode = Episode(
@@ -69,7 +69,7 @@ struct XtreamClientURLTests {
         #expect(url == expected)
     }
 
-    @Test func buildEpisodeURLDefaultExtension() {
+    @Test func `build episode URL default extension`() {
         let client = makeClient()
         let playlist = makePlaylist()
         let episode = Episode(
@@ -87,7 +87,7 @@ struct XtreamClientURLTests {
 
     // MARK: - Live Stream URL
 
-    @Test func buildLiveStreamURLDefaultFormat() {
+    @Test func `build live stream URL default format`() {
         let client = makeClient()
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-1", streamId: 555, name: "Test Channel")
@@ -96,7 +96,7 @@ struct XtreamClientURLTests {
         #expect(url == expected)
     }
 
-    @Test func buildLiveStreamURLTSFormat() {
+    @Test func `build live stream URLTS format`() {
         let client = makeClient()
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-2", streamId: 666, name: "TS Channel")
@@ -107,7 +107,7 @@ struct XtreamClientURLTests {
 
     // MARK: - Catchup URL
 
-    @Test func buildCatchupURL() {
+    @Test func `build catchup URL`() {
         let client = makeClient()
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-3", streamId: 777, name: "Catchup Channel")
@@ -120,7 +120,7 @@ struct XtreamClientURLTests {
 
     // MARK: - Server URL trailing slash handling
 
-    @Test func buildMovieURLWithTrailingSlash() {
+    @Test func `build movie URL with trailing slash`() {
         let client = makeClient(serverURL: "http://example.com:8080/")
         let playlist = makePlaylist(serverURL: "http://example.com:8080/")
         let movie = Movie(id: "t-1", streamId: 1, name: "Test", containerExtension: "mp4")
@@ -128,7 +128,7 @@ struct XtreamClientURLTests {
         #expect(url?.absoluteString == "http://example.com:8080//movie/testuser/testpass/1.mp4")
     }
 
-    @Test func buildMovieURLWithoutTrailingSlash() {
+    @Test func `build movie URL without trailing slash`() {
         let client = makeClient(serverURL: "http://example.com:8080")
         let playlist = makePlaylist(serverURL: "http://example.com:8080")
         let movie = Movie(id: "t-1", streamId: 1, name: "Test", containerExtension: "mp4")
@@ -138,7 +138,7 @@ struct XtreamClientURLTests {
 
     // MARK: - API URLs
 
-    @Test func getInfoURL() {
+    @Test func `get info URL`() {
         let client = makeClient()
         #expect(client.configuration.serverURL == "http://example.com:8080")
         #expect(client.configuration.username == "testuser")

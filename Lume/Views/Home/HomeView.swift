@@ -49,21 +49,21 @@ struct HomeView: View {
         // Recently watched: non-nil lastWatchedDate, newest first.
         var movies = FetchDescriptor<Movie>(
             predicate: #Predicate { $0.lastWatchedDate != nil },
-            sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)],
+            sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
         )
         movies.fetchLimit = 20
         _watchedMovies = Query(movies)
 
         var series = FetchDescriptor<Series>(
             predicate: #Predicate { $0.lastWatchedDate != nil },
-            sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)],
+            sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
         )
         series.fetchLimit = 20
         _watchedSeries = Query(series)
 
         var streams = FetchDescriptor<LiveStream>(
             predicate: #Predicate { $0.lastWatchedDate != nil },
-            sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)],
+            sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
         )
         streams.fetchLimit = 20
         _watchedStreams = Query(streams)
@@ -71,21 +71,21 @@ struct HomeView: View {
         // Favorites: alphabetical, capped.
         var favMovies = FetchDescriptor<Movie>(
             predicate: #Predicate { $0.isFavorite },
-            sortBy: [SortDescriptor(\.name)],
+            sortBy: [SortDescriptor(\.name)]
         )
         favMovies.fetchLimit = 30
         _favoriteMovies = Query(favMovies)
 
         var favSeries = FetchDescriptor<Series>(
             predicate: #Predicate { $0.isFavorite },
-            sortBy: [SortDescriptor(\.name)],
+            sortBy: [SortDescriptor(\.name)]
         )
         favSeries.fetchLimit = 30
         _favoriteSeries = Query(favSeries)
 
         var favStreams = FetchDescriptor<LiveStream>(
             predicate: #Predicate { $0.isFavorite },
-            sortBy: [SortDescriptor(\.name)],
+            sortBy: [SortDescriptor(\.name)]
         )
         favStreams.fetchLimit = 30
         _favoriteStreams = Query(favStreams)
@@ -98,13 +98,13 @@ struct HomeView: View {
                     ContentUnavailableView(
                         "No Playlists",
                         systemImage: "house",
-                        description: Text("Add a playlist in Settings to get started"),
+                        description: Text("Add a playlist in Settings to get started")
                     )
                 } else if isEmpty {
                     ContentUnavailableView(
                         "Nothing Here Yet",
                         systemImage: "house",
-                        description: Text("Watch something or mark titles as favorites and they'll show up here."),
+                        description: Text("Watch something or mark titles as favorites and they'll show up here.")
                     )
                 } else {
                     ScrollView {
@@ -143,7 +143,7 @@ struct HomeView: View {
                     contentSortRaw: $contentSortRaw,
                     showingSync: $showingSync,
                     showingSettings: $showingSettings,
-                    activePlaylist: activePlaylist,
+                    activePlaylist: activePlaylist
                 ))
                 .navigationDestination(for: Movie.self) { movie in
                     MovieDetailView(movie: movie, animationNamespace: animationNamespace)
@@ -242,7 +242,7 @@ struct HomeView: View {
                         heroes.append(.movie(
                             movie,
                             backdropURL: TMDBClient.backdropURL(title.backdropPath),
-                            overview: title.overview,
+                            overview: title.overview
                         ))
                     }
                 }
@@ -253,7 +253,7 @@ struct HomeView: View {
                         heroes.append(.series(
                             series,
                             backdropURL: TMDBClient.backdropURL(title.backdropPath),
-                            overview: title.overview,
+                            overview: title.overview
                         ))
                     }
                 }

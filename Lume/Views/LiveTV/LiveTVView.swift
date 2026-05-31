@@ -42,14 +42,14 @@ struct LiveTVView: View {
                     ContentUnavailableView(
                         "No Playlists",
                         systemImage: "antenna.radiowaves.left.and.right",
-                        description: Text("Add a playlist in Settings to start watching live TV"),
+                        description: Text("Add a playlist in Settings to start watching live TV")
                     )
                 } else if categories.isEmpty {
                     VStack(spacing: 20) {
                         ContentUnavailableView(
                             "No Channels",
                             systemImage: "antenna.radiowaves.left.and.right",
-                            description: Text("Sync your playlist to load live TV channels"),
+                            description: Text("Sync your playlist to load live TV channels")
                         )
 
                         if let playlist = activePlaylist {
@@ -79,7 +79,7 @@ struct LiveTVView: View {
                 contentSortRaw: $contentSortRaw,
                 showingSync: $showingSync,
                 showingSettings: $showingSettings,
-                activePlaylist: activePlaylist,
+                activePlaylist: activePlaylist
             ))
             .task {
                 if selectedCategory == nil, let first = sortedCategories.first {
@@ -107,7 +107,7 @@ struct LiveTVView: View {
             VStack(spacing: 0) {
                 CategoryBar(
                     categories: sortedCategories,
-                    selectedCategory: $selectedCategory,
+                    selectedCategory: $selectedCategory
                 )
 
                 if let category = selectedCategory {
@@ -119,7 +119,7 @@ struct LiveTVView: View {
                     ContentUnavailableView(
                         "Select a Category",
                         systemImage: "list.bullet",
-                        description: Text("Choose a category from the list"),
+                        description: Text("Choose a category from the list")
                     )
                 }
             }
@@ -130,7 +130,7 @@ struct LiveTVView: View {
         HStack(spacing: 0) {
             CategorySidebar(
                 categories: sortedCategories,
-                selectedCategory: $selectedCategory,
+                selectedCategory: $selectedCategory
             )
             .frame(width: 200)
 
@@ -145,7 +145,7 @@ struct LiveTVView: View {
                 ContentUnavailableView(
                     "Select a Category",
                     systemImage: "list.bullet",
-                    description: Text("Choose a category from the sidebar"),
+                    description: Text("Choose a category from the sidebar")
                 )
             }
         }
@@ -200,7 +200,7 @@ struct CategorySidebar: View {
             .listRowBackground(
                 selectedCategory?.id == category.id
                     ? Color.accentColor.opacity(0.15)
-                    : Color.clear,
+                    : Color.clear
             )
         }
         .listStyle(.sidebar)
@@ -229,12 +229,12 @@ struct CategorySidebar: View {
                                 .background(
                                     selectedCategory?.id == category.id
                                         ? Color.accentColor
-                                        : Color.gray.opacity(0.15),
+                                        : Color.gray.opacity(0.15)
                                 )
                                 .foregroundStyle(
                                     selectedCategory?.id == category.id
                                         ? .white
-                                        : .primary,
+                                        : .primary
                                 )
                                 .clipShape(Capsule())
                         }
@@ -264,7 +264,7 @@ struct ChannelsList: View {
         let categoryId = category.id
         _streams = Query(
             filter: #Predicate<LiveStream> { $0.categoryId == categoryId },
-            sort: sort.liveStreamDescriptors,
+            sort: sort.liveStreamDescriptors
         )
     }
 
@@ -275,7 +275,7 @@ struct ChannelsList: View {
                     ContentUnavailableView(
                         "No Channels",
                         systemImage: "antenna.radiowaves.left.and.right",
-                        description: Text("This category has no channels"),
+                        description: Text("This category has no channels")
                     )
                 } else {
                     ForEach(streams) { stream in

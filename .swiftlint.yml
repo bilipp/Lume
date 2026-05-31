@@ -1,6 +1,6 @@
 disabled_rules:
-  # Disabled because swiftformat enforces the opposite (consistent trailing commas).
-  - trailing_comma
+  # Disabled because swiftformat enforces the opposite
+  - opening_brace
 
 line_length:
   warning: 200

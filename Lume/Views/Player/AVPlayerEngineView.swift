@@ -106,14 +106,14 @@ final class PlayerObservation {
         statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
             guard let self else { return }
             let status = item.status
-            let target = self.startTime
-            let live = self.isLive
+            let target = startTime
+            let live = isLive
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if status == .readyToPlay, !self.didSeekToStart, !live, target > 1 {
-                    self.didSeekToStart = true
+                if status == .readyToPlay, !didSeekToStart, !live, target > 1 {
+                    didSeekToStart = true
                     let cmTime = CMTime(seconds: target, preferredTimescale: 600)
-                    await self.player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+                    await player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
                 }
             }
         }

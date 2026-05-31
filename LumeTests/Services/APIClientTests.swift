@@ -5,7 +5,7 @@ import Testing
 struct APIClientTests {
     // MARK: - HTTPMethod
 
-    @Test func httpMethodRawValues() {
+    @Test func `http method raw values`() {
         #expect(HTTPMethod.get.rawValue == "GET")
         #expect(HTTPMethod.post.rawValue == "POST")
         #expect(HTTPMethod.put.rawValue == "PUT")
@@ -15,7 +15,7 @@ struct APIClientTests {
 
     // MARK: - Endpoint asURLRequest
 
-    @Test func endpointBuildsBasicURL() throws {
+    @Test func `endpoint builds basic URL`() throws {
         let endpoint = try TestEndpoint(
             baseURL: #require(URL(string: "http://example.com")),
             path: "/api/test",
@@ -26,7 +26,7 @@ struct APIClientTests {
         #expect(request.httpMethod == "GET")
     }
 
-    @Test func endpointWithoutLeadingSlash() throws {
+    @Test func `endpoint without leading slash`() throws {
         let endpoint = try TestEndpoint(
             baseURL: #require(URL(string: "http://example.com/api")),
             path: "test",
@@ -36,7 +36,7 @@ struct APIClientTests {
         #expect(request.url?.absoluteString == "http://example.com/api/test")
     }
 
-    @Test func endpointWithTrailingSlashOnBase() throws {
+    @Test func `endpoint with trailing slash on base`() throws {
         let endpoint = try TestEndpoint(
             baseURL: #require(URL(string: "http://example.com/api/")),
             path: "/test",
@@ -46,14 +46,14 @@ struct APIClientTests {
         #expect(request.url?.absoluteString == "http://example.com/api//test")
     }
 
-    @Test func endpointWithQueryItems() throws {
+    @Test func `endpoint with query items`() throws {
         let endpoint = try TestEndpoint(
             baseURL: #require(URL(string: "http://example.com")),
             path: "/search",
             method: .get,
             queryItems: [
                 URLQueryItem(name: "q", value: "test"),
-                URLQueryItem(name: "limit", value: "10"),
+                URLQueryItem(name: "limit", value: "10")
             ]
         )
         let request = try endpoint.asURLRequest()
@@ -62,7 +62,7 @@ struct APIClientTests {
         #expect(urlString.contains("limit=10"))
     }
 
-    @Test func endpointWithHeaders() throws {
+    @Test func `endpoint with headers`() throws {
         let endpoint = try TestEndpoint(
             baseURL: #require(URL(string: "http://example.com")),
             path: "/auth",
@@ -73,7 +73,7 @@ struct APIClientTests {
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token123")
     }
 
-    @Test func endpointWithBody() throws {
+    @Test func `endpoint with body`() throws {
         let body = try JSONSerialization.data(withJSONObject: ["key": "value"])
         let endpoint = try TestEndpoint(
             baseURL: #require(URL(string: "http://example.com")),
@@ -85,7 +85,7 @@ struct APIClientTests {
         #expect(request.httpBody == body)
     }
 
-    @Test func endpointDefaultTimeout() throws {
+    @Test func `endpoint default timeout`() throws {
         let endpoint = try TestEndpoint(
             baseURL: #require(URL(string: "http://example.com")),
             path: "/test",
@@ -95,7 +95,7 @@ struct APIClientTests {
         #expect(request.timeoutInterval == 60)
     }
 
-    @Test func endpointCustomTimeout() throws {
+    @Test func `endpoint custom timeout`() throws {
         let endpoint = try TestEndpoint(
             baseURL: #require(URL(string: "http://example.com")),
             path: "/test",
@@ -108,33 +108,33 @@ struct APIClientTests {
 
     // MARK: - NetworkError
 
-    @Test func networkErrorDescriptions() {
+    @Test func `network error descriptions`() {
         #expect(NetworkError.invalidURL.errorDescription == "The URL is invalid")
         #expect(NetworkError.noConnection.errorDescription == "No internet connection")
         #expect(NetworkError.invalidResponse.errorDescription == "Invalid response from server")
         #expect(NetworkError.authenticationFailed.errorDescription == "Authentication failed. Please check your credentials.")
     }
 
-    @Test func networkErrorServerErrorMessage() {
+    @Test func `network error server error message`() {
         let error = NetworkError.serverError(500)
         #expect(error.errorDescription?.contains("500") == true)
     }
 
-    @Test func networkErrorDecodingMessage() {
+    @Test func `network error decoding message`() {
         let error = NetworkError.decodingError(NSError(domain: "test", code: 1))
         #expect(error.errorDescription?.contains("Failed to decode") == true)
     }
 
     // MARK: - Retriable
 
-    @Test func retriableErrors() {
+    @Test func `retriable errors`() {
         #expect(NetworkError.noConnection.isRetriable == true)
         #expect(NetworkError.timeout.isRetriable == true)
         #expect(NetworkError.rateLimited(retryAfter: 10).isRetriable == true)
         #expect(NetworkError.serverError(502).isRetriable == true)
     }
 
-    @Test func nonRetriableErrors() {
+    @Test func `non retriable errors`() {
         #expect(NetworkError.invalidURL.isRetriable == false)
         #expect(NetworkError.authenticationFailed.isRetriable == false)
         #expect(NetworkError.invalidResponse.isRetriable == false)
@@ -145,14 +145,14 @@ struct APIClientTests {
 
     // MARK: - RetryBackoff
 
-    @Test func linearBackoff() {
+    @Test func `linear backoff`() {
         let backoff = RetryBackoff.linear
         #expect(backoff.delay(for: 1) == 1)
         #expect(backoff.delay(for: 2) == 2)
         #expect(backoff.delay(for: 3) == 3)
     }
 
-    @Test func exponentialBackoff() {
+    @Test func `exponential backoff`() {
         let backoff = RetryBackoff.exponential
         #expect(backoff.delay(for: 1) == 2)
         #expect(backoff.delay(for: 2) == 4)
@@ -162,13 +162,13 @@ struct APIClientTests {
 
     // MARK: - RetryBackoff additional
 
-    @Test func exponentialBackoffIncreases() {
+    @Test func `exponential backoff increases`() {
         let backoff = RetryBackoff.exponential
         #expect(backoff.delay(for: 1) < backoff.delay(for: 2))
         #expect(backoff.delay(for: 2) < backoff.delay(for: 3))
     }
 
-    @Test func linearBackoffIncreases() {
+    @Test func `linear backoff increases`() {
         let backoff = RetryBackoff.linear
         #expect(backoff.delay(for: 1) < backoff.delay(for: 2))
         #expect(backoff.delay(for: 2) < backoff.delay(for: 3))

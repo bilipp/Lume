@@ -99,7 +99,7 @@ extension Endpoint {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
 
         if !path.isEmpty {
-            if components?.path.hasSuffix("/") == false && !path.hasPrefix("/") {
+            if components?.path.hasSuffix("/") == false, !path.hasPrefix("/") {
                 components?.path.append("/")
             }
             components?.path.append(path)
@@ -151,37 +151,37 @@ enum NetworkError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "The URL is invalid"
+            "The URL is invalid"
         case .noConnection:
-            return "No internet connection"
+            "No internet connection"
         case .timeout:
-            return "The request timed out"
+            "The request timed out"
         case .invalidResponse:
-            return "Invalid response from server"
+            "Invalid response from server"
         case .authenticationFailed:
-            return "Authentication failed. Please check your credentials."
+            "Authentication failed. Please check your credentials."
         case let .rateLimited(retryAfter):
-            return "Too many requests. Please try again in \(Int(retryAfter)) seconds."
+            "Too many requests. Please try again in \(Int(retryAfter)) seconds."
         case let .serverError(code):
-            return "Server error (code: \(code))"
+            "Server error (code: \(code))"
         case let .decodingError(error):
-            return "Failed to decode response: \(error.localizedDescription)"
+            "Failed to decode response: \(error.localizedDescription)"
         case .unknown:
-            return "An unknown error occurred"
+            "An unknown error occurred"
         }
     }
 
     var isRetriable: Bool {
         switch self {
         case .noConnection, .timeout:
-            return true
+            true
         case let .serverError(code):
             // Retry on 5xx server errors
-            return code >= 500
+            code >= 500
         case .rateLimited:
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 }
@@ -195,9 +195,9 @@ enum RetryBackoff {
     func delay(for attempt: Int) -> TimeInterval {
         switch self {
         case .linear:
-            return TimeInterval(attempt)
+            TimeInterval(attempt)
         case .exponential:
-            return pow(2.0, Double(attempt))
+            pow(2.0, Double(attempt))
         }
     }
 }

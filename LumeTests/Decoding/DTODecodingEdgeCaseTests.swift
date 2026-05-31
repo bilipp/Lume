@@ -5,7 +5,7 @@ import Testing
 struct DTODecodingEdgeCaseTests {
     // MARK: - XtreamEpisode ID/Season coercion
 
-    @Test func episodeDecodesStringID() throws {
+    @Test func `episode decodes string ID`() throws {
         let json = Data("""
         {"id": "129902", "episode_num": 1, "season": 1}
         """.utf8)
@@ -14,7 +14,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(episode.season == 1)
     }
 
-    @Test func episodeDecodesIntID() throws {
+    @Test func `episode decodes int ID`() throws {
         let json = Data("""
         {"id": 12345, "episode_num": 2, "season": "2"}
         """.utf8)
@@ -23,7 +23,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(episode.season == 2)
     }
 
-    @Test func episodeMissingID() throws {
+    @Test func `episode missing ID`() throws {
         let json = Data("""
         {"episode_num": 1}
         """.utf8)
@@ -31,7 +31,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(episode.id == nil)
     }
 
-    @Test func episodeDecodesWithInfo() throws {
+    @Test func `episode decodes with info`() throws {
         let json = Data("""
         {
             "id": "1",
@@ -58,7 +58,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(info.rating == 7.5)
     }
 
-    @Test func episodeInfoRatingAsString() throws {
+    @Test func `episode info rating as string`() throws {
         let json = Data("""
         {
             "id": "1",
@@ -70,7 +70,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(episode.info?.rating == 8.2)
     }
 
-    @Test func episodeInfoDurationAsString() throws {
+    @Test func `episode info duration as string`() throws {
         let json = Data("""
         {
             "id": "1",
@@ -82,7 +82,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(episode.info?.durationSecs == 1800)
     }
 
-    @Test func episodeInfoMissingFields() throws {
+    @Test func `episode info missing fields`() throws {
         let json = Data("""
         {"id": "1", "episode_num": 1, "info": {}}
         """.utf8)
@@ -94,7 +94,7 @@ struct DTODecodingEdgeCaseTests {
 
     // MARK: - XtreamShortEPG
 
-    @Test func shortEPGDecodes() throws {
+    @Test func `short EPG decodes`() throws {
         let json = Data("""
         {"start": "1700000000", "end": "1700003600", "title": "News", "description": "News program"}
         """.utf8)
@@ -105,7 +105,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(epg.end == "1700003600")
     }
 
-    @Test func shortEPGWithNilFields() throws {
+    @Test func `short EPG with nil fields`() throws {
         let json = Data("""
         {"start": null, "end": null, "title": null, "description": null}
         """.utf8)
@@ -116,7 +116,7 @@ struct DTODecodingEdgeCaseTests {
 
     // MARK: - XtreamLiveStream coercion variants
 
-    @Test func liveStreamCategoryIDAsInt() throws {
+    @Test func `live stream category ID as int`() throws {
         let json = Data("""
         {"stream_id": 1, "category_id": 42}
         """.utf8)
@@ -124,7 +124,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(stream.categoryId == "42")
     }
 
-    @Test func liveStreamCategoryIDAsString() throws {
+    @Test func `live stream category ID as string`() throws {
         let json = Data("""
         {"stream_id": 1, "category_id": "42"}
         """.utf8)
@@ -132,7 +132,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(stream.categoryId == "42")
     }
 
-    @Test func liveStreamIsAdultCoercion() throws {
+    @Test func `live stream is adult coercion`() throws {
         let json = Data("""
         {"stream_id": 1, "is_adult": "1"}
         """.utf8)
@@ -140,7 +140,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(stream.isAdult == 1)
     }
 
-    @Test func liveStreamTvArchiveCoercion() throws {
+    @Test func `live stream tv archive coercion`() throws {
         let json = Data("""
         {"stream_id": 1, "tv_archive": "1", "tv_archive_duration": "7"}
         """.utf8)
@@ -151,7 +151,7 @@ struct DTODecodingEdgeCaseTests {
 
     // MARK: - XtreamVODStream rating coercion edge cases
 
-    @Test func vodStreamRatingAsDouble() throws {
+    @Test func `vod stream rating as double`() throws {
         let json = Data("""
         {"stream_id": 1, "rating": 6.5, "rating_5based": 3.2}
         """.utf8)
@@ -160,7 +160,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(stream.rating5Based == 3.2)
     }
 
-    @Test func vodStreamRatingAsString() throws {
+    @Test func `vod stream rating as string`() throws {
         let json = Data("""
         {"stream_id": 1, "rating": "7.0", "rating_5based": "3.5"}
         """.utf8)
@@ -169,7 +169,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(stream.rating5Based == 3.5)
     }
 
-    @Test func vodStreamMissingRatingDefaultsToZero() throws {
+    @Test func `vod stream missing rating defaults to zero`() throws {
         let json = Data("""
         {"stream_id": 1}
         """.utf8)
@@ -178,7 +178,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(stream.rating5Based == 0.0)
     }
 
-    @Test func vodStreamIsAdultIntCoercion() throws {
+    @Test func `vod stream is adult int coercion`() throws {
         let json = Data("""
         {"stream_id": 1, "is_adult": "1"}
         """.utf8)
@@ -186,7 +186,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(stream.isAdult == 1)
     }
 
-    @Test func vodStreamCategoryIDAsInt() throws {
+    @Test func `vod stream category ID as int`() throws {
         let json = Data("""
         {"stream_id": 1, "category_id": 99}
         """.utf8)
@@ -196,7 +196,7 @@ struct DTODecodingEdgeCaseTests {
 
     // MARK: - XtreamVODMetadata duration coercion
 
-    @Test func vodMetadataDurationAsString() throws {
+    @Test func `vod metadata duration as string`() throws {
         let json = Data("""
         {"duration_secs": "3600"}
         """.utf8)
@@ -204,7 +204,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(meta.durationSecs == 3600)
     }
 
-    @Test func vodMetadataTmdbAsInt() throws {
+    @Test func `vod metadata tmdb as int`() throws {
         let json = Data("""
         {"tmdb_id": 12345}
         """.utf8)
@@ -214,7 +214,7 @@ struct DTODecodingEdgeCaseTests {
 
     // MARK: - XtreamSeries category_id coercion
 
-    @Test func seriesCategoryIDAsInt() throws {
+    @Test func `series category ID as int`() throws {
         let json = Data("""
         {"series_id": 1, "category_id": 42}
         """.utf8)
@@ -222,7 +222,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(series.categoryId == "42")
     }
 
-    @Test func seriesCategoryIDAsString() throws {
+    @Test func `series category ID as string`() throws {
         let json = Data("""
         {"series_id": 1, "category_id": "42"}
         """.utf8)
@@ -232,7 +232,7 @@ struct DTODecodingEdgeCaseTests {
 
     // MARK: - XtreamAuthResponse
 
-    @Test func authResponseDecodesPartialData() throws {
+    @Test func `auth response decodes partial data`() throws {
         let json = Data("""
         {
             "user_info": {"username": "test"},
@@ -244,7 +244,7 @@ struct DTODecodingEdgeCaseTests {
         #expect(response.serverInfo.url == "example.com")
     }
 
-    @Test func serverInfoProperties() throws {
+    @Test func `server info properties`() throws {
         let json = Data("""
         {
             "user_info": {},

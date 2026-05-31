@@ -19,7 +19,7 @@ struct LumeApp: App {
             Series.self,
             Episode.self,
             CastMember.self,
-            EPGListing.self,
+            EPGListing.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

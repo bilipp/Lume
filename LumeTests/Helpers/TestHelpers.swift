@@ -10,7 +10,7 @@ func makeTestContainer() throws -> ModelContainer {
         Movie.self,
         Series.self,
         Episode.self,
-        EPGListing.self,
+        EPGListing.self
     ])
     let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     return try ModelContainer(for: schema, configurations: [config])
@@ -18,7 +18,7 @@ func makeTestContainer() throws -> ModelContainer {
 
 func exampleDataURL(_ filename: String, filePath: String = #filePath) -> URL {
     var url = URL(fileURLWithPath: filePath)
-    while url.lastPathComponent != "LumeTests" && url.lastPathComponent != "LumeUITests" {
+    while url.lastPathComponent != "LumeTests", url.lastPathComponent != "LumeUITests" {
         url.deleteLastPathComponent()
     }
     url.deleteLastPathComponent()

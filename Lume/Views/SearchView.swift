@@ -156,11 +156,11 @@ enum SearchResult: Identifiable, Hashable {
     var id: String {
         switch self {
         case let .movie(movie):
-            return "movie-\(movie.id)"
+            "movie-\(movie.id)"
         case let .series(series):
-            return "series-\(series.id)"
+            "series-\(series.id)"
         case let .liveStream(stream):
-            return "live-\(stream.id)"
+            "live-\(stream.id)"
         }
     }
 
@@ -231,66 +231,66 @@ struct SearchResultRow: View {
     private var thumbnailURL: URL? {
         switch result {
         case let .movie(movie):
-            return URL(string: movie.streamIcon ?? "")
+            URL(string: movie.streamIcon ?? "")
         case let .series(series):
-            return URL(string: series.cover ?? "")
+            URL(string: series.cover ?? "")
         case let .liveStream(stream):
-            return URL(string: stream.streamIcon ?? "")
+            URL(string: stream.streamIcon ?? "")
         }
     }
 
     private var title: String {
         switch result {
         case let .movie(movie):
-            return movie.name
+            movie.name
         case let .series(series):
-            return series.name
+            series.name
         case let .liveStream(stream):
-            return stream.name
+            stream.name
         }
     }
 
     private var subtitle: String {
         switch result {
         case let .movie(movie):
-            return movie.genre ?? movie.releaseDate ?? ""
+            movie.genre ?? movie.releaseDate ?? ""
         case let .series(series):
-            return series.genre ?? series.releaseDate ?? ""
+            series.genre ?? series.releaseDate ?? ""
         case .liveStream:
-            return "Live"
+            "Live"
         }
     }
 
     private var categoryName: String {
         switch result {
         case .movie:
-            return "Movie"
+            "Movie"
         case .series:
-            return "Series"
+            "Series"
         case .liveStream:
-            return "Live TV"
+            "Live TV"
         }
     }
 
     private var categoryIcon: String {
         switch result {
         case .movie:
-            return "film"
+            "film"
         case .series:
-            return "tv"
+            "tv"
         case .liveStream:
-            return "antenna.radiowaves.left.and.right"
+            "antenna.radiowaves.left.and.right"
         }
     }
 
     private var iconName: String {
         switch result {
         case .movie:
-            return "film"
+            "film"
         case .series:
-            return "tv"
+            "tv"
         case .liveStream:
-            return "antenna.radiowaves.left.and.right"
+            "antenna.radiowaves.left.and.right"
         }
     }
 }

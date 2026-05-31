@@ -9,7 +9,7 @@ struct PlayableMediaTests {
 
     // MARK: - from(movie:playlist:client:)
 
-    @Test func fromMovieCreatesMedia() throws {
+    @Test func `from movie creates media`() throws {
         let playlist = makePlaylist()
         let movie = Movie(id: "p-1", streamId: 100, name: "Test Movie",
                           streamIcon: "http://example.com/poster.jpg",
@@ -27,7 +27,7 @@ struct PlayableMediaTests {
         #expect(unwrapped.contentRef == .movie(movie.id))
     }
 
-    @Test func fromMovieWithoutPoster() {
+    @Test func `from movie without poster`() {
         let playlist = makePlaylist()
         let movie = Movie(id: "p-2", streamId: 101, name: "No Poster", containerExtension: "ts")
         let media = PlayableMedia.from(movie: movie, playlist: playlist)
@@ -37,7 +37,7 @@ struct PlayableMediaTests {
 
     // MARK: - from(episode:playlist:client:)
 
-    @Test func fromEpisodeCreatesMedia() throws {
+    @Test func `from episode creates media`() throws {
         let playlist = makePlaylist()
         let series = Series(id: "s-1", seriesId: 1, name: "Test Series")
         let episode = Episode(
@@ -61,7 +61,7 @@ struct PlayableMediaTests {
         #expect(media.startTime == 120)
     }
 
-    @Test func fromEpisodeWithoutSeriesNameUsesEpisodeTitle() throws {
+    @Test func `from episode without series name uses episode title`() throws {
         let playlist = makePlaylist()
         let episode = Episode(
             id: "e-2",
@@ -78,7 +78,7 @@ struct PlayableMediaTests {
 
     // MARK: - from(stream:playlist:client:)
 
-    @Test func fromLiveStreamCreatesMedia() throws {
+    @Test func `from live stream creates media`() throws {
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-1", streamId: 200, name: "News Channel",
                                 streamIcon: "http://example.com/logo.png")
@@ -93,7 +93,7 @@ struct PlayableMediaTests {
         #expect(media.startTime == 0)
     }
 
-    @Test func fromLiveStreamWithoutPoster() {
+    @Test func `from live stream without poster`() {
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-2", streamId: 201, name: "Radio Stream")
         let media = PlayableMedia.from(stream: stream, playlist: playlist)
@@ -103,7 +103,7 @@ struct PlayableMediaTests {
 
     // MARK: - Codable
 
-    @Test func playableMediaCodableRoundTrip() throws {
+    @Test func `playable media codable round trip`() throws {
         let media = try PlayableMedia(
             id: "test-1",
             url: #require(URL(string: "http://example.com/stream.m3u8")),
@@ -121,7 +121,7 @@ struct PlayableMediaTests {
         #expect(decoded.title == media.title)
     }
 
-    @Test func playableMediaLiveCodeableRoundTrip() throws {
+    @Test func `playable media live codeable round trip`() throws {
         let media = try PlayableMedia(
             id: "live-1",
             url: #require(URL(string: "http://example.com/live.m3u8")),
@@ -140,7 +140,7 @@ struct PlayableMediaTests {
 
     // MARK: - Hashable
 
-    @Test func playableMediaHashable() throws {
+    @Test func `playable media hashable`() throws {
         let mediaA = try PlayableMedia(id: "x", url: #require(URL(string: "http://a.com")), title: "A", subtitle: nil, posterURL: nil, kind: .vod, startTime: 0, contentRef: .movie("m-1"))
         let mediaB = try PlayableMedia(id: "x", url: #require(URL(string: "http://b.com")), title: "B", subtitle: nil, posterURL: nil, kind: .vod, startTime: 0, contentRef: .movie("m-1"))
         let mediaC = try PlayableMedia(id: "y", url: #require(URL(string: "http://a.com")), title: "A", subtitle: nil, posterURL: nil, kind: .vod, startTime: 0, contentRef: .movie("m-2"))

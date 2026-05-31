@@ -6,7 +6,7 @@ import Testing
 struct ModelTests {
     // MARK: - ModelContainer Setup
 
-    @Test func modelContainerCreatesSuccessfully() throws {
+    @Test func `model container creates successfully`() throws {
         let container = try makeTestContainer()
         let entityNames = container.schema.entities.map(\.name)
         #expect(entityNames.contains("Playlist"))
@@ -20,7 +20,7 @@ struct ModelTests {
 
     // MARK: - Category
 
-    @Test func categoryIDConstruction() {
+    @Test func `category ID construction`() {
         let playlist = Playlist(name: "P", serverURL: "http://x.com", username: "u", password: "p")
         let category = Lume.Category(apiId: "42", name: "Action", parentId: 0, type: .vod, playlist: playlist)
         let expectedPrefix = "\(playlist.id.uuidString)-vod-42"
@@ -31,7 +31,7 @@ struct ModelTests {
         #expect(category.playlist?.id == playlist.id)
     }
 
-    @Test func categoryTypeRoundTrip() {
+    @Test func `category type round trip`() {
         let playlist = Playlist(name: "P", serverURL: "http://x.com", username: "u", password: "p")
         let live = Lume.Category(apiId: "1", name: "Live", parentId: 0, type: .live, playlist: playlist)
         #expect(live.type == .live)
@@ -42,7 +42,7 @@ struct ModelTests {
         #expect(live.typeRaw == "series")
     }
 
-    @Test func categoryUpsertViaUniqueAttribute() throws {
+    @Test func `category upsert via unique attribute`() throws {
         let container = try makeTestContainer()
         let playlist = Playlist(name: "P", serverURL: "http://x.com", username: "u", password: "p")
 
@@ -67,7 +67,7 @@ struct ModelTests {
 
     // MARK: - Movie
 
-    @Test func movieDownloadStatusRoundTrip() {
+    @Test func `movie download status round trip`() {
         let movie = Movie(id: "m-1", streamId: 1, name: "Test")
         #expect(movie.downloadStatus == nil)
 
@@ -79,7 +79,7 @@ struct ModelTests {
         #expect(movie.downloadStatus == .completed)
     }
 
-    @Test func movieFavoriteAndWatchTracking() {
+    @Test func `movie favorite and watch tracking`() {
         let movie = Movie(id: "m-2", streamId: 2, name: "Tracked")
         #expect(movie.isFavorite == false)
         #expect(movie.isWatched == false)
@@ -94,7 +94,7 @@ struct ModelTests {
         #expect(movie.isWatched == true)
     }
 
-    @Test func movieTMDBCoercion() {
+    @Test func `movie TMDB coercion`() {
         let movie = Movie(id: "m-3", streamId: 3, name: "TMDB", tmdb: "12345")
         movie.tmdbId = Int(movie.tmdb ?? "")
         #expect(movie.tmdbId == 12345)
@@ -102,7 +102,7 @@ struct ModelTests {
 
     // MARK: - Episode
 
-    @Test func episodeDownloadStatusRoundTrip() {
+    @Test func `episode download status round trip`() {
         let episode = Episode(id: "e-1", episodeId: "1", title: "Ep1",
                               containerExtension: "mp4", seasonNum: 1, episodeNum: 1)
         #expect(episode.downloadStatus == nil)
@@ -112,7 +112,7 @@ struct ModelTests {
         #expect(episode.downloadStatusRaw == "failed")
     }
 
-    @Test func episodeWatchProgress() {
+    @Test func `episode watch progress`() {
         let episode = Episode(id: "e-2", episodeId: "2", title: "Ep2",
                               containerExtension: "mkv", seasonNum: 2, episodeNum: 3)
         #expect(episode.watchProgress == 0)
@@ -122,7 +122,7 @@ struct ModelTests {
 
     // MARK: - Playlist
 
-    @Test func playlistSyncStatusRoundTrip() {
+    @Test func `playlist sync status round trip`() {
         let playlist = Playlist(name: "Test", serverURL: "http://x.com", username: "u", password: "p")
         #expect(playlist.syncStatus == .idle)
         #expect(playlist.syncStatusRaw == "idle")
@@ -134,7 +134,7 @@ struct ModelTests {
         #expect(playlist.syncStatus == .error)
     }
 
-    @Test func playlistDefaultValues() {
+    @Test func `playlist default values`() {
         let playlist = Playlist(name: "Test", serverURL: "http://x.com", username: "u", password: "p")
         #expect(playlist.syncEnabled == true)
         #expect(playlist.categories.isEmpty)
@@ -143,7 +143,7 @@ struct ModelTests {
 
     // MARK: - Series
 
-    @Test func seriesDefaultValues() {
+    @Test func `series default values`() {
         let series = Series(id: "s-1", seriesId: 1, name: "Series")
         #expect(series.isFavorite == false)
         #expect(series.episodes.isEmpty)
@@ -151,7 +151,7 @@ struct ModelTests {
 
     // MARK: - EPGListing
 
-    @Test func epgListingCreation() {
+    @Test func `epg listing creation`() {
         let start = Date()
         let end = start.addingTimeInterval(3600)
         let listing = EPGListing(
@@ -171,7 +171,7 @@ struct ModelTests {
         #expect(listing.liveStream == nil)
     }
 
-    @Test func epgListingLinksToLiveStream() {
+    @Test func `epg listing links to live stream`() {
         let stream = LiveStream(id: "l-1", streamId: 1, name: "Channel")
         let listing = EPGListing(
             id: "epg-1",
@@ -187,7 +187,7 @@ struct ModelTests {
 
     // MARK: - CastMember
 
-    @Test func castMemberCreation() {
+    @Test func `cast member creation`() {
         let movie = Movie(id: "m-1", streamId: 1, name: "Film")
         let cast = CastMember(
             id: "m-1-cast-0",
@@ -208,7 +208,7 @@ struct ModelTests {
         #expect(cast.series == nil)
     }
 
-    @Test func castMemberDefaultValues() {
+    @Test func `cast member default values`() {
         let cast = CastMember(
             id: "s-1-cast-0",
             tmdbPersonId: 456,
@@ -221,7 +221,7 @@ struct ModelTests {
         #expect(cast.series == nil)
     }
 
-    @Test func castMemberCanBelongToSeries() {
+    @Test func `cast member can belong to series`() {
         let series = Series(id: "s-1", seriesId: 1, name: "Show")
         let cast = CastMember(
             id: "s-1-cast-0",
@@ -238,7 +238,7 @@ struct ModelTests {
 
     // MARK: - Movie Ordered Cast
 
-    @Test func movieOrderedCastSortsByOrder() {
+    @Test func `movie ordered cast sorts by order`() {
         let movie = Movie(id: "m-1", streamId: 1, name: "Film")
         let cast1 = CastMember(id: "m-1-cast-0", tmdbPersonId: 1, name: "Second", order: 1, movie: movie)
         let cast2 = CastMember(id: "m-1-cast-1", tmdbPersonId: 2, name: "First", order: 0, movie: movie)
@@ -248,7 +248,7 @@ struct ModelTests {
         #expect(ordered[1].name == "Second")
     }
 
-    @Test func seriesOrderedCastSortsByOrder() {
+    @Test func `series ordered cast sorts by order`() {
         let series = Series(id: "s-1", seriesId: 1, name: "Show")
         let cast1 = CastMember(id: "s-1-cast-0", tmdbPersonId: 1, name: "Second", order: 1, series: series)
         let cast2 = CastMember(id: "s-1-cast-1", tmdbPersonId: 2, name: "First", order: 0, series: series)
@@ -260,7 +260,7 @@ struct ModelTests {
 
     // MARK: - LiveStream
 
-    @Test func liveStreamDefaultValues() {
+    @Test func `live stream default values`() {
         let stream = LiveStream(id: "l-1", streamId: 1, name: "Channel")
         #expect(stream.isFavorite == false)
         #expect(stream.epgListings.isEmpty)

@@ -413,15 +413,15 @@ enum SyncError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .syncInProgress:
-            return "A sync is already in progress for this playlist"
+            "A sync is already in progress for this playlist"
         case .playlistNotFound:
-            return "The playlist could not be found"
+            "The playlist could not be found"
         case .invalidCredentials:
-            return "Invalid username or password"
+            "Invalid username or password"
         case let .networkError(error):
-            return "Network error: \(error.localizedDescription)"
+            "Network error: \(error.localizedDescription)"
         case let .databaseError(error):
-            return "Database error: \(error.localizedDescription)"
+            "Database error: \(error.localizedDescription)"
         }
     }
 }

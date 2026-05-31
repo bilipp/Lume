@@ -19,7 +19,7 @@ enum PlaylistSelectionStore {
     static let key = "lume.selectedPlaylistID"
 }
 
-extension Array where Element == Playlist {
+extension [Playlist] {
     /// Resolves the stored selection to a concrete playlist, falling back to the
     /// first available playlist when the stored id is empty or no longer exists
     /// (e.g. the selected playlist was deleted).

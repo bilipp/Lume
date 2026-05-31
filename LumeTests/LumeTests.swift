@@ -2,7 +2,7 @@ import SwiftData
 import Testing
 
 struct LumeTests {
-    @Test func targetLoads() throws {
+    @Test func `target loads`() throws {
         // Verify the test target loads correctly by checking that
         // shared test helpers are accessible.
         let container = try makeTestContainer()

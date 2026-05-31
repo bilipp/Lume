@@ -84,7 +84,7 @@ func previewContainer() -> ModelContainer {
         Category(apiId: "10", name: "Action", parentId: 0, type: .vod, playlist: playlist),
         Category(apiId: "11", name: "Comedy", parentId: 0, type: .vod, playlist: playlist),
         Category(apiId: "20", name: "News", parentId: 0, type: .live, playlist: playlist),
-        Category(apiId: "30", name: "Drama", parentId: 0, type: .series, playlist: playlist),
+        Category(apiId: "30", name: "Drama", parentId: 0, type: .series, playlist: playlist)
     ]
     for cat in categories {
         container.mainContext.insert(cat)
@@ -143,7 +143,7 @@ private func insertTMDBMovie(into container: ModelContainer, categories: [Catego
         CastMember(id: "\(movieTMDB.id)-cast-0", tmdbPersonId: 6384, name: "Keanu Reeves", role: "Neo", profilePath: nil, order: 0, movie: movieTMDB),
         CastMember(id: "\(movieTMDB.id)-cast-1", tmdbPersonId: 6193, name: "Laurence Fishburne", role: "Morpheus", profilePath: nil, order: 1, movie: movieTMDB),
         CastMember(id: "\(movieTMDB.id)-cast-2", tmdbPersonId: 530, name: "Carrie-Anne Moss", role: "Trinity", profilePath: nil, order: 2, movie: movieTMDB),
-        CastMember(id: "\(movieTMDB.id)-cast-3", tmdbPersonId: 192, name: "Hugo Weaving", role: "Agent Smith", profilePath: nil, order: 3, movie: movieTMDB),
+        CastMember(id: "\(movieTMDB.id)-cast-3", tmdbPersonId: 192, name: "Hugo Weaving", role: "Agent Smith", profilePath: nil, order: 3, movie: movieTMDB)
     ]
     movieTMDB.castMembers = movieCast
     for cast in movieCast {
@@ -195,7 +195,7 @@ private func insertSeries(into container: ModelContainer, categories: [Category]
     let seriesCast = [
         CastMember(id: "\(seriesTMDB.id)-cast-0", tmdbPersonId: 17419, name: "Bryan Cranston", role: "Walter White", profilePath: nil, order: 0, series: seriesTMDB),
         CastMember(id: "\(seriesTMDB.id)-cast-1", tmdbPersonId: 234_989, name: "Aaron Paul", role: "Jesse Pinkman", profilePath: nil, order: 1, series: seriesTMDB),
-        CastMember(id: "\(seriesTMDB.id)-cast-2", tmdbPersonId: 1_215_295, name: "Anna Gunn", role: "Skyler White", profilePath: nil, order: 2, series: seriesTMDB),
+        CastMember(id: "\(seriesTMDB.id)-cast-2", tmdbPersonId: 1_215_295, name: "Anna Gunn", role: "Skyler White", profilePath: nil, order: 2, series: seriesTMDB)
     ]
     seriesTMDB.castMembers = seriesCast
     for cast in seriesCast {
@@ -206,7 +206,7 @@ private func insertSeries(into container: ModelContainer, categories: [Category]
         Episode(id: "\(seriesTMDB.id)-ep-1", episodeId: "1", title: "Pilot", containerExtension: "mp4", seasonNum: 1, episodeNum: 1, series: seriesTMDB),
         Episode(id: "\(seriesTMDB.id)-ep-2", episodeId: "2", title: "Cat's in the Bag...", containerExtension: "mp4", seasonNum: 1, episodeNum: 2, series: seriesTMDB),
         Episode(id: "\(seriesTMDB.id)-ep-3", episodeId: "3", title: "And the Bag's in the River", containerExtension: "mp4", seasonNum: 1, episodeNum: 3, series: seriesTMDB),
-        Episode(id: "\(seriesTMDB.id)-ep-4", episodeId: "4", title: "Cancer Man", containerExtension: "mp4", seasonNum: 1, episodeNum: 4, series: seriesTMDB),
+        Episode(id: "\(seriesTMDB.id)-ep-4", episodeId: "4", title: "Cancer Man", containerExtension: "mp4", seasonNum: 1, episodeNum: 4, series: seriesTMDB)
     ]
     seriesTMDB.episodes = episodes
     for episode in episodes {

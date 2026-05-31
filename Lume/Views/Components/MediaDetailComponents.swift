@@ -14,7 +14,7 @@ import SwiftUI
 extension View {
     @ViewBuilder
     func matchedTransitionSourceIfAvailable(id: some Hashable, in namespace: Namespace.ID?) -> some View {
-        if let namespace = namespace {
+        if let namespace {
             matchedTransitionSource(id: id, in: namespace)
         } else {
             self
@@ -551,7 +551,7 @@ enum DetailFormat {
     let cast = [
         CastMember(id: "preview-cast-0", tmdbPersonId: 1, name: "Keanu Reeves", role: "Neo", order: 0, movie: movie),
         CastMember(id: "preview-cast-1", tmdbPersonId: 2, name: "Laurence Fishburne", role: "Morpheus", order: 1, movie: movie),
-        CastMember(id: "preview-cast-2", tmdbPersonId: 3, name: "Carrie-Anne Moss", role: "Trinity", order: 2, movie: movie),
+        CastMember(id: "preview-cast-2", tmdbPersonId: 3, name: "Carrie-Anne Moss", role: "Trinity", order: 2, movie: movie)
     ]
     CastRow(cast: cast)
 }

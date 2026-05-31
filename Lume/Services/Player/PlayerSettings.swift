@@ -10,15 +10,15 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .ksPlayer: return "KSPlayer"
-        case .avPlayer: return "AVPlayer"
+        case .ksPlayer: "KSPlayer"
+        case .avPlayer: "AVPlayer"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .ksPlayer: return "FFmpeg-backed. Recommended for IPTV streams."
-        case .avPlayer: return "Native Apple player. Best for HLS and MP4."
+        case .ksPlayer: "FFmpeg-backed. Recommended for IPTV streams."
+        case .avPlayer: "Native Apple player. Best for HLS and MP4."
         }
     }
 

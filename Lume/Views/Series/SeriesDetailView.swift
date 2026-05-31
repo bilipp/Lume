@@ -101,7 +101,7 @@ struct SeriesDetailView: View {
 
     // MARK: - Sections
 
-    private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func section(title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             DetailSectionHeader(title: title)
                 .padding(.horizontal, DetailMetrics.contentPadding)

@@ -19,7 +19,7 @@ struct ContentSyncTests {
             Movie.self,
             Series.self,
             Episode.self,
-            EPGListing.self,
+            EPGListing.self
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         return try ModelContainer(for: schema, configurations: [config])
@@ -27,7 +27,7 @@ struct ContentSyncTests {
 
     // MARK: - Large Dataset Performance
 
-    @Test func syncMoviesFromExampleJSON() throws {
+    @Test func `sync movies from example JSON`() throws {
         let movies: [XtreamVODStream] = try loadExampleJSON("Movies.json")
         #expect(movies.count > 10000, "Expected at least 10,000 movies in example data, got \(movies.count)")
 
@@ -94,7 +94,7 @@ struct ContentSyncTests {
 
     // MARK: - Upsert
 
-    @Test func syncMoviesUpsertDoesNotDuplicate() throws {
+    @Test func `sync movies upsert does not duplicate`() throws {
         let container = try makeContainer()
         let playlistId = UUID()
 
@@ -121,7 +121,7 @@ struct ContentSyncTests {
 
     // MARK: - Batch Edge Cases
 
-    @Test func emptyDatasetHandledGracefully() throws {
+    @Test func `empty dataset handled gracefully`() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let playlist = Playlist(name: "Test", serverURL: "http://x.com", username: "u", password: "p")
@@ -132,7 +132,7 @@ struct ContentSyncTests {
         #expect(count == 0)
     }
 
-    @Test func singleItemInBatch() throws {
+    @Test func `single item in batch`() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let playlist = Playlist(name: "Test", serverURL: "http://x.com", username: "u", password: "p")
@@ -149,7 +149,7 @@ struct ContentSyncTests {
 
     // MARK: - ID Construction
 
-    @Test func movieIDUsesPlaylistPrefix() {
+    @Test func `movie ID uses playlist prefix`() {
         let playlistId = UUID()
         let streamId = 12345
         let movieId = "\(playlistId.uuidString)-movie-\(streamId)"
@@ -157,7 +157,7 @@ struct ContentSyncTests {
         #expect(movieId.hasSuffix("-movie-12345"))
     }
 
-    @Test func categoryIDMatchesContentSyncManagerPattern() {
+    @Test func `category ID matches content sync manager pattern`() {
         let playlistId = UUID()
         let categoryId = "117"
         let expected = "\(playlistId.uuidString)-vod-\(categoryId)"
@@ -166,7 +166,7 @@ struct ContentSyncTests {
 
     // MARK: - Playlist State Transitions
 
-    @Test func playlistSyncStatusTransitions() throws {
+    @Test func `playlist sync status transitions`() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let playlist = Playlist(name: "Test", serverURL: "http://x.com", username: "u", password: "p")
@@ -184,7 +184,7 @@ struct ContentSyncTests {
         #expect(playlist.lastSyncDate != nil)
     }
 
-    @Test func playlistErrorStatusPersists() throws {
+    @Test func `playlist error status persists`() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let playlist = Playlist(name: "Test", serverURL: "http://x.com", username: "u", password: "p")

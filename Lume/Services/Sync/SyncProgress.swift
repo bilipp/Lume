@@ -27,25 +27,25 @@ enum SyncStep: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .authenticating: return "Authenticating"
-        case .movieCategories: return "Movie categories"
-        case .seriesCategories: return "Series categories"
-        case .liveCategories: return "Live TV categories"
-        case .movies: return "Movies"
-        case .series: return "Series"
-        case .liveStreams: return "Live TV channels"
+        case .authenticating: "Authenticating"
+        case .movieCategories: "Movie categories"
+        case .seriesCategories: "Series categories"
+        case .liveCategories: "Live TV categories"
+        case .movies: "Movies"
+        case .series: "Series"
+        case .liveStreams: "Live TV channels"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .authenticating: return "person.badge.key"
-        case .movieCategories: return "folder"
-        case .seriesCategories: return "folder"
-        case .liveCategories: return "folder"
-        case .movies: return "film.stack"
-        case .series: return "tv"
-        case .liveStreams: return "antenna.radiowaves.left.and.right"
+        case .authenticating: "person.badge.key"
+        case .movieCategories: "folder"
+        case .seriesCategories: "folder"
+        case .liveCategories: "folder"
+        case .movies: "film.stack"
+        case .series: "tv"
+        case .liveStreams: "antenna.radiowaves.left.and.right"
         }
     }
 }

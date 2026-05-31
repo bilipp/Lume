@@ -99,27 +99,27 @@ struct SyncProgressView: View {
 
     private var headerIcon: String {
         switch phase {
-        case .ready: return "arrow.triangle.2.circlepath"
-        case .syncing: return "arrow.triangle.2.circlepath"
-        case .finished: return "checkmark.seal.fill"
-        case .failed: return "exclamationmark.triangle.fill"
+        case .ready: "arrow.triangle.2.circlepath"
+        case .syncing: "arrow.triangle.2.circlepath"
+        case .finished: "checkmark.seal.fill"
+        case .failed: "exclamationmark.triangle.fill"
         }
     }
 
     private var headerTint: Color {
         switch phase {
-        case .ready, .syncing: return .accentColor
-        case .finished: return .green
-        case .failed: return .red
+        case .ready, .syncing: .accentColor
+        case .finished: .green
+        case .failed: .red
         }
     }
 
     private var headerTitle: String {
         switch phase {
-        case .ready: return "Ready to sync"
-        case .syncing: return "Syncing your playlist"
-        case .finished: return "Sync complete"
-        case .failed: return "Sync failed"
+        case .ready: "Ready to sync"
+        case .syncing: "Syncing your playlist"
+        case .finished: "Sync complete"
+        case .failed: "Sync failed"
         }
     }
 
@@ -265,9 +265,9 @@ private struct StepRowView: View {
 
     private var titleColor: Color {
         switch state {
-        case .pending: return .secondary
-        case .active: return .primary
-        case .completed: return .primary
+        case .pending: .secondary
+        case .active: .primary
+        case .completed: .primary
         }
     }
 }
