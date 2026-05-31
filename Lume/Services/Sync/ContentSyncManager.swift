@@ -181,7 +181,7 @@ actor ContentSyncManager {
         await progress?.start(.movies)
         let movieDTOs = try await xtreamClient.getVODStreams(playlist: playlist)
         let totalCount = movieDTOs.count
-        // swiftformat:disable:next self
+        // swiftformat:disable:next redundantSelf
         Logger.database.info("Fetched \(totalCount) movies, syncing in batches of \(self.batchSize)")
         await progress?.update(detail: "0 of \(totalCount)", fraction: 0)
 
@@ -240,7 +240,7 @@ actor ContentSyncManager {
         await progress?.start(.series)
         let seriesDTOs = try await xtreamClient.getSeries(playlist: playlist)
         let totalCount = seriesDTOs.count
-        // swiftformat:disable:next self
+        // swiftformat:disable:next redundantSelf
         Logger.database.info("Fetched \(totalCount) series, syncing in batches of \(self.batchSize)")
         await progress?.update(detail: "0 of \(totalCount)", fraction: 0)
 
@@ -351,7 +351,7 @@ actor ContentSyncManager {
         await progress?.start(.liveStreams)
         let streamDTOs = try await xtreamClient.getLiveStreams(playlist: playlist)
         let totalCount = streamDTOs.count
-        // swiftformat:disable:next self
+        // swiftformat:disable:next redundantSelf
         Logger.database.info("Fetched \(totalCount) live streams, syncing in batches of \(self.batchSize)")
         await progress?.update(detail: "0 of \(totalCount)", fraction: 0)
 
