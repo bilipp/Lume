@@ -52,37 +52,41 @@ struct MovieDetailView: View {
     }
 
     var body: some View {
-        Group {
-            if isLoadingTMDB {
-                loadingView
-                    .transition(.opacity)
-            } else {
-                detailView
-                    .transition(.opacity)
-            }
-        }
-        .background(backgroundColor)
-        #if os(iOS)
-            .toolbar(.hidden, for: .tabBar)
-            .navigationBarBackButtonHidden(true)
-            .toolbarBackground(.hidden, for: .navigationBar)
-        #endif
-            .toolbar { toolbarContent }
-            .task(id: movie.id) {
-                await enrichIfNeeded()
-                resolveSimilar()
-                await resolveCollection()
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    isLoadingTMDB = false
+        #if os(tvOS)
+            TVMovieDetailView(movie: movie)
+        #else
+            Group {
+                if isLoadingTMDB {
+                    loadingView
+                        .transition(.opacity)
+                } else {
+                    detailView
+                        .transition(.opacity)
                 }
             }
-            .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
-            .onChange(of: movie.collectionId) { Task { await resolveCollection() } }
-            .onChange(of: refreshToken) { resolveSimilar() }
-        #if os(iOS)
-            .fullScreenCover(item: $playingMedia) { media in
-                FullScreenPlayerView(media: media)
-            }
+            .background(backgroundColor)
+            #if os(iOS)
+                .toolbar(.hidden, for: .tabBar)
+                .navigationBarBackButtonHidden(true)
+                .toolbarBackground(.hidden, for: .navigationBar)
+            #endif
+                .toolbar { toolbarContent }
+                .task(id: movie.id) {
+                    await enrichIfNeeded()
+                    resolveSimilar()
+                    await resolveCollection()
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isLoadingTMDB = false
+                    }
+                }
+                .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
+                .onChange(of: movie.collectionId) { Task { await resolveCollection() } }
+                .onChange(of: refreshToken) { resolveSimilar() }
+            #if os(iOS)
+                .fullScreenCover(item: $playingMedia) { media in
+                    FullScreenPlayerView(media: media)
+                }
+            #endif
         #endif
     }
 
