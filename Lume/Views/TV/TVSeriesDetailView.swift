@@ -17,7 +17,6 @@
         let series: Series
 
         @Environment(\.modelContext) private var modelContext
-        @Environment(\.dismiss) private var dismiss
         @Query private var playlists: [Playlist]
 
         @State private var selectedSeason: Int = 1
@@ -100,7 +99,6 @@
 
         private var topBar: some View {
             HStack {
-                TVIconButton(systemImage: "chevron.left", accessibilityLabel: "Back") { dismiss() }
                 Spacer()
                 TVIconButton(
                     systemImage: series.isFavorite ? "heart.fill" : "heart",

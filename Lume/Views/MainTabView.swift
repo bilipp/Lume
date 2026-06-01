@@ -18,28 +18,17 @@ struct MainTabView: View {
     /// so a view update doesn't start a second one while the first is running.
     @State private var initialSyncStarted: Set<UUID> = []
 
-    var body: some View {
-        TabView {
-            Tab("Home", systemImage: "house") {
-                HomeView()
-            }
+    #if os(tvOS)
+        /// Default to Home even though Search is placed first in the tab bar.
+        @State private var selectedTab: TabSelection = .home
 
-            Tab("Movies", systemImage: "film") {
-                MoviesView()
-            }
-
-            Tab("Series", systemImage: "tv") {
-                SeriesView()
-            }
-
-            Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right") {
-                LiveTVView()
-            }
-
-            Tab(role: .search) {
-                SearchView()
-            }
+        private enum TabSelection: Hashable {
+            case search, home, movies, series, liveTV, settings
         }
+    #endif
+
+    var body: some View {
+        tabView
         #if os(iOS)
         .tabBarMinimizeBehavior(.onScrollDown)
         #endif
@@ -47,6 +36,72 @@ struct MainTabView: View {
             startPendingInitialSyncs()
         }
     }
+
+    #if os(tvOS)
+        private var tabView: some View {
+            TabView(selection: $selectedTab) {
+                Tab(value: TabSelection.search) {
+                    SearchView()
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+
+                Tab(value: TabSelection.home) {
+                    HomeView()
+                } label: {
+                    Text("Home")
+                }
+
+                Tab(value: TabSelection.movies) {
+                    MoviesView()
+                } label: {
+                    Text("Movies")
+                }
+
+                Tab(value: TabSelection.series) {
+                    SeriesView()
+                } label: {
+                    Text("Series")
+                }
+
+                Tab(value: TabSelection.liveTV) {
+                    LiveTVView()
+                } label: {
+                    Text("Live TV")
+                }
+
+                Tab(value: TabSelection.settings) {
+                    SettingsView()
+                } label: {
+                    Image(systemName: "gear")
+                }
+            }
+        }
+    #else
+        private var tabView: some View {
+            TabView {
+                Tab("Home", systemImage: "house") {
+                    HomeView()
+                }
+
+                Tab("Movies", systemImage: "film") {
+                    MoviesView()
+                }
+
+                Tab("Series", systemImage: "tv") {
+                    SeriesView()
+                }
+
+                Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right") {
+                    LiveTVView()
+                }
+
+                Tab(role: .search) {
+                    SearchView()
+                }
+            }
+        }
+    #endif
 
     // MARK: - Initial sync
 

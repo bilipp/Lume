@@ -61,14 +61,19 @@ struct LibraryToolbarConfiguration {
 
 extension View {
     func libraryToolbar(config: LibraryToolbarConfiguration) -> some View {
-        modifier(LibraryToolbarModifier(
-            playlists: config.playlists,
-            selectedPlaylistID: config.$selectedPlaylistID,
-            categorySortRaw: config.$categorySortRaw,
-            contentSortRaw: config.$contentSortRaw,
-            showingSync: config.$showingSync,
-            showingSettings: config.$showingSettings,
-            activePlaylist: config.activePlaylist
-        ))
+        #if os(tvOS)
+            // tvOS surfaces sync/settings/sorting through the tab bar instead.
+            return self
+        #else
+            return modifier(LibraryToolbarModifier(
+                playlists: config.playlists,
+                selectedPlaylistID: config.$selectedPlaylistID,
+                categorySortRaw: config.$categorySortRaw,
+                contentSortRaw: config.$contentSortRaw,
+                showingSync: config.$showingSync,
+                showingSettings: config.$showingSettings,
+                activePlaylist: config.activePlaylist
+            ))
+        #endif
     }
 }

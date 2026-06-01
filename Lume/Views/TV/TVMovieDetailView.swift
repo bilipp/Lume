@@ -18,7 +18,6 @@
         let movie: Movie
 
         @Environment(\.modelContext) private var modelContext
-        @Environment(\.dismiss) private var dismiss
         @Query private var playlists: [Playlist]
 
         @State private var playingMedia: PlayableMedia?
@@ -107,7 +106,6 @@
 
         private var topBar: some View {
             HStack {
-                TVIconButton(systemImage: "chevron.left", accessibilityLabel: "Back") { dismiss() }
                 Spacer()
                 TVIconButton(
                     systemImage: movie.isFavorite ? "heart.fill" : "heart",
