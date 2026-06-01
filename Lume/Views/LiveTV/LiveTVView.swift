@@ -322,8 +322,8 @@ struct CategorySidebar: View {
         var body: some View {
             Button(action: action) {
                 Text(category.name)
-                    .font(.system(size: 30, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(foreground)
+                    .font(.system(size: 30, weight: isSelected || isFocused ? .semibold : .regular))
+                    .foregroundStyle(isFocused || isSelected ? .white : .white.opacity(0.6))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -334,19 +334,14 @@ struct CategorySidebar: View {
                             .fill(background)
                     )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
             .focused($isFocused)
-            .animation(.easeOut(duration: 0.15), value: isFocused)
-        }
-
-        private var foreground: Color {
-            if isFocused { return .black }
-            return isSelected ? .white : .white.opacity(0.7)
+            .animation(.easeOut(duration: 0.18), value: isFocused)
         }
 
         private var background: AnyShapeStyle {
-            if isFocused { return AnyShapeStyle(.white) }
-            if isSelected { return AnyShapeStyle(.white.opacity(0.14)) }
+            if isFocused { return AnyShapeStyle(.white.opacity(0.22)) }
+            if isSelected { return AnyShapeStyle(.white.opacity(0.1)) }
             return AnyShapeStyle(.clear)
         }
     }
@@ -470,7 +465,7 @@ struct CategorySidebar: View {
                         if stream.tvArchive > 0 {
                             Label("Catchup: \(stream.tvArchiveDuration)d", systemImage: "clock.arrow.circlepath")
                                 .font(.system(size: 22))
-                                .foregroundStyle(isFocused ? Color.black.opacity(0.7) : Color.blue)
+                                .foregroundStyle(Color.blue)
                         }
                     }
 
@@ -485,12 +480,11 @@ struct CategorySidebar: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.white.opacity(0.06)))
+                        .fill(isFocused ? AnyShapeStyle(.white.opacity(0.18)) : AnyShapeStyle(.white.opacity(0.06)))
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
             .focused($isFocused)
-            .scaleEffect(isFocused ? 1.02 : 1.0)
             .animation(.easeOut(duration: 0.18), value: isFocused)
         }
 
@@ -516,15 +510,15 @@ struct CategorySidebar: View {
         }
 
         private var primaryColor: Color {
-            isFocused ? .black : .white
+            .white
         }
 
         private var secondaryColor: Color {
-            isFocused ? .black.opacity(0.7) : .white.opacity(0.7)
+            .white.opacity(0.7)
         }
 
         private var tertiaryColor: Color {
-            isFocused ? .black.opacity(0.5) : .white.opacity(0.45)
+            .white.opacity(0.45)
         }
     }
 #endif
