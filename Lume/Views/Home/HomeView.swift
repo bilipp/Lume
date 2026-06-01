@@ -131,7 +131,7 @@ struct HomeView: View {
                     .ignoresSafeArea(edges: .top)
                 }
             }
-            .navigationTitle("Home")
+            .platformNavigationTitle("Home")
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(.hidden, for: .navigationBar)

@@ -78,7 +78,7 @@ struct SearchView: View {
                     }
                 }
             }
-            .navigationTitle("Search")
+            .platformNavigationTitle("Search")
             .searchable(text: $searchText, prompt: "Movies, Series, Live TV...")
             #if os(iOS)
                 .searchToolbarBehavior(.minimize)

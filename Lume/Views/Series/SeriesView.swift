@@ -73,7 +73,7 @@ struct SeriesView: View {
                     }
                 }
             }
-            .navigationTitle("Series")
+            .platformNavigationTitle("Series")
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,

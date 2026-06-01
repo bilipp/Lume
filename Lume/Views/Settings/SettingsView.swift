@@ -24,7 +24,7 @@ struct SettingsView: View {
             #if os(macOS)
             .listStyle(.inset(alternatesRowBackgrounds: true))
             #endif
-            .navigationTitle("Settings")
+            .platformNavigationTitle("Settings")
             .sheet(isPresented: $showingAddPlaylist) {
                 LoginView()
             }

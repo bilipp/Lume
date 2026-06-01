@@ -75,7 +75,7 @@ struct MoviesView: View {
                     }
                 }
             }
-            .navigationTitle("Movies")
+            .platformNavigationTitle("Movies")
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,
