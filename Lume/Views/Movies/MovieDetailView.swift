@@ -31,8 +31,79 @@ struct MovieDetailView: View {
     @State private var playingMedia: PlayableMedia?
     @State private var similar: [HomeMediaItem] = []
     @State private var refreshToken: UUID = .init()
+    @State private var isLoadingTMDB: Bool
+
+    init(movie: Movie, animationNamespace: Namespace.ID? = nil) {
+        self.movie = movie
+        self.animationNamespace = animationNamespace
+        let needsFetch = if movie.tmdbId != nil, TMDBClient.shared.isConfigured {
+            if let enrichedAt = movie.tmdbEnrichedAt,
+               Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600
+            {
+                false
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+        _isLoadingTMDB = State(initialValue: needsFetch)
+    }
 
     var body: some View {
+        Group {
+            if isLoadingTMDB {
+                loadingView
+                    .transition(.opacity)
+            } else {
+                detailView
+                    .transition(.opacity)
+            }
+        }
+        .background(backgroundColor)
+        #if os(iOS)
+            .toolbar(.hidden, for: .tabBar)
+            .navigationBarBackButtonHidden(true)
+            .toolbarBackground(.hidden, for: .navigationBar)
+        #endif
+            .toolbar { toolbarContent }
+            .task(id: movie.id) {
+                await enrichIfNeeded()
+                resolveSimilar()
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isLoadingTMDB = false
+                }
+            }
+            .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
+            .onChange(of: refreshToken) { resolveSimilar() }
+        #if os(iOS)
+            .fullScreenCover(item: $playingMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
+        #endif
+    }
+
+    // MARK: - Loading
+
+    private var loadingView: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .controlSize(.large)
+
+            Text(movie.name)
+                .font(.title3.weight(.semibold))
+                .multilineTextAlignment(.center)
+
+            Text("Loading details…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Content
+
+    private var detailView: some View {
         GeometryReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: DetailMetrics.sectionSpacing) {
@@ -85,24 +156,6 @@ struct MovieDetailView: View {
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: .top)
         }
-        .background(backgroundColor)
-        #if os(iOS)
-            .toolbar(.hidden, for: .tabBar)
-            .navigationBarBackButtonHidden(true)
-            .toolbarBackground(.hidden, for: .navigationBar)
-        #endif
-            .toolbar { toolbarContent }
-            .task(id: movie.id) {
-                await enrichIfNeeded()
-                resolveSimilar()
-            }
-            .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
-            .onChange(of: refreshToken) { resolveSimilar() }
-        #if os(iOS)
-            .fullScreenCover(item: $playingMedia) { media in
-                FullScreenPlayerView(media: media)
-            }
-        #endif
     }
 
     // MARK: - Sections
@@ -233,20 +286,16 @@ struct MovieDetailView: View {
 
     private func enrichIfNeeded() async {
         guard let tmdbId = movie.tmdbId else { return }
-        // Skip if enriched recently; backdrop/cast/similar rarely change.
         if let enrichedAt = movie.tmdbEnrichedAt,
            Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600
         {
             return
         }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        try? await manager.enrichMovie(id: movie.id, tmdbId: tmdbId)
-        // Force the view's context to pick up TMDB enrichment data written
-        // on the background context (backdrop, cast, tagline, etc.).
-        await MainActor.run {
-            modelContext.processPendingChanges()
-            refreshToken = UUID()
-        }
+        guard let details = try? await manager.fetchTMDBMovieDetails(tmdbId: tmdbId) else { return }
+        applyMovieDetails(details, to: movie, context: modelContext)
+        try? modelContext.save()
+        refreshToken = UUID()
     }
 
     private func resolveSimilar() {

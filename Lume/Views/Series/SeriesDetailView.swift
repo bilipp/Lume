@@ -32,8 +32,80 @@ struct SeriesDetailView: View {
     @State private var playingMedia: PlayableMedia?
     @State private var similar: [HomeMediaItem] = []
     @State private var refreshToken: UUID = .init()
+    @State private var isLoadingTMDB: Bool
+
+    init(series: Series, animationNamespace: Namespace.ID? = nil) {
+        self.series = series
+        self.animationNamespace = animationNamespace
+        let needsFetch = if series.tmdbId != nil, TMDBClient.shared.isConfigured {
+            if let enrichedAt = series.tmdbEnrichedAt,
+               Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600
+            {
+                false
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+        _isLoadingTMDB = State(initialValue: needsFetch)
+    }
 
     var body: some View {
+        Group {
+            if isLoadingTMDB {
+                loadingView
+                    .transition(.opacity)
+            } else {
+                detailView
+                    .transition(.opacity)
+            }
+        }
+        .background(backgroundColor)
+        #if os(iOS)
+            .toolbar(.hidden, for: .tabBar)
+            .navigationBarBackButtonHidden(true)
+            .toolbarBackground(.hidden, for: .navigationBar)
+        #endif
+            .toolbar { toolbarContent }
+            .task(id: series.id) {
+                await loadEpisodesIfNeeded()
+                await enrichIfNeeded()
+                resolveSimilar()
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isLoadingTMDB = false
+                }
+            }
+            .onChange(of: series.similarTMDBIds) { resolveSimilar() }
+            .onChange(of: refreshToken) { resolveSimilar() }
+        #if os(iOS)
+            .fullScreenCover(item: $playingMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
+        #endif
+    }
+
+    // MARK: - Loading
+
+    private var loadingView: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .controlSize(.large)
+
+            Text(series.name)
+                .font(.title3.weight(.semibold))
+                .multilineTextAlignment(.center)
+
+            Text("Loading details…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Content
+
+    private var detailView: some View {
         GeometryReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: DetailMetrics.sectionSpacing) {
@@ -78,25 +150,6 @@ struct SeriesDetailView: View {
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: .top)
         }
-        .background(backgroundColor)
-        #if os(iOS)
-            .toolbar(.hidden, for: .tabBar)
-            .navigationBarBackButtonHidden(true)
-            .toolbarBackground(.hidden, for: .navigationBar)
-        #endif
-            .toolbar { toolbarContent }
-            .task(id: series.id) {
-                await loadEpisodesIfNeeded()
-                await enrichIfNeeded()
-                resolveSimilar()
-            }
-            .onChange(of: series.similarTMDBIds) { resolveSimilar() }
-            .onChange(of: refreshToken) { resolveSimilar() }
-        #if os(iOS)
-            .fullScreenCover(item: $playingMedia) { media in
-                FullScreenPlayerView(media: media)
-            }
-        #endif
     }
 
     // MARK: - Sections
@@ -346,13 +399,10 @@ struct SeriesDetailView: View {
             return
         }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        try? await manager.enrichSeries(id: series.id, tmdbId: tmdbId)
-        // Force the view's context to pick up TMDB enrichment data written
-        // on the background context (backdrop, cast, tagline, etc.).
-        await MainActor.run {
-            modelContext.processPendingChanges()
-            refreshToken = UUID()
-        }
+        guard let details = try? await manager.fetchTMDBTVDetails(tmdbId: tmdbId) else { return }
+        applySeriesDetails(details, to: series, context: modelContext)
+        try? modelContext.save()
+        refreshToken = UUID()
     }
 
     private func resolveSimilar() {
@@ -399,89 +449,6 @@ struct SeriesDetailView: View {
     private func toggleFavorite() {
         series.isFavorite.toggle()
         series.addedToWatchlistDate = series.isFavorite ? Date() : nil
-    }
-}
-
-// MARK: - Episode card
-
-/// A wide episode row: 16:9 still on the left, title / runtime / synopsis on the
-/// right, a resume progress bar and a play affordance.
-private struct EpisodeCard: View {
-    let episode: Episode
-    let onPlay: () -> Void
-
-    var body: some View {
-        Button(action: onPlay) {
-            HStack(alignment: .top, spacing: 14) {
-                thumbnail
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("E\(episode.episodeNum)" + (episode.title.isEmpty ? "" : " · \(episode.title)"))
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    if let minutes = DetailFormat.minutes(episode.durationSecs) {
-                        Text(minutes)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let plot = episode.plot, !plot.isEmpty {
-                        Text(plot)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-
-                    if let progress = resumeFraction {
-                        ProgressView(value: progress)
-                            .progressViewStyle(.linear)
-                            .tint(.accentColor)
-                            .padding(.top, 2)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var thumbnail: some View {
-        ZStack {
-            AsyncImage(url: URL(string: episode.movieImage ?? "")) { phase in
-                switch phase {
-                case let .success(image):
-                    image.resizable().aspectRatio(contentMode: .fill)
-                case .empty where episode.movieImage != nil:
-                    Rectangle().fill(Color.gray.opacity(0.25)).overlay { ProgressView() }
-                default:
-                    Rectangle().fill(Color.gray.opacity(0.25))
-                        .overlay {
-                            Text("E\(episode.episodeNum)")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                        }
-                }
-            }
-            .frame(width: 142, height: 80)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            Image(systemName: "play.circle.fill")
-                .font(.title2)
-                .foregroundStyle(.white)
-                .shadow(radius: 4)
-                .opacity(0.9)
-        }
-    }
-
-    private var resumeFraction: Double? {
-        guard episode.watchProgress > 0,
-              let duration = episode.durationSecs, duration > 0,
-              !episode.isWatched else { return nil }
-        return min(episode.watchProgress / Double(duration), 1)
     }
 }
 
