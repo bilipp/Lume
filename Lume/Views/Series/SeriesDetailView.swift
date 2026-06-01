@@ -325,6 +325,19 @@ struct SeriesDetailView: View {
         Set(series.episodes.map(\.seasonNum)).sorted()
     }
 
+    private func determineDefaultSeason() -> Int {
+        let seasons = availableSeasons
+        guard !seasons.isEmpty else { return 1 }
+
+        let progressSeasons = seasons.filter { seasonNum in
+            series.episodes
+                .filter { $0.seasonNum == seasonNum }
+                .contains { $0.watchProgress > 0 || $0.isWatched }
+        }
+
+        return progressSeasons.first ?? seasons.first ?? 1
+    }
+
     private var seasonEpisodes: [Episode] {
         series.episodes
             .filter { $0.seasonNum == selectedSeason }
@@ -369,9 +382,7 @@ struct SeriesDetailView: View {
         if series.episodes.isEmpty {
             await loadEpisodes()
         }
-        if !availableSeasons.contains(selectedSeason), let first = availableSeasons.first {
-            selectedSeason = first
-        }
+        selectedSeason = determineDefaultSeason()
     }
 
     private func loadEpisodes() async {
@@ -386,9 +397,7 @@ struct SeriesDetailView: View {
             modelContext.processPendingChanges()
             refreshToken = UUID()
         }
-        if !availableSeasons.contains(selectedSeason), let first = availableSeasons.first {
-            selectedSeason = first
-        }
+        selectedSeason = determineDefaultSeason()
     }
 
     private func enrichIfNeeded() async {

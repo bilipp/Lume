@@ -364,12 +364,23 @@ enum HomeMediaItem: Identifiable, Hashable {
         return false
     }
 
-    /// Resume fraction for partially-watched movies (0...1), otherwise nil.
+    /// Resume fraction for partially-watched movies or series (0...1), otherwise nil.
     var progress: Double? {
-        guard case let .movie(movie) = self,
-              let duration = movie.durationSecs, duration > 0,
-              movie.watchProgress > 0, !movie.isWatched else { return nil }
-        return min(movie.watchProgress / Double(duration), 1)
+        switch self {
+        case let .movie(movie):
+            guard let duration = movie.durationSecs, duration > 0,
+                  movie.watchProgress > 0, !movie.isWatched else { return nil }
+            return min(movie.watchProgress / Double(duration), 1)
+        case let .series(series):
+            let inProgressEpisodes = series.episodes
+                .filter { $0.watchProgress > 0 && !$0.isWatched }
+                .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
+            guard let activeEpisode = inProgressEpisodes.first,
+                  let duration = activeEpisode.durationSecs, duration > 0 else { return nil }
+            return min(activeEpisode.watchProgress / Double(duration), 1)
+        case .live:
+            return nil
+        }
     }
 }
 
@@ -416,7 +427,7 @@ private struct HomeItemCell: View {
             .buttonStyle(.plain)
         case let .series(series):
             NavigationLink(value: series) {
-                HomePosterCard(title: item.title, imageURL: item.imageURL)
+                HomePosterCard(title: item.title, imageURL: item.imageURL, progress: item.progress)
                     .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
             }
             .buttonStyle(.plain)

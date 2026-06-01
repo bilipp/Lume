@@ -173,6 +173,9 @@ struct FullScreenPlayerView: View {
         episode.watchProgress = progress
         episode.lastWatchedDate = Date()
         if completed { episode.isWatched = true }
+        if let series = episode.series {
+            series.lastWatchedDate = Date()
+        }
         try? modelContext.save()
     }
 
