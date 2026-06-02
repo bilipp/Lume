@@ -309,9 +309,10 @@
                         }
                     }
                 } label: {
-                    menuIcon("waveform")
+                    Image(systemName: "waveform")
                 }
                 .menuIndicator(.hidden)
+                .buttonStyle(TVPlayerCircleButtonStyle())
                 .focused($focus, equals: .audio)
             }
         }
@@ -344,19 +345,12 @@
                         }
                     }
                 } label: {
-                    menuIcon("captions.bubble.fill")
+                    Image(systemName: "captions.bubble")
                 }
                 .menuIndicator(.hidden)
+                .buttonStyle(TVPlayerCircleButtonStyle())
                 .focused($focus, equals: .subtitles)
             }
-        }
-
-        private func menuIcon(_ systemImage: String) -> some View {
-            Image(systemName: systemImage)
-                .font(.system(size: 28, weight: .regular))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
         }
 
         // MARK: - Info panel
