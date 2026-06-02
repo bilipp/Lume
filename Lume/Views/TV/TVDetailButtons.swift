@@ -4,9 +4,9 @@
 //
 //  Focus-aware button styles and button components for the tvOS movie and
 //  series detail screens. Split out from TVDetailComponents to keep each file
-//  focused: this file owns the interactive controls (primary / glass / card /
-//  circle styles and the Play, secondary and icon buttons), while
-//  TVDetailComponents owns the static layout pieces.
+//  focused: this file owns the interactive controls (primary / glass / card
+//  styles and the Play and secondary action buttons), while TVDetailComponents
+//  owns the static layout pieces.
 //
 //  Everything here is tuned for the focus engine: cards and buttons lift and
 //  gain a shadow when focused, mirroring tvOS system controls.
@@ -38,8 +38,8 @@
                     .font(.system(size: 30, weight: .semibold))
                     .foregroundStyle(.black)
                     .padding(.horizontal, 44)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 76)
-                    .frame(minWidth: 300)
                     .background(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(background)
@@ -58,8 +58,9 @@
         }
     }
 
-    /// A translucent pill for secondary hero actions (Trailer, Favorite,
-    /// Watched). Tints solid white when focused.
+    /// A translucent pill for secondary hero actions (Favorite, Watched). Fills
+    /// the available width so a row of these matches the Play button above, and
+    /// tints solid white when focused.
     struct TVGlassButtonStyle: ButtonStyle {
         func makeBody(configuration: Configuration) -> some View {
             StyleBody(configuration: configuration)
@@ -76,9 +77,8 @@
                     : AnyShapeStyle(.regularMaterial)
                 let shadowOpacity: Double = isFocused ? 0.4 : 0
                 return configuration.label
-                    .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(foreground)
-                    .padding(.horizontal, 34)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 76)
                     .background(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -117,31 +117,6 @@
         }
     }
 
-    struct TVCircleButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            StyleBody(configuration: configuration)
-        }
-
-        struct StyleBody: View {
-            let configuration: ButtonStyleConfiguration
-            @Environment(\.isFocused) private var isFocused
-
-            var body: some View {
-                let background: AnyShapeStyle = isFocused
-                    ? AnyShapeStyle(.white)
-                    : AnyShapeStyle(.regularMaterial)
-                let shadowOpacity: Double = isFocused ? 0.4 : 0
-                return configuration.label
-                    .foregroundStyle(isFocused ? .black : .white)
-                    .frame(width: 68, height: 68)
-                    .background(Circle().fill(background))
-                    .scaleEffect(isFocused ? 1.1 : 1.0)
-                    .shadow(color: .black.opacity(shadowOpacity), radius: 16, y: 8)
-                    .animation(.easeOut(duration: 0.18), value: isFocused)
-            }
-        }
-    }
-
     // MARK: - Buttons
 
     struct TVPlayButton: View {
@@ -159,6 +134,9 @@
         }
     }
 
+    /// An icon-only secondary action (Favorite / Watched) shown below the Play
+    /// button. The `title` is used as the accessibility label since no text is
+    /// rendered.
     struct TVSecondaryActionButton: View {
         let title: String
         let systemImage: String
@@ -166,27 +144,11 @@
 
         var body: some View {
             Button(action: action) {
-                Label(title, systemImage: systemImage)
-                    .labelStyle(.titleAndIcon)
-            }
-            .buttonStyle(TVGlassButtonStyle())
-        }
-    }
-
-    /// A circular, focus-aware icon button for the floating top bar
-    /// (back, favorite, mark-watched).
-    struct TVIconButton: View {
-        let systemImage: String
-        var accessibilityLabel: String = ""
-        let action: () -> Void
-
-        var body: some View {
-            Button(action: action) {
                 Image(systemName: systemImage)
                     .font(.system(size: 30, weight: .semibold))
             }
-            .buttonStyle(TVCircleButtonStyle())
-            .accessibilityLabel(accessibilityLabel)
+            .buttonStyle(TVGlassButtonStyle())
+            .accessibilityLabel(title)
         }
     }
 
