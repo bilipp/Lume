@@ -24,11 +24,56 @@
         @State private var similar: [HomeMediaItem] = []
         @State private var collectionMovies: [HomeMediaItem] = []
         @State private var refreshToken: UUID = .init()
+        @State private var isLoadingTMDB: Bool
 
         private enum FocusTarget: Hashable { case play }
         @FocusState private var focus: FocusTarget?
 
+        init(movie: Movie) {
+            self.movie = movie
+            let needsFetch = if movie.tmdbId != nil, TMDBClient.shared.isConfigured {
+                if let enrichedAt = movie.tmdbEnrichedAt,
+                   Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600
+                {
+                    false
+                } else {
+                    true
+                }
+            } else {
+                false
+            }
+            _isLoadingTMDB = State(initialValue: needsFetch)
+        }
+
         var body: some View {
+            Group {
+                if isLoadingTMDB {
+                    TVDetailLoadingView(title: movie.name)
+                        .transition(.opacity)
+                } else {
+                    content
+                        .transition(.opacity)
+                }
+            }
+            .background(Color.black)
+            .ignoresSafeArea()
+            .fullScreenCover(item: $playingMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
+            .task(id: movie.id) {
+                await enrichIfNeeded()
+                resolveSimilar()
+                await resolveCollection()
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isLoadingTMDB = false
+                }
+            }
+            .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
+            .onChange(of: movie.collectionId) { Task { await resolveCollection() } }
+            .onChange(of: refreshToken) { resolveSimilar() }
+        }
+
+        private var content: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: TVDetailMetrics.sectionSpacing) {
                     hero
@@ -62,21 +107,8 @@
                 .padding(.bottom, 100)
             }
             .scrollClipDisabled()
-            .background(Color.black)
-            .ignoresSafeArea()
             .overlay(alignment: .top) { topBar }
             .defaultFocus($focus, .play)
-            .fullScreenCover(item: $playingMedia) { media in
-                FullScreenPlayerView(media: media)
-            }
-            .task(id: movie.id) {
-                await enrichIfNeeded()
-                resolveSimilar()
-                await resolveCollection()
-            }
-            .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
-            .onChange(of: movie.collectionId) { Task { await resolveCollection() } }
-            .onChange(of: refreshToken) { resolveSimilar() }
         }
 
         // MARK: - Hero
