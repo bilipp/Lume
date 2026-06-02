@@ -107,7 +107,6 @@
                 .padding(.bottom, 100)
             }
             .scrollClipDisabled()
-            .overlay(alignment: .top) { topBar }
             .defaultFocus($focus, .play)
         }
 
@@ -131,28 +130,21 @@
                     action: startPlayback
                 )
                 .focused($focus, equals: .play)
-            }
-        }
 
-        // MARK: - Top bar
+                HStack(spacing: 18) {
+                    TVSecondaryActionButton(
+                        title: movie.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                        systemImage: movie.isFavorite ? "heart.fill" : "heart",
+                        action: toggleFavorite
+                    )
 
-        private var topBar: some View {
-            HStack {
-                Spacer()
-                TVIconButton(
-                    systemImage: movie.isFavorite ? "heart.fill" : "heart",
-                    accessibilityLabel: movie.isFavorite ? "Remove from Favorites" : "Add to Favorites",
-                    action: toggleFavorite
-                )
-                TVIconButton(
-                    systemImage: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle",
-                    accessibilityLabel: movie.isWatched ? "Mark as Unwatched" : "Mark as Watched",
-                    action: toggleWatched
-                )
+                    TVSecondaryActionButton(
+                        title: movie.isWatched ? "Mark as Unwatched" : "Mark as Watched",
+                        systemImage: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle",
+                        action: toggleWatched
+                    )
+                }
             }
-            .padding(.horizontal, TVDetailMetrics.horizontalInset)
-            .padding(.top, 40)
-            .focusSection()
         }
 
         // MARK: - About / ratings / information

@@ -100,7 +100,6 @@
                 .padding(.bottom, 100)
             }
             .scrollClipDisabled()
-            .overlay(alignment: .top) { topBar }
             .defaultFocus($focus, .play)
         }
 
@@ -124,23 +123,16 @@
                     action: { if let episode = nextEpisode { playEpisode(episode) } }
                 )
                 .focused($focus, equals: .play)
-            }
-        }
 
-        // MARK: - Top bar
-
-        private var topBar: some View {
-            HStack {
-                Spacer()
-                TVIconButton(
-                    systemImage: series.isFavorite ? "heart.fill" : "heart",
-                    accessibilityLabel: series.isFavorite ? "Remove from Favorites" : "Add to Favorites",
-                    action: toggleFavorite
-                )
+                HStack(spacing: 18) {
+                    TVSecondaryActionButton(
+                        title: series.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                        systemImage: series.isFavorite ? "heart.fill" : "heart",
+                        action: toggleFavorite
+                    )
+                    Spacer(minLength: 0)
+                }
             }
-            .padding(.horizontal, TVDetailMetrics.horizontalInset)
-            .padding(.top, 40)
-            .focusSection()
         }
 
         // MARK: - Episodes
