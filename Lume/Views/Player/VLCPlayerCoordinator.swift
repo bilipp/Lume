@@ -65,7 +65,18 @@ import Foundation
 
         func attach(hostView: VLCHostView) {
             self.hostView = hostView
-            mediaPlayer.drawable = self
+            #if canImport(UIKit)
+                // iOS/tvOS: VLC inserts its render surface via the VLCDrawable
+                // protocol (addSubview:/bounds), and the same object backs PiP.
+                mediaPlayer.drawable = self
+            #elseif canImport(AppKit)
+                // macOS: VLCKit's sample-buffer display backend drives the
+                // drawable as a genuine NSView — it sends frame/setFrame:/
+                // removeFromSuperview: directly — so a custom VLCDrawable object
+                // crashes with "unrecognized selector …frame". Render straight
+                // into the host NSView instead.
+                mediaPlayer.drawable = hostView
+            #endif
         }
 
         func configure(media: PlayableMedia) {

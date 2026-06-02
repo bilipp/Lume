@@ -41,6 +41,12 @@ import SwiftUI
 
         var body: some View {
             ZStack {
+                // Backdrop. On macOS the host NSView is deliberately not
+                // layer-backed (see VLCVideoContainer), so it can't paint its
+                // own black fill — SwiftUI provides it here instead.
+                Color.black
+                    .ignoresSafeArea()
+
                 VLCVideoContainer(coordinator: coordinator)
                     .ignoresSafeArea()
 
@@ -192,9 +198,16 @@ import SwiftUI
             let coordinator: VLCPlayerCoordinator
 
             func makeNSView(context _: Context) -> NSView {
+                // Deliberately NOT layer-backed: VLCKit's macOS video output
+                // inserts a legacy `NSOpenGLView`. Inside a layer-backed view
+                // tree, on Apple Silicon's deprecated OpenGL-on-Metal shim,
+                // VLC's renderer aborts with `GL_INVALID_OPERATION` in
+                // `CreateFilters` (vout_helper.c). Leaving `wantsLayer` unset
+                // lets the GL view present the traditional, non-layer-backed
+                // way. SwiftUI may still force layer-backing from an ancestor;
+                // if so this won't be enough and macOS playback should fall
+                // back to a Metal-based engine (KSPlayer).
                 let view = NSView()
-                view.wantsLayer = true
-                view.layer?.backgroundColor = .black
                 coordinator.attach(hostView: view)
                 return view
             }

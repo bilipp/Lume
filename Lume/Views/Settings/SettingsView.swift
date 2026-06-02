@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Query private var playlists: [Playlist]
     @State private var showingAddPlaylist = false
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
@@ -23,12 +24,20 @@ struct SettingsView: View {
             }
             #if os(macOS)
             .listStyle(.inset(alternatesRowBackgrounds: true))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
             #endif
             .platformNavigationTitle("Settings")
             .sheet(isPresented: $showingAddPlaylist) {
                 LoginView()
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 480, idealWidth: 540, minHeight: 480, idealHeight: 600)
+        #endif
     }
 
     private var playlistsSection: some View {
