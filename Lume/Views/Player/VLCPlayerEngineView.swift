@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import VLCKitSPM
 
@@ -43,6 +44,11 @@ struct VLCPlayerEngineView: View {
         /// focus engine drops focus when the overlay disappears and no further
         /// remote input reaches the catcher.
         @FocusState private var catcherFocused: Bool
+        /// Live-content sort the channel browser uses — read so in-player channel
+        /// surfing follows the same order the viewer saw in the list.
+        @AppStorage(SortStorageKey.liveContent)
+        private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
+        @Environment(\.modelContext) private var modelContext
     #endif
 
     @Environment(\.dismiss) private var dismiss
@@ -155,7 +161,16 @@ struct VLCPlayerEngineView: View {
             .buttonStyle(InvisibleButtonStyle())
             .disabled(isControlsVisible)
             .focused($catcherFocused)
-            .onMoveCommand { _ in showControls() }
+            .onMoveCommand { direction in
+                // While watching live TV with the controls hidden, up/down surf
+                // channels directly — the classic channel rocker. Any other
+                // move just summons the controls.
+                if media.isLive, direction == .up || direction == .down {
+                    switchLiveChannel(direction)
+                } else {
+                    showControls()
+                }
+            }
         #else
             Color.clear
                 .contentShape(Rectangle())
@@ -177,7 +192,8 @@ struct VLCPlayerEngineView: View {
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
                 onSelectMedia: { onSelectMedia?($0) },
-                onPanelOpenChange: { setPanelOpen($0) }
+                onPanelOpenChange: { setPanelOpen($0) },
+                onSwitchChannel: { switchLiveChannel($0) }
             )
         #else
             VLCPlayerControlsOverlay(
@@ -202,6 +218,27 @@ struct VLCPlayerEngineView: View {
         coordinator.togglePlay()
         resetHideTimer()
     }
+
+    #if os(tvOS)
+        /// Surf to the adjacent live channel. Up selects the next channel, Down
+        /// the previous — matching a TV remote's channel rocker. The new channel's
+        /// controls are surfaced briefly so its name and EPG act as a banner.
+        private func switchLiveChannel(_ direction: MoveCommandDirection) {
+            guard media.isLive else { return }
+            let offset: Int
+            switch direction {
+            case .up: offset = 1
+            case .down: offset = -1
+            default: return
+            }
+            let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
+            guard let next = TVPlayerContent.adjacentLiveMedia(
+                for: media, offset: offset, sort: sort, in: modelContext
+            ) else { return }
+            onSelectMedia?(next)
+            showControls()
+        }
+    #endif
 
     private func toggleControls() {
         withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible.toggle() }

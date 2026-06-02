@@ -30,6 +30,10 @@
         var onResetHideTimer: () -> Void
         var onSelectMedia: (PlayableMedia) -> Void
         var onPanelOpenChange: (Bool) -> Void
+        /// Surf to the next (`.up`) or previous (`.down`) live channel. Wired to
+        /// the host so channel switching works identically whether the controls
+        /// are showing or hidden.
+        var onSwitchChannel: (MoveCommandDirection) -> Void
 
         /// `internal` (not `private`) so the derived-data extension in
         /// `TVPlayerControlsOverlay+Data.swift` can read this view's state.
@@ -62,6 +66,13 @@
                 .padding(.bottom, 56)
             }
             .defaultFocus($focus, .transport)
+            .onMoveCommand { direction in
+                // With the controls up, up/down still surf channels — but only
+                // for live TV and while no panel owns vertical navigation.
+                guard media.isLive, openTab == nil,
+                      direction == .up || direction == .down else { return }
+                onSwitchChannel(direction)
+            }
             .onChange(of: panelCloseToken) { closePanel() }
             .task(id: media.id) { resolveContent() }
             .onAppear {
