@@ -249,16 +249,20 @@ struct PlayerVideoInfo: Equatable {
 
     /// A short marketing-style quality tag derived from the pixel height.
     var qualityTag: String {
-        switch height {
-        case 4320...: "8K"
-        case 2160 ..< 4320: "4K"
-        case 1440 ..< 2160: "1440p"
-        case 1080 ..< 1440: "1080p"
-        case 720 ..< 1080: "720p"
-        case 480 ..< 720: "480p"
-        case 1 ..< 480: "SD"
-        default: ""
-        }
+        // TEMP: show the actual full resolution instead of the marketing tag.
+        // Restore the switch below to go back to "4K" / "1080p" labels.
+        "\(height)p"
+
+        // switch height {
+        // case 4320...: "8K"
+        // case 2160 ..< 4320: "4K"
+        // case 1440 ..< 2160: "1440p"
+        // case 1080 ..< 1440: "1080p"
+        // case 720 ..< 1080: "720p"
+        // case 480 ..< 720: "480p"
+        // case 1 ..< 480: "SD"
+        // default: ""
+        // }
     }
 
     /// Compact pieces for the overlay's right-hand technical caption, e.g.
