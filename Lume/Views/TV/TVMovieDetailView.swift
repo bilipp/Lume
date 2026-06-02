@@ -53,6 +53,7 @@
                 } else {
                     content
                         .transition(.opacity)
+                        .onAppear { focus = .play }
                 }
             }
             .background(Color.black)

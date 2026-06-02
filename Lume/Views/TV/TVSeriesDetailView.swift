@@ -53,6 +53,7 @@
                 } else {
                     content
                         .transition(.opacity)
+                        .onAppear { focus = .play }
                 }
             }
             .background(Color.black)
@@ -67,6 +68,10 @@
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isLoadingTMDB = false
                 }
+                // Episodes are now loaded, so the Play button is enabled and can
+                // accept focus (an assignment made before this point is ignored
+                // by the focus engine while the button is disabled).
+                focus = .play
             }
             .onChange(of: series.similarTMDBIds) { resolveSimilar() }
             .onChange(of: refreshToken) { resolveSimilar() }
