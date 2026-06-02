@@ -34,11 +34,12 @@ struct FullScreenPlayerView: View {
             playerView
                 .ignoresSafeArea()
 
-            // KSPlayer ships its own close button inside the auto-hiding
-            // controls overlay — showing a second one here means the user
-            // sees duplicate X buttons whenever the controls are visible.
-            // Only render our custom close for engines that don't have one.
-            if engine != .ksPlayer {
+            // VLCKit and KSPlayer ship their own close button inside the
+            // auto-hiding controls overlay — showing a second one here means
+            // the user sees duplicate X buttons whenever the controls are
+            // visible. Only render our custom close for engines that don't
+            // draw their own controls.
+            if !engine.rendersOwnControls {
                 closeButton
                     .padding(.top, 4)
                     .padding(.leading, 4)
@@ -71,6 +72,8 @@ struct FullScreenPlayerView: View {
             AVPlayerEngineView(media: media, currentTime: $currentTime, duration: $duration)
         case .ksPlayer:
             KSPlayerEngineView(media: media, currentTime: $currentTime, duration: $duration)
+        case .vlcKit:
+            VLCPlayerEngineView(media: media, currentTime: $currentTime, duration: $duration)
         }
     }
 

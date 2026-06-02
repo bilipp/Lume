@@ -1,5 +1,5 @@
 {
-  "originHash" : "9f4d02b36326f7abde21437747b4c93fd717fc0cfdb5a24d6ef00628796ec389",
+  "originHash" : "bade9719a9b0c1445f99405486308b257f81527e3a0d31a7adc9ed5bbc45ee9f",
   "pins" : [
     {
       "identity" : "ffmpegkit",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "bdfa2da39bb18865b317c4ffd08cdef5f8efc043",
         "version" : "2.3.4"
+      }
+    },
+    {
+      "identity" : "vlckit-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/virtualox/vlckit-spm",
+      "state" : {
+        "revision" : "1d19105c52515a1d52813923d88515947cdeb3d8",
+        "version" : "4.0.0-alpha.19"
       }
     }
   ],

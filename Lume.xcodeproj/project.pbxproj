@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = C66C81682FC5A59D0048468D /* KSPlayer */; };
+		C6FF000A2FC5A59D00484601 /* VLCKitSPM in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKitSPM */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */,
+				C6FF000A2FC5A59D00484601 /* VLCKitSPM in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -133,6 +135,7 @@
 			name = Lume;
 			packageProductDependencies = (
 				C66C81682FC5A59D0048468D /* KSPlayer */,
+				C6FF000B2FC5A59D00484602 /* VLCKitSPM */,
 			);
 			productName = Lume;
 			productReference = C67C02C02F880F2200842DBA /* Lume.app */;
@@ -218,6 +221,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				C66C81662FC5A59D0048468D /* XCRemoteSwiftPackageReference "KSPlayer" */,
+				C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "vlckit-spm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C67C02C12F880F2200842DBA /* Products */;
@@ -698,6 +702,14 @@
 				minimumVersion = 2.3.4;
 			};
 		};
+		C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "vlckit-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/virtualox/vlckit-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = "4.0.0-alpha.19";
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -705,6 +717,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C66C81662FC5A59D0048468D /* XCRemoteSwiftPackageReference "KSPlayer" */;
 			productName = KSPlayer;
+		};
+		C6FF000B2FC5A59D00484602 /* VLCKitSPM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "vlckit-spm" */;
+			productName = VLCKitSPM;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
