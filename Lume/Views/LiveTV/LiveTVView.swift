@@ -94,7 +94,7 @@ struct LiveTVView: View {
                 // playlist's first category so the channel list stays in sync.
                 selectedCategory = sortedCategories.first
             }
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
             .fullScreenCover(item: $playingMedia) { media in
                 FullScreenPlayerView(media: media)
             }
