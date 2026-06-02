@@ -35,8 +35,10 @@
 
     // MARK: - Button styles
 
-    /// A circular, translucent transport button that fills white and lifts when
-    /// focused — the player-overlay counterpart to the detail screens' styles.
+    /// A circular transport button rendered in genuine Liquid Glass. Idle it is
+    /// a clear lensing disc; on focus the glass brightens (white tint), the glyph
+    /// flips to black and the control lifts — the player-overlay counterpart to
+    /// the detail screens' styles, following the tvOS "glass on focus" pattern.
     struct TVPlayerCircleButtonStyle: ButtonStyle {
         var diameter: CGFloat = 60
         var glyphSize: CGFloat = 24
@@ -58,15 +60,21 @@
                     .font(.system(size: glyphSize, weight: .semibold))
                     .foregroundStyle(isFocused ? .black : .white)
                     .frame(width: diameter, height: diameter)
-                    .background(
-                        Circle().fill(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.ultraThinMaterial))
-                    )
-                    .overlay(Circle().stroke(.white.opacity(isFocused ? 0 : 0.12), lineWidth: 1))
+                    .glassEffect(glass, in: .circle)
                     .scaleEffect(pressed ? 1.05 : (isFocused ? 1.14 : 1.0))
                     .opacity(isEnabled ? 1 : 0.35)
                     .shadow(color: .black.opacity(isFocused ? 0.4 : 0), radius: 16, y: 8)
                     .animation(.easeOut(duration: 0.18), value: isFocused)
                     .animation(.easeOut(duration: 0.1), value: pressed)
+            }
+
+            /// Interactive so the material lenses and lifts under interaction;
+            /// white-tinted on focus to read as the highlighted control without
+            /// collapsing into a flat opaque fill.
+            private var glass: Glass {
+                isFocused
+                    ? .regular.tint(.white).interactive()
+                    : .regular.interactive()
             }
         }
     }
