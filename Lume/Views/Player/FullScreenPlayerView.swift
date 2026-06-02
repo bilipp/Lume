@@ -23,6 +23,15 @@ struct FullScreenPlayerView: View {
     @State private var duration: TimeInterval = 0
     @State private var lastSaved: Date = .distantPast
 
+    /// The stream currently playing. Starts as `media` but can be swapped when
+    /// the viewer picks another episode from the in-player episode rail (tvOS).
+    @State private var activeMedia: PlayableMedia
+
+    init(media: PlayableMedia) {
+        self.media = media
+        _activeMedia = State(initialValue: media)
+    }
+
     private var engine: PlayerEngineKind {
         PlayerEngineKind(rawValue: engineRaw) ?? .defaultValue
     }
@@ -69,12 +78,28 @@ struct FullScreenPlayerView: View {
     private var playerView: some View {
         switch engine {
         case .avPlayer:
-            AVPlayerEngineView(media: media, currentTime: $currentTime, duration: $duration)
+            AVPlayerEngineView(media: activeMedia, currentTime: $currentTime, duration: $duration)
         case .ksPlayer:
-            KSPlayerEngineView(media: media, currentTime: $currentTime, duration: $duration)
+            KSPlayerEngineView(media: activeMedia, currentTime: $currentTime, duration: $duration)
         case .vlcKit:
-            VLCPlayerEngineView(media: media, currentTime: $currentTime, duration: $duration)
+            VLCPlayerEngineView(
+                media: activeMedia,
+                currentTime: $currentTime,
+                duration: $duration,
+                onSelectMedia: switchMedia
+            )
         }
+    }
+
+    /// Persist the outgoing stream's progress, then swap in a new one. The
+    /// engine reconfigures its player when `activeMedia` changes.
+    private func switchMedia(to newMedia: PlayableMedia) {
+        guard newMedia.id != activeMedia.id else { return }
+        persistProgress(force: true)
+        currentTime = 0
+        duration = 0
+        lastSaved = .distantPast
+        activeMedia = newMedia
     }
 
     private var closeButton: some View {
@@ -128,7 +153,7 @@ struct FullScreenPlayerView: View {
             // Wait for the window to mount before toggling fullscreen.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 guard let window = NSApp.keyWindow ?? NSApp.windows.last(where: { $0.isVisible }) else { return }
-                window.title = media.title
+                window.title = activeMedia.title
                 if !window.styleMask.contains(.fullScreen) {
                     window.toggleFullScreen(nil)
                 }
@@ -137,7 +162,7 @@ struct FullScreenPlayerView: View {
     #endif
 
     private func persistProgress(force: Bool) {
-        guard !media.isLive else {
+        guard !activeMedia.isLive else {
             if force { touchLiveLastWatched() }
             return
         }
@@ -149,7 +174,7 @@ struct FullScreenPlayerView: View {
         let total = duration
         let completed = total > 0 && now / total >= 0.9
 
-        switch media.contentRef {
+        switch activeMedia.contentRef {
         case let .movie(id):
             updateMovie(id: id, progress: now, completed: completed)
         case let .episode(id):
@@ -183,7 +208,7 @@ struct FullScreenPlayerView: View {
     }
 
     private func touchLiveLastWatched() {
-        guard case let .live(id) = media.contentRef else { return }
+        guard case let .live(id) = activeMedia.contentRef else { return }
         var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         guard let stream = try? modelContext.fetch(descriptor).first else { return }

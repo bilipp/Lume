@@ -22,6 +22,9 @@ struct VLCPlayerEngineView: View {
     let media: PlayableMedia
     @Binding var currentTime: TimeInterval
     @Binding var duration: TimeInterval
+    /// Invoked when the viewer picks a different stream (e.g. another episode)
+    /// from the in-player overlay. The host swaps `media` in response.
+    var onSelectMedia: ((PlayableMedia) -> Void)?
 
     @StateObject private var coordinator = VLCPlayerCoordinator()
     @State private var isControlsVisible = true
@@ -29,6 +32,18 @@ struct VLCPlayerEngineView: View {
     @State private var seekPosition: TimeInterval = 0
     @State private var hideTask: Task<Void, Never>?
     @State private var hoverHideTask: Task<Void, Never>?
+    /// While an overlay panel (episodes / info) is open the controls must not
+    /// auto-hide out from under the viewer.
+    @State private var isPanelOpen = false
+    /// Bumped to ask the overlay to close its open panel (Menu/back press).
+    @State private var panelCloseToken = 0
+    #if os(tvOS)
+        /// Drives focus onto the transparent tap-catcher once the controls
+        /// auto-hide, so the Siri remote can summon them again. Without this the
+        /// focus engine drops focus when the overlay disappears and no further
+        /// remote input reaches the catcher.
+        @FocusState private var catcherFocused: Bool
+    #endif
 
     @Environment(\.dismiss) private var dismiss
     #if os(macOS)
@@ -78,28 +93,48 @@ struct VLCPlayerEngineView: View {
         .onChange(of: coordinator.isPlaying) { _, _ in
             resetHideTimer()
         }
+        .onChange(of: media) { _, newMedia in
+            // The host swapped the stream (e.g. a new episode). Reset local
+            // scrubbing state and hand the new media to the live player.
+            isSeeking = false
+            seekPosition = 0
+            isPanelOpen = false
+            coordinator.reload(media: newMedia)
+            resetHideTimer()
+        }
+        .onChange(of: isControlsVisible) { _, visible in
+            #if os(tvOS)
+                // Hand focus to the tap-catcher once the controls vanish so the
+                // remote can bring them back.
+                if !visible { Task { @MainActor in catcherFocused = true } }
+            #endif
+        }
+        // Handle the Menu/back button at the player root — the always-present
+        // ancestor of both the tap-catcher and the controls overlay — so it
+        // reliably overrides the fullScreenCover's default dismiss-on-Menu.
+        .onMenuPress { handleMenuPress() }
         #if os(macOS)
-        .onContinuousHover(coordinateSpace: .local) { phase in
-            switch phase {
-            case .active:
-                if !isControlsVisible {
-                    withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
-                }
-                resetHideTimer()
-                hoverHideTask?.cancel()
-            case .ended:
-                hoverHideTask?.cancel()
-                hoverHideTask = Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 600_000_000)
-                    guard !Task.isCancelled else { return }
-                    withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
+            .onContinuousHover(coordinateSpace: .local) { phase in
+                switch phase {
+                case .active:
+                    if !isControlsVisible {
+                        withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
+                    }
+                    resetHideTimer()
+                    hoverHideTask?.cancel()
+                case .ended:
+                    hoverHideTask?.cancel()
+                    hoverHideTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 600_000_000)
+                        guard !Task.isCancelled else { return }
+                        withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
+                    }
                 }
             }
-        }
-        .onKeyPress(.leftArrow) { coordinator.skip(by: -15); resetHideTimer(); return .handled }
-        .onKeyPress(.rightArrow) { coordinator.skip(by: 15); resetHideTimer(); return .handled }
-        .onKeyPress(.space) { togglePlay(); return .handled }
-        .onKeyPress(.escape) { closePlayer(); return .handled }
+            .onKeyPress(.leftArrow) { coordinator.skip(by: -15); resetHideTimer(); return .handled }
+            .onKeyPress(.rightArrow) { coordinator.skip(by: 15); resetHideTimer(); return .handled }
+            .onKeyPress(.space) { togglePlay(); return .handled }
+            .onKeyPress(.escape) { closePlayer(); return .handled }
         #endif
     }
 
@@ -111,11 +146,16 @@ struct VLCPlayerEngineView: View {
             // tvOS has no touch surface: drive the overlay from the Siri
             // remote. The catcher only takes focus while controls are
             // hidden, so the control buttons stay reachable otherwise.
-            Color.clear
-                .contentShape(Rectangle())
-                .focusable(!isControlsVisible)
-                .onMoveCommand { _ in showControls() }
-                .onTapGesture { showControls() }
+            // A focusable Button reliably catches the Siri remote's Select
+            // (center) press; `onMoveCommand` covers swipes/clicks. Disabled
+            // while the controls are up so the overlay's buttons own focus.
+            Button(action: showControls) {
+                Color.clear.contentShape(Rectangle())
+            }
+            .buttonStyle(InvisibleButtonStyle())
+            .disabled(isControlsVisible)
+            .focused($catcherFocused)
+            .onMoveCommand { _ in showControls() }
         #else
             Color.clear
                 .contentShape(Rectangle())
@@ -125,20 +165,35 @@ struct VLCPlayerEngineView: View {
 
     // MARK: - Controls Overlay
 
+    @ViewBuilder
     private var controlsOverlay: some View {
-        VLCPlayerControlsOverlay(
-            coordinator: coordinator,
-            media: media,
-            isSeeking: $isSeeking,
-            seekPosition: $seekPosition,
-            currentTime: $currentTime,
-            duration: $duration,
-            hideTask: $hideTask,
-            onClose: { closePlayer() },
-            onTogglePlay: { togglePlay() },
-            onResetHideTimer: { resetHideTimer() },
-            onScheduleHide: { scheduleHide() }
-        )
+        #if os(tvOS)
+            TVPlayerControlsOverlay(
+                coordinator: coordinator,
+                media: media,
+                currentTime: $currentTime,
+                duration: $duration,
+                panelCloseToken: panelCloseToken,
+                onTogglePlay: { togglePlay() },
+                onResetHideTimer: { resetHideTimer() },
+                onSelectMedia: { onSelectMedia?($0) },
+                onPanelOpenChange: { setPanelOpen($0) }
+            )
+        #else
+            VLCPlayerControlsOverlay(
+                coordinator: coordinator,
+                media: media,
+                isSeeking: $isSeeking,
+                seekPosition: $seekPosition,
+                currentTime: $currentTime,
+                duration: $duration,
+                hideTask: $hideTask,
+                onClose: { closePlayer() },
+                onTogglePlay: { togglePlay() },
+                onResetHideTimer: { resetHideTimer() },
+                onScheduleHide: { scheduleHide() }
+            )
+        #endif
     }
 
     // MARK: - Actions
@@ -159,14 +214,43 @@ struct VLCPlayerEngineView: View {
         scheduleHide()
     }
 
+    /// Dismiss the controls overlay (Menu button when no panel is open). A
+    /// second Menu press, with the controls hidden, dismisses the player.
+    private func hideControls() {
+        hideTask?.cancel()
+        withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
+    }
+
+    /// Menu/back routing: close an open panel first, then hide the controls,
+    /// and only dismiss the player once the controls are already hidden.
+    private func handleMenuPress() {
+        if isPanelOpen {
+            panelCloseToken += 1
+        } else if isControlsVisible {
+            hideControls()
+        } else {
+            closePlayer()
+        }
+    }
+
     private func resetHideTimer() {
         hideTask?.cancel()
         if isControlsVisible { scheduleHide() }
     }
 
+    /// Keep the controls pinned open while an overlay panel is showing.
+    private func setPanelOpen(_ open: Bool) {
+        isPanelOpen = open
+        if open {
+            hideTask?.cancel()
+        } else {
+            resetHideTimer()
+        }
+    }
+
     private func scheduleHide() {
         hideTask?.cancel()
-        guard coordinator.isPlaying else { return }
+        guard coordinator.isPlaying, !isPanelOpen else { return }
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
             guard !Task.isCancelled, coordinator.isPlaying else { return }
@@ -182,6 +266,30 @@ struct VLCPlayerEngineView: View {
             dismissWindow(id: "player")
         #else
             dismiss()
+        #endif
+    }
+}
+
+#if os(tvOS)
+    /// Draws only its (clear) label — no focus highlight, scale or background —
+    /// so the full-screen tap-catcher stays invisible even while it holds focus
+    /// with the controls hidden.
+    private struct InvisibleButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+        }
+    }
+#endif
+
+private extension View {
+    /// Runs `action` on the Siri remote's Menu/back press (tvOS only); a no-op
+    /// elsewhere so the cross-platform body still compiles.
+    @ViewBuilder
+    func onMenuPress(perform action: @escaping () -> Void) -> some View {
+        #if os(tvOS)
+            onExitCommand(perform: action)
+        #else
+            self
         #endif
     }
 }

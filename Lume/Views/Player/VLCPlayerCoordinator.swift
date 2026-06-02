@@ -28,6 +28,11 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     @Published var isPipActive = false
     @Published private(set) var isPipSupported = false
 
+    /// Live technical characteristics of the current video track, surfaced in
+    /// the tvOS overlay's right-hand caption. `nil` until the demuxer has
+    /// parsed the stream.
+    @Published private(set) var videoInfo: PlayerVideoInfo?
+
     /// Current playback rate (1.0 == normal).
     var playbackRate: Float {
         get { mediaPlayer.rate }
@@ -92,6 +97,54 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         mediaPlayer.media = vlcMedia
         mediaPlayer.play()
         isPlaying = true
+    }
+
+    /// Swap the current stream for a different one without tearing down the
+    /// player or its render surface. Used by the tvOS overlay to start a new
+    /// episode picked from the in-player episode rail.
+    func reload(media: PlayableMedia) {
+        isLive = media.isLive
+        startTime = media.startTime
+        needsResume = !media.isLive && media.startTime > 1
+        didSeekResume = false
+        resumeLanded = false
+        videoInfo = nil
+
+        let vlcMedia = VLCMedia(url: media.url)
+        vlcMedia?.addOption(media.isLive ? ":network-caching=3000" : ":network-caching=1500")
+        mediaPlayer.media = vlcMedia
+        mediaPlayer.play()
+        isPlaying = true
+    }
+
+    // MARK: - Video info
+
+    /// Reads the current video track's resolution, frame rate and codec.
+    /// Published only when the value actually changes to avoid view churn.
+    private func refreshVideoInfo() {
+        let size = mediaPlayer.videoSize
+        let track = mediaPlayer.videoTracks.first
+
+        var width = Int(size.width.rounded())
+        var height = Int(size.height.rounded())
+        var fps = 0.0
+        var codec: String?
+
+        if let track {
+            if let video = track.video {
+                if video.width > 0 { width = Int(video.width) }
+                if video.height > 0 { height = Int(video.height) }
+                let denominator = max(Int(video.frameRateDenominator), 1)
+                if video.frameRate > 0 { fps = Double(video.frameRate) / Double(denominator) }
+            }
+            let name = track.codecName()
+            codec = name.isEmpty ? nil : name
+        }
+
+        let info = (width > 0 && height > 0)
+            ? PlayerVideoInfo(width: width, height: height, fps: fps, codec: codec)
+            : nil
+        if info != videoInfo { videoInfo = info }
     }
 
     // MARK: - Resume
@@ -185,6 +238,46 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     }
 }
 
+// MARK: - Video info
+
+/// Resolution / frame-rate / codec snapshot for the current video track.
+struct PlayerVideoInfo: Equatable {
+    let width: Int
+    let height: Int
+    let fps: Double
+    let codec: String?
+
+    /// A short marketing-style quality tag derived from the pixel height.
+    var qualityTag: String {
+        switch height {
+        case 4320...: "8K"
+        case 2160 ..< 4320: "4K"
+        case 1440 ..< 2160: "1440p"
+        case 1080 ..< 1440: "1080p"
+        case 720 ..< 1080: "720p"
+        case 480 ..< 720: "480p"
+        case 1 ..< 480: "SD"
+        default: ""
+        }
+    }
+
+    /// Compact pieces for the overlay's right-hand technical caption, e.g.
+    /// `["4K", "H264", "24 fps"]`.
+    var captionParts: [String] {
+        var parts: [String] = []
+        if !qualityTag.isEmpty { parts.append(qualityTag) }
+        if let codec, !codec.isEmpty { parts.append(codec.uppercased()) }
+        if fps > 0 {
+            let rounded = (fps * 100).rounded() / 100
+            let text = rounded.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f", rounded)
+                : String(format: "%.2f", rounded)
+            parts.append("\(text) fps")
+        }
+        return parts
+    }
+}
+
 // MARK: - VLCMediaPlayerDelegate
 
 extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
@@ -198,6 +291,7 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
             isPlaying = mediaPlayer.isPlaying
             isPipSupported = pipController != nil
             pipController?.invalidatePlaybackState()
+            refreshVideoInfo()
         }
     }
 
@@ -208,6 +302,7 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
             let seconds = (mediaPlayer.time.value?.doubleValue ?? 0) / 1000
             guard isResumeSettled(currentSeconds: seconds) else { return }
             onTime?(seconds)
+            refreshVideoInfo()
         }
     }
 
