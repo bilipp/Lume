@@ -25,8 +25,8 @@
           },
           "glass" : false,
           "hidden" : false,
-          "image-name" : "lume_dark.svg",
-          "name" : "lume",
+          "image-name" : "lume-bw.svg",
+          "name" : "lume-bw",
           "position" : {
             "scale" : 2,
             "translation-in-points" : [
