@@ -29,7 +29,7 @@ struct TMDBClientTests {
 
     @Test func `backdrop URL with path`() {
         let url = TMDBClient.backdropURL("/abc.jpg")
-        #expect(url?.absoluteString == "https://image.tmdb.org/t/p/w1280/abc.jpg")
+        #expect(url?.absoluteString == "https://image.tmdb.org/t/p/w1920/abc.jpg")
     }
 
     @Test func `backdrop URL with nil path`() {

@@ -100,6 +100,40 @@ struct ModelTests {
         #expect(movie.tmdbId == 12345)
     }
 
+    @Test func `movie TMDB enrichment fields`() {
+        let movie = Movie(id: "m-4", streamId: 4, name: "Enriched")
+        movie.backdropPath = "/backdrop.jpg"
+        movie.tagline = "A tagline"
+        movie.contentRating = "PG-13"
+        movie.tmdbEnrichedAt = Date()
+        movie.similarTMDBIds = [1, 2, 3]
+        movie.collectionId = 42
+        movie.collectionName = "Collection"
+        movie.collectionPosterPath = "/poster.jpg"
+        movie.collectionBackdropPath = "/back.jpg"
+        #expect(movie.backdropPath == "/backdrop.jpg")
+        #expect(movie.tagline == "A tagline")
+        #expect(movie.contentRating == "PG-13")
+        #expect(movie.tmdbEnrichedAt != nil)
+        #expect(movie.similarTMDBIds == [1, 2, 3])
+        #expect(movie.collectionId == 42)
+        #expect(movie.collectionName == "Collection")
+    }
+
+    @Test func `movie watch tracking date fields`() {
+        let movie = Movie(id: "m-5", streamId: 5, name: "Dates")
+        movie.lastWatchedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        movie.addedToWatchlistDate = Date(timeIntervalSince1970: 1_700_000_100)
+        movie.traktId = "trakt-123"
+        movie.localFileURL = "/path/to/file.mp4"
+        movie.downloadedAt = Date()
+        #expect(movie.lastWatchedDate?.timeIntervalSince1970 == 1_700_000_000)
+        #expect(movie.addedToWatchlistDate?.timeIntervalSince1970 == 1_700_000_100)
+        #expect(movie.traktId == "trakt-123")
+        #expect(movie.localFileURL == "/path/to/file.mp4")
+        #expect(movie.downloadedAt != nil)
+    }
+
     // MARK: - Episode
 
     @Test func `episode download status round trip`() {
@@ -118,6 +152,53 @@ struct ModelTests {
         #expect(episode.watchProgress == 0)
         episode.watchProgress = 3600
         #expect(episode.watchProgress == 3600)
+    }
+
+    @Test func `episode is watched`() {
+        let episode = Episode(id: "e-3", episodeId: "3", title: "Ep3",
+                              containerExtension: "mp4", seasonNum: 1, episodeNum: 5)
+        #expect(episode.isWatched == false)
+        episode.isWatched = true
+        #expect(episode.isWatched == true)
+    }
+
+    @Test func `episode all download statuses`() {
+        let episode = Episode(id: "e-4", episodeId: "4", title: "Ep4",
+                              containerExtension: "mkv", seasonNum: 1, episodeNum: 1)
+        episode.downloadStatus = .pending
+        #expect(episode.downloadStatus == .pending)
+        episode.downloadStatus = .downloading
+        #expect(episode.downloadStatus == .downloading)
+        episode.downloadStatus = .completed
+        #expect(episode.downloadStatus == .completed)
+    }
+
+    @Test func `episode metadata fields`() {
+        let episode = Episode(id: "e-5", episodeId: "5", title: "Ep5",
+                              containerExtension: "mp4", seasonNum: 1, episodeNum: 2)
+        episode.durationSecs = 1800
+        episode.movieImage = "http://example.com/ep.jpg"
+        episode.plot = "An episode plot"
+        episode.rating = 8.5
+        episode.airDate = "2024-01-15"
+        episode.directSource = "http://example.com/direct"
+        episode.added = "1700000000"
+        #expect(episode.durationSecs == 1800)
+        #expect(episode.movieImage == "http://example.com/ep.jpg")
+        #expect(episode.plot == "An episode plot")
+        #expect(episode.rating == 8.5)
+        #expect(episode.airDate == "2024-01-15")
+        #expect(episode.directSource == "http://example.com/direct")
+        #expect(episode.added == "1700000000")
+    }
+
+    @Test func `episode series relationship`() {
+        let series = Series(id: "s-1", seriesId: 1, name: "Test Series")
+        let episode = Episode(id: "e-6", episodeId: "6", title: "Ep6",
+                              containerExtension: "mp4", seasonNum: 1, episodeNum: 1,
+                              series: series)
+        #expect(episode.series?.id == "s-1")
+        #expect(episode.series?.name == "Test Series")
     }
 
     // MARK: - Playlist
@@ -263,5 +344,61 @@ struct ModelTests {
         #expect(stream.isFavorite == false)
         #expect(stream.tvArchive == 0)
         #expect(stream.tvArchiveDuration == 0)
+    }
+
+    @Test func `live stream full init`() {
+        let stream = LiveStream(
+            id: "l-2",
+            streamId: 2,
+            name: "News Channel",
+            streamIcon: "http://example.com/icon.png",
+            epgChannelId: "BBC1",
+            added: "1700000000",
+            customSid: "sid-123",
+            tvArchive: 1,
+            tvArchiveDuration: 7,
+            isAdult: 0,
+            num: 1,
+            categoryId: "cat-1"
+        )
+        #expect(stream.streamIcon == "http://example.com/icon.png")
+        #expect(stream.epgChannelId == "BBC1")
+        #expect(stream.added == "1700000000")
+        #expect(stream.customSid == "sid-123")
+        #expect(stream.tvArchive == 1)
+        #expect(stream.tvArchiveDuration == 7)
+        #expect(stream.categoryId == "cat-1")
+        #expect(stream.customOrder == nil)
+    }
+
+    @Test func `live stream favorite`() {
+        let stream = LiveStream(id: "l-3", streamId: 3, name: "Fav Channel")
+        stream.isFavorite = true
+        stream.customOrder = 5
+        stream.lastWatchedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        #expect(stream.isFavorite == true)
+        #expect(stream.customOrder == 5)
+        #expect(stream.lastWatchedDate?.timeIntervalSince1970 == 1_700_000_000)
+    }
+
+    // MARK: - Enums
+
+    @Test func `category type raw values`() {
+        #expect(CategoryType.live.rawValue == "live")
+        #expect(CategoryType.vod.rawValue == "vod")
+        #expect(CategoryType.series.rawValue == "series")
+    }
+
+    @Test func `sync status raw values`() {
+        #expect(SyncStatus.idle.rawValue == "idle")
+        #expect(SyncStatus.syncing.rawValue == "syncing")
+        #expect(SyncStatus.error.rawValue == "error")
+    }
+
+    @Test func `download status all cases`() {
+        #expect(DownloadStatus.pending.rawValue == "pending")
+        #expect(DownloadStatus.downloading.rawValue == "downloading")
+        #expect(DownloadStatus.completed.rawValue == "completed")
+        #expect(DownloadStatus.failed.rawValue == "failed")
     }
 }

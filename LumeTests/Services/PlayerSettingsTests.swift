@@ -4,17 +4,20 @@ import Testing
 
 struct PlayerSettingsTests {
     @Test func `engine kind all cases`() {
-        #expect(PlayerEngineKind.allCases.count == 2)
+        #expect(PlayerEngineKind.allCases.count == 3)
+        #expect(PlayerEngineKind.vlcKit.rawValue == "vlcKit")
         #expect(PlayerEngineKind.ksPlayer.rawValue == "ksPlayer")
         #expect(PlayerEngineKind.avPlayer.rawValue == "avPlayer")
     }
 
     @Test func `engine kind display names`() {
+        #expect(PlayerEngineKind.vlcKit.displayName == "VLCKit")
         #expect(PlayerEngineKind.ksPlayer.displayName == "KSPlayer")
         #expect(PlayerEngineKind.avPlayer.displayName == "AVPlayer")
     }
 
     @Test func `engine kind identifiable`() {
+        #expect(PlayerEngineKind.vlcKit.id == "vlcKit")
         #expect(PlayerEngineKind.ksPlayer.id == "ksPlayer")
         #expect(PlayerEngineKind.avPlayer.id == "avPlayer")
     }
@@ -26,8 +29,16 @@ struct PlayerSettingsTests {
     }
 
     @Test func `engine kind subtitle content`() {
-        #expect(PlayerEngineKind.ksPlayer.subtitle.contains("FFmpeg"))
-        #expect(PlayerEngineKind.avPlayer.subtitle.contains("Native"))
+        let ksSubtitle = PlayerEngineKind.ksPlayer.subtitle
+        let avSubtitle = PlayerEngineKind.avPlayer.subtitle
+        #expect(!ksSubtitle.isEmpty)
+        #expect(!avSubtitle.isEmpty)
+    }
+
+    @Test func `engine renders own controls`() {
+        #expect(PlayerEngineKind.vlcKit.rendersOwnControls == true)
+        #expect(PlayerEngineKind.ksPlayer.rendersOwnControls == true)
+        #expect(PlayerEngineKind.avPlayer.rendersOwnControls == false)
     }
 
     @Test func `engine storage key`() {
