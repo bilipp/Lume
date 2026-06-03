@@ -1,7 +1,0 @@
-{
-  "images" : [
-    { "idiom" : "tv", "filename" : "mid_400.png", "scale" : "1x" },
-    { "idiom" : "tv", "filename" : "mid_800.png", "scale" : "2x" }
-  ],
-  "info" : { "author" : "xcode", "version" : 1 }
-}
