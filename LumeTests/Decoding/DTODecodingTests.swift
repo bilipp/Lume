@@ -18,8 +18,12 @@ struct DTODecodingTests {
     @Test func `decode live categories`() throws {
         let categories: [XtreamCategory] = try loadExampleJSON("LiveCategories.json")
         #expect(categories.count == 48, "Expected 48 live categories")
-        #expect(!categories.allSatisfy(\.categoryId.isEmpty))
-        #expect(!categories.allSatisfy(\.categoryName.isEmpty))
+        // An explicit closure (vs. a `\.categoryId.isEmpty` key path passed to
+        // the rethrows `allSatisfy`) sidesteps a toolchain quirk that infers the
+        // key-path argument as throwing and fails to compile. Same assertion:
+        // at least one category carries a non-empty id / name.
+        #expect(categories.contains(where: { !$0.categoryId.isEmpty }))
+        #expect(categories.contains(where: { !$0.categoryName.isEmpty }))
     }
 
     @Test func `decode movie categories`() throws {
