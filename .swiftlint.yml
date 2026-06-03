@@ -1,6 +1,7 @@
 disabled_rules:
   # Disabled because swiftformat enforces the opposite
   - opening_brace
+  - large_tuple
 
 line_length:
   warning: 200

@@ -160,7 +160,7 @@ struct HomeView: View {
                 .task(id: "\(playlists.count)-\(selectedPlaylistID)") {
                     await loadTrending()
                 }
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
                 .fullScreenCover(item: $playingMedia) { media in
                     FullScreenPlayerView(media: media)
                 }

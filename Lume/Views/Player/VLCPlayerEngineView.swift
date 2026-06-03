@@ -232,7 +232,7 @@ struct VLCPlayerEngineView: View {
             default: return
             }
             let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-            guard let next = TVPlayerContent.adjacentLiveMedia(
+            guard let next = LiveChannelNavigator.adjacentMedia(
                 for: media, offset: offset, sort: sort, in: modelContext
             ) else { return }
             onSelectMedia?(next)
