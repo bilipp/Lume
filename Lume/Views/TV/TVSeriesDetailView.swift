@@ -290,7 +290,7 @@
 
         private var informationItems: [TVMetaItem] {
             var items: [TVMetaItem] = []
-            items.append(TVMetaItem(label: "Title", value: series.name))
+            items.append(TVMetaItem(label: "Playlist Title", value: series.name))
             if let director = series.director, !director.isEmpty {
                 items.append(TVMetaItem(label: "Creator", value: director))
             }
@@ -324,13 +324,15 @@
             let seasons = availableSeasons
             guard !seasons.isEmpty else { return 1 }
 
-            let progressSeasons = seasons.filter { seasonNum in
-                series.episodes
-                    .filter { $0.seasonNum == seasonNum }
-                    .contains { $0.watchProgress > 0 || $0.isWatched }
+            // Open on the season of the furthest point reached in the series, so
+            // progress in a later season always wins over progress in an earlier
+            // one — regardless of which was watched more recently.
+            let target = furthestInProgressEpisode ?? furthestProgressEpisode
+            if let target, seasons.contains(target.seasonNum) {
+                return target.seasonNum
             }
 
-            return progressSeasons.first ?? seasons.first ?? 1
+            return seasons.first ?? 1
         }
 
         private var seasonEpisodes: [Episode] {
@@ -339,14 +341,26 @@
                 .sorted { $0.episodeNum < $1.episodeNum }
         }
 
-        /// The episode the Play button starts: the earliest partially-watched
-        /// episode, otherwise the first episode of the selected season.
-        private var nextEpisode: Episode? {
-            let inProgress = series.episodes
+        /// The furthest partially-watched (not completed) episode in the
+        /// series, ordered by season then episode.
+        private var furthestInProgressEpisode: Episode? {
+            series.episodes
                 .filter { $0.watchProgress > 1 && !$0.isWatched }
-                .sorted { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
-                .first
-            return inProgress ?? seasonEpisodes.first ?? series.episodes.sorted {
+                .max { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
+        }
+
+        /// The furthest episode with any watch progress, including completed.
+        private var furthestProgressEpisode: Episode? {
+            series.episodes
+                .filter { $0.watchProgress > 0 || $0.isWatched }
+                .max { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
+        }
+
+        /// The episode the Play button starts: resume the furthest
+        /// partially-watched episode, otherwise the first episode of the
+        /// selected season.
+        private var nextEpisode: Episode? {
+            furthestInProgressEpisode ?? seasonEpisodes.first ?? series.episodes.sorted {
                 ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum)
             }.first
         }

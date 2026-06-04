@@ -97,7 +97,7 @@ struct DetailHero: View {
             BackdropImage(url: backdropURL ?? posterFallbackURL, fallbackSymbol: fallbackSymbol)
 
             LinearGradient(
-                colors: [.clear, .black.opacity(0.2), .black.opacity(0.9)],
+                colors: [.clear, .black.opacity(0.35), .black.opacity(0.92)],
                 startPoint: .center,
                 endPoint: .bottom
             )

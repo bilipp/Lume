@@ -232,7 +232,7 @@
 
         private var informationItems: [TVMetaItem] {
             var items: [TVMetaItem] = []
-            items.append(TVMetaItem(label: "Title", value: movie.name))
+            items.append(TVMetaItem(label: "Playlist Title", value: movie.name))
             if let director = movie.director, !director.isEmpty {
                 items.append(TVMetaItem(label: "Director", value: director))
             }
