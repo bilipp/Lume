@@ -190,7 +190,7 @@
                 // Bottom scrim for legibility over bright artwork.
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.35), .black.opacity(0.92)],
-                    startPoint: .center,
+                    startPoint: .top,
                     endPoint: .bottom
                 )
                 .allowsHitTesting(false)
