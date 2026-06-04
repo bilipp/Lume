@@ -32,9 +32,15 @@ struct SettingsView: View {
             }
             #endif
             .platformNavigationTitle("Settings")
-            .sheet(isPresented: $showingAddPlaylist) {
-                LoginView()
-            }
+            #if os(tvOS)
+                .fullScreenCover(isPresented: $showingAddPlaylist) {
+                    LoginView()
+                }
+            #else
+                .sheet(isPresented: $showingAddPlaylist) {
+                        LoginView()
+                    }
+            #endif
         }
         #if os(macOS)
         .frame(minWidth: 480, idealWidth: 540, minHeight: 480, idealHeight: 600)
