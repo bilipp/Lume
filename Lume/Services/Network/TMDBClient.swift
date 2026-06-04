@@ -90,7 +90,7 @@ struct TMDBClient {
     /// US content rating folded in via `append_to_response`.
     func movieDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
-            "/movie/\(id)?append_to_response=credits,similar,release_dates"
+            "/movie/\(id)?append_to_response=credits,similar,release_dates,images"
         )
         return response.normalized(isMovie: true)
     }
@@ -98,7 +98,7 @@ struct TMDBClient {
     /// Full detail payload for a TV series.
     func tvDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
-            "/tv/\(id)?append_to_response=credits,similar,content_ratings"
+            "/tv/\(id)?append_to_response=credits,similar,content_ratings,images"
         )
         return response.normalized(isMovie: false)
     }
