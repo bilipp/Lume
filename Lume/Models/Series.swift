@@ -29,6 +29,8 @@ final class Series {
     var tmdbEnrichedAt: Date?
     /// TMDB ids of similar titles, in TMDB's order, for "You May Also Like".
     var similarTMDBIds: [Int] = []
+    /// YouTube videos (trailers, teasers, clips) from TMDB, in display order.
+    var trailers: [TitleVideo] = []
     @Relationship(deleteRule: .cascade, inverse: \CastMember.series)
     var castMembers: [CastMember] = []
 

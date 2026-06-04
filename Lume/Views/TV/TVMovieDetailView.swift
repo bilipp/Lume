@@ -89,6 +89,16 @@
                         }
                     }
 
+                    if !movie.trailers.isEmpty {
+                        TVRail(title: "Videos") {
+                            ForEach(movie.trailers) { video in
+                                TVVideoCard(video: video) {
+                                    if let url = video.youtubeURL { openVideoURL(url) }
+                                }
+                            }
+                        }
+                    }
+
                     if !similar.isEmpty {
                         TVRail(title: "You May Also Like") {
                             ForEach(similar) { item in

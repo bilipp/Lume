@@ -139,6 +139,14 @@ struct SeriesDetailView: View {
                         }
                     }
 
+                    if !series.trailers.isEmpty {
+                        section(title: "Videos") {
+                            VideoRow(videos: series.trailers) { video in
+                                if let url = video.youtubeURL { openVideoURL(url) }
+                            }
+                        }
+                    }
+
                     information
                         .padding(.horizontal, DetailMetrics.contentPadding)
 

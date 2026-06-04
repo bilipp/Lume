@@ -90,7 +90,7 @@ struct TMDBClient {
     /// US content rating folded in via `append_to_response`.
     func movieDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
-            "/movie/\(id)?append_to_response=credits,similar,release_dates,images"
+            "/movie/\(id)?append_to_response=credits,similar,release_dates,images,videos"
         )
         return response.normalized(isMovie: true)
     }
@@ -98,7 +98,7 @@ struct TMDBClient {
     /// Full detail payload for a TV series.
     func tvDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
-            "/tv/\(id)?append_to_response=credits,similar,content_ratings,images"
+            "/tv/\(id)?append_to_response=credits,similar,content_ratings,images,videos"
         )
         return response.normalized(isMovie: false)
     }
@@ -159,6 +159,8 @@ struct TMDBTitleDetails {
     var contentRating: String?
     var cast: [TMDBCastMember]
     var similarIDs: [Int]
+    /// YouTube videos (trailers, teasers, clips) in display order.
+    var videos: [TitleVideo]
 
     /// Collection this movie belongs to (only for movies, nil for series).
     var collectionId: Int?
@@ -211,13 +213,14 @@ private struct TitleDetailsResponse: Decodable {
     let releaseDates: Results<ReleaseDatesEntry>? // movies
     let contentRatings: Results<ContentRatingEntry>? // tv
     let belongsToCollection: BelongsToCollection?
+    let videos: Results<VideoEntry>?
 
     struct Genre: Decodable { let name: String }
     struct Credits: Decodable { let cast: [TMDBCastMemberDTO]? }
     struct Similar: Decodable { let results: [SimilarItem] }
     struct Results<Entry: Decodable>: Decodable { let results: [Entry] }
     enum CodingKeys: String, CodingKey {
-        case tagline, overview, runtime, genres, credits, similar
+        case tagline, overview, runtime, genres, credits, similar, videos
         case backdropPath = "backdrop_path"
         case voteAverage = "vote_average"
         case episodeRunTime = "episode_run_time"
@@ -271,6 +274,14 @@ private struct TMDBCastMemberDTO: Decodable {
 
 private struct SimilarItem: Decodable { let id: Int }
 
+private struct VideoEntry: Decodable {
+    let key: String
+    let name: String?
+    let site: String?
+    let type: String?
+    let official: Bool?
+}
+
 private struct ReleaseDateEntry: Decodable { let certification: String? }
 
 private struct CollectionDetailsResponse: Decodable {
@@ -307,11 +318,29 @@ extension TitleDetailsResponse {
             contentRating: isMovie ? movieCertification() : tvRating(),
             cast: Array(cast),
             similarIDs: similar?.results.map(\.id) ?? [],
+            videos: mappedVideos(),
             collectionId: isMovie ? belongsToCollection?.id : nil,
             collectionName: isMovie ? belongsToCollection?.name : nil,
             collectionPosterPath: isMovie ? belongsToCollection?.posterPath : nil,
             collectionBackdropPath: isMovie ? belongsToCollection?.backdropPath : nil
         )
+    }
+
+    /// YouTube videos sorted by usefulness — trailers first, then teasers,
+    /// clips and featurettes — with official entries leading within each kind.
+    private func mappedVideos() -> [TitleVideo] {
+        let priority: [String: Int] = [
+            "Trailer": 0, "Teaser": 1, "Clip": 2, "Featurette": 3, "Behind the Scenes": 4
+        ]
+        return (videos?.results ?? [])
+            .filter { $0.site == "YouTube" && !$0.key.isEmpty }
+            .sorted { lhs, rhs in
+                let lhsKey = (priority[lhs.type ?? ""] ?? 99, (lhs.official ?? false) ? 0 : 1)
+                let rhsKey = (priority[rhs.type ?? ""] ?? 99, (rhs.official ?? false) ? 0 : 1)
+                return lhsKey < rhsKey
+            }
+            .prefix(12)
+            .map { TitleVideo(key: $0.key, name: ($0.name?.isEmpty == false) ? $0.name! : "Video", type: $0.type ?? "Video") }
     }
 
     /// Picks a US certification, falling back to the first non-empty one.

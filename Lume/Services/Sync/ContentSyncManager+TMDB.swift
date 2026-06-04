@@ -38,6 +38,7 @@ func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie, context: Mo
     movie.tagline = details.tagline ?? movie.tagline
     movie.contentRating = details.contentRating ?? movie.contentRating
     movie.similarTMDBIds = details.similarIDs
+    movie.trailers = details.videos
 
     if (movie.plot ?? "").isEmpty, let overview = details.overview {
         movie.plot = overview
@@ -74,6 +75,7 @@ func applySeriesDetails(_ details: TMDBTitleDetails, to series: Series, context:
     series.tagline = details.tagline ?? series.tagline
     series.contentRating = details.contentRating ?? series.contentRating
     series.similarTMDBIds = details.similarIDs
+    series.trailers = details.videos
 
     if (series.plot ?? "").isEmpty, let overview = details.overview {
         series.plot = overview
