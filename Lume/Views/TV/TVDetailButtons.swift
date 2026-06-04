@@ -16,48 +16,6 @@
 
     import SwiftUI
 
-    // MARK: - Focus-aware button styles
-
-    /// The big, white, primary action (Play / Resume). Lifts and brightens on
-    /// focus the way tvOS system buttons do.
-    struct TVPrimaryButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            StyleBody(configuration: configuration)
-        }
-
-        struct StyleBody: View {
-            let configuration: ButtonStyleConfiguration
-            @Environment(\.isFocused) private var isFocused
-            @Environment(\.isEnabled) private var isEnabled
-
-            var body: some View {
-                let pressed = configuration.isPressed
-                let background = Color.white.opacity(isFocused ? 1.0 : 0.9)
-                let shadowOpacity: Double = isFocused ? 0.45 : 0
-                return configuration.label
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 44)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 76)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(background)
-                    )
-                    .scaleEffect(scale)
-                    .opacity(isEnabled ? 1 : 0.45)
-                    .shadow(color: .black.opacity(shadowOpacity), radius: 24, y: 14)
-                    .animation(.easeOut(duration: 0.18), value: isFocused)
-                    .animation(.easeOut(duration: 0.1), value: pressed)
-            }
-
-            private var scale: CGFloat {
-                if configuration.isPressed { return 1.02 }
-                return isFocused ? 1.08 : 1.0
-            }
-        }
-    }
-
     /// A translucent pill for secondary hero actions (Favorite, Watched). Fills
     /// the available width so a row of these matches the Play button above, and
     /// tints solid white when focused.
@@ -129,7 +87,7 @@
             Button(action: action) {
                 Label(title, systemImage: systemImage)
             }
-            .buttonStyle(TVPrimaryButtonStyle())
+            .buttonStyle(TVGlassButtonStyle())
             .disabled(!isEnabled)
         }
     }

@@ -348,22 +348,14 @@ private struct HeroInfo: View {
             Button {
                 onPlayMovie(movie)
             } label: {
-                Label("Play", systemImage: "play.fill")
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: fullWidth ? .infinity : nil)
+                playLabel(fullWidth: fullWidth)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.white)
+            .modifier(HeroPlayButtonStyle())
         } else if let series = hero.series {
             NavigationLink(value: series) {
-                Label("Play", systemImage: "play.fill")
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: fullWidth ? .infinity : nil)
+                playLabel(fullWidth: fullWidth)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.white)
+            .modifier(HeroPlayButtonStyle())
         }
     }
 
@@ -371,20 +363,71 @@ private struct HeroInfo: View {
     private func detailsButton(fullWidth: Bool) -> some View {
         if let movie = hero.movie {
             NavigationLink(value: movie) {
-                Label("Details", systemImage: "info.circle")
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: fullWidth ? .infinity : nil)
+                detailsLabel(fullWidth: fullWidth)
             }
-            .buttonStyle(.bordered)
-            .tint(.white)
+            .modifier(HeroDetailsButtonStyle())
         } else if let series = hero.series {
             NavigationLink(value: series) {
-                Label("Details", systemImage: "info.circle")
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: fullWidth ? .infinity : nil)
+                detailsLabel(fullWidth: fullWidth)
             }
-            .buttonStyle(.bordered)
-            .tint(.white)
+            .modifier(HeroDetailsButtonStyle())
         }
+    }
+
+    @ViewBuilder
+    private func playLabel(fullWidth: Bool) -> some View {
+        // On tvOS the glass style owns the foreground colour (it flips to black
+        // on focus) and sizing, so keep the label plain there.
+        #if os(tvOS)
+            Label("Play", systemImage: "play.fill")
+                .fontWeight(.semibold)
+        #else
+            Label("Play", systemImage: "play.fill")
+                .fontWeight(.semibold)
+                .foregroundStyle(.black)
+                .frame(maxWidth: fullWidth ? .infinity : nil)
+        #endif
+    }
+
+    @ViewBuilder
+    private func detailsLabel(fullWidth: Bool) -> some View {
+        #if os(tvOS)
+            Label("Details", systemImage: "info.circle")
+                .fontWeight(.semibold)
+        #else
+            Label("Details", systemImage: "info.circle")
+                .fontWeight(.semibold)
+                .frame(maxWidth: fullWidth ? .infinity : nil)
+        #endif
+    }
+}
+
+// MARK: - Hero button styles
+
+/// Matches the carousel Play button to the tvOS detail screen's glass pill,
+/// while keeping the prominent white style on iOS / macOS.
+private struct HeroPlayButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(tvOS)
+            content.buttonStyle(TVGlassButtonStyle())
+        #else
+            content
+                .buttonStyle(.borderedProminent)
+                .tint(.white)
+        #endif
+    }
+}
+
+/// Matches the carousel Details button to the tvOS detail screen's glass pill,
+/// while keeping the bordered style on iOS / macOS.
+private struct HeroDetailsButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(tvOS)
+            content.buttonStyle(TVGlassButtonStyle())
+        #else
+            content
+                .buttonStyle(.bordered)
+                .tint(.white)
+        #endif
     }
 }

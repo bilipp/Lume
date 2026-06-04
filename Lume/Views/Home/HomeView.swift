@@ -196,7 +196,7 @@ struct HomeView: View {
             + watchedStreams.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.live)
         return items
             .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
-            .prefix(20)
+            .prefix(10)
             .map(\.self)
     }
 

@@ -343,7 +343,7 @@
                     Button(action: primaryAction.perform) {
                         actionLabel(primaryAction)
                     }
-                    .buttonStyle(TVPrimaryButtonStyle())
+                    .buttonStyle(TVGlassButtonStyle())
                     .focused(focus, equals: .infoPrimary)
                 }
                 if let secondaryAction {
