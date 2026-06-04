@@ -28,7 +28,7 @@ struct EpisodeWatchedMenu: View {
             }
         }
 
-        if episode.hasLaterEpisodes {
+        if episode.hasLaterWatchedEpisodes {
             Button {
                 onMarkFollowingUnwatched()
             } label: {

@@ -82,12 +82,14 @@ extension Episode {
         }
     }
 
-    /// Whether any episode in the same series is ordered after this one
-    /// (later season, or same season and later episode number).
-    var hasLaterEpisodes: Bool {
+    /// Whether any episode ordered after this one has watched state to clear
+    /// (watched, or with resume progress) — the only case where offering to
+    /// mark following episodes unwatched is meaningful.
+    var hasLaterWatchedEpisodes: Bool {
         guard let series else { return false }
         return series.episodes.contains {
             ($0.seasonNum, $0.episodeNum) > (seasonNum, episodeNum)
+                && ($0.isWatched || $0.watchProgress > 0)
         }
     }
 
