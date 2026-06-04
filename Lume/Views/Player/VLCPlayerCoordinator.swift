@@ -99,6 +99,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         let vlcMedia = VLCMedia(url: media.url)
         applyMediaOptions(to: vlcMedia, isLive: media.isLive)
         mediaPlayer.media = vlcMedia
+        // swiftlint:disable:next line_length
         Logger.player.log("configure: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlace, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
         applyDeinterlace()
@@ -112,6 +113,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         media.addOption(":avcodec-hw=videotoolbox")
         media.addOption(":avcodec-threads=0")
         media.addOption(deinterlace ? ":deinterlace=1" : ":deinterlace=0")
+        media.addOption(":skip-frames")
         if deinterlace { media.addOption(":deinterlace-mode=blend") }
     }
 
@@ -142,6 +144,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         let vlcMedia = VLCMedia(url: media.url)
         applyMediaOptions(to: vlcMedia, isLive: media.isLive)
         mediaPlayer.media = vlcMedia
+        // swiftlint:disable:next line_length
         Logger.player.log("reload: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlace, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
         applyDeinterlace()
@@ -257,7 +260,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         Logger.player.debug(
             """
             health t=\(position, format: .fixed(precision: 1), privacy: .public)s state=\(state, privacy: .public) \
-            seekable=\(self.mediaPlayer.isSeekable, privacy: .public) \
+            seekable=\(mediaPlayer.isSeekable, privacy: .public) \
             input=\(inputKbps, format: .fixed(precision: 0), privacy: .public)kbps \
             demux=\(demuxKbps, format: .fixed(precision: 0), privacy: .public)kbps \
             displayed+\(dDisplayed, privacy: .public) late+\(dLate, privacy: .public) lost+\(dLost, privacy: .public) \
