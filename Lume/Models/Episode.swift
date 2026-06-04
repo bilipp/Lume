@@ -59,4 +59,57 @@ extension Episode {
         }
         set { downloadStatusRaw = newValue?.rawValue }
     }
+
+    /// Marks the episode watched or unwatched, keeping `watchProgress` and
+    /// `lastWatchedDate` consistent: a watched episode reads as fully played and
+    /// clears any resume point, an unwatched one resets progress to the start.
+    func setWatched(_ watched: Bool) {
+        isWatched = watched
+        if watched {
+            watchProgress = Double(durationSecs ?? 0)
+            lastWatchedDate = Date()
+        } else {
+            watchProgress = 0
+        }
+    }
+
+    /// Whether any episode in the same series is ordered before this one
+    /// (earlier season, or same season and earlier episode number).
+    var hasEarlierEpisodes: Bool {
+        guard let series else { return false }
+        return series.episodes.contains {
+            ($0.seasonNum, $0.episodeNum) < (seasonNum, episodeNum)
+        }
+    }
+
+    /// Whether any episode in the same series is ordered after this one
+    /// (later season, or same season and later episode number).
+    var hasLaterEpisodes: Bool {
+        guard let series else { return false }
+        return series.episodes.contains {
+            ($0.seasonNum, $0.episodeNum) > (seasonNum, episodeNum)
+        }
+    }
+
+    /// Marks every episode in the series ordered before this one as watched.
+    func markEarlierEpisodesWatched() {
+        guard let series else { return }
+        for other in series.episodes
+            where (other.seasonNum, other.episodeNum) < (seasonNum, episodeNum) && !other.isWatched
+        {
+            other.setWatched(true)
+        }
+    }
+
+    /// Marks every episode in the series ordered after this one as unwatched,
+    /// resetting their progress — used to rewind a series' viewing state.
+    func markLaterEpisodesUnwatched() {
+        guard let series else { return }
+        for other in series.episodes
+            where (other.seasonNum, other.episodeNum) > (seasonNum, episodeNum)
+            && (other.isWatched || other.watchProgress > 0)
+        {
+            other.setWatched(false)
+        }
+    }
 }

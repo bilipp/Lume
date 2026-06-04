@@ -170,7 +170,13 @@
                     ScrollView(.horizontal) {
                         LazyHStack(alignment: .top, spacing: TVDetailMetrics.railSpacing) {
                             ForEach(seasonEpisodes) { episode in
-                                TVEpisodeCard(episode: episode) { playEpisode(episode) }
+                                TVEpisodeCard(
+                                    episode: episode,
+                                    onPlay: { playEpisode(episode) },
+                                    onToggleWatched: { toggleWatched(episode) },
+                                    onMarkPreviousWatched: { markPreviousWatched(episode) },
+                                    onMarkFollowingUnwatched: { markFollowingUnwatched(episode) }
+                                )
                             }
                         }
                         .padding(.horizontal, TVDetailMetrics.horizontalInset)
@@ -451,6 +457,21 @@
         private func toggleFavorite() {
             series.isFavorite.toggle()
             series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+        }
+
+        private func toggleWatched(_ episode: Episode) {
+            episode.setWatched(!episode.isWatched)
+            try? modelContext.save()
+        }
+
+        private func markPreviousWatched(_ episode: Episode) {
+            episode.markEarlierEpisodesWatched()
+            try? modelContext.save()
+        }
+
+        private func markFollowingUnwatched(_ episode: Episode) {
+            episode.markLaterEpisodesUnwatched()
+            try? modelContext.save()
         }
     }
 

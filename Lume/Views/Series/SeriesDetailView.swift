@@ -201,7 +201,13 @@ struct SeriesDetailView: View {
             } else {
                 LazyVStack(spacing: 16) {
                     ForEach(seasonEpisodes) { episode in
-                        EpisodeCard(episode: episode) { playEpisode(episode) }
+                        EpisodeCard(
+                            episode: episode,
+                            onPlay: { playEpisode(episode) },
+                            onToggleWatched: { toggleWatched(episode) },
+                            onMarkPreviousWatched: { markPreviousWatched(episode) },
+                            onMarkFollowingUnwatched: { markFollowingUnwatched(episode) }
+                        )
                     }
                 }
                 .padding(.horizontal, DetailMetrics.contentPadding)
@@ -469,10 +475,12 @@ struct SeriesDetailView: View {
         }
         similar = Array(resolved.prefix(12))
     }
+}
 
-    // MARK: - Actions
+// MARK: - Actions
 
-    private func playEpisode(_ episode: Episode) {
+private extension SeriesDetailView {
+    func playEpisode(_ episode: Episode) {
         guard let playlist = seriesPlaylist,
               let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
         #if os(macOS)
@@ -482,9 +490,24 @@ struct SeriesDetailView: View {
         #endif
     }
 
-    private func toggleFavorite() {
+    func toggleFavorite() {
         series.isFavorite.toggle()
         series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+    }
+
+    func toggleWatched(_ episode: Episode) {
+        episode.setWatched(!episode.isWatched)
+        try? modelContext.save()
+    }
+
+    func markPreviousWatched(_ episode: Episode) {
+        episode.markEarlierEpisodesWatched()
+        try? modelContext.save()
+    }
+
+    func markFollowingUnwatched(_ episode: Episode) {
+        episode.markLaterEpisodesUnwatched()
+        try? modelContext.save()
     }
 }
 

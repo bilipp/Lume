@@ -273,7 +273,10 @@
     /// with a resume bar, then number/title, runtime and a two-line synopsis.
     struct TVEpisodeCard: View {
         let episode: Episode
-        let onPlay: () -> Void
+        var onPlay: () -> Void
+        var onToggleWatched: () -> Void = {}
+        var onMarkPreviousWatched: () -> Void = {}
+        var onMarkFollowingUnwatched: () -> Void = {}
 
         var body: some View {
             Button(action: onPlay) {
@@ -303,6 +306,14 @@
                 }
             }
             .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
+            .contextMenu {
+                EpisodeWatchedMenu(
+                    episode: episode,
+                    onToggleWatched: onToggleWatched,
+                    onMarkPreviousWatched: onMarkPreviousWatched,
+                    onMarkFollowingUnwatched: onMarkFollowingUnwatched
+                )
+            }
         }
 
         private var still: some View {

@@ -4,7 +4,10 @@ import SwiftUI
 /// right, a resume progress bar and a play affordance.
 struct EpisodeCard: View {
     let episode: Episode
-    let onPlay: () -> Void
+    var onPlay: () -> Void
+    var onToggleWatched: () -> Void = {}
+    var onMarkPreviousWatched: () -> Void = {}
+    var onMarkFollowingUnwatched: () -> Void = {}
 
     var body: some View {
         Button(action: onPlay) {
@@ -43,6 +46,14 @@ struct EpisodeCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            EpisodeWatchedMenu(
+                episode: episode,
+                onToggleWatched: onToggleWatched,
+                onMarkPreviousWatched: onMarkPreviousWatched,
+                onMarkFollowingUnwatched: onMarkFollowingUnwatched
+            )
+        }
     }
 
     private var thumbnail: some View {
