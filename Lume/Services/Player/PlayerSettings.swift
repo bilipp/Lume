@@ -48,4 +48,22 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
 
 enum PlayerSettings {
     static let engineKey = "player.engine"
+    static let deinterlaceKey = "player.deinterlace"
+
+    /// Default deinterlacing state.
+    ///
+    /// Off on iOS/tvOS: interlaced H.264 can't use VideoToolbox there (it aborts
+    /// on interlaced content) and falls back to software decode, so the lighter
+    /// default is to show frames woven rather than add a software deinterlace
+    /// pass on top. Combing may be visible on motion; the software decoder is
+    /// run multithreaded (see VLCPlayerCoordinator.applyMediaOptions) so either
+    /// way it can keep up. On by default on macOS, where VideoToolbox handles
+    /// deinterlacing in hardware.
+    static var deinterlaceDefault: Bool {
+        #if os(tvOS) || os(iOS)
+            false
+        #else
+            true
+        #endif
+    }
 }

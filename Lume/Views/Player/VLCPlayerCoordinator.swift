@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import OSLog
 import VLCKitSPM
 
 #if canImport(UIKit)
@@ -52,17 +53,19 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     private var startTime: TimeInterval = 0
     private var didConfigure = false
 
-    // Resume state. Rather than VLC's `:start-time` media option — which
-    // seeks the picture but makes the playback clock report from 0 on many
-    // stream types — we seek explicitly once the player is seekable and
-    // suppress time reporting until that seek lands, so the scrubber/clock
-    // reflect the true position and we never persist a bogus 0.
+    private var deinterlace = false
+
     private var needsResume = false
     private var didSeekResume = false
     private var resumeLanded = false
 
     /// PiP window controller, delivered by VLC once PiP is ready to use.
     private var pipController: (any VLCPictureInPictureWindowControlling)?
+
+    private var statsTimer: Timer?
+    private var lastStats: VLCMedia.Stats?
+    private var lastStateName: String?
+    private var bufferingStartedAt: Date?
 
     // MARK: - Setup
 
@@ -82,39 +85,68 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         #endif
     }
 
-    func configure(media: PlayableMedia) {
+    func configure(media: PlayableMedia, deinterlace: Bool) {
         guard !didConfigure else { return }
         didConfigure = true
 
+        VLCPlayerCoordinator.installLibVLCLogBridgeIfNeeded()
         isLive = media.isLive
         startTime = media.startTime
         needsResume = !media.isLive && media.startTime > 1
+        self.deinterlace = deinterlace
         mediaPlayer.delegate = self
 
         let vlcMedia = VLCMedia(url: media.url)
-        // Larger network buffer for live IPTV streams reduces stutter.
-        vlcMedia?.addOption(media.isLive ? ":network-caching=3000" : ":network-caching=1500")
+        applyMediaOptions(to: vlcMedia, isLive: media.isLive)
         mediaPlayer.media = vlcMedia
+        Logger.player.log("configure: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlace, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
+        applyDeinterlace()
         isPlaying = true
+        startStatsLogging()
+    }
+
+    private func applyMediaOptions(to media: VLCMedia?, isLive: Bool) {
+        guard let media else { return }
+        media.addOption(networkCaching(isLive: isLive))
+        media.addOption(":avcodec-hw=videotoolbox")
+        media.addOption(":avcodec-threads=0")
+        media.addOption(deinterlace ? ":deinterlace=1" : ":deinterlace=0")
+        if deinterlace { media.addOption(":deinterlace-mode=blend") }
+    }
+
+    private func applyDeinterlace() {
+        if deinterlace {
+            mediaPlayer.setDeinterlace(.on, withFilter: "blend")
+        } else {
+            mediaPlayer.setDeinterlaceFilter(nil)
+        }
+    }
+
+    private func networkCaching(isLive: Bool) -> String {
+        isLive ? ":network-caching=3000" : ":network-caching=1500"
     }
 
     /// Swap the current stream for a different one without tearing down the
     /// player or its render surface. Used by the tvOS overlay to start a new
     /// episode picked from the in-player episode rail.
-    func reload(media: PlayableMedia) {
+    func reload(media: PlayableMedia, deinterlace: Bool) {
         isLive = media.isLive
         startTime = media.startTime
         needsResume = !media.isLive && media.startTime > 1
         didSeekResume = false
         resumeLanded = false
         videoInfo = nil
+        self.deinterlace = deinterlace
 
         let vlcMedia = VLCMedia(url: media.url)
-        vlcMedia?.addOption(media.isLive ? ":network-caching=3000" : ":network-caching=1500")
+        applyMediaOptions(to: vlcMedia, isLive: media.isLive)
         mediaPlayer.media = vlcMedia
+        Logger.player.log("reload: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlace, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
+        applyDeinterlace()
         isPlaying = true
+        startStatsLogging()
     }
 
     // MARK: - Video info
@@ -170,7 +202,81 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         return false
     }
 
+    // MARK: - Diagnostics
+
+    private static var didInstallLogBridge = false
+
+    private static func installLibVLCLogBridgeIfNeeded() {
+        guard !didInstallLogBridge else { return }
+        didInstallLogBridge = true
+        VLCLibrary.shared().loggers = [VLCLogBridge()]
+    }
+
+    /// Begin periodic stream-health sampling. Idempotent.
+    private func startStatsLogging() {
+        lastStats = nil
+        statsTimer?.invalidate()
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+            self?.logStreamHealth()
+        }
+        // Common mode so sampling continues during scrolling / tracking runloop
+        // activity in the player UI.
+        RunLoop.main.add(timer, forMode: .common)
+        statsTimer = timer
+    }
+
+    private func stopStatsLogging() {
+        statsTimer?.invalidate()
+        statsTimer = nil
+        lastStats = nil
+    }
+
+    /// Snapshot `VLCMedia.statistics` and log it as deltas since the previous
+    /// sample, so the rate of dropped/late frames and discontinuities — the
+    /// signals behind live-stream stutter — is directly readable. Cumulative
+    /// counters are differenced; bitrates are instantaneous.
+    private func logStreamHealth() {
+        guard let stats = mediaPlayer.media?.statistics else { return }
+        defer { lastStats = stats }
+
+        let position = (mediaPlayer.time.value?.doubleValue ?? 0) / 1000
+        let state = VLCMediaPlayerStateToString(mediaPlayer.state)
+
+        // Deltas over the sample window (≈2s). First sample has no baseline.
+        let prev = lastStats
+        let dDisplayed = stats.displayedPictures - (prev?.displayedPictures ?? stats.displayedPictures)
+        let dLate = stats.latePictures - (prev?.latePictures ?? stats.latePictures)
+        let dLost = stats.lostPictures - (prev?.lostPictures ?? stats.lostPictures)
+        let dLostAudio = stats.lostAudioBuffers - (prev?.lostAudioBuffers ?? stats.lostAudioBuffers)
+        let dDiscont = stats.demuxDiscontinuity - (prev?.demuxDiscontinuity ?? stats.demuxDiscontinuity)
+        let dCorrupt = stats.demuxCorrupted - (prev?.demuxCorrupted ?? stats.demuxCorrupted)
+
+        let inputKbps = stats.inputBitrate * 8000 // bytes/ms → kbit/s
+        let demuxKbps = stats.demuxBitrate * 8000
+
+        Logger.player.debug(
+            """
+            health t=\(position, format: .fixed(precision: 1), privacy: .public)s state=\(state, privacy: .public) \
+            seekable=\(self.mediaPlayer.isSeekable, privacy: .public) \
+            input=\(inputKbps, format: .fixed(precision: 0), privacy: .public)kbps \
+            demux=\(demuxKbps, format: .fixed(precision: 0), privacy: .public)kbps \
+            displayed+\(dDisplayed, privacy: .public) late+\(dLate, privacy: .public) lost+\(dLost, privacy: .public) \
+            audioLost+\(dLostAudio, privacy: .public) discont+\(dDiscont, privacy: .public) corrupt+\(dCorrupt, privacy: .public)
+            """
+        )
+
+        // Call out the symptoms most associated with stutter at a level that
+        // survives release-log filtering.
+        if dLost > 0 || dLate > 0 || dDiscont > 0 || dLostAudio > 0 {
+            Logger.player.warning(
+                "stutter signals: lost=\(dLost, privacy: .public) late=\(dLate, privacy: .public) discont=\(dDiscont, privacy: .public) audioLost=\(dLostAudio, privacy: .public) over ~2s"
+            )
+        }
+    }
+
     func tearDown() {
+        stopStatsLogging()
+        Logger.player.log("tearDown")
         mediaPlayer.delegate = nil
         if mediaPlayer.isPlaying { mediaPlayer.stop() }
         mediaPlayer.drawable = nil
@@ -252,17 +358,6 @@ struct PlayerVideoInfo: Equatable {
         // TEMP: show the actual full resolution instead of the marketing tag.
         // Restore the switch below to go back to "4K" / "1080p" labels.
         "\(height)p"
-
-        // switch height {
-        // case 4320...: "8K"
-        // case 2160 ..< 4320: "4K"
-        // case 1440 ..< 2160: "1440p"
-        // case 1080 ..< 1440: "1080p"
-        // case 720 ..< 1080: "720p"
-        // case 480 ..< 720: "480p"
-        // case 1 ..< 480: "SD"
-        // default: ""
-        // }
     }
 
     /// Compact pieces for the overlay's right-hand technical caption, e.g.
@@ -291,11 +386,41 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
         // there (e.g. the resume seek) can crash or deadlock.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            logStateChange()
             seekToResumeIfNeeded()
             isPlaying = mediaPlayer.isPlaying
             isPipSupported = pipController != nil
             pipController?.invalidatePlaybackState()
             refreshVideoInfo()
+        }
+    }
+
+    /// Log player state transitions, and measure how long each buffering
+    /// episode lasts — frequent or long rebuffers are the clearest fingerprint
+    /// of a struggling live stream.
+    private func logStateChange() {
+        let state = mediaPlayer.state
+        let name = VLCMediaPlayerStateToString(state)
+        guard name != lastStateName else { return }
+        lastStateName = name
+
+        if state == .buffering {
+            bufferingStartedAt = Date()
+            Logger.player.log("state → \(name, privacy: .public)")
+        } else if let started = bufferingStartedAt {
+            let elapsed = Date().timeIntervalSince(started)
+            bufferingStartedAt = nil
+            Logger.player.log("state → \(name, privacy: .public) (rebuffered \(elapsed, format: .fixed(precision: 2), privacy: .public)s)")
+        } else {
+            Logger.player.log("state → \(name, privacy: .public)")
+        }
+
+        // Re-assert deinterlace once a vout exists: the runtime setting doesn't
+        // survive the output being (re)created, e.g. across a stream reload.
+        if state == .playing { applyDeinterlace() }
+
+        if state == .error {
+            Logger.player.error("player entered error state")
         }
     }
 
@@ -382,5 +507,32 @@ extension VLCPlayerCoordinator: VLCDrawable, VLCPictureInPictureDrawable, VLCPic
 
     func isMediaPlaying() -> Bool {
         mediaPlayer.isPlaying
+    }
+}
+
+// MARK: - libvlc log bridge
+
+/// Forwards libvlc's internal log messages into `Logger.player`, mapping VLC
+/// log levels onto the unified-logging levels so decoder/demux failures show
+/// up under the `Player` category alongside our structured samples.
+private final class VLCLogBridge: NSObject, VLCLogging {
+    var level: VLCLogLevel = .info
+
+    func handleMessage(_ message: String, logLevel: VLCLogLevel, context: VLCLogContext?) {
+        // Keychain HTTP-auth probe (errSecItemNotFound) — emitted per request,
+        // harmless, and drowns out everything else. Drop it.
+        if message.contains("lookup failed (-25300") { return }
+
+        let module = context?.module ?? "vlc"
+        switch logLevel {
+        case .error:
+            Logger.player.error("libvlc[\(module, privacy: .public)] \(message, privacy: .public)")
+        case .warning:
+            Logger.player.warning("libvlc[\(module, privacy: .public)] \(message, privacy: .public)")
+        case .info:
+            Logger.player.info("libvlc[\(module, privacy: .public)] \(message, privacy: .public)")
+        default:
+            Logger.player.debug("libvlc[\(module, privacy: .public)] \(message, privacy: .public)")
+        }
     }
 }

@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Query private var playlists: [Playlist]
     @State private var showingAddPlaylist = false
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
+    @AppStorage(PlayerSettings.deinterlaceKey) private var deinterlace = PlayerSettings.deinterlaceDefault
 
     private var engine: Binding<PlayerEngineKind> {
         Binding(
@@ -109,9 +110,23 @@ struct SettingsView: View {
             Text(engine.wrappedValue.subtitle)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Toggle("Deinterlace Video", isOn: $deinterlace)
+
+            Text(deinterlaceFooter)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         } header: {
             Text("Player")
         }
+    }
+
+    private var deinterlaceFooter: String {
+        #if os(tvOS) || os(iOS)
+            "Smooths interlaced channels (often 1080i). Best left off here — VLC does not support hardware decoding with interlacing. Disabling this can result in stutters for some channels."
+        #else
+            "Smooths interlaced channels (often 1080i). Turn off to show frames as-is, which may look combed on motion."
+        #endif
     }
 
     private var aboutSection: some View {
