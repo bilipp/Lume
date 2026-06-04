@@ -31,8 +31,10 @@ final class Series {
     var tmdbEnrichedAt: Date?
     /// TMDB ids of similar titles, in TMDB's order, for "You May Also Like".
     var similarTMDBIds: [Int] = []
-    /// YouTube videos (trailers, teasers, clips) from TMDB, in display order.
-    var trailers: [TitleVideo] = []
+    /// Encoded `[TitleVideo]` blob. SwiftData reliably persists `Data`, whereas a
+    /// stored `[TitleVideo]` attribute (a collection of a custom Codable struct)
+    /// traps in `ModelCoders` at save time. Access through `trailers`.
+    var trailersData: Data?
     @Relationship(deleteRule: .cascade, inverse: \CastMember.series)
     var castMembers: [CastMember] = []
 
@@ -81,6 +83,16 @@ final class Series {
 }
 
 extension Series {
+    /// YouTube videos (trailers, teasers, clips) from TMDB, in display order.
+    /// Backed by `trailersData` so SwiftData persists it as a plain `Data` blob.
+    var trailers: [TitleVideo] {
+        get {
+            guard let trailersData else { return [] }
+            return (try? JSONDecoder().decode([TitleVideo].self, from: trailersData)) ?? []
+        }
+        set { trailersData = try? JSONEncoder().encode(newValue) }
+    }
+
     /// Cast in TMDB billing order (top-billed first).
     var orderedCast: [CastMember] {
         castMembers.sorted { $0.order < $1.order }
