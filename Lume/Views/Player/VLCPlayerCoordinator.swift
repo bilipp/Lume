@@ -260,7 +260,6 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         Logger.player.debug(
             """
             health t=\(position, format: .fixed(precision: 1), privacy: .public)s state=\(state, privacy: .public) \
-            seekable=\(mediaPlayer.isSeekable, privacy: .public) \
             input=\(inputKbps, format: .fixed(precision: 0), privacy: .public)kbps \
             demux=\(demuxKbps, format: .fixed(precision: 0), privacy: .public)kbps \
             displayed+\(dDisplayed, privacy: .public) late+\(dLate, privacy: .public) lost+\(dLost, privacy: .public) \
