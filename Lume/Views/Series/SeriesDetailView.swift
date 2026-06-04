@@ -275,6 +275,7 @@ struct SeriesDetailView: View {
 
     private var informationRows: [(label: String, value: String)] {
         var rows: [(String, String)] = []
+        rows.append(("Title", series.name))
         if let director = series.director, !director.isEmpty {
             rows.append(("Director", director))
         }
@@ -283,9 +284,6 @@ struct SeriesDetailView: View {
         }
         if let cast = series.cast, !cast.isEmpty, series.orderedCast.isEmpty {
             rows.append(("Cast", cast))
-        }
-        if let playlist = seriesPlaylist {
-            rows.append(("Playlist", playlist.name))
         }
         return rows
     }

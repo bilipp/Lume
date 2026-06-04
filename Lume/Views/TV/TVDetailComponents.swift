@@ -27,7 +27,7 @@
         /// Gap between cards inside a horizontal rail.
         static let railSpacing: CGFloat = 40
         /// Height of the cinematic hero (leaves the rails just below the fold).
-        static let heroHeight: CGFloat = 800
+        static let heroHeight: CGFloat = 900
         /// Bottom padding of the hero info band.
         static let heroBottomInset: CGFloat = 80
 
@@ -204,7 +204,7 @@
 
                     // Title + synopsis + rating
                     VStack(alignment: .leading, spacing: 14) {
-                        TitleLogo(url: logoURL, title: title, maxWidth: 700, maxHeight: 150) {
+                        TitleLogo(url: logoURL, title: title, maxWidth: 700, maxHeight: 96) {
                             Text(title)
                                 .font(.system(size: 42, weight: .bold))
                                 .foregroundStyle(.white)

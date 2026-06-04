@@ -219,6 +219,7 @@ struct MovieDetailView: View {
 
     private var informationRows: [(label: String, value: String)] {
         var rows: [(String, String)] = []
+        rows.append(("Title", movie.name))
         if let director = movie.director, !director.isEmpty {
             rows.append(("Director", director))
         }
@@ -227,9 +228,6 @@ struct MovieDetailView: View {
         }
         if let actors = movie.actors, !actors.isEmpty, movie.orderedCast.isEmpty {
             rows.append(("Cast", actors))
-        }
-        if let playlist = moviePlaylist {
-            rows.append(("Playlist", playlist.name))
         }
         return rows
     }

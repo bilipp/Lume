@@ -290,6 +290,7 @@
 
         private var informationItems: [TVMetaItem] {
             var items: [TVMetaItem] = []
+            items.append(TVMetaItem(label: "Title", value: series.name))
             if let director = series.director, !director.isEmpty {
                 items.append(TVMetaItem(label: "Creator", value: director))
             }
@@ -301,9 +302,6 @@
             }
             if let cert = series.contentRating, !cert.isEmpty {
                 items.append(TVMetaItem(label: "Rated", value: cert))
-            }
-            if let playlist = seriesPlaylist {
-                items.append(TVMetaItem(label: "Playlist", value: playlist.name))
             }
             return items
         }

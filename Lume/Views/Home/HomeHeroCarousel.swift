@@ -80,6 +80,14 @@ struct HomeHeroCarousel: View {
     @State private var currentID: String?
     @State private var isInteracting = false
 
+    #if os(tvOS)
+        /// The Siri Remote drives the carousel through focus, not gestures. We
+        /// track whether the hero's (single) Details button holds focus so we can
+        /// page on left/right swipes and pause auto-advance while the user is on
+        /// the hero.
+        @FocusState private var detailsFocused: Bool
+    #endif
+
     private let autoAdvanceInterval: Duration = .seconds(6)
     /// Width below which the hero switches to the stacked, full-width layout.
     private let compactWidthThreshold: CGFloat = 600
@@ -111,10 +119,26 @@ struct HomeHeroCarousel: View {
                 .allowsHitTesting(false)
 
                 if let hero = currentHero {
-                    // Fixed overlay in normal layout — text wraps to `width`.
-                    HeroInfo(hero: hero, isCompact: isCompact, onPlayMovie: onPlayMovie)
-                        .id(hero.id)
-                        .transition(.opacity)
+                    #if os(tvOS)
+                        // Keep a STABLE identity (no `.id(hero.id)`) so the focused
+                        // Details button survives paging instead of being torn down
+                        // and losing focus. Left/right paging is wired through the
+                        // button's `onMoveCommand`; we re-assert focus after paging
+                        // because the link's identity changes across movie⇄series.
+                        HeroInfo(
+                            hero: hero,
+                            isCompact: isCompact,
+                            onPlayMovie: onPlayMovie,
+                            detailsFocus: $detailsFocused,
+                            onPrevious: { retreat(); detailsFocused = true },
+                            onNext: { advance(); detailsFocused = true }
+                        )
+                    #else
+                        // Fixed overlay in normal layout — text wraps to `width`.
+                        HeroInfo(hero: hero, isCompact: isCompact, onPlayMovie: onPlayMovie)
+                            .id(hero.id)
+                            .transition(.opacity)
+                    #endif
                 }
 
                 pageIndicator
@@ -200,6 +224,11 @@ struct HomeHeroCarousel: View {
             if Task.isCancelled { return }
             // Don't yank the carousel out from under an active gesture.
             guard !isInteracting else { continue }
+            #if os(tvOS)
+                // On tvOS, leave the carousel still while the user is parked on
+                // the hero paging through it manually.
+                if detailsFocused { continue }
+            #endif
             advance()
         }
     }
@@ -213,6 +242,17 @@ struct HomeHeroCarousel: View {
         }
         let next = items[(index + 1) % items.count].id
         withAnimation(.easeInOut(duration: 0.6)) { self.currentID = next }
+    }
+
+    private func retreat() {
+        guard let currentID,
+              let index = items.firstIndex(where: { $0.id == currentID })
+        else {
+            withAnimation(.easeInOut) { currentID = items.last?.id }
+            return
+        }
+        let previous = items[(index - 1 + items.count) % items.count].id
+        withAnimation(.easeInOut(duration: 0.6)) { self.currentID = previous }
     }
 }
 
@@ -297,6 +337,14 @@ private struct HeroInfo: View {
     let isCompact: Bool
     let onPlayMovie: (Movie) -> Void
 
+    #if os(tvOS)
+        // Binding to the parent's focus state for the Details button, plus the
+        // paging callbacks fired when the remote is swiped left / right.
+        var detailsFocus: FocusState<Bool>.Binding
+        var onPrevious: () -> Void = {}
+        var onNext: () -> Void = {}
+    #endif
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             TitleLogo(
@@ -344,18 +392,34 @@ private struct HeroInfo: View {
 
     @ViewBuilder
     private var actionButtons: some View {
-        if isCompact {
-            // Stacked, full-width buttons so nothing overflows horizontally.
-            VStack(spacing: 12) {
-                playButton(fullWidth: true)
-                detailsButton(fullWidth: true)
+        #if os(tvOS)
+            // A single Details button. Because it's the only focusable control in
+            // the hero, the Focus Engine has no horizontal neighbour to move to,
+            // so left / right swipes fall through to `onMoveCommand` and page the
+            // carousel. Up / down still move focus to the rows above/below.
+            detailsButton(fullWidth: false)
+                .focused(detailsFocus)
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .left: onPrevious()
+                    case .right: onNext()
+                    default: break
+                    }
+                }
+        #else
+            if isCompact {
+                // Stacked, full-width buttons so nothing overflows horizontally.
+                VStack(spacing: 12) {
+                    playButton(fullWidth: true)
+                    detailsButton(fullWidth: true)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    playButton(fullWidth: false)
+                    detailsButton(fullWidth: false)
+                }
             }
-        } else {
-            HStack(spacing: 12) {
-                playButton(fullWidth: false)
-                detailsButton(fullWidth: false)
-            }
-        }
+        #endif
     }
 
     @ViewBuilder
