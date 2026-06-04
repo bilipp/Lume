@@ -80,11 +80,13 @@ struct BackdropImage: View {
 // MARK: - Hero
 
 /// The cinematic header: backdrop artwork dimmed by a bottom gradient, with the
-/// title, an optional tagline and the metadata line pinned to the lower-left.
+/// title (or its wordmark logo), an optional tagline and the metadata line
+/// pinned to the lower-left.
 struct DetailHero: View {
     let title: String
     let backdropURL: URL?
     let posterFallbackURL: URL?
+    var logoURL: URL?
     var tagline: String?
     let metadata: DetailMetadata
     let height: CGFloat
@@ -102,13 +104,15 @@ struct DetailHero: View {
             .allowsHitTesting(false)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.largeTitle.weight(.heavy))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
-                    .shadow(radius: 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                TitleLogo(url: logoURL, title: title, maxWidth: 340, maxHeight: 96) {
+                    Text(title)
+                        .font(.largeTitle.weight(.heavy))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                        .shadow(radius: 8)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let tagline, !tagline.isEmpty {
                     Text(tagline)

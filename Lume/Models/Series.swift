@@ -22,6 +22,8 @@ final class Series {
 
     /// Wide landscape artwork path used for the detail hero (e.g. `/abc.jpg`).
     var backdropPath: String?
+    /// Transparent wordmark-logo path shown in place of the title (e.g. `/abc.png`).
+    var logoPath: String?
     var tagline: String?
     /// Localized content rating (e.g. "TV-MA", "16").
     var contentRating: String?

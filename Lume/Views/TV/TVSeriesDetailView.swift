@@ -125,6 +125,7 @@
                 title: series.name,
                 backdropURL: TMDBClient.backdropURL(series.backdropPath),
                 posterFallbackURL: URL(string: series.cover ?? ""),
+                logoURL: TMDBClient.logoURL(series.logoPath),
                 tagline: series.tagline,
                 synopsis: series.plot,
                 rating: rating5,
@@ -300,6 +301,9 @@
             }
             if let cert = series.contentRating, !cert.isEmpty {
                 items.append(TVMetaItem(label: "Rated", value: cert))
+            }
+            if let playlist = seriesPlaylist {
+                items.append(TVMetaItem(label: "Playlist", value: playlist.name))
             }
             return items
         }

@@ -117,6 +117,7 @@ struct SeriesDetailView: View {
                         title: series.name,
                         backdropURL: TMDBClient.backdropURL(series.backdropPath),
                         posterFallbackURL: URL(string: series.cover ?? ""),
+                        logoURL: TMDBClient.logoURL(series.logoPath),
                         tagline: series.tagline,
                         metadata: metadata,
                         height: DetailMetrics.heroHeight(for: proxy.size),
@@ -282,6 +283,9 @@ struct SeriesDetailView: View {
         }
         if let cast = series.cast, !cast.isEmpty, series.orderedCast.isEmpty {
             rows.append(("Cast", cast))
+        }
+        if let playlist = seriesPlaylist {
+            rows.append(("Playlist", playlist.name))
         }
         return rows
     }

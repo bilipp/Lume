@@ -53,6 +53,15 @@ enum HeroItem: Identifiable, Hashable {
         }
     }
 
+    /// The title's wordmark logo, shown in place of the text title when the
+    /// title has been enriched from TMDB and a logo is available.
+    var logoURL: URL? {
+        switch self {
+        case let .movie(movie, _, _): TMDBClient.logoURL(movie.logoPath)
+        case let .series(series, _, _): TMDBClient.logoURL(series.logoPath)
+        }
+    }
+
     var movie: Movie? {
         if case let .movie(movie, _, _) = self { return movie }
         return nil
@@ -290,10 +299,17 @@ private struct HeroInfo: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(hero.title)
-                .font(isCompact ? .title2.weight(.bold) : .largeTitle.weight(.bold))
-                .lineLimit(2)
-                .shadow(radius: 6)
+            TitleLogo(
+                url: hero.logoURL,
+                title: hero.title,
+                maxWidth: isCompact ? 260 : 400,
+                maxHeight: isCompact ? 64 : 110
+            ) {
+                Text(hero.title)
+                    .font(isCompact ? .title2.weight(.bold) : .largeTitle.weight(.bold))
+                    .lineLimit(2)
+                    .shadow(radius: 6)
+            }
 
             if !hero.overview.isEmpty {
                 Text(hero.overview)

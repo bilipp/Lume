@@ -118,6 +118,7 @@ struct MovieDetailView: View {
                         title: movie.name,
                         backdropURL: TMDBClient.backdropURL(movie.backdropPath),
                         posterFallbackURL: URL(string: movie.streamIcon ?? ""),
+                        logoURL: TMDBClient.logoURL(movie.logoPath),
                         tagline: movie.tagline,
                         metadata: metadata,
                         height: DetailMetrics.heroHeight(for: proxy.size),
@@ -226,6 +227,9 @@ struct MovieDetailView: View {
         }
         if let actors = movie.actors, !actors.isEmpty, movie.orderedCast.isEmpty {
             rows.append(("Cast", actors))
+        }
+        if let playlist = moviePlaylist {
+            rows.append(("Playlist", playlist.name))
         }
         return rows
     }

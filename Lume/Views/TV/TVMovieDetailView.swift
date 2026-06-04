@@ -128,6 +128,7 @@
                 title: movie.name,
                 backdropURL: TMDBClient.backdropURL(movie.backdropPath),
                 posterFallbackURL: URL(string: movie.streamIcon ?? ""),
+                logoURL: TMDBClient.logoURL(movie.logoPath),
                 tagline: movie.tagline,
                 synopsis: movie.plot,
                 rating: rating5,
@@ -242,6 +243,9 @@
             }
             if let cert = movie.contentRating, !cert.isEmpty {
                 items.append(TVMetaItem(label: "Rated", value: cert))
+            }
+            if let playlist = moviePlaylist {
+                items.append(TVMetaItem(label: "Playlist", value: playlist.name))
             }
             return items
         }

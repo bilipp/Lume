@@ -84,6 +84,14 @@ struct TMDBClient {
         return URL(string: imageBaseURL + size + path)
     }
 
+    /// Builds a full title-logo image URL from a TMDB relative path. Logos are
+    /// transparent PNGs of the title's wordmark; `w500` keeps them crisp at the
+    /// hero sizes the carousel and detail screens render them at.
+    static func logoURL(_ path: String?, size: String = "w500") -> URL? {
+        guard let path, !path.isEmpty else { return nil }
+        return URL(string: imageBaseURL + size + path)
+    }
+
     // MARK: - Title details
 
     /// Full detail payload for a movie, with credits, similar titles and the
@@ -161,6 +169,8 @@ struct TMDBTitleDetails {
     var similarIDs: [Int]
     /// YouTube videos (trailers, teasers, clips) in display order.
     var videos: [TitleVideo]
+    /// Relative path to the title's wordmark logo (transparent PNG), if any.
+    var logoPath: String?
 
     /// Collection this movie belongs to (only for movies, nil for series).
     var collectionId: Int?
@@ -214,13 +224,14 @@ private struct TitleDetailsResponse: Decodable {
     let contentRatings: Results<ContentRatingEntry>? // tv
     let belongsToCollection: BelongsToCollection?
     let videos: Results<VideoEntry>?
+    let images: ImagesEntry?
 
     struct Genre: Decodable { let name: String }
     struct Credits: Decodable { let cast: [TMDBCastMemberDTO]? }
     struct Similar: Decodable { let results: [SimilarItem] }
     struct Results<Entry: Decodable>: Decodable { let results: [Entry] }
     enum CodingKeys: String, CodingKey {
-        case tagline, overview, runtime, genres, credits, similar, videos
+        case tagline, overview, runtime, genres, credits, similar, videos, images
         case backdropPath = "backdrop_path"
         case voteAverage = "vote_average"
         case episodeRunTime = "episode_run_time"
@@ -282,6 +293,21 @@ private struct VideoEntry: Decodable {
     let official: Bool?
 }
 
+private struct ImagesEntry: Decodable {
+    let logos: [LogoEntry]?
+}
+
+private struct LogoEntry: Decodable {
+    let filePath: String
+    let languageCode: String?
+    let voteAverage: Double?
+    enum CodingKeys: String, CodingKey {
+        case filePath = "file_path"
+        case languageCode = "iso_639_1"
+        case voteAverage = "vote_average"
+    }
+}
+
 private struct ReleaseDateEntry: Decodable { let certification: String? }
 
 private struct CollectionDetailsResponse: Decodable {
@@ -319,6 +345,7 @@ extension TitleDetailsResponse {
             cast: Array(cast),
             similarIDs: similar?.results.map(\.id) ?? [],
             videos: mappedVideos(),
+            logoPath: bestLogoPath(),
             collectionId: isMovie ? belongsToCollection?.id : nil,
             collectionName: isMovie ? belongsToCollection?.name : nil,
             collectionPosterPath: isMovie ? belongsToCollection?.posterPath : nil,
@@ -341,6 +368,23 @@ extension TitleDetailsResponse {
             }
             .prefix(12)
             .map { TitleVideo(key: $0.key, name: ($0.name?.isEmpty == false) ? $0.name! : "Video", type: $0.type ?? "Video") }
+    }
+
+    /// Picks the best wordmark logo: an English one first, then a
+    /// language-neutral one, then any other; ties broken by TMDB vote average.
+    private func bestLogoPath() -> String? {
+        let logos = images?.logos ?? []
+        guard !logos.isEmpty else { return nil }
+        func rank(_ logo: LogoEntry) -> Int {
+            switch logo.languageCode {
+            case "en": 0
+            case nil, "": 1
+            default: 2
+            }
+        }
+        return logos
+            .sorted { (rank($0), -($0.voteAverage ?? 0)) < (rank($1), -($1.voteAverage ?? 0)) }
+            .first?.filePath
     }
 
     /// Picks a US certification, falling back to the first non-empty one.

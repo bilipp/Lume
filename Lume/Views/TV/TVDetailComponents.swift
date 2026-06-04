@@ -174,6 +174,7 @@
         let title: String
         let backdropURL: URL?
         let posterFallbackURL: URL?
+        var logoURL: URL?
         var tagline: String?
         var synopsis: String?
         var rating: Double? // 0...5
@@ -203,12 +204,14 @@
 
                     // Title + synopsis + rating
                     VStack(alignment: .leading, spacing: 14) {
-                        Text(title)
-                            .font(.system(size: 42, weight: .bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.6)
-                            .shadow(radius: 10)
+                        TitleLogo(url: logoURL, title: title, maxWidth: 700, maxHeight: 150) {
+                            Text(title)
+                                .font(.system(size: 42, weight: .bold))
+                                .foregroundStyle(.white)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.6)
+                                .shadow(radius: 10)
+                        }
 
                         if let tagline, !tagline.isEmpty {
                             Text(tagline)

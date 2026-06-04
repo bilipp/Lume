@@ -35,6 +35,7 @@ extension ContentSyncManager {
 @MainActor
 func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie, context: ModelContext) {
     movie.backdropPath = details.backdropPath ?? movie.backdropPath
+    movie.logoPath = details.logoPath ?? movie.logoPath
     movie.tagline = details.tagline ?? movie.tagline
     movie.contentRating = details.contentRating ?? movie.contentRating
     movie.similarTMDBIds = details.similarIDs
@@ -72,6 +73,7 @@ func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie, context: Mo
 @MainActor
 func applySeriesDetails(_ details: TMDBTitleDetails, to series: Series, context: ModelContext) {
     series.backdropPath = details.backdropPath ?? series.backdropPath
+    series.logoPath = details.logoPath ?? series.logoPath
     series.tagline = details.tagline ?? series.tagline
     series.contentRating = details.contentRating ?? series.contentRating
     series.similarTMDBIds = details.similarIDs
