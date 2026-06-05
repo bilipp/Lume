@@ -395,11 +395,16 @@
             isLoadingEpisodes = true
             defer { isLoadingEpisodes = false }
             let manager = ContentSyncManager(modelContainer: modelContext.container)
-            try? await manager.syncEpisodes(for: series, playlist: playlist)
-            await MainActor.run {
-                modelContext.processPendingChanges()
-                refreshToken = UUID()
-            }
+            let parsed = await (try? manager.fetchEpisodes(
+                seriesId: series.seriesId,
+                seriesElementId: series.id,
+                playlist: playlist
+            )) ?? []
+            // Insert through the view's own context, attaching to `series`, so its
+            // episodes relationship — and this view — update synchronously. Writing
+            // through a background context left the relationship stale until a later
+            // cross-context merge, so episodes only appeared after navigating back.
+            await MainActor.run { series.insertEpisodes(parsed, into: modelContext) }
             selectedSeason = determineDefaultSeason()
         }
 

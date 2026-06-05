@@ -423,13 +423,14 @@ struct SeriesDetailView: View {
         isLoadingEpisodes = true
         defer { isLoadingEpisodes = false }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        try? await manager.syncEpisodes(for: series, playlist: playlist)
-        // Force the view's context to pick up the background-context writes
-        // so that series.episodes is re-evaluated immediately.
-        await MainActor.run {
-            modelContext.processPendingChanges()
-            refreshToken = UUID()
-        }
+        let parsed = await (try? manager.fetchEpisodes(
+            seriesId: series.seriesId,
+            seriesElementId: series.id,
+            playlist: playlist
+        )) ?? []
+        // Insert through the view's own context, attaching to `series`, so its
+        // episodes relationship — and this view — update synchronously.
+        await MainActor.run { series.insertEpisodes(parsed, into: modelContext) }
         selectedSeason = determineDefaultSeason()
     }
 

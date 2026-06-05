@@ -9,6 +9,57 @@ import Foundation
 import OSLog
 import SwiftData
 
+// MARK: - ParsedEpisode
+
+/// A provider episode parsed off the main actor, ready to be turned into an
+/// `Episode` model by the caller on its own context. Value type so it can cross
+/// the actor boundary safely.
+struct ParsedEpisode {
+    let id: String
+    let episodeId: String
+    let title: String
+    let containerExtension: String
+    let seasonNum: Int
+    let episodeNum: Int
+    let added: String?
+    let directSource: String?
+    let durationSecs: Int?
+    let movieImage: String?
+    let rating: Double?
+    let airDate: String?
+    let plot: String?
+}
+
+extension Series {
+    /// Materializes fetched episodes on `context` and links them to this series,
+    /// de-duping against any already present (Episode.id is unique). Mutating the
+    /// `episodes` relationship directly updates any observing SwiftUI view, so the
+    /// caller must run this on the same context the view renders from.
+    func insertEpisodes(_ parsed: [ParsedEpisode], into context: ModelContext) {
+        let existingIds = Set(episodes.map(\.id))
+        for parsed in parsed where !existingIds.contains(parsed.id) {
+            let episode = Episode(
+                id: parsed.id,
+                episodeId: parsed.episodeId,
+                title: parsed.title,
+                containerExtension: parsed.containerExtension,
+                seasonNum: parsed.seasonNum,
+                episodeNum: parsed.episodeNum,
+                added: parsed.added,
+                directSource: parsed.directSource
+            )
+            episode.durationSecs = parsed.durationSecs
+            episode.movieImage = parsed.movieImage
+            episode.rating = parsed.rating
+            episode.airDate = parsed.airDate
+            episode.plot = parsed.plot
+            context.insert(episode)
+            episodes.append(episode)
+        }
+        try? context.save()
+    }
+}
+
 // MARK: - ContentSyncManager
 
 actor ContentSyncManager {
@@ -298,56 +349,43 @@ actor ContentSyncManager {
     }
 
     /// Syncs episodes for a series
-    func syncEpisodes(for series: Series, playlist: Playlist) async throws {
-        let seriesInfo = try await xtreamClient.getSeriesInfo(playlist: playlist, seriesId: series.seriesId)
-        guard let episodesDict = seriesInfo.episodes else { return }
+    /// Fetches and parses a series' episodes from the provider **without**
+    /// touching the database.
+    ///
+    /// The caller inserts the returned episodes through its own (view) context,
+    /// attaching them to the `Series` instance it already holds. Writing through
+    /// a separate background context instead leaves the view-context series'
+    /// `episodes` relationship stale until a later cross-context merge — which
+    /// races the UI refresh and, on tvOS, loses (episodes only appear after
+    /// navigating away and back). Returning value types sidesteps that entirely.
+    func fetchEpisodes(seriesId: Int, seriesElementId: String, playlist: Playlist) async throws -> [ParsedEpisode] {
+        let seriesInfo = try await xtreamClient.getSeriesInfo(playlist: playlist, seriesId: seriesId)
+        guard let episodesDict = seriesInfo.episodes else { return [] }
 
-        let context = ModelContext(modelContainer)
-        context.autosaveEnabled = false
-
-        let seriesId = series.id
-        guard let localSeries = try context.fetch(
-            FetchDescriptor<Series>(predicate: #Predicate { $0.id == seriesId })
-        ).first else { return }
-
+        var result: [ParsedEpisode] = []
         for (seasonKey, episodes) in episodesDict {
             guard let seasonNum = Int(seasonKey) else { continue }
             for episodeDTO in episodes {
                 guard let episodeIdString = episodeDTO.id else { continue }
-                let episodeId = "\(localSeries.id)-episode-\(episodeIdString)"
-
-                let episode = Episode(
-                    id: episodeId,
+                let plot = episodeDTO.info?.plot
+                result.append(ParsedEpisode(
+                    id: "\(seriesElementId)-episode-\(episodeIdString)",
                     episodeId: episodeIdString,
-                    title: "",
-                    containerExtension: "mkv",
+                    title: Self.cleanEpisodeTitle(episodeDTO.title),
+                    containerExtension: episodeDTO.containerExtension ?? "mkv",
                     seasonNum: seasonNum,
                     episodeNum: episodeDTO.episodeNum ?? 0,
-                    series: localSeries
-                )
-
-                episode.title = Self.cleanEpisodeTitle(episodeDTO.title)
-                episode.containerExtension = episodeDTO.containerExtension ?? "mkv"
-                episode.seasonNum = seasonNum
-                episode.episodeNum = episodeDTO.episodeNum ?? 0
-                episode.added = episodeDTO.added
-                episode.directSource = episodeDTO.directSource
-
-                if let info = episodeDTO.info {
-                    episode.durationSecs = info.durationSecs
-                    episode.movieImage = info.movieImage
-                    episode.rating = info.rating
-                    episode.airDate = info.airDate
-                    if let plot = info.plot, !plot.isEmpty {
-                        episode.plot = plot
-                    }
-                }
-
-                context.insert(episode)
+                    added: episodeDTO.added,
+                    directSource: episodeDTO.directSource,
+                    durationSecs: episodeDTO.info?.durationSecs,
+                    movieImage: episodeDTO.info?.movieImage,
+                    rating: episodeDTO.info?.rating,
+                    airDate: episodeDTO.info?.airDate,
+                    plot: (plot?.isEmpty == false) ? plot : nil
+                ))
             }
         }
-
-        try context.save()
+        return result
     }
 
     /// Reduces a raw Xtream episode title to just the episode name.
