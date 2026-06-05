@@ -71,20 +71,10 @@ struct TMDBClient {
         }
     }
 
-    /// Backdrop size for the cinematic heroes (home + movie/series detail).
-    /// Apple TV renders these full-screen at up to 4K, so we pull TMDB's
-    /// `original` asset there; phone/tablet/desktop heroes are well served by the
-    /// 1080p-wide `w1920`.
     static var heroBackdropSize: String {
-        #if os(tvOS)
-            "original"
-        #else
-            "w1920"
-        #endif
+        "w1920"
     }
 
-    /// Title-logo size. Larger on tvOS where the wordmark is rendered up to
-    /// 700pt wide on the 10-foot UI.
     static var heroLogoSize: String {
         #if os(tvOS)
             "original"
