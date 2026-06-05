@@ -140,7 +140,6 @@
                 posterFallbackURL: URL(string: movie.streamIcon ?? ""),
                 logoURL: TMDBClient.logoURL(movie.logoPath),
                 tagline: movie.tagline,
-                synopsis: movie.plot,
                 rating: rating5,
                 badge: movie.contentRating,
                 metaItems: heroMetaItems,
