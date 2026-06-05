@@ -153,11 +153,7 @@ struct HomeHeroCarousel: View {
         }
         .frame(height: heroHeight)
         #if os(tvOS)
-            // tvOS applies overscan safe-area insets (~60pt) on every edge. The
-            // enclosing ScrollView only ignores the top edge, which leaves the
-            // hero inset on the left/right and stops it from spanning the full
-            // screen. Bleed past the horizontal insets so the artwork reaches
-            // both edges; HeroInfo keeps its own title-safe padding.
+            // tvOS applies overscan safe-area insets (~60pt) on every edge
             .ignoresSafeArea(edges: .horizontal)
             // Group the hero as a focus section. The hero is a single, full-width
             // focusable surface (see `HeroInfo`), so the tab bar's downward focus
@@ -245,11 +241,12 @@ struct HomeHeroCarousel: View {
             // Don't yank the carousel out from under an active gesture.
             guard !isInteracting else { continue }
             #if os(tvOS)
-                // On tvOS, leave the carousel still while the user is parked on
-                // the hero paging through it manually.
-                if heroFocused { continue }
+                let wasFocused = heroFocused
+                advance()
+                if wasFocused { heroFocused = true }
+            #else
+                advance()
             #endif
-            advance()
         }
     }
 
