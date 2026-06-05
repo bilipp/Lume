@@ -71,9 +71,31 @@ struct TMDBClient {
         }
     }
 
+    /// Backdrop size for the cinematic heroes (home + movie/series detail).
+    /// Apple TV renders these full-screen at up to 4K, so we pull TMDB's
+    /// `original` asset there; phone/tablet/desktop heroes are well served by the
+    /// 1080p-wide `w1920`.
+    static var heroBackdropSize: String {
+        #if os(tvOS)
+            "original"
+        #else
+            "w1920"
+        #endif
+    }
+
+    /// Title-logo size. Larger on tvOS where the wordmark is rendered up to
+    /// 700pt wide on the 10-foot UI.
+    static var heroLogoSize: String {
+        #if os(tvOS)
+            "original"
+        #else
+            "w500"
+        #endif
+    }
+
     /// Builds a full image URL from a TMDB relative path (e.g. `/abc.jpg`).
-    /// `w1920` is the widescreen backdrop size used by the hero carousel.
-    static func backdropURL(_ path: String?, size: String = "w1920") -> URL? {
+    /// Defaults to the platform-appropriate hero backdrop size.
+    static func backdropURL(_ path: String?, size: String = heroBackdropSize) -> URL? {
         guard let path, !path.isEmpty else { return nil }
         return URL(string: imageBaseURL + size + path)
     }
@@ -85,9 +107,8 @@ struct TMDBClient {
     }
 
     /// Builds a full title-logo image URL from a TMDB relative path. Logos are
-    /// transparent PNGs of the title's wordmark; `w500` keeps them crisp at the
-    /// hero sizes the carousel and detail screens render them at.
-    static func logoURL(_ path: String?, size: String = "w500") -> URL? {
+    /// transparent PNGs of the title's wordmark, sized for the hero treatments.
+    static func logoURL(_ path: String?, size: String = heroLogoSize) -> URL? {
         guard let path, !path.isEmpty else { return nil }
         return URL(string: imageBaseURL + size + path)
     }

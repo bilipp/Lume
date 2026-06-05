@@ -457,7 +457,7 @@ private struct HomePosterCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PosterCardMetrics.titleSpacing) {
             ZStack(alignment: .bottomLeading) {
-                AsyncImage(url: imageURL) { phase in
+                CachedAsyncImage(url: imageURL, maxPixelSize: PosterCardMetrics.posterHeight) { phase in
                     switch phase {
                     case .empty:
                         Rectangle()

@@ -22,7 +22,7 @@
             Button(action: onSelect) {
                 VStack(alignment: .leading, spacing: 14) {
                     ZStack {
-                        AsyncImage(url: video.thumbnailURL) { phase in
+                        CachedAsyncImage(url: video.thumbnailURL, maxPixelSize: TVDetailMetrics.episodeCardWidth) { phase in
                             switch phase {
                             case let .success(image):
                                 image.resizable().aspectRatio(contentMode: .fill)

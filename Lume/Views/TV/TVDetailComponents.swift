@@ -50,7 +50,7 @@
 
         var body: some View {
             GeometryReader { geo in
-                AsyncImage(url: url) { phase in
+                CachedAsyncImage(url: url) { phase in
                     switch phase {
                     case .empty:
                         Rectangle().fill(Color.black.opacity(0.6))
@@ -318,7 +318,7 @@
 
         private var still: some View {
             ZStack(alignment: .bottom) {
-                AsyncImage(url: URL(string: episode.movieImage ?? "")) { phase in
+                CachedAsyncImage(url: URL(string: episode.movieImage ?? ""), maxPixelSize: 640) { phase in
                     switch phase {
                     case let .success(image):
                         image.resizable().aspectRatio(contentMode: .fill)
@@ -385,7 +385,7 @@
 
         var body: some View {
             VStack(spacing: 14) {
-                AsyncImage(url: TMDBClient.profileURL(member.profilePath, size: "w342")) { phase in
+                CachedAsyncImage(url: TMDBClient.profileURL(member.profilePath, size: "w342"), maxPixelSize: 160) { phase in
                     switch phase {
                     case let .success(image):
                         image.resizable().aspectRatio(contentMode: .fill)
@@ -436,7 +436,7 @@
 
         var body: some View {
             VStack(alignment: .leading, spacing: 10) {
-                AsyncImage(url: imageURL) { phase in
+                CachedAsyncImage(url: imageURL, maxPixelSize: PosterCardMetrics.posterHeight) { phase in
                     switch phase {
                     case .empty:
                         Rectangle().fill(Color.white.opacity(0.08)).overlay { ProgressView() }

@@ -13,7 +13,7 @@ struct MovieCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PosterCardMetrics.titleSpacing) {
             // Poster
-            AsyncImage(url: URL(string: movie.streamIcon ?? "")) { phase in
+            CachedAsyncImage(url: URL(string: movie.streamIcon ?? ""), maxPixelSize: PosterCardMetrics.posterHeight) { phase in
                 switch phase {
                 case .empty:
                     Rectangle()

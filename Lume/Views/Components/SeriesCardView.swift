@@ -13,7 +13,7 @@ struct SeriesCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PosterCardMetrics.titleSpacing) {
             // Cover
-            AsyncImage(url: URL(string: series.cover ?? "")) { phase in
+            CachedAsyncImage(url: URL(string: series.cover ?? ""), maxPixelSize: PosterCardMetrics.posterHeight) { phase in
                 switch phase {
                 case .empty:
                     Rectangle()
