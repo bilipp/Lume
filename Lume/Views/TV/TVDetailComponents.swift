@@ -176,7 +176,6 @@
         let posterFallbackURL: URL?
         var logoURL: URL?
         var tagline: String?
-        var synopsis: String?
         var rating: Double? // 0...5
         var badge: String?
         let metaItems: [TVMetaItem]
@@ -204,9 +203,9 @@
 
                     // Title + synopsis + rating
                     VStack(alignment: .leading, spacing: 14) {
-                        TitleLogo(url: logoURL, title: title, maxWidth: 700, maxHeight: 96) {
+                        TitleLogo(url: logoURL, title: title, maxWidth: 820, maxHeight: 150) {
                             Text(title)
-                                .font(.system(size: 42, weight: .bold))
+                                .font(.system(size: 52, weight: .bold))
                                 .foregroundStyle(.white)
                                 .lineLimit(2)
                                 .minimumScaleFactor(0.6)
@@ -218,14 +217,6 @@
                                 .font(.system(size: 24, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.85))
                                 .lineLimit(1)
-                        }
-
-                        if let synopsis, !synopsis.isEmpty {
-                            Text(synopsis)
-                                .font(.system(size: 24))
-                                .foregroundStyle(.white.opacity(0.85))
-                                .lineLimit(3)
-                                .frame(maxWidth: 720, alignment: .leading)
                         }
 
                         HStack(spacing: 20) {
@@ -495,36 +486,6 @@
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(.white.opacity(0.06))
             )
-        }
-    }
-
-    // MARK: - Expandable synopsis (About block)
-
-    /// The "About" paragraph. tvOS can't hover, so this is a focusable button
-    /// that expands the full text inline when selected.
-    struct TVAboutText: View {
-        let text: String
-        @State private var isExpanded = false
-
-        var body: some View {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-            } label: {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(text)
-                        .font(.system(size: 26))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .lineLimit(isExpanded ? nil : 4)
-                        .multilineTextAlignment(.leading)
-                    if text.count > 240 {
-                        Text(isExpanded ? "Less" : "More")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .frame(maxWidth: 1100, alignment: .leading)
-            }
-            .buttonStyle(.plain)
         }
     }
 

@@ -137,7 +137,6 @@
                 posterFallbackURL: URL(string: series.cover ?? ""),
                 logoURL: TMDBClient.logoURL(series.logoPath),
                 tagline: series.tagline,
-                synopsis: series.plot,
                 rating: rating5,
                 badge: series.contentRating,
                 metaItems: heroMetaItems,
