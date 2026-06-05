@@ -77,16 +77,16 @@ struct HomeHeroCarousel: View {
     let items: [HeroItem]
     let onPlayMovie: (Movie) -> Void
 
+    #if os(tvOS)
+        /// The Siri Remote drives the carousel through focus, not gestures. The
+        /// whole hero is a single focusable control (see `HeroInfo`); we track
+        /// whether it holds focus so we can page on left/right swipes and pause
+        /// auto-advance while the user is parked on the hero.
+        @FocusState private var heroFocused: Bool
+    #endif
+
     @State private var currentID: String?
     @State private var isInteracting = false
-
-    #if os(tvOS)
-        /// The Siri Remote drives the carousel through focus, not gestures. We
-        /// track whether the hero's (single) Details button holds focus so we can
-        /// page on left/right swipes and pause auto-advance while the user is on
-        /// the hero.
-        @FocusState private var detailsFocused: Bool
-    #endif
 
     private let autoAdvanceInterval: Duration = .seconds(6)
     /// Width below which the hero switches to the stacked, full-width layout.
@@ -121,17 +121,17 @@ struct HomeHeroCarousel: View {
                 if let hero = currentHero {
                     #if os(tvOS)
                         // Keep a STABLE identity (no `.id(hero.id)`) so the focused
-                        // Details button survives paging instead of being torn down
-                        // and losing focus. Left/right paging is wired through the
-                        // button's `onMoveCommand`; we re-assert focus after paging
-                        // because the link's identity changes across movie⇄series.
+                        // hero survives paging instead of being torn down and losing
+                        // focus. Left/right paging is wired through the hero's
+                        // `onMoveCommand`; we re-assert focus after paging because the
+                        // link's identity changes across movie⇄series.
                         HeroInfo(
                             hero: hero,
                             isCompact: isCompact,
                             onPlayMovie: onPlayMovie,
-                            detailsFocus: $detailsFocused,
-                            onPrevious: { retreat(); detailsFocused = true },
-                            onNext: { advance(); detailsFocused = true }
+                            heroFocus: $heroFocused,
+                            onPrevious: { retreat(); heroFocused = true },
+                            onNext: { advance(); heroFocused = true }
                         )
                     #else
                         // Fixed overlay in normal layout — text wraps to `width`.
@@ -157,6 +157,11 @@ struct HomeHeroCarousel: View {
             // screen. Bleed past the horizontal insets so the artwork reaches
             // both edges; HeroInfo keeps its own title-safe padding.
             .ignoresSafeArea(edges: .horizontal)
+            // Group the hero as a focus section. The hero is a single, full-width
+            // focusable surface (see `HeroInfo`), so the tab bar's downward focus
+            // move lands on it directly and an upward move from any card in the
+            // row below routes back to it regardless of horizontal position.
+            .focusSection()
         #endif
             .onAppear {
                 if currentID == nil { currentID = items.first?.id }
@@ -227,7 +232,7 @@ struct HomeHeroCarousel: View {
             #if os(tvOS)
                 // On tvOS, leave the carousel still while the user is parked on
                 // the hero paging through it manually.
-                if detailsFocused { continue }
+                if heroFocused { continue }
             #endif
             advance()
         }
@@ -338,14 +343,24 @@ private struct HeroInfo: View {
     let onPlayMovie: (Movie) -> Void
 
     #if os(tvOS)
-        // Binding to the parent's focus state for the Details button, plus the
+        // Binding to the parent's focus state for the hero surface, plus the
         // paging callbacks fired when the remote is swiped left / right.
-        var detailsFocus: FocusState<Bool>.Binding
+        var heroFocus: FocusState<Bool>.Binding
         var onPrevious: () -> Void = {}
         var onNext: () -> Void = {}
     #endif
 
     var body: some View {
+        #if os(tvOS)
+            heroSurface
+        #else
+            infoStack
+        #endif
+    }
+
+    /// The title / overview / action block. On tvOS it's the label of the
+    /// full-hero focusable surface; elsewhere it's a fixed overlay.
+    private var infoStack: some View {
         VStack(alignment: .leading, spacing: 10) {
             TitleLogo(
                 url: hero.logoURL,
@@ -390,22 +405,56 @@ private struct HeroInfo: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    #if os(tvOS)
+        /// On tvOS the ENTIRE hero is one focusable control rather than a small
+        /// Details button. This is the key to focus navigation: the tab bar's
+        /// downward move is a geometric search, so it lands on whatever sits in
+        /// the column below the tab item. A small leading-aligned button gets
+        /// skipped in favour of a card directly below it; a full-width surface
+        /// that spans the hero can't be missed. Selecting it opens Details and
+        /// left/right pages the carousel (no horizontal neighbour to move to).
+        @ViewBuilder
+        private var heroSurface: some View {
+            if let movie = hero.movie {
+                heroLink(value: movie)
+            } else if let series = hero.series {
+                heroLink(value: series)
+            }
+        }
+
+        /// The hero rendered as one full-WIDTH `NavigationLink`, pinned to the
+        /// bottom of the artwork at its natural height — NOT full height. The
+        /// width is what makes the tab bar's downward focus move land on it
+        /// (it can't miss a full-width target). The height matters too: if the
+        /// surface reached the top of the screen there'd be no room above it for
+        /// the Focus Engine to move "up" into the tab bar, so we leave the
+        /// artwork above it unfocusable. `HeroSurfaceButtonStyle` draws no focus
+        /// highlight (otherwise tvOS washes the whole surface white) — the
+        /// `detailsPill` carries the highlight instead.
+        private func heroLink(value: some Hashable) -> some View {
+            NavigationLink(value: value) {
+                infoStack
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(HeroSurfaceButtonStyle())
+            .focused(heroFocus)
+            .onMoveCommand { direction in
+                switch direction {
+                case .left: onPrevious()
+                case .right: onNext()
+                default: break
+                }
+            }
+        }
+    #endif
+
     @ViewBuilder
     private var actionButtons: some View {
         #if os(tvOS)
-            // A single Details button. Because it's the only focusable control in
-            // the hero, the Focus Engine has no horizontal neighbour to move to,
-            // so left / right swipes fall through to `onMoveCommand` and page the
-            // carousel. Up / down still move focus to the rows above/below.
-            detailsButton(fullWidth: false)
-                .focused(detailsFocus)
-                .onMoveCommand { direction in
-                    switch direction {
-                    case .left: onPrevious()
-                    case .right: onNext()
-                    default: break
-                    }
-                }
+            // Not a control: the whole hero is the focusable surface (see
+            // `heroSurface`). This is just a Details affordance that reflects the
+            // hero's focus state so it reads like a button when highlighted.
+            detailsPill
         #else
             if isCompact {
                 // Stacked, full-width buttons so nothing overflows horizontally.
@@ -422,67 +471,90 @@ private struct HeroInfo: View {
         #endif
     }
 
-    @ViewBuilder
-    private func playButton(fullWidth: Bool) -> some View {
-        if let movie = hero.movie {
-            Button {
-                onPlayMovie(movie)
-            } label: {
-                playLabel(fullWidth: fullWidth)
-            }
-            .modifier(HeroPlayButtonStyle())
-        } else if let series = hero.series {
-            NavigationLink(value: series) {
-                playLabel(fullWidth: fullWidth)
-            }
-            .modifier(HeroPlayButtonStyle())
-        }
-    }
-
-    @ViewBuilder
-    private func detailsButton(fullWidth: Bool) -> some View {
-        if let movie = hero.movie {
-            NavigationLink(value: movie) {
-                detailsLabel(fullWidth: fullWidth)
-            }
-            .modifier(HeroDetailsButtonStyle())
-        } else if let series = hero.series {
-            NavigationLink(value: series) {
-                detailsLabel(fullWidth: fullWidth)
-            }
-            .modifier(HeroDetailsButtonStyle())
-        }
-    }
-
-    @ViewBuilder
-    private func playLabel(fullWidth: Bool) -> some View {
-        // On tvOS the glass style owns the foreground colour (it flips to black
-        // on focus) and sizing, so keep the label plain there.
-        #if os(tvOS)
-            Label("Play", systemImage: "play.fill")
+    #if os(tvOS)
+        /// A purely visual "Details" affordance. It isn't focusable itself — the
+        /// enclosing hero surface is — so it mirrors the hero's focus state to
+        /// flip between a glassy resting style and a solid highlighted style.
+        private var detailsPill: some View {
+            Label("Details", systemImage: "info.circle")
                 .fontWeight(.semibold)
-        #else
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(
+                    heroFocus.wrappedValue
+                        ? AnyShapeStyle(.white)
+                        : AnyShapeStyle(.ultraThinMaterial),
+                    in: Capsule()
+                )
+                .foregroundStyle(heroFocus.wrappedValue ? .black : .white)
+                .scaleEffect(heroFocus.wrappedValue ? 1.04 : 1.0)
+                .animation(.easeOut(duration: 0.18), value: heroFocus.wrappedValue)
+        }
+    #endif
+
+    // The hero exposes separate Play and Details buttons on iOS / macOS. On
+    // tvOS the whole hero is a single focusable surface, so these are unused.
+    #if !os(tvOS)
+        @ViewBuilder
+        private func playButton(fullWidth: Bool) -> some View {
+            if let movie = hero.movie {
+                Button {
+                    onPlayMovie(movie)
+                } label: {
+                    playLabel(fullWidth: fullWidth)
+                }
+                .modifier(HeroPlayButtonStyle())
+            } else if let series = hero.series {
+                NavigationLink(value: series) {
+                    playLabel(fullWidth: fullWidth)
+                }
+                .modifier(HeroPlayButtonStyle())
+            }
+        }
+
+        @ViewBuilder
+        private func detailsButton(fullWidth: Bool) -> some View {
+            if let movie = hero.movie {
+                NavigationLink(value: movie) {
+                    detailsLabel(fullWidth: fullWidth)
+                }
+                .modifier(HeroDetailsButtonStyle())
+            } else if let series = hero.series {
+                NavigationLink(value: series) {
+                    detailsLabel(fullWidth: fullWidth)
+                }
+                .modifier(HeroDetailsButtonStyle())
+            }
+        }
+
+        private func playLabel(fullWidth: Bool) -> some View {
             Label("Play", systemImage: "play.fill")
                 .fontWeight(.semibold)
                 .foregroundStyle(.black)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
-        #endif
-    }
+        }
 
-    @ViewBuilder
-    private func detailsLabel(fullWidth: Bool) -> some View {
-        #if os(tvOS)
-            Label("Details", systemImage: "info.circle")
-                .fontWeight(.semibold)
-        #else
+        private func detailsLabel(fullWidth: Bool) -> some View {
             Label("Details", systemImage: "info.circle")
                 .fontWeight(.semibold)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
-        #endif
-    }
+        }
+    #endif
 }
 
 // MARK: - Hero button styles
+
+#if os(tvOS)
+    /// A focus-neutral button style for the full-hero surface: it renders only
+    /// the label, so tvOS adds no automatic focus highlight (which would wash
+    /// the entire hero white). The `detailsPill` reflects focus instead.
+    private struct HeroSurfaceButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .opacity(configuration.isPressed ? 0.85 : 1)
+        }
+    }
+#endif
 
 /// Matches the carousel Play button to the tvOS detail screen's glass pill,
 /// while keeping the prominent white style on iOS / macOS.
