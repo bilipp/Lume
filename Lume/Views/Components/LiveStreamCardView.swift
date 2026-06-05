@@ -41,7 +41,7 @@ struct LiveStreamCardView: View {
     var body: some View {
         HStack(spacing: 12) {
             // Channel logo
-            AsyncImage(url: URL(string: stream.streamIcon ?? "")) { phase in
+            CachedAsyncImage(url: URL(string: stream.streamIcon ?? ""), maxPixelSize: 60) { phase in
                 switch phase {
                 case .empty:
                     Rectangle()

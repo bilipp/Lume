@@ -61,7 +61,7 @@ private struct VideoThumbnailCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
-                AsyncImage(url: video.thumbnailURL) { phase in
+                CachedAsyncImage(url: video.thumbnailURL, maxPixelSize: width) { phase in
                     switch phase {
                     case let .success(image):
                         image.resizable().aspectRatio(contentMode: .fill)

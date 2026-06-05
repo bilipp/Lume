@@ -22,7 +22,7 @@ struct TitleLogo<Fallback: View>: View {
 
     var body: some View {
         if let url {
-            AsyncImage(url: url) { phase in
+            CachedAsyncImage(url: url) { phase in
                 switch phase {
                 case .empty:
                     // Reserve the logo's vertical space without flashing the

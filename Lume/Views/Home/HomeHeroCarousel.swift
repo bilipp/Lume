@@ -165,10 +165,23 @@ struct HomeHeroCarousel: View {
         #endif
             .onAppear {
                 if currentID == nil { currentID = items.first?.id }
+                prefetchNeighbours()
             }
+            .onChange(of: currentID) { _, _ in prefetchNeighbours() }
             .task(id: items.count) {
                 await autoAdvance()
             }
+    }
+
+    /// Warms the cache for the slides on either side of the current one so they
+    /// appear instantly when the carousel pages (full-resolution, tvOS 4K).
+    private func prefetchNeighbours() {
+        guard let currentID, let index = items.firstIndex(where: { $0.id == currentID }) else { return }
+        let neighbours = [index - 1, index + 1]
+            .filter { items.indices.contains($0) }
+            .compactMap { items[$0].imageURL }
+        guard !neighbours.isEmpty else { return }
+        Task { await ImagePipeline.shared.prefetch(neighbours, maxPixelSize: nil) }
     }
 
     // MARK: - Scrolling artwork
@@ -306,7 +319,7 @@ private struct HeroBackdrop: View {
 
     var body: some View {
         GeometryReader { geo in
-            AsyncImage(url: url) { phase in
+            CachedAsyncImage(url: url) { phase in
                 switch phase {
                 case .empty:
                     Rectangle()

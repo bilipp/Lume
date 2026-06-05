@@ -156,7 +156,7 @@
 
         private var still: some View {
             ZStack(alignment: .bottomLeading) {
-                AsyncImage(url: URL(string: episode.movieImage ?? "")) { phase in
+                CachedAsyncImage(url: URL(string: episode.movieImage ?? ""), maxPixelSize: cardWidth) { phase in
                     switch phase {
                     case let .success(image):
                         image.resizable().aspectRatio(contentMode: .fill)
@@ -273,7 +273,7 @@
         @ViewBuilder
         private var artwork: some View {
             if let posterURL {
-                AsyncImage(url: posterURL) { phase in
+                CachedAsyncImage(url: posterURL, maxPixelSize: 220) { phase in
                     switch phase {
                     case let .success(image):
                         image.resizable().aspectRatio(contentMode: .fill)

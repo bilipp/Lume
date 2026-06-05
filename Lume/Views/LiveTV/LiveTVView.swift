@@ -489,7 +489,7 @@ struct CategorySidebar: View {
         }
 
         private var logo: some View {
-            AsyncImage(url: URL(string: stream.streamIcon ?? "")) { phase in
+            CachedAsyncImage(url: URL(string: stream.streamIcon ?? ""), maxPixelSize: 84) { phase in
                 switch phase {
                 case .empty:
                     Rectangle().fill(Color.white.opacity(0.12)).overlay { ProgressView() }

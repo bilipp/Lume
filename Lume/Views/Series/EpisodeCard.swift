@@ -58,7 +58,7 @@ struct EpisodeCard: View {
 
     private var thumbnail: some View {
         ZStack {
-            AsyncImage(url: URL(string: episode.movieImage ?? "")) { phase in
+            CachedAsyncImage(url: URL(string: episode.movieImage ?? ""), maxPixelSize: 142) { phase in
                 switch phase {
                 case let .success(image):
                     image.resizable().aspectRatio(contentMode: .fill)

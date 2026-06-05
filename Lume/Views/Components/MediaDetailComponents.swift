@@ -52,7 +52,7 @@ struct BackdropImage: View {
 
     var body: some View {
         GeometryReader { geo in
-            AsyncImage(url: url) { phase in
+            CachedAsyncImage(url: url) { phase in
                 switch phase {
                 case .empty:
                     Rectangle().fill(Color.gray.opacity(0.25))
@@ -317,7 +317,7 @@ private struct CastCard: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            AsyncImage(url: TMDBClient.profileURL(member.profilePath)) { phase in
+            CachedAsyncImage(url: TMDBClient.profileURL(member.profilePath), maxPixelSize: 78) { phase in
                 switch phase {
                 case let .success(image):
                     image.resizable().aspectRatio(contentMode: .fill)
@@ -395,7 +395,7 @@ struct DetailPosterCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: imageURL) { phase in
+            CachedAsyncImage(url: imageURL, maxPixelSize: PosterCardMetrics.posterHeight) { phase in
                 switch phase {
                 case .empty:
                     Rectangle().fill(Color.gray.opacity(0.3)).overlay { ProgressView() }

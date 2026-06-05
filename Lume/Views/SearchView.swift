@@ -208,7 +208,7 @@ struct SearchResultRow: View {
     var body: some View {
         HStack(spacing: 12) {
             // Thumbnail
-            AsyncImage(url: thumbnailURL) { phase in
+            CachedAsyncImage(url: thumbnailURL, maxPixelSize: 90) { phase in
                 switch phase {
                 case .empty:
                     Rectangle()
