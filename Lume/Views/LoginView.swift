@@ -102,105 +102,61 @@ struct LoginView: View {
     #endif
 
     #if os(tvOS)
-        @FocusState private var focusedField: LoginField?
-
         private var tvBody: some View {
-            ZStack {
-                LinearGradient(
-                    colors: [Color(white: 0.13), Color(white: 0.04)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 0) {
-                        VStack(spacing: 10) {
-                            Text("Add Playlist")
-                                .font(.system(size: 62, weight: .bold))
-                            Text("Connect to your IPTV provider")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.bottom, 52)
-
-                        VStack(spacing: 26) {
-                            TVField(
-                                title: "Name",
-                                placeholder: "e.g. My IPTV",
-                                text: $name,
-                                field: .name,
-                                contentType: .name,
-                                focused: $focusedField
-                            )
-                            TVField(
-                                title: "Server URL",
-                                placeholder: "e.g. http://example.com:8080",
-                                text: $serverURL,
-                                field: .server,
-                                contentType: .URL,
-                                focused: $focusedField
-                            )
-                            TVField(
-                                title: "Username",
-                                placeholder: "Username",
-                                text: $username,
-                                field: .username,
-                                contentType: .username,
-                                focused: $focusedField
-                            )
-                            TVField(
-                                title: "Password",
-                                placeholder: "Password",
-                                text: $password,
-                                isSecure: true,
-                                field: .password,
-                                contentType: .password,
-                                focused: $focusedField
-                            )
-                        }
-
-                        Text("Your credentials are stored locally on this device.")
-                            .font(.callout)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Add Playlist")
+                            .font(.system(size: 38, weight: .bold))
+                        Text("Connect to your IPTV provider")
+                            .font(.system(size: TVSettingsMetrics.secondaryFontSize))
                             .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 22)
-
-                        if let errorMessage {
-                            Label(errorMessage, systemImage: "exclamationmark.circle.fill")
-                                .font(.callout)
-                                .foregroundStyle(.red)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 16)
-                        }
-
-                        HStack(spacing: 24) {
-                            Button(action: login) {
-                                ZStack {
-                                    if isLoading {
-                                        ProgressView()
-                                    } else {
-                                        Label("Add Playlist", systemImage: "plus")
-                                            .fontWeight(.semibold)
-                                    }
-                                }
-                            }
-                            .buttonStyle(TVGlassButtonStyle())
-                            .disabled(!isFormValid || isLoading)
-
-                            Button("Cancel") { dismiss() }
-                                .buttonStyle(TVGlassButtonStyle())
-                                .disabled(isLoading)
-                        }
-                        .padding(.top, 44)
                     }
-                    .frame(maxWidth: 840)
-                    .padding(.horizontal, 60)
-                    .padding(.vertical, 80)
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                    VStack(spacing: 22) {
+                        TVSettingsField(title: "Name", placeholder: "e.g. My IPTV", text: $name, contentType: .name)
+                        TVSettingsField(title: "Server URL", placeholder: "e.g. http://example.com:8080", text: $serverURL, contentType: .URL)
+                        TVSettingsField(title: "Username", placeholder: "Username", text: $username, contentType: .username)
+                        TVSettingsField(title: "Password", placeholder: "Password", text: $password, isSecure: true, contentType: .password)
+                    }
+
+                    Text("Your credentials are stored locally on this device.")
+                        .font(.system(size: TVSettingsMetrics.secondaryFontSize))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                    if let errorMessage {
+                        Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                            .font(.system(size: TVSettingsMetrics.secondaryFontSize))
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    }
+
+                    HStack(spacing: 16) {
+                        Button(action: login) {
+                            if isLoading {
+                                ProgressView()
+                            } else {
+                                Label("Add Playlist", systemImage: "plus")
+                            }
+                        }
+                        .buttonStyle(TVSettingsActionButtonStyle(prominent: true))
+                        .disabled(!isFormValid || isLoading)
+
+                        Button("Cancel") { dismiss() }
+                            .buttonStyle(TVSettingsActionButtonStyle())
+                            .disabled(isLoading)
+                    }
+                    .padding(.top, 8)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 }
-                .defaultFocus($focusedField, .name)
+                .frame(maxWidth: TVSettingsMetrics.contentMaxWidth, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 48)
+                .padding(.vertical, 72)
             }
+            .tvSettingsBackground()
         }
     #endif
 
@@ -256,52 +212,6 @@ struct LoginView: View {
         }
     }
 }
-
-#if os(tvOS)
-
-    /// Identifies the focusable text inputs in the tvOS login layout.
-    private enum LoginField: Hashable {
-        case name, server, username, password
-    }
-
-    /// A labelled, focus-aware text input styled to match the app's tvOS
-    /// controls (`.regularMaterial` pill that fills solid white on focus,
-    /// mirroring `TVGlassButtonStyle`).
-    private struct TVField: View {
-        let title: String
-        let placeholder: String
-        @Binding var text: String
-        var isSecure: Bool = false
-        let field: LoginField
-        let contentType: UITextContentType
-        @FocusState.Binding var focused: LoginField?
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(title)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                // Use the native tvOS field appearance for both states. Its
-                // focus treatment (white pill + lift) is system-drawn and can't
-                // be replaced by a custom background — layering one on top just
-                // produces a doubled, mismatched-radius shape. Labels and layout
-                // are ours; the field itself stays native.
-                Group {
-                    if isSecure {
-                        SecureField(placeholder, text: $text)
-                    } else {
-                        TextField(placeholder, text: $text)
-                    }
-                }
-                .textContentType(contentType)
-                .autocorrectionDisabled()
-                .focused($focused, equals: field)
-            }
-        }
-    }
-
-#endif
 
 #Preview("Empty") {
     LoginView()
