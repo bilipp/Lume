@@ -92,7 +92,9 @@ struct HomeHeroCarousel: View {
     /// Width below which the hero switches to the stacked, full-width layout.
     private let compactWidthThreshold: CGFloat = 600
 
-    #if os(macOS)
+    #if os(tvOS)
+        private let heroHeight: CGFloat = 960
+    #elseif os(macOS)
         private let heroHeight: CGFloat = 800
     #else
         private let heroHeight: CGFloat = 800
