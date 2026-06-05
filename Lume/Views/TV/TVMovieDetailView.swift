@@ -23,6 +23,7 @@
         @State private var playingMedia: PlayableMedia?
         @State private var similar: [HomeMediaItem] = []
         @State private var collectionMovies: [HomeMediaItem] = []
+        @State private var otherSources: [HomeMediaItem] = []
         @State private var refreshToken: UUID = .init()
         @State private var isLoadingTMDB: Bool
 
@@ -65,6 +66,7 @@
                 await enrichIfNeeded()
                 resolveSimilar()
                 await resolveCollection()
+                resolveOtherSources()
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isLoadingTMDB = false
                 }
@@ -110,6 +112,14 @@
                     if !collectionMovies.isEmpty, let name = movie.collectionName {
                         TVRail(title: "\(name) Collection") {
                             ForEach(collectionMovies) { item in
+                                posterLink(for: item)
+                            }
+                        }
+                    }
+
+                    if !otherSources.isEmpty {
+                        TVRail(title: "Other Sources") {
+                            ForEach(otherSources) { item in
                                 posterLink(for: item)
                             }
                         }
@@ -336,6 +346,10 @@
                 }
             }
             collectionMovies = resolved
+        }
+
+        private func resolveOtherSources() {
+            otherSources = OtherSources.resolve(for: movie, in: modelContext)
         }
 
         // MARK: - Actions

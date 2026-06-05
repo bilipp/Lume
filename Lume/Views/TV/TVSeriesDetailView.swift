@@ -23,6 +23,7 @@
         @State private var isLoadingEpisodes = false
         @State private var playingMedia: PlayableMedia?
         @State private var similar: [HomeMediaItem] = []
+        @State private var otherSources: [HomeMediaItem] = []
         @State private var refreshToken: UUID = .init()
         @State private var isLoadingTMDB: Bool
 
@@ -65,6 +66,7 @@
                 await loadEpisodesIfNeeded()
                 await enrichIfNeeded()
                 resolveSimilar()
+                resolveOtherSources()
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isLoadingTMDB = false
                 }
@@ -107,6 +109,14 @@
                     if !similar.isEmpty {
                         TVRail(title: "You May Also Like") {
                             ForEach(similar) { item in
+                                posterLink(for: item)
+                            }
+                        }
+                    }
+
+                    if !otherSources.isEmpty {
+                        TVRail(title: "Other Sources") {
+                            ForEach(otherSources) { item in
                                 posterLink(for: item)
                             }
                         }
@@ -422,7 +432,39 @@
             refreshToken = UUID()
         }
 
-        private func resolveSimilar() {
+        // MARK: - Actions
+
+        private func playEpisode(_ episode: Episode) {
+            guard let playlist = seriesPlaylist,
+                  let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
+            playingMedia = media
+        }
+
+        private func toggleFavorite() {
+            series.isFavorite.toggle()
+            series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+        }
+
+        private func toggleWatched(_ episode: Episode) {
+            episode.setWatched(!episode.isWatched)
+            try? modelContext.save()
+        }
+
+        private func markPreviousWatched(_ episode: Episode) {
+            episode.markEarlierEpisodesWatched()
+            try? modelContext.save()
+        }
+
+        private func markFollowingUnwatched(_ episode: Episode) {
+            episode.markLaterEpisodesUnwatched()
+            try? modelContext.save()
+        }
+    }
+
+    // MARK: - Related titles
+
+    private extension TVSeriesDetailView {
+        func resolveSimilar() {
             let ids = series.similarTMDBIds
             guard !ids.isEmpty else { similar = []; return }
 
@@ -451,32 +493,8 @@
             similar = Array(resolved.prefix(12))
         }
 
-        // MARK: - Actions
-
-        private func playEpisode(_ episode: Episode) {
-            guard let playlist = seriesPlaylist,
-                  let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
-            playingMedia = media
-        }
-
-        private func toggleFavorite() {
-            series.isFavorite.toggle()
-            series.addedToWatchlistDate = series.isFavorite ? Date() : nil
-        }
-
-        private func toggleWatched(_ episode: Episode) {
-            episode.setWatched(!episode.isWatched)
-            try? modelContext.save()
-        }
-
-        private func markPreviousWatched(_ episode: Episode) {
-            episode.markEarlierEpisodesWatched()
-            try? modelContext.save()
-        }
-
-        private func markFollowingUnwatched(_ episode: Episode) {
-            episode.markLaterEpisodesUnwatched()
-            try? modelContext.save()
+        func resolveOtherSources() {
+            otherSources = OtherSources.resolve(for: series, in: modelContext)
         }
     }
 

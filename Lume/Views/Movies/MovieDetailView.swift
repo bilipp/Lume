@@ -31,6 +31,7 @@ struct MovieDetailView: View {
     @State private var playingMedia: PlayableMedia?
     @State private var similar: [HomeMediaItem] = []
     @State private var collectionMovies: [HomeMediaItem] = []
+    @State private var otherSources: [HomeMediaItem] = []
     @State private var refreshToken: UUID = .init()
     @State private var isLoadingTMDB: Bool
 
@@ -75,6 +76,7 @@ struct MovieDetailView: View {
                     await enrichIfNeeded()
                     resolveSimilar()
                     await resolveCollection()
+                    resolveOtherSources()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isLoadingTMDB = false
                     }
@@ -169,6 +171,12 @@ struct MovieDetailView: View {
                     if !collectionMovies.isEmpty, let name = movie.collectionName {
                         section(title: "Part of \(name)") {
                             SimilarRow(items: collectionMovies, animationNamespace: animationNamespace)
+                        }
+                    }
+
+                    if !otherSources.isEmpty {
+                        section(title: "Other Sources") {
+                            SimilarRow(items: otherSources, animationNamespace: animationNamespace)
                         }
                     }
                 }
@@ -382,6 +390,10 @@ struct MovieDetailView: View {
             }
         }
         collectionMovies = resolved
+    }
+
+    private func resolveOtherSources() {
+        otherSources = OtherSources.resolve(for: movie, in: modelContext)
     }
 
     // MARK: - Actions

@@ -31,6 +31,7 @@ struct SeriesDetailView: View {
     @State private var isLoadingEpisodes = false
     @State private var playingMedia: PlayableMedia?
     @State private var similar: [HomeMediaItem] = []
+    @State private var otherSources: [HomeMediaItem] = []
     @State private var refreshToken: UUID = .init()
     @State private var isLoadingTMDB: Bool
 
@@ -75,6 +76,7 @@ struct SeriesDetailView: View {
                     await loadEpisodesIfNeeded()
                     await enrichIfNeeded()
                     resolveSimilar()
+                    resolveOtherSources()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isLoadingTMDB = false
                     }
@@ -154,6 +156,12 @@ struct SeriesDetailView: View {
                     if !similar.isEmpty {
                         section(title: "You May Also Like") {
                             SimilarRow(items: similar, animationNamespace: animationNamespace)
+                        }
+                    }
+
+                    if !otherSources.isEmpty {
+                        section(title: "Other Sources") {
+                            SimilarRow(items: otherSources, animationNamespace: animationNamespace)
                         }
                     }
                 }
@@ -447,8 +455,12 @@ struct SeriesDetailView: View {
         try? modelContext.save()
         refreshToken = UUID()
     }
+}
 
-    private func resolveSimilar() {
+// MARK: - Related titles
+
+private extension SeriesDetailView {
+    func resolveSimilar() {
         let ids = series.similarTMDBIds
         guard !ids.isEmpty else { similar = []; return }
 
@@ -475,6 +487,10 @@ struct SeriesDetailView: View {
             }
         }
         similar = Array(resolved.prefix(12))
+    }
+
+    func resolveOtherSources() {
+        otherSources = OtherSources.resolve(for: series, in: modelContext)
     }
 }
 
