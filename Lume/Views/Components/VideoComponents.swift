@@ -15,13 +15,32 @@ import SwiftUI
     import AppKit
 #endif
 
-/// Opens a video URL in the YouTube app (if installed) or the system browser.
-/// On tvOS this best-effort hands off to the YouTube app via its universal link.
+/// Opens a video in the YouTube app (or the system browser, where one exists).
+///
+/// Platform behaviour differs because the hand-off mechanism differs:
+/// - **macOS / iOS**: the `https` watch URL is a universal link the system
+///   routes to the YouTube app, falling back to a browser if it isn't installed.
+/// - **tvOS**: there is no browser and `https` universal links are *not* routed
+///   to other apps, so the only way to open a trailer is the YouTube app's
+///   custom URL scheme. We try the candidate schemes in order and open the
+///   first one the system can resolve. If none resolve (YouTube not installed,
+///   or it no longer registers the scheme) `onUnavailable` is called so the
+///   caller can surface that to the user instead of failing silently.
 @MainActor
-func openVideoURL(_ url: URL) {
+func openVideo(_ video: TitleVideo, onUnavailable: @escaping () -> Void = {}) {
     #if os(macOS)
+        guard let url = video.youtubeURL else { return onUnavailable() }
         NSWorkspace.shared.open(url)
+    #elseif os(tvOS)
+        let app = UIApplication.shared
+        guard let url = video.youtubeAppURLs.first(where: { app.canOpenURL($0) }) else {
+            return onUnavailable()
+        }
+        app.open(url) { opened in
+            if !opened { onUnavailable() }
+        }
     #else
+        guard let url = video.youtubeURL else { return onUnavailable() }
         UIApplication.shared.open(url)
     #endif
 }

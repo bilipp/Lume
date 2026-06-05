@@ -154,7 +154,7 @@ struct MovieDetailView: View {
                     if !movie.trailers.isEmpty {
                         section(title: "Videos") {
                             VideoRow(videos: movie.trailers) { video in
-                                if let url = video.youtubeURL { openVideoURL(url) }
+                                openVideo(video)
                             }
                         }
                     }

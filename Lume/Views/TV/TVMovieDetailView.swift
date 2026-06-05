@@ -26,6 +26,7 @@
         @State private var otherSources: [HomeMediaItem] = []
         @State private var refreshToken: UUID = .init()
         @State private var isLoadingTMDB: Bool
+        @State private var showYouTubeUnavailable = false
 
         private enum FocusTarget: Hashable { case play }
         @FocusState private var focus: FocusTarget?
@@ -62,6 +63,11 @@
             .fullScreenCover(item: $playingMedia) { media in
                 FullScreenPlayerView(media: media)
             }
+            .alert("YouTube Unavailable", isPresented: $showYouTubeUnavailable) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Install the YouTube app on your Apple TV to watch trailers.")
+            }
             .task(id: movie.id) {
                 await enrichIfNeeded()
                 resolveSimilar()
@@ -95,7 +101,7 @@
                         TVRail(title: "Videos") {
                             ForEach(movie.trailers) { video in
                                 TVVideoCard(video: video) {
-                                    if let url = video.youtubeURL { openVideoURL(url) }
+                                    openVideo(video) { showYouTubeUnavailable = true }
                                 }
                             }
                         }
