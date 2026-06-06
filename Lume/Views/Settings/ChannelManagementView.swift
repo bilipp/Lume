@@ -43,49 +43,55 @@ struct ChannelManagementView: View {
     // MARK: - Platform bodies
 
     #if os(tvOS)
+        /// True while a channel is lifted for placement — disables Reset so it
+        /// can't steal focus mid-move.
+        @State private var isReordering = false
+
         var body: some View {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    Text(category.name)
-                        .font(.system(size: 34, weight: .bold))
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-
-                    HStack {
-                        TVSettingsSectionLabel("Channels")
-                        Spacer()
-                        Button("Reset") { reset() }
-                            .buttonStyle(TVSettingsActionButtonStyle())
-                            .disabled(streams.isEmpty)
-                    }
-
-                    if streams.isEmpty {
-                        Text("This category has no channels.")
-                            .font(.system(size: 22))
-                            .foregroundStyle(.secondary)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        Text(category.name)
+                            .font(.system(size: 34, weight: .bold))
                             .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                    } else {
-                        VStack(spacing: 6) {
-                            ForEach(Array(streams.enumerated()), id: \.element.id) { index, stream in
-                                TVContentManageRow(
-                                    title: stream.name,
-                                    isHidden: stream.isHidden,
-                                    isFirst: index == 0,
-                                    isLast: index == streams.count - 1,
-                                    showsDrillIn: false,
-                                    drillValue: category,
-                                    onToggleHidden: { stream.isHidden.toggle() },
-                                    onMoveUp: { ContentOrganizer.move(streams, at: index, by: -1) },
-                                    onMoveDown: { ContentOrganizer.move(streams, at: index, by: 1) }
-                                )
-                            }
+
+                        HStack {
+                            TVSettingsSectionLabel("Channels")
+                            Spacer()
+                            Button("Reset") { reset() }
+                                .buttonStyle(TVSettingsActionButtonStyle())
+                                .disabled(streams.isEmpty || isReordering)
                         }
-                        .focusSection()
+
+                        if isReordering {
+                            Text("Move up or down to position, then select to place. Press Menu to cancel.")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        }
+
+                        if streams.isEmpty {
+                            Text("This category has no channels.")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        } else {
+                            TVReorderableContentList(
+                                items: streams,
+                                title: { $0.name },
+                                isHidden: { $0.isHidden },
+                                onToggleHidden: { $0.isHidden.toggle() },
+                                onCommitOrder: { ContentOrganizer.commitOrder($0) },
+                                isReordering: $isReordering,
+                                scrollProxy: proxy
+                            )
+                        }
                     }
+                    .frame(maxWidth: TVSettingsMetrics.contentMaxWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 48)
+                    .padding(.vertical, 72)
                 }
-                .frame(maxWidth: TVSettingsMetrics.contentMaxWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 48)
-                .padding(.vertical, 72)
             }
             .tvSettingsBackground()
         }

@@ -26,28 +26,21 @@ struct ContentOrganizerTests {
         #expect(sorted.map(\.name) == ["C", "A", "B"])
     }
 
-    // MARK: - Move (tvOS up/down)
+    // MARK: - Commit order (tvOS pick-up/place)
 
-    @Test func `move down swaps with the next item`() {
+    @Test func `commit order stamps dense custom order from the arrangement`() {
         let cats = makeCategories(["A", "B", "C"])
-        ContentOrganizer.move(cats, at: 0, by: 1)
+        // The tvOS reorder hands back a locally-arranged copy on drop; here the
+        // user lifted "C" and placed it at the front.
+        let arranged = [cats[2], cats[0], cats[1]]
+        ContentOrganizer.commitOrder(arranged)
+
+        #expect(cats[0].customOrder == 1) // A
+        #expect(cats[1].customOrder == 2) // B
+        #expect(cats[2].customOrder == 0) // C is now first
+
         let sorted = CategorySortOption.playlist.sort(cats)
-        #expect(sorted.map(\.name) == ["B", "A", "C"])
-    }
-
-    @Test func `move up at the top is a no-op`() {
-        let cats = makeCategories(["A", "B", "C"])
-        ContentOrganizer.move(cats, at: 0, by: -1)
-        // No customOrder assigned, so the playlist order is untouched.
-        #expect(cats.allSatisfy { $0.customOrder == nil })
-        let sorted = CategorySortOption.playlist.sort(cats)
-        #expect(sorted.map(\.name) == ["A", "B", "C"])
-    }
-
-    @Test func `move down at the bottom is a no-op`() {
-        let cats = makeCategories(["A", "B", "C"])
-        ContentOrganizer.move(cats, at: 2, by: 1)
-        #expect(cats.allSatisfy { $0.customOrder == nil })
+        #expect(sorted.map(\.name) == ["C", "A", "B"])
     }
 
     // MARK: - Reset

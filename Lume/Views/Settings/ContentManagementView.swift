@@ -22,6 +22,10 @@ struct ContentManagementView: View {
 
     @State private var selectedType: CategoryType = .live
 
+    /// True while a category is lifted for placement on tvOS — used to disable
+    /// the type picker and Reset so they can't steal focus mid-move.
+    @State private var isReordering = false
+
     /// Every category across all playlists; scoped and sorted in-memory. Category
     /// counts are small (tens–low hundreds per playlist), so an in-memory pass is
     /// simpler than re-parameterising a `@Query` on the picker selection.
@@ -73,31 +77,41 @@ struct ContentManagementView: View {
         ContentOrganizer.showAll(categories)
     }
 
+    /// Drill-in provider for the reorderable list: only live categories expose a
+    /// channels link. Written as a function (not a ternary) so the closure type
+    /// is unambiguous.
+    private var categoryDrill: ((Category) -> Category)? {
+        guard selectedType == .live else { return nil }
+        return { $0 }
+    }
+
     // MARK: - Platform bodies
 
     #if os(tvOS)
         private var content: some View {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    Text("Content")
-                        .font(.system(size: 34, weight: .bold))
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-
-                    if let name = activePlaylist?.name {
-                        Text(name)
-                            .font(.system(size: 22))
-                            .foregroundStyle(.secondary)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        Text("Content")
+                            .font(.system(size: 34, weight: .bold))
                             .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                        if let name = activePlaylist?.name {
+                            Text(name)
+                                .font(.system(size: 22))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        }
+
+                        tvTypePicker
+
+                        tvCategoryList(proxy: proxy)
                     }
-
-                    tvTypePicker
-
-                    tvCategoryList
+                    .frame(maxWidth: TVSettingsMetrics.contentMaxWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 48)
+                    .padding(.vertical, 72)
                 }
-                .frame(maxWidth: TVSettingsMetrics.contentMaxWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 48)
-                .padding(.vertical, 72)
             }
             .tvSettingsBackground()
         }
@@ -115,15 +129,24 @@ struct ContentManagementView: View {
             }
             .focusSection()
             .padding(.bottom, 4)
+            .disabled(isReordering)
         }
 
         @ViewBuilder
-        private var tvCategoryList: some View {
+        private func tvCategoryList(proxy: ScrollViewProxy) -> some View {
             HStack {
                 TVSettingsSectionLabel("Categories")
                 Spacer()
                 Button("Reset") { resetCurrentType() }
                     .buttonStyle(TVSettingsActionButtonStyle())
+                    .disabled(isReordering)
+            }
+
+            if isReordering {
+                Text("Move up or down to position, then select to place. Press Menu to cancel.")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
             }
 
             if categories.isEmpty {
@@ -133,22 +156,16 @@ struct ContentManagementView: View {
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                     .padding(.vertical, 8)
             } else {
-                VStack(spacing: 6) {
-                    ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
-                        TVContentManageRow(
-                            title: category.name,
-                            isHidden: category.isHidden,
-                            isFirst: index == 0,
-                            isLast: index == categories.count - 1,
-                            showsDrillIn: selectedType == .live,
-                            drillValue: category,
-                            onToggleHidden: { category.isHidden.toggle() },
-                            onMoveUp: { ContentOrganizer.move(categories, at: index, by: -1) },
-                            onMoveDown: { ContentOrganizer.move(categories, at: index, by: 1) }
-                        )
-                    }
-                }
-                .focusSection()
+                TVReorderableContentList(
+                    items: categories,
+                    title: { $0.name },
+                    isHidden: { $0.isHidden },
+                    drillValue: categoryDrill,
+                    onToggleHidden: { $0.isHidden.toggle() },
+                    onCommitOrder: { ContentOrganizer.commitOrder($0) },
+                    isReordering: $isReordering,
+                    scrollProxy: proxy
+                )
             }
         }
     #else
@@ -253,120 +270,6 @@ struct ContentManagementView: View {
                     }
                     .buttonStyle(.borderless)
                 }
-            }
-        }
-    }
-#endif
-
-// MARK: - tvOS row
-
-#if os(tvOS)
-    /// A focus-friendly management row for tvOS. There is no drag reorder on
-    /// tvOS, so ordering uses explicit up/down buttons; each control is its own
-    /// focusable target laid out left-to-right.
-    struct TVContentManageRow: View {
-        let title: String
-        let isHidden: Bool
-        let isFirst: Bool
-        let isLast: Bool
-        let showsDrillIn: Bool
-        let drillValue: Category
-        let onToggleHidden: () -> Void
-        let onMoveUp: () -> Void
-        let onMoveDown: () -> Void
-
-        var body: some View {
-            HStack(spacing: 14) {
-                Button(action: onMoveUp) {
-                    Image(systemName: "chevron.up")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-                .disabled(isFirst)
-
-                Button(action: onMoveDown) {
-                    Image(systemName: "chevron.down")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-                .disabled(isLast)
-
-                Button(action: onToggleHidden) {
-                    Image(systemName: isHidden ? "eye.slash" : "eye")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-
-                Text(title)
-                    .font(.system(size: TVSettingsMetrics.rowFontSize))
-                    .foregroundStyle(isHidden ? .secondary : .primary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if showsDrillIn {
-                    NavigationLink(value: drillValue) {
-                        HStack(spacing: 10) {
-                            Text("Channels")
-                            Image(systemName: "chevron.right")
-                        }
-                    }
-                    .buttonStyle(TVContentActionButtonStyle())
-                }
-            }
-            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.04))
-            )
-        }
-    }
-
-    /// Compact square icon button used for the per-row tvOS controls.
-    struct TVContentIconButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            StyleBody(configuration: configuration)
-        }
-
-        struct StyleBody: View {
-            let configuration: ButtonStyleConfiguration
-            @Environment(\.isFocused) private var isFocused
-            @Environment(\.isEnabled) private var isEnabled
-
-            var body: some View {
-                configuration.label
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(isFocused ? .black : .white)
-                    .opacity(isEnabled ? 1 : 0.25)
-                    .frame(width: 56, height: 56)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(isFocused ? AnyShapeStyle(Color.white.opacity(0.95)) : AnyShapeStyle(Color.white.opacity(0.08)))
-                    )
-                    .animation(.easeOut(duration: 0.15), value: isFocused)
-            }
-        }
-    }
-
-    /// Pill action button (e.g. "Channels") for tvOS rows.
-    struct TVContentActionButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            StyleBody(configuration: configuration)
-        }
-
-        struct StyleBody: View {
-            let configuration: ButtonStyleConfiguration
-            @Environment(\.isFocused) private var isFocused
-
-            var body: some View {
-                configuration.label
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(isFocused ? .black : .white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(isFocused ? AnyShapeStyle(Color.white.opacity(0.95)) : AnyShapeStyle(Color.white.opacity(0.08)))
-                    )
-                    .animation(.easeOut(duration: 0.15), value: isFocused)
             }
         }
     }

@@ -21,6 +21,7 @@ import SwiftUI // for Array.move(fromOffsets:toOffset:)
 
 /// A piece of content the user can hide and reorder in Content Management.
 protocol ContentItem: AnyObject {
+    var id: String { get }
     var customOrder: Int? { get set }
     var isHidden: Bool { get set }
 }
@@ -37,15 +38,11 @@ enum ContentOrganizer {
         stampOrder(arranged)
     }
 
-    /// Moves the item at `index` within an already-sorted group by `delta`
-    /// positions (negative = up). Used by the tvOS move buttons, which have no
-    /// drag gesture. No-ops when the move would leave the bounds.
-    static func move(_ items: [some ContentItem], at index: Int, by delta: Int) {
-        let target = index + delta
-        guard items.indices.contains(index), items.indices.contains(target) else { return }
-        var arranged = items
-        let moved = arranged.remove(at: index)
-        arranged.insert(moved, at: target)
+    /// Persists an explicit final arrangement in one pass, stamping a dense
+    /// `customOrder`. Used by the tvOS pick-up/place reorder, which arranges a
+    /// *local* working copy as the user slides a lifted row and commits only
+    /// once on drop — never touching SwiftData during the move itself.
+    static func commitOrder(_ arranged: [some ContentItem]) {
         stampOrder(arranged)
     }
 
