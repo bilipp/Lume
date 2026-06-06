@@ -42,8 +42,10 @@ enum CategorySortOption: String, CaseIterable, Identifiable {
     func sort(_ categories: [Category]) -> [Category] {
         switch self {
         case .playlist:
+            // A user-defined order (set in Content Management) takes precedence;
+            // categories without one fall back to the synced playlist order.
             categories.sorted(by: { (lhs: Category, rhs: Category) -> Bool in
-                (lhs.sortOrder, lhs.name) < (rhs.sortOrder, rhs.name)
+                (lhs.customOrder ?? lhs.sortOrder, lhs.name) < (rhs.customOrder ?? rhs.sortOrder, rhs.name)
             })
         case .nameAscending:
             categories.sorted(by: { (lhs: Category, rhs: Category) -> Bool in
@@ -131,7 +133,10 @@ enum ContentSortOption: String, CaseIterable, Identifiable {
     var liveStreamDescriptors: [SortDescriptor<LiveStream>] {
         switch self {
         case .playlist:
-            [SortDescriptor(\LiveStream.num), SortDescriptor(\LiveStream.name)]
+            // `customOrder` (nil-first) leads: an un-reordered category ties on
+            // nil and falls through to the provider order, while a reordered one
+            // sorts by the user's arrangement. See ContentOrganizer.
+            [SortDescriptor(\LiveStream.customOrder), SortDescriptor(\LiveStream.num), SortDescriptor(\LiveStream.name)]
         case .nameAscending:
             [SortDescriptor(\LiveStream.name, order: .forward)]
         case .nameDescending:

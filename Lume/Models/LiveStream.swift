@@ -19,6 +19,12 @@ final class LiveStream {
 
     var isFavorite: Bool = false
     var lastWatchedDate: Date?
+    /// Hidden channels are kept in the store but excluded from browsing. Toggled
+    /// from Content Management.
+    var isHidden: Bool = false
+    /// A user-defined order set in Content Management. `nil` means "follow the
+    /// provider order" (`num`); once reordered, every channel in the category
+    /// gets a dense value so it survives re-syncs.
     var customOrder: Int?
 
     init(
