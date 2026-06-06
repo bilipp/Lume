@@ -39,7 +39,12 @@ struct MovieCardView: View {
             }
             .frame(width: PosterCardMetrics.posterWidth, height: PosterCardMetrics.posterHeight)
             .clipShape(RoundedRectangle(cornerRadius: PosterCardMetrics.cornerRadius))
-            .shadow(radius: 2)
+            // A shadow applied after clipShape forces an offscreen render pass per
+            // card every frame. On tvOS the focus style already supplies depth and
+            // a 2pt shadow is invisible on the 10-foot UI, so we skip it there.
+            #if !os(tvOS)
+                .shadow(radius: 2)
+            #endif
 
             // Title
             Text(movie.name)

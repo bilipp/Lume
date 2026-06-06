@@ -67,8 +67,14 @@
                 let scale: CGFloat = pressed ? focusScale * 0.97 : (isFocused ? focusScale : 1.0)
                 let shadowOpacity: Double = isFocused ? 0.5 : 0
                 return configuration.label
+                    // The shadow is applied *before* the scale transform so it is
+                    // rasterised once and then scaled as a bitmap, rather than the
+                    // GPU re-blurring it on every frame of the focus animation
+                    // (which happens when scaleEffect precedes shadow). A smaller
+                    // radius further cuts the per-frame blur cost while still
+                    // reading as a clear focus lift on the 10-foot UI.
+                    .shadow(color: .black.opacity(shadowOpacity), radius: 12, y: 8)
                     .scaleEffect(scale)
-                    .shadow(color: .black.opacity(shadowOpacity), radius: 22, y: 14)
                     .animation(.easeOut(duration: 0.18), value: isFocused)
                     .animation(.easeOut(duration: 0.1), value: pressed)
             }
