@@ -31,6 +31,12 @@ struct ContentManagementView: View {
     /// simpler than re-parameterising a `@Query` on the picker selection.
     @Query private var allCategories: [Category]
 
+    #if !os(tvOS)
+        /// Drives the drill-in to channel management. Owned here (not by a List
+        /// row's NavigationLink) so the push survives the List reloading its rows.
+        @State private var selectedCategory: Category?
+    #endif
+
     var body: some View {
         Group {
             if activePlaylist != nil {
@@ -43,9 +49,22 @@ struct ContentManagementView: View {
                 )
             }
         }
+        #if os(tvOS)
+        // tvOS pushes via NavigationLink(value:) from TVReorderableContentList.
         .navigationDestination(for: Category.self) { category in
             ChannelManagementView(category: category)
         }
+        #else
+                // iOS/macOS drives the drill-in from view-owned @State rather than a
+                // value-based NavigationLink inside the List row. A row link's push is
+                // cleared when the List reloads its ForEach — and it reloads on the
+                // SwiftData change notification fired by ChannelManagementView's first
+                // @Query fetch — so the channel list would flash up and pop straight
+                // back. An item-binding push survives that reload.
+        .navigationDestination(item: $selectedCategory) { category in
+                    ChannelManagementView(category: category)
+                }
+        #endif
     }
 
     // MARK: - Scoping
@@ -192,7 +211,8 @@ struct ContentManagementView: View {
                                 title: category.name,
                                 isHidden: category.isHidden,
                                 drillInValue: selectedType == .live ? category : nil,
-                                onToggleHidden: { category.isHidden.toggle() }
+                                onToggleHidden: { category.isHidden.toggle() },
+                                onDrillIn: { selectedCategory = $0 }
                             )
                         }
                         .onMove(perform: move)
@@ -247,6 +267,7 @@ struct ContentManagementView: View {
         let isHidden: Bool
         let drillInValue: Category?
         let onToggleHidden: () -> Void
+        let onDrillIn: (Category) -> Void
 
         var body: some View {
             HStack(spacing: 12) {
@@ -263,10 +284,17 @@ struct ContentManagementView: View {
                 Spacer()
 
                 if let drillInValue {
-                    NavigationLink(value: drillInValue) {
-                        Text("Channels")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                    Button {
+                        onDrillIn(drillInValue)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Channels")
+                                .font(.callout)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.borderless)
                 }
