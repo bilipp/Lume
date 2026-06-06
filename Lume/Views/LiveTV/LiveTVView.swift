@@ -112,7 +112,7 @@ struct LiveTVView: View {
                     selectedCategory: $selectedCategory
                 )
 
-                if let category = selectedCategory {
+                if let category = displayedCategory {
                     ChannelsList(category: category, sort: contentSort) { stream in
                         playChannel(stream)
                     }
@@ -138,7 +138,7 @@ struct LiveTVView: View {
 
             Divider()
 
-            if let category = selectedCategory {
+            if let category = displayedCategory {
                 ChannelsList(category: category, sort: contentSort) { stream in
                     playChannel(stream)
                 }
@@ -166,7 +166,7 @@ struct LiveTVView: View {
                 )
                 .frame(width: 560)
 
-                if let category = selectedCategory {
+                if let category = displayedCategory {
                     TVChannelsList(category: category, sort: contentSort) { stream in
                         playChannel(stream)
                     }
@@ -197,6 +197,17 @@ struct LiveTVView: View {
         guard let playlistId = activePlaylist?.id else { return [] }
         let prefix = "\(playlistId.uuidString)-"
         return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) })
+    }
+
+    /// The category to render in the detail pane. Normally the user's selection,
+    /// but if that category was just hidden in Content Management it's no longer
+    /// in `sortedCategories`, so fall back to the first visible one rather than
+    /// keep showing a now-hidden category's channels.
+    private var displayedCategory: Category? {
+        guard let selectedCategory else { return sortedCategories.first }
+        return sortedCategories.contains { $0.id == selectedCategory.id }
+            ? selectedCategory
+            : sortedCategories.first
     }
 
     private func playChannel(_ stream: LiveStream) {
@@ -358,7 +369,7 @@ struct CategorySidebar: View {
             self.onPlay = onPlay
             let categoryId = category.id
             _streams = Query(
-                filter: #Predicate<LiveStream> { $0.categoryId == categoryId },
+                filter: #Predicate<LiveStream> { $0.categoryId == categoryId && $0.isHidden == false },
                 sort: sort.liveStreamDescriptors
             )
         }
@@ -535,7 +546,7 @@ struct ChannelsList: View {
         self.onPlay = onPlay
         let categoryId = category.id
         _streams = Query(
-            filter: #Predicate<LiveStream> { $0.categoryId == categoryId },
+            filter: #Predicate<LiveStream> { $0.categoryId == categoryId && $0.isHidden == false },
             sort: sort.liveStreamDescriptors
         )
     }

@@ -111,7 +111,8 @@ struct TMDBClientTests {
             genreNames: [],
             contentRating: nil,
             cast: [],
-            similarIDs: []
+            similarIDs: [],
+            videos: []
         )
         #expect(details.backdropPath == nil)
         #expect(details.tagline == nil)
@@ -135,7 +136,8 @@ struct TMDBClientTests {
             genreNames: ["Action", "Drama"],
             contentRating: "PG-13",
             cast: cast,
-            similarIDs: [10, 20, 30]
+            similarIDs: [10, 20, 30],
+            videos: []
         )
         #expect(details.backdropPath == "/back.jpg")
         #expect(details.tagline == "Tagline")

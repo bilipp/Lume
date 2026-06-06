@@ -1,10 +1,23 @@
 import Foundation
 import SwiftData
 
-enum CategoryType: String, Codable {
+enum CategoryType: String, Codable, CaseIterable, Identifiable {
     case live
     case vod
     case series
+
+    var id: String {
+        rawValue
+    }
+
+    /// User-facing label, matching the tab names.
+    var label: String {
+        switch self {
+        case .live: "Live TV"
+        case .vod: "Movies"
+        case .series: "Series"
+        }
+    }
 }
 
 @Model
@@ -17,7 +30,12 @@ final class Category {
     var playlist: Playlist?
 
     var isHidden: Bool = false
+    /// The playlist's own order, refreshed from the provider on every sync.
     var sortOrder: Int = 0
+    /// A user-defined order set in Content Management. `nil` means "follow the
+    /// playlist order"; once the user reorders, every category in the group gets
+    /// a dense value so it survives re-syncs (which only touch `sortOrder`).
+    var customOrder: Int?
     var customIcon: String?
     var lastRefreshed: Date?
 

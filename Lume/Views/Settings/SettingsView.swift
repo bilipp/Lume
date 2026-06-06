@@ -39,7 +39,7 @@ struct SettingsView: View {
             NavigationStack {
                 HStack(spacing: 0) {
                     tvSidebar
-                    tvDetail
+                    tvDetailContainer
                 }
                 .tvSettingsBackground()
                 .defaultFocus($focusedCategory, .playlists)
@@ -89,6 +89,19 @@ struct SettingsView: View {
             .focusSection()
         }
 
+        /// Content Management brings its own scroll/background, so it replaces the
+        /// detail pane wholesale rather than nesting inside the scrolling detail.
+        @ViewBuilder
+        private var tvDetailContainer: some View {
+            switch selectedCategory {
+            case .content:
+                ContentManagementView()
+                    .focusSection()
+            default:
+                tvDetail
+            }
+        }
+
         private var tvDetail: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 36) {
@@ -96,6 +109,7 @@ struct SettingsView: View {
                     case .playlists: tvPlaylistsDetail
                     case .player: tvPlayerDetail
                     case .about: tvAboutDetail
+                    case .content: EmptyView() // handled by tvDetailContainer
                     }
                 }
                 .frame(maxWidth: 860, alignment: .leading)
@@ -243,6 +257,7 @@ struct SettingsView: View {
             NavigationStack {
                 List {
                     playlistsSection
+                    librarySection
                     playerSection
                     aboutSection
                 }
@@ -321,6 +336,21 @@ struct SettingsView: View {
             }
         }
 
+        private var librarySection: some View {
+            Section {
+                NavigationLink {
+                    ContentManagementView()
+                } label: {
+                    Label("Content Management", systemImage: "slider.horizontal.3")
+                }
+                .disabled(playlists.isEmpty)
+            } header: {
+                Text("Library")
+            } footer: {
+                Text("Hide and reorder categories and channels for the active playlist.")
+            }
+        }
+
         private var playerSection: some View {
             Section {
                 Picker("Engine", selection: engine) {
@@ -389,7 +419,7 @@ struct SettingsView: View {
 
     /// The top-level settings categories shown in the tvOS sidebar.
     private enum SettingsCategory: String, CaseIterable, Identifiable {
-        case playlists, player, about
+        case playlists, content, player, about
 
         var id: String {
             rawValue
@@ -398,6 +428,7 @@ struct SettingsView: View {
         var title: String {
             switch self {
             case .playlists: "Playlists"
+            case .content: "Content"
             case .player: "Player"
             case .about: "About"
             }
