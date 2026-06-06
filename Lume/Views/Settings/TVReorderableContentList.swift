@@ -85,7 +85,14 @@
         }
 
         var body: some View {
-            VStack(spacing: 6) {
+            // LazyVStack (not VStack) so the ForEach only materialises the rows
+            // near the viewport. tvOS "scrolling" is focus movement, and the
+            // @FocusState below re-runs this body on every focus step; with a
+            // plain VStack that rebuilt all N row structs and kept focus geometry
+            // live for every category at once, which is what made scrolling judder
+            // with many categories loaded. Lazy keeps that cost bounded to the
+            // visible window.
+            LazyVStack(spacing: 6) {
                 // Invisible focus sinks bracketing the rows, present only during a
                 // move. An up/down press off the lifted row lands on one of these
                 // — far nearer than the tab bar above the screen — so the escape
