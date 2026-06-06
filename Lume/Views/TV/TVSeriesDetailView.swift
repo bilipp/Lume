@@ -377,18 +377,28 @@
                 .max { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
         }
 
-        /// The episode the Play button starts: resume the furthest
-        /// partially-watched episode, otherwise the first episode of the
-        /// selected season.
+        /// The furthest fully-watched episode in the series.
+        private var furthestWatchedEpisode: Episode? {
+            series.episodes
+                .filter(\.isWatched)
+                .max { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
+        }
+
+        /// Play button target: resume the furthest in-progress episode; else the
+        /// episode after the furthest watched one (overflowing seasons, wrapping
+        /// to the premiere after the finale); else the selected season's first.
         private var nextEpisode: Episode? {
-            furthestInProgressEpisode ?? seasonEpisodes.first ?? series.episodes.sorted {
-                ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum)
-            }.first
+            if let inProgress = furthestInProgressEpisode { return inProgress }
+            let ordered = series.episodes.sorted { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
+            guard let watched = furthestWatchedEpisode,
+                  let index = ordered.firstIndex(where: { $0 === watched })
+            else { return seasonEpisodes.first ?? ordered.first }
+            return index + 1 < ordered.count ? ordered[index + 1] : ordered.first
         }
 
         private var playTitle: String {
             guard let episode = nextEpisode else { return "Play" }
-            let prefix = (episode.watchProgress > 1) ? "Resume" : "Play"
+            let prefix = (!episode.isWatched && episode.watchProgress > 1) ? "Resume" : "Play"
             return "\(prefix) S\(episode.seasonNum) E\(episode.episodeNum)"
         }
 
