@@ -36,7 +36,7 @@
                 VStack(alignment: .leading, spacing: 12) {
                     Text(text)
                         .font(.system(size: 26))
-                        .foregroundStyle(isFocused ? .black : .white.opacity(0.85))
+                        .foregroundStyle(isFocused ? .white : .white.opacity(0.85))
                         .lineLimit(isExpanded ? nil : collapsedLineLimit)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -49,14 +49,14 @@
                                 .font(.system(size: 22, weight: .semibold))
                         }
                         .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(isFocused ? .black : .white)
+                        .foregroundStyle(.white)
                     }
                 }
                 .frame(maxWidth: 1100, alignment: .leading)
                 .padding(28)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.white.opacity(0.06)))
+                        .fill(isFocused ? AnyShapeStyle(.clear) : AnyShapeStyle(.white.opacity(0.06)))
                 )
                 .scaleEffect(isFocused ? 1.02 : 1.0)
                 .shadow(color: .black.opacity(isFocused ? 0.4 : 0), radius: 18, y: 10)
