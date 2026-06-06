@@ -14,22 +14,27 @@ struct SearchView: View {
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
-    @Query private var movies: [Movie]
-    @Query private var series: [Series]
-    @Query private var liveStreams: [LiveStream]
     @Query private var playlists: [Playlist]
 
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
     @State private var selectedFilter: ContentFilter = .all
-    @State private var searchTask: Task<Void, Never>?
+    @State private var results: [SearchResult] = []
     @State private var playingMedia: PlayableMedia?
+
+    /// Max matches fetched per content type. Keeps the result set bounded so the
+    /// list stays responsive even when a playlist holds tens of thousands of items.
+    private let resultLimit = 50
+
+    private var trimmedQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                if debouncedSearchText.isEmpty {
+                if trimmedQuery.isEmpty {
                     ContentUnavailableView(
                         "Search",
                         systemImage: "magnifyingglass",
@@ -46,12 +51,15 @@ struct SearchView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
 
-                    // Results
-                    if filteredResults.isEmpty {
-                        ContentUnavailableView.search
+                    // Results — only show "No Results" once a query has actually
+                    // been run, so it doesn't flash while the input is debouncing.
+                    if results.isEmpty {
+                        if !debouncedSearchText.isEmpty {
+                            ContentUnavailableView.search
+                        }
                     } else {
                         Section {
-                            ForEach(filteredResults) { result in
+                            ForEach(results) { result in
                                 switch result {
                                 case let .movie(movie):
                                     NavigationLink(value: movie) {
@@ -73,7 +81,7 @@ struct SearchView: View {
                                 }
                             }
                         } header: {
-                            Text("\(filteredResults.count) Results")
+                            Text("\(results.count) Results")
                         }
                     }
                 }
@@ -95,13 +103,23 @@ struct SearchView: View {
                         .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
                     #endif
                 }
-                .onChange(of: searchText) { _, newValue in
-                    searchTask?.cancel()
-                    searchTask = Task {
-                        try? await Task.sleep(for: .milliseconds(500))
-                        guard !Task.isCancelled else { return }
-                        debouncedSearchText = newValue
+                .task(id: searchText) {
+                    // Debounce raw keystrokes. .task(id:) cancels the in-flight task
+                    // (including this sleep) the instant searchText changes, so the
+                    // fetch below only fires once typing actually pauses.
+                    let trimmed = trimmedQuery
+                    guard !trimmed.isEmpty else {
+                        debouncedSearchText = ""
+                        return
                     }
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    debouncedSearchText = trimmed
+                }
+                .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter)) {
+                    // Re-run whenever the settled query or the filter changes.
+                    // Filter changes are instant (no debounce on the segmented control).
+                    updateResults()
                 }
         }
         #if os(iOS)
@@ -127,37 +145,66 @@ struct SearchView: View {
         #endif
     }
 
-    private var filteredResults: [SearchResult] {
-        var results: [SearchResult] = []
+    // MARK: - Searching
 
-        let query = debouncedSearchText.lowercased()
+    /// Runs the search against SwiftData using bounded, predicate-based fetches.
+    ///
+    /// Filtering happens in SQLite (via `localizedStandardContains`) instead of
+    /// loading every Movie/Series/LiveStream into memory and scanning on the main
+    /// thread. Combined with the debounce above, this keeps typing smooth no matter
+    /// how large the library is — the work runs once, after input settles, and
+    /// returns at most `resultLimit` rows per content type.
+    @MainActor
+    private func updateResults() {
+        let query = debouncedSearchText
+        guard !query.isEmpty else {
+            results = []
+            return
+        }
 
-        // Movies
+        var matches: [SearchResult] = []
+
         if selectedFilter == .all || selectedFilter == .movies {
-            let matchingMovies = movies.filter { movie in
-                movie.name.lowercased().contains(query)
-            }
-            results.append(contentsOf: matchingMovies.map { .movie($0) })
+            var descriptor = FetchDescriptor<Movie>(
+                predicate: #Predicate { $0.name.localizedStandardContains(query) },
+                sortBy: [SortDescriptor(\.name)]
+            )
+            descriptor.fetchLimit = resultLimit
+            let movies = (try? modelContext.fetch(descriptor)) ?? []
+            matches.append(contentsOf: movies.map { .movie($0) })
         }
 
-        // Series
         if selectedFilter == .all || selectedFilter == .series {
-            let matchingSeries = series.filter { entry in
-                entry.name.lowercased().contains(query)
-            }
-            results.append(contentsOf: matchingSeries.map { .series($0) })
+            var descriptor = FetchDescriptor<Series>(
+                predicate: #Predicate { $0.name.localizedStandardContains(query) },
+                sortBy: [SortDescriptor(\.name)]
+            )
+            descriptor.fetchLimit = resultLimit
+            let series = (try? modelContext.fetch(descriptor)) ?? []
+            matches.append(contentsOf: series.map { .series($0) })
         }
 
-        // Live Streams
         if selectedFilter == .all || selectedFilter == .liveTV {
-            let matchingStreams = liveStreams.filter { stream in
-                stream.name.lowercased().contains(query)
-            }
-            results.append(contentsOf: matchingStreams.map { .liveStream($0) })
+            var descriptor = FetchDescriptor<LiveStream>(
+                predicate: #Predicate { $0.name.localizedStandardContains(query) },
+                sortBy: [SortDescriptor(\.name)]
+            )
+            descriptor.fetchLimit = resultLimit
+            let streams = (try? modelContext.fetch(descriptor)) ?? []
+            matches.append(contentsOf: streams.map { .liveStream($0) })
         }
 
-        return results
+        results = matches
     }
+}
+
+// MARK: - Search Key
+
+/// Identity for the fetch task: re-run when either the settled query text or the
+/// active content filter changes.
+private struct SearchKey: Equatable {
+    let text: String
+    let filter: ContentFilter
 }
 
 // MARK: - Content Filter
