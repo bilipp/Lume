@@ -437,7 +437,7 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
         }
     }
 
-    func mediaPlayerTimeChanged(_: Notification!) {
+    func mediaPlayerTimeChanged(_: Notification) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             seekToResumeIfNeeded()

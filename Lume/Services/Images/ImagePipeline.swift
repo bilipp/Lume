@@ -22,7 +22,7 @@ import Foundation
 import SwiftUI
 
 actor ImagePipeline {
-    static let shared = ImagePipeline()
+    nonisolated static let shared = ImagePipeline()
 
     /// Dedicated session with conservative timeouts. We do our own disk caching,
     /// so `URLCache` is disabled to avoid double-storing bytes.
@@ -101,7 +101,7 @@ actor ImagePipeline {
 
     // MARK: - Loading (runs off-actor)
 
-    private static func load(url: URL, maxPixelSize: CGFloat?, key: String, retries: Int) async throws -> PlatformImage {
+    private nonisolated static func load(url: URL, maxPixelSize: CGFloat?, key: String, retries: Int) async throws -> PlatformImage {
         // Disk holds the original bytes keyed by URL; reuse across target sizes.
         let diskKey = url.absoluteString
         if let data = ImageDiskCache.shared.data(for: diskKey),
@@ -121,7 +121,7 @@ actor ImagePipeline {
         return image
     }
 
-    private static func fetch(url: URL, retries: Int) async throws -> Data {
+    private nonisolated static func fetch(url: URL, retries: Int) async throws -> Data {
         var attempt = 0
         while true {
             try Task.checkCancellation()
@@ -149,7 +149,7 @@ actor ImagePipeline {
         }
     }
 
-    private static func isTransient(_ error: URLError) -> Bool {
+    private nonisolated static func isTransient(_ error: URLError) -> Bool {
         switch error.code {
         case .timedOut, .networkConnectionLost, .cannotConnectToHost,
              .cannotFindHost, .dnsLookupFailed, .notConnectedToInternet,
@@ -161,7 +161,7 @@ actor ImagePipeline {
     }
 
     /// Exponential backoff: ~0.4s, 0.8s, 1.6s.
-    private static func backoff(_ attempt: Int) async throws {
+    private nonisolated static func backoff(_ attempt: Int) async throws {
         let nanoseconds = UInt64(0.4 * pow(2.0, Double(attempt)) * 1_000_000_000)
         try await Task.sleep(nanoseconds: nanoseconds)
     }

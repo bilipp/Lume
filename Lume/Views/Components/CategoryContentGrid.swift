@@ -148,7 +148,7 @@ struct MovieCategoryView: View {
         )
         .task(id: contentSortRaw) {
             let categoryId = category.id
-            var descriptor = FetchDescriptor<Movie>(
+            let descriptor = FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.categoryId == categoryId },
                 sortBy: contentSort.movieDescriptors
             )
@@ -215,7 +215,7 @@ struct SeriesCategoryView: View {
         )
         .task(id: contentSortRaw) {
             let categoryId = category.id
-            var descriptor = FetchDescriptor<Series>(
+            let descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { $0.categoryId == categoryId },
                 sortBy: contentSort.seriesDescriptors
             )

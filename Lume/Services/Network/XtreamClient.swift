@@ -59,7 +59,7 @@ enum XtreamError: LocalizedError {
 // MARK: - XtreamClient
 
 class XtreamClient: APIClient {
-    struct Configuration {
+    nonisolated struct Configuration {
         let serverURL: String
         let username: String
         let password: String
@@ -76,13 +76,13 @@ class XtreamClient: APIClient {
     let configuration: Configuration
     let session: URLSession
 
-    init(configuration: Configuration, urlSession: URLSession? = nil) {
+    nonisolated init(configuration: Configuration, urlSession: URLSession? = nil) {
         self.configuration = configuration
         session = urlSession ?? Self.makeSession(timeout: configuration.timeout)
     }
 
     /// Convenience initializer for backward compatibility
-    convenience init(urlSession: URLSession? = nil) {
+    convenience nonisolated init(urlSession: URLSession? = nil) {
         let config = Configuration(
             serverURL: "",
             username: "",
@@ -99,7 +99,7 @@ class XtreamClient: APIClient {
     /// Serializing connections (instead of reusing `.shared`'s pool, which the
     /// server may RST after a heavy transfer) avoids tripping that limit. Also
     /// applies the configured timeout, which was previously ignored.
-    private static func makeSession(timeout: TimeInterval) -> URLSession {
+    private nonisolated static func makeSession(timeout: TimeInterval) -> URLSession {
         let config = URLSessionConfiguration.default
         config.httpMaximumConnectionsPerHost = 1
         config.timeoutIntervalForRequest = timeout
@@ -440,7 +440,7 @@ struct ParsedProgramme {
 }
 
 /// Streaming SAX parser that yields batches via a callback to keep memory flat.
-final class XMLTVParser: NSObject, XMLParserDelegate {
+final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
     private var batch: [ParsedProgramme] = []
     private let batchSize: Int
     private let onBatch: ([ParsedProgramme]) -> Void

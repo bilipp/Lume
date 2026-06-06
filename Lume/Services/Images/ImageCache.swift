@@ -47,7 +47,7 @@ extension Image {
 
 /// Thread-safe in-memory store of decoded images. `NSCache` evicts under memory
 /// pressure on its own, so we only set a generous cost ceiling.
-final class ImageMemoryCache: @unchecked Sendable {
+final nonisolated class ImageMemoryCache: @unchecked Sendable {
     static let shared = ImageMemoryCache()
 
     private let cache = NSCache<NSString, PlatformImage>()
@@ -75,7 +75,7 @@ final class ImageMemoryCache: @unchecked Sendable {
 /// Persists original image bytes in the Caches directory. Reads/writes are
 /// synchronous file IO and are always called off the main actor (from the
 /// detached load tasks in `ImagePipeline`).
-final class ImageDiskCache: @unchecked Sendable {
+final nonisolated class ImageDiskCache: @unchecked Sendable {
     static let shared = ImageDiskCache()
 
     private let directory: URL
@@ -110,7 +110,7 @@ final class ImageDiskCache: @unchecked Sendable {
 
 // MARK: - Decoding
 
-enum ImageDecoder {
+nonisolated enum ImageDecoder {
     /// Decodes raw image data into a platform image. When `maxPixelSize` is set,
     /// uses ImageIO to decode a thumbnail no larger than that on its longest
     /// edge — this both saves memory and is far faster than decoding full-size
@@ -145,7 +145,7 @@ enum ImageDecoder {
     }
 }
 
-private extension PlatformImage {
+private nonisolated extension PlatformImage {
     /// Rough decoded size in bytes (w × h × 4) used as the `NSCache` cost.
     var approximateByteCost: Int {
         #if canImport(UIKit)

@@ -21,7 +21,7 @@ enum TMDBError: Error {
 }
 
 /// Read-only TMDB API client. Only the endpoints the home screen needs are implemented (trending)
-struct TMDBClient {
+nonisolated struct TMDBClient {
     static let shared = TMDBClient()
 
     enum MediaType: String {
@@ -255,7 +255,7 @@ private nonisolated struct TrendingItem: Decodable {
 /// Decodes `/movie/{id}` and `/tv/{id}` responses (with `credits`, `similar`
 /// and certifications appended). Every field is optional so a single shape
 /// works for both endpoints.
-private struct TitleDetailsResponse: Decodable {
+private nonisolated struct TitleDetailsResponse: Decodable {
     let backdropPath: String?
     let tagline: String?
     let overview: String?
@@ -286,7 +286,7 @@ private struct TitleDetailsResponse: Decodable {
     }
 }
 
-private struct BelongsToCollection: Decodable {
+private nonisolated struct BelongsToCollection: Decodable {
     let id: Int
     let name: String?
     let posterPath: String?
@@ -298,7 +298,7 @@ private struct BelongsToCollection: Decodable {
     }
 }
 
-private struct ReleaseDatesEntry: Decodable {
+private nonisolated struct ReleaseDatesEntry: Decodable {
     let countryCode: String
     let releaseDates: [ReleaseDateEntry]
     enum CodingKeys: String, CodingKey {
@@ -307,7 +307,7 @@ private struct ReleaseDatesEntry: Decodable {
     }
 }
 
-private struct ContentRatingEntry: Decodable {
+private nonisolated struct ContentRatingEntry: Decodable {
     let countryCode: String
     let rating: String?
     enum CodingKeys: String, CodingKey {
@@ -316,7 +316,7 @@ private struct ContentRatingEntry: Decodable {
     }
 }
 
-private struct TMDBCastMemberDTO: Decodable {
+private nonisolated struct TMDBCastMemberDTO: Decodable {
     let id: Int
     let name: String
     let character: String?
@@ -328,9 +328,9 @@ private struct TMDBCastMemberDTO: Decodable {
     }
 }
 
-private struct SimilarItem: Decodable { let id: Int }
+private nonisolated struct SimilarItem: Decodable { let id: Int }
 
-private struct VideoEntry: Decodable {
+private nonisolated struct VideoEntry: Decodable {
     let key: String
     let name: String?
     let site: String?
@@ -338,11 +338,11 @@ private struct VideoEntry: Decodable {
     let official: Bool?
 }
 
-private struct ImagesEntry: Decodable {
+private nonisolated struct ImagesEntry: Decodable {
     let logos: [LogoEntry]?
 }
 
-private struct LogoEntry: Decodable {
+private nonisolated struct LogoEntry: Decodable {
     let filePath: String
     let languageCode: String?
     let voteAverage: Double?
@@ -353,18 +353,18 @@ private struct LogoEntry: Decodable {
     }
 }
 
-private struct ReleaseDateEntry: Decodable { let certification: String? }
+private nonisolated struct ReleaseDateEntry: Decodable { let certification: String? }
 
-private struct CollectionDetailsResponse: Decodable {
+private nonisolated struct CollectionDetailsResponse: Decodable {
     let id: Int
     let parts: [CollectionPart]
 }
 
-private struct CollectionPart: Decodable {
+private nonisolated struct CollectionPart: Decodable {
     let id: Int
 }
 
-extension TitleDetailsResponse {
+nonisolated extension TitleDetailsResponse {
     func normalized(isMovie: Bool) -> TMDBTitleDetails {
         let cast = (credits?.cast ?? [])
             .sorted { ($0.order ?? .max) < ($1.order ?? .max) }
