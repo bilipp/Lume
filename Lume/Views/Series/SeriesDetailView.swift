@@ -525,6 +525,7 @@ private extension SeriesDetailView {
 
     func toggleWatched(_ episode: Episode) {
         episode.setWatched(!episode.isWatched)
+        TraktService.shared.syncWatched(episode: episode, watched: episode.isWatched)
         try? modelContext.save()
     }
 

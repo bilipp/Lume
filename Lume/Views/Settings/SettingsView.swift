@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var playlists: [Playlist]
     @State private var showingAddPlaylist = false
+    @State private var trakt = TraktService.shared
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
     @AppStorage(PlayerSettings.deinterlaceKey) private var deinterlace = PlayerSettings.deinterlaceDefault
 
@@ -68,7 +69,7 @@ struct SettingsView: View {
                     .padding(.bottom, 28)
 
                 VStack(spacing: 2) {
-                    ForEach(SettingsCategory.allCases) { category in
+                    ForEach(availableCategories) { category in
                         Button {
                             selectedCategory = category
                         } label: {
@@ -89,6 +90,12 @@ struct SettingsView: View {
             .focusSection()
         }
 
+        /// The sidebar categories. Integrations is hidden unless the build has
+        /// Trakt credentials configured.
+        private var availableCategories: [SettingsCategory] {
+            SettingsCategory.allCases.filter { $0 != .integrations || trakt.isConfigured }
+        }
+
         /// Content Management brings its own scroll/background, so it replaces the
         /// detail pane wholesale rather than nesting inside the scrolling detail.
         @ViewBuilder
@@ -107,6 +114,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 36) {
                     switch selectedCategory {
                     case .playlists: tvPlaylistsDetail
+                    case .integrations: tvIntegrationsDetail
                     case .player: tvPlayerDetail
                     case .about: tvAboutDetail
                     case .content: EmptyView() // handled by tvDetailContainer
@@ -163,6 +171,10 @@ struct SettingsView: View {
                 }
                 .buttonStyle(TVSettingsRowButtonStyle())
             }
+        }
+
+        private var tvIntegrationsDetail: some View {
+            TVTraktIntegrationView()
         }
 
         private var tvPlayerDetail: some View {
@@ -258,6 +270,9 @@ struct SettingsView: View {
                 List {
                     playlistsSection
                     librarySection
+                    if trakt.isConfigured {
+                        integrationsSection
+                    }
                     playerSection
                     aboutSection
                 }
@@ -351,6 +366,28 @@ struct SettingsView: View {
             }
         }
 
+        private var integrationsSection: some View {
+            Section {
+                NavigationLink {
+                    TraktIntegrationView()
+                } label: {
+                    HStack {
+                        Label("Trakt", systemImage: "rectangle.stack.badge.play")
+                        Spacer()
+                        if trakt.isConnected {
+                            Text(trakt.username.map { "@\($0)" } ?? "Connected")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("Integrations")
+            } footer: {
+                Text("Sync watched movies and episodes, and show your Trakt watchlist on Home.")
+            }
+        }
+
         private var playerSection: some View {
             Section {
                 Picker("Engine", selection: engine) {
@@ -419,7 +456,7 @@ struct SettingsView: View {
 
     /// The top-level settings categories shown in the tvOS sidebar.
     private enum SettingsCategory: String, CaseIterable, Identifiable {
-        case playlists, content, player, about
+        case playlists, content, integrations, player, about
 
         var id: String {
             rawValue
@@ -429,6 +466,7 @@ struct SettingsView: View {
             switch self {
             case .playlists: "Playlists"
             case .content: "Content"
+            case .integrations: "Integrations"
             case .player: "Player"
             case .about: "About"
             }

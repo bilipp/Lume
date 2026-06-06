@@ -39,8 +39,10 @@ struct HomeView: View {
 
     @State private var trendingMovies: [HomeMediaItem] = []
     @State private var trendingSeries: [HomeMediaItem] = []
+    @State private var watchlist: [HomeMediaItem] = []
     @State private var heroItems: [HeroItem] = []
     @State private var trendingState: LoadState = .idle
+    @State private var trakt = TraktService.shared
     @State private var playingMedia: PlayableMedia?
     @State private var showingSync = false
     @State private var showingSettings = false
@@ -121,6 +123,9 @@ struct HomeView: View {
                             if !trendingSeries.isEmpty {
                                 HomeRow(title: "Trending Series", items: trendingSeries, onPlayLive: playChannel, animationNamespace: animationNamespace)
                             }
+                            if !watchlist.isEmpty {
+                                HomeRow(title: "From Your Trakt Watchlist", items: watchlist, onPlayLive: playChannel, animationNamespace: animationNamespace)
+                            }
                             if !favorites.isEmpty {
                                 HomeRow(title: "Favorites", items: favorites, onPlayLive: playChannel, animationNamespace: animationNamespace)
                             }
@@ -159,6 +164,9 @@ struct HomeView: View {
                 }
                 .task(id: "\(playlists.count)-\(selectedPlaylistID)") {
                     await loadTrending()
+                }
+                .task(id: "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)") {
+                    await loadWatchlist()
                 }
             #if os(iOS) || os(tvOS)
                 .fullScreenCover(item: $playingMedia) { media in
@@ -213,6 +221,7 @@ struct HomeView: View {
             && favorites.isEmpty
             && trendingMovies.isEmpty
             && trendingSeries.isEmpty
+            && watchlist.isEmpty
             && trendingState.isSettled
     }
 
@@ -265,6 +274,33 @@ struct HomeView: View {
         } catch {
             trendingState = .failed
         }
+    }
+
+    /// Loads the connected user's Trakt watchlist and keeps only the titles the
+    /// user actually owns in the active playlist — matched by TMDB id, the same
+    /// way the trending rows work.
+    private func loadWatchlist() async {
+        guard trakt.isConnected else {
+            watchlist = []
+            return
+        }
+        let items = await trakt.fetchWatchlist()
+        var matched: [HomeMediaItem] = []
+        for item in items {
+            switch item.type {
+            case "movie":
+                if let tmdbID = item.movie?.ids.tmdb, let movie = fetchMovie(tmdbId: tmdbID) {
+                    matched.append(.movie(movie))
+                }
+            case "show":
+                if let tmdbID = item.show?.ids.tmdb, let series = fetchSeries(tmdbId: tmdbID) {
+                    matched.append(.series(series))
+                }
+            default:
+                break
+            }
+        }
+        watchlist = Array(matched.prefix(20))
     }
 
     private func fetchMovie(tmdbId: Int) -> Movie? {

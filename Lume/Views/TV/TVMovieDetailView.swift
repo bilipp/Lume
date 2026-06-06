@@ -375,6 +375,7 @@
             if movie.isWatched {
                 movie.watchProgress = Double(movie.durationSecs ?? 0)
             }
+            TraktService.shared.syncWatched(movie: movie, watched: movie.isWatched)
         }
     }
 

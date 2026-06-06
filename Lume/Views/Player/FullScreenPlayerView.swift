@@ -190,7 +190,10 @@ struct FullScreenPlayerView: View {
         guard let movie = try? modelContext.fetch(descriptor).first else { return }
         movie.watchProgress = progress
         movie.lastWatchedDate = Date()
-        if completed { movie.isWatched = true }
+        if completed, !movie.isWatched {
+            movie.isWatched = true
+            TraktService.shared.syncWatched(movie: movie, watched: true)
+        }
         try? modelContext.save()
     }
 
@@ -200,7 +203,10 @@ struct FullScreenPlayerView: View {
         guard let episode = try? modelContext.fetch(descriptor).first else { return }
         episode.watchProgress = progress
         episode.lastWatchedDate = Date()
-        if completed { episode.isWatched = true }
+        if completed, !episode.isWatched {
+            episode.isWatched = true
+            TraktService.shared.syncWatched(episode: episode, watched: true)
+        }
         if let series = episode.series {
             series.lastWatchedDate = Date()
         }

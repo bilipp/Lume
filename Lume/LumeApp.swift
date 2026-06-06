@@ -68,6 +68,13 @@ struct LumeApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(TraktService.shared)
+                .task {
+                    // Restore a previously connected Trakt session (refreshing
+                    // the token if stale) so watched-sync and the watchlist work
+                    // from launch.
+                    await TraktService.shared.restore()
+                }
         }
         .modelContainer(sharedModelContainer)
 
@@ -79,6 +86,7 @@ struct LumeApp: App {
                 }
             }
             .modelContainer(sharedModelContainer)
+            .environment(TraktService.shared)
             .windowStyle(.hiddenTitleBar)
             .windowResizability(.contentMinSize)
         #endif

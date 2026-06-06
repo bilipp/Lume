@@ -51,3 +51,13 @@ if [ -n "$TMDB_ACCESS_TOKEN" ]; then
 else
     echo "warning: TMDB_ACCESS_TOKEN not set in .env — Trending will be hidden"
 fi
+
+TRAKT_CLIENT_ID="$(read_env TRAKT_CLIENT_ID)"
+TRAKT_CLIENT_SECRET="$(read_env TRAKT_CLIENT_SECRET)"
+if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then
+    set_plist TraktClientID "$TRAKT_CLIENT_ID"
+    set_plist TraktClientSecret "$TRAKT_CLIENT_SECRET"
+    echo "Injected Trakt credentials into Info.plist"
+else
+    echo "warning: TRAKT_CLIENT_ID/SECRET not set in .env — Trakt integration will be hidden"
+fi
