@@ -25,6 +25,18 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
 
     var body: some View {
         ScrollView {
+            // tvOS suppresses the system navigation title (it renders centred and
+            // the tab bar only shows the section, not the category), so we surface
+            // the category name as a leading-aligned heading in the content itself.
+            #if os(tvOS)
+                Text(title)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.top, 40)
+            #endif
+
             if items.isEmpty {
                 ContentUnavailableView(
                     emptyTitle,
@@ -45,12 +57,16 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
                 .padding()
             }
         }
+        // tvOS surfaces sorting through the tab bar's library controls instead of a
+        // toolbar, mirroring the main browse views.
+        #if !os(tvOS)
         .navigationTitle(title)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 ContentSortMenu(sortRaw: $sortRaw)
             }
         }
+        #endif
     }
 }
 
