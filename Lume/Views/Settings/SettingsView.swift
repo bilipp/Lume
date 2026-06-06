@@ -112,7 +112,7 @@ struct SettingsView: View {
                     case .content: EmptyView() // handled by tvDetailContainer
                     }
                 }
-                .frame(maxWidth: 860, alignment: .leading)
+                .frame(maxWidth: TVSettingsMetrics.detailMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 48)
                 .padding(.vertical, 72)

@@ -22,6 +22,9 @@
         static let labelFontSize: CGFloat = 18
         static let secondaryFontSize: CGFloat = 20
         static let contentMaxWidth: CGFloat = 760
+        /// Width of the Settings detail pane content (sits next to the sidebar, so
+        /// it gets a touch more room than the full-screen `contentMaxWidth`).
+        static let detailMaxWidth: CGFloat = 860
         static let background = Color(white: 0.09)
     }
 

@@ -126,8 +126,8 @@ struct ContentManagementView: View {
 
                         tvCategoryList(proxy: proxy)
                     }
-                    .frame(maxWidth: TVSettingsMetrics.contentMaxWidth, alignment: .leading)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: TVSettingsMetrics.detailMaxWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 48)
                     .padding(.vertical, 72)
                 }
