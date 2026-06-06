@@ -59,16 +59,44 @@ struct TMDBClient {
 
     /// Returns trending titles enriched with the artwork and copy the home hero
     /// carousel needs (backdrop, title, overview), in popularity order.
-    func trending(_ media: MediaType, timeWindow: TimeWindow = .week) async throws -> [TrendingTitle] {
-        let response: TrendingResponse = try await get("/trending/\(media.rawValue)/\(timeWindow.rawValue)")
-        return response.results.map {
-            TrendingTitle(
-                id: $0.id,
-                title: $0.title ?? $0.name ?? "",
-                overview: $0.overview ?? "",
-                backdropPath: $0.backdropPath
-            )
+    ///
+    /// Fetches up to `pages` pages (20 titles each) so the home screen has a
+    /// larger pool to match against the active playlist — the trending row only
+    /// shows titles already in the library, so a wider net surfaces more of them.
+    func trending(_ media: MediaType, timeWindow: TimeWindow = .week, pages: Int = 5) async throws -> [TrendingTitle] {
+        let basePath = "/trending/\(media.rawValue)/\(timeWindow.rawValue)"
+
+        // Fetch the first page up front so we learn the real page count and
+        // never request pages beyond what TMDB has.
+        let first: TrendingResponse = try await get("\(basePath)?page=1")
+        let pageCount = min(max(pages, 1), max(first.totalPages ?? 1, 1))
+
+        var itemsByPage: [Int: [TrendingItem]] = [1: first.results]
+        if pageCount > 1 {
+            try await withThrowingTaskGroup(of: (Int, [TrendingItem]).self) { group in
+                for page in 2 ... pageCount {
+                    group.addTask {
+                        let response: TrendingResponse = try await get("\(basePath)?page=\(page)")
+                        return (page, response.results)
+                    }
+                }
+                for try await (page, results) in group {
+                    itemsByPage[page] = results
+                }
+            }
         }
+
+        // Reassemble in page order to preserve TMDB's popularity ranking.
+        return (1 ... pageCount)
+            .flatMap { itemsByPage[$0] ?? [] }
+            .map {
+                TrendingTitle(
+                    id: $0.id,
+                    title: $0.title ?? $0.name ?? "",
+                    overview: $0.overview ?? "",
+                    backdropPath: $0.backdropPath
+                )
+            }
     }
 
     static var heroBackdropSize: String {
@@ -201,11 +229,17 @@ struct TMDBCastMember: Hashable {
 
 // MARK: - DTOs
 
-private struct TrendingResponse: Decodable {
+private nonisolated struct TrendingResponse: Decodable {
     let results: [TrendingItem]
+    let totalPages: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case results
+        case totalPages = "total_pages"
+    }
 }
 
-private struct TrendingItem: Decodable {
+private nonisolated struct TrendingItem: Decodable {
     let id: Int
     let title: String?
     let name: String?
