@@ -70,6 +70,14 @@ struct LumeApp: App {
             ContentView()
                 .environment(TraktService.shared)
                 .task {
+                    // If the preferred language changed since last launch (e.g.
+                    // via the per-app language override in iOS Settings), drop
+                    // cached TMDB enrichment so detail views re-fetch text,
+                    // videos and artwork in the new language.
+                    TMDBLanguageWatcher.invalidateEnrichmentIfLanguageChanged(
+                        in: sharedModelContainer.mainContext
+                    )
+
                     // Restore a previously connected Trakt session (refreshing
                     // the token if stale) so watched-sync and the watchlist work
                     // from launch.
