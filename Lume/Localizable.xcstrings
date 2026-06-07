@@ -1,6 +1,66 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Automatic Sync" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische Synchronisierung"
+          }
+        }
+      }
+    },
+    "Every 3 Days" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle 3 Tage"
+          }
+        }
+      }
+    },
+    "Every 6 Hours" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle 6 Stunden"
+          }
+        }
+      }
+    },
+    "Every Day" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Täglich"
+          }
+        }
+      }
+    },
+    "Every Week" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wöchentlich"
+          }
+        }
+      }
+    },
+    "Playlists and the TV guide refresh automatically in the background at this interval. Disable a specific playlist's sync in its details." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlists und der TV-Programmführer werden in diesem Intervall automatisch im Hintergrund aktualisiert. Die Synchronisierung einer bestimmten Playlist kannst du in deren Details deaktivieren."
+          }
+        }
+      }
+    },
     "-" : {
 
     },

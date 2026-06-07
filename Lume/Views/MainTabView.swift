@@ -10,13 +10,24 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var playlists: [Playlist]
+
+    @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
+    @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
 
     @State private var navigationPath = NavigationPath()
 
-    /// Playlists for which we've already kicked off an initial sync this session,
-    /// so a view update doesn't start a second one while the first is running.
-    @State private var initialSyncStarted: Set<UUID> = []
+    /// Playlists for which we've kicked off an auto-sync that hasn't finished
+    /// yet, so a view update doesn't start a second one before the playlist's
+    /// `syncStatus` flips to `.syncing`. An id is removed once its task
+    /// completes, so a playlist that goes stale again later (e.g. on a long
+    /// foreground session) can re-sync.
+    @State private var autoSyncStarted: Set<UUID> = []
+
+    private var syncFrequency: SyncFrequency {
+        SyncFrequency.resolve(syncFrequencyRaw)
+    }
 
     #if os(tvOS)
         /// Default to Home even though Search is placed first in the tab bar.
@@ -33,7 +44,20 @@ struct MainTabView: View {
         .tabBarMinimizeBehavior(.onScrollDown)
         #endif
         .task(id: playlists.count) {
-            startPendingInitialSyncs()
+            // On launch (and whenever a playlist is added) sync any playlist that
+            // is due per the configured frequency.
+            startDueAutoSyncs()
+        }
+        .onChange(of: selectedPlaylistID) {
+            // On playlist switch, sync the newly selected one if it's due.
+            syncSelectedPlaylistIfDue()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Returning to the foreground re-checks staleness — for a long-lived
+            // app this is the practical equivalent of "on launch".
+            if phase == .active {
+                startDueAutoSyncs()
+            }
         }
     }
 
@@ -103,24 +127,45 @@ struct MainTabView: View {
         }
     #endif
 
-    // MARK: - Initial sync
+    // MARK: - Automatic sync
 
-    private func startPendingInitialSyncs() {
-        for playlist in playlists where shouldStartInitialSync(playlist) {
-            initialSyncStarted.insert(playlist.id)
-
-            Task {
-                let manager = ContentSyncManager(modelContainer: modelContext.container)
-                try? await manager.syncPlaylist(playlist, full: true)
-            }
+    /// Kicks off a background sync for every playlist that is due per the
+    /// configured frequency (covers the never-synced first launch too).
+    private func startDueAutoSyncs() {
+        for playlist in playlists where shouldAutoSync(playlist) {
+            autoSync(playlist)
         }
     }
 
-    private func shouldStartInitialSync(_ playlist: Playlist) -> Bool {
-        playlist.syncEnabled
-            && playlist.lastSyncDate == nil
-            && playlist.syncStatus != .syncing
-            && !initialSyncStarted.contains(playlist.id)
+    /// Syncs the currently selected playlist if it is due. Called on playlist
+    /// switch so the content you're about to browse is refreshed.
+    private func syncSelectedPlaylistIfDue() {
+        guard let playlist = playlists.active(for: selectedPlaylistID),
+              shouldAutoSync(playlist) else { return }
+        autoSync(playlist)
+    }
+
+    private func shouldAutoSync(_ playlist: Playlist) -> Bool {
+        AutoSync.shouldSync(
+            syncEnabled: playlist.syncEnabled,
+            status: playlist.syncStatus,
+            lastSyncDate: playlist.lastSyncDate,
+            frequency: syncFrequency,
+            alreadyStarted: autoSyncStarted.contains(playlist.id)
+        )
+    }
+
+    /// Starts a silent background sync, tracking the playlist as in-flight so a
+    /// rapid view update doesn't double-trigger, and clearing it when done.
+    private func autoSync(_ playlist: Playlist) {
+        let playlistId = playlist.id
+        autoSyncStarted.insert(playlistId)
+
+        Task {
+            let manager = ContentSyncManager(modelContainer: modelContext.container)
+            try? await manager.syncPlaylist(playlist, full: true)
+            await MainActor.run { _ = autoSyncStarted.remove(playlistId) }
+        }
     }
 }
 
