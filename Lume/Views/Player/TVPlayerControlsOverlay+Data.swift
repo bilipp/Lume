@@ -27,6 +27,8 @@
             epgNow = nil
             epgNext = nil
             seriesPlaylist = nil
+            recentChannels = []
+            recentNowTitles = [:]
 
             switch media.contentRef {
             case .episode:
@@ -43,6 +45,8 @@
                 let now = Date()
                 epgNow = listings.first { $0.start <= now && now < $0.end }
                 epgNext = listings.first { $0.start > now }
+                recentChannels = TVPlayerContent.recentChannels(in: modelContext)
+                recentNowTitles = TVPlayerContent.nowProgrammeTitles(for: recentChannels, in: modelContext)
             }
         }
 
@@ -112,6 +116,15 @@
             onSelectMedia(newMedia)
         }
 
+        func select(channel stream: LiveStream) {
+            guard let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext),
+                  let newMedia = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+            withAnimation(.easeInOut(duration: 0.2)) { openTab = nil }
+            onPanelOpenChange(false)
+            focus = .transport
+            onSelectMedia(newMedia)
+        }
+
         func toggle(tab kind: TabKind) {
             withAnimation(.easeInOut(duration: 0.22)) {
                 openTab = (openTab == kind) ? nil : kind
@@ -120,6 +133,9 @@
             case .episodes:
                 onPanelOpenChange(true)
                 focus = .episode(episode?.id ?? seasonEpisodes.first?.id ?? "")
+            case .recent:
+                onPanelOpenChange(true)
+                focus = .channel(liveStream?.id ?? recentChannels.first?.id ?? "")
             case .info:
                 onPanelOpenChange(true)
                 focus = infoPrimaryAction != nil ? .infoPrimary : .panelClose

@@ -47,8 +47,10 @@
         @State var epgNow: EPGListing?
         @State var epgNext: EPGListing?
         @State var seriesPlaylist: Playlist?
+        @State var recentChannels: [LiveStream] = []
+        @State var recentNowTitles: [String: String] = [:]
 
-        enum TabKind: Hashable { case episodes, info }
+        enum TabKind: Hashable { case episodes, recent, info }
         @State var openTab: TabKind?
         @FocusState var focus: TVPlayerFocus?
 
@@ -114,6 +116,16 @@
                     currentEpisodeID: episode?.id,
                     focus: $focus,
                     onSelect: select(episode:),
+                    onClose: closePanel
+                )
+                .transition(.opacity)
+            case .recent:
+                TVPlayerRecentChannelsPanel(
+                    channels: recentChannels,
+                    currentChannelID: liveStream?.id,
+                    nowTitles: recentNowTitles,
+                    focus: $focus,
+                    onSelect: select(channel:),
                     onClose: closePanel
                 )
                 .transition(.opacity)
@@ -201,7 +213,11 @@
         // MARK: - Tabs
 
         var tabKinds: [TabKind] {
-            isSeries ? [.episodes, .info] : [.info]
+            if isSeries { return [.episodes, .info] }
+            // The recents rail only earns a tab once there's somewhere to switch
+            // to — i.e. a channel beyond the one playing now.
+            if media.isLive, recentChannels.count > 1 { return [.recent, .info] }
+            return [.info]
         }
 
         private var tabButtons: some View {
@@ -217,6 +233,7 @@
         private func tabTitle(_ kind: TabKind) -> LocalizedStringKey {
             switch kind {
             case .episodes: "Episodes"
+            case .recent: "Recent"
             case .info: "Info"
             }
         }

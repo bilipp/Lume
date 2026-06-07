@@ -140,4 +140,58 @@ struct LiveChannelHistoryTests {
 
         #expect(LiveChannelHistory.recallMedia(in: context, defaults: defaults)?.contentRef == alpha.contentRef)
     }
+
+    // MARK: - Recents list
+
+    /// The id `record` stores for a stream — "<playlistUUID>-live-<streamId>".
+    private func channelId(forStreamId streamId: Int, playlist: Playlist) -> String {
+        "\(playlist.id.uuidString)-live-\(streamId)"
+    }
+
+    @Test func `recents lists watched channels most-recent first`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let defaults = try makeDefaults()
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+        let charlie = try media(forStreamId: 102, playlist: playlist, in: context)
+
+        LiveChannelHistory.record(alpha, defaults: defaults)
+        LiveChannelHistory.record(bravo, defaults: defaults)
+        LiveChannelHistory.record(charlie, defaults: defaults)
+
+        #expect(LiveChannelHistory.recentChannelIds(defaults: defaults) == [
+            channelId(forStreamId: 102, playlist: playlist),
+            channelId(forStreamId: 101, playlist: playlist),
+            channelId(forStreamId: 100, playlist: playlist)
+        ])
+    }
+
+    @Test func `re-watching a channel moves it to the front without duplicating`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let defaults = try makeDefaults()
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        LiveChannelHistory.record(alpha, defaults: defaults)
+        LiveChannelHistory.record(bravo, defaults: defaults)
+        LiveChannelHistory.record(alpha, defaults: defaults)
+
+        #expect(LiveChannelHistory.recentChannelIds(defaults: defaults) == [
+            channelId(forStreamId: 100, playlist: playlist),
+            channelId(forStreamId: 101, playlist: playlist)
+        ])
+    }
+
+    @Test func `non-live media stays out of the recents list`() throws {
+        let (_, playlist) = try makeWorld(streams: threeChannels)
+        let defaults = try makeDefaults()
+        let movie = try #require(PlayableMedia.from(
+            movie: Movie(id: "m-1", streamId: 1, name: "Film", containerExtension: "mp4"),
+            playlist: playlist
+        ))
+
+        LiveChannelHistory.record(movie, defaults: defaults)
+
+        #expect(LiveChannelHistory.recentChannelIds(defaults: defaults).isEmpty)
+    }
 }

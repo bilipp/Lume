@@ -57,6 +57,35 @@
             return playlists.first { series.id.hasPrefix($0.id.uuidString) } ?? playlists.first
         }
 
+        // MARK: - Recent channels
+
+        /// The recently-watched live channels, current channel first, resolved
+        /// into models for the in-player "Recent" rail. Order follows
+        /// `LiveChannelHistory`; channels that no longer resolve (e.g. removed in
+        /// a sync) are simply dropped.
+        static func recentChannels(in context: ModelContext, defaults: UserDefaults = .standard) -> [LiveStream] {
+            let ids = LiveChannelHistory.recentChannelIds(defaults: defaults)
+            guard !ids.isEmpty else { return [] }
+            let descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { ids.contains($0.id) })
+            let byId = Dictionary(((try? context.fetch(descriptor)) ?? []).map { ($0.id, $0) },
+                                  uniquingKeysWith: { first, _ in first })
+            return ids.compactMap { byId[$0] }
+        }
+
+        /// The titles of the programmes airing right now on the given channels,
+        /// keyed by EPG channel id — a single fetch that backs the subtitle line
+        /// on each card in the "Recent" rail.
+        static func nowProgrammeTitles(for channels: [LiveStream], in context: ModelContext) -> [String: String] {
+            let epgIds = Set(channels.compactMap(\.epgChannelId).filter { !$0.isEmpty })
+            guard !epgIds.isEmpty else { return [:] }
+            let now = Date()
+            let descriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate { epgIds.contains($0.channelId) && $0.start <= now && now < $0.end }
+            )
+            let listings = (try? context.fetch(descriptor)) ?? []
+            return Dictionary(listings.map { ($0.channelId, $0.title) }, uniquingKeysWith: { first, _ in first })
+        }
+
         // MARK: - EPG
 
         /// Upcoming/ongoing EPG listings for a channel, soonest first.

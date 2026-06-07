@@ -29,6 +29,7 @@
         case subtitles
         case panelClose
         case episode(String)
+        case channel(String)
         case infoPrimary
         case infoSecondary
     }
@@ -213,6 +214,111 @@
                   let duration = episode.durationSecs, duration > 0,
                   !episode.isWatched else { return nil }
             return min(episode.watchProgress / Double(duration), 1)
+        }
+    }
+
+    // MARK: - Recent channels panel
+
+    /// The "Recent" slide-up for live TV: a horizontal rail of recently-watched
+    /// channels, current channel first and marked, mirroring the episode rail.
+    /// Picking a channel switches to it.
+    struct TVPlayerRecentChannelsPanel: View {
+        let channels: [LiveStream]
+        let currentChannelID: String?
+        /// Programme titles airing now, keyed by EPG channel id.
+        let nowTitles: [String: String]
+        var focus: FocusState<TVPlayerFocus?>.Binding
+        let onSelect: (LiveStream) -> Void
+        let onClose: () -> Void
+
+        /// Logo (160) + spacing + name + programme line + focus-lift breathing
+        /// room. Pinned like the episode rail so the panel keeps a fixed height.
+        private let railHeight: CGFloat = 300
+
+        var body: some View {
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 30) {
+                    ForEach(channels) { channel in
+                        TVPlayerChannelCard(
+                            channel: channel,
+                            isCurrent: channel.id == currentChannelID,
+                            nowTitle: channel.epgChannelId.flatMap { nowTitles[$0] },
+                            action: { onSelect(channel) }
+                        )
+                        .focused(focus, equals: .channel(channel.id))
+                    }
+                }
+                .padding(.vertical, 18)
+            }
+            .frame(height: railHeight)
+            .scrollClipDisabled()
+            .focusSection()
+        }
+    }
+
+    /// A compact channel card for the in-player "Recent" rail: a square logo
+    /// tile with the channel name and the programme airing now beneath it.
+    struct TVPlayerChannelCard: View {
+        let channel: LiveStream
+        let isCurrent: Bool
+        let nowTitle: String?
+        let action: () -> Void
+
+        private let cardWidth: CGFloat = 200
+        private let logoHeight: CGFloat = 180
+
+        var body: some View {
+            Button(action: action) {
+                VStack(alignment: .leading, spacing: 10) {
+                    logo
+                    Text(channel.name)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text(nowTitle ?? String(localized: "Live"))
+                        .font(.system(size: 19))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+                .frame(width: cardWidth, alignment: .leading)
+            }
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
+        }
+
+        private var logo: some View {
+            ZStack {
+                CachedAsyncImage(url: URL(string: channel.streamIcon ?? ""), maxPixelSize: cardWidth) { phase in
+                    switch phase {
+                    case let .success(image):
+                        image.resizable().aspectRatio(contentMode: .fit).padding(18)
+                    case .empty where channel.streamIcon != nil:
+                        ProgressView()
+                    default:
+                        Image(systemName: "tv")
+                            .font(.system(size: 44))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+                .frame(width: cardWidth, height: logoHeight)
+
+                if isCurrent {
+                    Text("NOW PLAYING")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(.white))
+                        .padding(8)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            }
+            .frame(width: cardWidth, height: logoHeight)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(.white.opacity(isCurrent ? 0.9 : 0), lineWidth: 3)
+            )
         }
     }
 
