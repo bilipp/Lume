@@ -262,10 +262,7 @@ struct CategorySidebar: View {
 
         var body: some View {
             ScrollView(.horizontal, showsIndicators: false) {
-                // Lazy so a playlist with hundreds of live categories only builds
-                // the chips on screen, mirroring the tvOS sidebar (TVCategorySidebar)
-                // which already uses a lazy stack.
-                LazyHStack(spacing: 8) {
+                HStack(spacing: 8) {
                     ForEach(categories) { category in
                         Button {
                             selectedCategory = category
