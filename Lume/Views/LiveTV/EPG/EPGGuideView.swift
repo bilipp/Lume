@@ -105,17 +105,21 @@ private struct EPGGridScroller: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header: jump-to-now corner + time ruler.
+            // Header: corner + time ruler. Touch/pointer get a jump-to-now
+            // button in the corner; tvOS auto-scrolls to now on appear and has
+            // no use for a corner button it can't easily reach, so the corner
+            // is left empty there.
             HStack(spacing: 0) {
-                jumpToNowButton
+                corner
                     .frame(width: metrics.channelColumnWidth, height: metrics.headerHeight)
-                    .overlay(alignment: .trailing) { Rectangle().fill(.quaternary).frame(width: 1) }
 
                 EPGRulerStrip(timeline: timeline, metrics: metrics, now: now, sync: sync)
             }
             .frame(height: metrics.headerHeight)
 
-            Divider()
+            #if !os(tvOS)
+                Divider()
+            #endif
 
             // Body: frozen channel column + scrollable programme grid.
             HStack(spacing: 0) {
@@ -134,7 +138,9 @@ private struct EPGGridScroller: View {
                 }
             }
         }
+        #if !os(tvOS)
         .background(.background)
+        #endif
         .sheet(item: $selection) { selection in
             EPGProgramDetailView(
                 stream: selection.stream,
@@ -150,18 +156,24 @@ private struct EPGGridScroller: View {
         max(0, timeline.x(for: now) - 12)
     }
 
-    private var jumpToNowButton: some View {
-        Button {
-            jumpToken += 1
-        } label: {
-            Label("Now", systemImage: "smallcircle.filled.circle")
-                .font(.subheadline.weight(.semibold))
-                .labelStyle(.titleAndIcon)
-                .foregroundStyle(Color.accentColor)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+    @ViewBuilder
+    private var corner: some View {
+        #if os(tvOS)
+            Color.clear
+        #else
+            Button {
+                jumpToken += 1
+            } label: {
+                Label("Now", systemImage: "smallcircle.filled.circle")
+                    .font(.subheadline.weight(.semibold))
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .trailing) { Rectangle().fill(.quaternary).frame(width: 1) }
+        #endif
     }
 }
 
@@ -221,7 +233,11 @@ private struct EPGFrozenColumn: View {
                     .offset(y: -sync.offset.y)
             }
             .clipped()
+        #if !os(tvOS)
+            // The channel cards on tvOS already read as a separate rail, so
+            // a vertical rule would only add visual weight.
             .overlay(alignment: .trailing) { Rectangle().fill(.quaternary).frame(width: 1) }
+        #endif
     }
 
     private struct ColumnCells: View {
