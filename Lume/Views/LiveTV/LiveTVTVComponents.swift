@@ -11,65 +11,6 @@
     import SwiftData
     import SwiftUI
 
-    // MARK: - tvOS Category Sidebar
-
-    struct TVCategorySidebar: View {
-        let categories: [Category]
-        @Binding var selectedCategory: Category?
-
-        var body: some View {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                    ForEach(categories) { category in
-                        TVCategoryRow(
-                            category: category,
-                            isSelected: selectedCategory?.id == category.id
-                        ) {
-                            selectedCategory = category
-                        }
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.vertical, 40)
-            }
-            .focusSection()
-        }
-    }
-
-    private struct TVCategoryRow: View {
-        let category: Category
-        let isSelected: Bool
-        let action: () -> Void
-
-        @FocusState private var isFocused: Bool
-
-        var body: some View {
-            Button(action: action) {
-                Text(category.name)
-                    .font(.system(size: 30, weight: isSelected || isFocused ? .semibold : .regular))
-                    .foregroundStyle(isFocused || isSelected ? .white : .white.opacity(0.6))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 18)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(background)
-                    )
-            }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
-            .focused($isFocused)
-            .animation(.easeOut(duration: 0.18), value: isFocused)
-        }
-
-        private var background: AnyShapeStyle {
-            if isFocused { return AnyShapeStyle(.white.opacity(0.22)) }
-            if isSelected { return AnyShapeStyle(.white.opacity(0.1)) }
-            return AnyShapeStyle(.clear)
-        }
-    }
-
     // MARK: - tvOS Channels List
 
     struct TVChannelsList: View {
@@ -246,14 +187,14 @@
         }
     }
 
-    // MARK: - tvOS EPG Guide screen
+    // MARK: - tvOS Live TV screen
 
-    /// The Live TV "Guide" experience on tvOS: a wide programme grid with a slim,
-    /// always-visible category rail pinned to the leading edge. The rail is
-    /// selectable in place — focusing an entry highlights it (system white-fill
-    /// idiom) and clicking switches the grid's category — so the guide keeps its
-    /// space while a category change stays one press to the left.
-    struct TVEPGScreen: View {
+    /// The unified tvOS Live TV screen for both layouts: a slim, always-visible
+    /// category rail on the leading edge — topped by a single List/Guide switch —
+    /// beside the content area, which shows either the channel list or the
+    /// programme guide. One rail and one switch, in one place and one style,
+    /// across both modes makes moving between the two views consistent.
+    struct TVLiveTVScreen: View {
         let categories: [Category]
         @Binding var selectedCategory: Category?
         let displayedCategory: Category?
@@ -263,27 +204,38 @@
 
         /// Which rail control currently holds focus — drives the highlight.
         private enum RailItem: Hashable {
-            case modeToggle
+            case mode(String)
             case category(String)
         }
 
         @FocusState private var focused: RailItem?
 
-        private let railWidth: CGFloat = 170
+        private let railWidth: CGFloat = 180
+
+        private var layoutMode: LiveTVLayoutMode {
+            LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
+        }
 
         var body: some View {
             HStack(spacing: 0) {
                 rail
-                grid
+                content
             }
         }
 
         @ViewBuilder
-        private var grid: some View {
+        private var content: some View {
             if let category = displayedCategory {
-                EPGGuideView(category: category, sort: contentSort, onPlay: onPlay)
-                    .id("\(category.id)-\(contentSort.rawValue)")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                switch layoutMode {
+                case .guide:
+                    EPGGuideView(category: category, sort: contentSort, onPlay: onPlay)
+                        .id("\(category.id)-\(contentSort.rawValue)-guide")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .list:
+                    TVChannelsList(category: category, sort: contentSort, onPlay: onPlay)
+                        .id("\(category.id)-\(contentSort.rawValue)-list")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else {
                 ContentUnavailableView(
                     "Select a Category",
@@ -298,10 +250,16 @@
 
         private var rail: some View {
             VStack(alignment: .leading, spacing: 0) {
-                modeToggle
+                // The switch and the category list are each their own focus
+                // section so a Down press moves between them as vertical groups.
+                // Without this, pressing Down from the right-hand "Guide" segment
+                // misses the left-aligned categories (only the left "List"
+                // segment sits directly above them).
+                viewModeSwitch
                     .padding(.horizontal, 14)
                     .padding(.top, 40)
                     .padding(.bottom, 18)
+                    .focusSection()
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
@@ -313,39 +271,66 @@
                     .padding(.bottom, 40)
                 }
                 .scrollClipDisabled()
+                .focusSection()
             }
             .frame(width: railWidth, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .top)
-            .focusSection()
         }
 
-        /// Switches back to the List layout. The reverse switch lives in the
-        /// List layout's segmented toggle, so the two modes stay reachable.
-        private var modeToggle: some View {
-            Button {
-                layoutModeRaw = LiveTVLayoutMode.list.rawValue
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 20, weight: .semibold))
-                    Text("List")
-                        .font(.system(size: 20, weight: .semibold))
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
+        // MARK: View-mode switch
+
+        /// A two-segment List/Guide control rendered as a focusable pill pair —
+        /// the system white-fill focus idiom reads clearly with a remote, where a
+        /// `.segmented` Picker does not.
+        private var viewModeSwitch: some View {
+            HStack(spacing: 6) {
+                ForEach(LiveTVLayoutMode.allCases) { mode in
+                    modeSegment(mode)
                 }
-                .foregroundStyle(focused == .modeToggle ? .black : .white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.white.opacity(0.08))
+            )
+        }
+
+        private func modeSegment(_ mode: LiveTVLayoutMode) -> some View {
+            let isActive = layoutMode == mode
+            let isItemFocused = focused == .mode(mode.rawValue)
+            return Button {
+                layoutModeRaw = mode.rawValue
+            } label: {
+                VStack(spacing: 4) {
+                    Image(systemName: mode.systemImage)
+                        .font(.system(size: 22, weight: .semibold))
+                    Text(mode.label)
+                        .font(.system(size: 16, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .foregroundStyle(segmentForeground(isFocused: isItemFocused, isActive: isActive))
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(focused == .modeToggle
-                            ? AnyShapeStyle(.white)
-                            : AnyShapeStyle(.white.opacity(0.12)))
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(segmentFill(isFocused: isItemFocused, isActive: isActive))
                 )
             }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
-            .focused($focused, equals: .modeToggle)
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
+            .focused($focused, equals: .mode(mode.rawValue))
+            .animation(.easeOut(duration: 0.18), value: isItemFocused)
+        }
+
+        private func segmentForeground(isFocused: Bool, isActive: Bool) -> Color {
+            if isFocused { return .black }
+            if isActive { return .white }
+            return .white.opacity(0.5)
+        }
+
+        private func segmentFill(isFocused: Bool, isActive: Bool) -> AnyShapeStyle {
+            if isFocused { return AnyShapeStyle(.white) }
+            if isActive { return AnyShapeStyle(.white.opacity(0.22)) }
+            return AnyShapeStyle(.clear)
         }
 
         private func categoryButton(_ category: Category) -> some View {
