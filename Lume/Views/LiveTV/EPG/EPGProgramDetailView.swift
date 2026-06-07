@@ -22,64 +22,189 @@ struct EPGProgramDetailView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    channelHeader
+        #if os(tvOS)
+            tvBody
+        #else
+            standardBody
+        #endif
+    }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        if isLive {
-                            statusBadge("On Now", color: .red)
-                        } else if cell.isPast(at: now) {
-                            statusBadge("Earlier", color: .secondary)
-                        } else {
-                            statusBadge("Upcoming", color: .accentColor)
+    #if !os(tvOS)
+        private var standardBody: some View {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        channelHeader
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            if isLive {
+                                statusBadge("On Now", color: .red)
+                            } else if cell.isPast(at: now) {
+                                statusBadge("Earlier", color: .secondary)
+                            } else {
+                                statusBadge("Upcoming", color: .accentColor)
+                            }
+
+                            Text(cell.title)
+                                .font(.title2.weight(.bold))
+
+                            timeRow
+
+                            if isLive {
+                                ProgressView(value: cell.progress(at: now))
+                                    .tint(.red)
+                            }
                         }
 
-                        Text(cell.title)
-                            .font(.title2.weight(.bold))
+                        if !cell.detail.isEmpty {
+                            Text(cell.detail)
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
 
-                        timeRow
+                        if stream.tvArchive > 0 {
+                            Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
+                                .font(.subheadline)
+                                .foregroundStyle(.blue)
+                        }
+
+                        watchButton
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .navigationTitle(stream.name)
+                #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                #endif
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { dismiss() }
+                        }
+                    }
+            }
+            #if os(macOS)
+            .frame(minWidth: 420, minHeight: 360)
+            #endif
+        }
+    #endif
+
+    // MARK: - tvOS
+
+    #if os(tvOS)
+        /// A roomy, 10-foot-readable detail card. No navigation chrome or Close
+        /// button: tvOS dismisses a sheet with the Menu/Back button, and the toolbar
+        /// "Close" rendered as an oversized, unfocusable control. Type is sized
+        /// explicitly to match the rest of the tvOS UI rather than inheriting the
+        /// blown-up dynamic sizes.
+        private var tvBody: some View {
+            HStack(alignment: .top, spacing: 56) {
+                tvArtwork
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        tvStatusBadge
+
+                        Text(cell.title)
+                            .font(.system(size: 56, weight: .bold))
+                            .lineLimit(3)
+
+                        Text(stream.name)
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundStyle(.secondary)
+
+                        tvTimeRow
 
                         if isLive {
                             ProgressView(value: cell.progress(at: now))
                                 .tint(.red)
+                                .frame(maxWidth: 520)
                         }
-                    }
 
-                    if !cell.detail.isEmpty {
-                        Text(cell.detail)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                        if !cell.detail.isEmpty {
+                            Text(cell.detail)
+                                .font(.system(size: 28))
+                                .foregroundStyle(.secondary)
+                                .lineSpacing(6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
 
-                    if stream.tvArchive > 0 {
-                        Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
-                            .font(.subheadline)
-                            .foregroundStyle(.blue)
-                    }
+                        if stream.tvArchive > 0 {
+                            Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
+                                .font(.system(size: 26))
+                                .foregroundStyle(.blue)
+                        }
 
-                    watchButton
+                        TVPlayButton(title: "Watch Live", systemImage: "play.fill") {
+                            onPlay()
+                            dismiss()
+                        }
+                        .frame(maxWidth: 460)
+                        .padding(.top, 16)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 24)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .scrollClipDisabled()
             }
-            .navigationTitle(stream.name)
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-            #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") { dismiss() }
-                    }
-                }
+            .padding(80)
+            .frame(width: 1280, height: 840)
         }
-        #if os(macOS)
-        .frame(minWidth: 420, minHeight: 360)
-        #endif
-    }
+
+        private var tvArtwork: some View {
+            CachedAsyncImage(url: URL(string: stream.streamIcon ?? ""), maxPixelSize: 480) { phase in
+                switch phase {
+                case let .success(image):
+                    image.resizable().aspectRatio(contentMode: .fit)
+                default:
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(.white.opacity(0.08))
+                        .overlay {
+                            Image(systemName: "antenna.radiowaves.left.and.right")
+                                .font(.system(size: 80))
+                                .foregroundStyle(.secondary)
+                        }
+                }
+            }
+            .frame(width: 280, height: 280)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+
+        private var tvStatusBadge: some View {
+            Group {
+                if isLive {
+                    tvBadge("On Now", color: .red)
+                } else if cell.isPast(at: now) {
+                    tvBadge("Earlier", color: .secondary)
+                } else {
+                    tvBadge("Upcoming", color: .blue)
+                }
+            }
+        }
+
+        private func tvBadge(_ title: LocalizedStringKey, color: Color) -> some View {
+            Text(title)
+                .font(.system(size: 24, weight: .bold))
+                .textCase(.uppercase)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(color))
+        }
+
+        private var tvTimeRow: some View {
+            HStack(spacing: 10) {
+                Text(cell.start, format: .dateTime.weekday(.abbreviated).hour().minute())
+                Text("–")
+                Text(cell.end, format: .dateTime.hour().minute())
+                Text("·")
+                Text(durationText)
+            }
+            .font(.system(size: 28))
+            .foregroundStyle(.secondary)
+        }
+    #endif
 
     private var channelHeader: some View {
         HStack(spacing: 14) {

@@ -9,6 +9,18 @@
 
 import SwiftUI
 
+// MARK: - Palette
+
+/// Explicit guide colours. The app ships an empty `AccentColor` asset, so
+/// `Color.accentColor` resolves to *white* on tvOS — which renders a focused
+/// block as white text on a white fill. The 10-foot UI therefore uses these
+/// concrete colours and the system "focused = solid white, dark text" idiom
+/// (mirroring `TVGlassButtonStyle`) instead of the accent colour.
+enum EPGColors {
+    /// Tint for the currently-airing programme (progress bar + live accents).
+    static let live = Color.blue
+}
+
 // MARK: - Metrics
 
 /// Platform-tuned sizing for the guide. The 10-foot UI needs far larger touch
@@ -129,11 +141,19 @@ struct EPGChannelCell: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 12)
-        .frame(width: metrics.channelColumnWidth, height: metrics.rowHeight, alignment: .leading)
-        .background(.background)
-        .overlay(alignment: .trailing) {
-            Rectangle().fill(.quaternary).frame(width: 1)
-        }
+        #if os(tvOS)
+            .frame(width: metrics.channelColumnWidth, height: metrics.rowHeight, alignment: .leading)
+            .background(
+                .white.opacity(0.06),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+        #else
+            .frame(width: metrics.channelColumnWidth, height: metrics.rowHeight, alignment: .leading)
+                .background(.background)
+                .overlay(alignment: .trailing) {
+                    Rectangle().fill(.quaternary).frame(width: 1)
+                }
+        #endif
     }
 
     private var logoSide: CGFloat {
@@ -214,7 +234,7 @@ struct EPGProgramBlockView: View {
                 if showsTime {
                     Text(cell.start, format: .dateTime.hour().minute())
                         .font(timeFont)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(timeColor)
                 }
             }
             .padding(.horizontal, metrics.blockInset)
@@ -249,22 +269,40 @@ struct EPGProgramBlockView: View {
         let shape = RoundedRectangle(cornerRadius: metrics.blockCornerRadius, style: .continuous)
         if cell.isGap {
             shape.fill(.fill.quaternary)
-        } else if isFocused {
-            shape.fill(Color.accentColor)
-        } else if isLive {
-            shape.fill(Color.accentColor.opacity(0.18))
-                .overlay {
-                    shape.strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
-                }
         } else {
-            shape.fill(.fill.tertiary)
+            #if os(tvOS)
+                // tvOS uses the system focus idiom (solid white fill, dark text)
+                // and translucent surfaces that sit lightly on the dark backdrop,
+                // matching the channel list rather than a heavy opaque grid.
+                if isFocused {
+                    shape.fill(.white)
+                } else if isLive {
+                    shape.fill(.white.opacity(0.16))
+                        .overlay {
+                            shape.strokeBorder(EPGColors.live.opacity(0.55), lineWidth: 1.5)
+                        }
+                } else {
+                    shape.fill(.white.opacity(0.08))
+                }
+            #else
+                if isFocused {
+                    shape.fill(Color.accentColor)
+                } else if isLive {
+                    shape.fill(Color.accentColor.opacity(0.18))
+                        .overlay {
+                            shape.strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                        }
+                } else {
+                    shape.fill(.fill.tertiary)
+                }
+            #endif
         }
     }
 
     private var liveProgressBar: some View {
         GeometryReader { geo in
             Capsule()
-                .fill(isFocused ? Color.white : Color.accentColor)
+                .fill(progressTint)
                 .frame(width: geo.size.width * cell.progress(at: now), height: 3)
                 .frame(maxHeight: .infinity, alignment: .bottom)
         }
@@ -273,10 +311,31 @@ struct EPGProgramBlockView: View {
         .padding(.bottom, 2)
     }
 
+    private var progressTint: Color {
+        #if os(tvOS)
+            // A coloured bar stays readable on both the translucent and the
+            // focused (white) fill; a white bar would vanish on the latter.
+            return EPGColors.live
+        #else
+            return isFocused ? .white : .accentColor
+        #endif
+    }
+
     private var titleColor: Color {
         if cell.isGap { return .secondary }
-        if isFocused { return .white }
-        return .primary
+        #if os(tvOS)
+            return isFocused ? .black : .white
+        #else
+            return isFocused ? .white : .primary
+        #endif
+    }
+
+    private var timeColor: Color {
+        #if os(tvOS)
+            return isFocused ? .black.opacity(0.6) : .white.opacity(0.6)
+        #else
+            return .secondary
+        #endif
     }
 
     private var titleFont: Font {
