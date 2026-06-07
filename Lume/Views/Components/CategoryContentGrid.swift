@@ -15,9 +15,9 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
     let title: String
     let items: [Item]
     let animationNamespace: Namespace.ID?
-    let emptyTitle: String
+    let emptyTitle: LocalizedStringKey
     let emptyIcon: String
-    let emptyDescription: String
+    let emptyDescription: LocalizedStringKey
     @Binding var sortRaw: String
     @ViewBuilder let card: (Item) -> Card
 
@@ -76,7 +76,7 @@ struct CategoryPreviewRow<Item: Identifiable & Hashable, Card: View>: View {
     let category: Category
     let items: [Item]
     let animationNamespace: Namespace.ID?
-    let emptyMessage: String
+    let emptyMessage: LocalizedStringKey
     @ViewBuilder let card: (Item) -> Card
 
     var body: some View {

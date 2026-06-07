@@ -84,7 +84,7 @@
     // MARK: - Buttons
 
     struct TVPlayButton: View {
-        let title: String
+        let title: LocalizedStringKey
         var systemImage: String = "play.fill"
         var isEnabled: Bool = true
         let action: () -> Void
@@ -102,7 +102,7 @@
     /// button. The `title` is used as the accessibility label since no text is
     /// rendered.
     struct TVSecondaryActionButton: View {
-        let title: String
+        let title: LocalizedStringKey
         let systemImage: String
         var action: () -> Void
 

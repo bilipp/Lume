@@ -211,7 +211,7 @@ struct MetadataLineView: View {
 
 /// The big, white, full-width primary action (Play / Resume).
 struct PrimaryPlayButton: View {
-    let title: String
+    let title: LocalizedStringKey
     var systemImage: String = "play.fill"
     var isEnabled: Bool = true
     let action: () -> Void
@@ -234,7 +234,7 @@ struct PrimaryPlayButton: View {
 /// A circular glass button for the floating navigation overlay (back, share…).
 struct GlassIconButton: View {
     let systemImage: String
-    var accessibilityLabel: String
+    var accessibilityLabel: LocalizedStringKey
     let action: () -> Void
 
     var body: some View {
@@ -254,7 +254,7 @@ struct GlassIconButton: View {
 // MARK: - Section header
 
 struct DetailSectionHeader: View {
-    let title: String
+    let title: LocalizedStringKey
     var body: some View {
         Text(title)
             .font(.title3.weight(.bold))
@@ -284,7 +284,7 @@ struct ExpandableText: View {
                 .animation(.easeInOut(duration: 0.2), value: isExpanded)
 
             if isExpandable {
-                Button(isExpanded ? "less" : "more") {
+                Button(LocalizedStringKey(isExpanded ? "less" : "more")) {
                     isExpanded.toggle()
                 }
                 .font(.callout.weight(.semibold))

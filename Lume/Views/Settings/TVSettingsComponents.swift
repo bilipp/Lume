@@ -39,14 +39,17 @@
 
     /// A small uppercase grouped-section header.
     struct TVSettingsSectionLabel: View {
-        private let title: String
+        private let title: LocalizedStringKey
 
-        init(_ title: String) {
+        init(_ title: LocalizedStringKey) {
             self.title = title
         }
 
         var body: some View {
-            Text(title.uppercased())
+            // `.textCase` uppercases the *localized* string for display while the
+            // catalog lookup still happens on the original-case key.
+            Text(title)
+                .textCase(.uppercase)
                 .font(.system(size: TVSettingsMetrics.labelFontSize, weight: .semibold))
                 .tracking(1.4)
                 .foregroundStyle(.secondary)
@@ -61,10 +64,10 @@
     /// focusable, so the focus engine skips it and moves between the actual
     /// controls — matching the Apple TV Settings information rows.
     struct TVSettingsValueRow<Value: View>: View {
-        private let label: String
+        private let label: LocalizedStringKey
         private let value: Value
 
-        init(_ label: String, @ViewBuilder value: () -> Value) {
+        init(_ label: LocalizedStringKey, @ViewBuilder value: () -> Value) {
             self.label = label
             self.value = value()
         }
@@ -88,8 +91,9 @@
     }
 
     extension TVSettingsValueRow where Value == Text {
-        init(_ label: String, value: String) {
-            self.init(label) { Text(value) }
+        init(_ label: LocalizedStringKey, value: String) {
+            // `value` is dynamic data (a name, URL, status), so it stays verbatim.
+            self.init(label) { Text(verbatim: value) }
         }
     }
 
@@ -99,15 +103,16 @@
     /// (its focus treatment is system-drawn and can't be cleanly replaced); only
     /// the small uppercase label and spacing are ours.
     struct TVSettingsField: View {
-        let title: String
-        let placeholder: String
+        let title: LocalizedStringKey
+        let placeholder: LocalizedStringKey
         @Binding var text: String
         var isSecure: Bool = false
         var contentType: UITextContentType?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
-                Text(title.uppercased())
+                Text(title)
+                    .textCase(.uppercase)
                     .font(.system(size: TVSettingsMetrics.labelFontSize, weight: .semibold))
                     .tracking(1.4)
                     .foregroundStyle(.secondary)

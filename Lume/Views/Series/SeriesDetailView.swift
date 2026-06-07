@@ -175,7 +175,7 @@ struct SeriesDetailView: View {
 
     // MARK: - Sections
 
-    private func section(title: String, @ViewBuilder content: () -> some View) -> some View {
+    private func section(title: LocalizedStringKey, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             DetailSectionHeader(title: title)
                 .padding(.horizontal, DetailMetrics.contentPadding)
@@ -276,7 +276,7 @@ struct SeriesDetailView: View {
                 DetailSectionHeader(title: "Information")
                 ForEach(rows, id: \.label) { row in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(row.label)
+                        Text(LocalizedStringKey(row.label))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(row.value)
@@ -346,7 +346,7 @@ struct SeriesDetailView: View {
     }
 
     private var seasonCountLabel: String {
-        availableSeasons.count == 1 ? "1 Season" : "\(availableSeasons.count) Seasons"
+        availableSeasons.count == 1 ? String(localized: "1 Season") : String(localized: "\(availableSeasons.count) Seasons")
     }
 
     private var availableSeasons: [Int] {
@@ -408,10 +408,10 @@ struct SeriesDetailView: View {
         return index + 1 < ordered.count ? ordered[index + 1] : ordered.first
     }
 
-    private var playTitle: String {
+    private var playTitle: LocalizedStringKey {
         guard let episode = nextEpisode else { return "Play" }
-        let prefix = (!episode.isWatched && episode.watchProgress > 1) ? "Resume" : "Play"
-        return "\(prefix) S\(episode.seasonNum) E\(episode.episodeNum)"
+        let resume = !episode.isWatched && episode.watchProgress > 1
+        return resume ? "Resume S\(episode.seasonNum) E\(episode.episodeNum)" : "Play S\(episode.seasonNum) E\(episode.episodeNum)"
     }
 
     private var backgroundColor: Color {

@@ -1,5 +1,6 @@
 import Foundation
 @testable import Lume
+import SwiftUI
 import Testing
 
 struct SortOptionTests {

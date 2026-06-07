@@ -214,7 +214,7 @@
             }
         }
 
-        private func tabTitle(_ kind: TabKind) -> String {
+        private func tabTitle(_ kind: TabKind) -> LocalizedStringKey {
             switch kind {
             case .episodes: "Episodes"
             case .info: "Info"

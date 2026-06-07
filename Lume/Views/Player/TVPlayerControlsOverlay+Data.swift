@@ -10,6 +10,7 @@
 
 #if os(tvOS)
 
+    import Foundation
     import SwiftData
     import SwiftUI
 
@@ -149,7 +150,7 @@
 
         private var episodeHeading: String? {
             guard let episode else { return nil }
-            let base = episode.title.isEmpty ? "Episode \(episode.episodeNum)" : episode.title
+            let base = episode.title.isEmpty ? String(localized: "Episode \(episode.episodeNum)") : episode.title
             return "S\(episode.seasonNum) E\(episode.episodeNum) · \(base)"
         }
 
@@ -167,7 +168,7 @@
             if media.isLive {
                 guard let epgNow else { return nil }
                 var line = "\(clock(epgNow.start)) – \(clock(epgNow.end))"
-                if let epgNext { line += "   ·   Next: \(epgNext.title)" }
+                if let epgNext { line += "   ·   " + String(localized: "Next: \(epgNext.title)") }
                 return line
             }
             if isSeries {

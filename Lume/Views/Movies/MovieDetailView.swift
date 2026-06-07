@@ -190,7 +190,7 @@ struct MovieDetailView: View {
 
     // MARK: - Sections
 
-    private func section(title: String, @ViewBuilder content: () -> some View) -> some View {
+    private func section(title: LocalizedStringKey, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             DetailSectionHeader(title: title)
                 .padding(.horizontal, DetailMetrics.contentPadding)
@@ -214,7 +214,7 @@ struct MovieDetailView: View {
                 DetailSectionHeader(title: "Information")
                 ForEach(rows, id: \.label) { row in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(row.label)
+                        Text(LocalizedStringKey(row.label))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(row.value)

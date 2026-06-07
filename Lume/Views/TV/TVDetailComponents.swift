@@ -15,6 +15,7 @@
 
 #if os(tvOS)
 
+    import Foundation
     import SwiftUI
 
     // MARK: - Layout metrics
@@ -152,7 +153,7 @@
             VStack(alignment: .leading, spacing: 18) {
                 ForEach(items) { item in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.label.uppercased())
+                        Text(LocalizedStringKey(item.label)).textCase(.uppercase)
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.55))
                         Text(item.value)
@@ -249,7 +250,7 @@
     // MARK: - Section header
 
     struct TVSectionHeader: View {
-        let title: String
+        let title: LocalizedStringKey
 
         var body: some View {
             Text(title)
@@ -348,7 +349,7 @@
         }
 
         private var heading: String {
-            episode.title.isEmpty ? "Episode \(episode.episodeNum)" : "\(episode.episodeNum). \(episode.title)"
+            episode.title.isEmpty ? String(localized: "Episode \(episode.episodeNum)") : "\(episode.episodeNum). \(episode.title)"
         }
 
         private var metaLine: String? {
@@ -460,7 +461,7 @@
 
     /// A card listing supplementary key/value information (Director, Genre…).
     struct TVInfoCard: View {
-        let title: String
+        let title: LocalizedStringKey
         let items: [TVMetaItem]
 
         var body: some View {
@@ -470,7 +471,7 @@
                     .foregroundStyle(.white)
                 ForEach(items) { item in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.label.uppercased())
+                        Text(LocalizedStringKey(item.label)).textCase(.uppercase)
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.55))
                         Text(item.value)
@@ -494,7 +495,7 @@
     /// A titled horizontal rail wrapped in a focus section so the remote moves
     /// cleanly between sections.
     struct TVRail<Content: View>: View {
-        let title: String
+        let title: LocalizedStringKey
         @ViewBuilder var content: () -> Content
 
         var body: some View {

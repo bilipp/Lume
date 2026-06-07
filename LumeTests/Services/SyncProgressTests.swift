@@ -91,7 +91,7 @@ struct SyncProgressTests {
 
     @Test func `all steps have titles`() {
         for step in SyncStep.allCases {
-            #expect(!step.title.isEmpty)
+            #expect(!String(localized: step.title).isEmpty)
         }
     }
 

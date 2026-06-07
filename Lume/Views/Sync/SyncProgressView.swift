@@ -114,7 +114,7 @@ struct SyncProgressView: View {
         }
     }
 
-    private var headerTitle: String {
+    private var headerTitle: LocalizedStringKey {
         switch phase {
         case .ready: "Ready to sync"
         case .syncing: "Syncing your playlist"

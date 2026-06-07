@@ -44,7 +44,7 @@ struct SearchView: View {
                     // Filter Picker
                     Picker("Filter", selection: $selectedFilter) {
                         ForEach(ContentFilter.allCases) { filter in
-                            Text(filter.rawValue).tag(filter)
+                            Text(filter.label).tag(filter)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -218,6 +218,10 @@ enum ContentFilter: String, CaseIterable, Identifiable {
     var id: String {
         rawValue
     }
+
+    var label: LocalizedStringKey {
+        LocalizedStringKey(rawValue)
+    }
 }
 
 // MARK: - Search Result
@@ -292,7 +296,7 @@ struct SearchResultRow: View {
 
                 HStack(spacing: 4) {
                     Image(systemName: categoryIcon)
-                    Text(categoryName)
+                    Text(LocalizedStringKey(categoryName))
                 }
                 .font(.caption2)
                 .foregroundStyle(.blue)

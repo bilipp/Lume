@@ -202,7 +202,11 @@
         }
 
         private var heading: String {
-            episode.title.isEmpty ? "Episode \(episode.episodeNum)" : "\(episode.episodeNum). \(episode.title)"
+            // The numbered-title branch is content and stays verbatim; only the
+            // "Episode N" fallback is a translatable label.
+            episode.title.isEmpty
+                ? String(localized: "Episode \(episode.episodeNum)")
+                : "\(episode.episodeNum). \(episode.title)"
         }
 
         private var metaLine: String? {
@@ -225,7 +229,7 @@
 
     /// A contextual action shown on the right of the information panel.
     struct TVPlayerInfoAction {
-        let title: String
+        let title: LocalizedStringKey
         var systemImage: String?
         let perform: () -> Void
     }

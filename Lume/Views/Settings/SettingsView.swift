@@ -257,7 +257,7 @@ struct SettingsView: View {
             }
         }
 
-        private var tvDeinterlaceFooter: String {
+        private var tvDeinterlaceFooter: LocalizedStringKey {
             "Smooths interlaced channels (often 1080i). Best left off here — VLC does not support hardware decoding with interlacing. Disabling this can result in stutters for some channels."
         }
     #endif
@@ -411,7 +411,7 @@ struct SettingsView: View {
             }
         }
 
-        private var deinterlaceFooter: String {
+        private var deinterlaceFooter: LocalizedStringKey {
             #if os(iOS)
                 "Smooths interlaced channels (often 1080i). Best left off here — VLC does not support hardware decoding with interlacing. Disabling this can result in stutters for some channels."
             #else
@@ -462,7 +462,7 @@ struct SettingsView: View {
             rawValue
         }
 
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
             case .playlists: "Playlists"
             case .content: "Content"

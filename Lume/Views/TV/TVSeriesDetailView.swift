@@ -396,10 +396,12 @@
             return index + 1 < ordered.count ? ordered[index + 1] : ordered.first
         }
 
-        private var playTitle: String {
+        private var playTitle: LocalizedStringKey {
             guard let episode = nextEpisode else { return "Play" }
-            let prefix = (!episode.isWatched && episode.watchProgress > 1) ? "Resume" : "Play"
-            return "\(prefix) S\(episode.seasonNum) E\(episode.episodeNum)"
+            if !episode.isWatched, episode.watchProgress > 1 {
+                return "Resume S\(episode.seasonNum) E\(episode.episodeNum)"
+            }
+            return "Play S\(episode.seasonNum) E\(episode.episodeNum)"
         }
 
         private var seriesPlaylist: Playlist? {

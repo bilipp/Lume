@@ -423,7 +423,7 @@ enum HomeMediaItem: Identifiable, Hashable {
 // MARK: - Row
 
 private struct HomeRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let items: [HomeMediaItem]
     let onPlayLive: (LiveStream) -> Void
     var animationNamespace: Namespace.ID?

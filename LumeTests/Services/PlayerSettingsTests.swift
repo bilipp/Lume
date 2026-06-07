@@ -24,13 +24,13 @@ struct PlayerSettingsTests {
 
     @Test func `engine kind subtitles not empty`() {
         for kind in PlayerEngineKind.allCases {
-            #expect(!kind.subtitle.isEmpty)
+            #expect(!String(localized: kind.subtitle).isEmpty)
         }
     }
 
     @Test func `engine kind subtitle content`() {
-        let ksSubtitle = PlayerEngineKind.ksPlayer.subtitle
-        let avSubtitle = PlayerEngineKind.avPlayer.subtitle
+        let ksSubtitle = String(localized: PlayerEngineKind.ksPlayer.subtitle)
+        let avSubtitle = String(localized: PlayerEngineKind.avPlayer.subtitle)
         #expect(!ksSubtitle.isEmpty)
         #expect(!avSubtitle.isEmpty)
     }

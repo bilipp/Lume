@@ -9,6 +9,7 @@
 
 import Foundation
 import Observation
+import SwiftUI
 
 // MARK: - Sync Steps
 
@@ -26,7 +27,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         rawValue
     }
 
-    var title: String {
+    var title: LocalizedStringResource {
         switch self {
         case .authenticating: "Authenticating"
         case .movieCategories: "Movie categories"

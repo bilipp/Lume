@@ -9,6 +9,7 @@
 
 import Foundation
 import SwiftData
+import SwiftUI
 
 // MARK: - Category Sort
 
@@ -21,7 +22,7 @@ enum CategorySortOption: String, CaseIterable, Identifiable {
         rawValue
     }
 
-    var label: String {
+    var label: LocalizedStringKey {
         switch self {
         case .playlist: "Playlist Order"
         case .nameAscending: "Name (A–Z)"
@@ -72,7 +73,7 @@ enum ContentSortOption: String, CaseIterable, Identifiable {
         rawValue
     }
 
-    var label: String {
+    var label: LocalizedStringKey {
         switch self {
         case .playlist: "Playlist Order"
         case .nameAscending: "Name (A–Z)"

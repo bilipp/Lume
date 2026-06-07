@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum PlayerEngineKind: String, CaseIterable, Identifiable {
     case vlcKit
@@ -17,7 +18,7 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
         }
     }
 
-    var subtitle: String {
+    var subtitle: LocalizedStringResource {
         switch self {
         case .vlcKit: "VLCKit 4 is VLC's native engine. Plays virtually any format and codec, with hardware-accelerated 4K HDR, Picture in Picture, and the broadest IPTV compatibility."
         case .ksPlayer: "KSPlayer is a powerful third-party player that supports a wide range of formats, including those commonly used in IPTV streams."

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 enum CategoryType: String, Codable, CaseIterable, Identifiable {
     case live
@@ -17,6 +18,13 @@ enum CategoryType: String, Codable, CaseIterable, Identifiable {
         case .vod: "Movies"
         case .series: "Series"
         }
+    }
+
+    /// Localized variant of `label` for rendering in SwiftUI `Text`. `label`
+    /// itself stays a plain `String` because it is also interpolated into
+    /// composed strings elsewhere.
+    var localizedLabel: LocalizedStringKey {
+        LocalizedStringKey(label)
     }
 }
 
