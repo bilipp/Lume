@@ -85,7 +85,7 @@ struct PlaylistDetailView: View {
                     Text("All synced content for this playlist will also be removed.")
                 }
                 .sheet(isPresented: $showSync) {
-                    SyncProgressView(playlist: playlist, isPresented: $showSync)
+                    SyncProgressView(playlist: playlist)
                 }
         }
     #endif
@@ -200,7 +200,7 @@ struct PlaylistDetailView: View {
                 Text("All synced content for this playlist will also be removed.")
             }
             .sheet(isPresented: $showSync) {
-                SyncProgressView(playlist: playlist, isPresented: $showSync)
+                SyncProgressView(playlist: playlist)
             }
         }
 

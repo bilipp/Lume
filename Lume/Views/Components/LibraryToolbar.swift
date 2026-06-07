@@ -43,7 +43,7 @@ struct LibraryToolbarModifier: ViewModifier {
             }
             .sheet(isPresented: $showingSync) {
                 if let playlist = activePlaylist {
-                    SyncProgressView(playlist: playlist, isPresented: $showingSync)
+                    SyncProgressView(playlist: playlist)
                 }
             }
     }
