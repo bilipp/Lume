@@ -224,11 +224,31 @@ struct LiveTVView: View {
     }
 
     #if os(tvOS)
-        /// Two focus sections tuned for the 10-foot UI: a wide, readable category
-        /// rail on the left and a large channel list on the right. The macOS
+        /// tvOS Live TV has two distinct shapes. In **List** mode: a wide,
+        /// readable category rail beside a large channel list. In **Guide** mode:
+        /// a dedicated full-bleed timeline grid with a slim category drawer that
+        /// expands on focus, so the guide gets the room a 10-foot grid needs.
+        @ViewBuilder
+        private var tvOSLayout: some View {
+            if layoutMode == .guide {
+                TVEPGScreen(
+                    categories: sortedCategories,
+                    selectedCategory: $selectedCategory,
+                    displayedCategory: displayedCategory,
+                    layoutModeRaw: $layoutModeRaw,
+                    contentSort: contentSort,
+                    onPlay: { playChannel($0) }
+                )
+            } else {
+                tvOSListLayout
+            }
+        }
+
+        /// The List-mode layout: a wide category rail on the left and the channel
+        /// list on the right, with the Guide/List toggle above it. The macOS
         /// layout's fixed 200pt sidebar is far too narrow for a TV — it wraps
         /// category names one word per line — so tvOS gets its own components.
-        private var tvOSLayout: some View {
+        private var tvOSListLayout: some View {
             HStack(spacing: 0) {
                 TVCategorySidebar(
                     categories: sortedCategories,
