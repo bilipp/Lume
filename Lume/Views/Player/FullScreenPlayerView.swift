@@ -63,6 +63,9 @@ struct FullScreenPlayerView: View {
             persistProgress(force: false)
         }
         .task {
+            // Seed the recall pair with the channel we opened on, so the very
+            // first in-player recall has somewhere to jump back to.
+            LiveChannelHistory.record(activeMedia)
             configureAudioSessionForPlayback()
             #if os(macOS)
                 enterMacFullScreen()
@@ -105,6 +108,8 @@ struct FullScreenPlayerView: View {
         duration = 0
         lastSaved = .distantPast
         activeMedia = newMedia
+        // Slide the outgoing channel into the recall slot so `right` can jump back.
+        LiveChannelHistory.record(newMedia)
     }
 
     private var closeButton: some View {

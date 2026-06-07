@@ -153,7 +153,7 @@ struct KSPlayerEngineView: View {
             .focused($catcherFocused)
             .onMoveCommand { direction in
                 // Watching live TV with the controls hidden, up/down surf
-                // channels directly, and right jumps to the previous channel.
+                // adjacent channels and right recalls the last channel watched.
                 // Any other move summons the controls.
                 if media.isLive, direction == .up || direction == .down || direction == .right {
                     switchLiveChannel(direction)
@@ -163,21 +163,27 @@ struct KSPlayerEngineView: View {
             }
         }
 
-        /// Surf to the adjacent live channel — up selects the next channel, down
-        /// (or right) the previous — matching a TV remote's channel rocker.
+        /// Change the live channel from the Siri Remote: up/down surf to the
+        /// adjacent channel (a TV remote's channel rocker), while right recalls
+        /// the channel watched just before this one (the remote's "last"
+        /// button). Falls back to summoning the controls when there's nothing
+        /// to jump to.
         private func switchLiveChannel(_ direction: MoveCommandDirection) {
             guard media.isLive else { return }
-            let offset: Int
+            let target: PlayableMedia?
             switch direction {
-            case .up: offset = 1
-            case .down, .right: offset = -1
-            default: return
+            case .up, .down:
+                let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
+                target = LiveChannelNavigator.adjacentMedia(
+                    for: media, offset: direction == .up ? 1 : -1, sort: sort, in: modelContext
+                )
+            case .right:
+                target = LiveChannelHistory.recallMedia(in: modelContext)
+            default:
+                return
             }
-            let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-            guard let next = LiveChannelNavigator.adjacentMedia(
-                for: media, offset: offset, sort: sort, in: modelContext
-            ) else { return }
-            onSelectMedia?(next)
+            guard let target else { showControls(); return }
+            onSelectMedia?(target)
             showControls()
         }
 
