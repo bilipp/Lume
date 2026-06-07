@@ -442,10 +442,18 @@ struct KSPlayerEngineView: View {
 
     // MARK: - Options
 
-    private func makeOptions() -> KSOptions {
+    /// Process-wide KSPlayer configuration, applied exactly once on first
+    /// access (static `let` init is lazy and thread-safe). These are global
+    /// settings, so assigning them on every `makeOptions()` call was a needless
+    /// side effect from a view body.
+    private static let configureGlobalOptions: Void = {
         KSOptions.secondPlayerType = KSMEPlayer.self
         KSOptions.isAutoPlay = true
         KSOptions.isPipPopViewController = false
+    }()
+
+    private func makeOptions() -> KSOptions {
+        _ = Self.configureGlobalOptions
 
         let options = KSOptions()
         options.canStartPictureInPictureAutomaticallyFromInline = true

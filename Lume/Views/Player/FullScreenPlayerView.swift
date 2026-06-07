@@ -19,9 +19,15 @@ struct FullScreenPlayerView: View {
     #endif
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
 
-    @State private var currentTime: TimeInterval = 0
-    @State private var duration: TimeInterval = 0
+    /// The only high-frequency playback state. An `@Observable` the host owns
+    /// but never reads in its own body, so playback ticks invalidate just the
+    /// scrubber/time labels rather than re-rendering the whole player tree. See
+    /// `PlaybackClock`.
+    @State private var clock = PlaybackClock()
     @State private var lastSaved: Date = .distantPast
+    /// Last progress value written to SwiftData, so the periodic sampler skips
+    /// redundant saves while playback is paused (the clock isn't advancing).
+    @State private var lastSavedProgress: TimeInterval = -1
 
     /// The stream currently playing. Starts as `media` but can be swapped when
     /// the viewer picks another episode from the in-player episode rail (tvOS).
@@ -59,9 +65,6 @@ struct FullScreenPlayerView: View {
         #endif
         .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.dark)
-        .onChange(of: currentTime) { _, _ in
-            persistProgress(force: false)
-        }
         .task {
             // Seed the recall pair with the channel we opened on, so the very
             // first in-player recall has somewhere to jump back to.
@@ -70,6 +73,17 @@ struct FullScreenPlayerView: View {
             #if os(macOS)
                 enterMacFullScreen()
             #endif
+        }
+        .task {
+            // Persist VOD progress on a cadence by sampling the clock, rather
+            // than reacting to every tick. The clock is an @Observable this view
+            // never reads in its body, so sampling it from a detached task keeps
+            // playback ticks from re-rendering the player tree.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { break }
+                persistProgress(force: false)
+            }
         }
         .onDisappear {
             persistProgress(force: true)
@@ -81,19 +95,19 @@ struct FullScreenPlayerView: View {
     private var playerView: some View {
         switch engine {
         case .avPlayer:
-            AVPlayerEngineView(media: activeMedia, currentTime: $currentTime, duration: $duration)
+            AVPlayerEngineView(media: activeMedia, currentTime: $clock.current, duration: $clock.duration)
         case .ksPlayer:
             KSPlayerEngineView(
                 media: activeMedia,
-                currentTime: $currentTime,
-                duration: $duration,
+                currentTime: $clock.current,
+                duration: $clock.duration,
                 onSelectMedia: switchMedia
             )
         case .vlcKit:
             VLCPlayerEngineView(
                 media: activeMedia,
-                currentTime: $currentTime,
-                duration: $duration,
+                currentTime: $clock.current,
+                duration: $clock.duration,
                 onSelectMedia: switchMedia
             )
         }
@@ -104,9 +118,9 @@ struct FullScreenPlayerView: View {
     private func switchMedia(to newMedia: PlayableMedia) {
         guard newMedia.id != activeMedia.id else { return }
         persistProgress(force: true)
-        currentTime = 0
-        duration = 0
+        clock.reset()
         lastSaved = .distantPast
+        lastSavedProgress = -1
         activeMedia = newMedia
         // Slide the outgoing channel into the recall slot so `right` can jump back.
         LiveChannelHistory.record(newMedia)
@@ -176,12 +190,16 @@ struct FullScreenPlayerView: View {
             if force { touchLiveLastWatched() }
             return
         }
-        guard currentTime > 0 else { return }
-        if !force, Date().timeIntervalSince(lastSaved) < 5 { return }
+        let now = clock.current
+        let total = clock.duration
+        guard now > 0 else { return }
+        if !force {
+            if Date().timeIntervalSince(lastSaved) < 5 { return }
+            if now == lastSavedProgress { return }
+        }
         lastSaved = Date()
+        lastSavedProgress = now
 
-        let now = currentTime
-        let total = duration
         let completed = total > 0 && now / total >= 0.9
 
         switch activeMedia.contentRef {
