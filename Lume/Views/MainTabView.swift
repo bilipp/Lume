@@ -18,15 +18,26 @@ struct MainTabView: View {
 
     @State private var navigationPath = NavigationPath()
 
-    /// Playlists for which we've kicked off an auto-sync that hasn't finished
-    /// yet, so a view update doesn't start a second one before the playlist's
-    /// `syncStatus` flips to `.syncing`. An id is removed once its task
-    /// completes, so a playlist that goes stale again later (e.g. on a long
-    /// foreground session) can re-sync.
-    @State private var autoSyncStarted: Set<UUID> = []
+    /// Playlists waiting to be auto-synced, and the one currently shown in the
+    /// blocking progress cover. Auto-sync is presented (not silent) so the user
+    /// sees progress and waits for it to finish — most importantly right after
+    /// adding a playlist, when the app would otherwise look empty and broken.
+    @State private var syncQueue: [Playlist] = []
+    @State private var activeSyncPlaylist: Playlist?
+
+    /// Playlists we've already auto-synced (or attempted) this session, so the
+    /// launch / switch / foreground triggers don't re-present the cover for one
+    /// that's already been handled.
+    @State private var autoSyncAttempted: Set<UUID> = []
 
     private var syncFrequency: SyncFrequency {
         SyncFrequency.resolve(syncFrequencyRaw)
+    }
+
+    /// UI tests seed a fake playlist; auto-sync would present a blocking cover
+    /// that can never succeed against the stub server, so skip it there.
+    private var isUITesting: Bool {
+        CommandLine.arguments.contains("-ui-testing")
     }
 
     #if os(tvOS)
@@ -46,19 +57,22 @@ struct MainTabView: View {
         .task(id: playlists.count) {
             // On launch (and whenever a playlist is added) sync any playlist that
             // is due per the configured frequency.
-            startDueAutoSyncs()
+            enqueueDueSyncs(playlists)
         }
         .onChange(of: selectedPlaylistID) {
             // On playlist switch, sync the newly selected one if it's due.
-            syncSelectedPlaylistIfDue()
+            if let playlist = playlists.active(for: selectedPlaylistID) {
+                enqueueDueSyncs([playlist])
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             // Returning to the foreground re-checks staleness — for a long-lived
             // app this is the practical equivalent of "on launch".
             if phase == .active {
-                startDueAutoSyncs()
+                enqueueDueSyncs(playlists)
             }
         }
+        .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
     }
 
     #if os(tvOS)
@@ -129,20 +143,17 @@ struct MainTabView: View {
 
     // MARK: - Automatic sync
 
-    /// Kicks off a background sync for every playlist that is due per the
-    /// configured frequency (covers the never-synced first launch too).
-    private func startDueAutoSyncs() {
-        for playlist in playlists where shouldAutoSync(playlist) {
-            autoSync(playlist)
-        }
-    }
+    /// Enqueues every due playlist for a blocking, progress-visible sync and
+    /// presents the first one. Covers the never-synced first launch (where
+    /// `lastSyncDate == nil` makes a playlist due) as well as periodic refreshes.
+    private func enqueueDueSyncs(_ candidates: [Playlist]) {
+        guard !isUITesting else { return }
 
-    /// Syncs the currently selected playlist if it is due. Called on playlist
-    /// switch so the content you're about to browse is refreshed.
-    private func syncSelectedPlaylistIfDue() {
-        guard let playlist = playlists.active(for: selectedPlaylistID),
-              shouldAutoSync(playlist) else { return }
-        autoSync(playlist)
+        for playlist in candidates where shouldAutoSync(playlist) {
+            autoSyncAttempted.insert(playlist.id)
+            syncQueue.append(playlist)
+        }
+        promoteNextIfIdle()
     }
 
     private func shouldAutoSync(_ playlist: Playlist) -> Bool {
@@ -151,21 +162,37 @@ struct MainTabView: View {
             status: playlist.syncStatus,
             lastSyncDate: playlist.lastSyncDate,
             frequency: syncFrequency,
-            alreadyStarted: autoSyncStarted.contains(playlist.id)
+            alreadyStarted: autoSyncAttempted.contains(playlist.id)
         )
     }
 
-    /// Starts a silent background sync, tracking the playlist as in-flight so a
-    /// rapid view update doesn't double-trigger, and clearing it when done.
-    private func autoSync(_ playlist: Playlist) {
-        let playlistId = playlist.id
-        autoSyncStarted.insert(playlistId)
+    /// Presents the next queued playlist's sync cover when none is showing. The
+    /// `SyncProgressView` auto-starts the sync and dismisses itself on success;
+    /// the cover's `onDismiss` calls back here to advance the queue.
+    private func promoteNextIfIdle() {
+        guard activeSyncPlaylist == nil, !syncQueue.isEmpty else { return }
+        activeSyncPlaylist = syncQueue.removeFirst()
+    }
+}
 
-        Task {
-            let manager = ContentSyncManager(modelContainer: modelContext.container)
-            try? await manager.syncPlaylist(playlist, full: true)
-            await MainActor.run { _ = autoSyncStarted.remove(playlistId) }
-        }
+// MARK: - Sync cover presentation
+
+private extension View {
+    /// Presents the auto-sync progress UI as a blocking cover: a full-screen
+    /// cover on iOS/tvOS (no swipe-to-dismiss), a sheet on macOS where
+    /// `fullScreenCover` is unavailable.
+    @ViewBuilder
+    func syncCover(item: Binding<Playlist?>, onDismiss: @escaping () -> Void) -> some View {
+        #if os(macOS)
+            sheet(item: item, onDismiss: onDismiss) { playlist in
+                SyncProgressView(playlist: playlist, autoStart: true)
+                    .frame(minWidth: 420, minHeight: 480)
+            }
+        #else
+            fullScreenCover(item: item, onDismiss: onDismiss) { playlist in
+                SyncProgressView(playlist: playlist, autoStart: true)
+            }
+        #endif
     }
 }
 

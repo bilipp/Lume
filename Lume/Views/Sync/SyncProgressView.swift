@@ -11,13 +11,27 @@ import SwiftUI
 
 struct SyncProgressView: View {
     let playlist: Playlist
-    @Binding var isPresented: Bool
+
+    /// When true the sync begins on appear and the sheet dismisses itself once
+    /// it finishes successfully — used for the blocking auto-sync cover. When
+    /// false (the manual "Sync Now" flow) it waits for the user to tap Start and
+    /// shows a Done button when finished.
+    let autoStart: Bool
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var progress = SyncProgress()
-    @State private var phase: Phase = .ready
+    @State private var phase: Phase
     @State private var syncError: String?
+
+    init(playlist: Playlist, autoStart: Bool = false) {
+        self.playlist = playlist
+        self.autoStart = autoStart
+        // Start already in the syncing state for auto-sync so the "Ready" screen
+        // (with its Start button) never flashes before `.task` kicks off.
+        _phase = State(initialValue: autoStart ? .syncing : .ready)
+    }
 
     private enum Phase {
         case ready
@@ -59,13 +73,20 @@ struct SyncProgressView: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
-                            isPresented = false
+                            dismiss()
                         }
+                        // Block dismissal while syncing — the user must wait for
+                        // it to finish (or fail) before continuing.
                         .disabled(phase == .syncing)
                     }
                 }
         }
         .interactiveDismissDisabled(phase == .syncing)
+        .task {
+            if autoStart, phase != .finished {
+                startSync()
+            }
+        }
     }
 
     // MARK: - Header
@@ -150,7 +171,7 @@ struct SyncProgressView: View {
 
         case .finished:
             Button {
-                isPresented = false
+                dismiss()
             } label: {
                 Text("Done")
                     .frame(maxWidth: .infinity)
@@ -174,6 +195,13 @@ struct SyncProgressView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+
+                // Let the user leave a failed auto-sync without retrying — they
+                // can sync later from the playlist's settings.
+                Button("Continue Without Syncing") {
+                    dismiss()
+                }
+                .controlSize(.large)
             }
         }
     }
@@ -190,7 +218,12 @@ struct SyncProgressView: View {
             do {
                 let syncManager = ContentSyncManager(modelContainer: modelContext.container)
                 try await syncManager.syncPlaylist(playlist, progress: progress, full: true)
-                await MainActor.run { phase = .finished }
+                await MainActor.run {
+                    phase = .finished
+                    // Auto-sync gets out of the way as soon as it succeeds so the
+                    // user can start browsing; the manual flow waits for Done.
+                    if autoStart { dismiss() }
+                }
             } catch {
                 await MainActor.run {
                     syncError = error.localizedDescription
@@ -275,6 +308,6 @@ private struct StepRowView: View {
 #Preview("Ready") {
     let container = previewContainer()
     let playlist = PreviewData.samplePlaylist
-    return SyncProgressView(playlist: playlist, isPresented: .constant(true))
+    return SyncProgressView(playlist: playlist)
         .modelContainer(container)
 }
