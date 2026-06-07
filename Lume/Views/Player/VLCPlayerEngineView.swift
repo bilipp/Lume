@@ -172,9 +172,10 @@ struct VLCPlayerEngineView: View {
             .focused($catcherFocused)
             .onMoveCommand { direction in
                 // While watching live TV with the controls hidden, up/down surf
-                // channels directly — the classic channel rocker. Any other
-                // move just summons the controls.
-                if media.isLive, direction == .up || direction == .down {
+                // channels directly — the classic channel rocker — and right
+                // jumps to the previous channel. Any other move just summons
+                // the controls.
+                if media.isLive, direction == .up || direction == .down || direction == .right {
                     switchLiveChannel(direction)
                 } else {
                     showControls()
@@ -230,14 +231,15 @@ struct VLCPlayerEngineView: View {
 
     #if os(tvOS)
         /// Surf to the adjacent live channel. Up selects the next channel, Down
-        /// the previous — matching a TV remote's channel rocker. The new channel's
-        /// controls are surfaced briefly so its name and EPG act as a banner.
+        /// (or Right) the previous — matching a TV remote's channel rocker. The
+        /// new channel's controls are surfaced briefly so its name and EPG act
+        /// as a banner.
         private func switchLiveChannel(_ direction: MoveCommandDirection) {
             guard media.isLive else { return }
             let offset: Int
             switch direction {
             case .up: offset = 1
-            case .down: offset = -1
+            case .down, .right: offset = -1
             default: return
             }
             let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist

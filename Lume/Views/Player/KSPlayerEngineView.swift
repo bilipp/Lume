@@ -153,8 +153,9 @@ struct KSPlayerEngineView: View {
             .focused($catcherFocused)
             .onMoveCommand { direction in
                 // Watching live TV with the controls hidden, up/down surf
-                // channels directly. Any other move summons the controls.
-                if media.isLive, direction == .up || direction == .down {
+                // channels directly, and right jumps to the previous channel.
+                // Any other move summons the controls.
+                if media.isLive, direction == .up || direction == .down || direction == .right {
                     switchLiveChannel(direction)
                 } else {
                     showControls()
@@ -163,13 +164,13 @@ struct KSPlayerEngineView: View {
         }
 
         /// Surf to the adjacent live channel — up selects the next channel, down
-        /// the previous — matching a TV remote's channel rocker.
+        /// (or right) the previous — matching a TV remote's channel rocker.
         private func switchLiveChannel(_ direction: MoveCommandDirection) {
             guard media.isLive else { return }
             let offset: Int
             switch direction {
             case .up: offset = 1
-            case .down: offset = -1
+            case .down, .right: offset = -1
             default: return
             }
             let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
