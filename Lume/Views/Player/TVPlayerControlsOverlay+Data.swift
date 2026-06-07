@@ -20,6 +20,10 @@
         }
 
         func resolveContent() {
+            // A stream swap invalidates any in-flight scrub.
+            isScrubbing = false
+            scrubResetTask?.cancel()
+            scrubResetTask = nil
             episode = nil
             seasonEpisodes = []
             movie = nil
@@ -78,14 +82,96 @@
             return min(max(currentTime / total, 0), 1)
         }
 
+        /// VOD playhead position for the scrubber bar — the scrub target while
+        /// scrubbing, otherwise live playback time.
+        var scrubberFraction: Double {
+            let total = max(duration, 1)
+            let reference = isScrubbing ? scrubTarget : currentTime
+            return min(max(reference / total, 0), 1)
+        }
+
         var leadingTimeLabel: String {
             if media.isLive, let epgNow { return clock(epgNow.start) }
-            return timeString(currentTime)
+            return timeString(isScrubbing ? scrubTarget : currentTime)
         }
 
         var trailingTimeLabel: String {
             if media.isLive, let epgNow { return clock(epgNow.end) }
-            return "-" + timeString(max(duration - currentTime, 0))
+            let reference = isScrubbing ? scrubTarget : currentTime
+            return "-" + timeString(max(duration - reference, 0))
+        }
+
+        // MARK: Scrubbing (VOD)
+
+        /// Select toggles scrub mode: the first press enters (and pauses), the
+        /// second commits the seek.
+        func toggleScrub() {
+            if isScrubbing { commitScrub() } else { beginScrub() }
+        }
+
+        /// Enter scrub mode: remember the play state, pause, and seed the
+        /// target at the current position. Treated like an open panel so the
+        /// controls stay up and the Menu button routes back here to cancel.
+        func beginScrub() {
+            guard !media.isLive else { return }
+            wasPlayingBeforeScrub = coordinator.isPlaying
+            if coordinator.isPlaying { onTogglePlay() }
+            scrubTarget = currentTime.isFinite ? currentTime : 0
+            scrubStepLevel = 0
+            scrubLastDirection = nil
+            onPanelOpenChange(true)
+            withAnimation(.easeOut(duration: 0.15)) { isScrubbing = true }
+        }
+
+        /// Commit the seek and leave scrub mode, resuming playback if it had
+        /// been playing when scrubbing began.
+        func commitScrub() {
+            let target = min(max(scrubTarget, 0), max(duration, 0))
+            coordinator.seek(to: target)
+            currentTime = target
+            finishScrub(resume: wasPlayingBeforeScrub)
+        }
+
+        /// Abort the scrub (Menu press) without seeking, restoring the prior
+        /// play state.
+        func cancelScrub() {
+            finishScrub(resume: wasPlayingBeforeScrub)
+        }
+
+        private func finishScrub(resume: Bool) {
+            scrubResetTask?.cancel()
+            scrubResetTask = nil
+            withAnimation(.easeOut(duration: 0.15)) { isScrubbing = false }
+            onPanelOpenChange(false)
+            if resume, !coordinator.isPlaying { onTogglePlay() }
+            focus = .scrubber
+            onResetHideTimer()
+        }
+
+        /// Step the scrub target on a left/right press. The step grows with
+        /// sustained input in one direction and decays after a brief pause.
+        func moveScrub(_ direction: MoveCommandDirection) {
+            guard isScrubbing, duration > 0 else { return }
+            let sign: Double
+            switch direction {
+            case .left: sign = -1
+            case .right: sign = 1
+            default: return
+            }
+            if direction != scrubLastDirection { scrubStepLevel = 0 }
+            scrubLastDirection = direction
+            scrubStepLevel = min(scrubStepLevel + 1, 12)
+            let step = 8.0 * Double(scrubStepLevel) // 8s → up to 96s per press
+            scrubTarget = min(max(scrubTarget + sign * step, 0), duration)
+            onResetHideTimer()
+
+            scrubResetTask?.cancel()
+            scrubResetTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                guard !Task.isCancelled else { return }
+                scrubStepLevel = 0
+                scrubLastDirection = nil
+            }
         }
 
         // MARK: Episode navigation

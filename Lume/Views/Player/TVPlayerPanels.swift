@@ -19,6 +19,7 @@
     /// `@FocusState` of this type is owned by the overlay and shared with the
     /// panels so focus can be moved programmatically as panels open and close.
     enum TVPlayerFocus: Hashable {
+        case scrubber
         case transport
         case skipBackward
         case skipForward
@@ -76,6 +77,69 @@
                 isFocused
                     ? .regular.tint(.white).interactive()
                     : .regular.interactive()
+            }
+        }
+    }
+
+    /// The focusable VOD scrubber bar. Idle it reads as a slim progress line;
+    /// on focus it thickens and reveals a playhead knob to signal it can be
+    /// selected; while scrubbing the knob grows so the playhead is easy to
+    /// track as it steps. The bar draws its own visuals, so the host `Button`'s
+    /// label is ignored — only its select + focus behaviour is used.
+    struct TVScrubBarStyle: ButtonStyle {
+        /// 0…1 playhead position (current time, or the scrub target while active).
+        var fraction: Double
+        var isScrubbing: Bool
+
+        func makeBody(configuration: Configuration) -> some View {
+            StyleBody(fraction: fraction, isScrubbing: isScrubbing, pressed: configuration.isPressed)
+        }
+
+        struct StyleBody: View {
+            let fraction: Double
+            let isScrubbing: Bool
+            let pressed: Bool
+            @Environment(\.isFocused) private var isFocused
+
+            private var active: Bool {
+                isFocused || isScrubbing
+            }
+
+            private var trackHeight: CGFloat {
+                active ? 10 : 6
+            }
+
+            private var knobSize: CGFloat {
+                if isScrubbing { return pressed ? 32 : 28 }
+                return isFocused ? 20 : 0
+            }
+
+            var body: some View {
+                GeometryReader { geo in
+                    let width = geo.size.width
+                    let clamped = min(max(fraction, 0), 1)
+                    let filled = width * clamped
+                    let knobX = min(max(filled - knobSize / 2, 0), max(width - knobSize, 0))
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(.white.opacity(0.3))
+                            .frame(height: trackHeight)
+                        Capsule()
+                            .fill(.white)
+                            .frame(width: filled, height: trackHeight)
+                        if knobSize > 0 {
+                            Circle()
+                                .fill(.white)
+                                .frame(width: knobSize, height: knobSize)
+                                .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
+                                .offset(x: knobX)
+                        }
+                    }
+                    .frame(maxHeight: .infinity, alignment: .center)
+                }
+                .frame(height: 34)
+                .animation(.easeOut(duration: 0.18), value: active)
+                .animation(.easeOut(duration: 0.18), value: fraction)
             }
         }
     }

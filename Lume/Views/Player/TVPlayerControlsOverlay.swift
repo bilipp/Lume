@@ -50,6 +50,20 @@
         @State var recentChannels: [LiveStream] = []
         @State var recentNowTitles: [String: String] = [:]
 
+        // Scrubbing (VOD only). The progress bar is focusable; selecting it
+        // pauses playback and enters a scrub mode where left/right step the
+        // playhead. A second select commits the seek (and resumes playback if
+        // it had been playing); the Menu button cancels without seeking.
+        @State var isScrubbing = false
+        @State var scrubTarget: TimeInterval = 0
+        @State var wasPlayingBeforeScrub = false
+        /// Grows on sustained same-direction input so a held d-pad covers
+        /// ground quickly while a single tap still nudges precisely.
+        @State var scrubStepLevel = 0
+        @State var scrubLastDirection: MoveCommandDirection?
+        /// Decays `scrubStepLevel` back to zero after a pause in input.
+        @State var scrubResetTask: Task<Void, Never>?
+
         enum TabKind: Hashable { case episodes, recent, info }
         @State var openTab: TabKind?
         @FocusState var focus: TVPlayerFocus?
@@ -62,20 +76,34 @@
 
                 VStack(alignment: .leading, spacing: 26) {
                     upperRegion
+                    // While scrubbing, the transport / tab / menu controls are
+                    // locked out so focus stays pinned on the bar and left/right
+                    // step the playhead instead of moving focus.
                     controlRow
+                        .disabled(isScrubbing)
                 }
                 .padding(.horizontal, 80)
                 .padding(.bottom, 56)
             }
             .defaultFocus($focus, .transport)
             .onMoveCommand { direction in
+                // While scrubbing, left/right step the playhead; vertical moves
+                // are swallowed so focus can't escape the bar.
+                if isScrubbing {
+                    if direction == .left || direction == .right { moveScrub(direction) }
+                    return
+                }
                 // With the controls up, up/down still surf channels — but only
                 // for live TV and while no panel owns vertical navigation.
                 guard media.isLive, openTab == nil,
                       direction == .up || direction == .down else { return }
                 onSwitchChannel(direction)
             }
-            .onChange(of: panelCloseToken) { closePanel() }
+            // The host bumps `panelCloseToken` on a Menu/back press. Mid-scrub
+            // that cancels the scrub; otherwise it closes an open panel.
+            .onChange(of: panelCloseToken) {
+                if isScrubbing { cancelScrub() } else { closePanel() }
+            }
             .task(id: media.id) { resolveContent() }
             .onAppear {
                 // Every time the controls reappear this is a fresh subtree;
@@ -178,9 +206,7 @@
         private var scrubber: some View {
             if showsScrubber {
                 VStack(spacing: 6) {
-                    ProgressView(value: progressFraction)
-                        .progressViewStyle(.linear)
-                        .tint(.white)
+                    progressBar
 
                     HStack {
                         Text(leadingTimeLabel)
@@ -192,6 +218,21 @@
                     .font(.system(size: 22, weight: .medium).monospacedDigit())
                     .contentTransition(.numericText())
                 }
+            }
+        }
+
+        /// Live progress is fixed to the EPG programme clock, so it stays a
+        /// read-only bar. VOD gets the focusable, seekable scrubber.
+        @ViewBuilder
+        private var progressBar: some View {
+            if media.isLive {
+                ProgressView(value: progressFraction)
+                    .progressViewStyle(.linear)
+                    .tint(.white)
+            } else {
+                Button { toggleScrub() } label: { Color.clear }
+                    .buttonStyle(TVScrubBarStyle(fraction: scrubberFraction, isScrubbing: isScrubbing))
+                    .focused($focus, equals: .scrubber)
             }
         }
 
