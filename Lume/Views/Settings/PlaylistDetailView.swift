@@ -199,7 +199,7 @@ struct PlaylistDetailView: View {
             } message: {
                 Text("All synced content for this playlist will also be removed.")
             }
-            .sheet(isPresented: $showSync) {
+            .fullScreenCover(isPresented: $showSync) {
                 SyncProgressView(playlist: playlist)
             }
         }
