@@ -25,6 +25,44 @@ struct TMDBClientTests {
         #expect(client.isConfigured == true)
     }
 
+    // MARK: - Language code
+
+    @Test func `language code keeps language and region`() {
+        #expect(TMDBClient.tmdbLanguageCode(from: "de-DE") == "de-DE")
+        #expect(TMDBClient.tmdbLanguageCode(from: "en-US") == "en-US")
+        #expect(TMDBClient.tmdbLanguageCode(from: "pt-BR") == "pt-BR")
+        #expect(TMDBClient.tmdbLanguageCode(from: "fr-CA") == "fr-CA")
+    }
+
+    @Test func `language code without region stays language only`() {
+        #expect(TMDBClient.tmdbLanguageCode(from: "de") == "de")
+        #expect(TMDBClient.tmdbLanguageCode(from: "en") == "en")
+    }
+
+    @Test func `language code reduces script variants to region`() {
+        #expect(TMDBClient.tmdbLanguageCode(from: "zh-Hans-CN") == "zh-CN")
+        #expect(TMDBClient.tmdbLanguageCode(from: "zh-Hant-TW") == "zh-TW")
+    }
+
+    @Test func `language code falls back to english for empty identifier`() {
+        #expect(TMDBClient.tmdbLanguageCode(from: "") == "en")
+    }
+
+    // MARK: - pathWithLanguage
+
+    @Test func `path with language appends query when none present`() {
+        #expect(TMDBClient.pathWithLanguage("/movie/1", language: "de-DE") == "/movie/1?language=de-DE")
+    }
+
+    @Test func `path with language uses ampersand when query present`() {
+        let path = TMDBClient.pathWithLanguage("/movie/1?append_to_response=credits", language: "de-DE")
+        #expect(path == "/movie/1?append_to_response=credits&language=de-DE")
+    }
+
+    @Test func `path with language is unchanged for empty language`() {
+        #expect(TMDBClient.pathWithLanguage("/movie/1", language: "") == "/movie/1")
+    }
+
     // MARK: - backdropURL
 
     @Test func `backdrop URL with path`() {

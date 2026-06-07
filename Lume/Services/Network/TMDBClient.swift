@@ -39,9 +39,28 @@ nonisolated struct TMDBClient {
     private let session: URLSession
     private let token: String?
 
-    init(session: URLSession = .shared, token: String? = TMDBClient.tokenFromBundle()) {
+    /// TMDB `language` query value (e.g. `en-US`, `de-DE`, `pt-BR`). Derived
+    /// from the user's preferred language, which honours the per-app language
+    /// override in iOS Settings — there is deliberately no in-app language
+    /// picker. Every request localises text, and the title-detail requests also
+    /// localise videos and logo artwork.
+    private let language: String
+
+    /// The ISO 639-1 portion of `language` (e.g. `de` from `de-DE`). Used for
+    /// the `include_image_language` / `include_video_language` parameters and
+    /// for ranking logos, which TMDB keys by language code only.
+    private var languageCode: String {
+        String(language.prefix { $0 != "-" })
+    }
+
+    init(
+        session: URLSession = .shared,
+        token: String? = TMDBClient.tokenFromBundle(),
+        language: String = TMDBClient.preferredLanguageCode()
+    ) {
         self.session = session
         self.token = token
+        self.language = language
     }
 
     /// Whether a usable token is present. When false the trending section is
@@ -55,6 +74,35 @@ nonisolated struct TMDBClient {
     static func tokenFromBundle() -> String? {
         let raw = Bundle.main.object(forInfoDictionaryKey: "TMDBAccessToken") as? String
         return raw?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The TMDB `language` value for the user's current preferred language.
+    ///
+    /// `Locale.preferredLanguages.first` reflects the per-app language override
+    /// from iOS Settings when one is set, falling back to the system language —
+    /// which is exactly the behaviour we want.
+    static func preferredLanguageCode() -> String {
+        tmdbLanguageCode(from: Locale.preferredLanguages.first ?? "en-US")
+    }
+
+    /// Normalises a BCP-47 language identifier (e.g. `de-DE`, `zh-Hans-CN`)
+    /// into the `language`-`REGION` shape TMDB expects (e.g. `de-DE`, `zh-CN`).
+    /// Identifiers without a region (e.g. `en`) are returned language-only.
+    static func tmdbLanguageCode(from identifier: String) -> String {
+        let locale = Locale(identifier: identifier)
+        let language = locale.language.languageCode?.identifier ?? "en"
+        if let region = locale.region?.identifier, !region.isEmpty {
+            return "\(language)-\(region)"
+        }
+        return language
+    }
+
+    /// Appends the `language` query item to a request path, preserving any
+    /// query string the path already carries.
+    static func pathWithLanguage(_ path: String, language: String) -> String {
+        guard !language.isEmpty else { return path }
+        let separator = path.contains("?") ? "&" : "?"
+        return "\(path)\(separator)language=\(language)"
     }
 
     /// Returns trending titles enriched with the artwork and copy the home hero
@@ -138,16 +186,29 @@ nonisolated struct TMDBClient {
     func movieDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
             "/movie/\(id)?append_to_response=credits,similar,release_dates,images,videos"
+                + imageAndVideoLanguageQuery
         )
-        return response.normalized(isMovie: true)
+        return response.normalized(isMovie: true, preferredLanguage: languageCode)
     }
 
     /// Full detail payload for a TV series.
     func tvDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
             "/tv/\(id)?append_to_response=credits,similar,content_ratings,images,videos"
+                + imageAndVideoLanguageQuery
         )
-        return response.normalized(isMovie: false)
+        return response.normalized(isMovie: false, preferredLanguage: languageCode)
+    }
+
+    /// Widens the appended `images`/`videos` to the user's language, English,
+    /// and (for images) language-neutral artwork — otherwise TMDB filters them
+    /// to the `language` value alone, which often returns nothing.
+    private var imageAndVideoLanguageQuery: String {
+        let code = languageCode
+        guard !code.isEmpty, code != "en" else {
+            return "&include_image_language=en,null&include_video_language=en"
+        }
+        return "&include_image_language=\(code),en,null&include_video_language=\(code),en"
     }
 
     /// Returns the list of TMDB movie IDs that belong to a collection.
@@ -160,7 +221,8 @@ nonisolated struct TMDBClient {
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
         guard isConfigured, let token else { throw TMDBError.missingToken }
-        guard let url = URL(string: baseURL + path) else { throw TMDBError.invalidURL }
+        let localizedPath = TMDBClient.pathWithLanguage(path, language: language)
+        guard let url = URL(string: baseURL + localizedPath) else { throw TMDBError.invalidURL }
 
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -365,7 +427,7 @@ private nonisolated struct CollectionPart: Decodable {
 }
 
 nonisolated extension TitleDetailsResponse {
-    func normalized(isMovie: Bool) -> TMDBTitleDetails {
+    func normalized(isMovie: Bool, preferredLanguage: String = "en") -> TMDBTitleDetails {
         let cast = (credits?.cast ?? [])
             .sorted { ($0.order ?? .max) < ($1.order ?? .max) }
             .prefix(20)
@@ -390,7 +452,7 @@ nonisolated extension TitleDetailsResponse {
             cast: Array(cast),
             similarIDs: similar?.results.map(\.id) ?? [],
             videos: mappedVideos(),
-            logoPath: bestLogoPath(),
+            logoPath: bestLogoPath(preferredLanguage: preferredLanguage),
             collectionId: isMovie ? belongsToCollection?.id : nil,
             collectionName: isMovie ? belongsToCollection?.name : nil,
             collectionPosterPath: isMovie ? belongsToCollection?.posterPath : nil,
@@ -415,16 +477,18 @@ nonisolated extension TitleDetailsResponse {
             .map { TitleVideo(key: $0.key, name: ($0.name?.isEmpty == false) ? $0.name! : "Video", type: $0.type ?? "Video") }
     }
 
-    /// Picks the best wordmark logo: an English one first, then a
-    /// language-neutral one, then any other; ties broken by TMDB vote average.
-    private func bestLogoPath() -> String? {
+    /// Picks the best wordmark logo: the user's language first, then English, a
+    /// language-neutral one, and finally any other; ties broken by TMDB vote
+    /// average. `preferredLanguage` is an ISO 639-1 code (e.g. `de`).
+    private func bestLogoPath(preferredLanguage: String) -> String? {
         let logos = images?.logos ?? []
         guard !logos.isEmpty else { return nil }
         func rank(_ logo: LogoEntry) -> Int {
             switch logo.languageCode {
-            case "en": 0
-            case nil, "": 1
-            default: 2
+            case preferredLanguage: 0
+            case "en": 1
+            case nil, "": 2
+            default: 3
             }
         }
         return logos
