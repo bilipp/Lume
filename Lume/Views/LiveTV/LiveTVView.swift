@@ -224,61 +224,19 @@ struct LiveTVView: View {
     }
 
     #if os(tvOS)
-        /// tvOS Live TV has two distinct shapes. In **List** mode: a wide,
-        /// readable category rail beside a large channel list. In **Guide** mode:
-        /// a dedicated full-bleed timeline grid with a slim category drawer that
-        /// expands on focus, so the guide gets the room a 10-foot grid needs.
-        @ViewBuilder
+        /// One shape for both modes: a slim category rail on the leading edge —
+        /// topped by a single List/Guide switch — beside the content area, which
+        /// shows either the channel list or the programme guide. Sharing one rail
+        /// and one switch keeps moving between the two views consistent.
         private var tvOSLayout: some View {
-            if layoutMode == .guide {
-                TVEPGScreen(
-                    categories: sortedCategories,
-                    selectedCategory: $selectedCategory,
-                    displayedCategory: displayedCategory,
-                    layoutModeRaw: $layoutModeRaw,
-                    contentSort: contentSort,
-                    onPlay: { playChannel($0) }
-                )
-            } else {
-                tvOSListLayout
-            }
-        }
-
-        /// The List-mode layout: a wide category rail on the left and the channel
-        /// list on the right, with the Guide/List toggle above it. The macOS
-        /// layout's fixed 200pt sidebar is far too narrow for a TV — it wraps
-        /// category names one word per line — so tvOS gets its own components.
-        private var tvOSListLayout: some View {
-            HStack(spacing: 0) {
-                TVCategorySidebar(
-                    categories: sortedCategories,
-                    selectedCategory: $selectedCategory
-                )
-                .frame(width: 560)
-
-                VStack(spacing: 0) {
-                    HStack {
-                        layoutModePicker
-                            .frame(maxWidth: 360)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 60)
-                    .padding(.top, 40)
-                    .focusSection()
-
-                    if let category = displayedCategory {
-                        detail(for: category)
-                    } else {
-                        ContentUnavailableView(
-                            "Select a Category",
-                            systemImage: "list.bullet",
-                            description: Text("Choose a category from the list")
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
+            TVLiveTVScreen(
+                categories: sortedCategories,
+                selectedCategory: $selectedCategory,
+                displayedCategory: displayedCategory,
+                layoutModeRaw: $layoutModeRaw,
+                contentSort: contentSort,
+                onPlay: { playChannel($0) }
+            )
         }
     #endif
 
