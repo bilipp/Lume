@@ -124,12 +124,27 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
 
     private func applyMediaOptions(to media: VLCMedia?, isLive: Bool) {
         guard let media else { return }
-        media.addOption(networkCaching(isLive: isLive))
+
         media.addOption(":avcodec-hw=videotoolbox")
         media.addOption(":avcodec-threads=0")
+        media.addOption(":skip-frames=1")
+        media.addOption(":drop-late-frames=1")
+        media.addOption(":http-reconnect=1")
+        // media.addOption(":clock-jitter=500")
+        // media.addOption(":clock-synchro=1")
+
         media.addOption(deinterlace ? ":deinterlace=1" : ":deinterlace=0")
-        media.addOption(":skip-frames")
         if deinterlace { media.addOption(":deinterlace-mode=blend") }
+
+        if isLive {
+            media.addOption(":network-caching=3000")
+            // media.addOption(":live-caching=3000")
+            // media.addOption(":hls-adaptive=1")
+            // media.addOption(":ts-trust-pcr=1")
+        } else {
+            media.addOption(":network-caching=1500")
+            media.addOption(":file-caching=1500")
+        }
     }
 
     private func applyDeinterlace() {
@@ -138,10 +153,6 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         } else {
             mediaPlayer.setDeinterlaceFilter(nil)
         }
-    }
-
-    private func networkCaching(isLive: Bool) -> String {
-        isLive ? ":network-caching=3000" : ":network-caching=1500"
     }
 
     /// Swap the current stream for a different one without tearing down the
@@ -176,11 +187,6 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// once playback is healthy again, and schedule a backoff reconnect when
     /// the stream drops.
     ///
-    /// VLCKit 4 has no `.ended` state — a finished VOD and a self-initiated stop
-    /// both surface as `.stopped`, while a mid-stream failure surfaces as
-    /// `.error`. We always retry `.error`; we retry `.stopped` only for live
-    /// streams (which never legitimately end), and not while a reconnect we
-    /// just issued is still bringing the new media up.
     private func handleRetry(for state: VLCMediaPlayerState) {
         switch state {
         case .opening, .buffering, .playing:
@@ -358,10 +364,6 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         pipController = nil
     }
 
-    /// Pause playback when the app leaves the foreground (e.g. the tvOS Home
-    /// button). `onDisappear`/`tearDown` don't fire on backgrounding — the view
-    /// stays in the hierarchy — so VLC would otherwise keep playing audio.
-    /// Skipped while Picture in Picture is active so PiP playback continues.
     func pauseForBackground() {
         guard !isPipActive, mediaPlayer.isPlaying else { return }
         mediaPlayer.pause()
@@ -573,9 +575,6 @@ extension VLCPlayerCoordinator: VLCDrawable, VLCPictureInPictureDrawable, VLCPic
 /// log levels onto the unified-logging levels so decoder/demux failures show
 /// up under the `Player` category alongside our structured samples.
 private final class VLCLogBridge: NSObject, VLCLogging {
-    /// `.warning`, not `.info`: at info level libvlc logs at very high volume
-    /// (some modules per packet/frame), each message costing a String bridge +
-    /// os_log on the decode thread. Warnings and errors still come through.
     var level: VLCLogLevel = .warning
 
     func handleMessage(_ message: String, logLevel: VLCLogLevel, context: VLCLogContext?) {
