@@ -67,6 +67,19 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     private var lastStateName: String?
     private var bufferingStartedAt: Date?
 
+    /// Drives bounded backoff reconnects when the stream drops (see
+    /// `handleRetry`).
+    private let retry = PlaybackRetryController()
+    /// Current stream URL, kept so a reconnect can rebuild the `VLCMedia`.
+    private var mediaURL: URL?
+    /// Last playback position reported to the UI — a reconnect resumes VOD here
+    /// rather than restarting from the top.
+    private var lastKnownTime: TimeInterval = 0
+    /// True between issuing a reconnect and the new media starting to open, so
+    /// the old media's trailing `.stopped` callback isn't mistaken for a fresh
+    /// drop.
+    private var isReloading = false
+
     // MARK: - Setup
 
     func attach(hostView: VLCHostView) {
@@ -94,6 +107,8 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         startTime = media.startTime
         needsResume = !media.isLive && media.startTime > 1
         self.deinterlace = deinterlace
+        mediaURL = media.url
+        retry.reset()
         mediaPlayer.delegate = self
 
         let vlcMedia = VLCMedia(url: media.url)
@@ -140,6 +155,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         resumeLanded = false
         videoInfo = nil
         self.deinterlace = deinterlace
+        mediaURL = media.url
+        lastKnownTime = 0
+        retry.reset()
 
         let vlcMedia = VLCMedia(url: media.url)
         applyMediaOptions(to: vlcMedia, isLive: media.isLive)
@@ -150,6 +168,53 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         applyDeinterlace()
         isPlaying = true
         startStatsLogging()
+    }
+
+    // MARK: - Reconnect
+
+    /// React to a player state change for reconnect purposes: clear the budget
+    /// once playback is healthy again, and schedule a backoff reconnect when
+    /// the stream drops.
+    ///
+    /// VLCKit 4 has no `.ended` state — a finished VOD and a self-initiated stop
+    /// both surface as `.stopped`, while a mid-stream failure surfaces as
+    /// `.error`. We always retry `.error`; we retry `.stopped` only for live
+    /// streams (which never legitimately end), and not while a reconnect we
+    /// just issued is still bringing the new media up.
+    private func handleRetry(for state: VLCMediaPlayerState) {
+        switch state {
+        case .opening, .buffering, .playing:
+            isReloading = false
+            if state == .playing { retry.reset() }
+        case .error:
+            retry.scheduleRetry { [weak self] in self?.reconnect() }
+        case .stopped where isLive && !isReloading:
+            retry.scheduleRetry { [weak self] in self?.reconnect() }
+        default:
+            break
+        }
+    }
+
+    /// Rebuild the current stream and resume playback in place. VOD resumes at
+    /// the last reported position; live rejoins the live edge.
+    private func reconnect() {
+        guard let mediaURL else { return }
+        Logger.player.log("reconnect: reloading stream")
+        isReloading = true
+
+        if !isLive, lastKnownTime > 1 {
+            startTime = lastKnownTime
+            needsResume = true
+            didSeekResume = false
+            resumeLanded = false
+        }
+
+        let vlcMedia = VLCMedia(url: mediaURL)
+        applyMediaOptions(to: vlcMedia, isLive: isLive)
+        mediaPlayer.media = vlcMedia
+        mediaPlayer.play()
+        applyDeinterlace()
+        isPlaying = true
     }
 
     // MARK: - Video info
@@ -278,6 +343,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
 
     func tearDown() {
         stopStatsLogging()
+        retry.cancel()
         Logger.player.log("tearDown")
         mediaPlayer.delegate = nil
         if mediaPlayer.isPlaying { mediaPlayer.stop() }
@@ -356,50 +422,6 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     }
 }
 
-// MARK: - Video info
-
-/// Resolution / frame-rate / codec snapshot for the current video track.
-struct PlayerVideoInfo: Equatable {
-    let width: Int
-    let height: Int
-    let fps: Double
-    let codec: String?
-
-    /// A short marketing-style quality tag derived from the pixel width.
-    ///
-    /// Keyed off width rather than height because many films are wider than
-    /// 16:9 (e.g. a 4K scope feature is 3840×1608) — keying off height would
-    /// drop such a title into a lower bucket ("1440p") even though it's 4K.
-    var qualityTag: String {
-        switch width {
-        case 7680...: "8K"
-        case 3840 ..< 7680: "4K"
-        case 2560 ..< 3840: "1440p"
-        case 1920 ..< 2560: "1080p"
-        case 1280 ..< 1920: "720p"
-        case 854 ..< 1280: "480p"
-        case 1 ..< 854: "SD"
-        default: ""
-        }
-    }
-
-    /// Compact pieces for the overlay's right-hand technical caption, e.g.
-    /// `["4K", "H264", "24 fps"]`.
-    var captionParts: [String] {
-        var parts: [String] = []
-        if !qualityTag.isEmpty { parts.append(qualityTag) }
-        if let codec, !codec.isEmpty { parts.append(codec.uppercased()) }
-        if fps > 0 {
-            let rounded = (fps * 100).rounded() / 100
-            let text = rounded.truncatingRemainder(dividingBy: 1) == 0
-                ? String(format: "%.0f", rounded)
-                : String(format: "%.2f", rounded)
-            parts.append("\(text) fps")
-        }
-        return parts
-    }
-}
-
 // MARK: - VLCMediaPlayerDelegate
 
 extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
@@ -410,6 +432,7 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             logStateChange()
+            handleRetry(for: mediaPlayer.state)
             seekToResumeIfNeeded()
             isPlaying = mediaPlayer.isPlaying
             isPipSupported = pipController != nil
@@ -453,6 +476,7 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
             seekToResumeIfNeeded()
             let seconds = (mediaPlayer.time.value?.doubleValue ?? 0) / 1000
             guard isResumeSettled(currentSeconds: seconds) else { return }
+            lastKnownTime = seconds
             onTime?(seconds)
             refreshVideoInfo()
         }

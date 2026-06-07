@@ -1,5 +1,6 @@
 import Combine
 import KSPlayer
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -20,6 +21,9 @@ struct KSPlayerEngineView: View {
     var onSelectMedia: ((PlayableMedia) -> Void)?
 
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
+    /// Drives bounded backoff reconnects when the stream drops (see
+    /// `handleState`). KSPlayer otherwise stops dead on a mid-stream failure.
+    @State private var reconnector = PlaybackRetryController()
     @State private var isPlaying = false
     @State private var isControlsVisible = true
     @State private var isSeeking = false
@@ -76,6 +80,7 @@ struct KSPlayerEngineView: View {
                     .onStateChanged { _, state in
                         isPlaying = (state == .bufferFinished)
                         engine.syncState(state)
+                        handleState(state)
                     }
                     .onPlay { current, total in
                         if !isSeeking {
@@ -111,6 +116,7 @@ struct KSPlayerEngineView: View {
             }
             .onDisappear {
                 hideTask?.cancel()
+                reconnector.cancel()
                 coordinator.resetPlayer()
             }
             .onChange(of: engine.isPlaying) { _, _ in
@@ -128,6 +134,7 @@ struct KSPlayerEngineView: View {
                 isSeeking = false
                 seekPosition = 0
                 isPanelOpen = false
+                reconnector.reset()
                 engine.reset()
                 resetHideTimer()
             }
@@ -230,6 +237,7 @@ struct KSPlayerEngineView: View {
                 KSVideoPlayer(coordinator: coordinator, url: media.url, options: options)
                     .onStateChanged { _, state in
                         isPlaying = (state == .bufferFinished)
+                        handleState(state)
                     }
                     .onPlay { current, total in
                         if !isSeeking {
@@ -252,6 +260,7 @@ struct KSPlayerEngineView: View {
             .onDisappear {
                 hideTask?.cancel()
                 hoverHideTask?.cancel()
+                reconnector.cancel()
                 coordinator.resetPlayer()
             }
             .onTapGesture {
@@ -330,6 +339,37 @@ struct KSPlayerEngineView: View {
             }
         }
     #endif
+
+    // MARK: - Reconnect (shared)
+
+    /// React to a KSPlayer state change for reconnect purposes. A mid-stream
+    /// failure lands the layer in `.error` and it sits there frozen; we drive a
+    /// bounded backoff reconnect off that, and clear the budget once playback is
+    /// confirmed healthy again. `.playedToTheEnd` is a clean finish, not a drop,
+    /// so it is left alone.
+    private func handleState(_ state: KSPlayerState) {
+        switch state {
+        case .readyToPlay, .bufferFinished:
+            reconnector.reset()
+        case .error:
+            reconnector.scheduleRetry { reconnect() }
+        default:
+            break
+        }
+    }
+
+    /// Re-prepare the current stream in place. `KSPlayerLayer.play()` calls
+    /// `prepareToPlay()` whenever the layer is in `.error`, which rebuilds the
+    /// input from scratch. VOD resumes near the drop point via `startPlayTime`
+    /// (re-read on each prepare); live rejoins the live edge.
+    private func reconnect() {
+        guard let layer = coordinator.playerLayer else { return }
+        if !media.isLive, currentTime > 1 {
+            layer.options.startPlayTime = currentTime
+        }
+        Logger.player.log("reconnect: reloading KSPlayer stream")
+        layer.play()
+    }
 
     // MARK: - Actions (shared)
 
