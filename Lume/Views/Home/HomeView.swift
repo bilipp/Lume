@@ -271,9 +271,49 @@ struct HomeView: View {
             trendingSeries = Array(seriesItems.prefix(20))
             heroItems = Array(heroes.prefix(8))
             trendingState = .loaded
+            await enrichHeroLogos()
         } catch {
             trendingState = .failed
         }
+    }
+
+    /// The TMDB trending feed carries no logo artwork, so a hero title shows
+    /// only its backdrop until its full details are fetched. That fetch used to
+    /// happen only on the detail screen, so logos "popped in" after visiting
+    /// Details and coming back. Enrich the visible hero titles up front via the
+    /// same TMDB detail path. Runs after the carousel is shown so backdrops
+    /// aren't blocked.
+    private func enrichHeroLogos() async {
+        let manager = ContentSyncManager(modelContainer: modelContext.container)
+        var didChange = false
+        for hero in heroItems {
+            switch hero {
+            case let .movie(movie, _, _):
+                guard heroNeedsLogo(logoPath: movie.logoPath, enrichedAt: movie.tmdbEnrichedAt),
+                      let tmdbId = movie.tmdbId,
+                      let details = try? await manager.fetchTMDBMovieDetails(tmdbId: tmdbId)
+                else { continue }
+                applyMovieDetails(details, to: movie, context: modelContext)
+                didChange = true
+            case let .series(series, _, _):
+                guard heroNeedsLogo(logoPath: series.logoPath, enrichedAt: series.tmdbEnrichedAt),
+                      let tmdbId = series.tmdbId,
+                      let details = try? await manager.fetchTMDBTVDetails(tmdbId: tmdbId)
+                else { continue }
+                applySeriesDetails(details, to: series, context: modelContext)
+                didChange = true
+            }
+        }
+        if didChange { try? modelContext.save() }
+    }
+
+    /// A hero needs a logo fetch when it has none yet and hasn't been enriched
+    /// recently. The recency guard mirrors the detail screen's 14-day window so
+    /// titles TMDB simply has no logo for aren't refetched on every appearance.
+    private func heroNeedsLogo(logoPath: String?, enrichedAt: Date?) -> Bool {
+        guard (logoPath ?? "").isEmpty else { return false }
+        guard let enrichedAt else { return true }
+        return Date().timeIntervalSince(enrichedAt) >= 14 * 24 * 3600
     }
 
     /// Loads the connected user's Trakt watchlist and keeps only the titles the
