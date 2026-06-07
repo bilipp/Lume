@@ -87,7 +87,11 @@ struct KSPlayerEngineView: View {
                             if current.isFinite { currentTime = current }
                             if total.isFinite, total > 0 { duration = total }
                         }
-                        engine.refreshVideoInfo()
+                        // syncState (onStateChanged) already refreshes this on
+                        // every transition; only chase it from the per-tick play
+                        // callback until it first lands, so steady playback
+                        // doesn't re-read tracks/codec each tick.
+                        if engine.videoInfo == nil { engine.refreshVideoInfo() }
                     }
                     .ignoresSafeArea()
 
@@ -146,6 +150,11 @@ struct KSPlayerEngineView: View {
             // Handle Menu/back at the player root so it reliably overrides the
             // cover's default dismiss-on-Menu.
             .onExitCommand { handleMenuPress() }
+            // The Siri Remote's dedicated Play/Pause button is a distinct press
+            // type from a click-pad Select, so the on-screen button never sees
+            // it. Drive togglePlay() explicitly, otherwise the press falls
+            // through to KSPlayer's own handling, which pauses but won't resume.
+            .onPlayPauseCommand { togglePlay() }
         }
 
         private var tapCatcher: some View {

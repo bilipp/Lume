@@ -128,6 +128,11 @@ struct VLCPlayerEngineView: View {
         // ancestor of both the tap-catcher and the controls overlay — so it
         // reliably overrides the fullScreenCover's default dismiss-on-Menu.
         .onMenuPress { handleMenuPress() }
+        // The Siri Remote's dedicated Play/Pause button is a distinct press
+        // type from a click-pad Select, so the on-screen button never sees it.
+        // Drive togglePlay() explicitly, otherwise the press is swallowed and
+        // playback never toggles.
+        .onPlayPausePress { togglePlay() }
         #if os(macOS)
             .onContinuousHover(coordinateSpace: .local) { phase in
                 switch phase {
@@ -341,6 +346,17 @@ private extension View {
     func onMenuPress(perform action: @escaping () -> Void) -> some View {
         #if os(tvOS)
             onExitCommand(perform: action)
+        #else
+            self
+        #endif
+    }
+
+    /// Runs `action` on the Siri remote's dedicated Play/Pause button (tvOS
+    /// only); a no-op elsewhere so the cross-platform body still compiles.
+    @ViewBuilder
+    func onPlayPausePress(perform action: @escaping () -> Void) -> some View {
+        #if os(tvOS)
+            onPlayPauseCommand(perform: action)
         #else
             self
         #endif
