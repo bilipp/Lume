@@ -19,8 +19,8 @@
     import SwiftUI
     import VLCKitSPM
 
-    struct TVPlayerControlsOverlay: View {
-        @ObservedObject var coordinator: VLCPlayerCoordinator
+    struct TVPlayerControlsOverlay<Engine: TVPlaybackEngine>: View {
+        @ObservedObject var coordinator: Engine
         let media: PlayableMedia
         @Binding var currentTime: TimeInterval
         @Binding var duration: TimeInterval
@@ -304,18 +304,18 @@
 
         @ViewBuilder
         private var audioTrackMenu: some View {
-            let tracks = coordinator.audioTracks
+            let tracks = coordinator.audioTrackOptions
             if tracks.count > 1 {
                 Menu {
-                    ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                    ForEach(tracks) { track in
                         Button {
-                            coordinator.selectAudioTrack(track)
+                            coordinator.selectAudioTrack(id: track.id)
                             onResetHideTimer()
                         } label: {
-                            if track.isSelectedExclusively {
-                                Label(track.trackName, systemImage: "checkmark")
+                            if track.isSelected {
+                                Label(track.label, systemImage: "checkmark")
                             } else {
-                                Text(track.trackName)
+                                Text(track.label)
                             }
                         }
                     }
@@ -330,28 +330,28 @@
 
         @ViewBuilder
         private var subtitleMenu: some View {
-            let tracks = coordinator.textTracks
+            let tracks = coordinator.textTrackOptions
             if !tracks.isEmpty {
                 Menu {
                     Button {
-                        coordinator.selectTextTrack(nil)
+                        coordinator.selectTextTrack(id: nil)
                         onResetHideTimer()
                     } label: {
-                        if !tracks.contains(where: \.isSelectedExclusively) {
+                        if !tracks.contains(where: \.isSelected) {
                             Label("Off", systemImage: "checkmark")
                         } else {
                             Text("Off")
                         }
                     }
-                    ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                    ForEach(tracks) { track in
                         Button {
-                            coordinator.selectTextTrack(track)
+                            coordinator.selectTextTrack(id: track.id)
                             onResetHideTimer()
                         } label: {
-                            if track.isSelectedExclusively {
-                                Label(track.trackName, systemImage: "checkmark")
+                            if track.isSelected {
+                                Label(track.label, systemImage: "checkmark")
                             } else {
-                                Text(track.trackName)
+                                Text(track.label)
                             }
                         }
                     }

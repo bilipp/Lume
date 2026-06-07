@@ -80,7 +80,12 @@ struct FullScreenPlayerView: View {
         case .avPlayer:
             AVPlayerEngineView(media: activeMedia, currentTime: $currentTime, duration: $duration)
         case .ksPlayer:
-            KSPlayerEngineView(media: activeMedia, currentTime: $currentTime, duration: $duration)
+            KSPlayerEngineView(
+                media: activeMedia,
+                currentTime: $currentTime,
+                duration: $duration,
+                onSelectMedia: switchMedia
+            )
         case .vlcKit:
             VLCPlayerEngineView(
                 media: activeMedia,
