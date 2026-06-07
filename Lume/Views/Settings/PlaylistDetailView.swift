@@ -6,6 +6,12 @@ struct PlaylistDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var playlist: Playlist
 
+    /// tvOS: called to leave this detail when it is shown inline in the Settings
+    /// detail pane (e.g. after deleting the playlist, whose object then becomes
+    /// invalid). Unused on iOS/macOS, where the view is pushed and `dismiss()`
+    /// pops it.
+    var onClose: (() -> Void)?
+
     @State private var isEditing = false
     @State private var editName = ""
     @State private var editServerURL = ""
@@ -175,24 +181,23 @@ struct PlaylistDetailView: View {
     // MARK: - tvOS layout
 
     #if os(tvOS)
+        /// Rendered *inline* inside the Settings detail pane (next to the sidebar),
+        /// not pushed full-screen. A push hides the TabView's header tab bar and
+        /// strands focus once the content scrolls — keeping it in the pane means
+        /// the sidebar and tab bar stay one "Left"/"Up" away at all times. The
+        /// enclosing pane supplies the ScrollView, background, and width framing.
         private var tvBody: some View {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 32) {
-                    Text(playlist.name)
-                        .font(.system(size: 34, weight: .bold))
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            VStack(alignment: .leading, spacing: 32) {
+                Text(playlist.name)
+                    .font(.system(size: 34, weight: .bold))
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
-                    tvServerSection
-                    tvAccountSection
-                    tvSyncSection
-                    tvActionsSection
-                }
-                .frame(maxWidth: TVSettingsMetrics.contentMaxWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 48)
-                .padding(.vertical, 72)
+                tvServerSection
+                tvAccountSection
+                tvSyncSection
+                tvActionsSection
             }
-            .tvSettingsBackground()
+            .frame(maxWidth: .infinity, alignment: .leading)
             .alert("Delete Playlist", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete", role: .destructive) { deletePlaylist() }
@@ -338,7 +343,11 @@ struct PlaylistDetailView: View {
 
     private func deletePlaylist() {
         modelContext.delete(playlist)
-        dismiss()
+        #if os(tvOS)
+            onClose?()
+        #else
+            dismiss()
+        #endif
     }
 
     // MARK: - Helpers

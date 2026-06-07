@@ -19,6 +19,11 @@ struct SettingsView: View {
         /// moves into the detail pane.
         @State private var selectedCategory: SettingsCategory = .playlists
         @FocusState private var focusedCategory: SettingsCategory?
+        /// The playlist drilled into within the Playlists category. When set, its
+        /// settings replace the playlist list *in the detail pane* rather than
+        /// pushing a full-screen view — a push hides the header tab bar and
+        /// strands remote focus once the content scrolls.
+        @State private var selectedPlaylist: Playlist?
     #endif
 
     private var engine: Binding<PlayerEngineKind> {
@@ -35,242 +40,6 @@ struct SettingsView: View {
             standardBody
         #endif
     }
-
-    // MARK: - tvOS (Apple TV Settings-style two-pane layout)
-
-    #if os(tvOS)
-        private var tvBody: some View {
-            NavigationStack {
-                HStack(spacing: 0) {
-                    tvSidebar
-                    tvDetailContainer
-                }
-                .tvSettingsBackground()
-                .defaultFocus($focusedCategory, .playlists)
-                .onChange(of: focusedCategory) { _, newValue in
-                    // Follow focus so the detail pane mirrors the highlighted
-                    // category. Ignore nil (focus moved into the detail pane),
-                    // which keeps the current selection visible.
-                    if let newValue {
-                        selectedCategory = newValue
-                    }
-                }
-                .navigationDestination(for: Playlist.self) { playlist in
-                    PlaylistDetailView(playlist: playlist)
-                }
-                .fullScreenCover(isPresented: $showingAddPlaylist) {
-                    LoginView()
-                }
-            }
-        }
-
-        private var tvSidebar: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Settings")
-                    .font(.system(size: 38, weight: .bold))
-                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                    .padding(.bottom, 28)
-
-                VStack(spacing: 2) {
-                    ForEach(availableCategories) { category in
-                        Button {
-                            selectedCategory = category
-                        } label: {
-                            Text(category.title)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(TVSettingsSidebarButtonStyle(isSelected: selectedCategory == category))
-                        .focused($focusedCategory, equals: category)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .frame(width: 320, alignment: .leading)
-            .padding(.leading, 60)
-            .padding(.trailing, 24)
-            .padding(.vertical, 72)
-            .focusSection()
-        }
-
-        /// The sidebar categories. Integrations is hidden unless the build has
-        /// Trakt credentials configured.
-        private var availableCategories: [SettingsCategory] {
-            SettingsCategory.allCases.filter { $0 != .integrations || trakt.isConfigured }
-        }
-
-        /// Content Management brings its own scroll/background, so it replaces the
-        /// detail pane wholesale rather than nesting inside the scrolling detail.
-        @ViewBuilder
-        private var tvDetailContainer: some View {
-            switch selectedCategory {
-            case .content:
-                ContentManagementView()
-                    .focusSection()
-            default:
-                tvDetail
-            }
-        }
-
-        private var tvDetail: some View {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 36) {
-                    switch selectedCategory {
-                    case .playlists: tvPlaylistsDetail
-                    case .integrations: tvIntegrationsDetail
-                    case .player: tvPlayerDetail
-                    case .about: tvAboutDetail
-                    case .content: EmptyView() // handled by tvDetailContainer
-                    }
-                }
-                .frame(maxWidth: TVSettingsMetrics.detailMaxWidth, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 48)
-                .padding(.vertical, 72)
-            }
-            .focusSection()
-        }
-
-        private var tvPlaylistsDetail: some View {
-            VStack(alignment: .leading, spacing: 36) {
-                tvPlaylistsList
-                tvAutoSyncSection
-            }
-        }
-
-        private var tvPlaylistsList: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel("Playlists")
-
-                if playlists.isEmpty {
-                    Text("No playlists yet. Add your IPTV provider to start streaming.")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
-                } else {
-                    ForEach(playlists) { playlist in
-                        NavigationLink(value: playlist) {
-                            HStack(spacing: 16) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(playlist.name)
-                                    Text(playlist.serverURL)
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                        .truncationMode(.middle)
-                                }
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(TVSettingsRowButtonStyle())
-                    }
-                }
-
-                Button {
-                    showingAddPlaylist = true
-                } label: {
-                    HStack(spacing: 16) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 22, weight: .medium))
-                        Text("Add Playlist")
-                        Spacer(minLength: 0)
-                    }
-                }
-                .buttonStyle(TVSettingsRowButtonStyle())
-            }
-        }
-
-        private var tvIntegrationsDetail: some View {
-            TVTraktIntegrationView()
-        }
-
-        private var tvPlayerDetail: some View {
-            VStack(alignment: .leading, spacing: 28) {
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Engine")
-
-                    VStack(spacing: 2) {
-                        ForEach(PlayerEngineKind.allCases) { kind in
-                            Button {
-                                engine.wrappedValue = kind
-                            } label: {
-                                HStack(spacing: 16) {
-                                    Text(kind.displayName)
-                                    Spacer(minLength: 0)
-                                    if engine.wrappedValue == kind {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 24, weight: .semibold))
-                                    }
-                                }
-                            }
-                            .buttonStyle(TVSettingsRowButtonStyle())
-                        }
-                    }
-
-                    Text(engine.wrappedValue.subtitle)
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 6)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Playback")
-
-                    Button {
-                        deinterlace.toggle()
-                    } label: {
-                        HStack(spacing: 16) {
-                            Text("Deinterlace Video")
-                            Spacer(minLength: 0)
-                            Text(deinterlace ? "On" : "Off")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(TVSettingsRowButtonStyle())
-
-                    Text(tvDeinterlaceFooter)
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 6)
-                }
-            }
-        }
-
-        private var tvAboutDetail: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel("About")
-
-                HStack(spacing: 18) {
-                    Image(systemName: "play.tv.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.tint)
-                        .frame(width: 60, height: 60)
-                        .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Lume")
-                            .font(.system(size: 26, weight: .semibold))
-                        Text("Version 1.0.0")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                .padding(.vertical, 8)
-            }
-        }
-
-        private var tvDeinterlaceFooter: LocalizedStringKey {
-            "Smooths interlaced channels (often 1080i). Best left off here — VLC does not support hardware decoding with interlacing. Disabling this can result in stutters for some channels."
-        }
-    #endif
 
     // MARK: - iOS / macOS (grouped list)
 
@@ -460,6 +229,255 @@ struct SettingsView: View {
         }
     #endif
 }
+
+// MARK: - tvOS (Apple TV Settings-style two-pane layout)
+
+#if os(tvOS)
+
+    extension SettingsView {
+        private var tvBody: some View {
+            NavigationStack {
+                HStack(spacing: 0) {
+                    tvSidebar
+                    tvDetailContainer
+                }
+                .tvSettingsBackground()
+                .defaultFocus($focusedCategory, .playlists)
+                .onChange(of: focusedCategory) { _, newValue in
+                    // Follow focus so the detail pane mirrors the highlighted
+                    // category. Ignore nil (focus moved into the detail pane),
+                    // which keeps the current selection visible.
+                    if let newValue {
+                        selectedCategory = newValue
+                        // Returning focus to the sidebar leaves any drilled-in
+                        // playlist, so the pane reverts to the playlist list.
+                        selectedPlaylist = nil
+                    }
+                }
+                .fullScreenCover(isPresented: $showingAddPlaylist) {
+                    LoginView()
+                }
+            }
+        }
+
+        private var tvSidebar: some View {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Settings")
+                    .font(.system(size: 38, weight: .bold))
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.bottom, 28)
+
+                VStack(spacing: 2) {
+                    ForEach(availableCategories) { category in
+                        Button {
+                            selectedCategory = category
+                        } label: {
+                            Text(category.title)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(TVSettingsSidebarButtonStyle(isSelected: selectedCategory == category))
+                        .focused($focusedCategory, equals: category)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .frame(width: 320, alignment: .leading)
+            .padding(.leading, 60)
+            .padding(.trailing, 24)
+            .padding(.vertical, 72)
+            .focusSection()
+        }
+
+        /// The sidebar categories. Integrations is hidden unless the build has
+        /// Trakt credentials configured.
+        private var availableCategories: [SettingsCategory] {
+            SettingsCategory.allCases.filter { $0 != .integrations || trakt.isConfigured }
+        }
+
+        /// Content Management brings its own scroll/background, so it replaces the
+        /// detail pane wholesale rather than nesting inside the scrolling detail.
+        @ViewBuilder
+        private var tvDetailContainer: some View {
+            switch selectedCategory {
+            case .content:
+                ContentManagementView()
+                    .focusSection()
+            default:
+                tvDetail
+            }
+        }
+
+        private var tvDetail: some View {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 36) {
+                    switch selectedCategory {
+                    case .playlists:
+                        if let selectedPlaylist {
+                            PlaylistDetailView(playlist: selectedPlaylist) {
+                                self.selectedPlaylist = nil
+                            }
+                        } else {
+                            tvPlaylistsDetail
+                        }
+                    case .integrations: tvIntegrationsDetail
+                    case .player: tvPlayerDetail
+                    case .about: tvAboutDetail
+                    case .content: EmptyView() // handled by tvDetailContainer
+                    }
+                }
+                .frame(maxWidth: TVSettingsMetrics.detailMaxWidth, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 48)
+                .padding(.vertical, 72)
+            }
+            .focusSection()
+        }
+
+        private var tvPlaylistsDetail: some View {
+            VStack(alignment: .leading, spacing: 36) {
+                tvPlaylistsList
+                tvAutoSyncSection
+            }
+        }
+
+        private var tvPlaylistsList: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                TVSettingsSectionLabel("Playlists")
+
+                if playlists.isEmpty {
+                    Text("No playlists yet. Add your IPTV provider to start streaming.")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                } else {
+                    ForEach(playlists) { playlist in
+                        Button {
+                            selectedPlaylist = playlist
+                        } label: {
+                            HStack(spacing: 16) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(playlist.name)
+                                    Text(playlist.serverURL)
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .buttonStyle(TVSettingsRowButtonStyle())
+                    }
+                }
+
+                Button {
+                    showingAddPlaylist = true
+                } label: {
+                    HStack(spacing: 16) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 22, weight: .medium))
+                        Text("Add Playlist")
+                        Spacer(minLength: 0)
+                    }
+                }
+                .buttonStyle(TVSettingsRowButtonStyle())
+            }
+        }
+
+        private var tvIntegrationsDetail: some View {
+            TVTraktIntegrationView()
+        }
+
+        private var tvPlayerDetail: some View {
+            VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Engine")
+
+                    VStack(spacing: 2) {
+                        ForEach(PlayerEngineKind.allCases) { kind in
+                            Button {
+                                engine.wrappedValue = kind
+                            } label: {
+                                HStack(spacing: 16) {
+                                    Text(kind.displayName)
+                                    Spacer(minLength: 0)
+                                    if engine.wrappedValue == kind {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 24, weight: .semibold))
+                                    }
+                                }
+                            }
+                            .buttonStyle(TVSettingsRowButtonStyle())
+                        }
+                    }
+
+                    Text(engine.wrappedValue.subtitle)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Playback")
+
+                    Button {
+                        deinterlace.toggle()
+                    } label: {
+                        HStack(spacing: 16) {
+                            Text("Deinterlace Video")
+                            Spacer(minLength: 0)
+                            Text(deinterlace ? "On" : "Off")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(TVSettingsRowButtonStyle())
+
+                    Text(tvDeinterlaceFooter)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+            }
+        }
+
+        private var tvAboutDetail: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                TVSettingsSectionLabel("About")
+
+                HStack(spacing: 18) {
+                    Image(systemName: "play.tv.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.tint)
+                        .frame(width: 60, height: 60)
+                        .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Lume")
+                            .font(.system(size: 26, weight: .semibold))
+                        Text("Version 1.0.0")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                .padding(.vertical, 8)
+            }
+        }
+
+        private var tvDeinterlaceFooter: LocalizedStringKey {
+            "Smooths interlaced channels (often 1080i). Best left off here — VLC does not support hardware decoding with interlacing. Disabling this can result in stutters for some channels."
+        }
+    }
+
+#endif
 
 // MARK: - tvOS settings categories
 
