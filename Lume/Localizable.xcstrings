@@ -306,6 +306,7 @@
       }
     },
     "Close episodes" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -316,6 +317,7 @@
       }
     },
     "Close information" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

@@ -97,30 +97,21 @@
         private let railHeight: CGFloat = 300
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 18) {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                }
-                .buttonStyle(TVPlayerCircleButtonStyle(diameter: 52, glyphSize: 20))
-                .focused(focus, equals: .panelClose)
-                .accessibilityLabel("Close episodes")
-
-                ScrollView(.horizontal) {
-                    LazyHStack(alignment: .top, spacing: 30) {
-                        ForEach(episodes) { episode in
-                            TVPlayerEpisodeCard(
-                                episode: episode,
-                                isCurrent: episode.id == currentEpisodeID,
-                                action: { onSelect(episode) }
-                            )
-                            .focused(focus, equals: .episode(episode.id))
-                        }
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 30) {
+                    ForEach(episodes) { episode in
+                        TVPlayerEpisodeCard(
+                            episode: episode,
+                            isCurrent: episode.id == currentEpisodeID,
+                            action: { onSelect(episode) }
+                        )
+                        .focused(focus, equals: .episode(episode.id))
                     }
-                    .padding(.vertical, 18)
                 }
-                .frame(height: railHeight)
-                .scrollClipDisabled()
+                .padding(.vertical, 18)
             }
+            .frame(height: railHeight)
+            .scrollClipDisabled()
             .focusSection()
         }
     }
@@ -249,28 +240,19 @@
         let onClose: () -> Void
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 18) {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
+            HStack(alignment: .top, spacing: 36) {
+                artwork
+                details
+                if primaryAction != nil || secondaryAction != nil {
+                    actions
+                        .frame(width: 380)
                 }
-                .buttonStyle(TVPlayerCircleButtonStyle(diameter: 52, glyphSize: 20))
-                .focused(focus, equals: .panelClose)
-                .accessibilityLabel("Close information")
-
-                HStack(alignment: .top, spacing: 36) {
-                    artwork
-                    details
-                    if primaryAction != nil || secondaryAction != nil {
-                        actions
-                            .frame(width: 380)
-                    }
-                }
-                .padding(28)
-                .background(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                )
             }
+            .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
             .focusSection()
         }
 
