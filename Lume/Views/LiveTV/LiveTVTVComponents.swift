@@ -202,23 +202,21 @@
         let contentSort: ContentSortOption
         let onPlay: (LiveStream) -> Void
 
-        /// Which rail control currently holds focus — drives the highlight.
-        private enum RailItem: Hashable {
-            case mode(String)
-            case category(String)
-        }
-
-        @FocusState private var focused: RailItem?
-
-        private let railWidth: CGFloat = 180
-
         private var layoutMode: LiveTVLayoutMode {
             LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
         }
 
         var body: some View {
             HStack(spacing: 0) {
-                rail
+                // The rail owns its own focus state. Keeping it in a child means
+                // moving focus between categories re-evaluates only the rail —
+                // not this screen's `content`, which would otherwise reconstruct
+                // `EPGGuideView` (and re-run its grid build) on every keypress.
+                TVCategoryRail(
+                    categories: categories,
+                    selectedCategory: $selectedCategory,
+                    layoutModeRaw: $layoutModeRaw
+                )
                 content
             }
         }
@@ -245,10 +243,33 @@
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+    }
 
-        // MARK: Rail
+    // MARK: - tvOS category rail
 
-        private var rail: some View {
+    /// The leading rail: the List/Guide switch above the scrollable category
+    /// list. Owns the rail's `@FocusState` so focus changes here never propagate
+    /// up to `TVLiveTVScreen` and rebuild the (expensive) content area.
+    private struct TVCategoryRail: View {
+        let categories: [Category]
+        @Binding var selectedCategory: Category?
+        @Binding var layoutModeRaw: String
+
+        /// Which rail control currently holds focus — drives the highlight.
+        private enum RailItem: Hashable {
+            case mode(String)
+            case category(String)
+        }
+
+        @FocusState private var focused: RailItem?
+
+        private let railWidth: CGFloat = 180
+
+        private var layoutMode: LiveTVLayoutMode {
+            LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
+        }
+
+        var body: some View {
             VStack(alignment: .leading, spacing: 0) {
                 // The switch and the category list are each their own focus
                 // section so a Down press moves between them as vertical groups.

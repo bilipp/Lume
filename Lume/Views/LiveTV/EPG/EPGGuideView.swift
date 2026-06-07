@@ -314,7 +314,7 @@ private struct EPGRows: View {
     var body: some View {
         LazyVStack(spacing: metrics.rowSpacing) {
             ForEach(rows) { row in
-                EPGProgramStrip(row: row, metrics: metrics, now: now) { cell in
+                EPGProgramStrip(row: row, metrics: metrics, now: now, contentWidth: timeline.totalWidth) { cell in
                     onSelect(row, cell)
                 }
             }
@@ -338,10 +338,18 @@ private struct EPGProgramStrip: View {
     let row: EPGChannelRow
     let metrics: EPGMetrics
     let now: Date
+    /// The full timeline width. Pinned on the lazy stack so the row reserves its
+    /// whole horizontal extent up front — the scroll region and the "now" line
+    /// stay correct even before trailing (off-screen) blocks are realized.
+    let contentWidth: CGFloat
     let onSelect: (EPGProgramCell) -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
+        // Lazy so only the handful of on-screen programmes per row are built and
+        // made focusable. An eager HStack tiles the entire ~25-hour window —
+        // hundreds of shadowed, focusable buttons the tvOS focus engine must
+        // track every frame, which is what made focus-scrolling stutter.
+        LazyHStack(spacing: 0) {
             ForEach(row.cells) { cell in
                 if cell.isGap {
                     EPGProgramBlockView(cell: cell, metrics: metrics, now: now, isFocused: false)
@@ -357,7 +365,7 @@ private struct EPGProgramStrip: View {
                 }
             }
         }
-        .frame(height: metrics.rowHeight)
+        .frame(width: contentWidth, height: metrics.rowHeight, alignment: .leading)
     }
 }
 
