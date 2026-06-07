@@ -9,6 +9,27 @@
 import SwiftData
 import SwiftUI
 
+/// How the Live TV detail area presents channels: a scannable list (default) or
+/// the EPG timeline grid. Persisted across launches.
+enum LiveTVLayoutMode: String, CaseIterable, Identifiable {
+    case list
+    case guide
+
+    var id: String {
+        rawValue
+    }
+
+    var label: LocalizedStringKey {
+        self == .list ? "List" : "Guide"
+    }
+
+    var systemImage: String {
+        self == .list ? "list.bullet" : "tablecells"
+    }
+
+    static let storageKey = "lume.liveTV.layoutMode"
+}
+
 struct LiveTVView: View {
     @Environment(\.modelContext) private var modelContext
     #if os(macOS)
@@ -26,6 +47,7 @@ struct LiveTVView: View {
 
     @AppStorage(SortStorageKey.liveCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.liveContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(LiveTVLayoutMode.storageKey) private var layoutModeRaw: String = LiveTVLayoutMode.list.rawValue
 
     private var categorySort: CategorySortOption {
         CategorySortOption(rawValue: categorySortRaw) ?? .playlist
@@ -33,6 +55,50 @@ struct LiveTVView: View {
 
     private var contentSort: ContentSortOption {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
+    }
+
+    private var layoutMode: LiveTVLayoutMode {
+        LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
+    }
+
+    /// Guide/List segmented switch shared across platforms.
+    private var layoutModePicker: some View {
+        Picker("Layout", selection: $layoutModeRaw) {
+            ForEach(LiveTVLayoutMode.allCases) { mode in
+                Label(mode.label, systemImage: mode.systemImage).tag(mode.rawValue)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+    }
+
+    /// The channel detail area for the selected category, honouring the current
+    /// layout mode. Shared by every platform's layout.
+    private func detail(for category: Category) -> some View {
+        Group {
+            if layoutMode == .guide {
+                EPGGuideView(category: category, sort: contentSort) { stream in
+                    playChannel(stream)
+                }
+            } else {
+                channelList(for: category)
+            }
+        }
+        .id("\(category.id)-\(contentSort.rawValue)-\(layoutModeRaw)")
+    }
+
+    @ViewBuilder
+    private func channelList(for category: Category) -> some View {
+        #if os(tvOS)
+            TVChannelsList(category: category, sort: contentSort) { stream in
+                playChannel(stream)
+            }
+            .frame(maxWidth: .infinity)
+        #else
+            ChannelsList(category: category, sort: contentSort) { stream in
+                playChannel(stream)
+            }
+        #endif
     }
 
     var body: some View {
@@ -74,30 +140,40 @@ struct LiveTVView: View {
                 }
             }
             .platformNavigationTitle("Live TV")
-            .libraryToolbar(config: LibraryToolbarConfiguration(
-                playlists: playlists,
-                selectedPlaylistID: $selectedPlaylistID,
-                categorySortRaw: $categorySortRaw,
-                contentSortRaw: $contentSortRaw,
-                showingSync: $showingSync,
-                showingSettings: $showingSettings,
-                activePlaylist: activePlaylist
-            ))
-            .task {
-                if selectedCategory == nil, let first = sortedCategories.first {
-                    selectedCategory = first
+            #if os(iOS) || os(macOS)
+                .toolbar {
+                    if !playlists.isEmpty, !categories.isEmpty {
+                        ToolbarItem(placement: .principal) {
+                            layoutModePicker
+                                .frame(maxWidth: 240)
+                        }
+                    }
                 }
-            }
-            .onChange(of: selectedPlaylistID) {
-                // Switching playlists invalidates the current category selection,
-                // which belongs to the previous playlist. Reset to the new
-                // playlist's first category so the channel list stays in sync.
-                selectedCategory = sortedCategories.first
-            }
+            #endif
+                .libraryToolbar(config: LibraryToolbarConfiguration(
+                    playlists: playlists,
+                    selectedPlaylistID: $selectedPlaylistID,
+                    categorySortRaw: $categorySortRaw,
+                    contentSortRaw: $contentSortRaw,
+                    showingSync: $showingSync,
+                    showingSettings: $showingSettings,
+                    activePlaylist: activePlaylist
+                ))
+                .task {
+                    if selectedCategory == nil, let first = sortedCategories.first {
+                        selectedCategory = first
+                    }
+                }
+                .onChange(of: selectedPlaylistID) {
+                    // Switching playlists invalidates the current category selection,
+                    // which belongs to the previous playlist. Reset to the new
+                    // playlist's first category so the channel list stays in sync.
+                    selectedCategory = sortedCategories.first
+                }
             #if os(iOS) || os(tvOS)
-            .fullScreenCover(item: $playingMedia) { media in
-                FullScreenPlayerView(media: media)
-            }
+                .fullScreenCover(item: $playingMedia) { media in
+                    FullScreenPlayerView(media: media)
+                }
             #endif
         }
     }
@@ -113,10 +189,7 @@ struct LiveTVView: View {
                 )
 
                 if let category = displayedCategory {
-                    ChannelsList(category: category, sort: contentSort) { stream in
-                        playChannel(stream)
-                    }
-                    .id("\(category.id)-\(contentSort.rawValue)")
+                    detail(for: category)
                 } else {
                     ContentUnavailableView(
                         "Select a Category",
@@ -139,10 +212,7 @@ struct LiveTVView: View {
             Divider()
 
             if let category = displayedCategory {
-                ChannelsList(category: category, sort: contentSort) { stream in
-                    playChannel(stream)
-                }
-                .id("\(category.id)-\(contentSort.rawValue)")
+                detail(for: category)
             } else {
                 ContentUnavailableView(
                     "Select a Category",
@@ -166,20 +236,28 @@ struct LiveTVView: View {
                 )
                 .frame(width: 560)
 
-                if let category = displayedCategory {
-                    TVChannelsList(category: category, sort: contentSort) { stream in
-                        playChannel(stream)
+                VStack(spacing: 0) {
+                    HStack {
+                        layoutModePicker
+                            .frame(maxWidth: 360)
+                        Spacer()
                     }
-                    .id("\(category.id)-\(contentSort.rawValue)")
-                    .frame(maxWidth: .infinity)
-                } else {
-                    ContentUnavailableView(
-                        "Select a Category",
-                        systemImage: "list.bullet",
-                        description: Text("Choose a category from the list")
-                    )
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 60)
+                    .padding(.top, 40)
+                    .focusSection()
+
+                    if let category = displayedCategory {
+                        detail(for: category)
+                    } else {
+                        ContentUnavailableView(
+                            "Select a Category",
+                            systemImage: "list.bullet",
+                            description: Text("Choose a category from the list")
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
                 }
+                .frame(maxWidth: .infinity)
             }
         }
     #endif
@@ -293,243 +371,6 @@ struct CategorySidebar: View {
             .background(.bar)
 
             Divider()
-        }
-    }
-#endif
-
-// MARK: - tvOS Category Sidebar
-
-#if os(tvOS)
-    struct TVCategorySidebar: View {
-        let categories: [Category]
-        @Binding var selectedCategory: Category?
-
-        var body: some View {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                    ForEach(categories) { category in
-                        TVCategoryRow(
-                            category: category,
-                            isSelected: selectedCategory?.id == category.id
-                        ) {
-                            selectedCategory = category
-                        }
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.vertical, 40)
-            }
-            .focusSection()
-        }
-    }
-
-    private struct TVCategoryRow: View {
-        let category: Category
-        let isSelected: Bool
-        let action: () -> Void
-
-        @FocusState private var isFocused: Bool
-
-        var body: some View {
-            Button(action: action) {
-                Text(category.name)
-                    .font(.system(size: 30, weight: isSelected || isFocused ? .semibold : .regular))
-                    .foregroundStyle(isFocused || isSelected ? .white : .white.opacity(0.6))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 18)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(background)
-                    )
-            }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
-            .focused($isFocused)
-            .animation(.easeOut(duration: 0.18), value: isFocused)
-        }
-
-        private var background: AnyShapeStyle {
-            if isFocused { return AnyShapeStyle(.white.opacity(0.22)) }
-            if isSelected { return AnyShapeStyle(.white.opacity(0.1)) }
-            return AnyShapeStyle(.clear)
-        }
-    }
-
-    // MARK: - tvOS Channels List
-
-    struct TVChannelsList: View {
-        let category: Category
-        let onPlay: (LiveStream) -> Void
-        @Query private var streams: [LiveStream]
-
-        init(category: Category, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
-            self.category = category
-            self.onPlay = onPlay
-            let categoryId = category.id
-            _streams = Query(
-                filter: #Predicate<LiveStream> { $0.categoryId == categoryId && $0.isHidden == false },
-                sort: sort.liveStreamDescriptors
-            )
-        }
-
-        var body: some View {
-            ScrollView {
-                LazyVStack(spacing: 14) {
-                    if streams.isEmpty {
-                        ContentUnavailableView(
-                            "No Channels",
-                            systemImage: "antenna.radiowaves.left.and.right",
-                            description: Text("This category has no channels")
-                        )
-                        .padding(.top, 80)
-                    } else {
-                        ForEach(streams) { stream in
-                            TVChannelRow(stream: stream) {
-                                onPlay(stream)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 60)
-                .padding(.vertical, 40)
-            }
-            .focusSection()
-        }
-    }
-
-    private struct TVChannelRow: View {
-        let stream: LiveStream
-        let onPlay: () -> Void
-
-        @Query private var epgListings: [EPGListing]
-        @FocusState private var isFocused: Bool
-
-        init(stream: LiveStream, onPlay: @escaping () -> Void) {
-            self.stream = stream
-            self.onPlay = onPlay
-            let channelId = stream.epgChannelId ?? ""
-            let now = Date()
-            _epgListings = Query(
-                filter: #Predicate<EPGListing> { $0.channelId == channelId && $0.end > now },
-                sort: [SortDescriptor(\.start)]
-            )
-        }
-
-        private var now: Date {
-            Date()
-        }
-
-        private var currentEPG: EPGListing? {
-            epgListings.first { $0.start <= now && now < $0.end }
-        }
-
-        private var nextEPG: EPGListing? {
-            epgListings.filter { $0.start > now }.min { $0.start < $1.start }
-        }
-
-        var body: some View {
-            Button(action: onPlay) {
-                HStack(spacing: 24) {
-                    logo
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(stream.name)
-                            .font(.system(size: 30, weight: .semibold))
-                            .foregroundStyle(primaryColor)
-                            .lineLimit(1)
-
-                        if let current = currentEPG {
-                            Text(current.title)
-                                .font(.system(size: 25))
-                                .foregroundStyle(secondaryColor)
-                                .lineLimit(1)
-
-                            HStack(spacing: 6) {
-                                Text(current.start, style: .time)
-                                Text("–")
-                                Text(current.end, style: .time)
-                            }
-                            .font(.system(size: 22))
-                            .foregroundStyle(tertiaryColor)
-
-                            if let next = nextEPG {
-                                HStack(spacing: 6) {
-                                    Text("Next:")
-                                    Text(next.title).lineLimit(1)
-                                    Text(next.start, style: .time)
-                                }
-                                .font(.system(size: 22))
-                                .foregroundStyle(tertiaryColor)
-                            }
-                        } else if stream.epgChannelId != nil {
-                            Text("No EPG data")
-                                .font(.system(size: 22))
-                                .foregroundStyle(tertiaryColor)
-                        } else {
-                            Text("Live")
-                                .font(.system(size: 22))
-                                .foregroundStyle(secondaryColor)
-                        }
-
-                        if stream.tvArchive > 0 {
-                            Label("Catchup: \(stream.tvArchiveDuration)d", systemImage: "clock.arrow.circlepath")
-                                .font(.system(size: 22))
-                                .foregroundStyle(Color.blue)
-                        }
-                    }
-
-                    Spacer(minLength: 0)
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(tertiaryColor)
-                }
-                .padding(.horizontal, 32)
-                .padding(.vertical, 22)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(isFocused ? AnyShapeStyle(.white.opacity(0.18)) : AnyShapeStyle(.white.opacity(0.06)))
-                )
-            }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
-            .focused($isFocused)
-            .animation(.easeOut(duration: 0.18), value: isFocused)
-        }
-
-        private var logo: some View {
-            CachedAsyncImage(url: URL(string: stream.streamIcon ?? ""), maxPixelSize: 84) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle().fill(Color.white.opacity(0.12)).overlay { ProgressView() }
-                case let .success(image):
-                    image.resizable().aspectRatio(contentMode: .fit)
-                case .failure:
-                    Rectangle().fill(Color.white.opacity(0.12))
-                        .overlay {
-                            Image(systemName: "antenna.radiowaves.left.and.right")
-                                .foregroundStyle(secondaryColor)
-                        }
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .frame(width: 84, height: 84)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-
-        private var primaryColor: Color {
-            .white
-        }
-
-        private var secondaryColor: Color {
-            .white.opacity(0.7)
-        }
-
-        private var tertiaryColor: Color {
-            .white.opacity(0.45)
         }
     }
 #endif
