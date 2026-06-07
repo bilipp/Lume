@@ -1,12 +1,13 @@
 import SwiftUI
 import VLCKitSPM
 
-/// Apple-style auto-hiding controls overlay for the VLCKit engine.
+/// Native iOS-style controls overlay for the VLCKit engine.
 ///
-/// Extracted from `VLCPlayerEngineView` to keep each type under the
-/// SwiftLint `type_body_length` threshold. Mirrors the design language of
-/// the KSPlayer overlay (top close bar, center play button, bottom
-/// scrubber + transport + secondary controls).
+/// Modeled on the system video player (Apple TV app): a center transport
+/// cluster (skip · large play/pause · skip) rendered in Liquid Glass, a
+/// title block paired with a grouped glass pill of track controls, and a
+/// clean full-width scrubber. Extracted from `VLCPlayerEngineView` to keep
+/// each type under the SwiftLint `type_body_length` threshold.
 struct VLCPlayerControlsOverlay: View {
     @ObservedObject var coordinator: VLCPlayerCoordinator
     let media: PlayableMedia
@@ -21,38 +22,45 @@ struct VLCPlayerControlsOverlay: View {
     var onScheduleHide: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            topBar
-            Spacer()
-            centerPlayButton
-            Spacer()
-            bottomBar
+        ZStack {
+            scrim
+
+            VStack(spacing: 0) {
+                topBar
+                Spacer(minLength: 0)
+                centerTransport
+                Spacer(minLength: 0)
+                bottomControls
+            }
         }
-        .background(
-            LinearGradient(
-                stops: [
-                    .init(color: .black.opacity(0.35), location: 0),
-                    .init(color: .clear, location: 0.2),
-                    .init(color: .clear, location: 0.8),
-                    .init(color: .black.opacity(0.35), location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .allowsHitTesting(false)
+    }
+
+    // MARK: - Scrim
+
+    /// Subtle top/bottom darkening so the white glyphs and title stay legible
+    /// over bright video. The glass controls carry their own legibility; this
+    /// only protects the bare text.
+    private var scrim: some View {
+        LinearGradient(
+            stops: [
+                .init(color: .black.opacity(0.45), location: 0),
+                .init(color: .clear, location: 0.28),
+                .init(color: .clear, location: 0.62),
+                .init(color: .black.opacity(0.55), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
         )
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 
     // MARK: - Top Bar
 
     private var topBar: some View {
-        HStack(spacing: 12) {
+        HStack {
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(.ultraThinMaterial, in: Circle())
+                circleGlyph("xmark", size: 15, diameter: 44)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close player")
@@ -61,94 +69,212 @@ struct VLCPlayerControlsOverlay: View {
             #endif
 
             Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-    }
 
-    // MARK: - Center Play Button
+            pipButton
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+    }
 
     @ViewBuilder
-    private var centerPlayButton: some View {
-        if !coordinator.isPlaying {
+    private var pipButton: some View {
+        #if os(iOS) || os(macOS)
+            if coordinator.isPipSupported {
+                Button {
+                    coordinator.togglePictureInPicture()
+                    onResetHideTimer()
+                } label: {
+                    circleGlyph(coordinator.isPipActive ? "pip.exit" : "pip.enter", size: 16, diameter: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(coordinator.isPipActive ? "Exit Picture in Picture" : "Picture in Picture")
+            }
+        #endif
+    }
+
+    // MARK: - Center Transport
+
+    private var centerTransport: some View {
+        HStack(spacing: 32) {
+            if !media.isLive {
+                Button {
+                    coordinator.skip(by: -15)
+                    onResetHideTimer()
+                } label: {
+                    circleGlyph("gobackward.15", size: 22, diameter: 60)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Skip back 15 seconds")
+            }
+
             Button(action: onTogglePlay) {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 32))
-                    .foregroundStyle(.white)
-                    .frame(width: 68, height: 68)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().stroke(.white.opacity(0.12), lineWidth: 1))
+                circleGlyph(
+                    coordinator.isPlaying ? "pause.fill" : "play.fill",
+                    size: 30,
+                    diameter: 76
+                )
             }
             .buttonStyle(.plain)
-            .transition(.opacity)
-        }
-    }
+            .accessibilityLabel(coordinator.isPlaying ? "Pause" : "Play")
 
-    // MARK: - Bottom Bar
-
-    private var bottomBar: some View {
-        VStack(spacing: 10) {
-            timeSliderView
-
-            HStack(spacing: 0) {
-                timeLabels
-                Spacer()
-                transportControls
-                Spacer()
-                secondaryControls
+            if !media.isLive {
+                Button {
+                    coordinator.skip(by: 15)
+                    onResetHideTimer()
+                } label: {
+                    circleGlyph("goforward.15", size: 22, diameter: 60)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Skip forward 15 seconds")
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 20)
-        .padding(.top, 8)
-        .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .mask {
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black.opacity(0), location: 0),
-                            .init(color: .black.opacity(1), location: 0.25),
-                            .init(color: .black.opacity(1), location: 1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-        }
     }
 
-    // MARK: - Time Labels
+    // MARK: - Bottom Controls
 
-    private var timeLabels: some View {
-        HStack(spacing: 3) {
-            Text(timeString(from: isSeeking ? seekPosition : currentTime))
-                .font(.caption2.monospacedDigit())
+    private var bottomControls: some View {
+        VStack(spacing: 14) {
+            HStack(alignment: .bottom, spacing: 16) {
+                titleBlock
+                Spacer(minLength: 0)
+                secondaryControls
+            }
+
+            if media.isLive {
+                liveIndicator
+            } else {
+                scrubber
+                timeLabels
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 28)
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let subtitle = media.subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+            }
+            Text(media.title)
+                .font(.title3.weight(.bold))
                 .foregroundStyle(.white)
-                .contentTransition(.numericText(countsDown: true))
-            Text("/")
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.white.opacity(0.35))
-            Text(timeString(from: max(duration, 0)))
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.white.opacity(0.6))
+                .lineLimit(1)
+        }
+        .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
+    }
+
+    private var liveIndicator: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(.red)
+                .frame(width: 7, height: 7)
+            Text("LIVE")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+            Spacer()
+        }
+        .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
+    }
+
+    // MARK: - Secondary Controls (grouped glass pill)
+
+    @ViewBuilder
+    private var secondaryControls: some View {
+        let hasAudio = coordinator.audioTracks.count > 1
+        let hasText = !coordinator.textTracks.isEmpty
+        let hasRate = !media.isLive
+
+        if hasText || hasAudio || hasRate {
+            HStack(spacing: 4) {
+                if hasText { subtitleMenu }
+                if hasAudio { audioTrackMenu }
+                if hasRate { playbackRateMenu }
+            }
+            .padding(.horizontal, 4)
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
     }
 
-    // MARK: - Time Slider
+    @ViewBuilder
+    private var subtitleMenu: some View {
+        let tracks = coordinator.textTracks
+        let hasSelection = tracks.contains(where: \.isSelectedExclusively)
+        Menu {
+            Button {
+                coordinator.selectTextTrack(nil)
+                onResetHideTimer()
+            } label: {
+                checkmarkLabel("Off", checked: !hasSelection)
+            }
+            ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                Button {
+                    coordinator.selectTextTrack(track)
+                    onResetHideTimer()
+                } label: {
+                    checkmarkLabel(track.trackName, checked: track.isSelectedExclusively)
+                }
+            }
+        } label: {
+            pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
+        }
+        .menuIndicator(.hidden)
+    }
 
-    private var timeSliderView: some View {
+    @ViewBuilder
+    private var audioTrackMenu: some View {
+        let tracks = coordinator.audioTracks
+        Menu {
+            ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                Button {
+                    coordinator.selectAudioTrack(track)
+                    onResetHideTimer()
+                } label: {
+                    checkmarkLabel(track.trackName, checked: track.isSelectedExclusively)
+                }
+            }
+        } label: {
+            pillGlyph("waveform")
+        }
+        .menuIndicator(.hidden)
+    }
+
+    private var playbackRateMenu: some View {
+        Menu {
+            ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
+                Button {
+                    coordinator.playbackRate = rate
+                    onResetHideTimer()
+                } label: {
+                    checkmarkLabel(rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                }
+            }
+        } label: {
+            Text(verbatim: rateString(coordinator.playbackRate))
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.white)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .menuIndicator(.hidden)
+    }
+
+    // MARK: - Scrubber
+
+    private var scrubber: some View {
         #if os(tvOS)
-            // `Slider` is unavailable on tvOS. Show a non-interactive
-            // progress bar instead — seeking is driven by the focusable
-            // skip buttons and the Siri remote.
+            // `Slider` is unavailable on tvOS; this overlay isn't used there
+            // (see `VLCPlayerEngineView`), but the type still compiles for the
+            // platform — fall back to a read-only bar.
             ProgressView(
                 value: min(currentTime.isFinite ? currentTime : 0, max(duration, 1)),
                 total: max(duration.isFinite ? duration : 1, 1)
             )
             .progressViewStyle(.linear)
             .tint(.white)
-            .opacity(media.isLive ? 0 : 1)
         #else
             Slider(
                 value: Binding<TimeInterval>(
@@ -156,11 +282,23 @@ struct VLCPlayerControlsOverlay: View {
                     set: { seekPosition = $0 }
                 ),
                 in: 0 ... max(duration.isFinite ? duration : 1, 1),
-                onEditingChanged: { onSliderEditingChanged(editing: $0) }
+                onEditingChanged: onSliderEditingChanged
             )
             .tint(.white)
-            .disabled(media.isLive)
         #endif
+    }
+
+    private var timeLabels: some View {
+        HStack {
+            Text(timeString(from: isSeeking ? seekPosition : currentTime))
+                .contentTransition(.numericText())
+                .foregroundStyle(.white)
+            Spacer()
+            Text(timeString(from: max(duration, 0)))
+                .foregroundStyle(.white.opacity(0.7))
+        }
+        .font(.caption.monospacedDigit())
+        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
     }
 
     private func onSliderEditingChanged(editing: Bool) {
@@ -174,161 +312,47 @@ struct VLCPlayerControlsOverlay: View {
         }
     }
 
-    // MARK: - Transport Controls
+    // MARK: - Building Blocks
 
-    private var transportControls: some View {
-        HStack(spacing: 22) {
-            skipButton(seconds: -15, symbol: "gobackward.15")
-
-            Button(action: onTogglePlay) {
-                Image(systemName: coordinator.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.white)
-                    .frame(width: 42, height: 42)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 0.5))
-            }
-            .buttonStyle(.plain)
-
-            skipButton(seconds: 15, symbol: "goforward.15")
-        }
+    /// A white glyph centered in an interactive Liquid Glass circle — the
+    /// shared shape for every standalone control (close, PiP, transport) and
+    /// for each icon inside the grouped track pill.
+    private func circleGlyph(
+        _ systemName: String,
+        size: CGFloat,
+        diameter: CGFloat,
+        dimmed: Bool = false
+    ) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: size, weight: .semibold))
+            .foregroundStyle(dimmed ? .white.opacity(0.55) : .white)
+            .frame(width: diameter, height: diameter)
+            .contentShape(Circle())
+            .glassEffect(.regular.interactive(), in: .circle)
     }
 
-    private func skipButton(seconds: Double, symbol: String) -> some View {
-        Button {
-            coordinator.skip(by: seconds)
-            onResetHideTimer()
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 17))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-        }
-        .buttonStyle(.plain)
-        .contentShape(Rectangle())
-        .disabled(media.isLive)
+    /// A white glyph sized for the grouped track pill. Carries no glass of its
+    /// own — the enclosing capsule is the single glass surface, so stacking
+    /// per-icon glass (prohibited) is avoided.
+    private func pillGlyph(_ systemName: String, dimmed: Bool = false) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(dimmed ? .white.opacity(0.55) : .white)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
     }
 
-    // MARK: - Secondary Controls
-
-    private var secondaryControls: some View {
-        HStack(spacing: 12) {
-            playbackRateMenu
-            audioTrackMenu
-            subtitleMenu
-            pipButton
-        }
+    /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
+    private func rateString(_ rate: Float) -> String {
+        String(format: "%g×", rate)
     }
 
     @ViewBuilder
-    private var pipButton: some View {
-        #if os(iOS) || os(macOS)
-            if coordinator.isPipSupported {
-                Button {
-                    coordinator.togglePictureInPicture()
-                    onResetHideTimer()
-                } label: {
-                    Image(systemName: coordinator.isPipActive ? "pip.exit" : "pip.enter")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white)
-                        .frame(width: 30, height: 30)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(coordinator.isPipActive ? "Exit Picture in Picture" : "Picture in Picture")
-            }
-        #endif
-    }
-
-    private var playbackRateMenu: some View {
-        Menu {
-            ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
-                Button {
-                    coordinator.playbackRate = rate
-                    onResetHideTimer()
-                } label: {
-                    if abs(coordinator.playbackRate - rate) < 0.01 {
-                        Label("\(rate, specifier: "%.2g")x", systemImage: "checkmark")
-                    } else {
-                        Text("\(rate, specifier: "%.2g")x")
-                    }
-                }
-            }
-        } label: {
-            Text("\(coordinator.playbackRate, specifier: "%.2g")x")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(.ultraThinMaterial, in: Capsule())
-        }
-        .menuIndicator(.hidden)
-    }
-
-    @ViewBuilder
-    private var audioTrackMenu: some View {
-        let tracks = coordinator.audioTracks
-        if tracks.count > 1 {
-            Menu {
-                ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
-                    Button {
-                        coordinator.selectAudioTrack(track)
-                        onResetHideTimer()
-                    } label: {
-                        if track.isSelectedExclusively {
-                            Label(track.trackName, systemImage: "checkmark")
-                        } else {
-                            Text(track.trackName)
-                        }
-                    }
-                }
-            } label: {
-                Image(systemName: "waveform")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .menuIndicator(.hidden)
-        }
-    }
-
-    @ViewBuilder
-    private var subtitleMenu: some View {
-        let tracks = coordinator.textTracks
-        if !tracks.isEmpty {
-            Menu {
-                Button {
-                    coordinator.selectTextTrack(nil)
-                    onResetHideTimer()
-                } label: {
-                    if !tracks.contains(where: \.isSelectedExclusively) {
-                        Label("Off", systemImage: "checkmark")
-                    } else {
-                        Text("Off")
-                    }
-                }
-                ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
-                    Button {
-                        coordinator.selectTextTrack(track)
-                        onResetHideTimer()
-                    } label: {
-                        if track.isSelectedExclusively {
-                            Label(track.trackName, systemImage: "checkmark")
-                        } else {
-                            Text(track.trackName)
-                        }
-                    }
-                }
-            } label: {
-                let hasSelection = tracks.contains(where: \.isSelectedExclusively)
-                Image(systemName: "captions.bubble.fill")
-                    .font(.system(size: 13))
-                    .foregroundStyle(hasSelection ? .white : .white.opacity(0.55))
-                    .frame(width: 30, height: 30)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .menuIndicator(.hidden)
+    private func checkmarkLabel(_ title: String, checked: Bool) -> some View {
+        if checked {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
         }
     }
 
