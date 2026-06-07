@@ -160,8 +160,10 @@
             }
             if direction != scrubLastDirection { scrubStepLevel = 0 }
             scrubLastDirection = direction
-            scrubStepLevel = min(scrubStepLevel + 1, 12)
-            let step = 8.0 * Double(scrubStepLevel) // 8s → up to 96s per press
+            scrubStepLevel = min(scrubStepLevel + 1, 40)
+            // A single tap nudges ~30s; a held d-pad ramps to ~20 min/press, so
+            // even a long movie crosses in a second or two of sustained input.
+            let step = 30.0 * Double(scrubStepLevel)
             scrubTarget = min(max(scrubTarget + sign * step, 0), duration)
             onResetHideTimer()
 
