@@ -4,11 +4,14 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query private var playlists: [Playlist]
+    // Not `private`: read by the SettingsView+AutoSync extension (separate file).
+    @Query var playlists: [Playlist]
     @State private var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
     @AppStorage(PlayerSettings.deinterlaceKey) private var deinterlace = PlayerSettings.deinterlaceDefault
+    /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
+    @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
 
     #if os(tvOS)
         /// The category whose content is shown in the right pane. Follows focus
@@ -129,6 +132,13 @@ struct SettingsView: View {
         }
 
         private var tvPlaylistsDetail: some View {
+            VStack(alignment: .leading, spacing: 36) {
+                tvPlaylistsList
+                tvAutoSyncSection
+            }
+        }
+
+        private var tvPlaylistsList: some View {
             VStack(alignment: .leading, spacing: 8) {
                 TVSettingsSectionLabel("Playlists")
 
@@ -270,6 +280,7 @@ struct SettingsView: View {
                 List {
                     playlistsSection
                     librarySection
+                    autoSyncSection
                     if trakt.isConfigured {
                         integrationsSection
                     }
