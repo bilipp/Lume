@@ -130,20 +130,20 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         media.addOption(":skip-frames=1")
         media.addOption(":drop-late-frames=1")
         media.addOption(":http-reconnect=1")
-        // media.addOption(":clock-jitter=500")
-        // media.addOption(":clock-synchro=1")
 
         media.addOption(deinterlace ? ":deinterlace=1" : ":deinterlace=0")
         if deinterlace { media.addOption(":deinterlace-mode=blend") }
 
         if isLive {
             media.addOption(":network-caching=3000")
-            // media.addOption(":live-caching=3000")
+            media.addOption(":live-caching=3000")
             // media.addOption(":hls-adaptive=1")
             // media.addOption(":ts-trust-pcr=1")
         } else {
             media.addOption(":network-caching=1500")
             media.addOption(":file-caching=1500")
+            // media.addOption(":clock-jitter=500")
+            // media.addOption(":clock-synchro=1")
         }
     }
 
