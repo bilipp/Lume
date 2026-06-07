@@ -285,6 +285,16 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         pipController = nil
     }
 
+    /// Pause playback when the app leaves the foreground (e.g. the tvOS Home
+    /// button). `onDisappear`/`tearDown` don't fire on backgrounding — the view
+    /// stays in the hierarchy — so VLC would otherwise keep playing audio.
+    /// Skipped while Picture in Picture is active so PiP playback continues.
+    func pauseForBackground() {
+        guard !isPipActive, mediaPlayer.isPlaying else { return }
+        mediaPlayer.pause()
+        isPlaying = false
+    }
+
     // MARK: - Transport
 
     func togglePlay() {

@@ -55,6 +55,7 @@ struct VLCPlayerEngineView: View {
     #endif
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
         @Environment(\.dismissWindow) private var dismissWindow
     #endif
@@ -101,6 +102,11 @@ struct VLCPlayerEngineView: View {
         }
         .onChange(of: coordinator.isPlaying) { _, _ in
             resetHideTimer()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // The Home button backgrounds the app without calling onDisappear,
+            // so pause here to stop audio when the player loses focus.
+            if phase != .active { coordinator.pauseForBackground() }
         }
         .onChange(of: media) { _, newMedia in
             // The host swapped the stream (e.g. a new episode). Reset local
