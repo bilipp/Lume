@@ -70,6 +70,11 @@ struct LumeApp: App {
             ContentView()
                 .environment(TraktService.shared)
                 .task {
+                    // Commit any watch progress that a previous session buffered
+                    // but never flushed to SwiftData (e.g. it was killed mid-
+                    // playback). Runs off the main thread before playback starts.
+                    await WatchProgressWriter.reconcilePending(container: sharedModelContainer)
+
                     // If the preferred language changed since last launch (e.g.
                     // via the per-app language override in iOS Settings), drop
                     // cached TMDB enrichment so detail views re-fetch text,

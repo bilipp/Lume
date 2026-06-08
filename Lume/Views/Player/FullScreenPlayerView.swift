@@ -14,6 +14,7 @@ struct FullScreenPlayerView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
         @Environment(\.dismissWindow) private var dismissWindow
     #endif
@@ -24,10 +25,12 @@ struct FullScreenPlayerView: View {
     /// scrubber/time labels rather than re-rendering the whole player tree. See
     /// `PlaybackClock`.
     @State private var clock = PlaybackClock()
-    @State private var lastSaved: Date = .distantPast
-    /// Last progress value written to SwiftData, so the periodic sampler skips
-    /// redundant saves while playback is paused (the clock isn't advancing).
-    @State private var lastSavedProgress: TimeInterval = -1
+
+    /// Writes watch progress on a private background `ModelContext`. Saving on
+    /// the main context mid-playback hitches KSPlayer's render loop, so the
+    /// sampler below only reads the clock and hands `Sendable` values to this
+    /// actor. Created in `.task` once the environment's container is available.
+    @State private var progressWriter: WatchProgressWriter?
 
     /// The stream currently playing. Starts as `media` but can be swapped when
     /// the viewer picks another episode from the in-player episode rail (tvOS).
@@ -75,19 +78,29 @@ struct FullScreenPlayerView: View {
             #endif
         }
         .task {
-            // Persist VOD progress on a cadence by sampling the clock, rather
-            // than reacting to every tick. The clock is an @Observable this view
-            // never reads in its body, so sampling it from a detached task keeps
-            // playback ticks from re-rendering the player tree.
+            // Sample progress on a cadence and stash it in `WatchProgressBuffer`
+            // (UserDefaults) rather than writing SwiftData. A background-context
+            // save still forces the main context to merge and re-run every
+            // `@Query` on `Movie`/`Episode`/`Series` (e.g. Home's continue-
+            // watching rows) on the main thread — that merge is what hitched
+            // KSPlayer every few seconds. Buffering triggers neither, so the only
+            // periodic main-thread work is reading two clock values. The buffer
+            // is flushed to SwiftData at safe boundaries (see `persistProgressDetached`).
+            progressWriter = WatchProgressWriter(container: modelContext.container)
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
                 guard !Task.isCancelled else { break }
-
-                // persistProgress(force: false)
+                bufferProgress()
             }
         }
+        .onChange(of: scenePhase) { _, phase in
+            // Leaving the foreground is a safe moment to flush; covers the user
+            // backgrounding the app mid-playback without closing the player.
+            if phase != .active { persistProgressDetached(force: true) }
+        }
         .onDisappear {
-            persistProgress(force: true)
+            // Capture the clock synchronously, then flush off the main thread.
+            persistProgressDetached(force: true)
             releaseAudioSession()
         }
     }
@@ -116,10 +129,10 @@ struct FullScreenPlayerView: View {
     /// engine reconfigures its player when `activeMedia` changes.
     private func switchMedia(to newMedia: PlayableMedia) {
         guard newMedia.id != activeMedia.id else { return }
-        persistProgress(force: true)
+        // Flush the outgoing stream's progress before the clock resets — capture
+        // happens synchronously inside `persistProgressDetached`.
+        persistProgressDetached(force: true)
         clock.reset()
-        lastSaved = .distantPast
-        lastSavedProgress = -1
         activeMedia = newMedia
         // Slide the outgoing channel into the recall slot so `right` can jump back.
         LiveChannelHistory.record(newMedia)
@@ -127,7 +140,7 @@ struct FullScreenPlayerView: View {
 
     private var closeButton: some View {
         Button {
-            persistProgress(force: true)
+            persistProgressDetached(force: true)
             closePlayer()
         } label: {
             Image(systemName: "xmark")
@@ -184,69 +197,60 @@ struct FullScreenPlayerView: View {
         }
     #endif
 
-    private func persistProgress(force: Bool) {
-        guard !activeMedia.isLive else {
-            if force { touchLiveLastWatched() }
-            return
-        }
+    /// Seconds between progress samples. These only write `UserDefaults` now, so
+    /// the cadence trades crash-recovery granularity against nothing meaningful.
+    private static let progressSampleInterval: TimeInterval = 5
+
+    /// Stash the current progress in `WatchProgressBuffer`. Cheap, main-actor
+    /// reads of two `Double`s plus a small `UserDefaults` write — no SwiftData,
+    /// no store merge, no `@Query` invalidation. Live streams carry no progress.
+    private func bufferProgress() {
+        guard !activeMedia.isLive else { return }
+        WatchProgressBuffer.record(
+            ref: activeMedia.contentRef,
+            progress: clock.current,
+            duration: clock.duration
+        )
+    }
+
+    /// Commit the current progress to SwiftData off the main thread. Called only
+    /// at boundaries (close, episode switch, app backgrounding) where the one
+    /// resulting store merge can't disturb playback. Captures the clock
+    /// synchronously *before* awaiting, so a subsequent `clock.reset()` can't
+    /// race the read; clears the buffer entry once the write lands.
+    private func persistProgressDetached(force: Bool) {
+        guard let writer = progressWriter else { return }
+        if activeMedia.isLive, !force { return }
+        let ref = activeMedia.contentRef
         let now = clock.current
         let total = clock.duration
-        guard now > 0 else { return }
-        if !force {
-            if Date().timeIntervalSince(lastSaved) < 5 { return }
-            if now == lastSavedProgress { return }
+        Task { @MainActor in
+            let completion = await writer.record(
+                ref: ref, progress: now, duration: total, force: force
+            )
+            WatchProgressBuffer.remove(ref: ref)
+            if let completion { syncTraktWatched(ref: completion.ref) }
         }
-        lastSaved = Date()
-        lastSavedProgress = now
+    }
 
-        let completed = total > 0 && now / total >= 0.9
-
-        switch activeMedia.contentRef {
+    /// One-time "watched" sync on Trakt. Runs at most once per title (when it
+    /// crosses 90%), so the main-context fetch here is off the playback hot path.
+    /// `TraktService` is `@MainActor`, hence this stays on the main actor.
+    private func syncTraktWatched(ref: PlayableMedia.ContentRef) {
+        switch ref {
         case let .movie(id):
-            updateMovie(id: id, progress: now, completed: completed)
+            var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            guard let movie = try? modelContext.fetch(descriptor).first else { return }
+            TraktService.shared.syncWatched(movie: movie, watched: true)
         case let .episode(id):
-            updateEpisode(id: id, progress: now, completed: completed)
+            var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            guard let episode = try? modelContext.fetch(descriptor).first else { return }
+            TraktService.shared.syncWatched(episode: episode, watched: true)
         case .live:
             break
         }
-    }
-
-    private func updateMovie(id: String, progress: TimeInterval, completed: Bool) {
-        var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let movie = try? modelContext.fetch(descriptor).first else { return }
-        movie.watchProgress = progress
-        movie.lastWatchedDate = Date()
-        if completed, !movie.isWatched {
-            movie.isWatched = true
-            TraktService.shared.syncWatched(movie: movie, watched: true)
-        }
-        try? modelContext.save()
-    }
-
-    private func updateEpisode(id: String, progress: TimeInterval, completed: Bool) {
-        var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let episode = try? modelContext.fetch(descriptor).first else { return }
-        episode.watchProgress = progress
-        episode.lastWatchedDate = Date()
-        if completed, !episode.isWatched {
-            episode.isWatched = true
-            TraktService.shared.syncWatched(episode: episode, watched: true)
-        }
-        if let series = episode.series {
-            series.lastWatchedDate = Date()
-        }
-        try? modelContext.save()
-    }
-
-    private func touchLiveLastWatched() {
-        guard case let .live(id) = activeMedia.contentRef else { return }
-        var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let stream = try? modelContext.fetch(descriptor).first else { return }
-        stream.lastWatchedDate = Date()
-        try? modelContext.save()
     }
 }
 
