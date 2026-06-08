@@ -1564,6 +1564,16 @@
         }
       }
     },
+    "Remove from Recently Watched" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus „Kürzlich gesehen“ entfernen"
+          }
+        }
+      }
+    },
     "Reorder the channels in your Favorites category." : {
       "localizations" : {
         "de" : {

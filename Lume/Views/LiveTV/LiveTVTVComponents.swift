@@ -17,6 +17,7 @@
         let scope: LiveChannelScope
         let playlistPrefix: String
         let onPlay: (LiveStream) -> Void
+        @Environment(\.modelContext) private var modelContext
         @Query private var streams: [LiveStream]
 
         init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
@@ -42,7 +43,10 @@
                         .padding(.top, 80)
                     } else {
                         ForEach(scopedStreams) { stream in
-                            TVChannelRow(stream: stream) {
+                            TVChannelRow(
+                                stream: stream,
+                                onRemove: scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil
+                            ) {
                                 onPlay(stream)
                             }
                         }
@@ -53,17 +57,26 @@
             }
             .focusSection()
         }
+
+        /// Clears a channel's watch timestamp so it drops out of the Recently
+        /// Watched list. The @Query-backed list updates once the change is saved.
+        private func removeFromRecentlyWatched(_ stream: LiveStream) {
+            stream.lastWatchedDate = nil
+            try? modelContext.save()
+        }
     }
 
     private struct TVChannelRow: View {
         let stream: LiveStream
+        var onRemove: (() -> Void)?
         let onPlay: () -> Void
 
         @Query private var epgListings: [EPGListing]
         @FocusState private var isFocused: Bool
 
-        init(stream: LiveStream, onPlay: @escaping () -> Void) {
+        init(stream: LiveStream, onRemove: (() -> Void)? = nil, onPlay: @escaping () -> Void) {
             self.stream = stream
+            self.onRemove = onRemove
             self.onPlay = onPlay
             let channelId = stream.epgChannelId ?? ""
             let now = Date()
@@ -153,6 +166,7 @@
             .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
             .focused($isFocused)
             .animation(.easeOut(duration: 0.18), value: isFocused)
+            .recentlyWatchedRemoveMenu(onRemove)
         }
 
         private var logo: some View {

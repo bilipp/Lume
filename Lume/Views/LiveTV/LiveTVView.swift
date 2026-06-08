@@ -401,6 +401,7 @@ struct ChannelsList: View {
     let scope: LiveChannelScope
     let playlistPrefix: String
     let onPlay: (LiveStream) -> Void
+    @Environment(\.modelContext) private var modelContext
     @Query private var streams: [LiveStream]
 
     init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
@@ -412,6 +413,13 @@ struct ChannelsList: View {
 
     private var scopedStreams: [LiveStream] {
         LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
+    }
+
+    /// Clears a channel's watch timestamp so it drops out of the Recently
+    /// Watched list. The @Query-backed list updates once the change is saved.
+    private func removeFromRecentlyWatched(_ stream: LiveStream) {
+        stream.lastWatchedDate = nil
+        try? modelContext.save()
     }
 
     var body: some View {
@@ -433,6 +441,7 @@ struct ChannelsList: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .recentlyWatchedRemoveMenu(scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil)
 
                         Divider()
                             .padding(.leading, 88)

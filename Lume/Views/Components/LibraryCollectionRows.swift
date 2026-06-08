@@ -57,7 +57,14 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable, Card: View>: 
     let title: LocalizedStringKey
     let collection: LibraryCollection
     let items: [Item]
+    /// Whether the full collection holds more items than this preview shows.
+    /// When false, the "Show All" link is hidden — there's nothing more to see.
+    let hasMore: Bool
     let animationNamespace: Namespace.ID?
+    /// When set, each card gains a destructive "Remove from Recently Watched"
+    /// context menu (a long-press on the focused card on tvOS). Nil for rows
+    /// where removal doesn't apply, e.g. Favorites.
+    var removeAction: ((Item) -> Void)?
     @ViewBuilder let card: (Item) -> Card
 
     var body: some View {
@@ -69,9 +76,11 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable, Card: View>: 
 
                 Spacer()
 
-                NavigationLink(value: collection) {
-                    Text("Show All")
-                        .font(.subheadline)
+                if hasMore {
+                    NavigationLink(value: collection) {
+                        Text("Show All")
+                            .font(.subheadline)
+                    }
                 }
             }
             .padding(.horizontal)
@@ -84,6 +93,7 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable, Card: View>: 
                                 .matchedTransitionSourceIfAvailable(id: item.id, in: animationNamespace)
                         }
                         .posterCardButtonStyle()
+                        .recentlyWatchedRemoveMenu(removeAction.map { action in { action(item) } })
                     }
                 }
                 .padding(.horizontal)
@@ -104,6 +114,7 @@ struct MovieCollectionRow: View {
     let kind: LibraryCollection.Kind
     let playlistPrefix: String
     var animationNamespace: Namespace.ID?
+    @Environment(\.modelContext) private var modelContext
     @Query private var movies: [Movie]
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
@@ -114,17 +125,23 @@ struct MovieCollectionRow: View {
     }
 
     private var scoped: [Movie] {
-        Array(movies.filter { $0.id.hasPrefix(playlistPrefix) }.prefix(collectionPreviewLimit))
+        movies.filter { $0.id.hasPrefix(playlistPrefix) }
     }
 
     var body: some View {
-        let items = scoped
+        let matches = scoped
+        let items = Array(matches.prefix(collectionPreviewLimit))
         if !items.isEmpty {
             CollectionPreviewRow(
                 title: kind.title,
                 collection: LibraryCollection(kind: kind, type: .vod),
                 items: items,
+                hasMore: matches.count > items.count,
                 animationNamespace: animationNamespace,
+                removeAction: kind == .recentlyWatched ? { movie in
+                    movie.lastWatchedDate = nil
+                    try? modelContext.save()
+                } : nil,
                 card: { MovieCardView(movie: $0) }
             )
         }
@@ -189,6 +206,7 @@ struct SeriesCollectionRow: View {
     let kind: LibraryCollection.Kind
     let playlistPrefix: String
     var animationNamespace: Namespace.ID?
+    @Environment(\.modelContext) private var modelContext
     @Query private var series: [Series]
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
@@ -199,17 +217,23 @@ struct SeriesCollectionRow: View {
     }
 
     private var scoped: [Series] {
-        Array(series.filter { $0.id.hasPrefix(playlistPrefix) }.prefix(collectionPreviewLimit))
+        series.filter { $0.id.hasPrefix(playlistPrefix) }
     }
 
     var body: some View {
-        let items = scoped
+        let matches = scoped
+        let items = Array(matches.prefix(collectionPreviewLimit))
         if !items.isEmpty {
             CollectionPreviewRow(
                 title: kind.title,
                 collection: LibraryCollection(kind: kind, type: .series),
                 items: items,
+                hasMore: matches.count > items.count,
                 animationNamespace: animationNamespace,
+                removeAction: kind == .recentlyWatched ? { series in
+                    series.lastWatchedDate = nil
+                    try? modelContext.save()
+                } : nil,
                 card: { SeriesCardView(series: $0) }
             )
         }
@@ -262,6 +286,27 @@ private enum SeriesCollectionQuery {
                 predicate: #Predicate { $0.isFavorite },
                 sortBy: [SortDescriptor(\.name)]
             )
+        }
+    }
+}
+
+// MARK: - Remove-from-recents menu
+
+extension View {
+    /// Attaches a destructive "Remove from Recently Watched" context menu when an
+    /// action is provided, otherwise leaves the view untouched. Surfaced by a
+    /// long-press on the focused card on tvOS (and on iOS), or a right-click on
+    /// macOS — the standard cross-platform secondary-action gesture.
+    @ViewBuilder
+    func recentlyWatchedRemoveMenu(_ remove: (() -> Void)?) -> some View {
+        if let remove {
+            contextMenu {
+                Button(role: .destructive, action: remove) {
+                    Label("Remove from Recently Watched", systemImage: "clock.badge.xmark")
+                }
+            }
+        } else {
+            self
         }
     }
 }

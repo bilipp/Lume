@@ -79,6 +79,9 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
 struct CategoryPreviewRow<Item: Identifiable & Hashable, Card: View>: View {
     let category: Category
     let items: [Item]
+    /// Whether the category holds more items than this preview shows. When false,
+    /// the "Show All" link is hidden — there's nothing more to see.
+    let hasMore: Bool
     let animationNamespace: Namespace.ID?
     let emptyMessage: LocalizedStringKey
     @ViewBuilder let card: (Item) -> Card
@@ -92,9 +95,11 @@ struct CategoryPreviewRow<Item: Identifiable & Hashable, Card: View>: View {
 
                 Spacer()
 
-                NavigationLink(value: category) {
-                    Text("Show All")
-                        .font(.subheadline)
+                if hasMore {
+                    NavigationLink(value: category) {
+                        Text("Show All")
+                            .font(.subheadline)
+                    }
                 }
             }
             .padding(.horizontal)
@@ -165,25 +170,29 @@ struct MovieCategoryView: View {
 
 struct MovieCategoryPreview: View {
     let category: Category
+    private let limit: Int
     @Query private var movies: [Movie]
     var animationNamespace: Namespace.ID?
 
     init(category: Category, limit: Int, sort: ContentSortOption, animationNamespace: Namespace.ID? = nil) {
         self.category = category
+        self.limit = limit
         self.animationNamespace = animationNamespace
         let categoryId = category.id
         var descriptor = FetchDescriptor<Movie>(
             predicate: #Predicate<Movie> { $0.categoryId == categoryId },
             sortBy: sort.movieDescriptors
         )
-        descriptor.fetchLimit = limit
+        // Fetch one extra so we can tell whether a full grid would show more.
+        descriptor.fetchLimit = limit + 1
         _movies = Query(descriptor)
     }
 
     var body: some View {
         CategoryPreviewRow(
             category: category,
-            items: movies,
+            items: Array(movies.prefix(limit)),
+            hasMore: movies.count > limit,
             animationNamespace: animationNamespace,
             emptyMessage: "No movies in this category",
             card: { MovieCardView(movie: $0) }
@@ -232,25 +241,29 @@ struct SeriesCategoryView: View {
 
 struct SeriesCategoryPreview: View {
     let category: Category
+    private let limit: Int
     @Query private var series: [Series]
     var animationNamespace: Namespace.ID?
 
     init(category: Category, limit: Int, sort: ContentSortOption, animationNamespace: Namespace.ID? = nil) {
         self.category = category
+        self.limit = limit
         self.animationNamespace = animationNamespace
         let categoryId = category.id
         var descriptor = FetchDescriptor<Series>(
             predicate: #Predicate<Series> { $0.categoryId == categoryId },
             sortBy: sort.seriesDescriptors
         )
-        descriptor.fetchLimit = limit
+        // Fetch one extra so we can tell whether a full grid would show more.
+        descriptor.fetchLimit = limit + 1
         _series = Query(descriptor)
     }
 
     var body: some View {
         CategoryPreviewRow(
             category: category,
-            items: series,
+            items: Array(series.prefix(limit)),
+            hasMore: series.count > limit,
             animationNamespace: animationNamespace,
             emptyMessage: "No series in this category",
             card: { SeriesCardView(series: $0) }
