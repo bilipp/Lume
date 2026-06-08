@@ -102,7 +102,9 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable, Card: View>: 
             .scrollClipDisabled()
             .frame(height: PosterCardMetrics.rowHeight)
         }
+        #if os(tvOS)
         .focusSection()
+        #endif
     }
 }
 
