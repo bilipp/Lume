@@ -22,8 +22,11 @@
     struct TVPlayerControlsOverlay<Engine: TVPlaybackEngine>: View {
         @ObservedObject var coordinator: Engine
         let media: PlayableMedia
-        @Binding var currentTime: TimeInterval
-        @Binding var duration: TimeInterval
+        /// High-frequency playback clock, held as the `@Observable` object. The
+        /// overlay body never reads `current`/`duration` (only the scrubber leaf
+        /// does), so playback ticks don't re-render the overlay — which is what
+        /// made the audio/subtitle `Menu`s flicker on tvOS.
+        let clock: PlaybackClock
         /// Bumped by the host (Menu/back press) to request closing an open panel.
         var panelCloseToken: Int
         var onTogglePlay: () -> Void
@@ -196,43 +199,21 @@
                     }
                 }
 
-                scrubber
-            }
-        }
-
-        // MARK: - Scrubber
-
-        @ViewBuilder
-        private var scrubber: some View {
-            if showsScrubber {
-                VStack(spacing: 6) {
-                    progressBar
-
-                    HStack {
-                        Text(leadingTimeLabel)
-                            .foregroundStyle(.white)
-                        Spacer()
-                        Text(trailingTimeLabel)
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .font(.system(size: 22, weight: .medium).monospacedDigit())
-                    .contentTransition(.numericText())
-                }
-            }
-        }
-
-        /// Live progress is fixed to the EPG programme clock, so it stays a
-        /// read-only bar. VOD gets the focusable, seekable scrubber.
-        @ViewBuilder
-        private var progressBar: some View {
-            if media.isLive {
-                ProgressView(value: progressFraction)
-                    .progressViewStyle(.linear)
-                    .tint(.white)
-            } else {
-                Button { toggleScrub() } label: { Color.clear }
-                    .buttonStyle(TVScrubBarStyle(fraction: scrubberFraction, isScrubbing: isScrubbing))
-                    .focused($focus, equals: .scrubber)
+                // The scrubber lives in its own view so the high-frequency
+                // playback clock (`currentTime`/`duration`) re-renders only it.
+                // Reading those bindings here would re-evaluate the whole
+                // overlay — including the audio/subtitle `Menu`s — on every tick,
+                // which makes an open menu flicker heavily on tvOS. The bindings
+                // are forwarded (projected), not read, so no dependency is added.
+                TVPlayerScrubber(
+                    isLive: media.isLive,
+                    epgNow: epgNow,
+                    clock: clock,
+                    isScrubbing: isScrubbing,
+                    scrubTarget: scrubTarget,
+                    focus: $focus,
+                    onToggleScrub: toggleScrub
+                )
             }
         }
 
@@ -437,6 +418,107 @@
                 focus: $focus,
                 onClose: closePanel
             )
+        }
+    }
+
+    // MARK: - Scrubber
+
+    /// The progress bar + elapsed / remaining time readout, isolated into its
+    /// own view so the high-frequency playback clock invalidates only this
+    /// leaf — not the whole overlay. See the call site in `titleBlock` for why
+    /// (open-menu flicker on tvOS). Live progress is fixed to the EPG programme
+    /// clock, so it stays a read-only bar; VOD gets the focusable, seekable
+    /// scrubber.
+    private struct TVPlayerScrubber: View {
+        let isLive: Bool
+        let epgNow: EPGListing?
+        /// The high-frequency clock. Held as the `@Observable` object and read
+        /// only here, so ticking it invalidates *only* this leaf view — not the
+        /// overlay or the engine view above it (see the `@Binding`-to-observable
+        /// re-render trap that drove the menu flicker).
+        let clock: PlaybackClock
+        let isScrubbing: Bool
+        let scrubTarget: TimeInterval
+        var focus: FocusState<TVPlayerFocus?>.Binding
+        let onToggleScrub: () -> Void
+
+        var body: some View {
+            if showsScrubber {
+                VStack(spacing: 6) {
+                    progressBar
+
+                    HStack {
+                        Text(leadingTimeLabel)
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Text(trailingTimeLabel)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .font(.system(size: 22, weight: .medium).monospacedDigit())
+                    .contentTransition(.numericText())
+                }
+            }
+        }
+
+        @ViewBuilder
+        private var progressBar: some View {
+            if isLive {
+                ProgressView(value: progressFraction)
+                    .progressViewStyle(.linear)
+                    .tint(.white)
+            } else {
+                Button { onToggleScrub() } label: { Color.clear }
+                    .buttonStyle(TVScrubBarStyle(fraction: scrubberFraction, isScrubbing: isScrubbing))
+                    .focused(focus, equals: .scrubber)
+            }
+        }
+
+        private var showsScrubber: Bool {
+            isLive ? epgNow != nil : true
+        }
+
+        private var progressFraction: Double {
+            if isLive, let epgNow {
+                let total = epgNow.end.timeIntervalSince(epgNow.start)
+                guard total > 0 else { return 0 }
+                return min(max(Date().timeIntervalSince(epgNow.start) / total, 0), 1)
+            }
+            let total = max(clock.duration, 1)
+            return min(max(clock.current / total, 0), 1)
+        }
+
+        /// VOD playhead position for the scrubber bar — the scrub target while
+        /// scrubbing, otherwise live playback time.
+        private var scrubberFraction: Double {
+            let total = max(clock.duration, 1)
+            let reference = isScrubbing ? scrubTarget : clock.current
+            return min(max(reference / total, 0), 1)
+        }
+
+        private var leadingTimeLabel: String {
+            if isLive, let epgNow { return Self.wallClock(epgNow.start) }
+            return Self.timeString(isScrubbing ? scrubTarget : clock.current)
+        }
+
+        private var trailingTimeLabel: String {
+            if isLive, let epgNow { return Self.wallClock(epgNow.end) }
+            let reference = isScrubbing ? scrubTarget : clock.current
+            return "-" + Self.timeString(max(clock.duration - reference, 0))
+        }
+
+        private static func wallClock(_ date: Date) -> String {
+            date.formatted(date: .omitted, time: .shortened)
+        }
+
+        private static func timeString(_ time: TimeInterval) -> String {
+            guard time.isFinite, time >= 0 else { return "0:00" }
+            let total = Int(time)
+            let hours = total / 3600
+            let minutes = (total % 3600) / 60
+            let seconds = total % 60
+            return hours > 0
+                ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
+                : String(format: "%d:%02d", minutes, seconds)
         }
     }
 

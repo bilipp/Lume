@@ -66,41 +66,6 @@
             coordinator.videoInfo?.captionParts.joined(separator: "  ·  ") ?? ""
         }
 
-        // MARK: Scrubber
-
-        var showsScrubber: Bool {
-            media.isLive ? epgNow != nil : true
-        }
-
-        var progressFraction: Double {
-            if media.isLive, let epgNow {
-                let total = epgNow.end.timeIntervalSince(epgNow.start)
-                guard total > 0 else { return 0 }
-                return min(max(Date().timeIntervalSince(epgNow.start) / total, 0), 1)
-            }
-            let total = max(duration, 1)
-            return min(max(currentTime / total, 0), 1)
-        }
-
-        /// VOD playhead position for the scrubber bar — the scrub target while
-        /// scrubbing, otherwise live playback time.
-        var scrubberFraction: Double {
-            let total = max(duration, 1)
-            let reference = isScrubbing ? scrubTarget : currentTime
-            return min(max(reference / total, 0), 1)
-        }
-
-        var leadingTimeLabel: String {
-            if media.isLive, let epgNow { return clock(epgNow.start) }
-            return timeString(isScrubbing ? scrubTarget : currentTime)
-        }
-
-        var trailingTimeLabel: String {
-            if media.isLive, let epgNow { return clock(epgNow.end) }
-            let reference = isScrubbing ? scrubTarget : currentTime
-            return "-" + timeString(max(duration - reference, 0))
-        }
-
         // MARK: Scrubbing (VOD)
 
         /// Select toggles scrub mode: the first press enters (and pauses), the
@@ -116,7 +81,7 @@
             guard !media.isLive else { return }
             wasPlayingBeforeScrub = coordinator.isPlaying
             if coordinator.isPlaying { onTogglePlay() }
-            scrubTarget = currentTime.isFinite ? currentTime : 0
+            scrubTarget = clock.current.isFinite ? clock.current : 0
             scrubStepLevel = 0
             scrubLastDirection = nil
             onPanelOpenChange(true)
@@ -126,9 +91,9 @@
         /// Commit the seek and leave scrub mode, resuming playback if it had
         /// been playing when scrubbing began.
         func commitScrub() {
-            let target = min(max(scrubTarget, 0), max(duration, 0))
+            let target = min(max(scrubTarget, 0), max(clock.duration, 0))
             coordinator.seek(to: target)
-            currentTime = target
+            clock.current = target
             finishScrub(resume: wasPlayingBeforeScrub)
         }
 
@@ -151,7 +116,7 @@
         /// Step the scrub target on a left/right press. The step grows with
         /// sustained input in one direction and decays after a brief pause.
         func moveScrub(_ direction: MoveCommandDirection) {
-            guard isScrubbing, duration > 0 else { return }
+            guard isScrubbing, clock.duration > 0 else { return }
             let sign: Double
             switch direction {
             case .left: sign = -1
@@ -164,7 +129,7 @@
             // A single tap nudges ~30s; a held d-pad ramps to ~20 min/press, so
             // even a long movie crosses in a second or two of sustained input.
             let step = 30.0 * Double(scrubStepLevel)
-            scrubTarget = min(max(scrubTarget + sign * step, 0), duration)
+            scrubTarget = min(max(scrubTarget + sign * step, 0), clock.duration)
             onResetHideTimer()
 
             scrubResetTask?.cancel()
@@ -308,7 +273,7 @@
             guard !media.isLive else { return nil }
             return TVPlayerInfoAction(title: "Restart", systemImage: "gobackward") {
                 coordinator.seek(to: 0)
-                currentTime = 0
+                clock.current = 0
                 closePanel()
                 onResetHideTimer()
             }
@@ -353,17 +318,6 @@
 
         private func clock(_ date: Date) -> String {
             date.formatted(date: .omitted, time: .shortened)
-        }
-
-        private func timeString(_ time: TimeInterval) -> String {
-            guard time.isFinite, time >= 0 else { return "0:00" }
-            let total = Int(time)
-            let hours = total / 3600
-            let minutes = (total % 3600) / 60
-            let seconds = total % 60
-            return hours > 0
-                ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
-                : String(format: "%d:%02d", minutes, seconds)
         }
     }
 

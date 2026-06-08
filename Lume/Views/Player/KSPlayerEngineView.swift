@@ -13,8 +13,14 @@ import SwiftUI
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
 struct KSPlayerEngineView: View {
     let media: PlayableMedia
-    @Binding var currentTime: TimeInterval
-    @Binding var duration: TimeInterval
+    /// High-frequency playback clock, held as the `@Observable` object rather
+    /// than as `@Binding` scalars. A `@Binding` whose root is an `@Observable`
+    /// re-renders the *holding* view on every change — which rebuilt the controls
+    /// overlay / menus on every playback tick. Holding the object and never
+    /// reading `current`/`duration` in this body keeps the engine view off the
+    /// tick path; only the scrubber leaf reads it. `@Bindable` so the iOS/macOS
+    /// overlay can still take plain bindings.
+    @Bindable var clock: PlaybackClock
     /// Invoked when the viewer picks a different stream (another episode, or a
     /// live channel via the Siri remote) from the in-player overlay. The host
     /// swaps `media` in response. tvOS only.
@@ -84,8 +90,8 @@ struct KSPlayerEngineView: View {
                     }
                     .onPlay { current, total in
                         if !isSeeking {
-                            if current.isFinite { currentTime = current }
-                            if total.isFinite, total > 0 { duration = total }
+                            if current.isFinite { clock.current = current }
+                            if total.isFinite, total > 0 { clock.duration = total }
                         }
                         // syncState (onStateChanged) already refreshes this on
                         // every transition; only chase it from the per-tick play
@@ -101,8 +107,7 @@ struct KSPlayerEngineView: View {
                     TVPlayerControlsOverlay(
                         coordinator: engine,
                         media: media,
-                        currentTime: $currentTime,
-                        duration: $duration,
+                        clock: clock,
                         panelCloseToken: panelCloseToken,
                         onTogglePlay: { togglePlay() },
                         onResetHideTimer: { resetHideTimer() },
@@ -250,8 +255,8 @@ struct KSPlayerEngineView: View {
                     }
                     .onPlay { current, total in
                         if !isSeeking {
-                            if current.isFinite { currentTime = current }
-                            if total.isFinite, total > 0 { duration = total }
+                            if current.isFinite { clock.current = current }
+                            if total.isFinite, total > 0 { clock.duration = total }
                         }
                     }
                     .ignoresSafeArea()
@@ -311,8 +316,8 @@ struct KSPlayerEngineView: View {
                 isPlaying: $isPlaying,
                 isSeeking: $isSeeking,
                 seekPosition: $seekPosition,
-                currentTime: $currentTime,
-                duration: $duration,
+                currentTime: $clock.current,
+                duration: $clock.duration,
                 isPipActive: $isPipActive,
                 hideTask: $hideTask,
                 onClose: { closePlayer() },
@@ -373,8 +378,8 @@ struct KSPlayerEngineView: View {
     /// (re-read on each prepare); live rejoins the live edge.
     private func reconnect() {
         guard let layer = coordinator.playerLayer else { return }
-        if !media.isLive, currentTime > 1 {
-            layer.options.startPlayTime = currentTime
+        if !media.isLive, clock.current > 1 {
+            layer.options.startPlayTime = clock.current
         }
         Logger.player.log("reconnect: reloading KSPlayer stream")
         layer.play()
@@ -491,8 +496,7 @@ struct KSPlayerEngineView: View {
             startTime: 0,
             contentRef: .movie("preview")
         ),
-        currentTime: .constant(0),
-        duration: .constant(120)
+        clock: PlaybackClock()
     )
     .preferredColorScheme(.dark)
 }

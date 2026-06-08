@@ -21,8 +21,15 @@ import VLCKitSPM
 /// internally — see `VLCPlayerCoordinator`.
 struct VLCPlayerEngineView: View {
     let media: PlayableMedia
-    @Binding var currentTime: TimeInterval
-    @Binding var duration: TimeInterval
+    /// High-frequency playback clock, held as the `@Observable` object rather
+    /// than as `@Binding` scalars. A `@Binding` whose root is an `@Observable`
+    /// makes the *holding* view re-render on every change — so binding the clock
+    /// here re-rendered the engine view (and rebuilt the controls overlay /
+    /// menus) on every playback tick. Holding the object and never reading
+    /// `current`/`duration` in this body keeps the engine view off the tick path;
+    /// only the scrubber leaf reads it. `@Bindable` so the iOS/macOS overlay can
+    /// still take plain bindings.
+    @Bindable var clock: PlaybackClock
     /// Invoked when the viewer picks a different stream (e.g. another episode)
     /// from the in-player overlay. The host swaps `media` in response.
     var onSelectMedia: ((PlayableMedia) -> Void)?
@@ -87,10 +94,10 @@ struct VLCPlayerEngineView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             coordinator.onTime = { current in
-                if !isSeeking, current.isFinite { currentTime = current }
+                if !isSeeking, current.isFinite { clock.current = current }
             }
             coordinator.onDuration = { total in
-                if total.isFinite, total > 0 { duration = total }
+                if total.isFinite, total > 0 { clock.duration = total }
             }
             coordinator.configure(media: media, deinterlace: deinterlace)
             scheduleHide()
@@ -201,8 +208,7 @@ struct VLCPlayerEngineView: View {
             TVPlayerControlsOverlay(
                 coordinator: coordinator,
                 media: media,
-                currentTime: $currentTime,
-                duration: $duration,
+                clock: clock,
                 panelCloseToken: panelCloseToken,
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
@@ -216,8 +222,8 @@ struct VLCPlayerEngineView: View {
                 media: media,
                 isSeeking: $isSeeking,
                 seekPosition: $seekPosition,
-                currentTime: $currentTime,
-                duration: $duration,
+                currentTime: $clock.current,
+                duration: $clock.duration,
                 hideTask: $hideTask,
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
@@ -416,8 +422,7 @@ private extension View {
             startTime: 0,
             contentRef: .movie("preview")
         ),
-        currentTime: .constant(0),
-        duration: .constant(120)
+        clock: PlaybackClock()
     )
     .preferredColorScheme(.dark)
 }
