@@ -1,96 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Drag to reorder your favorite channels — this sets the order shown in the Favorites category. Tap the heart to remove one. Reset restores the provider's order." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ziehe, um deine Favoritensender neu anzuordnen – das bestimmt ihre Reihenfolge in der Favoriten-Kategorie. Tippe auf das Herz, um einen zu entfernen. Zurücksetzen stellt die Reihenfolge des Anbieters wieder her."
-          }
-        }
-      }
-    },
-    "Favorite Channels" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Favoritensender"
-          }
-        }
-      }
-    },
-    "Movies you mark as favorites will appear here" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filme, die du als Favoriten markierst, erscheinen hier"
-          }
-        }
-      }
-    },
-    "Movies you watch will appear here" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filme, die du ansiehst, erscheinen hier"
-          }
-        }
-      }
-    },
-    "No favorite channels yet." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Noch keine Favoritensender."
-          }
-        }
-      }
-    },
-    "No favorite channels yet. Mark channels as favorites to manage their order here." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Noch keine Favoritensender. Markiere Sender als Favoriten, um ihre Reihenfolge hier zu verwalten."
-          }
-        }
-      }
-    },
-    "Reorder the channels in your Favorites category." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ordne die Sender in deiner Favoriten-Kategorie neu an."
-          }
-        }
-      }
-    },
-    "Series you mark as favorites will appear here" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Serien, die du als Favoriten markierst, erscheinen hier"
-          }
-        }
-      }
-    },
-    "Series you watch will appear here" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Serien, die du ansiehst, erscheinen hier"
-          }
-        }
-      }
-    },
     "-" : {
 
     },
@@ -577,6 +487,16 @@
         }
       }
     },
+    "Drag to reorder your favorite channels — this sets the order shown in the Favorites category. Tap the heart to remove one. Reset restores the provider's order." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziehe, um deine Favoritensender neu anzuordnen – das bestimmt ihre Reihenfolge in der Favoriten-Kategorie. Tippe auf das Herz, um einen zu entfernen. Zurücksetzen stellt die Reihenfolge des Anbieters wieder her."
+          }
+        }
+      }
+    },
     "e.g. http://example.com:8080" : {
       "localizations" : {
         "de" : {
@@ -740,6 +660,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Favorit"
+          }
+        }
+      }
+    },
+    "Favorite Channels" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favoritensender"
           }
         }
       }
@@ -1117,6 +1047,26 @@
         }
       }
     },
+    "Movies you mark as favorites will appear here" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filme, die du als Favoriten markierst, erscheinen hier"
+          }
+        }
+      }
+    },
+    "Movies you watch will appear here" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filme, die du ansiehst, erscheinen hier"
+          }
+        }
+      }
+    },
     "Movies, Series, Live TV..." : {
       "localizations" : {
         "de" : {
@@ -1212,6 +1162,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Episoden verfügbar"
+          }
+        }
+      }
+    },
+    "No favorite channels yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Favoritensender."
+          }
+        }
+      }
+    },
+    "No favorite channels yet. Mark channels as favorites to manage their order here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Favoritensender. Markiere Sender als Favoriten, um ihre Reihenfolge hier zu verwalten."
           }
         }
       }
@@ -1570,6 +1540,10 @@
         }
       }
     },
+    "Remove %@ from favorites" : {
+      "comment" : "A button that removes a live channel from the user's favorites. The argument is the name of the channel.",
+      "isCommentAutoGenerated" : true
+    },
     "Remove from favorites" : {
       "localizations" : {
         "de" : {
@@ -1586,6 +1560,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aus Favoriten entfernen"
+          }
+        }
+      }
+    },
+    "Reorder the channels in your Favorites category." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordne die Sender in deiner Favoriten-Kategorie neu an."
           }
         }
       }
@@ -1732,6 +1716,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Serien-Kategorien"
+          }
+        }
+      }
+    },
+    "Series you mark as favorites will appear here" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serien, die du als Favoriten markierst, erscheinen hier"
+          }
+        }
+      }
+    },
+    "Series you watch will appear here" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serien, die du ansiehst, erscheinen hier"
           }
         }
       }
