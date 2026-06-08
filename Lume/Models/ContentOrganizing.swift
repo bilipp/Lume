@@ -61,8 +61,53 @@ enum ContentOrganizer {
     }
 
     private static func stampOrder(_ arranged: [some ContentItem]) {
+        stamp(arranged, into: \.customOrder)
+    }
+
+    private static func stamp<Item: AnyObject>(_ arranged: [Item], into keyPath: ReferenceWritableKeyPath<Item, Int?>) {
         for (index, item) in arranged.enumerated() {
-            item.customOrder = index
+            item[keyPath: keyPath] = index
         }
+    }
+}
+
+// MARK: - Favorites ordering
+
+/// Content that carries an independent ordering for the Favorites collection,
+/// alongside its primary `customOrder`. Live channels are reorderable both
+/// within their category and within Favorites, so the two orders are stored
+/// separately.
+protocol FavoriteOrderable: AnyObject {
+    var id: String { get }
+    var favoriteOrder: Int? { get set }
+    var isFavorite: Bool { get set }
+}
+
+extension LiveStream: FavoriteOrderable {}
+
+extension ContentOrganizer {
+    /// Applies a SwiftUI `.onMove` to an already-sorted favorites group and
+    /// stamps a dense `favoriteOrder` so the arrangement persists.
+    static func reorderFavorites(_ items: [some FavoriteOrderable], from source: IndexSet, to destination: Int) {
+        var arranged = items
+        arranged.move(fromOffsets: source, toOffset: destination)
+        stampFavoriteOrder(arranged)
+    }
+
+    /// Persists an explicit final favorites arrangement in one pass (tvOS
+    /// pick-up/place reorder).
+    static func commitFavoriteOrder(_ arranged: [some FavoriteOrderable]) {
+        stampFavoriteOrder(arranged)
+    }
+
+    /// Clears the user-defined favorites order, reverting to provider order.
+    static func resetFavoriteOrder(_ items: [some FavoriteOrderable]) {
+        for item in items {
+            item.favoriteOrder = nil
+        }
+    }
+
+    private static func stampFavoriteOrder(_ arranged: [some FavoriteOrderable]) {
+        stamp(arranged, into: \.favoriteOrder)
     }
 }

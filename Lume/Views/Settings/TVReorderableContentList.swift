@@ -39,6 +39,12 @@
         /// category's channels. nil for the channel list itself.
         var drillValue: ((Item) -> Category)?
         let onToggleHidden: (Item) -> Void
+        /// The per-row toggle's SF Symbol, given the row's `isHidden` value.
+        /// Defaults to the eye / eye-slash hide control; the favorites reorder
+        /// screen overrides it with a heart to mean "remove from favorites".
+        var toggleImage: (Bool) -> String = { $0 ? "eye.slash" : "eye" }
+        /// Accessibility label for that toggle, given `isHidden` and the title.
+        var toggleAccessibility: (Bool, String) -> String = { $0 ? "Show \($1)" : "Hide \($1)" }
         /// Commit the final arrangement (single batched persistence pass).
         let onCommitOrder: ([Item]) -> Void
         /// Lets the host disable its type picker / Reset while a row is lifted,
@@ -64,7 +70,9 @@
             onToggleHidden: @escaping (Item) -> Void,
             onCommitOrder: @escaping ([Item]) -> Void,
             isReordering: Binding<Bool>,
-            scrollProxy: ScrollViewProxy
+            scrollProxy: ScrollViewProxy,
+            toggleImage: @escaping (Bool) -> String = { $0 ? "eye.slash" : "eye" },
+            toggleAccessibility: @escaping (Bool, String) -> String = { $0 ? "Show \($1)" : "Hide \($1)" }
         ) {
             self.items = items
             self.title = title
@@ -74,6 +82,8 @@
             self.onCommitOrder = onCommitOrder
             _isReordering = isReordering
             self.scrollProxy = scrollProxy
+            self.toggleImage = toggleImage
+            self.toggleAccessibility = toggleAccessibility
         }
 
         private var displayed: [Item] {
@@ -109,6 +119,8 @@
                         isLifted: lifted,
                         isMoving: liftedID != nil,
                         drillValue: drillValue?(item),
+                        toggleImageName: toggleImage(isHidden(item)),
+                        toggleAccessibilityLabel: toggleAccessibility(isHidden(item), title(item)),
                         focus: $focusedID,
                         onGrabOrDrop: { lifted ? drop() : lift(item) },
                         onToggleHidden: { onToggleHidden(item) },
@@ -216,6 +228,8 @@
         let isLifted: Bool
         let isMoving: Bool
         let drillValue: Category?
+        let toggleImageName: String
+        let toggleAccessibilityLabel: String
         var focus: FocusState<String?>.Binding
         let onGrabOrDrop: () -> Void
         let onToggleHidden: () -> Void
@@ -244,10 +258,10 @@
 
                 if !isMoving {
                     Button(action: onToggleHidden) {
-                        Image(systemName: isHidden ? "eye.slash" : "eye")
+                        Image(systemName: toggleImageName)
                     }
                     .buttonStyle(TVContentIconButtonStyle())
-                    .accessibilityLabel(isHidden ? "Show \(title)" : "Hide \(title)")
+                    .accessibilityLabel(toggleAccessibilityLabel)
 
                     if let drillValue {
                         NavigationLink(value: drillValue) {

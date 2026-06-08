@@ -35,6 +35,8 @@ struct ContentManagementView: View {
         /// Drives the drill-in to channel management. Owned here (not by a List
         /// row's NavigationLink) so the push survives the List reloading its rows.
         @State private var selectedCategory: Category?
+        /// Drives the drill-in to favorites reordering, same rationale as above.
+        @State private var favoritesRoute: FavoriteChannelsRoute?
     #endif
 
     var body: some View {
@@ -54,6 +56,9 @@ struct ContentManagementView: View {
         .navigationDestination(for: Category.self) { category in
             ChannelManagementView(category: category)
         }
+        .navigationDestination(for: FavoriteChannelsRoute.self) { _ in
+            FavoriteChannelManagementView()
+        }
         #else
                 // iOS/macOS drives the drill-in from view-owned @State rather than a
                 // value-based NavigationLink inside the List row. A row link's push is
@@ -63,6 +68,9 @@ struct ContentManagementView: View {
                 // back. An item-binding push survives that reload.
         .navigationDestination(item: $selectedCategory) { category in
                     ChannelManagementView(category: category)
+                }
+                .navigationDestination(item: $favoritesRoute) { _ in
+                    FavoriteChannelManagementView()
                 }
         #endif
     }
@@ -123,6 +131,19 @@ struct ContentManagementView: View {
                         }
 
                         tvTypePicker
+
+                        if selectedType == .live, !isReordering {
+                            NavigationLink(value: FavoriteChannelsRoute()) {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "heart.fill")
+                                    Text("Favorites")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                }
+                            }
+                            .buttonStyle(TVContentActionButtonStyle())
+                            .focusSection()
+                        }
 
                         tvCategoryList(proxy: proxy)
                     }
@@ -199,6 +220,30 @@ struct ContentManagementView: View {
                     .pickerStyle(.segmented)
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
+                }
+
+                if selectedType == .live {
+                    Section {
+                        Button {
+                            favoritesRoute = FavoriteChannelsRoute()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "heart.fill")
+                                    .foregroundStyle(.red)
+                                Text("Favorites")
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    } footer: {
+                        Text("Reorder the channels in your Favorites category.")
+                    }
                 }
 
                 Section {

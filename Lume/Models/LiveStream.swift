@@ -26,6 +26,13 @@ final class LiveStream {
     /// provider order" (`num`); once reordered, every channel in the category
     /// gets a dense value so it survives re-syncs.
     var customOrder: Int?
+    /// A user-defined order for the Favorites collection, independent of the
+    /// per-category `customOrder`. `nil` means "follow the provider order"; once
+    /// the favorites are reordered in Content Management, every favorite gets a
+    /// dense value so the arrangement survives re-syncs. Kept separate from
+    /// `customOrder` because a channel's place among its category's channels and
+    /// its place in the Favorites list are independent.
+    var favoriteOrder: Int?
 
     init(
         id: String,

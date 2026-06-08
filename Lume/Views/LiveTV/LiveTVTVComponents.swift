@@ -14,24 +14,26 @@
     // MARK: - tvOS Channels List
 
     struct TVChannelsList: View {
-        let category: Category
+        let scope: LiveChannelScope
+        let playlistPrefix: String
         let onPlay: (LiveStream) -> Void
         @Query private var streams: [LiveStream]
 
-        init(category: Category, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
-            self.category = category
+        init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
+            self.scope = scope
+            self.playlistPrefix = playlistPrefix
             self.onPlay = onPlay
-            let categoryId = category.id
-            _streams = Query(
-                filter: #Predicate<LiveStream> { $0.categoryId == categoryId && $0.isHidden == false },
-                sort: sort.liveStreamDescriptors
-            )
+            _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
+        }
+
+        private var scopedStreams: [LiveStream] {
+            LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
         }
 
         var body: some View {
             ScrollView {
                 LazyVStack(spacing: 14) {
-                    if streams.isEmpty {
+                    if scopedStreams.isEmpty {
                         ContentUnavailableView(
                             "No Channels",
                             systemImage: "antenna.radiowaves.left.and.right",
@@ -39,7 +41,7 @@
                         )
                         .padding(.top, 80)
                     } else {
-                        ForEach(streams) { stream in
+                        ForEach(scopedStreams) { stream in
                             TVChannelRow(stream: stream) {
                                 onPlay(stream)
                             }
@@ -195,12 +197,16 @@
     /// programme guide. One rail and one switch, in one place and one style,
     /// across both modes makes moving between the two views consistent.
     struct TVLiveTVScreen: View {
-        let categories: [Category]
-        @Binding var selectedCategory: Category?
-        let displayedCategory: Category?
+        let sections: [LiveTVSection]
+        @Binding var selectedSection: LiveTVSection?
+        let displayedSection: LiveTVSection?
         @Binding var layoutModeRaw: String
         let contentSort: ContentSortOption
         let onPlay: (LiveStream) -> Void
+
+        /// The active playlist's id prefix, needed to scope the virtual
+        /// (favorites / recently watched) collections in-memory.
+        let playlistPrefix: String
 
         private var layoutMode: LiveTVLayoutMode {
             LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
@@ -213,8 +219,8 @@
                 // not this screen's `content`, which would otherwise reconstruct
                 // `EPGGuideView` (and re-run its grid build) on every keypress.
                 TVCategoryRail(
-                    categories: categories,
-                    selectedCategory: $selectedCategory,
+                    sections: sections,
+                    selectedSection: $selectedSection,
                     layoutModeRaw: $layoutModeRaw
                 )
                 content
@@ -223,15 +229,15 @@
 
         @ViewBuilder
         private var content: some View {
-            if let category = displayedCategory {
+            if let section = displayedSection {
                 switch layoutMode {
                 case .guide:
-                    EPGGuideView(category: category, sort: contentSort, onPlay: onPlay)
-                        .id("\(category.id)-\(contentSort.rawValue)-guide")
+                    EPGGuideView(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort, onPlay: onPlay)
+                        .id("\(section.id)-\(contentSort.rawValue)-guide")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .list:
-                    TVChannelsList(category: category, sort: contentSort, onPlay: onPlay)
-                        .id("\(category.id)-\(contentSort.rawValue)-list")
+                    TVChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort, onPlay: onPlay)
+                        .id("\(section.id)-\(contentSort.rawValue)-list")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
@@ -251,8 +257,8 @@
     /// list. Owns the rail's `@FocusState` so focus changes here never propagate
     /// up to `TVLiveTVScreen` and rebuild the (expensive) content area.
     private struct TVCategoryRail: View {
-        let categories: [Category]
-        @Binding var selectedCategory: Category?
+        let sections: [LiveTVSection]
+        @Binding var selectedSection: LiveTVSection?
         @Binding var layoutModeRaw: String
 
         /// Which rail control currently holds focus — drives the highlight.
@@ -284,8 +290,8 @@
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
-                        ForEach(categories) { category in
-                            categoryButton(category)
+                        ForEach(sections) { section in
+                            categoryButton(section)
                         }
                     }
                     .padding(.horizontal, 14)
@@ -354,31 +360,37 @@
             return AnyShapeStyle(.clear)
         }
 
-        private func categoryButton(_ category: Category) -> some View {
-            let isSelected = selectedCategory?.id == category.id
-            let isItemFocused = focused == .category(category.id)
+        private func categoryButton(_ section: LiveTVSection) -> some View {
+            let isSelected = selectedSection?.id == section.id
+            let isItemFocused = focused == .category(section.id)
             return Button {
-                selectedCategory = category
+                selectedSection = section
             } label: {
-                Text(category.name)
-                    .font(.system(
-                        size: 22,
-                        weight: isSelected || isItemFocused ? .semibold : .regular
-                    ))
-                    .foregroundStyle(textColor(isFocused: isItemFocused, isSelected: isSelected))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(categoryFill(isFocused: isItemFocused, isSelected: isSelected))
-                    )
+                HStack(spacing: 8) {
+                    if let icon = section.icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 20, weight: .semibold))
+                    }
+                    section.titleText
+                        .font(.system(
+                            size: 22,
+                            weight: isSelected || isItemFocused ? .semibold : .regular
+                        ))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                        .multilineTextAlignment(.leading)
+                }
+                .foregroundStyle(textColor(isFocused: isItemFocused, isSelected: isSelected))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(categoryFill(isFocused: isItemFocused, isSelected: isSelected))
+                )
             }
             .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
-            .focused($focused, equals: .category(category.id))
+            .focused($focused, equals: .category(section.id))
             .animation(.easeOut(duration: 0.18), value: isItemFocused)
         }
 
