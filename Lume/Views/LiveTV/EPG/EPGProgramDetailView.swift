@@ -123,6 +123,23 @@ struct EPGProgramDetailView: View {
                                 .frame(maxWidth: 520)
                         }
 
+                        if stream.tvArchive > 0 {
+                            Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
+                                .font(.system(size: 26))
+                                .foregroundStyle(.blue)
+                        }
+
+                        // Keep the action above the synopsis. The button is the only
+                        // focusable element here, and on tvOS the ScrollView only
+                        // reveals content as focus moves. A long synopsis below the
+                        // button would otherwise push it off-screen and out of reach.
+                        TVPlayButton(title: "Watch Live", systemImage: "play.fill") {
+                            onPlay()
+                            dismiss()
+                        }
+                        .frame(maxWidth: 460)
+                        .padding(.top, 16)
+
                         if !cell.detail.isEmpty {
                             Text(cell.detail)
                                 .font(.system(size: 28))
@@ -130,19 +147,6 @@ struct EPGProgramDetailView: View {
                                 .lineSpacing(6)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-
-                        if stream.tvArchive > 0 {
-                            Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
-                                .font(.system(size: 26))
-                                .foregroundStyle(.blue)
-                        }
-
-                        TVPlayButton(title: "Watch Live", systemImage: "play.fill") {
-                            onPlay()
-                            dismiss()
-                        }
-                        .frame(maxWidth: 460)
-                        .padding(.top, 16)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
