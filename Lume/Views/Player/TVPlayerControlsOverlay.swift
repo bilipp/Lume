@@ -332,13 +332,26 @@
             .disabled(!enabled)
         }
 
-        // MARK: - Trailing controls (audio / subtitles)
+        // MARK: - Trailing controls (audio / subtitles / favorite)
 
         private var trailingControls: some View {
             HStack(spacing: 16) {
                 audioTrackMenu
                 subtitleMenu
+                favoriteButton
             }
+        }
+
+        /// Icon-only heart sitting alongside the track menus, rendered in the
+        /// same glass circle. Always available (favoriting needs no tracks);
+        /// works for live, series and movies via the resolved content.
+        private var favoriteButton: some View {
+            Button(action: toggleFavorite) {
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+            }
+            .buttonStyle(TVPlayerCircleButtonStyle())
+            .focused($focus, equals: .favorite)
+            .accessibilityLabel(isFavorite ? "In Favorites" : "Favorite")
         }
 
         @ViewBuilder
@@ -414,7 +427,7 @@
                 badges: infoBadges,
                 posterURL: media.posterURL,
                 primaryAction: infoPrimaryAction,
-                secondaryAction: infoSecondaryAction,
+                secondaryAction: nil,
                 focus: $focus,
                 onClose: closePanel
             )

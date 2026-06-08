@@ -279,21 +279,16 @@
             }
         }
 
-        var infoSecondaryAction: TVPlayerInfoAction? {
-            TVPlayerInfoAction(
-                title: isFavorite ? "In Favorites" : "Favorite",
-                systemImage: isFavorite ? "heart.fill" : "heart",
-                perform: toggleFavorite
-            )
-        }
-
-        private var isFavorite: Bool {
+        /// Drives the heart control in the trailing track-menu group (see
+        /// `TVPlayerControlsOverlay.favoriteButton`). Reads the resolved
+        /// `@Observable` model so toggling re-renders the glyph.
+        var isFavorite: Bool {
             if isSeries { return episode?.series?.isFavorite ?? false }
             if media.isLive { return liveStream?.isFavorite ?? false }
             return movie?.isFavorite ?? false
         }
 
-        private func toggleFavorite() {
+        func toggleFavorite() {
             if isSeries, let series = episode?.series {
                 series.isFavorite.toggle()
                 series.addedToWatchlistDate = series.isFavorite ? Date() : nil

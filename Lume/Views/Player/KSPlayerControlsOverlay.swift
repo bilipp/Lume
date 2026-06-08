@@ -1,4 +1,5 @@
 import KSPlayer
+import SwiftData
 import SwiftUI
 
 // MARK: - Controls Overlay (iOS / macOS)
@@ -26,6 +27,11 @@ import SwiftUI
         var onResetHideTimer: () -> Void
         var onScheduleHide: () -> Void
 
+        @Environment(\.modelContext) private var modelContext
+        /// Mirrors the backing model's favorite flag; refreshed when the media
+        /// changes and updated locally on toggle so the heart re-renders.
+        @State private var isFavorite = false
+
         var body: some View {
             ZStack {
                 scrim
@@ -37,6 +43,9 @@ import SwiftUI
                     Spacer(minLength: 0)
                     bottomControls
                 }
+            }
+            .task(id: media.id) {
+                isFavorite = PlayerFavorites.isFavorite(for: media.contentRef, in: modelContext)
             }
         }
 
@@ -185,9 +194,21 @@ import SwiftUI
                 if !coordinator.subtitleModel.subtitleInfos.isEmpty { subtitleMenu }
                 if !media.isLive { playbackRateMenu }
                 contentModeButton
+                favoriteButton
             }
             .padding(.horizontal, 4)
             .glassEffect(.regular.interactive(), in: .capsule)
+        }
+
+        private var favoriteButton: some View {
+            Button {
+                isFavorite = PlayerFavorites.toggle(for: media.contentRef, in: modelContext)
+                onResetHideTimer()
+            } label: {
+                pillGlyph(isFavorite ? "heart.fill" : "heart")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isFavorite ? "In Favorites" : "Favorite")
         }
 
         @ViewBuilder

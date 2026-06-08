@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import VLCKitSPM
 
@@ -21,6 +22,11 @@ struct VLCPlayerControlsOverlay: View {
     var onResetHideTimer: () -> Void
     var onScheduleHide: () -> Void
 
+    @Environment(\.modelContext) private var modelContext
+    /// Mirrors the backing model's favorite flag; refreshed when the media
+    /// changes and updated locally on toggle so the heart re-renders.
+    @State private var isFavorite = false
+
     var body: some View {
         ZStack {
             scrim
@@ -32,6 +38,9 @@ struct VLCPlayerControlsOverlay: View {
                 Spacer(minLength: 0)
                 bottomControls
             }
+        }
+        .task(id: media.id) {
+            isFavorite = PlayerFavorites.isFavorite(for: media.contentRef, in: modelContext)
         }
     }
 
@@ -182,21 +191,30 @@ struct VLCPlayerControlsOverlay: View {
 
     // MARK: - Secondary Controls (grouped glass pill)
 
-    @ViewBuilder
     private var secondaryControls: some View {
         let hasAudio = coordinator.audioTracks.count > 1
         let hasText = !coordinator.textTracks.isEmpty
         let hasRate = !media.isLive
 
-        if hasText || hasAudio || hasRate {
-            HStack(spacing: 4) {
-                if hasText { subtitleMenu }
-                if hasAudio { audioTrackMenu }
-                if hasRate { playbackRateMenu }
-            }
-            .padding(.horizontal, 4)
-            .glassEffect(.regular.interactive(), in: .capsule)
+        return HStack(spacing: 4) {
+            if hasText { subtitleMenu }
+            if hasAudio { audioTrackMenu }
+            if hasRate { playbackRateMenu }
+            favoriteButton
         }
+        .padding(.horizontal, 4)
+        .glassEffect(.regular.interactive(), in: .capsule)
+    }
+
+    private var favoriteButton: some View {
+        Button {
+            isFavorite = PlayerFavorites.toggle(for: media.contentRef, in: modelContext)
+            onResetHideTimer()
+        } label: {
+            pillGlyph(isFavorite ? "heart.fill" : "heart")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isFavorite ? "In Favorites" : "Favorite")
     }
 
     @ViewBuilder

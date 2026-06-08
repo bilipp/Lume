@@ -28,6 +28,7 @@
         case tab(Int)
         case audio
         case subtitles
+        case favorite
         case panelClose
         case episode(String)
         case channel(String)
