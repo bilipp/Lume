@@ -66,7 +66,7 @@ struct SettingsView: View {
                 #endif
                 .platformNavigationTitle("Settings")
                 .sheet(isPresented: $showingAddPlaylist) {
-                    LoginView()
+                    LoginView(isModal: true)
                 }
             }
             #if os(macOS)
@@ -255,7 +255,7 @@ struct SettingsView: View {
                     }
                 }
                 .fullScreenCover(isPresented: $showingAddPlaylist) {
-                    LoginView()
+                    LoginView(isModal: true)
                 }
             }
         }

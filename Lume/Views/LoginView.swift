@@ -2,8 +2,20 @@ import SwiftData
 import SwiftUI
 
 struct LoginView: View {
+    /// Whether this view is presented modally (the Settings "Add Playlist"
+    /// sheet / cover) and should therefore offer a Cancel button and dismiss
+    /// itself once a playlist is added. False when it's the window's root
+    /// content on first launch — there is nothing to cancel to, and on macOS
+    /// calling `dismiss()` on root content closes the whole window (the app
+    /// keeps running but loses its only window, forcing a relaunch from the
+    /// Dock). Adding the playlist swaps the root to MainTabView on its own via
+    /// ContentView's @Query, so no dismissal is needed there.
+    ///
+    /// This is passed explicitly rather than read from `@Environment(\.isPresented)`
+    /// because on macOS that value is `true` even for non-presented root content.
+    var isModal = false
+
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.isPresented) private var isPresented
     @Environment(\.modelContext) private var modelContext
 
     @State private var name = ""
@@ -91,9 +103,13 @@ struct LoginView: View {
                 #endif
                 .navigationTitle("Add Playlist")
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                            .disabled(isLoading)
+                    // Only offer Cancel when presented modally (the Settings
+                    // sheet). On first launch there is nothing to cancel to.
+                    if isModal {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { dismiss() }
+                                .disabled(isLoading)
+                        }
                     }
                 }
                 .interactiveDismissDisabled(isLoading)
@@ -144,9 +160,13 @@ struct LoginView: View {
                         .buttonStyle(TVSettingsActionButtonStyle(prominent: true))
                         .disabled(!isFormValid || isLoading)
 
-                        Button("Cancel") { dismiss() }
-                            .buttonStyle(TVSettingsActionButtonStyle())
-                            .disabled(isLoading)
+                        // Only offer Cancel when presented modally (the Settings
+                        // cover); on first launch there is nothing to cancel to.
+                        if isModal {
+                            Button("Cancel") { dismiss() }
+                                .buttonStyle(TVSettingsActionButtonStyle())
+                                .disabled(isLoading)
+                        }
                     }
                     .padding(.top, 8)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -194,12 +214,13 @@ struct LoginView: View {
                     // fetches nil, silently completing without syncing.
                     try? modelContext.save()
                     isLoading = false
-                    // Only dismiss when presented (e.g. the Settings sheet). On
-                    // first run LoginView is the window's root content, where
-                    // dismiss() would close the window on macOS and leave the app
-                    // with no visible window. Inserting the playlist already swaps
-                    // the root over to MainTabView via ContentView's @Query.
-                    if isPresented {
+                    // Only dismiss when presented modally (e.g. the Settings
+                    // sheet). On first launch LoginView is the window's root
+                    // content, where dismiss() closes the window on macOS and
+                    // leaves the app with no visible window. Inserting the
+                    // playlist already swaps the root over to MainTabView via
+                    // ContentView's @Query.
+                    if isModal {
                         dismiss()
                     }
                 }
