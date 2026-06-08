@@ -134,10 +134,12 @@ private struct EPGGridScroller: View {
                     now: now,
                     sync: sync,
                     jumpToken: jumpToken,
-                    nowTarget: nowScrollTarget
-                ) { row, cell in
-                    selection = EPGSelection(id: cell.id, stream: row.stream, cell: cell)
-                }
+                    nowTarget: nowScrollTarget,
+                    onPlay: { row, _ in onPlay(row.stream) },
+                    onShowDetails: { row, cell in
+                        selection = EPGSelection(id: cell.id, stream: row.stream, cell: cell)
+                    }
+                )
             }
         }
         #if !os(tvOS)
@@ -270,14 +272,15 @@ private struct EPGGrid: View {
     let sync: EPGScrollSync
     let jumpToken: Int
     let nowTarget: CGFloat
-    let onSelect: (EPGChannelRow, EPGProgramCell) -> Void
+    let onPlay: (EPGChannelRow, EPGProgramCell) -> Void
+    let onShowDetails: (EPGChannelRow, EPGProgramCell) -> Void
 
     @State private var position = ScrollPosition()
     @State private var didInitialScroll = false
 
     var body: some View {
         ScrollView([.horizontal, .vertical]) {
-            EPGRows(rows: rows, timeline: timeline, metrics: metrics, now: now, onSelect: onSelect)
+            EPGRows(rows: rows, timeline: timeline, metrics: metrics, now: now, onPlay: onPlay, onShowDetails: onShowDetails)
         }
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGPoint.self) { $0.contentOffset } action: { _, new in
@@ -306,7 +309,8 @@ private struct EPGRows: View {
     let timeline: EPGTimeline
     let metrics: EPGMetrics
     let now: Date
-    let onSelect: (EPGChannelRow, EPGProgramCell) -> Void
+    let onPlay: (EPGChannelRow, EPGProgramCell) -> Void
+    let onShowDetails: (EPGChannelRow, EPGProgramCell) -> Void
 
     private var contentHeight: CGFloat {
         guard !rows.isEmpty else { return 0 }
@@ -316,9 +320,14 @@ private struct EPGRows: View {
     var body: some View {
         LazyVStack(spacing: metrics.rowSpacing) {
             ForEach(rows) { row in
-                EPGProgramStrip(row: row, metrics: metrics, now: now, contentWidth: timeline.totalWidth) { cell in
-                    onSelect(row, cell)
-                }
+                EPGProgramStrip(
+                    row: row,
+                    metrics: metrics,
+                    now: now,
+                    contentWidth: timeline.totalWidth,
+                    onPlay: { cell in onPlay(row, cell) },
+                    onShowDetails: { cell in onShowDetails(row, cell) }
+                )
             }
         }
         .frame(width: timeline.totalWidth, alignment: .topLeading)
@@ -335,7 +344,8 @@ private struct EPGRows: View {
 // MARK: - Programme strip
 
 /// A single channel's row of programme blocks. Programmes are buttons; gaps are
-/// inert.
+/// inert. A quick click plays the channel; a long press opens the programme
+/// detail sheet.
 private struct EPGProgramStrip: View {
     let row: EPGChannelRow
     let metrics: EPGMetrics
@@ -344,7 +354,8 @@ private struct EPGProgramStrip: View {
     /// whole horizontal extent up front — the scroll region and the "now" line
     /// stay correct even before trailing (off-screen) blocks are realized.
     let contentWidth: CGFloat
-    let onSelect: (EPGProgramCell) -> Void
+    let onPlay: (EPGProgramCell) -> Void
+    let onShowDetails: (EPGProgramCell) -> Void
 
     var body: some View {
         // Lazy so only the handful of on-screen programmes per row are built and
@@ -357,13 +368,20 @@ private struct EPGProgramStrip: View {
                     EPGProgramBlockView(cell: cell, metrics: metrics, now: now, isFocused: false)
                 } else {
                     Button {
-                        onSelect(cell)
+                        onPlay(cell)
                     } label: {
                         Color.clear.frame(width: cell.width, height: metrics.rowHeight)
                     }
                     .buttonStyle(EPGBlockButtonStyle(cell: cell, metrics: metrics, now: now))
+                    // Long press (press-and-hold Select on tvOS) opens the detail
+                    // sheet. The gesture takes the press once it recognizes, so a
+                    // hold doesn't also fire the button's play action.
+                    .onLongPressGesture(minimumDuration: 0.4) {
+                        onShowDetails(cell)
+                    }
                     .accessibilityLabel(Text(cell.title))
                     .accessibilityHint(Text("\(cell.start, format: .dateTime.hour().minute()) to \(cell.end, format: .dateTime.hour().minute()) on \(row.name)"))
+                    .accessibilityAction(named: Text("Show Details")) { onShowDetails(cell) }
                 }
             }
         }
