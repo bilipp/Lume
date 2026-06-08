@@ -1,111 +1,266 @@
-# Lume - the IPTV player for iOS and macOS
+<div align="center">
 
-## General
-Lume is an IPTV player for iOS and macOS (tvOS support planned). It supports xtream playlists, EPG data, and various streaming formats. Lume is built using SwiftUI, SwiftData and KSPlayer, providing a modern and intuitive user interface.
+<img src=".github/assets/lume-banner.png" alt="Lume" width="640">
 
+### A modern, native IPTV player for Apple platforms
+
+Browse, search, and stream your Xtream playlists with a clean SwiftUI interface — Live TV, Movies, and Series, enriched with metadata, EPG, and watch progress that follows you across your devices.
+
+<br>
+
+[![Platforms](https://img.shields.io/badge/platforms-iOS%20·%20iPadOS%20·%20macOS%20·%20tvOS%20·%20visionOS-1f1f2e?labelColor=1f1f2e)](#supported-platforms)
+[![Swift](https://img.shields.io/badge/Swift-5.x-F05138?logo=swift&logoColor=white)](https://swift.org)
+[![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)](https://developer.apple.com/xcode/swiftui/)
+[![SwiftData](https://img.shields.io/badge/Persistence-SwiftData-30B0C7)](https://developer.apple.com/documentation/swiftdata)
+[![Issues](https://img.shields.io/github/issues/bilipp/Lume?color=F9EE00&labelColor=1f1f2e)](https://github.com/bilipp/Lume/issues)
+
+</div>
+
+---
+
+## Table of contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Supported platforms](#supported-platforms)
+- [Playback engines](#playback-engines)
+- [Architecture](#architecture)
+- [Project structure](#project-structure)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Overview
+
+**Lume** is a native IPTV client for the Apple ecosystem. It connects to your own
+Xtream Codes provider, indexes the full catalog locally with **SwiftData** for
+instant, offline-capable browsing, and plays everything through a choice of three
+playback engines — from VLC's universal codec support to Apple's native AVPlayer.
+
+It is built entirely in **SwiftUI** with a single, platform-adaptive codebase that
+runs on iPhone, iPad, Mac, Apple TV, and Apple Vision Pro. Content is enriched with
+artwork, cast, trailers, and ratings from **TMDB**, and your viewing activity can be
+scrobbled to **Trakt**.
+
+> **Note** — Lume is a player only. It ships with **no channels, streams, or content**
+> of its own. You bring your own Xtream Codes credentials from a provider you are
+> entitled to use.
+
+---
 
 ## Features
-- **Xtream Playlist Support** — Add, manage, and sync multiple Xtream playlists
-- **Live TV** — Browse channels by category with EPG data display, channel logos, and catchup support
-- **Movies & Series** — Browse by categories with detailed metadata (rating, cast, plot, release date, etc.)
-- **Global Search** — Fast search across movies, series, and live channels with filter picker
-- **Watch Progress** — Automatic progress tracking with resume playback and auto-mark-watched at 90%
-- **Favorites & Watchlist** — Mark movies, series, and channels as favorites or watched
-- **Dual-Player Engine** — Choose between AVPlayer (native) and KSPlayer (FFmpeg-based) with user preference
-- **Multi-Platform** — Native support for iOS and macOS with platform-adaptive UI
-- **Content Sync** — Background sync engine with step-by-step progress for all content types
-- **Sorting & Organization** — Configurable sort options for categories and content
-- **Modern SwiftUI** — Clean interface following latest SwiftUI design patterns with Liquid Glass aesthetics
 
-## Layout
+#### 📺 Live TV
+- Browse channels by category with logos and **EPG** data (now & next)
+- Full **program guide** with a scrollable timeline
+- Catchup / time-shift support
+- Channel zapping with recently-watched history
+- Favorite channels and per-channel management
 
-### General
-- The app has a clean and modern design, following the latest SwiftUI design patterns and best practices (including liquid glass)
-- Tab-based navigation with sections for Live TV, Movies, TV Shows, and Settings. Search is available across all content types.
-- Each section has its own view with consistent navigation patterns
-- Settings in the tab bar (gear icon)
-- Title of the active section in the top center of the screen
+#### 🎬 Movies & Series
+- Category-based browsing with poster grids and horizontal rails
+- Rich detail views: plot, rating, cast, director, genre, runtime, release date
+- Season / episode navigation with **per-episode progress**
+- TMDB-enriched artwork, logos, and trailers
+- Quality / source picker when multiple streams are available
 
-### Live TV
-- Channel categories (from playlist). On click, the category is opened and all channels are shown with channel logo, name and EPG data (current and next show). On click on a channel, the player opens and the stream starts playing.
-- Recently watched and favorite channels (planned, tracked in [GitHub Issues](https://github.com/bilipp/Lume/issues))
+#### 🏠 Home
+- Personalized dashboard with a hero carousel
+- Continue Watching, Favorites, Recently Watched, and Trending rails
 
-### Movies
-- Sections for different categories (continue watching, trending, recently added, etc.)
-- Each section will have a horizontal scrollable list of movies with their poster - resulting in a clean look.
-- On click on a movie, the movie details view will be opened
+#### 🔎 Discovery & organization
+- Global search across Movies, Series, and Live channels with type filtering
+- Configurable sort options per category and content type
+- Hide and reorder categories to taste
+- Favorites and watched markers across every content type
 
-### TV Shows
-- Features similar to the movies
-- Within a show, the user will be able to select the season and episode
+#### ⏱️ Watch tracking
+- Automatic resume playback and progress tracking
+- Auto-mark-as-watched at 90% completion
+- Optional **Trakt** scrobbling and **TMDB** metadata enrichment
 
-#### Movie / Show Details
-- Movie or show poster, title, description, rating, cast, director, plot, genre, release date, duration
-- Play / Resume button to start playback
-- On play, the app checks availability in the xtream playlist. If multiple streams are available (different qualities), the user can choose.
-- Season and episode selection for TV shows with per-episode progress tracking
-- Ratings display (from Xtream playlist)
-- Cast and director information display
-- YouTube trailer link (full trailer player planned — tracked in [GitHub Issues](https://github.com/bilipp/Lume/issues))
-- Related and recommended movies/shows (planned — tracked in [GitHub Issues](https://github.com/bilipp/Lume/issues))
+#### ⚙️ Library management
+- Manage multiple Xtream playlists (add / edit / delete / switch)
+- Server info at a glance: status, active connections, expiry
+- Background **content sync** with step-by-step progress
+- Scheduled **auto-sync** (every 6 hours, daily, every 3 days, or weekly)
 
-##### View
-- Header icons: Back button on the left. Favorite (heart icon) and watched (eye icon) toggle buttons on the right.
-- Poster
-- Title (or logo if available)
-- Play / Resume button
-- Year and Duration
-- Description
-- Ratings section (IMDB, Rotten Tomatoes, etc.) (planned — tracked in [GitHub Issues](https://github.com/bilipp/Lume/issues))
-- Trailers (planned — tracked in [GitHub Issues](https://github.com/bilipp/Lume/issues))
-- Cast
-- Related movies/shows (planned — tracked in [GitHub Issues](https://github.com/bilipp/Lume/issues))
+---
 
-### Settings
-Manage Xtream playlists (add, edit, delete, sync) with server info display (status, active connections, expiry date). Customize the player engine (AVPlayer / KSPlayer). Additional settings like appearance themes, content management (hide/reorder categories), and player preferences (aspect ratio, subtitles) are planned — tracked in [GitHub Issues](https://github.com/bilipp/Lume/issues).
+## Supported platforms
 
-## Content indexing
-The app indexes content from the xtream playlist and EPG data locally using SwiftData, enabling fast searching and offline browsing. Progressive tracking and watch history are already supported, with personalized recommendations, hide/show categories, and reordering planned through [GitHub Issues](https://github.com/bilipp/Lume/issues).
+Lume is a single SwiftUI codebase that adapts to each platform's idioms — including a
+dedicated focus-driven interface and top-shelf branding on tvOS.
 
-## Future Plans
-Upcoming features and enhancements are tracked as [GitHub Issues](https://github.com/bilipp/Lume/issues). Key planned items include a home screen dashboard, Trakt and TMDB integration, downloads for offline viewing, iCloud sync, m3u support, parental controls, Chromecast support, and more.
+| Platform | Minimum OS | Devices |
+|---|---|---|
+| iOS / iPadOS | 26.4 | iPhone, iPad |
+| macOS | 26.4 | Apple Silicon & Intel |
+| tvOS | 26.4 | Apple TV 4K |
+| visionOS | 26.4 | Apple Vision Pro |
+
+---
+
+## Playback engines
+
+Lume ships with three interchangeable engines, selectable in **Settings**. It defaults
+to the broadest-compatibility engine available on the platform (VLCKit → KSPlayer →
+AVPlayer).
+
+| Engine | Backend | Best for | Notes |
+|---|---|---|---|
+| **VLCKit** | VLCKit 4 (libVLC) | Maximum compatibility | Virtually any format/codec, hardware-accelerated 4K HDR, Picture in Picture, broadest IPTV support |
+| **KSPlayer** | FFmpeg (FFmpegKit) | Wide IPTV support | Handles most formats common in IPTV streams |
+| **AVPlayer** | AVFoundation | HLS & MP4 | Native Apple player; limited codec coverage for IPTV |
+
+---
+
+## Architecture
+
+Lume follows a clean, layered SwiftUI architecture:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Views (SwiftUI)  — platform-adaptive screens & players  │
+├─────────────────────────────────────────────────────────┤
+│  Services         — networking, sync, playback, images   │
+│    ├─ XtreamClient        Xtream Codes API + DTOs         │
+│    ├─ TMDBClient          metadata / artwork enrichment   │
+│    ├─ TraktService        OAuth device flow + scrobbling  │
+│    ├─ ContentSyncManager  background catalog indexing     │
+│    └─ ImagePipeline        cached async image loading     │
+├─────────────────────────────────────────────────────────┤
+│  Models (SwiftData) — Playlist · Category · LiveStream    │
+│                       Movie · Series · Episode            │
+│                       CastMember · EPGListing             │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Tech stack**
+
+- **UI** — SwiftUI, adaptive across iOS / macOS / tvOS / visionOS
+- **Persistence** — SwiftData (8 model types, local catalog index)
+- **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer
+- **Networking** — `URLSession` with typed endpoints, retry/backoff, and error classification
+- **Integrations** — TMDB (metadata), Trakt (device OAuth + scrobbling)
+- **Localization** — English & German via String Catalogs
+
+**Dependencies** (Swift Package Manager)
+
+| Package | Purpose |
+|---|---|
+| [KSPlayer](https://github.com/kingslay/KSPlayer) | FFmpeg-based playback engine |
+| [FFmpegKit](https://github.com/kingslay/FFmpegKit.git) | Media decoding backend for KSPlayer |
+| [vlckit-spm](https://github.com/virtualox/vlckit-spm) | VLCKit 4 playback engine |
+
+---
+
+## Project structure
+
+```
+Lume/
+├── LumeApp.swift            App entry point & SwiftData container
+├── ContentView.swift        Root view / login gate
+├── Models/                  SwiftData models & sort options
+├── Services/
+│   ├── Network/             Xtream, TMDB, Trakt clients
+│   ├── Sync/                Content sync manager & progress
+│   ├── Player/              Playable media, settings, history
+│   └── Images/              Image cache & pipeline
+├── Views/
+│   ├── Home/                Dashboard, hero carousel, rails
+│   ├── LiveTV/              Channels & EPG guide
+│   ├── Movies/ · Series/    Browse & detail views
+│   ├── Player/              AVPlayer / KSPlayer / VLC engines
+│   ├── TV/                  tvOS-specific detail screens
+│   ├── Settings/            Playlists, sync, Trakt, content mgmt
+│   └── Components/          Reusable cards, toolbars, grids
+└── Assets.xcassets/         App icon & tvOS brand assets
+
+LumeTests/                   Unit & integration tests (Swift Testing)
+LumeUITests/                 UI automation tests (XCTest)
+Scripts/                     Build helpers (env injection, frameworks)
+```
+
+---
+
+## Getting started
+
+### Requirements
+
+- **Xcode 26.4** or later
+- An **Xtream Codes** account (server URL, username, password)
+- *(Optional)* a [TMDB](https://www.themoviedb.org/settings/api) API access token for metadata enrichment
+- *(Optional)* a [Trakt](https://trakt.tv/oauth/applications) application for scrobbling
+
+### Build & run
+
+```bash
+git clone https://github.com/bilipp/Lume.git
+cd Lume
+open Lume.xcodeproj
+```
+
+Select the **Lume** scheme and a target destination (iPhone, Mac, Apple TV, or Vision
+Pro), then build and run (`⌘R`). On first launch, sign in with your Xtream credentials
+and Lume will sync your catalog.
+
+> Dependencies are resolved automatically by Swift Package Manager on first build.
+
+---
+
+## Configuration
+
+Optional integrations (TMDB and Trakt) are configured through a repo-root `.env` file.
+The `Scripts/inject-env.sh` build phase reads it and injects the values into the built
+app's `Info.plist` — keeping secrets out of source control. `.env` is gitignored, and
+if it is missing the dependent features simply degrade gracefully (e.g. the Trending
+rail hides).
+
+Create a `.env` file in the project root:
+
+```dotenv
+# TMDB — metadata, artwork & trailers
+TMDB_ACCESS_TOKEN=your_tmdb_v4_read_access_token
+
+# Trakt — watch scrobbling (device OAuth flow)
+TRAKT_CLIENT_ID=your_trakt_client_id
+TRAKT_CLIENT_SECRET=your_trakt_client_secret
+```
+
+Trakt uses the **device OAuth flow** (no embedded web view), which works on tvOS as
+well as iOS/macOS. Tokens are stored securely in the Keychain.
+
+---
 
 ## Testing
 
-### Test Suite
-Lume has **~173 tests** spanning unit tests (Swift Testing) and UI tests (XCTest).
+Lume has an extensive test suite split across unit/integration tests (**Swift Testing**)
+and UI automation (**XCTest**).
 
-| Target | Tests | Type | Framework |
-|---|---|---|---|
-| `LumeTests` | 129 | Unit / Integration | Swift Testing |
-| `LumeUITests` | ~44 | UI Automation | XCTest |
+| Target | Framework | Coverage |
+|---|---|---|
+| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt token store, content organizing |
+| `LumeUITests` | XCTest | App launch & performance, login flow, tab navigation, playlist detail, settings |
 
-### Test Contents
-
-**DTO Decoding (17 tests)** — Decodes all 8 real API payloads from `ExampleData/` (Movies: 13,955; Live Streams: 2,568; Series: 2,215). Verifies JSON→Swift model mapping and type coercion (Int-as-String, String-as-Double, Unix timestamps).
-
-**URL Building (11 tests)** — Validates movie, episode, live stream, and catchup URL formats, trailing slash handling, and special characters in credentials.
-
-**API Client (16 tests)** — Tests `Endpoint.asURLRequest()` construction, `NetworkError` descriptions and retriable classification, `RetryBackoff` linear/exponential delay math.
-
-**Model Layer (13 tests)** — SwiftData `@Attribute(.unique)` upsert, computed properties, Category ID construction, Playlist sync status transitions.
-
-**Sort Options (17 tests)** — All `CategorySortOption`/`ContentSortOption` permutations, empty/duplicate arrays, label and icon validation.
-
-**Playable Media (9 tests)** — Factory methods, Codable round-trip, Hashable conformance.
-
-**Sync Progress (13 tests)** — State machine (`pending`→`active`→`completed`), `overallFraction` computation, all 7 `SyncSteps`.
-
-**Content Sync (8 tests)** — Large-batch performance (13,900 movies < 30s), upsert deduplication, empty/single edge cases.
-
-**Player Settings (4 tests)** — `PlayerEngineKind` all cases, display names, storage key.
-
-**UI Tests (~44 tests)** — App launch and performance, login flow, tab navigation (Live TV, Movies, Series, Settings), playlist detail view, settings controls.
-
-### Running Tests
+Run the full suite:
 
 ```bash
-# Unit tests only
+xcodebuild test \
+  -project Lume.xcodeproj \
+  -scheme Lume \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+Run a single target:
+
+```bash
+# Unit / integration tests only
 xcodebuild test -project Lume.xcodeproj -scheme Lume \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -only-testing:LumeTests
@@ -114,20 +269,39 @@ xcodebuild test -project Lume.xcodeproj -scheme Lume \
 xcodebuild test -project Lume.xcodeproj -scheme Lume \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -only-testing:LumeUITests
-
-# All tests
-xcodebuild test -project Lume.xcodeproj -scheme Lume \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-### Test Helpers
-Shared utilities in `LumeTests/Helpers/TestHelpers.swift`:
-- **`loadExampleJSON<T>(_:)`** — Loads and decodes any file from `ExampleData/` using `#filePath`-based navigation (no bundle resource setup needed)
-- **`makeTestContainer()`** — Creates an in-memory `ModelContainer` with all 7 SwiftData model types
-- **`exampleDataURL(_:)`** — Resolves a filename to its full path relative to the test target
+Decoding tests run against real, anonymized API payloads in `ExampleData/`. Shared
+helpers in `LumeTests/Helpers/TestHelpers.swift` provide an in-memory `ModelContainer`
+and JSON loaders so tests need no bundle-resource setup.
 
-### Testing Strategy
-Full strategy document available in [`TestingStrategy.md`](TestingStrategy.md), covering priority matrix, file organization, and CI setup.
+---
 
-## Xtream Codes API Documentation
-For more information on the Xtream Codes API, please refer to the [Xtream Codes API Documentation](XtreamAPI.md) file, which provides detailed information on the available endpoints, authentication, and response formats for retrieving server information, live streams, video-on-demand content, series, and EPG data.
+## Roadmap
+
+Planned features and enhancements are tracked as
+[**GitHub Issues**](https://github.com/bilipp/Lume/issues).
+
+---
+
+## Contributing
+
+Contributions are welcome! If you'd like to help:
+
+1. Open an [issue](https://github.com/bilipp/Lume/issues) to discuss a bug or feature.
+2. Fork the repo and create a feature branch.
+3. Keep the code style consistent (SwiftFormat & SwiftLint configs are included).
+4. Make sure the test suite passes before opening a pull request.
+
+---
+
+## License
+
+This project does not yet include an open-source license. Until one is added, all
+rights are reserved by the author. If you'd like to use or contribute to Lume, please
+open an issue to discuss.
+
+<div align="center">
+<br>
+<sub>Built with SwiftUI for iPhone, iPad, Mac, Apple TV & Vision Pro.</sub>
+</div>
