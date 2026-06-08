@@ -66,6 +66,9 @@ struct MoviesView: View {
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
+                            MovieCollectionRow(kind: .recentlyWatched, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+                            MovieCollectionRow(kind: .favorites, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+
                             ForEach(sortedCategories) { category in
                                 MovieCategoryPreview(category: category, limit: previewLimit, sort: contentSort, animationNamespace: animationNamespace)
                                     .id("\(category.id)-\(contentSort.rawValue)")
@@ -88,6 +91,9 @@ struct MoviesView: View {
             .navigationDestination(for: Category.self) { category in
                 MovieCategoryView(category: category, animationNamespace: animationNamespace)
             }
+            .navigationDestination(for: LibraryCollection.self) { collection in
+                MovieCollectionView(kind: collection.kind, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+            }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
                 #if os(iOS)
@@ -101,6 +107,12 @@ struct MoviesView: View {
     /// selection. Falls back to the first playlist until the user picks one.
     private var activePlaylist: Playlist? {
         playlists.active(for: selectedPlaylistID)
+    }
+
+    /// The id prefix every Movie/Category of the active playlist shares. Used to
+    /// scope the cross-category collection rows in-memory.
+    private var playlistPrefix: String {
+        activePlaylist.map { "\($0.id.uuidString)-" } ?? ""
     }
 
     /// Categories scoped to the active playlist. The `@Query` fetches every

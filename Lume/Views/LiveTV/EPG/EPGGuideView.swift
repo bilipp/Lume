@@ -15,7 +15,8 @@ import SwiftData
 import SwiftUI
 
 struct EPGGuideView: View {
-    let category: Category
+    let scope: LiveChannelScope
+    let playlistPrefix: String
     let onPlay: (LiveStream) -> Void
 
     @Query private var streams: [LiveStream]
@@ -23,18 +24,15 @@ struct EPGGuideView: View {
 
     private let timeline: EPGTimeline
 
-    init(category: Category, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
-        self.category = category
+    init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
+        self.scope = scope
+        self.playlistPrefix = playlistPrefix
         self.onPlay = onPlay
 
         let timeline = EPGTimeline.live(now: Date(), pointsPerMinute: EPGMetrics.current.pointsPerMinute)
         self.timeline = timeline
 
-        let categoryId = category.id
-        _streams = Query(
-            filter: #Predicate<LiveStream> { $0.categoryId == categoryId && $0.isHidden == false },
-            sort: sort.liveStreamDescriptors
-        )
+        _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
 
         // Fetch only listings overlapping the window, then group in memory.
         let windowStart = timeline.start
@@ -45,8 +43,12 @@ struct EPGGuideView: View {
         )
     }
 
+    private var scopedStreams: [LiveStream] {
+        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
+    }
+
     var body: some View {
-        if streams.isEmpty {
+        if scopedStreams.isEmpty {
             ContentUnavailableView(
                 "No Channels",
                 systemImage: "antenna.radiowaves.left.and.right",
@@ -61,7 +63,7 @@ struct EPGGuideView: View {
     /// Runs only when the queries change — not on scroll.
     private func buildRows() -> [EPGChannelRow] {
         let grouped = Dictionary(grouping: listings, by: \.channelId)
-        return EPGGridBuilder.rows(streams: streams, listingsByChannel: grouped, timeline: timeline)
+        return EPGGridBuilder.rows(streams: scopedStreams, listingsByChannel: grouped, timeline: timeline)
     }
 }
 
@@ -440,7 +442,7 @@ private struct EPGProgramStrip: View {
         }
 
         var body: some View {
-            EPGGuideView(category: category, sort: .playlist) { _ in }
+            EPGGuideView(scope: .category(category.id), playlistPrefix: "", sort: .playlist) { _ in }
                 .modelContainer(container)
                 .frame(minHeight: 520)
         }

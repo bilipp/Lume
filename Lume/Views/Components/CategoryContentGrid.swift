@@ -19,6 +19,10 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
     let emptyIcon: String
     let emptyDescription: LocalizedStringKey
     @Binding var sortRaw: String
+    /// Whether to surface the content sort menu. Categories are user-sortable;
+    /// the Favorites / Recently Watched collections have an intrinsic order
+    /// (alphabetical / most-recent-first) and pass `false` to hide it.
+    var showsSortMenu: Bool = true
     @ViewBuilder let card: (Item) -> Card
 
     private let columns = [GridItem(.adaptive(minimum: PosterCardMetrics.gridMinimum), spacing: PosterCardMetrics.gridSpacing)]
