@@ -82,7 +82,8 @@ struct FullScreenPlayerView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
                 guard !Task.isCancelled else { break }
-                persistProgress(force: false)
+
+                // persistProgress(force: false)
             }
         }
         .onDisappear {

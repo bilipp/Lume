@@ -455,6 +455,14 @@ struct KSPlayerEngineView: View {
         KSOptions.secondPlayerType = KSMEPlayer.self
         KSOptions.isAutoPlay = true
         KSOptions.isPipPopViewController = false
+        KSOptions.hardwareDecode = true
+        KSOptions.asynchronousDecompression = true
+
+        #if DEBUG
+            KSOptions.logLevel = .warning
+        #else
+            KSOptions.logLevel = .error
+        #endif
     }()
 
     private func makeOptions() -> KSOptions {
