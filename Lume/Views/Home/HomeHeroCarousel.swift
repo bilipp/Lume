@@ -201,7 +201,9 @@ struct HomeHeroCarousel: View {
             .scrollPosition(id: $currentID)
             .scrollIndicators(.hidden)
             .onScrollPhaseChange { _, newPhase, _ in
-                isInteracting = newPhase != .idle
+                // Only user-driven scrolling pauses auto-advance; `.animating` is
+                // our own programmatic paging, which once latched this `true` forever.
+                isInteracting = newPhase == .tracking || newPhase == .interacting || newPhase == .decelerating
             }
         }
     }
