@@ -31,6 +31,15 @@ struct KSPlayerEngineView: View {
     /// `handleState`). KSPlayer otherwise stops dead on a mid-stream failure.
     @State private var reconnector = PlaybackRetryController()
     @State private var isPlaying = false
+    /// Initial-load gate. The engine sits in `.preparing` / `.buffering` for
+    /// ~10–20s before the first frame (`.bufferFinished`); showing the normal
+    /// controls — with their Play button — during that window made viewers think
+    /// playback was paused and needed a press. The controls stay suppressed and
+    /// a loading indicator shows until the stream first reaches `.bufferFinished`.
+    @State private var hasStartedPlayback = false
+    /// True while the engine is preparing or (re)buffering, so the spinner shows
+    /// both on first open and on a mid-stream stall.
+    @State private var isBuffering = true
     @State private var isControlsVisible = true
     @State private var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
@@ -85,6 +94,7 @@ struct KSPlayerEngineView: View {
                 KSVideoPlayer(coordinator: coordinator, url: media.url, options: options)
                     .onStateChanged { _, state in
                         isPlaying = (state == .bufferFinished)
+                        updateLoadingState(state)
                         engine.syncState(state)
                         handleState(state)
                     }
@@ -103,7 +113,10 @@ struct KSPlayerEngineView: View {
 
                 tapCatcher
 
-                if isControlsVisible {
+                // Suppress the controls (and their Play button) until the stream
+                // has actually started, so viewers see a loading indicator
+                // instead of a player that looks paused.
+                if isControlsVisible, hasStartedPlayback {
                     TVPlayerControlsOverlay(
                         coordinator: engine,
                         media: media,
@@ -116,6 +129,11 @@ struct KSPlayerEngineView: View {
                         onSwitchChannel: { switchLiveChannel($0) }
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                }
+
+                if isBuffering {
+                    PlayerLoadingIndicator(title: hasStartedPlayback ? nil : media.title)
+                        .transition(.opacity)
                 }
             }
             .preferredColorScheme(.dark)
@@ -143,6 +161,8 @@ struct KSPlayerEngineView: View {
                 isSeeking = false
                 seekPosition = 0
                 isPanelOpen = false
+                hasStartedPlayback = false
+                isBuffering = true
                 reconnector.reset()
                 engine.reset()
                 resetHideTimer()
@@ -251,6 +271,7 @@ struct KSPlayerEngineView: View {
                 KSVideoPlayer(coordinator: coordinator, url: media.url, options: options)
                     .onStateChanged { _, state in
                         isPlaying = (state == .bufferFinished)
+                        updateLoadingState(state)
                         handleState(state)
                     }
                     .onPlay { current, total in
@@ -261,9 +282,17 @@ struct KSPlayerEngineView: View {
                     }
                     .ignoresSafeArea()
 
-                if isControlsVisible {
+                // Hold the controls back until the stream starts, so the loading
+                // indicator stands in for a player that would otherwise look
+                // paused behind its Play button.
+                if isControlsVisible, hasStartedPlayback {
                     controlsOverlay
                         .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                }
+
+                if isBuffering {
+                    PlayerLoadingIndicator(title: hasStartedPlayback ? nil : media.title)
+                        .transition(.opacity)
                 }
             }
             .preferredColorScheme(.dark)
@@ -353,6 +382,34 @@ struct KSPlayerEngineView: View {
             }
         }
     #endif
+
+    // MARK: - Loading state (shared)
+
+    /// Drive the loading indicator + initial controls gate off KSPlayer's state.
+    /// `.bufferFinished` is the first frame actually playing, so it both clears
+    /// the spinner and unlocks the controls for good; a later `.buffering` (a
+    /// mid-stream stall) re-shows the spinner without re-hiding the controls.
+    private func updateLoadingState(_ state: KSPlayerState) {
+        switch state {
+        case .initialized, .preparing, .readyToPlay, .buffering:
+            if !isBuffering {
+                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = true }
+            }
+        case .bufferFinished:
+            if !hasStartedPlayback { hasStartedPlayback = true }
+            if isBuffering {
+                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
+            }
+        case .paused, .playedToTheEnd:
+            if isBuffering {
+                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
+            }
+        case .error:
+            // Leave the spinner as-is: a drop during initial load keeps spinning
+            // through the bounded reconnect (which returns to `.preparing`).
+            break
+        }
+    }
 
     // MARK: - Reconnect (shared)
 
