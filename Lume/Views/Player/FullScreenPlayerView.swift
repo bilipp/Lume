@@ -199,7 +199,7 @@ struct FullScreenPlayerView: View {
 
     /// Seconds between progress samples. These only write `UserDefaults` now, so
     /// the cadence trades crash-recovery granularity against nothing meaningful.
-    private static let progressSampleInterval: TimeInterval = 5
+    private static let progressSampleInterval: TimeInterval = 30
 
     /// Stash the current progress in `WatchProgressBuffer`. The only main-actor
     /// work is reading two `Double`s off the clock; the JSON + `UserDefaults`
