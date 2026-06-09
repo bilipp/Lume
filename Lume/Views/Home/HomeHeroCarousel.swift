@@ -7,12 +7,9 @@
 //  auto-advancing every few seconds while honouring manual swipes.
 //
 //  The artwork lives in a paging ScrollView (`scrollTargetBehavior(.paging)` +
-//  `scrollPosition`) so it works on macOS too, where the page tab style is
-//  unavailable. The title / overview / buttons are drawn as a FIXED overlay on
-//  top of the carousel (not inside the scrolling content) and simply update to
-//  the current page. Keeping the text out of the scroll axis avoids the
-//  unbounded-width proposal a horizontal ScrollView hands its content, which
-//  otherwise stops the copy from wrapping.
+//  `scrollPosition`) so it works on macOS too. The title / overview / buttons
+//  are a FIXED overlay on top (not inside the scroll content) so the copy wraps
+//  to the view width instead of the scroll view's unbounded-width proposal.
 //
 
 import SwiftUI
@@ -22,27 +19,29 @@ struct HomeHeroCarousel: View {
     let onPlayMovie: (Movie) -> Void
 
     #if os(tvOS)
-        /// The Siri Remote drives the carousel through focus, not gestures. The
-        /// whole hero is a single focusable control (see `HeroInfo`); we track
-        /// whether it holds focus so we can page on left/right swipes and pause
-        /// auto-advance while the user is parked on the hero.
+        /// The Siri Remote drives the carousel through focus, not gestures. We
+        /// track focus to page on left/right swipes and pause auto-advance while
+        /// the user is parked on the hero.
         @FocusState private var heroFocused: Bool
     #endif
 
     @State private var currentID: String?
     @State private var isInteracting = false
 
-    /// Which hero the title / logo / buttons overlay is showing. It deliberately
-    /// LAGS `currentID`: on a page change the overlay fades out, swaps to the
-    /// freshly paged hero while invisible, then fades back in (see
-    /// `crossfadeInfo()`). Keeping it separate from the scroll position is what
-    /// turns the old cross-dissolve into a clean fade-out-then-fade-in.
+    /// Which hero the overlay is showing. Deliberately LAGS the scroll position:
+    /// on a page change the overlay fades out, swaps while invisible, then fades
+    /// back in (see `crossfadeInfo()`) — a clean fade rather than a cross-dissolve.
     @State private var displayedID: String?
     @State private var infoOpacity: Double = 1
 
     private let autoAdvanceInterval: Duration = .seconds(6)
     /// Width below which the hero switches to the stacked, full-width layout.
     private let compactWidthThreshold: CGFloat = 600
+
+    /// Sentinel scroll ids for the boundary clones, so `currentID` can tell a
+    /// clone apart from the real page it mirrors (see `normaliseClonePosition()`).
+    private static let headCloneID = "hero-clone-head"
+    private static let tailCloneID = "hero-clone-tail"
 
     #if os(tvOS)
         private let heroHeight: CGFloat = 960
@@ -52,13 +51,33 @@ struct HomeHeroCarousel: View {
         private let heroHeight: CGFloat = 800
     #endif
 
-    private var currentHero: HeroItem? {
-        items.first { $0.id == currentID } ?? items.first
+    /// The rendered pages: the real items padded with a clone of the LAST item
+    /// at the front and the FIRST at the back. Paging onto a clone is one slide;
+    /// once settled there `normaliseClonePosition()` silently re-seats to the
+    /// real page, so looping never scrolls back through every slide in between.
+    private var slots: [HeroSlot] {
+        guard items.count > 1, let first = items.first, let last = items.last else {
+            return items.map { HeroSlot(id: $0.id, item: $0) }
+        }
+        return [HeroSlot(id: Self.headCloneID, item: last)]
+            + items.map { HeroSlot(id: $0.id, item: $0) }
+            + [HeroSlot(id: Self.tailCloneID, item: first)]
     }
 
-    /// The hero whose copy is currently rendered in the overlay. Lags
-    /// `currentHero` so the outgoing title can fade out before the next one
-    /// fades in. Falls back to the scroll position before the first swap.
+    /// The real hero id the scroll rests on, resolving either clone to the item
+    /// it mirrors. Everything user-facing keys off THIS (not `currentID`) so the
+    /// silent clone→real re-seat is never seen as a page change.
+    private var currentItemID: String? {
+        guard let currentID else { return items.first?.id }
+        return slots.first { $0.id == currentID }?.item.id ?? currentID
+    }
+
+    private var currentHero: HeroItem? {
+        items.first { $0.id == currentItemID } ?? items.first
+    }
+
+    /// The hero whose copy is in the overlay. Lags `currentHero` so the outgoing
+    /// title fades out before the next fades in; falls back before the first swap.
     private var displayedHero: HeroItem? {
         items.first { $0.id == displayedID } ?? currentHero
     }
@@ -70,8 +89,7 @@ struct HomeHeroCarousel: View {
 
             ZStack(alignment: .bottomLeading) {
                 artwork
-                // Darken the bottom so the title and buttons stay legible over
-                // any artwork.
+                // Darken the bottom so the title and buttons stay legible.
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.15), .black.opacity(0.85)],
                     startPoint: .center,
@@ -81,11 +99,9 @@ struct HomeHeroCarousel: View {
 
                 if let hero = displayedHero {
                     #if os(tvOS)
-                        // Keep a STABLE identity (no `.id(hero.id)`) so the focused
-                        // hero survives paging instead of being torn down and losing
-                        // focus. Left/right paging is wired through the hero's
-                        // `onMoveCommand`; we re-assert focus after paging because the
-                        // link's identity changes across movie⇄series.
+                        // STABLE identity (no `.id(hero.id)`) so the focused hero
+                        // survives paging. Left/right pages via `onMoveCommand`; we
+                        // re-assert focus since the link identity changes movie⇄series.
                         HeroInfo(
                             hero: hero,
                             isCompact: isCompact,
@@ -96,10 +112,8 @@ struct HomeHeroCarousel: View {
                         )
                         .opacity(infoOpacity)
                     #else
-                        // Fixed overlay in normal layout — text wraps to `width`.
-                        // No `.id`/`.transition`: a stable view lets us fade the
-                        // shared overlay out and back in via `infoOpacity` instead
-                        // of cross-dissolving two copies over the moving artwork.
+                        // Fixed overlay — no `.id`/`.transition` so a stable view can
+                        // fade out/in via `infoOpacity` rather than cross-dissolving.
                         HeroInfo(hero: hero, isCompact: isCompact, onPlayMovie: onPlayMovie)
                             .opacity(infoOpacity)
                     #endif
@@ -111,26 +125,23 @@ struct HomeHeroCarousel: View {
             .frame(width: width, height: heroHeight)
             .clipped()
             .contentShape(Rectangle())
-            .animation(.easeInOut(duration: 0.35), value: currentID)
+            .animation(.easeInOut(duration: 0.35), value: currentItemID)
         }
         .frame(height: heroHeight)
         #if os(tvOS)
             // tvOS applies overscan safe-area insets (~60pt) on every edge
             .ignoresSafeArea(edges: .horizontal)
-            // Group the hero as a focus section. The hero is a single, full-width
-            // focusable surface (see `HeroInfo`), so the tab bar's downward focus
-            // move lands on it directly and an upward move from any card in the
-            // row below routes back to it regardless of horizontal position.
+            // The hero is one full-width focusable surface (see `HeroInfo`), so the
+            // tab bar's downward move lands on it and upward moves route back to it.
             .focusSection()
         #endif
             .onAppear {
-                // Seed `displayedID` first so the initial `currentID` assignment
-                // below finds them already in sync and skips the crossfade.
+                // Seed `displayedID` first so the initial assignment skips the crossfade.
                 if displayedID == nil { displayedID = items.first?.id }
                 if currentID == nil { currentID = items.first?.id }
                 prefetchNeighbours()
             }
-            .onChange(of: currentID) { _, _ in
+            .onChange(of: currentItemID) { _, _ in
                 prefetchNeighbours()
                 crossfadeInfo()
             }
@@ -139,12 +150,15 @@ struct HomeHeroCarousel: View {
             }
     }
 
-    /// Warms the cache for the slides on either side of the current one so they
-    /// appear instantly when the carousel pages (full-resolution, tvOS 4K).
+    /// Warms the cache for the slides on either side so they appear instantly.
     private func prefetchNeighbours() {
-        guard let currentID, let index = items.firstIndex(where: { $0.id == currentID }) else { return }
-        let neighbours = [index - 1, index + 1]
-            .filter { items.indices.contains($0) }
+        guard let currentItemID,
+              let index = items.firstIndex(where: { $0.id == currentItemID })
+        else { return }
+        let count = items.count
+        guard count > 1 else { return }
+        // Wrap the neighbours so the loop targets (last⇄first) are warm too.
+        let neighbours = [(index - 1 + count) % count, (index + 1) % count]
             .compactMap { items[$0].imageURL }
         guard !neighbours.isEmpty else { return }
         Task { await ImagePipeline.shared.prefetch(neighbours, maxPixelSize: nil) }
@@ -157,10 +171,10 @@ struct HomeHeroCarousel: View {
             let width = proxy.size.width
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
-                    ForEach(items) { hero in
-                        HeroBackdrop(url: hero.imageURL)
+                    ForEach(slots) { slot in
+                        HeroBackdrop(url: slot.item.imageURL)
                             .frame(width: width, height: heroHeight)
-                            .id(hero.id)
+                            .id(slot.id)
                     }
                 }
                 .scrollTargetLayout()
@@ -172,6 +186,8 @@ struct HomeHeroCarousel: View {
                 // Only user-driven scrolling pauses auto-advance; `.animating` is
                 // our own programmatic paging, which once latched this `true` forever.
                 isInteracting = newPhase == .tracking || newPhase == .interacting || newPhase == .decelerating
+                // Settled on a boundary clone? Silently re-seat to the real page.
+                if newPhase == .idle { normaliseClonePosition() }
             }
         }
     }
@@ -184,7 +200,7 @@ struct HomeHeroCarousel: View {
             HStack(spacing: 8) {
                 ForEach(items) { hero in
                     Circle()
-                        .fill(hero.id == currentID ? Color.white : Color.white.opacity(0.4))
+                        .fill(hero.id == currentItemID ? Color.white : Color.white.opacity(0.4))
                         .frame(width: 7, height: 7)
                 }
             }
@@ -197,7 +213,7 @@ struct HomeHeroCarousel: View {
             #else
                 .padding(.bottom, 14)
             #endif
-                .animation(.easeInOut, value: currentID)
+                .animation(.easeInOut, value: currentItemID)
         }
     }
 
@@ -221,45 +237,54 @@ struct HomeHeroCarousel: View {
     }
 
     private func advance() {
-        guard let currentID,
-              let index = items.firstIndex(where: { $0.id == currentID })
-        else {
-            withAnimation(.easeInOut) { currentID = items.first?.id }
-            return
-        }
-        let next = items[(index + 1) % items.count].id
-        withAnimation(.easeInOut(duration: 0.6)) { self.currentID = next }
+        guard slots.count > 1 else { return }
+        let index = slots.firstIndex { $0.id == currentID } ?? 1
+        let next = slots[min(index + 1, slots.count - 1)].id
+        withAnimation(.easeInOut(duration: 0.6)) { currentID = next }
     }
 
     private func retreat() {
-        guard let currentID,
-              let index = items.firstIndex(where: { $0.id == currentID })
-        else {
-            withAnimation(.easeInOut) { currentID = items.last?.id }
-            return
-        }
-        let previous = items[(index - 1 + items.count) % items.count].id
-        withAnimation(.easeInOut(duration: 0.6)) { self.currentID = previous }
+        guard slots.count > 1 else { return }
+        let index = slots.firstIndex { $0.id == currentID } ?? 1
+        let previous = slots[max(index - 1, 0)].id
+        withAnimation(.easeInOut(duration: 0.6)) { currentID = previous }
     }
 
-    /// Fades the title / logo / buttons out, swaps the overlay to the freshly
-    /// paged hero while it's invisible, then fades it back in. The fade-in is a
-    /// touch longer than the fade-out and finishes just after the 0.6s artwork
-    /// page settles, so the new copy lands once the new image is on screen
-    /// rather than dissolving over the outgoing slide. Reading `currentID` in
-    /// the completion (not a captured value) self-heals rapid paging — the
-    /// overlay always resolves to whatever slide is current when it reappears.
+    /// On settling on a boundary clone, jump WITHOUT animation to the real page
+    /// it mirrors: the artwork is identical so it's invisible, but it restocks
+    /// real pages on the far side so the next wrap is again a single slide.
+    private func normaliseClonePosition() {
+        guard let currentID else { return }
+        if currentID == Self.headCloneID {
+            self.currentID = items.last?.id
+        } else if currentID == Self.tailCloneID {
+            self.currentID = items.first?.id
+        }
+    }
+
+    /// Fades the overlay out, swaps it while invisible, then fades back in. The
+    /// fade-in is slightly longer so the new copy lands once the 0.6s artwork
+    /// page settles. Reading `currentItemID` in the completion (not a captured
+    /// value) self-heals rapid paging to whatever slide is current on reappear.
     private func crossfadeInfo() {
-        guard displayedID != currentID else { return }
+        guard displayedID != currentItemID else { return }
         withAnimation(.easeInOut(duration: 0.25)) {
             infoOpacity = 0
         } completion: {
-            displayedID = currentID
+            displayedID = currentItemID
             withAnimation(.easeOut(duration: 0.45)) {
                 infoOpacity = 1
             }
         }
     }
+}
+
+/// One rendered page in the carousel. Real items use their own `HeroItem.id`;
+/// boundary clones reuse a mirrored item but carry a sentinel id so the scroll
+/// position can distinguish a clone from the page it duplicates.
+private struct HeroSlot: Identifiable {
+    let id: String
+    let item: HeroItem
 }
 
 // MARK: - Preview
@@ -344,8 +369,7 @@ private struct HeroInfo: View {
     let onPlayMovie: (Movie) -> Void
 
     #if os(tvOS)
-        // Binding to the parent's focus state for the hero surface, plus the
-        // paging callbacks fired when the remote is swiped left / right.
+        // Parent focus binding for the hero surface, plus left/right paging callbacks.
         var heroFocus: FocusState<Bool>.Binding
         var onPrevious: () -> Void = {}
         var onNext: () -> Void = {}
@@ -359,8 +383,8 @@ private struct HeroInfo: View {
         #endif
     }
 
-    /// The title / overview / action block. On tvOS it's the label of the
-    /// full-hero focusable surface; elsewhere it's a fixed overlay.
+    /// The title / overview / action block — the focusable surface's label on
+    /// tvOS, a fixed overlay elsewhere.
     private var infoStack: some View {
         VStack(alignment: .leading, spacing: 10) {
             TitleLogo(
@@ -390,8 +414,7 @@ private struct HeroInfo: View {
         .foregroundStyle(.white)
         .padding(.top, isCompact ? 16 : 24)
         #if os(tvOS)
-            // The carousel bleeds to the screen edges on tvOS, so pad the text
-            // and buttons into the title-safe area (overscan is ~60pt).
+            // Carousel bleeds to the edges on tvOS; pad into the title-safe area (~60pt).
             .padding(.horizontal, 60)
             .padding(.bottom, 60)
         #else
@@ -400,20 +423,16 @@ private struct HeroInfo: View {
             // indicator instead of colliding with it / clipping at the edge.
             .padding(.bottom, 40)
         #endif
-            // Cap the readable column on very wide windows; fill the width when
-            // compact. Pin the block to the leading edge.
+            // Cap the readable column on wide windows; fill when compact, pin leading.
             .frame(maxWidth: isCompact ? .infinity : 640, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     #if os(tvOS)
-        /// On tvOS the ENTIRE hero is one focusable control rather than a small
-        /// Details button. This is the key to focus navigation: the tab bar's
-        /// downward move is a geometric search, so it lands on whatever sits in
-        /// the column below the tab item. A small leading-aligned button gets
-        /// skipped in favour of a card directly below it; a full-width surface
-        /// that spans the hero can't be missed. Selecting it opens Details and
-        /// left/right pages the carousel (no horizontal neighbour to move to).
+        /// On tvOS the ENTIRE hero is one focusable control: the tab bar's
+        /// downward move is a geometric search, and a full-width surface can't be
+        /// missed (a small leading button would be skipped for a card below it).
+        /// Selecting opens Details; left/right pages the carousel.
         @ViewBuilder
         private var heroSurface: some View {
             if let movie = hero.movie {
@@ -423,15 +442,10 @@ private struct HeroInfo: View {
             }
         }
 
-        /// The hero rendered as one full-WIDTH `NavigationLink`, pinned to the
-        /// bottom of the artwork at its natural height — NOT full height. The
-        /// width is what makes the tab bar's downward focus move land on it
-        /// (it can't miss a full-width target). The height matters too: if the
-        /// surface reached the top of the screen there'd be no room above it for
-        /// the Focus Engine to move "up" into the tab bar, so we leave the
-        /// artwork above it unfocusable. `HeroSurfaceButtonStyle` draws no focus
-        /// highlight (otherwise tvOS washes the whole surface white) — the
-        /// `detailsPill` carries the highlight instead.
+        /// The hero as one full-WIDTH `NavigationLink` pinned to the bottom at its
+        /// natural height — NOT full height, so the Focus Engine has room above it
+        /// to move "up" into the tab bar. `HeroSurfaceButtonStyle` draws no focus
+        /// highlight (it would wash the surface white); `detailsPill` carries it.
         private func heroLink(value: some Hashable) -> some View {
             NavigationLink(value: value) {
                 infoStack
