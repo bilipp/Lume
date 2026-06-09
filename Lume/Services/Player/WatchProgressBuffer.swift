@@ -8,15 +8,26 @@ import Foundation
 /// main thread. That merge is what hitches KSPlayer's render loop every few
 /// seconds, even when the `save()` itself runs on a background context.
 ///
-/// So during playback we only stash progress here: `UserDefaults` writes trigger
-/// no store merge and no SwiftUI invalidation (nothing observes this key via
-/// `@AppStorage`). The player commits the buffered value to SwiftData only at
-/// safe boundaries — close, episode switch, app backgrounding — and whatever is
-/// still buffered after a crash or force-quit is reconciled on the next launch.
+/// So during playback we only stash progress here. The player commits the
+/// buffered value to SwiftData only at safe boundaries — close, episode switch,
+/// app backgrounding — and whatever is still buffered after a crash or
+/// force-quit is reconciled on the next launch.
+///
+/// Even this lightweight buffer has to be careful: KSPlayer presents frames via
+/// a main-run-loop display link *and* keeps decode/render threads busy on the
+/// Apple TV's limited cores, so it drops a burst of frames to resync if anything
+/// — on or off the main thread — stalls that pipeline for even a few ms. Hence
+/// the deliberately minimal write path here: a flat primitive `UserDefaults`
+/// layout (no JSON coding, no whole-dict read-modify-write), dispatched onto a
+/// serial `.background` queue that yields to the video pipeline, with a paused-
+/// playback dedup so a still clock doesn't rewrite anything.
+///
+/// The on-disk layout is internal — the app isn't published, so there is no
+/// legacy format to migrate.
 enum WatchProgressBuffer {
-    enum Kind: String, Codable { case movie, episode }
+    enum Kind: String { case movie, episode }
 
-    struct Entry: Codable {
+    struct Entry {
         let kind: Kind
         let id: String
         let progress: TimeInterval
@@ -30,33 +41,38 @@ enum WatchProgressBuffer {
         }
     }
 
-    private static let storageKey = "pendingWatchProgress"
+    /// One `UserDefaults` key per pending item, value = `[progress, duration]`.
+    private static let prefix = "watchProgress."
 
-    /// Serializes every read-modify-write and, crucially, runs the JSON coding +
-    /// `UserDefaults` round-trip off the caller's thread. The player samples from
-    /// the main actor, where KSPlayer presents frames via a main-run-loop display
-    /// link — doing the encode/write inline there dropped a frame every sample.
-    /// A serial queue also stops two overlapping samples from clobbering the dict.
-    private static let queue = DispatchQueue(label: "com.lume.watchprogressbuffer", qos: .utility)
+    /// Serializes the writes and runs them at the lowest priority, off the
+    /// caller's thread — the player samples from the main actor, where KSPlayer
+    /// presents frames, and `.background` keeps the write from preempting decode.
+    private static let queue = DispatchQueue(label: "com.lume.watchprogressbuffer", qos: .background)
 
-    /// Stash the latest progress for `ref`, overwriting any earlier value. Returns
-    /// immediately; the actual write lands on `queue`. Live streams carry no
-    /// resumable progress and are ignored.
+    /// Last progress written per key, so a paused stream (clock not moving)
+    /// doesn't rewrite `UserDefaults` every tick. Touched only on `queue`.
+    private static var lastProgress: [String: TimeInterval] = [:]
+
+    /// Stash the latest progress for `ref`, overwriting any earlier value.
+    /// Returns immediately; the (deduped) write lands on `queue`. Live streams
+    /// carry no resumable progress and are ignored.
     static func record(ref: PlayableMedia.ContentRef, progress: TimeInterval, duration: TimeInterval) {
         guard progress > 0, let (kind, id) = decompose(ref) else { return }
+        let storageKey = prefix + key(kind, id)
         queue.async {
-            var all = load()
-            all[key(kind, id)] = Entry(kind: kind, id: id, progress: progress, duration: duration)
-            save(all)
+            guard lastProgress[storageKey] != progress else { return }
+            lastProgress[storageKey] = progress
+            UserDefaults.standard.set([progress, duration], forKey: storageKey)
         }
     }
 
     /// Drop the buffered entry for `ref` once it has been committed to SwiftData.
     static func remove(ref: PlayableMedia.ContentRef) {
         guard let (kind, id) = decompose(ref) else { return }
+        let storageKey = prefix + key(kind, id)
         queue.async {
-            var all = load()
-            if all.removeValue(forKey: key(kind, id)) != nil { save(all) }
+            lastProgress[storageKey] = nil
+            UserDefaults.standard.removeObject(forKey: storageKey)
         }
     }
 
@@ -65,9 +81,19 @@ enum WatchProgressBuffer {
     /// synchronously on `queue` so it can't race an in-flight `record`/`remove`.
     static func drain() -> [Entry] {
         queue.sync {
-            let all = load()
-            if !all.isEmpty { UserDefaults.standard.removeObject(forKey: storageKey) }
-            return Array(all.values)
+            let defaults = UserDefaults.standard
+            var entries: [Entry] = []
+
+            for (storageKey, value) in defaults.dictionaryRepresentation() where storageKey.hasPrefix(prefix) {
+                defaults.removeObject(forKey: storageKey)
+                lastProgress[storageKey] = nil
+                guard let values = value as? [Double], values.count == 2,
+                      let (kind, id) = parse(String(storageKey.dropFirst(prefix.count)))
+                else { continue }
+                entries.append(Entry(kind: kind, id: id, progress: values[0], duration: values[1]))
+            }
+
+            return entries
         }
     }
 
@@ -83,19 +109,10 @@ enum WatchProgressBuffer {
         "\(kind.rawValue):\(id)"
     }
 
-    private static func load() -> [String: Entry] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([String: Entry].self, from: data)
-        else { return [:] }
-        return decoded
-    }
-
-    private static func save(_ all: [String: Entry]) {
-        guard !all.isEmpty else {
-            UserDefaults.standard.removeObject(forKey: storageKey)
-            return
-        }
-        guard let data = try? JSONEncoder().encode(all) else { return }
-        UserDefaults.standard.set(data, forKey: storageKey)
+    private static func parse(_ suffix: String) -> (Kind, String)? {
+        guard let sep = suffix.firstIndex(of: ":"),
+              let kind = Kind(rawValue: String(suffix[suffix.startIndex ..< sep]))
+        else { return nil }
+        return (kind, String(suffix[suffix.index(after: sep)...]))
     }
 }
