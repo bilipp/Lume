@@ -41,7 +41,13 @@ struct LumeApp: App {
         // #endif
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            // A `.syncing` status in the freshly opened store is stale by
+            // definition — its owning task died with the previous process. Reset
+            // it now, before MainTabView's auto-sync gate reads playlist status,
+            // or the playlist stays wedged out of all future syncs.
+            ContentSyncManager.recoverInterruptedSyncs(in: ModelContext(container))
+            return container
         } catch {
             #if DEBUG
                 // Init-time migration failure: wipe the store and retry once.
