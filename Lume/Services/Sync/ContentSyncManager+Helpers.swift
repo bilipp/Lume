@@ -1,5 +1,37 @@
 import Foundation
+import OSLog
 import SwiftData
+
+// MARK: - Crash recovery
+
+extension ContentSyncManager {
+    /// Resets any playlist left in `.syncing` by a previous session that died
+    /// mid-sync (tvOS suspends then terminates background apps aggressively, and
+    /// a crash has the same effect).
+    ///
+    /// `.syncing` is a runtime-only state: the only thing that sets it is a live
+    /// in-process task tracked in `activeSyncTasks`, which cannot survive a
+    /// process launch. So a `.syncing` status observed at startup is by
+    /// definition stale. Left untouched it wedges the playlist permanently —
+    /// `AutoSync.shouldSync` skips anything already `.syncing`, so no further
+    /// auto-sync ever fires and the blocking progress cover (driven by in-memory
+    /// state) never reappears, while Settings keeps showing "Syncing" forever.
+    ///
+    /// Call once at launch, before the auto-sync gate reads playlist status.
+    static func recoverInterruptedSyncs(in context: ModelContext) {
+        let syncingRaw = SyncStatus.syncing.rawValue
+        let descriptor = FetchDescriptor<Playlist>(
+            predicate: #Predicate { $0.syncStatusRaw == syncingRaw }
+        )
+        guard let stuck = try? context.fetch(descriptor), !stuck.isEmpty else { return }
+
+        for playlist in stuck {
+            playlist.syncStatus = .idle
+        }
+        try? context.save()
+        Logger.database.info("Recovered \(stuck.count) playlist(s) stuck in .syncing from a previous session")
+    }
+}
 
 // MARK: - Helper Methods
 
