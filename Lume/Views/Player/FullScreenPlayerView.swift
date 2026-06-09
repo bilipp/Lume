@@ -87,11 +87,11 @@ struct FullScreenPlayerView: View {
             // periodic main-thread work is reading two clock values. The buffer
             // is flushed to SwiftData at safe boundaries (see `persistProgressDetached`).
             progressWriter = WatchProgressWriter(container: modelContext.container)
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
-                guard !Task.isCancelled else { break }
-                bufferProgress()
-            }
+            // while !Task.isCancelled {
+            //     try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
+            //     guard !Task.isCancelled else { break }
+            //     bufferProgress()
+            // }
         }
         .onChange(of: scenePhase) { _, phase in
             // Leaving the foreground is a safe moment to flush; covers the user
