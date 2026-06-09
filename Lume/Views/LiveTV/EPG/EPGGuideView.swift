@@ -277,11 +277,30 @@ private struct EPGGrid: View {
 
     @State private var position = ScrollPosition()
     @State private var didInitialScroll = false
+    #if os(tvOS)
+        /// tvOS centers scroll content that is shorter than the viewport. The
+        /// frozen channel column pins its cells to the top, so without this the
+        /// two panes drift apart when a category has only a few channels. Pinning
+        /// the rows to at least the viewport height (top-aligned) keeps them level.
+        @State private var viewportHeight: CGFloat = 0
+    #endif
 
     var body: some View {
         ScrollView([.horizontal, .vertical]) {
             EPGRows(rows: rows, timeline: timeline, metrics: metrics, now: now, onPlay: onPlay, onShowDetails: onShowDetails)
+            #if os(tvOS)
+                .frame(minHeight: viewportHeight, alignment: .topLeading)
+            #endif
         }
+        #if os(tvOS)
+        .background {
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { viewportHeight = geo.size.height }
+                    .onChange(of: geo.size.height) { viewportHeight = $1 }
+            }
+        }
+        #endif
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGPoint.self) { $0.contentOffset } action: { _, new in
             sync.offset = CGPoint(x: max(0, new.x), y: max(0, new.y))
