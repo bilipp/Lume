@@ -17,62 +17,6 @@
 
 import SwiftUI
 
-/// One featured item in the hero carousel: a Movie or Series the user owns,
-/// plus the TMDB-sourced wide artwork and copy that make it look cinematic.
-enum HeroItem: Identifiable, Hashable {
-    case movie(Movie, backdropURL: URL?, overview: String)
-    case series(Series, backdropURL: URL?, overview: String)
-
-    var id: String {
-        switch self {
-        case let .movie(movie, _, _): "movie-\(movie.id)"
-        case let .series(series, _, _): "series-\(series.id)"
-        }
-    }
-
-    var title: String {
-        switch self {
-        case let .movie(movie, _, _): movie.name
-        case let .series(series, _, _): series.name
-        }
-    }
-
-    var overview: String {
-        switch self {
-        case let .movie(_, _, overview): overview
-        case let .series(_, _, overview): overview
-        }
-    }
-
-    var imageURL: URL? {
-        switch self {
-        case let .movie(movie, backdrop, _):
-            backdrop ?? URL(string: movie.streamIcon ?? "")
-        case let .series(series, backdrop, _):
-            backdrop ?? URL(string: series.cover ?? "")
-        }
-    }
-
-    /// The title's wordmark logo, shown in place of the text title when the
-    /// title has been enriched from TMDB and a logo is available.
-    var logoURL: URL? {
-        switch self {
-        case let .movie(movie, _, _): TMDBClient.logoURL(movie.logoPath)
-        case let .series(series, _, _): TMDBClient.logoURL(series.logoPath)
-        }
-    }
-
-    var movie: Movie? {
-        if case let .movie(movie, _, _) = self { return movie }
-        return nil
-    }
-
-    var series: Series? {
-        if case let .series(series, _, _) = self { return series }
-        return nil
-    }
-}
-
 struct HomeHeroCarousel: View {
     let items: [HeroItem]
     let onPlayMovie: (Movie) -> Void
@@ -88,6 +32,14 @@ struct HomeHeroCarousel: View {
     @State private var currentID: String?
     @State private var isInteracting = false
 
+    /// Which hero the title / logo / buttons overlay is showing. It deliberately
+    /// LAGS `currentID`: on a page change the overlay fades out, swaps to the
+    /// freshly paged hero while invisible, then fades back in (see
+    /// `crossfadeInfo()`). Keeping it separate from the scroll position is what
+    /// turns the old cross-dissolve into a clean fade-out-then-fade-in.
+    @State private var displayedID: String?
+    @State private var infoOpacity: Double = 1
+
     private let autoAdvanceInterval: Duration = .seconds(6)
     /// Width below which the hero switches to the stacked, full-width layout.
     private let compactWidthThreshold: CGFloat = 600
@@ -102,6 +54,13 @@ struct HomeHeroCarousel: View {
 
     private var currentHero: HeroItem? {
         items.first { $0.id == currentID } ?? items.first
+    }
+
+    /// The hero whose copy is currently rendered in the overlay. Lags
+    /// `currentHero` so the outgoing title can fade out before the next one
+    /// fades in. Falls back to the scroll position before the first swap.
+    private var displayedHero: HeroItem? {
+        items.first { $0.id == displayedID } ?? currentHero
     }
 
     var body: some View {
@@ -120,7 +79,7 @@ struct HomeHeroCarousel: View {
                 )
                 .allowsHitTesting(false)
 
-                if let hero = currentHero {
+                if let hero = displayedHero {
                     #if os(tvOS)
                         // Keep a STABLE identity (no `.id(hero.id)`) so the focused
                         // hero survives paging instead of being torn down and losing
@@ -135,11 +94,14 @@ struct HomeHeroCarousel: View {
                             onPrevious: { retreat(); heroFocused = true },
                             onNext: { advance(); heroFocused = true }
                         )
+                        .opacity(infoOpacity)
                     #else
                         // Fixed overlay in normal layout — text wraps to `width`.
+                        // No `.id`/`.transition`: a stable view lets us fade the
+                        // shared overlay out and back in via `infoOpacity` instead
+                        // of cross-dissolving two copies over the moving artwork.
                         HeroInfo(hero: hero, isCompact: isCompact, onPlayMovie: onPlayMovie)
-                            .id(hero.id)
-                            .transition(.opacity)
+                            .opacity(infoOpacity)
                     #endif
                 }
 
@@ -162,10 +124,16 @@ struct HomeHeroCarousel: View {
             .focusSection()
         #endif
             .onAppear {
+                // Seed `displayedID` first so the initial `currentID` assignment
+                // below finds them already in sync and skips the crossfade.
+                if displayedID == nil { displayedID = items.first?.id }
                 if currentID == nil { currentID = items.first?.id }
                 prefetchNeighbours()
             }
-            .onChange(of: currentID) { _, _ in prefetchNeighbours() }
+            .onChange(of: currentID) { _, _ in
+                prefetchNeighbours()
+                crossfadeInfo()
+            }
             .task(id: items.count) {
                 await autoAdvance()
             }
@@ -272,6 +240,25 @@ struct HomeHeroCarousel: View {
         }
         let previous = items[(index - 1 + items.count) % items.count].id
         withAnimation(.easeInOut(duration: 0.6)) { self.currentID = previous }
+    }
+
+    /// Fades the title / logo / buttons out, swaps the overlay to the freshly
+    /// paged hero while it's invisible, then fades it back in. The fade-in is a
+    /// touch longer than the fade-out and finishes just after the 0.6s artwork
+    /// page settles, so the new copy lands once the new image is on screen
+    /// rather than dissolving over the outgoing slide. Reading `currentID` in
+    /// the completion (not a captured value) self-heals rapid paging — the
+    /// overlay always resolves to whatever slide is current when it reappears.
+    private func crossfadeInfo() {
+        guard displayedID != currentID else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            infoOpacity = 0
+        } completion: {
+            displayedID = currentID
+            withAnimation(.easeOut(duration: 0.45)) {
+                infoOpacity = 1
+            }
+        }
     }
 }
 
