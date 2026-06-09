@@ -119,6 +119,63 @@ struct ContentSyncTests {
         #expect(count == 100, "Expected 100 movies after upsert, got \(count)")
     }
 
+    @Test func `re-sync preserves favorites and watch progress`() throws {
+        let container = try makeContainer()
+        let playlistId = UUID()
+        let movieId = "\(playlistId)-movie-1"
+
+        // Initial sync inserts the movie.
+        let ctx1 = ModelContext(container)
+        ctx1.autosaveEnabled = false
+        let inserted = Movie(id: movieId, streamId: 1, name: "Movie")
+        ctx1.insert(inserted)
+        try ctx1.save()
+
+        // User favorites it, watches partway, and it lands in recently-watched.
+        let ctx2 = ModelContext(container)
+        ctx2.autosaveEnabled = false
+        let toEdit = try #require(try ctx2.fetch(
+            FetchDescriptor<Movie>(predicate: #Predicate { $0.id == movieId })
+        ).first)
+        toEdit.isFavorite = true
+        toEdit.watchProgress = 1234
+        toEdit.lastWatchedDate = Date(timeIntervalSince1970: 1_000_000)
+        try ctx2.save()
+
+        // Re-sync: update the existing row in place (the fixed behavior) rather
+        // than upserting a fresh object, which would reset the user fields.
+        let ctx3 = ModelContext(container)
+        ctx3.autosaveEnabled = false
+        var existing: [String: Movie] = [:]
+        let batchIds = [movieId]
+        for movie in try ctx3.fetch(
+            FetchDescriptor<Movie>(predicate: #Predicate { batchIds.contains($0.id) })
+        ) {
+            existing[movie.id] = movie
+        }
+        let movie: Movie
+        if let found = existing[movieId] {
+            movie = found
+        } else {
+            movie = Movie(id: movieId, streamId: 1, name: "")
+            ctx3.insert(movie)
+        }
+        movie.name = "Movie (renamed by provider)"
+        try ctx3.save()
+
+        let verify = ModelContext(container)
+        let result = try #require(try verify.fetch(
+            FetchDescriptor<Movie>(predicate: #Predicate { $0.id == movieId })
+        ).first)
+        #expect(result.name == "Movie (renamed by provider)", "Provider field should update")
+        #expect(result.isFavorite, "Favorite must survive re-sync")
+        #expect(result.watchProgress == 1234, "Watch progress must survive re-sync")
+        #expect(
+            result.lastWatchedDate == Date(timeIntervalSince1970: 1_000_000),
+            "Recently-watched timestamp must survive re-sync"
+        )
+    }
+
     // MARK: - Batch Edge Cases
 
     @Test func `empty dataset handled gracefully`() throws {

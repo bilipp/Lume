@@ -247,12 +247,20 @@ actor ContentSyncManager {
                 let context = ModelContext(modelContainer)
                 context.autosaveEnabled = false
 
+                // Update existing rows in place; see existingMovies for why.
+                let existing = existingMovies(in: batch, playlistId: playlistId, context: context)
+
                 for movieDTO in batch {
                     guard let streamId = movieDTO.streamId else { continue }
                     let movieId = "\(playlistId.uuidString)-movie-\(streamId)"
 
-                    // @Attribute(.unique) on Movie.id: insert acts as upsert on save()
-                    let movie = Movie(id: movieId, streamId: streamId, name: "")
+                    let movie: Movie
+                    if let found = existing[movieId] {
+                        movie = found
+                    } else {
+                        movie = Movie(id: movieId, streamId: streamId, name: "")
+                        context.insert(movie)
+                    }
                     movie.name = movieDTO.name ?? ""
                     movie.streamIcon = movieDTO.streamIcon
                     movie.rating = movieDTO.rating ?? 0
@@ -270,8 +278,6 @@ actor ContentSyncManager {
                     if let tmdbString = movieDTO.tmdb, let tmdbInt = Int(tmdbString) {
                         movie.tmdbId = tmdbInt
                     }
-
-                    context.insert(movie)
                 }
 
                 try context.save()
@@ -306,33 +312,21 @@ actor ContentSyncManager {
                 let context = ModelContext(modelContainer)
                 context.autosaveEnabled = false
 
+                // Update existing rows in place; see existingSeries for why.
+                let existing = existingSeries(in: batch, playlistId: playlistId, context: context)
+
                 for seriesDTO in batch {
                     guard let seriesId = seriesDTO.seriesId else { continue }
                     let id = "\(playlistId.uuidString)-series-\(seriesId)"
 
-                    let series = Series(id: id, seriesId: seriesId, name: "")
-                    series.name = seriesDTO.name ?? ""
-                    series.cover = seriesDTO.cover
-                    series.plot = seriesDTO.plot
-                    series.cast = seriesDTO.cast
-                    series.director = seriesDTO.director
-                    series.genre = seriesDTO.genre
-                    series.releaseDate = seriesDTO.releaseDate
-                    series.lastModified = seriesDTO.lastModified
-                    series.rating = seriesDTO.rating
-                    series.rating5Based = seriesDTO.rating5Based
-                    series.tmdb = seriesDTO.tmdb
-                    series.num = seriesDTO.num ?? 0
-
-                    if let catIdStr = seriesDTO.categoryId {
-                        series.categoryId = playlistPrefix + catIdStr
+                    let series: Series
+                    if let found = existing[id] {
+                        series = found
+                    } else {
+                        series = Series(id: id, seriesId: seriesId, name: "")
+                        context.insert(series)
                     }
-
-                    if let tmdbString = seriesDTO.tmdb, let tmdbInt = Int(tmdbString) {
-                        series.tmdbId = tmdbInt
-                    }
-
-                    context.insert(series)
+                    applySeriesFields(from: seriesDTO, to: series, playlistPrefix: playlistPrefix)
                 }
 
                 try context.save()
@@ -428,11 +422,20 @@ actor ContentSyncManager {
                 let context = ModelContext(modelContainer)
                 context.autosaveEnabled = false
 
+                // Update existing rows in place; see existingLiveStreams for why.
+                let existing = existingLiveStreams(in: batch, playlistId: playlistId, context: context)
+
                 for streamDTO in batch {
                     guard let streamId = streamDTO.streamId else { continue }
                     let id = "\(playlistId.uuidString)-live-\(streamId)"
 
-                    let liveStream = LiveStream(id: id, streamId: streamId, name: "")
+                    let liveStream: LiveStream
+                    if let found = existing[id] {
+                        liveStream = found
+                    } else {
+                        liveStream = LiveStream(id: id, streamId: streamId, name: "")
+                        context.insert(liveStream)
+                    }
                     liveStream.name = streamDTO.name ?? ""
                     liveStream.streamIcon = streamDTO.streamIcon
                     liveStream.epgChannelId = streamDTO.epgChannelId
@@ -446,8 +449,6 @@ actor ContentSyncManager {
                     if let catIdStr = streamDTO.categoryId {
                         liveStream.categoryId = playlistPrefix + catIdStr
                     }
-
-                    context.insert(liveStream)
                 }
 
                 try context.save()
