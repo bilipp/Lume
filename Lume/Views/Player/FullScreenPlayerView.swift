@@ -201,9 +201,11 @@ struct FullScreenPlayerView: View {
     /// the cadence trades crash-recovery granularity against nothing meaningful.
     private static let progressSampleInterval: TimeInterval = 5
 
-    /// Stash the current progress in `WatchProgressBuffer`. Cheap, main-actor
-    /// reads of two `Double`s plus a small `UserDefaults` write — no SwiftData,
-    /// no store merge, no `@Query` invalidation. Live streams carry no progress.
+    /// Stash the current progress in `WatchProgressBuffer`. The only main-actor
+    /// work is reading two `Double`s off the clock; the JSON + `UserDefaults`
+    /// write is dispatched onto the buffer's background queue, so it can't stall
+    /// KSPlayer's main-run-loop frame presentation. No SwiftData, no store merge,
+    /// no `@Query` invalidation. Live streams carry no progress.
     private func bufferProgress() {
         guard !activeMedia.isLive else { return }
         WatchProgressBuffer.record(

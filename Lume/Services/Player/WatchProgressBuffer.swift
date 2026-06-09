@@ -32,28 +32,43 @@ enum WatchProgressBuffer {
 
     private static let storageKey = "pendingWatchProgress"
 
-    /// Stash the latest progress for `ref`, overwriting any earlier value. Live
-    /// streams carry no resumable progress and are ignored.
+    /// Serializes every read-modify-write and, crucially, runs the JSON coding +
+    /// `UserDefaults` round-trip off the caller's thread. The player samples from
+    /// the main actor, where KSPlayer presents frames via a main-run-loop display
+    /// link — doing the encode/write inline there dropped a frame every sample.
+    /// A serial queue also stops two overlapping samples from clobbering the dict.
+    private static let queue = DispatchQueue(label: "com.lume.watchprogressbuffer", qos: .utility)
+
+    /// Stash the latest progress for `ref`, overwriting any earlier value. Returns
+    /// immediately; the actual write lands on `queue`. Live streams carry no
+    /// resumable progress and are ignored.
     static func record(ref: PlayableMedia.ContentRef, progress: TimeInterval, duration: TimeInterval) {
         guard progress > 0, let (kind, id) = decompose(ref) else { return }
-        var all = load()
-        all[key(kind, id)] = Entry(kind: kind, id: id, progress: progress, duration: duration)
-        save(all)
+        queue.async {
+            var all = load()
+            all[key(kind, id)] = Entry(kind: kind, id: id, progress: progress, duration: duration)
+            save(all)
+        }
     }
 
     /// Drop the buffered entry for `ref` once it has been committed to SwiftData.
     static func remove(ref: PlayableMedia.ContentRef) {
         guard let (kind, id) = decompose(ref) else { return }
-        var all = load()
-        if all.removeValue(forKey: key(kind, id)) != nil { save(all) }
+        queue.async {
+            var all = load()
+            if all.removeValue(forKey: key(kind, id)) != nil { save(all) }
+        }
     }
 
     /// Read and clear every buffered entry. Used at launch to reconcile progress
-    /// that never reached SwiftData because the app died mid-playback.
+    /// that never reached SwiftData because the app died mid-playback. Runs
+    /// synchronously on `queue` so it can't race an in-flight `record`/`remove`.
     static func drain() -> [Entry] {
-        let all = load()
-        if !all.isEmpty { UserDefaults.standard.removeObject(forKey: storageKey) }
-        return Array(all.values)
+        queue.sync {
+            let all = load()
+            if !all.isEmpty { UserDefaults.standard.removeObject(forKey: storageKey) }
+            return Array(all.values)
+        }
     }
 
     private static func decompose(_ ref: PlayableMedia.ContentRef) -> (Kind, String)? {
