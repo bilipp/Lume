@@ -90,8 +90,9 @@ struct CategoryPreviewRow<Item: Identifiable & Hashable, Card: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(category.name)
-                    .font(.title2)
+                    .font(.headline)
                     .fontWeight(.bold)
+                    .foregroundStyle(.secondary)
 
                 Spacer()
 
