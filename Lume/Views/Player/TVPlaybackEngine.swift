@@ -15,16 +15,6 @@
     import Foundation
     import VLCKitSPM
 
-    /// One selectable audio or subtitle track, flattened to what the overlay's
-    /// menus need. Engines map their native track types onto this so the menu
-    /// code stays identical regardless of the backing player.
-    struct PlayerTrackOption: Identifiable, Hashable {
-        /// Opaque, engine-defined identifier handed back to `select…Track(id:)`.
-        let id: String
-        let label: String
-        let isSelected: Bool
-    }
-
     /// The playback surface the tvOS overlay reads and commands. Marked
     /// `@MainActor` because the overlay (a SwiftUI `View`) only ever touches it
     /// from the main actor — this lets a main-actor adapter (KSPlayer) and a
@@ -52,6 +42,14 @@
         /// `nil` disables subtitles ("Off").
         func selectTextTrack(id: String?)
     }
+
+    // MARK: - AVPlayer conformance
+
+    /// `AVPlayerCoordinator` already exposes every member the overlay needs
+    /// (`isPlaying`, `videoInfo`, the neutral track surface, `skip(by:)`,
+    /// `seek(to:)` and the `select…Track(id:)` pair) with matching signatures,
+    /// so the conformance is an empty declaration.
+    extension AVPlayerCoordinator: TVPlaybackEngine {}
 
     // MARK: - VLCKit conformance
 

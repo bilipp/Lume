@@ -31,8 +31,7 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
     /// for these, to avoid duplicate controls.
     var rendersOwnControls: Bool {
         switch self {
-        case .vlcKit, .ksPlayer: true
-        case .avPlayer: false
+        case .vlcKit, .ksPlayer, .avPlayer: true
         }
     }
 

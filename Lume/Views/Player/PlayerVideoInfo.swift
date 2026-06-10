@@ -4,6 +4,20 @@ import Foundation
 ///
 /// Engine-agnostic: produced by both the VLCKit coordinator and the KSPlayer
 /// adapter, and consumed by the shared player overlay.
+/// One selectable audio or subtitle track, flattened to what the player
+/// overlays' menus need. Engines map their native track types onto this so the
+/// menu code stays identical regardless of the backing player.
+///
+/// Engine-agnostic and unguarded by platform: the shared tvOS overlay
+/// (`TVPlayerControlsOverlay`) and the AVPlayer iOS / macOS overlay both consume
+/// it, and the AVPlayer coordinator produces it on every platform.
+struct PlayerTrackOption: Identifiable, Hashable {
+    /// Opaque, engine-defined identifier handed back to `select…Track(id:)`.
+    let id: String
+    let label: String
+    let isSelected: Bool
+}
+
 struct PlayerVideoInfo: Equatable {
     let width: Int
     let height: Int

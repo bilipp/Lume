@@ -109,7 +109,11 @@ struct FullScreenPlayerView: View {
     private var playerView: some View {
         switch engine {
         case .avPlayer:
-            AVPlayerEngineView(media: activeMedia, currentTime: $clock.current, duration: $clock.duration)
+            AVPlayerEngineView(
+                media: activeMedia,
+                clock: clock,
+                onSelectMedia: switchMedia
+            )
         case .ksPlayer:
             KSPlayerEngineView(
                 media: activeMedia,
