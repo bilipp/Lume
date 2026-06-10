@@ -1,6 +1,46 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Automatically start the next episode when one finishes, and show a button near the end to skip ahead." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Startet die nächste Folge automatisch, sobald eine endet, und zeigt gegen Ende eine Schaltfläche zum Vorspringen an."
+          }
+        }
+      }
+    },
+    "Autoplay Next Episode" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächste Folge automatisch abspielen"
+          }
+        }
+      }
+    },
+    "Next Episode" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächste Folge"
+          }
+        }
+      }
+    },
+    "Show Next Episode Button" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schaltfläche „Nächste Folge“ anzeigen"
+          }
+        }
+      }
+    },
     "-" : {
 
     },
@@ -1802,7 +1842,6 @@
       }
     },
     "Playback" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

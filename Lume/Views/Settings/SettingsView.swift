@@ -9,6 +9,10 @@ struct SettingsView: View {
     @State private var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
+    @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
+    private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
+    @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
+    private var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
 
@@ -52,6 +56,7 @@ struct SettingsView: View {
                     if trakt.isConfigured {
                         integrationsSection
                     }
+                    playbackSection
                     playerSection
                     playerEngineSection
                     aboutSection
@@ -165,6 +170,17 @@ struct SettingsView: View {
                 Text("Integrations")
             } footer: {
                 Text("Sync watched movies and episodes, and show your Trakt watchlist on Home.")
+            }
+        }
+
+        private var playbackSection: some View {
+            Section {
+                Toggle("Autoplay Next Episode", isOn: $autoPlayNext)
+                Toggle("Show Next Episode Button", isOn: $showNextEpisodeButton)
+            } header: {
+                Text("Playback")
+            } footer: {
+                Text("Automatically start the next episode when one finishes, and show a button near the end to skip ahead.")
             }
         }
 
@@ -394,6 +410,12 @@ struct SettingsView: View {
 
         private var tvPlayerDetail: some View {
             VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Playback")
+                    TVOptionToggleRow(title: "Autoplay Next Episode", isOn: $autoPlayNext)
+                    TVOptionToggleRow(title: "Show Next Episode Button", isOn: $showNextEpisodeButton)
+                }
+
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Engine")
 

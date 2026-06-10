@@ -36,6 +36,13 @@ struct FullScreenPlayerView: View {
     /// the viewer picks another episode from the in-player episode rail (tvOS).
     @State private var activeMedia: PlayableMedia
 
+    /// The episode queued to play after `activeMedia`, resolved whenever the
+    /// active stream changes. Drives both the in-player Next Episode button and
+    /// auto-advance (see `PlayerNextUpOverlay`); `nil` for movies, live channels
+    /// and series finales. Read only when the player tree is (re)built, never on
+    /// the per-tick clock path.
+    @State private var nextUpMedia: PlayableMedia?
+
     init(media: PlayableMedia) {
         self.media = media
         _activeMedia = State(initialValue: media)
@@ -77,6 +84,14 @@ struct FullScreenPlayerView: View {
                 enterMacFullScreen()
             #endif
         }
+        .task(id: activeMedia.id) {
+            // Resolve the next episode for the active stream. Runs on appear and
+            // whenever the stream swaps (manual pick or auto-advance), so the
+            // queued episode always trails the one on screen.
+            nextUpMedia = activeMedia.isLive
+                ? nil
+                : NextEpisodeResolver.nextMedia(after: activeMedia.contentRef, in: modelContext)
+        }
         .task {
             // Sample progress on a cadence and stash it in `WatchProgressBuffer`
             // (UserDefaults) rather than writing SwiftData. A background-context
@@ -112,18 +127,21 @@ struct FullScreenPlayerView: View {
             AVPlayerEngineView(
                 media: activeMedia,
                 clock: clock,
+                nextUpMedia: nextUpMedia,
                 onSelectMedia: switchMedia
             )
         case .ksPlayer:
             KSPlayerEngineView(
                 media: activeMedia,
                 clock: clock,
+                nextUpMedia: nextUpMedia,
                 onSelectMedia: switchMedia
             )
         case .vlcKit:
             VLCPlayerEngineView(
                 media: activeMedia,
                 clock: clock,
+                nextUpMedia: nextUpMedia,
                 onSelectMedia: switchMedia
             )
         }

@@ -48,6 +48,22 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
 
 enum PlayerSettings {
     static let engineKey = "player.engine"
+
+    // MARK: - Playback behaviour
+
+    /// Engine-independent playback preferences for episodic content. Both default
+    /// on, matching the behaviour viewers expect from a binge-friendly player.
+    enum Playback {
+        /// Automatically start the next episode once the current one finishes.
+        static let autoPlayNextKey = "player.autoPlayNext"
+        /// Surface a focused "Next Episode" button once the current episode is
+        /// near its end (mirrors the ≥90% "watched" line).
+        static let showNextEpisodeButtonKey = "player.showNextEpisodeButton"
+
+        static let autoPlayNextDefault = true
+        static let showNextEpisodeButtonDefault = true
+    }
+
     /// Legacy top-level key for VLC's deinterlace toggle, kept stable so the
     /// preference survives this option being moved under the VLC engine area.
     static let deinterlaceKey = "player.deinterlace"

@@ -30,6 +30,10 @@ struct VLCPlayerEngineView: View {
     /// only the scrubber leaf reads it. `@Bindable` so the iOS/macOS overlay can
     /// still take plain bindings.
     @Bindable var clock: PlaybackClock
+    /// The episode queued after `media`, resolved by the host. Drives the
+    /// end-of-episode Next Up affordances; `nil` when there is nothing to play
+    /// next.
+    var nextUpMedia: PlayableMedia?
     /// Invoked when the viewer picks a different stream (e.g. another episode)
     /// from the in-player overlay. The host swaps `media` in response.
     var onSelectMedia: ((PlayableMedia) -> Void)?
@@ -86,6 +90,15 @@ struct VLCPlayerEngineView: View {
             if isControlsVisible {
                 controlsOverlay
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+            }
+
+            if let nextUpMedia {
+                PlayerNextUpOverlay(
+                    nextMedia: nextUpMedia,
+                    clock: clock,
+                    controlsVisible: isControlsVisible,
+                    onPlayNext: { onSelectMedia?($0) }
+                )
             }
         }
         .preferredColorScheme(.dark)

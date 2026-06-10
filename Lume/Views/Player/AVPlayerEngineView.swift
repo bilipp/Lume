@@ -23,6 +23,10 @@ struct AVPlayerEngineView: View {
     /// than as `@Binding` scalars — see `VLCPlayerEngineView` for why this keeps
     /// the engine view off the per-tick re-render path.
     @Bindable var clock: PlaybackClock
+    /// The episode queued after `media`, resolved by the host. Drives the
+    /// end-of-episode Next Up affordances; `nil` when there is nothing to play
+    /// next.
+    var nextUpMedia: PlayableMedia?
     /// Invoked when the viewer picks a different stream (another episode, or a
     /// live channel via the Siri remote) from the in-player overlay.
     var onSelectMedia: ((PlayableMedia) -> Void)?
@@ -72,6 +76,15 @@ struct AVPlayerEngineView: View {
             if isControlsVisible {
                 controlsOverlay
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+            }
+
+            if let nextUpMedia {
+                PlayerNextUpOverlay(
+                    nextMedia: nextUpMedia,
+                    clock: clock,
+                    controlsVisible: isControlsVisible,
+                    onPlayNext: { onSelectMedia?($0) }
+                )
             }
         }
         .preferredColorScheme(.dark)
