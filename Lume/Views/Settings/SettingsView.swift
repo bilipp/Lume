@@ -9,7 +9,6 @@ struct SettingsView: View {
     @State private var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
-    @AppStorage(PlayerSettings.deinterlaceKey) private var deinterlace = PlayerSettings.deinterlaceDefault
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
 
@@ -54,6 +53,7 @@ struct SettingsView: View {
                         integrationsSection
                     }
                     playerSection
+                    playerEngineSection
                     aboutSection
                 }
                 #if os(macOS)
@@ -180,23 +180,23 @@ struct SettingsView: View {
                 Text(engine.wrappedValue.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-
-                Toggle("Deinterlace Video", isOn: $deinterlace)
-
-                Text(deinterlaceFooter)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             } header: {
                 Text("Player")
             }
         }
 
-        private var deinterlaceFooter: LocalizedStringKey {
-            #if os(iOS)
-                "Smooths interlaced channels (often 1080i). Best left off here — VLC does not support hardware decoding with interlacing. Disabling this can result in stutters for some channels."
-            #else
-                "Smooths interlaced channels (often 1080i). Turn off to show frames as-is, which may look combed on motion."
-            #endif
+        /// Options for the currently selected engine only — each engine keeps a
+        /// dedicated area, and switching the picker above swaps which one shows.
+        @ViewBuilder
+        private var playerEngineSection: some View {
+            switch engine.wrappedValue {
+            case .vlcKit:
+                VLCEngineSettingsForm()
+            case .ksPlayer:
+                KSEngineSettingsForm()
+            case .avPlayer:
+                EmptyView()
+            }
         }
 
         private var aboutSection: some View {
@@ -422,26 +422,18 @@ struct SettingsView: View {
                         .padding(.top, 6)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Playback")
-
-                    Button {
-                        deinterlace.toggle()
-                    } label: {
-                        HStack(spacing: 16) {
-                            Text("Deinterlace Video")
-                            Spacer(minLength: 0)
-                            Text(deinterlace ? "On" : "Off")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(TVSettingsRowButtonStyle())
-
-                    Text(tvDeinterlaceFooter)
+                // Options for the selected engine only — each engine keeps a
+                // dedicated area.
+                switch engine.wrappedValue {
+                case .vlcKit:
+                    VLCEngineSettingsTVDetail()
+                case .ksPlayer:
+                    KSEngineSettingsTVDetail()
+                case .avPlayer:
+                    Text("AVPlayer has no configurable options.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 6)
                 }
             }
         }
@@ -470,10 +462,6 @@ struct SettingsView: View {
                 .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 .padding(.vertical, 8)
             }
-        }
-
-        private var tvDeinterlaceFooter: LocalizedStringKey {
-            "Smooths interlaced channels (often 1080i). Best left off here — VLC does not support hardware decoding with interlacing. Disabling this can result in stutters for some channels."
         }
     }
 

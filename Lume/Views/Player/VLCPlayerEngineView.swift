@@ -45,9 +45,6 @@ struct VLCPlayerEngineView: View {
     @State private var isPanelOpen = false
     /// Bumped to ask the overlay to close its open panel (Menu/back press).
     @State private var panelCloseToken = 0
-    /// Deinterlace preference, handed to the coordinator as a libvlc option.
-    /// Defaults off on iOS/tvOS so interlaced streams keep hardware decode.
-    @AppStorage(PlayerSettings.deinterlaceKey) private var deinterlace = PlayerSettings.deinterlaceDefault
     #if os(tvOS)
         /// Drives focus onto the transparent tap-catcher once the controls
         /// auto-hide, so the Siri remote can summon them again. Without this the
@@ -99,7 +96,7 @@ struct VLCPlayerEngineView: View {
             coordinator.onDuration = { total in
                 if total.isFinite, total > 0 { clock.duration = total }
             }
-            coordinator.configure(media: media, deinterlace: deinterlace)
+            coordinator.configure(media: media)
             scheduleHide()
         }
         .onDisappear {
@@ -121,7 +118,7 @@ struct VLCPlayerEngineView: View {
             isSeeking = false
             seekPosition = 0
             isPanelOpen = false
-            coordinator.reload(media: newMedia, deinterlace: deinterlace)
+            coordinator.reload(media: newMedia)
             resetHideTimer()
         }
         .onChange(of: isControlsVisible) { _, visible in

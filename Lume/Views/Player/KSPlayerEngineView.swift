@@ -501,19 +501,20 @@ struct KSPlayerEngineView: View {
             dismiss()
         #endif
     }
+}
 
-    // MARK: - Options
+// MARK: - Options
 
+@available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
+private extension KSPlayerEngineView {
     /// Process-wide KSPlayer configuration, applied exactly once on first
     /// access (static `let` init is lazy and thread-safe). These are global
     /// settings, so assigning them on every `makeOptions()` call was a needless
     /// side effect from a view body.
-    private static let configureGlobalOptions: Void = {
+    static let configureGlobalOptions: Void = {
         KSOptions.secondPlayerType = KSMEPlayer.self
         KSOptions.isAutoPlay = true
         KSOptions.isPipPopViewController = false
-        KSOptions.hardwareDecode = true
-        KSOptions.asynchronousDecompression = true
 
         #if DEBUG
             KSOptions.logLevel = .warning
@@ -522,12 +523,28 @@ struct KSPlayerEngineView: View {
         #endif
     }()
 
-    private func makeOptions() -> KSOptions {
+    func makeOptions() -> KSOptions {
         _ = Self.configureGlobalOptions
 
+        let settings = KSPlayerOptions.load()
+        // System-proxy use is a process-wide static with no per-instance
+        // counterpart, so it's applied on the type each time.
+        KSOptions.useSystemHTTPProxy = settings.systemProxy
+
         let options = KSOptions()
-        options.canStartPictureInPictureAutomaticallyFromInline = true
-        options.preferredForwardBufferDuration = media.isLive ? 4 : 8
+        options.hardwareDecode = settings.hardwareDecode
+        options.asynchronousDecompression = settings.asyncDecompression
+        options.isSecondOpen = settings.secondOpen
+        options.isAccurateSeek = settings.accurateSeek
+        options.isLoopPlay = settings.loopPlay
+        options.autoDeInterlace = settings.autoDeinterlace
+        options.autoRotate = settings.autoRotate
+        options.videoAdaptable = settings.adaptive
+        options.nobuffer = settings.noBuffer
+        options.codecLowDelay = settings.codecLowDelay
+        options.canStartPictureInPictureAutomaticallyFromInline = settings.autoPip
+        options.maxBufferDuration = Double(settings.maxBuffer)
+        options.preferredForwardBufferDuration = Double(media.isLive ? settings.liveBuffer : settings.vodBuffer)
         if !media.isLive, media.startTime > 1 {
             options.startPlayTime = media.startTime
         }

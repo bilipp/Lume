@@ -53,7 +53,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     private var startTime: TimeInterval = 0
     private var didConfigure = false
 
-    private var deinterlace = false
+    /// Snapshot of the user's VLCKit options, refreshed from `UserDefaults` each
+    /// time a stream is configured or reloaded.
+    private var options = VLCPlayerOptions.load()
 
     private var needsResume = false
     private var didSeekResume = false
@@ -98,7 +100,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         #endif
     }
 
-    func configure(media: PlayableMedia, deinterlace: Bool) {
+    func configure(media: PlayableMedia) {
         guard !didConfigure else { return }
         didConfigure = true
 
@@ -106,7 +108,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         isLive = media.isLive
         startTime = media.startTime
         needsResume = !media.isLive && media.startTime > 1
-        self.deinterlace = deinterlace
+        options = VLCPlayerOptions.load()
         mediaURL = media.url
         retry.reset()
         mediaPlayer.delegate = self
@@ -114,8 +116,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         let vlcMedia = VLCMedia(url: media.url)
         applyMediaOptions(to: vlcMedia, isLive: media.isLive)
         mediaPlayer.media = vlcMedia
+        let deinterlaceOn = options.deinterlace
         // swiftlint:disable:next line_length
-        Logger.player.log("configure: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlace, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
+        Logger.player.log("configure: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
         applyDeinterlace()
         isPlaying = true
@@ -125,31 +128,28 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     private func applyMediaOptions(to media: VLCMedia?, isLive: Bool) {
         guard let media else { return }
 
-        media.addOption(":avcodec-hw=videotoolbox")
-        media.addOption(":avcodec-threads=0")
-        media.addOption(":skip-frames=1")
-        media.addOption(":drop-late-frames=1")
-        media.addOption(":http-reconnect=1")
+        media.addOption(options.hardwareDecode ? ":avcodec-hw=videotoolbox" : ":avcodec-hw=none")
+        media.addOption(":avcodec-threads=\(options.decodeThreads)")
+        media.addOption(options.skipFrames ? ":skip-frames=1" : ":skip-frames=0")
+        media.addOption(options.dropLateFrames ? ":drop-late-frames=1" : ":drop-late-frames=0")
+        if options.httpReconnect { media.addOption(":http-reconnect=1") }
 
-        media.addOption(deinterlace ? ":deinterlace=1" : ":deinterlace=0")
-        if deinterlace { media.addOption(":deinterlace-mode=blend") }
+        media.addOption(options.deinterlace ? ":deinterlace=1" : ":deinterlace=0")
+        if options.deinterlace { media.addOption(":deinterlace-mode=\(options.deinterlaceMode)") }
 
-        if isLive {
-            media.addOption(":network-caching=3000")
-            media.addOption(":live-caching=3000")
-            // media.addOption(":hls-adaptive=1")
-            // media.addOption(":ts-trust-pcr=1")
-        } else {
-            media.addOption(":network-caching=1500")
-            media.addOption(":file-caching=1500")
-            // media.addOption(":clock-jitter=500")
-            // media.addOption(":clock-synchro=1")
-        }
+        // The original code set network-caching alongside the live/file caching
+        // to the same value; the live and on-demand buffers keep that pairing.
+        let buffer = isLive ? options.liveBuffer : options.vodBuffer
+        media.addOption(":network-caching=\(buffer)")
+        media.addOption(isLive ? ":live-caching=\(buffer)" : ":file-caching=\(buffer)")
+
+        if let jitter = options.clockJitter { media.addOption(":clock-jitter=\(jitter)") }
+        if let synchro = options.clockSynchro { media.addOption(":clock-synchro=\(synchro)") }
     }
 
     private func applyDeinterlace() {
-        if deinterlace {
-            mediaPlayer.setDeinterlace(.on, withFilter: "blend")
+        if options.deinterlace {
+            mediaPlayer.setDeinterlace(.on, withFilter: options.deinterlaceMode)
         } else {
             mediaPlayer.setDeinterlaceFilter(nil)
         }
@@ -158,14 +158,14 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// Swap the current stream for a different one without tearing down the
     /// player or its render surface. Used by the tvOS overlay to start a new
     /// episode picked from the in-player episode rail.
-    func reload(media: PlayableMedia, deinterlace: Bool) {
+    func reload(media: PlayableMedia) {
         isLive = media.isLive
         startTime = media.startTime
         needsResume = !media.isLive && media.startTime > 1
         didSeekResume = false
         resumeLanded = false
         videoInfo = nil
-        self.deinterlace = deinterlace
+        options = VLCPlayerOptions.load()
         mediaURL = media.url
         lastKnownTime = 0
         retry.reset()
@@ -173,8 +173,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         let vlcMedia = VLCMedia(url: media.url)
         applyMediaOptions(to: vlcMedia, isLive: media.isLive)
         mediaPlayer.media = vlcMedia
+        let deinterlaceOn = options.deinterlace
         // swiftlint:disable:next line_length
-        Logger.player.log("reload: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlace, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
+        Logger.player.log("reload: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
         applyDeinterlace()
         isPlaying = true

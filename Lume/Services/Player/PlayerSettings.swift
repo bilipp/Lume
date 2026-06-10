@@ -49,6 +49,8 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
 
 enum PlayerSettings {
     static let engineKey = "player.engine"
+    /// Legacy top-level key for VLC's deinterlace toggle, kept stable so the
+    /// preference survives this option being moved under the VLC engine area.
     static let deinterlaceKey = "player.deinterlace"
 
     /// Default deinterlacing state.
@@ -66,5 +68,77 @@ enum PlayerSettings {
         #else
             true
         #endif
+    }
+
+    // MARK: - VLCKit options
+
+    /// Storage keys and defaults for the VLCKit engine. Every libvlc option the
+    /// player applies is surfaced as a user setting; the defaults reproduce the
+    /// values the engine previously hard-coded.
+    enum VLC {
+        static let hardwareDecodeKey = "player.vlc.hardwareDecode"
+        static let decodeThreadsKey = "player.vlc.decodeThreads"
+        static let skipFramesKey = "player.vlc.skipFrames"
+        static let dropLateFramesKey = "player.vlc.dropLateFrames"
+        static let httpReconnectKey = "player.vlc.httpReconnect"
+        static let deinterlaceModeKey = "player.vlc.deinterlaceMode"
+        static let liveBufferKey = "player.vlc.liveBuffer"
+        static let vodBufferKey = "player.vlc.vodBuffer"
+        static let clockJitterKey = "player.vlc.clockJitter"
+        static let clockSynchroKey = "player.vlc.clockSynchro"
+
+        static let hardwareDecodeDefault = true
+        /// 0 == let FFmpeg pick (`auto`).
+        static let decodeThreadsDefault = 0
+        static let skipFramesDefault = true
+        static let dropLateFramesDefault = true
+        static let httpReconnectDefault = true
+        /// Network/live caching for live streams, in milliseconds.
+        static let liveBufferDefault = 3000
+        /// Network/file caching for on-demand streams, in milliseconds.
+        static let vodBufferDefault = 1500
+    }
+
+    // MARK: - KSPlayer options
+
+    /// Storage keys and defaults for the KSPlayer engine, mapped 1:1 onto
+    /// `KSOptions` fields. Defaults match `KSOptions`' own defaults except where
+    /// the app deliberately diverged (asynchronous decompression on, so the
+    /// hardware path actually engages — see the KSPlayer hardware-decode gate).
+    enum KSPlayer {
+        static let hardwareDecodeKey = "player.ks.hardwareDecode"
+        static let asyncDecompressionKey = "player.ks.asyncDecompression"
+        static let secondOpenKey = "player.ks.secondOpen"
+        static let accurateSeekKey = "player.ks.accurateSeek"
+        static let loopPlayKey = "player.ks.loopPlay"
+        static let systemProxyKey = "player.ks.systemProxy"
+        static let autoDeinterlaceKey = "player.ks.autoDeinterlace"
+        static let autoRotateKey = "player.ks.autoRotate"
+        static let adaptiveKey = "player.ks.adaptive"
+        static let noBufferKey = "player.ks.noBuffer"
+        static let codecLowDelayKey = "player.ks.codecLowDelay"
+        static let autoPipKey = "player.ks.autoPip"
+        static let liveBufferKey = "player.ks.liveBuffer"
+        static let vodBufferKey = "player.ks.vodBuffer"
+        static let maxBufferKey = "player.ks.maxBuffer"
+
+        static let hardwareDecodeDefault = true
+        static let asyncDecompressionDefault = true
+        static let secondOpenDefault = false
+        static let accurateSeekDefault = false
+        static let loopPlayDefault = false
+        static let systemProxyDefault = true
+        static let autoDeinterlaceDefault = false
+        static let autoRotateDefault = true
+        static let adaptiveDefault = true
+        static let noBufferDefault = false
+        static let codecLowDelayDefault = false
+        static let autoPipDefault = true
+        /// Minimum forward buffer for live streams, in seconds.
+        static let liveBufferDefault = 4
+        /// Minimum forward buffer for on-demand streams, in seconds.
+        static let vodBufferDefault = 8
+        /// Maximum buffer, in seconds.
+        static let maxBufferDefault = 30
     }
 }
