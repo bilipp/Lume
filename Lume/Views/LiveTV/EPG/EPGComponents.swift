@@ -268,7 +268,19 @@ struct EPGProgramBlockView: View {
     private var background: some View {
         let shape = RoundedRectangle(cornerRadius: metrics.blockCornerRadius, style: .continuous)
         if cell.isGap {
-            shape.fill(.fill.quaternary)
+            #if os(tvOS)
+                // Gaps are focusable so a no-EPG channel can still be selected;
+                // give the focused gap a light fill + border so the focus lands
+                // visibly, without the heavy solid-white fill a programme gets.
+                if isFocused {
+                    shape.fill(.white.opacity(0.18))
+                        .overlay { shape.strokeBorder(.white.opacity(0.6), lineWidth: 1.5) }
+                } else {
+                    shape.fill(.fill.quaternary)
+                }
+            #else
+                shape.fill(.fill.quaternary)
+            #endif
         } else {
             #if os(tvOS)
                 // tvOS uses the system focus idiom (solid white fill, dark text)

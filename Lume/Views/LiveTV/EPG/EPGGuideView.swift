@@ -379,7 +379,19 @@ private struct EPGProgramStrip: View {
         LazyHStack(spacing: 0) {
             ForEach(row.cells) { cell in
                 if cell.isGap {
-                    EPGProgramBlockView(cell: cell, metrics: metrics, now: now, isFocused: false)
+                    // A channel with no EPG is a single full-width gap. Gaps must
+                    // still be focusable, playable buttons or the tvOS focus
+                    // engine has nothing to land on and the channel can't be
+                    // selected at all (#27). There's no programme to detail, so
+                    // gaps skip the long-press detail sheet.
+                    Button {
+                        onPlay(cell)
+                    } label: {
+                        Color.clear.frame(width: cell.width, height: metrics.rowHeight)
+                    }
+                    .buttonStyle(EPGBlockButtonStyle(cell: cell, metrics: metrics, now: now))
+                    .accessibilityLabel(Text(row.name))
+                    .accessibilityHint(Text("No programme information"))
                 } else {
                     Button {
                         onPlay(cell)
