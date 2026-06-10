@@ -121,6 +121,7 @@ enum PlayerSettings {
         static let liveBufferKey = "player.ks.liveBuffer"
         static let vodBufferKey = "player.ks.vodBuffer"
         static let maxBufferKey = "player.ks.maxBuffer"
+        static let primaryEngineKey = "player.ks.primaryEngine"
 
         static let hardwareDecodeDefault = true
         static let asyncDecompressionDefault = true

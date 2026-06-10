@@ -74,6 +74,7 @@ import SwiftUI
 
     /// KSPlayer options as a grouped `Form` section.
     struct KSEngineSettingsForm: View {
+        @AppStorage(PlayerSettings.KSPlayer.primaryEngineKey) private var primaryEngine = KSPrimaryEngine.defaultValue.rawValue
         @AppStorage(PlayerSettings.KSPlayer.hardwareDecodeKey) private var hardwareDecode = PlayerSettings.KSPlayer.hardwareDecodeDefault
         @AppStorage(PlayerSettings.KSPlayer.asyncDecompressionKey) private var asyncDecompression = PlayerSettings.KSPlayer.asyncDecompressionDefault
         @AppStorage(PlayerSettings.KSPlayer.secondOpenKey) private var secondOpen = PlayerSettings.KSPlayer.secondOpenDefault
@@ -92,6 +93,10 @@ import SwiftUI
 
         var body: some View {
             Section {
+                Picker("Decoder Engine", selection: $primaryEngine) {
+                    ForEach(KSPrimaryEngine.allCases) { Text($0.label).tag($0.rawValue) }
+                }
+
                 Toggle("Hardware Decoding", isOn: $hardwareDecode)
                 Toggle("Asynchronous Decompression", isOn: $asyncDecompression)
                 Toggle("Codec Low Delay", isOn: $codecLowDelay)
@@ -117,7 +122,8 @@ import SwiftUI
             } header: {
                 Text("KSPlayer Options")
             } footer: {
-                Text("Applied the next time playback starts.")
+                Text("FFmpeg honours every option below for all streams. ")
+                    + Text("AVPlayer is more efficient but ignores most of them — including buffering — for formats it plays natively, such as HLS. Applied the next time playback starts.")
             }
         }
     }
@@ -227,6 +233,7 @@ import SwiftUI
 
     /// KSPlayer options for the tvOS settings detail pane.
     struct KSEngineSettingsTVDetail: View {
+        @AppStorage(PlayerSettings.KSPlayer.primaryEngineKey) private var primaryEngine = KSPrimaryEngine.defaultValue.rawValue
         @AppStorage(PlayerSettings.KSPlayer.hardwareDecodeKey) private var hardwareDecode = PlayerSettings.KSPlayer.hardwareDecodeDefault
         @AppStorage(PlayerSettings.KSPlayer.asyncDecompressionKey) private var asyncDecompression = PlayerSettings.KSPlayer.asyncDecompressionDefault
         @AppStorage(PlayerSettings.KSPlayer.secondOpenKey) private var secondOpen = PlayerSettings.KSPlayer.secondOpenDefault
@@ -247,6 +254,10 @@ import SwiftUI
             VStack(alignment: .leading, spacing: 28) {
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("KSPlayer — Decoding")
+                    TVOptionCycleRow(
+                        title: "Decoder Engine",
+                        valueLabel: (KSPrimaryEngine(rawValue: primaryEngine) ?? .defaultValue).label
+                    ) { primaryEngine = PlayerOptionCycle.next(primaryEngine, in: KSPrimaryEngine.self) }
                     TVOptionToggleRow(title: "Hardware Decoding", isOn: $hardwareDecode)
                     TVOptionToggleRow(title: "Asynchronous Decompression", isOn: $asyncDecompression)
                     TVOptionToggleRow(title: "Codec Low Delay", isOn: $codecLowDelay)

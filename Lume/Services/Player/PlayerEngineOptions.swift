@@ -125,6 +125,34 @@ enum VLCCachingPreset {
 
 // MARK: - KSPlayer choices
 
+/// Which underlying KSPlayer engine handles playback first. KSPlayer tries this
+/// engine and only falls back to the other when it fails to open a stream.
+///
+/// - `avPlayer`: Apple's AVFoundation player — efficient and native for HLS/MP4,
+///   but it ignores most KSPlayer options (buffering, hardware decode, etc.) for
+///   streams it can play itself.
+/// - `ffmpeg`: KSPlayer's FFmpeg-based engine, which honours every option below
+///   for all streams and supports the broadest range of formats.
+enum KSPrimaryEngine: String, CaseIterable, Identifiable {
+    case avPlayer
+    case ffmpeg
+
+    /// FFmpeg by default: it honours the buffering and decode options for every
+    /// stream, where AVPlayer silently ignores most of them for HLS/MP4.
+    static let defaultValue: KSPrimaryEngine = .ffmpeg
+
+    var id: String {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .avPlayer: "AVPlayer"
+        case .ffmpeg: "FFmpeg"
+        }
+    }
+}
+
 /// Forward-buffer presets (seconds) offered for KSPlayer's live and on-demand
 /// streams.
 enum KSBufferPreset {
@@ -197,6 +225,7 @@ struct KSPlayerOptions {
     var noBuffer: Bool
     var codecLowDelay: Bool
     var autoPip: Bool
+    var primaryEngine: KSPrimaryEngine
     /// Forward-buffer durations, in seconds.
     var liveBuffer: Int
     var vodBuffer: Int
@@ -216,6 +245,7 @@ struct KSPlayerOptions {
             noBuffer: defaults.bool(PlayerSettings.KSPlayer.noBufferKey, default: PlayerSettings.KSPlayer.noBufferDefault),
             codecLowDelay: defaults.bool(PlayerSettings.KSPlayer.codecLowDelayKey, default: PlayerSettings.KSPlayer.codecLowDelayDefault),
             autoPip: defaults.bool(PlayerSettings.KSPlayer.autoPipKey, default: PlayerSettings.KSPlayer.autoPipDefault),
+            primaryEngine: KSPrimaryEngine(rawValue: defaults.string(forKey: PlayerSettings.KSPlayer.primaryEngineKey) ?? "") ?? .defaultValue,
             liveBuffer: defaults.integer(PlayerSettings.KSPlayer.liveBufferKey, default: PlayerSettings.KSPlayer.liveBufferDefault),
             vodBuffer: defaults.integer(PlayerSettings.KSPlayer.vodBufferKey, default: PlayerSettings.KSPlayer.vodBufferDefault),
             maxBuffer: defaults.integer(PlayerSettings.KSPlayer.maxBufferKey, default: PlayerSettings.KSPlayer.maxBufferDefault)

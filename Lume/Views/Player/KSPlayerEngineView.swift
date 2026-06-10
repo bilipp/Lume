@@ -40,6 +40,9 @@ struct KSPlayerEngineView: View {
     /// True while the engine is preparing or (re)buffering, so the spinner shows
     /// both on first open and on a mid-stream stall.
     @State private var isBuffering = true
+    /// Last playhead position seen in `onPlay`, used to detect that frames are
+    /// actually advancing. `-1` until the first sample. See `notePlaybackProgress`.
+    @State private var lastPlayhead: TimeInterval = -1
     @State private var isControlsVisible = true
     @State private var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
@@ -103,6 +106,7 @@ struct KSPlayerEngineView: View {
                             if current.isFinite { clock.current = current }
                             if total.isFinite, total > 0 { clock.duration = total }
                         }
+                        notePlaybackProgress(current)
                         // syncState (onStateChanged) already refreshes this on
                         // every transition; only chase it from the per-tick play
                         // callback until it first lands, so steady playback
@@ -163,6 +167,7 @@ struct KSPlayerEngineView: View {
                 isPanelOpen = false
                 hasStartedPlayback = false
                 isBuffering = true
+                lastPlayhead = -1
                 reconnector.reset()
                 engine.reset()
                 resetHideTimer()
@@ -279,6 +284,7 @@ struct KSPlayerEngineView: View {
                             if current.isFinite { clock.current = current }
                             if total.isFinite, total > 0 { clock.duration = total }
                         }
+                        notePlaybackProgress(current)
                     }
                     .ignoresSafeArea()
 
@@ -389,6 +395,13 @@ struct KSPlayerEngineView: View {
     /// `.bufferFinished` is the first frame actually playing, so it both clears
     /// the spinner and unlocks the controls for good; a later `.buffering` (a
     /// mid-stream stall) re-shows the spinner without re-hiding the controls.
+    ///
+    /// This raises the spinner reliably but can't be trusted to lower it: after
+    /// the first `.bufferFinished`, KSPlayer may re-emit a non-playing state
+    /// (`.readyToPlay` on a second-open, a track/subtitle attach) and never emit
+    /// another `.bufferFinished` because it's already effectively playing — which
+    /// left the spinner stuck on over a stream that was running. `notePlaybackProgress`
+    /// is the ground-truth backstop that clears it.
     private func updateLoadingState(_ state: KSPlayerState) {
         switch state {
         case .initialized, .preparing, .readyToPlay, .buffering:
@@ -409,6 +422,22 @@ struct KSPlayerEngineView: View {
             // through the bounded reconnect (which returns to `.preparing`).
             break
         }
+    }
+
+    /// Ground-truth "frames are rendering" signal that clears the spinner even
+    /// when the state callback settled on a non-`.bufferFinished` state and never
+    /// recovered (see `updateLoadingState`). KSPlayer's 0.1s clock fires `onPlay`
+    /// whenever the player is ready — including during a stall — so the tick alone
+    /// isn't enough; but `currentPlaybackTime` only *advances* while frames are
+    /// actually being presented. An advancing playhead therefore means the stream
+    /// is playing, while a genuine stall or in-flight reconnect leaves it frozen
+    /// (no advance → spinner stays). Cheap no-op once the spinner is already down.
+    private func notePlaybackProgress(_ current: TimeInterval) {
+        guard current.isFinite, !isSeeking else { return }
+        defer { lastPlayhead = current }
+        guard isBuffering, lastPlayhead >= 0, current > lastPlayhead else { return }
+        if !hasStartedPlayback { hasStartedPlayback = true }
+        withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
     }
 
     // MARK: - Reconnect (shared)
@@ -500,58 +529,6 @@ struct KSPlayerEngineView: View {
         #else
             dismiss()
         #endif
-    }
-}
-
-// MARK: - Options
-
-@available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
-private extension KSPlayerEngineView {
-    /// Process-wide KSPlayer configuration, applied exactly once on first
-    /// access (static `let` init is lazy and thread-safe). These are global
-    /// settings, so assigning them on every `makeOptions()` call was a needless
-    /// side effect from a view body.
-    static let configureGlobalOptions: Void = {
-        KSOptions.secondPlayerType = KSMEPlayer.self
-        KSOptions.isAutoPlay = true
-        KSOptions.isPipPopViewController = false
-
-        #if DEBUG
-            KSOptions.logLevel = .warning
-        #else
-            KSOptions.logLevel = .error
-        #endif
-    }()
-
-    func makeOptions() -> KSOptions {
-        _ = Self.configureGlobalOptions
-
-        let settings = KSPlayerOptions.load()
-        // System-proxy use is a process-wide static with no per-instance
-        // counterpart, so it's applied on the type each time.
-        KSOptions.useSystemHTTPProxy = settings.systemProxy
-
-        let options = KSOptions()
-        options.hardwareDecode = settings.hardwareDecode
-        options.asynchronousDecompression = settings.asyncDecompression
-        options.isSecondOpen = settings.secondOpen
-        options.isAccurateSeek = settings.accurateSeek
-        options.isLoopPlay = settings.loopPlay
-        options.autoDeInterlace = settings.autoDeinterlace
-        options.autoRotate = settings.autoRotate
-        options.videoAdaptable = settings.adaptive
-        options.nobuffer = settings.noBuffer
-        options.codecLowDelay = settings.codecLowDelay
-        options.canStartPictureInPictureAutomaticallyFromInline = settings.autoPip
-        options.maxBufferDuration = Double(settings.maxBuffer)
-        options.preferredForwardBufferDuration = Double(media.isLive ? settings.liveBuffer : settings.vodBuffer)
-        if !media.isLive, media.startTime > 1 {
-            options.startPlayTime = media.startTime
-        }
-        #if os(macOS)
-            options.automaticWindowResize = false
-        #endif
-        return options
     }
 }
 
