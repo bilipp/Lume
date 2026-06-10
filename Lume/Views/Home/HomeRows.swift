@@ -23,8 +23,9 @@ struct HomeRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.title2)
+                .font(.subheadline)
                 .fontWeight(.bold)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal)
 
             ScrollView(.horizontal, showsIndicators: false) {
