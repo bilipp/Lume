@@ -283,7 +283,7 @@
 
         @FocusState private var focused: RailItem?
 
-        private let railWidth: CGFloat = 180
+        private let railWidth: CGFloat = 280
 
         private var layoutMode: LiveTVLayoutMode {
             LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
