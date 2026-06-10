@@ -28,6 +28,11 @@ struct HomeHeroCarousel: View {
     @State private var currentID: String?
     @State private var isInteracting = false
 
+    /// Fill of the active page indicator (0…1). Driven by `autoAdvance()` and
+    /// reset on every page change, it doubles as the auto-advance clock so the
+    /// loading-bar dot and the actual slide jump can never drift apart.
+    @State private var progress: Double = 0
+
     /// Which hero the overlay is showing. Deliberately LAGS the scroll position:
     /// on a page change the overlay fades out, swaps while invisible, then fades
     /// back in (see `crossfadeInfo()`) — a clean fade rather than a cross-dissolve.
@@ -74,6 +79,11 @@ struct HomeHeroCarousel: View {
 
     private var currentHero: HeroItem? {
         items.first { $0.id == currentItemID } ?? items.first
+    }
+
+    /// Index of the resting slide among the real items — which dot is active.
+    private var currentIndex: Int {
+        items.firstIndex { $0.id == currentItemID } ?? 0
     }
 
     /// The hero whose copy is in the overlay. Lags `currentHero` so the outgoing
@@ -142,6 +152,8 @@ struct HomeHeroCarousel: View {
                 prefetchNeighbours()
             }
             .onChange(of: currentItemID) { _, _ in
+                // Restart the loading bar on every page change — auto or manual.
+                progress = 0
                 prefetchNeighbours()
                 crossfadeInfo()
             }
@@ -197,42 +209,50 @@ struct HomeHeroCarousel: View {
     @ViewBuilder
     private var pageIndicator: some View {
         if items.count > 1 {
-            HStack(spacing: 8) {
-                ForEach(items) { hero in
-                    Circle()
-                        .fill(hero.id == currentItemID ? Color.white : Color.white.opacity(0.4))
-                        .frame(width: 7, height: 7)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: Capsule())
+            HeroPageIndicator(
+                count: items.count,
+                activeIndex: currentIndex,
+                progress: progress
+            )
             #if os(tvOS)
-                // Keep the indicator clear of the bottom overscan margin.
-                .padding(.bottom, 40)
+            // Keep the indicator clear of the bottom overscan margin.
+            .padding(.bottom, 40)
             #else
-                .padding(.bottom, 14)
+            .padding(.bottom, 14)
             #endif
-                .animation(.easeInOut, value: currentItemID)
         }
     }
 
     // MARK: - Auto-advance
 
+    /// Ticks the loading-bar progress forward and pages when it fills. Driving the
+    /// jump off the same `progress` the indicator renders keeps the bar and the
+    /// slide change perfectly in step (like UIKit's `UIPageControlTimerProgress`).
     private func autoAdvance() async {
         guard items.count > 1 else { return }
+        let tick: Duration = .milliseconds(50)
+        let total = Double(autoAdvanceInterval.components.seconds)
+        // Fraction of the bar to add per tick: 50ms / 6s.
+        let step = 0.05 / total
         while !Task.isCancelled {
-            try? await Task.sleep(for: autoAdvanceInterval)
+            try? await Task.sleep(for: tick)
             if Task.isCancelled { return }
-            // Don't yank the carousel out from under an active gesture.
+            // Hold the bar steady while the user is driving the carousel.
             guard !isInteracting else { continue }
-            #if os(tvOS)
-                let wasFocused = heroFocused
-                advance()
-                if wasFocused { heroFocused = true }
-            #else
-                advance()
-            #endif
+            if progress >= 1 {
+                // Reset BEFORE paging so the next tick can't re-trigger an advance
+                // in the window before `onChange(currentItemID)` resets it.
+                progress = 0
+                #if os(tvOS)
+                    let wasFocused = heroFocused
+                    advance()
+                    if wasFocused { heroFocused = true }
+                #else
+                    advance()
+                #endif
+            } else {
+                progress = min(progress + step, 1)
+            }
         }
     }
 
@@ -285,6 +305,52 @@ struct HomeHeroCarousel: View {
 private struct HeroSlot: Identifiable {
     let id: String
     let item: HeroItem
+}
+
+// MARK: - Page indicator
+
+/// The carousel's dots. Inactive slides are small circles; the active slide
+/// stretches into a capsule "track" whose fill grows with `progress`, reading as
+/// a loading bar that previews when the carousel will jump to the next slide.
+private struct HeroPageIndicator: View {
+    let count: Int
+    /// Index of the active slide (0-based, over the real items).
+    let activeIndex: Int
+    /// Fill of the active capsule, 0…1.
+    let progress: Double
+
+    private let dotSize: CGFloat = 7
+    private let activeWidth: CGFloat = 28
+    private let spacing: CGFloat = 8
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            ForEach(0 ..< count, id: \.self) { index in
+                let isActive = index == activeIndex
+                // Always a Capsule (a 7×7 capsule reads as a circle) so the
+                // active dot can smoothly stretch/contract on a page change
+                // instead of swapping shapes and losing its animation identity.
+                Capsule()
+                    .fill(Color.white.opacity(isActive ? 0.35 : 0.4))
+                    .frame(width: isActive ? activeWidth : dotSize, height: dotSize)
+                    .overlay(alignment: .leading) {
+                        if isActive {
+                            Capsule()
+                                .fill(Color.white)
+                                // Tracks `progress` directly (no animation) so the
+                                // fill steps with the tick rather than lagging it.
+                                .frame(width: activeWidth * progress, height: dotSize)
+                        }
+                    }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        // Scope the animation to the active-dot stretch on page change; the
+        // per-tick fill changes happen in other passes and stay unanimated.
+        .animation(.easeInOut(duration: 0.35), value: activeIndex)
+    }
 }
 
 // MARK: - Preview
@@ -361,240 +427,5 @@ private struct HeroBackdrop: View {
     }
 }
 
-// MARK: - Title / overview / buttons
-
-private struct HeroInfo: View {
-    let hero: HeroItem
-    let isCompact: Bool
-    let onPlayMovie: (Movie) -> Void
-
-    #if os(tvOS)
-        // Parent focus binding for the hero surface, plus left/right paging callbacks.
-        var heroFocus: FocusState<Bool>.Binding
-        var onPrevious: () -> Void = {}
-        var onNext: () -> Void = {}
-    #endif
-
-    var body: some View {
-        #if os(tvOS)
-            heroSurface
-        #else
-            infoStack
-        #endif
-    }
-
-    /// The title / overview / action block — the focusable surface's label on
-    /// tvOS, a fixed overlay elsewhere.
-    private var infoStack: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TitleLogo(
-                url: hero.logoURL,
-                title: hero.title,
-                maxWidth: isCompact ? 260 : 400,
-                maxHeight: isCompact ? 64 : 110
-            ) {
-                Text(hero.title)
-                    .font(isCompact ? .title2.weight(.bold) : .largeTitle.weight(.bold))
-                    .lineLimit(2)
-                    .shadow(radius: 6)
-            }
-
-            if !hero.overview.isEmpty {
-                Text(hero.overview)
-                    .font(.subheadline)
-                    .lineLimit(2)
-                    .foregroundStyle(.white.opacity(0.85))
-                    .shadow(radius: 4)
-            }
-
-            actionButtons
-                .controlSize(.large)
-                .padding(.top, 4)
-        }
-        .foregroundStyle(.white)
-        .padding(.top, isCompact ? 16 : 24)
-        #if os(tvOS)
-            // Carousel bleeds to the edges on tvOS; pad into the title-safe area (~60pt).
-            .padding(.horizontal, 60)
-            .padding(.bottom, 60)
-        #else
-            .padding(.horizontal, isCompact ? 16 : 24)
-            // Extra bottom inset so the (taller) stacked buttons clear the page
-            // indicator instead of colliding with it / clipping at the edge.
-            .padding(.bottom, 40)
-        #endif
-            // Cap the readable column on wide windows; fill when compact, pin leading.
-            .frame(maxWidth: isCompact ? .infinity : 640, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    #if os(tvOS)
-        /// On tvOS the ENTIRE hero is one focusable control: the tab bar's
-        /// downward move is a geometric search, and a full-width surface can't be
-        /// missed (a small leading button would be skipped for a card below it).
-        /// Selecting opens Details; left/right pages the carousel.
-        @ViewBuilder
-        private var heroSurface: some View {
-            if let movie = hero.movie {
-                heroLink(value: movie)
-            } else if let series = hero.series {
-                heroLink(value: series)
-            }
-        }
-
-        /// The hero as one full-WIDTH `NavigationLink` pinned to the bottom at its
-        /// natural height — NOT full height, so the Focus Engine has room above it
-        /// to move "up" into the tab bar. `HeroSurfaceButtonStyle` draws no focus
-        /// highlight (it would wash the surface white); `detailsPill` carries it.
-        private func heroLink(value: some Hashable) -> some View {
-            NavigationLink(value: value) {
-                infoStack
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(HeroSurfaceButtonStyle())
-            .focused(heroFocus)
-            .onMoveCommand { direction in
-                switch direction {
-                case .left: onPrevious()
-                case .right: onNext()
-                default: break
-                }
-            }
-        }
-    #endif
-
-    @ViewBuilder
-    private var actionButtons: some View {
-        #if os(tvOS)
-            // Not a control: the whole hero is the focusable surface (see
-            // `heroSurface`). This is just a Details affordance that reflects the
-            // hero's focus state so it reads like a button when highlighted.
-            detailsPill
-        #else
-            if isCompact {
-                // Stacked, full-width buttons so nothing overflows horizontally.
-                VStack(spacing: 12) {
-                    playButton(fullWidth: true)
-                    detailsButton(fullWidth: true)
-                }
-            } else {
-                HStack(spacing: 12) {
-                    playButton(fullWidth: false)
-                    detailsButton(fullWidth: false)
-                }
-            }
-        #endif
-    }
-
-    #if os(tvOS)
-        /// A purely visual "Details" affordance. It isn't focusable itself — the
-        /// enclosing hero surface is — so it mirrors the hero's focus state to
-        /// flip between a glassy resting style and a solid highlighted style.
-        private var detailsPill: some View {
-            Label("Details", systemImage: "info.circle")
-                .fontWeight(.semibold)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 14)
-                .background(
-                    heroFocus.wrappedValue
-                        ? AnyShapeStyle(.white)
-                        : AnyShapeStyle(.ultraThinMaterial),
-                    in: Capsule()
-                )
-                .foregroundStyle(heroFocus.wrappedValue ? .black : .white)
-                .scaleEffect(heroFocus.wrappedValue ? 1.04 : 1.0)
-                .animation(.easeOut(duration: 0.18), value: heroFocus.wrappedValue)
-        }
-    #endif
-
-    // The hero exposes separate Play and Details buttons on iOS / macOS. On
-    // tvOS the whole hero is a single focusable surface, so these are unused.
-    #if !os(tvOS)
-        @ViewBuilder
-        private func playButton(fullWidth: Bool) -> some View {
-            if let movie = hero.movie {
-                Button {
-                    onPlayMovie(movie)
-                } label: {
-                    playLabel(fullWidth: fullWidth)
-                }
-                .modifier(HeroPlayButtonStyle())
-            } else if let series = hero.series {
-                NavigationLink(value: series) {
-                    playLabel(fullWidth: fullWidth)
-                }
-                .modifier(HeroPlayButtonStyle())
-            }
-        }
-
-        @ViewBuilder
-        private func detailsButton(fullWidth: Bool) -> some View {
-            if let movie = hero.movie {
-                NavigationLink(value: movie) {
-                    detailsLabel(fullWidth: fullWidth)
-                }
-                .modifier(HeroDetailsButtonStyle())
-            } else if let series = hero.series {
-                NavigationLink(value: series) {
-                    detailsLabel(fullWidth: fullWidth)
-                }
-                .modifier(HeroDetailsButtonStyle())
-            }
-        }
-
-        private func playLabel(fullWidth: Bool) -> some View {
-            Label("Play", systemImage: "play.fill")
-                .fontWeight(.semibold)
-                .foregroundStyle(.black)
-                .frame(maxWidth: fullWidth ? .infinity : nil)
-        }
-
-        private func detailsLabel(fullWidth: Bool) -> some View {
-            Label("Details", systemImage: "info.circle")
-                .fontWeight(.semibold)
-                .frame(maxWidth: fullWidth ? .infinity : nil)
-        }
-    #endif
-}
-
-// MARK: - Hero button styles
-
-#if os(tvOS)
-    /// A focus-neutral button style for the full-hero surface: it renders only
-    /// the label, so tvOS adds no automatic focus highlight (which would wash
-    /// the entire hero white). The `detailsPill` reflects focus instead.
-    private struct HeroSurfaceButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            configuration.label
-                .opacity(configuration.isPressed ? 0.85 : 1)
-        }
-    }
-#endif
-
-/// Matches the carousel Play button to the tvOS detail screen's glass pill,
-/// while keeping the prominent white style on iOS / macOS.
-private struct HeroPlayButtonStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        #if os(tvOS)
-            content.buttonStyle(TVGlassButtonStyle())
-        #else
-            content
-                .buttonStyle(.borderedProminent)
-                .tint(.white)
-        #endif
-    }
-}
-
-/// Matches the carousel Details button to the tvOS detail screen's glass pill,
-/// while keeping the bordered style on iOS / macOS.
-private struct HeroDetailsButtonStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        #if os(tvOS)
-            content.buttonStyle(TVGlassButtonStyle())
-        #else
-            content
-                .buttonStyle(.bordered)
-                .tint(.white)
-        #endif
-    }
-}
+// `HeroInfo` (the title / overview / buttons overlay) and the hero button styles
+// live in `HeroInfo.swift`.
