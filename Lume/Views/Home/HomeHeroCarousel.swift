@@ -117,8 +117,12 @@ struct HomeHeroCarousel: View {
                             isCompact: isCompact,
                             onPlayMovie: onPlayMovie,
                             heroFocus: $heroFocused,
-                            onPrevious: { retreat(); heroFocused = true },
-                            onNext: { advance(); heroFocused = true }
+                            // Zero the timer BEFORE paging: on tvOS `isInteracting`
+                            // stays false (remote paging is `.animating`, not a
+                            // drag), so this is what stops the auto-advance tick
+                            // from firing a second jump in the same beat as the press.
+                            onPrevious: { progress = 0; retreat(); heroFocused = true },
+                            onNext: { progress = 0; advance(); heroFocused = true }
                         )
                         .opacity(infoOpacity)
                     #else
@@ -237,8 +241,15 @@ struct HomeHeroCarousel: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: tick)
             if Task.isCancelled { return }
-            // Hold the bar steady while the user is driving the carousel.
-            guard !isInteracting else { continue }
+            // While the user is driving the carousel, hold the bar EMPTY rather
+            // than frozen. Freezing it near full meant the first tick after they
+            // let go fired `advance()` immediately — off a still-settling
+            // `currentID` — which read as random forward/backward jumps. Keeping
+            // it at zero guarantees a full dwell on the slide they land on.
+            if isInteracting {
+                progress = 0
+                continue
+            }
             if progress >= 1 {
                 // Reset BEFORE paging so the next tick can't re-trigger an advance
                 // in the window before `onChange(currentItemID)` resets it.
