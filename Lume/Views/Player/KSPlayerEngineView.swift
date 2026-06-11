@@ -51,7 +51,7 @@ struct KSPlayerEngineView: View {
     @State private var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
     @State private var isPipActive = false
-    @State private var hideTask: Task<Void, Never>?
+    @State var hideTask: Task<Void, Never>?
     @State private var hoverHideTask: Task<Void, Never>?
 
     #if os(tvOS)
@@ -63,14 +63,19 @@ struct KSPlayerEngineView: View {
         @State private var isPanelOpen = false
         /// Bumped to ask the overlay to close its open panel (Menu/back press).
         @State private var panelCloseToken = 0
+        /// The channel-switching state below is `internal` (not `private`) so the
+        /// extension in `KSPlayerEngineView+TVChannels.swift` can drive it.
+        /// The full channel browser (categories + channels) raised by a left
+        /// press while watching live TV with the controls hidden.
+        @State var isChannelBrowserOpen = false
         /// Drives focus onto the transparent tap-catcher once the controls
         /// auto-hide, so the Siri remote can summon them again.
-        @FocusState private var catcherFocused: Bool
+        @FocusState var catcherFocused: Bool
         /// Live-content sort the channel browser uses — so in-player channel
         /// surfing follows the same order the viewer saw in the list.
         @AppStorage(SortStorageKey.liveContent)
-        private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
-        @Environment(\.modelContext) private var modelContext
+        var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
+        @Environment(\.modelContext) var modelContext
     #endif
 
     @Environment(\.dismiss) private var dismiss
@@ -148,6 +153,10 @@ struct KSPlayerEngineView: View {
                     )
                 }
 
+                if isChannelBrowserOpen {
+                    channelBrowser
+                }
+
                 if isBuffering {
                     PlayerLoadingIndicator(title: hasStartedPlayback ? nil : media.title)
                         .transition(.opacity)
@@ -208,13 +217,16 @@ struct KSPlayerEngineView: View {
                 Color.clear.contentShape(Rectangle())
             }
             .buttonStyle(KSInvisibleButtonStyle())
-            .disabled(isControlsVisible)
+            .disabled(isControlsVisible || isChannelBrowserOpen)
             .focused($catcherFocused)
             .onMoveCommand { direction in
-                // Watching live TV with the controls hidden, up/down surf
-                // adjacent channels and right recalls the last channel watched.
-                // Any other move summons the controls.
-                if media.isLive, direction == .up || direction == .down || direction == .right {
+                // Watching live TV with the controls hidden, left opens the
+                // channel browser, up/down surf adjacent channels and right
+                // recalls the last channel watched. Any other move summons
+                // the controls.
+                if media.isLive, direction == .left {
+                    openChannelBrowser()
+                } else if media.isLive, direction == .up || direction == .down || direction == .right {
                     switchLiveChannel(direction)
                 } else {
                     showControls()
@@ -222,31 +234,7 @@ struct KSPlayerEngineView: View {
             }
         }
 
-        /// Change the live channel from the Siri Remote: up/down surf to the
-        /// adjacent channel (a TV remote's channel rocker), while right recalls
-        /// the channel watched just before this one (the remote's "last"
-        /// button). Falls back to summoning the controls when there's nothing
-        /// to jump to.
-        private func switchLiveChannel(_ direction: MoveCommandDirection) {
-            guard media.isLive else { return }
-            let target: PlayableMedia?
-            switch direction {
-            case .up, .down:
-                let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
-                    for: media, offset: direction == .up ? 1 : -1, sort: sort, in: modelContext
-                )
-            case .right:
-                target = LiveChannelHistory.recallMedia(in: modelContext)
-            default:
-                return
-            }
-            guard let target else { showControls(); return }
-            onSelectMedia?(target)
-            showControls()
-        }
-
-        private func showControls() {
+        func showControls() {
             guard !isControlsVisible else { resetHideTimer(); return }
             withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
             scheduleHide()
@@ -260,7 +248,9 @@ struct KSPlayerEngineView: View {
         }
 
         private func handleMenuPress() {
-            if isPanelOpen {
+            if isChannelBrowserOpen {
+                closeChannelBrowser()
+            } else if isPanelOpen {
                 panelCloseToken += 1
             } else if isControlsVisible {
                 hideControls()
