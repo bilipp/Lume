@@ -8,6 +8,11 @@ struct EpisodeCard: View {
     var onToggleWatched: () -> Void = {}
     var onMarkPreviousWatched: () -> Void = {}
     var onMarkFollowingUnwatched: () -> Void = {}
+    #if !os(tvOS)
+        var onDownload: (() -> Void)?
+        var onDeleteDownload: (() -> Void)?
+        var downloadProgress: Double?
+    #endif
 
     var body: some View {
         Button(action: onPlay) {
@@ -53,11 +58,34 @@ struct EpisodeCard: View {
                 onMarkPreviousWatched: onMarkPreviousWatched,
                 onMarkFollowingUnwatched: onMarkFollowingUnwatched
             )
+            #if !os(tvOS)
+                Divider()
+                if episode.downloadStatus == .completed {
+                    Button(role: .destructive) {
+                        onDeleteDownload?()
+                    } label: {
+                        Label("Remove Download", systemImage: "trash")
+                    }
+                } else if downloadProgress == nil {
+                    Button {
+                        onDownload?()
+                    } label: {
+                        Label("Download Episode", systemImage: "arrow.down.circle")
+                    }
+                    .disabled(onDownload == nil)
+                } else {
+                    Button(role: .destructive) {
+                        onDeleteDownload?()
+                    } label: {
+                        Label("Cancel Download", systemImage: "xmark.circle")
+                    }
+                }
+            #endif
         }
     }
 
     private var thumbnail: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             CachedAsyncImage(url: URL(string: episode.movieImage ?? ""), maxPixelSize: 142) { phase in
                 switch phase {
                 case let .success(image):
@@ -76,12 +104,44 @@ struct EpisodeCard: View {
             .frame(width: 142, height: 80)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
+            #if !os(tvOS)
+                if let progress = downloadProgress {
+                    // Actively downloading: show a progress indicator
+                    ZStack {
+                        Rectangle()
+                            .fill(.black.opacity(0.45))
+                        if progress > 0 {
+                            ProgressView(value: progress)
+                                .progressViewStyle(.circular)
+                                .tint(.white)
+                                .scaleEffect(0.6)
+                        } else {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(.white)
+                                .scaleEffect(0.6)
+                        }
+                    }
+                    .frame(width: 142, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else if episode.downloadStatus == .completed {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(.tint.opacity(0.85), in: Circle())
+                        .padding(5)
+                }
+            #endif
+
             Image(systemName: "play.circle.fill")
                 .font(.title2)
                 .foregroundStyle(.white)
                 .shadow(radius: 4)
                 .opacity(0.9)
+                .frame(width: 142, height: 80)
         }
+        .frame(width: 142, height: 80)
     }
 
     /// Air date and runtime joined on a single caption line, omitting whichever is missing.

@@ -209,6 +209,8 @@ struct MetadataLineView: View {
 
 // MARK: - Buttons
 
+// MARK: - Play button
+
 /// The big, white, full-width primary action (Play / Resume).
 struct PrimaryPlayButton: View {
     let title: LocalizedStringKey

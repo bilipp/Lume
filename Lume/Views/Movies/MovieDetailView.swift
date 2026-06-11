@@ -34,6 +34,11 @@ struct MovieDetailView: View {
     @State private var otherSources: [HomeMediaItem] = []
     @State private var refreshToken: UUID = .init()
     @State private var isLoadingTMDB: Bool
+    #if !os(tvOS)
+        @State private var downloads = DownloadManager.shared
+        @AppStorage(DownloadManager.maxConcurrentKey) private var maxConcurrent = 1
+        @AppStorage(DownloadManager.autoDeleteKey) private var autoDeleteAfterWatching = false
+    #endif
 
     init(movie: Movie, animationNamespace: Namespace.ID? = nil) {
         self.movie = movie
@@ -205,11 +210,24 @@ struct MovieDetailView: View {
     }
 
     private var actions: some View {
-        PrimaryPlayButton(
-            title: movie.watchProgress > 1 ? "Resume" : "Play",
-            isEnabled: moviePlaylist != nil,
-            action: startPlayback
-        )
+        VStack(spacing: 12) {
+            PrimaryPlayButton(
+                title: movie.watchProgress > 1 ? "Resume" : "Play",
+                isEnabled: moviePlaylist != nil,
+                action: startPlayback
+            )
+            #if !os(tvOS)
+                if let playlist = moviePlaylist {
+                    DownloadButton(
+                        id: movie.id,
+                        downloadStatus: movie.downloadStatus,
+                        downloads: downloads,
+                        onStart: { downloads.startDownload(movie: movie, playlist: playlist) },
+                        onDelete: { deleteMovieDownload() }
+                    )
+                }
+            #endif
+        }
     }
 
     @ViewBuilder
@@ -432,9 +450,18 @@ struct MovieDetailView: View {
         movie.isWatched.toggle()
         if movie.isWatched {
             movie.watchProgress = Double(movie.durationSecs ?? 0)
+            #if !os(tvOS)
+                downloads.checkAutoDelete(id: movie.id)
+            #endif
         }
         TraktService.shared.syncWatched(movie: movie, watched: movie.isWatched)
     }
+
+    #if !os(tvOS)
+        private func deleteMovieDownload() {
+            downloads.deleteLocalFile(id: movie.id)
+        }
+    #endif
 }
 
 #Preview("Basic") {
