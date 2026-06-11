@@ -47,6 +47,13 @@ struct HomeView: View {
     @State private var showingSync = false
     @State private var showingSettings = false
 
+    #if os(tvOS)
+        /// Hero selected on the immersive home. Drives navigation
+        /// programmatically: the hero surface is a stable Button (not a
+        /// NavigationLink) so paging the carousel never changes its identity.
+        @State private var selectedHero: HeroItem?
+    #endif
+
     init() {
         // Recently watched: non-nil lastWatchedDate, newest first.
         var movies = FetchDescriptor<Movie>(
@@ -113,9 +120,11 @@ struct HomeView: View {
                         // Immersive Apple TV-style home: full-screen backdrop,
                         // teasing first row, fold-snapping scroll. Lives in
                         // `TVHomeScreen.swift`.
-                        TVHomeScreen(heroItems: heroItems) {
-                            homeRows
-                        }
+                        TVHomeScreen(
+                            heroItems: heroItems,
+                            onSelectHero: { selectedHero = $0 },
+                            rows: { homeRows }
+                        )
                     #else
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 28) {
@@ -157,6 +166,15 @@ struct HomeView: View {
                         .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
                     #endif
                 }
+            #if os(tvOS)
+                .navigationDestination(item: $selectedHero) { hero in
+                    if let movie = hero.movie {
+                        MovieDetailView(movie: movie, animationNamespace: animationNamespace)
+                    } else if let series = hero.series {
+                        SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                    }
+                }
+            #endif
                 .task(id: "\(playlists.count)-\(selectedPlaylistID)") {
                     await loadTrending()
                 }
