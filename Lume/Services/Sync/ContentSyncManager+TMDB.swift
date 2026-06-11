@@ -38,6 +38,7 @@ func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie, context: Mo
     movie.logoPath = details.logoPath ?? movie.logoPath
     movie.tagline = details.tagline ?? movie.tagline
     movie.contentRating = details.contentRating ?? movie.contentRating
+    movie.imdbId = details.imdbId ?? movie.imdbId
     movie.similarTMDBIds = details.similarIDs
     movie.trailers = details.videos
 
@@ -76,6 +77,7 @@ func applySeriesDetails(_ details: TMDBTitleDetails, to series: Series, context:
     series.logoPath = details.logoPath ?? series.logoPath
     series.tagline = details.tagline ?? series.tagline
     series.contentRating = details.contentRating ?? series.contentRating
+    series.imdbId = details.imdbId ?? series.imdbId
     series.similarTMDBIds = details.similarIDs
     series.trailers = details.videos
 

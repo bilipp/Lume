@@ -75,6 +75,7 @@ struct SeriesDetailView: View {
                 .task(id: series.id) {
                     await loadEpisodesIfNeeded()
                     await enrichIfNeeded()
+                    await enrichSeriesRatingsIfNeeded(series, context: modelContext)
                     resolveSimilar()
                     resolveOtherSources()
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -131,6 +132,11 @@ struct SeriesDetailView: View {
 
                     if let plot = series.plot, !plot.isEmpty {
                         ExpandableText(text: plot)
+                            .padding(.horizontal, DetailMetrics.contentPadding)
+                    }
+
+                    if !series.externalRatings.isEmpty {
+                        ExternalRatingsView(ratings: series.externalRatings)
                             .padding(.horizontal, DetailMetrics.contentPadding)
                     }
 
@@ -559,15 +565,6 @@ private extension SeriesDetailView {
     series.tmdb = "1396"
     series.tmdbEnrichedAt = Date().addingTimeInterval(-3600)
     series.isFavorite = true
-    return NavigationStack {
-        SeriesDetailView(series: series)
-    }
-    .modelContainer(container)
-}
-
-#Preview("No Episodes") {
-    let container = previewContainer()
-    let series = PreviewData.sampleSeries
     return NavigationStack {
         SeriesDetailView(series: series)
     }
