@@ -185,7 +185,7 @@ nonisolated struct TMDBClient {
     /// US content rating folded in via `append_to_response`.
     func movieDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
-            "/movie/\(id)?append_to_response=credits,similar,release_dates,images,videos"
+            "/movie/\(id)?append_to_response=credits,similar,release_dates,images,videos,external_ids"
                 + imageAndVideoLanguageQuery
         )
         return response.normalized(isMovie: true, preferredLanguage: languageCode)
@@ -194,7 +194,7 @@ nonisolated struct TMDBClient {
     /// Full detail payload for a TV series.
     func tvDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
-            "/tv/\(id)?append_to_response=credits,similar,content_ratings,images,videos"
+            "/tv/\(id)?append_to_response=credits,similar,content_ratings,images,videos,external_ids"
                 + imageAndVideoLanguageQuery
         )
         return response.normalized(isMovie: false, preferredLanguage: languageCode)
@@ -272,6 +272,8 @@ struct TMDBTitleDetails {
     var videos: [TitleVideo]
     /// Relative path to the title's wordmark logo (transparent PNG), if any.
     var logoPath: String?
+    /// IMDb id (e.g. `tt3896198`), used to query OMDb for aggregator ratings.
+    var imdbId: String?
 
     /// Collection this movie belongs to (only for movies, nil for series).
     var collectionId: Int?
@@ -332,11 +334,14 @@ private nonisolated struct TitleDetailsResponse: Decodable {
     let belongsToCollection: BelongsToCollection?
     let videos: Results<VideoEntry>?
     let images: ImagesEntry?
+    let imdbId: String? // movies expose it top-level
+    let externalIds: ExternalIds? // tv (and movies) expose it under external_ids
 
     struct Genre: Decodable { let name: String }
     struct Credits: Decodable { let cast: [TMDBCastMemberDTO]? }
     struct Similar: Decodable { let results: [SimilarItem] }
     struct Results<Entry: Decodable>: Decodable { let results: [Entry] }
+
     enum CodingKeys: String, CodingKey {
         case tagline, overview, runtime, genres, credits, similar, videos, images
         case backdropPath = "backdrop_path"
@@ -345,7 +350,15 @@ private nonisolated struct TitleDetailsResponse: Decodable {
         case releaseDates = "release_dates"
         case contentRatings = "content_ratings"
         case belongsToCollection = "belongs_to_collection"
+        case imdbId = "imdb_id"
+        case externalIds = "external_ids"
     }
+}
+
+/// TMDB's appended `external_ids` payload — only the IMDb id is used.
+private nonisolated struct ExternalIds: Decodable {
+    let imdbId: String?
+    enum CodingKeys: String, CodingKey { case imdbId = "imdb_id" }
 }
 
 private nonisolated struct BelongsToCollection: Decodable {
@@ -453,11 +466,20 @@ nonisolated extension TitleDetailsResponse {
             similarIDs: similar?.results.map(\.id) ?? [],
             videos: mappedVideos(),
             logoPath: bestLogoPath(preferredLanguage: preferredLanguage),
+            imdbId: resolvedIMDbId(),
             collectionId: isMovie ? belongsToCollection?.id : nil,
             collectionName: isMovie ? belongsToCollection?.name : nil,
             collectionPosterPath: isMovie ? belongsToCollection?.posterPath : nil,
             collectionBackdropPath: isMovie ? belongsToCollection?.backdropPath : nil
         )
+    }
+
+    /// The IMDb id, preferring the top-level value (movies) and falling back to
+    /// the appended `external_ids` (series). Empty strings are treated as absent.
+    private func resolvedIMDbId() -> String? {
+        let candidate = imdbId ?? externalIds?.imdbId
+        guard let candidate, !candidate.isEmpty else { return nil }
+        return candidate
     }
 
     /// YouTube videos sorted by usefulness — trailers first, then teasers,
