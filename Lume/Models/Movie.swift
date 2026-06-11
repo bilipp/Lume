@@ -43,6 +43,18 @@ final class Movie {
     @Relationship(deleteRule: .cascade, inverse: \CastMember.movie)
     var castMembers: [CastMember] = []
 
+    // MARK: External ratings (OMDb, keyed by IMDb id — lazy-fetched on detail)
+
+    /// IMDb id (e.g. `tt3896198`), resolved from TMDB's external ids. Required
+    /// to query OMDb for aggregator ratings.
+    var imdbId: String?
+    /// Encoded `[ExternalRating]` blob (IMDb / Rotten Tomatoes / Metacritic).
+    /// A `Data` blob for the same reason as `trailersData`. Access through
+    /// `externalRatings`.
+    var externalRatingsData: Data?
+    /// When ratings were last fetched from OMDb; nil means never.
+    var ratingsEnrichedAt: Date?
+
     // MARK: TMDB collection
 
     var collectionId: Int?
@@ -116,6 +128,16 @@ extension Movie {
     /// Cast in TMDB billing order (top-billed first).
     var orderedCast: [CastMember] {
         castMembers.sorted { $0.order < $1.order }
+    }
+
+    /// External aggregator ratings, in display order. Backed by
+    /// `externalRatingsData` so SwiftData persists it as a plain `Data` blob.
+    var externalRatings: [ExternalRating] {
+        get {
+            guard let externalRatingsData else { return [] }
+            return (try? JSONDecoder().decode([ExternalRating].self, from: externalRatingsData)) ?? []
+        }
+        set { externalRatingsData = try? JSONEncoder().encode(newValue) }
     }
 
     var downloadStatus: DownloadStatus? {

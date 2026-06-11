@@ -71,6 +71,7 @@
             .task(id: series.id) {
                 await loadEpisodesIfNeeded()
                 await enrichIfNeeded()
+                await enrichSeriesRatingsIfNeeded(series, context: modelContext)
                 resolveSimilar()
                 resolveOtherSources()
                 withAnimation(.easeInOut(duration: 0.3)) {
@@ -252,6 +253,11 @@
                         Text("No description available.")
                             .font(.system(size: 26))
                             .foregroundStyle(.white.opacity(0.6))
+                    }
+
+                    if !series.externalRatings.isEmpty {
+                        TVExternalRatingsView(ratings: series.externalRatings)
+                            .padding(.top, 8)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
