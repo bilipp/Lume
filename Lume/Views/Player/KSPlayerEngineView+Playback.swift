@@ -101,7 +101,16 @@ extension KSPlayerEngineView {
             hasSeenReadyToPlay = true
             reconnector.reset()
         case .bufferFinished:
-            reconnector.reset()
+            // Guard: KSPlayerLayer.play() immediately sets state = .bufferFinished
+            // if the previous session's loadState is still .playable (it isn't reset
+            // by prepareToPlay). That stale callback fires before the new session
+            // opens, so .readyToPlay hasn't been seen yet. Resetting the budget on
+            // that stale signal causes an infinite loop on persistent failures (e.g.
+            // 403 token expiry) — the counter resets to 0 every cycle and never
+            // reaches the give-up threshold.
+            if hasSeenReadyToPlay {
+                reconnector.reset()
+            }
         case .error:
             reconnector.scheduleRetry { reconnect() }
             // Budget just exhausted on this drop: the stream is dead, so stop
@@ -278,6 +287,10 @@ extension KSPlayerEngineView {
     /// `.error` and `.playedToTheEnd` cases.
     func reconnect() {
         guard let layer = coordinator.playerLayer else { return }
+        // Reset session gates so stale callbacks from the previous session don't
+        // prematurely clear the spinner or reset the reconnect budget.
+        hasSeenReadyToPlay = false
+        lastPlayhead = -1
         if !media.isLive, clock.current > 1 {
             layer.options.startPlayTime = clock.current
         }
