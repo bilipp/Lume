@@ -4,6 +4,26 @@
     "-" : {
 
     },
+    "Playback Failed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wiedergabe fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "This stream couldn’t be loaded. It may be offline or temporarily unavailable." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Stream konnte nicht geladen werden. Er ist möglicherweise offline oder vorübergehend nicht verfügbar."
+          }
+        }
+      }
+    },
     "–" : {
 
     },
