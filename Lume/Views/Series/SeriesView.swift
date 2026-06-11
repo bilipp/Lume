@@ -76,6 +76,7 @@ struct SeriesView: View {
                     }
                 }
             }
+            .tvPlaylistSwitcher(playlists: playlists, selectedPlaylistID: $selectedPlaylistID)
             .platformNavigationTitle("Series")
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,

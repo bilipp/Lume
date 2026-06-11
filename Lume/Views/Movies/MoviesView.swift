@@ -78,6 +78,7 @@ struct MoviesView: View {
                     }
                 }
             }
+            .tvPlaylistSwitcher(playlists: playlists, selectedPlaylistID: $selectedPlaylistID)
             .platformNavigationTitle("Movies")
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,

@@ -71,6 +71,75 @@ struct PlaylistSwitcher: View {
     }
 }
 
+// MARK: - tvOS switcher
+
+#if os(tvOS)
+    /// Floating playlist switch for the tvOS library screens: a compact button
+    /// pinned below the tab bar in the top-right corner. tvOS has no `Menu`,
+    /// so pressing it presents the playlist list as a confirmation dialog.
+    /// Hidden with a single playlist — there is nothing to switch to.
+    private struct TVPlaylistSwitcherModifier: ViewModifier {
+        let playlists: [Playlist]
+        @Binding var selectedPlaylistID: String
+
+        @State private var showingPicker = false
+
+        func body(content: Content) -> some View {
+            content.overlay(alignment: .topTrailing) {
+                if playlists.count > 1 {
+                    switchButton
+                }
+            }
+        }
+
+        private var switchButton: some View {
+            Button {
+                showingPicker = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "square.stack")
+                        .font(.caption)
+                    Text(playlists.active(for: selectedPlaylistID)?.name ?? "")
+                        .lineLimit(1)
+                }
+                .font(.callout)
+            }
+            // A lone narrow target at the screen edge: the section gives the
+            // focus engine an explicit group so "up" from right-side content
+            // can land here instead of skipping straight to the tab bar.
+            .focusSection()
+            .confirmationDialog("Switch Playlist", isPresented: $showingPicker, titleVisibility: .visible) {
+                ForEach(playlists) { playlist in
+                    Button {
+                        selectedPlaylistID = playlist.id.uuidString
+                    } label: {
+                        if playlist.id == playlists.active(for: selectedPlaylistID)?.id {
+                            Label(playlist.name, systemImage: "checkmark")
+                        } else {
+                            Text(playlist.name)
+                        }
+                    }
+                }
+            }
+        }
+    }
+#endif
+
+extension View {
+    /// tvOS: pins the compact playlist switch to the view's top-right corner.
+    /// No-op everywhere else — iOS/macOS get `PlaylistSwitcher` via the
+    /// library toolbar instead. Attach to a tab's ROOT content (inside its
+    /// `NavigationStack`) so the switch disappears on pushed detail screens.
+    @ViewBuilder
+    func tvPlaylistSwitcher(playlists: [Playlist], selectedPlaylistID: Binding<String>) -> some View {
+        #if os(tvOS)
+            modifier(TVPlaylistSwitcherModifier(playlists: playlists, selectedPlaylistID: selectedPlaylistID))
+        #else
+            self
+        #endif
+    }
+}
+
 #Preview("Multiple Playlists") {
     let playlist1 = Playlist(name: "My IPTV", serverURL: "http://example.com:8080", username: "user", password: "pass")
     let playlist2 = Playlist(name: "Backup", serverURL: "http://backup.com:8080", username: "user2", password: "pass2")
