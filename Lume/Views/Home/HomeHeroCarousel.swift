@@ -2,8 +2,9 @@
 //  HomeHeroCarousel.swift
 //  Lume
 //
-//  A Netflix / Apple TV-style hero carousel for the top of the home screen.
-//  Features trending movies the user owns using wide TMDB backdrop artwork,
+//  A Netflix / Apple TV-style hero carousel for the top of the home screen on
+//  iOS and macOS. (tvOS uses the immersive `TVHomeScreen` instead.) Features
+//  trending movies the user owns using wide TMDB backdrop artwork,
 //  auto-advancing every few seconds while honouring manual swipes.
 //
 //  The artwork lives in a paging ScrollView (`scrollTargetBehavior(.paging)` +
@@ -17,13 +18,6 @@ import SwiftUI
 struct HomeHeroCarousel: View {
     let items: [HeroItem]
     let onPlayMovie: (Movie) -> Void
-
-    #if os(tvOS)
-        /// The Siri Remote drives the carousel through focus, not gestures. We
-        /// track focus to page on left/right swipes and pause auto-advance while
-        /// the user is parked on the hero.
-        @FocusState private var heroFocused: Bool
-    #endif
 
     @State private var currentID: String?
     @State private var isInteracting = false
@@ -48,13 +42,7 @@ struct HomeHeroCarousel: View {
     private static let headCloneID = "hero-clone-head"
     private static let tailCloneID = "hero-clone-tail"
 
-    #if os(tvOS)
-        private let heroHeight: CGFloat = 960
-    #elseif os(macOS)
-        private let heroHeight: CGFloat = 800
-    #else
-        private let heroHeight: CGFloat = 800
-    #endif
+    private let heroHeight: CGFloat = 800
 
     /// The rendered pages: the real items padded with a clone of the LAST item
     /// at the front and the FIRST at the back. Paging onto a clone is one slide;
@@ -108,29 +96,10 @@ struct HomeHeroCarousel: View {
                 .allowsHitTesting(false)
 
                 if let hero = displayedHero {
-                    #if os(tvOS)
-                        // STABLE identity (no `.id(hero.id)`) so the focused hero
-                        // survives paging. Left/right pages via `onMoveCommand`; we
-                        // re-assert focus since the link identity changes movie⇄series.
-                        HeroInfo(
-                            hero: hero,
-                            isCompact: isCompact,
-                            onPlayMovie: onPlayMovie,
-                            heroFocus: $heroFocused,
-                            // Zero the timer BEFORE paging: on tvOS `isInteracting`
-                            // stays false (remote paging is `.animating`, not a
-                            // drag), so this is what stops the auto-advance tick
-                            // from firing a second jump in the same beat as the press.
-                            onPrevious: { progress = 0; retreat(); heroFocused = true },
-                            onNext: { progress = 0; advance(); heroFocused = true }
-                        )
+                    // Fixed overlay — no `.id`/`.transition` so a stable view can
+                    // fade out/in via `infoOpacity` rather than cross-dissolving.
+                    HeroInfo(hero: hero, isCompact: isCompact, onPlayMovie: onPlayMovie)
                         .opacity(infoOpacity)
-                    #else
-                        // Fixed overlay — no `.id`/`.transition` so a stable view can
-                        // fade out/in via `infoOpacity` rather than cross-dissolving.
-                        HeroInfo(hero: hero, isCompact: isCompact, onPlayMovie: onPlayMovie)
-                            .opacity(infoOpacity)
-                    #endif
                 }
 
                 pageIndicator
@@ -142,28 +111,21 @@ struct HomeHeroCarousel: View {
             .animation(.easeInOut(duration: 0.35), value: currentItemID)
         }
         .frame(height: heroHeight)
-        #if os(tvOS)
-            // tvOS applies overscan safe-area insets (~60pt) on every edge
-            .ignoresSafeArea(edges: .horizontal)
-            // The hero is one full-width focusable surface (see `HeroInfo`), so the
-            // tab bar's downward move lands on it and upward moves route back to it.
-            .focusSection()
-        #endif
-            .onAppear {
-                // Seed `displayedID` first so the initial assignment skips the crossfade.
-                if displayedID == nil { displayedID = items.first?.id }
-                if currentID == nil { currentID = items.first?.id }
-                prefetchNeighbours()
-            }
-            .onChange(of: currentItemID) { _, _ in
-                // Restart the loading bar on every page change — auto or manual.
-                progress = 0
-                prefetchNeighbours()
-                crossfadeInfo()
-            }
-            .task(id: items.count) {
-                await autoAdvance()
-            }
+        .onAppear {
+            // Seed `displayedID` first so the initial assignment skips the crossfade.
+            if displayedID == nil { displayedID = items.first?.id }
+            if currentID == nil { currentID = items.first?.id }
+            prefetchNeighbours()
+        }
+        .onChange(of: currentItemID) { _, _ in
+            // Restart the loading bar on every page change — auto or manual.
+            progress = 0
+            prefetchNeighbours()
+            crossfadeInfo()
+        }
+        .task(id: items.count) {
+            await autoAdvance()
+        }
     }
 
     /// Warms the cache for the slides on either side so they appear instantly.
@@ -218,12 +180,7 @@ struct HomeHeroCarousel: View {
                 activeIndex: currentIndex,
                 progress: progress
             )
-            #if os(tvOS)
-            // Keep the indicator clear of the bottom overscan margin.
-            .padding(.bottom, 40)
-            #else
             .padding(.bottom, 14)
-            #endif
         }
     }
 
@@ -254,13 +211,7 @@ struct HomeHeroCarousel: View {
                 // Reset BEFORE paging so the next tick can't re-trigger an advance
                 // in the window before `onChange(currentItemID)` resets it.
                 progress = 0
-                #if os(tvOS)
-                    let wasFocused = heroFocused
-                    advance()
-                    if wasFocused { heroFocused = true }
-                #else
-                    advance()
-                #endif
+                advance()
             } else {
                 progress = min(progress + step, 1)
             }
@@ -316,52 +267,6 @@ struct HomeHeroCarousel: View {
 private struct HeroSlot: Identifiable {
     let id: String
     let item: HeroItem
-}
-
-// MARK: - Page indicator
-
-/// The carousel's dots. Inactive slides are small circles; the active slide
-/// stretches into a capsule "track" whose fill grows with `progress`, reading as
-/// a loading bar that previews when the carousel will jump to the next slide.
-private struct HeroPageIndicator: View {
-    let count: Int
-    /// Index of the active slide (0-based, over the real items).
-    let activeIndex: Int
-    /// Fill of the active capsule, 0…1.
-    let progress: Double
-
-    private let dotSize: CGFloat = 7
-    private let activeWidth: CGFloat = 28
-    private let spacing: CGFloat = 8
-
-    var body: some View {
-        HStack(spacing: spacing) {
-            ForEach(0 ..< count, id: \.self) { index in
-                let isActive = index == activeIndex
-                // Always a Capsule (a 7×7 capsule reads as a circle) so the
-                // active dot can smoothly stretch/contract on a page change
-                // instead of swapping shapes and losing its animation identity.
-                Capsule()
-                    .fill(Color.white.opacity(isActive ? 0.35 : 0.4))
-                    .frame(width: isActive ? activeWidth : dotSize, height: dotSize)
-                    .overlay(alignment: .leading) {
-                        if isActive {
-                            Capsule()
-                                .fill(Color.white)
-                                // Tracks `progress` directly (no animation) so the
-                                // fill steps with the tick rather than lagging it.
-                                .frame(width: activeWidth * progress, height: dotSize)
-                        }
-                    }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        // Scope the animation to the active-dot stretch on page change; the
-        // per-tick fill changes happen in other passes and stay unanimated.
-        .animation(.easeInOut(duration: 0.35), value: activeIndex)
-    }
 }
 
 // MARK: - Preview

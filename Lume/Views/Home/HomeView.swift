@@ -109,31 +109,26 @@ struct HomeView: View {
                         description: Text("Watch something or mark titles as favorites and they'll show up here.")
                     )
                 } else {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 28) {
-                            if !heroItems.isEmpty {
-                                HomeHeroCarousel(items: heroItems, onPlayMovie: playMovie)
-                            }
-                            if !recentlyWatched.isEmpty {
-                                HomeRow(title: "Recently Watched", items: recentlyWatched, onPlayLive: playChannel, onRemove: removeFromRecentlyWatched, animationNamespace: animationNamespace)
-                            }
-                            if !trendingMovies.isEmpty {
-                                HomeRow(title: "Trending Movies", items: trendingMovies, onPlayLive: playChannel, animationNamespace: animationNamespace)
-                            }
-                            if !trendingSeries.isEmpty {
-                                HomeRow(title: "Trending Series", items: trendingSeries, onPlayLive: playChannel, animationNamespace: animationNamespace)
-                            }
-                            if !watchlist.isEmpty {
-                                HomeRow(title: "From Your Trakt Watchlist", items: watchlist, onPlayLive: playChannel, animationNamespace: animationNamespace)
-                            }
-                            if !favorites.isEmpty {
-                                HomeRow(title: "Favorites", items: favorites, onPlayLive: playChannel, animationNamespace: animationNamespace)
-                            }
+                    #if os(tvOS)
+                        // Immersive Apple TV-style home: full-screen backdrop,
+                        // teasing first row, fold-snapping scroll. Lives in
+                        // `TVHomeScreen.swift`.
+                        TVHomeScreen(heroItems: heroItems) {
+                            homeRows
                         }
-                        .padding(.bottom)
-                    }
-                    .scrollIndicators(.hidden)
-                    .ignoresSafeArea(edges: .top)
+                    #else
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 28) {
+                                if !heroItems.isEmpty {
+                                    HomeHeroCarousel(items: heroItems, onPlayMovie: playMovie)
+                                }
+                                homeRows
+                            }
+                            .padding(.bottom)
+                        }
+                        .scrollIndicators(.hidden)
+                        .ignoresSafeArea(edges: .top)
+                    #endif
                 }
             }
             .platformNavigationTitle("Home")
@@ -173,6 +168,27 @@ struct HomeView: View {
                     FullScreenPlayerView(media: media)
                 }
             #endif
+        }
+    }
+
+    /// The horizontal rails, shared by the iOS/macOS scroll layout and the tvOS
+    /// immersive home. Each row only renders when it has content.
+    @ViewBuilder
+    private var homeRows: some View {
+        if !recentlyWatched.isEmpty {
+            HomeRow(title: "Recently Watched", items: recentlyWatched, onPlayLive: playChannel, onRemove: removeFromRecentlyWatched, animationNamespace: animationNamespace)
+        }
+        if !trendingMovies.isEmpty {
+            HomeRow(title: "Trending Movies", items: trendingMovies, onPlayLive: playChannel, animationNamespace: animationNamespace)
+        }
+        if !trendingSeries.isEmpty {
+            HomeRow(title: "Trending Series", items: trendingSeries, onPlayLive: playChannel, animationNamespace: animationNamespace)
+        }
+        if !watchlist.isEmpty {
+            HomeRow(title: "From Your Trakt Watchlist", items: watchlist, onPlayLive: playChannel, animationNamespace: animationNamespace)
+        }
+        if !favorites.isEmpty {
+            HomeRow(title: "Favorites", items: favorites, onPlayLive: playChannel, animationNamespace: animationNamespace)
         }
     }
 
