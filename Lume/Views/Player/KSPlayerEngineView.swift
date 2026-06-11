@@ -54,10 +54,30 @@ struct KSPlayerEngineView: View {
     /// Swaps the endless spinner for the `PlayerErrorIndicator` (Try Again / Back)
     /// so a stream that never starts no longer locks the player.
     @State var loadFailed = false
+    /// Gate that ensures `markPlaybackStarted()` and the `.bufferFinished` path in
+    /// `updateLoadingState` only fire after the current session has emitted its own
+    /// `.readyToPlay`. A stale `.bufferFinished` from the previous session
+    /// (arriving in the window after `retryPlayback()` resets `hasStartedPlayback`)
+    /// would otherwise prematurely cancel the startup watchdog and clear the
+    /// spinner before the new session is ready.
+    @State var hasSeenReadyToPlay = false
     /// Fires `failPlayback()` if the stream hasn't produced a frame within
     /// `startupTimeout`. Covers a stream that hangs in `.preparing`/`.buffering`
     /// forever without ever emitting `.error` (so the reconnector never engages).
     @State var startupWatchdog: Task<Void, Never>?
+    /// When a runaway live A/V clock split was first observed, `nil` while in
+    /// sync (see `noteClockDrift` — frozen image with healthy audio after an
+    /// HLS timestamp discontinuity).
+    @State var driftSince: TimeInterval?
+    /// When the last drift-triggered stream rebuild fired, for the re-fire
+    /// cooldown in `noteClockDrift`.
+    @State var lastDriftRecovery: TimeInterval = -.infinity
+    /// Fires `retryPlayback()` if a live stream sits in `.buffering` for
+    /// `stallTimeout` after playback had started. A mid-stream decode failure
+    /// wedges KSPlayer in `.buffering` forever without ever emitting `.error`
+    /// (so the reconnector never engages, and the startup watchdog is already
+    /// disarmed). See `handleState`.
+    @State var stallWatchdog: Task<Void, Never>?
     @State private var isControlsVisible = true
     @State var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
@@ -102,6 +122,11 @@ struct KSPlayerEngineView: View {
     /// (~31s of bounded backoff) usually trips first on a stream that *errors*;
     /// this catches the one that simply never responds.
     let startupTimeout: TimeInterval = 40
+    /// How long a live stream may sit in `.buffering` mid-playback before the
+    /// stall watchdog rebuilds it. A healthy rebuffer only has to reach the
+    /// live-buffer target (a few seconds), so 30s of no recovery means the
+    /// pipeline is wedged, not catching up.
+    let stallTimeout: TimeInterval = 30
 
     var body: some View {
         #if os(tvOS)
@@ -122,22 +147,38 @@ struct KSPlayerEngineView: View {
 
                 KSVideoPlayer(coordinator: coordinator, url: media.url, options: options)
                     .onStateChanged { _, state in
-                        isPlaying = (state == .bufferFinished)
-                        updateLoadingState(state)
-                        engine.syncState(state)
-                        handleState(state)
+                        // Defer all state mutations so they never run inside a
+                        // SwiftUI view-update pass, which would trigger the
+                        // "Modifying state during view update" / "Publishing
+                        // changes from within view updates" runtime warnings.
+                        DispatchQueue.main.async {
+                            isPlaying = (state == .bufferFinished)
+                            updateLoadingState(state)
+                            engine.syncState(state)
+                            handleState(state)
+                        }
                     }
                     .onPlay { current, total in
-                        if !isSeeking {
-                            if current.isFinite { clock.current = current }
-                            if total.isFinite, total > 0 { clock.duration = total }
+                        // Defer for the same reason as onStateChanged; also
+                        // prevents rapid back-to-back transitions (e.g.
+                        // bufferFinished → buffering) from publishing two
+                        // @ObservableObject changes in the same SwiftUI frame,
+                        // which triggers "onChange updated multiple times per
+                        // frame" warnings.
+                        DispatchQueue.main.async {
+                            if !isSeeking {
+                                if current.isFinite { clock.current = current }
+                                if total.isFinite, total > 0 { clock.duration = total }
+                            }
+                            notePlaybackProgress(current)
+                            noteClockDrift()
+                            // syncState (onStateChanged) already refreshes this
+                            // on every transition; only chase it from the
+                            // per-tick play callback until it first lands, so
+                            // steady playback doesn't re-read tracks/codec each
+                            // tick.
+                            if engine.videoInfo == nil { engine.refreshVideoInfo() }
                         }
-                        notePlaybackProgress(current)
-                        // syncState (onStateChanged) already refreshes this on
-                        // every transition; only chase it from the per-tick play
-                        // callback until it first lands, so steady playback
-                        // doesn't re-read tracks/codec each tick.
-                        if engine.videoInfo == nil { engine.refreshVideoInfo() }
                     }
                     .ignoresSafeArea()
 
@@ -198,6 +239,7 @@ struct KSPlayerEngineView: View {
                 hideTask?.cancel()
                 reconnector.cancel()
                 cancelStartupWatchdog()
+                cancelStallWatchdog()
                 coordinator.resetPlayer()
             }
             .onChange(of: engine.isPlaying) { _, _ in
@@ -216,9 +258,13 @@ struct KSPlayerEngineView: View {
                 seekPosition = 0
                 isPanelOpen = false
                 hasStartedPlayback = false
+                hasSeenReadyToPlay = false
                 isBuffering = true
                 loadFailed = false
                 lastPlayhead = -1
+                driftSince = nil
+                lastDriftRecovery = -.infinity
+                cancelStallWatchdog()
                 reconnector.reset()
                 engine.reset()
                 startStartupWatchdog()
@@ -311,16 +357,21 @@ struct KSPlayerEngineView: View {
             return ZStack {
                 KSVideoPlayer(coordinator: coordinator, url: media.url, options: options)
                     .onStateChanged { _, state in
-                        isPlaying = (state == .bufferFinished)
-                        updateLoadingState(state)
-                        handleState(state)
+                        DispatchQueue.main.async {
+                            isPlaying = (state == .bufferFinished)
+                            updateLoadingState(state)
+                            handleState(state)
+                        }
                     }
                     .onPlay { current, total in
-                        if !isSeeking {
-                            if current.isFinite { clock.current = current }
-                            if total.isFinite, total > 0 { clock.duration = total }
+                        DispatchQueue.main.async {
+                            if !isSeeking {
+                                if current.isFinite { clock.current = current }
+                                if total.isFinite, total > 0 { clock.duration = total }
+                            }
+                            notePlaybackProgress(current)
+                            noteClockDrift()
                         }
-                        notePlaybackProgress(current)
                     }
                     .ignoresSafeArea()
 
@@ -366,6 +417,7 @@ struct KSPlayerEngineView: View {
                 hoverHideTask?.cancel()
                 reconnector.cancel()
                 cancelStartupWatchdog()
+                cancelStallWatchdog()
                 coordinator.resetPlayer()
             }
             .onTapGesture {

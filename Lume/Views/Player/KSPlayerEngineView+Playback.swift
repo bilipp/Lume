@@ -1,5 +1,6 @@
 import KSPlayer
 import OSLog
+import QuartzCore
 import SwiftUI
 
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
@@ -24,6 +25,10 @@ extension KSPlayerEngineView {
                 withAnimation(.easeInOut(duration: 0.25)) { isBuffering = true }
             }
         case .bufferFinished:
+            // Ignore a stale .bufferFinished from the previous session that
+            // can arrive in the window between retryPlayback() resetting the
+            // state and the new session emitting its own .readyToPlay.
+            guard hasSeenReadyToPlay else { return }
             markPlaybackStarted()
             if isBuffering {
                 withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
@@ -58,8 +63,13 @@ extension KSPlayerEngineView {
     /// Record that the stream has produced its first frame. Unlocks the controls
     /// for good and disarms the startup watchdog (a dead-stream timeout is moot
     /// once frames are flowing). Idempotent.
+    ///
+    /// Guarded by `hasSeenReadyToPlay` so a stale `.bufferFinished` callback
+    /// from the *previous* session (which arrives after `retryPlayback()` resets
+    /// `hasStartedPlayback`) cannot prematurely cancel the watchdog before the
+    /// new session's prepare cycle has started.
     func markPlaybackStarted() {
-        guard !hasStartedPlayback else { return }
+        guard !hasStartedPlayback, hasSeenReadyToPlay else { return }
         hasStartedPlayback = true
         cancelStartupWatchdog()
     }
@@ -72,8 +82,19 @@ extension KSPlayerEngineView {
     /// confirmed healthy again. `.playedToTheEnd` is a clean finish, not a drop,
     /// so it is left alone.
     func handleState(_ state: KSPlayerState) {
+        // The stall watchdog lives exactly as long as a mid-playback `.buffering`
+        // window on a live stream; any other state means the engine moved on.
+        // Startup buffering is excluded — `startupTimeout` already covers it.
+        if state == .buffering, hasStartedPlayback, media.isLive {
+            startStallWatchdog()
+        } else {
+            cancelStallWatchdog()
+        }
         switch state {
-        case .readyToPlay, .bufferFinished:
+        case .readyToPlay:
+            hasSeenReadyToPlay = true
+            reconnector.reset()
+        case .bufferFinished:
             reconnector.reset()
         case .error:
             reconnector.scheduleRetry { reconnect() }
@@ -83,6 +104,87 @@ extension KSPlayerEngineView {
         default:
             break
         }
+    }
+
+    // MARK: - Mid-stream stall watchdog
+
+    /// Rebuild a live stream that buffers without ever recovering.
+    ///
+    /// A decode error mid-stream (one corrupt packet after a network stall is
+    /// enough) kills KSPlayer's decode thread for that track; with no frames
+    /// ever decoded again the track can't satisfy the playable check, so the
+    /// layer reports `.buffering` forever — and never `.error`, so the
+    /// reconnector has nothing to react to. The startup watchdog is disarmed
+    /// once the first frame rendered, leaving this window uncovered. A healthy
+    /// live rebuffer only has to refill a few seconds of buffer, so a stall
+    /// outliving `stallTimeout` means the pipeline is wedged: rebuild in place
+    /// (`retryPlayback` re-prepares the input and rejoins the live edge).
+    func startStallWatchdog() {
+        guard stallWatchdog == nil else { return }
+        stallWatchdog = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(stallTimeout * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            stallWatchdog = nil
+            Logger.player.error("stall watchdog: live stream stuck buffering for \(stallTimeout, format: .fixed(precision: 0), privacy: .public)s, rebuilding stream")
+            retryPlayback()
+        }
+    }
+
+    func cancelStallWatchdog() {
+        stallWatchdog?.cancel()
+        stallWatchdog = nil
+    }
+
+    // MARK: - Live clock-drift watchdog
+
+    /// A/V clock divergence treated as unrecoverable. Normal playback keeps the
+    /// sync diff within fractions of a second; the failure this watches for
+    /// puts it at tens of thousands of seconds, so anything past a few seconds
+    /// that *persists* means the timelines have split for good.
+    private static let driftTolerance: TimeInterval = 10
+    /// How long the divergence must persist before rebuilding. Filters the
+    /// transient spikes a seek or discontinuity flush can produce.
+    private static let driftPersistence: TimeInterval = 2
+    /// Minimum spacing between drift-triggered rebuilds, so a stream whose
+    /// timestamps are broken at the source can't thrash in a reload loop.
+    private static let driftRecoveryCooldown: TimeInterval = 60
+
+    /// Detect a runaway audio/video clock split on a live stream and rebuild
+    /// the stream in place.
+    ///
+    /// FFmpeg's HLS demuxer tracks each rendition playlist independently; when
+    /// a live mux crosses the MPEG-TS 33-bit timestamp wraparound (every
+    /// ~26.5h of broadcast uptime) or the provider's segmenter restarts
+    /// ("skipping N segments ahead, expired from playlists"), wraparound
+    /// correction can land on one elementary stream but not the other. Audio —
+    /// which renders unconditionally and drives the master clock — keeps
+    /// playing, while every video frame now looks hours "late" and is dropped
+    /// forever: frozen image, healthy sound, and no `.error` state for the
+    /// reconnector to react to. Nothing app-side can rejoin the timelines;
+    /// only re-preparing the input resets the demuxer.
+    ///
+    /// Polled from `onPlay` (KSPlayer's 0.1s tick, which keeps firing in this
+    /// state because the audio clock still advances), watching the sync diff
+    /// the video render loop publishes through `dynamicInfo`.
+    func noteClockDrift() {
+        guard media.isLive, hasStartedPlayback, !isSeeking, !loadFailed,
+              let diff = coordinator.playerLayer?.player.dynamicInfo?.audioVideoSyncDiff,
+              abs(diff) > Self.driftTolerance
+        else {
+            driftSince = nil
+            return
+        }
+        let now = CACurrentMediaTime()
+        guard let since = driftSince else {
+            driftSince = now
+            return
+        }
+        guard now - since >= Self.driftPersistence else { return }
+        driftSince = nil
+        guard now - lastDriftRecovery >= Self.driftRecoveryCooldown else { return }
+        lastDriftRecovery = now
+        Logger.player.error("clock-drift watchdog: A/V sync diff \(diff, format: .fixed(precision: 1), privacy: .public)s persisted, rebuilding live stream")
+        retryPlayback()
     }
 
     // MARK: - Dead-stream handling
@@ -130,6 +232,7 @@ extension KSPlayerEngineView {
             isBuffering = true
         }
         hasStartedPlayback = false
+        hasSeenReadyToPlay = false
         lastPlayhead = -1
         reconnector.reset()
         #if os(tvOS)
