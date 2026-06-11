@@ -2315,16 +2315,6 @@
         }
       }
     },
-    "Switch Playlist" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Playlist wechseln"
-          }
-        }
-      }
-    },
     "Sync" : {
       "localizations" : {
         "de" : {

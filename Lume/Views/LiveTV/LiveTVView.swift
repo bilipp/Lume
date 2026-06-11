@@ -146,7 +146,6 @@ struct LiveTVView: View {
                     #endif
                 }
             }
-            .tvPlaylistSwitcher(playlists: playlists, selectedPlaylistID: $selectedPlaylistID)
             .platformNavigationTitle("Live TV")
             #if os(iOS) || os(macOS)
                 .toolbar {
