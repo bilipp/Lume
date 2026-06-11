@@ -43,6 +43,9 @@ struct AVPlayerEngineView: View {
     /// Bumped to ask the overlay to close its open panel (Menu/back press).
     @State private var panelCloseToken = 0
     #if os(tvOS)
+        /// The full channel browser (categories + channels) raised by a left
+        /// press while watching live TV with the controls hidden.
+        @State private var isChannelBrowserOpen = false
         /// Drives focus onto the transparent tap-catcher once the controls
         /// auto-hide, so the Siri remote can summon them again.
         @FocusState private var catcherFocused: Bool
@@ -86,6 +89,12 @@ struct AVPlayerEngineView: View {
                     onPlayNext: { onSelectMedia?($0) }
                 )
             }
+
+            #if os(tvOS)
+                if isChannelBrowserOpen {
+                    channelBrowser
+                }
+            #endif
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -161,10 +170,14 @@ struct AVPlayerEngineView: View {
                 Color.clear.contentShape(Rectangle())
             }
             .buttonStyle(AVInvisibleButtonStyle())
-            .disabled(isControlsVisible)
+            .disabled(isControlsVisible || isChannelBrowserOpen)
             .focused($catcherFocused)
             .onMoveCommand { direction in
-                if media.isLive, direction == .up || direction == .down || direction == .right {
+                // Left opens the channel browser; up/down surf adjacent
+                // channels; right recalls the last channel watched.
+                if media.isLive, direction == .left {
+                    openChannelBrowser()
+                } else if media.isLive, direction == .up || direction == .down || direction == .right {
                     switchLiveChannel(direction)
                 } else {
                     showControls()
@@ -240,6 +253,34 @@ struct AVPlayerEngineView: View {
             onSelectMedia?(target)
             showControls()
         }
+
+        /// The two-column category / channel browser, slid in over the leading
+        /// edge. Picking a channel switches the stream and surfaces the controls
+        /// briefly so the new channel's name and EPG act as a banner.
+        private var channelBrowser: some View {
+            TVChannelBrowserOverlay(
+                media: media,
+                onSelect: { target in
+                    onSelectMedia?(target)
+                    withAnimation(.easeInOut(duration: 0.25)) { isChannelBrowserOpen = false }
+                    showControls()
+                },
+                onClose: { closeChannelBrowser() }
+            )
+            .transition(.move(edge: .leading).combined(with: .opacity))
+        }
+
+        private func openChannelBrowser() {
+            guard media.isLive, !isChannelBrowserOpen else { return }
+            hideTask?.cancel()
+            withAnimation(.easeInOut(duration: 0.25)) { isChannelBrowserOpen = true }
+        }
+
+        private func closeChannelBrowser() {
+            withAnimation(.easeInOut(duration: 0.25)) { isChannelBrowserOpen = false }
+            // Hand focus back to the tap-catcher so the remote keeps working.
+            Task { @MainActor in catcherFocused = true }
+        }
     #endif
 
     private func toggleControls() {
@@ -260,9 +301,16 @@ struct AVPlayerEngineView: View {
         withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
     }
 
-    /// Menu/back routing: close an open panel first, then hide the controls,
-    /// and only dismiss the player once the controls are already hidden.
+    /// Menu/back routing: close the channel browser or an open panel first,
+    /// then hide the controls, and only dismiss the player once the controls
+    /// are already hidden.
     private func handleMenuPress() {
+        #if os(tvOS)
+            if isChannelBrowserOpen {
+                closeChannelBrowser()
+                return
+            }
+        #endif
         if isPanelOpen {
             panelCloseToken += 1
         } else if isControlsVisible {
