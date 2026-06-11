@@ -9,105 +9,16 @@
 //    (crossfading between slides), so artwork always fills the screen.
 //  • The scroll content opens with a "showcase" slot sized to the screen height
 //    minus `TVHomeMetrics.rowPeek`, so the first row teases at the bottom edge.
-//  • `TVHomeFoldBehavior` (a custom `ScrollTargetBehavior`) snaps the fold in
-//    three stages: the first move down parks the first row mid-screen with the
-//    hero's bottom strip still visible (`.strip`), the next hides the hero
-//    entirely (`.rows`), and moving back up restores the full hero.
-//
-//  tvOS fully owns focus and scrolling here — the snap behavior only retargets
-//  where a focus-driven scroll comes to REST; it never re-layouts content in
-//  response to focus, which the focus engine cannot tolerate (see the earlier
-//  collapse-on-focus attempt that had to be reverted).
+//  • `TVHomeFoldBehavior` (a custom `ScrollTargetBehavior`, in
+//    `TVHomeFold.swift`) snaps the fold in three stages: the first move down
+//    parks the first row mid-screen with the hero's bottom strip still visible
+//    (`.strip`), the next hides the hero entirely (`.rows`), and moving back
+//    up restores the full hero.
 //
 
 #if os(tvOS)
 
     import SwiftUI
-
-    // MARK: - Geometry
-
-    enum TVHomeMetrics {
-        /// Scroll content reserved below the showcase so the first row teases at
-        /// the bottom of the screen (includes the `rowSpacing` gap above it).
-        static let rowPeek: CGFloat = 198
-        /// Hero strip that stays visible at the top after the first scroll down.
-        static let heroStrip: CGFloat = 280
-        /// Vertical gap between the showcase and the rows / between rows.
-        static let rowSpacing: CGFloat = 28
-    }
-
-    // MARK: - Fold zones
-
-    /// Where the home scroll is resting relative to the hero fold.
-    enum TVHomeZone: Equatable {
-        /// Hero fills the screen; the first row peeks at the bottom.
-        case expanded
-        /// One step down: hero strip at the top, first row parked mid-screen.
-        case strip
-        /// Hero offscreen; native row browsing.
-        case rows
-
-        init(offset: CGFloat, showcaseHeight: CGFloat) {
-            let collapsed = showcaseHeight - TVHomeMetrics.heroStrip
-            if showcaseHeight <= 0 || offset < collapsed * 0.5 {
-                self = .expanded
-            } else if offset < showcaseHeight - 40 {
-                self = .strip
-            } else {
-                self = .rows
-            }
-        }
-    }
-
-    /// Snaps focus-driven scrolls to the three fold stages. The decision is based
-    /// on the zone the scroll STARTED in plus the proposed resting offset, so the
-    /// same target range can resolve differently for "down from hero" vs "up from
-    /// the rows" without ever inspecting focus.
-    struct TVHomeFoldBehavior: ScrollTargetBehavior {
-        var zone: TVHomeZone
-        var showcaseHeight: CGFloat
-
-        func updateTarget(_ target: inout ScrollTarget, context _: TargetContext) {
-            guard showcaseHeight > 0 else { return }
-            let collapsed = showcaseHeight - TVHomeMetrics.heroStrip
-            let proposed = target.rect.origin.y
-
-            switch zone {
-            case .expanded:
-                // Small targets (the focus engine nudging the scroll a few
-                // points to track the focused hero while its content swaps)
-                // are pinned BACK to exactly 0 — merely returning would let
-                // each nudge stick and the rows visibly drift while paging.
-                if proposed < showcaseHeight * 0.3 {
-                    target.rect.origin.y = 0
-                    return
-                }
-                // First step down parks at the strip; a bigger jump (rapid
-                // double-press landing two rows deep) skips straight past it.
-                target.rect.origin.y = proposed <= collapsed + 120
-                    ? collapsed
-                    : max(proposed, showcaseHeight)
-
-            case .strip:
-                // Horizontal moves along the parked row: pin to the exact
-                // strip offset so focus-tracking nudges can't accumulate.
-                if abs(proposed - collapsed) < 40 {
-                    target.rect.origin.y = collapsed
-                    return
-                }
-                // Up restores the full hero; down hides it completely.
-                target.rect.origin.y = proposed < collapsed ? 0 : max(proposed, showcaseHeight)
-
-            case .rows:
-                // Deep in the rows scrolling is fully native.
-                if proposed > showcaseHeight { return }
-                // Mirrors Apple's fold sample: a target that would reveal only a
-                // sliver of the hero settles hidden; revealing more than ~30%
-                // (focus actually moved onto the hero) expands it fully.
-                target.rect.origin.y = proposed > showcaseHeight * 0.7 ? showcaseHeight : 0
-            }
-        }
-    }
 
     // MARK: - Hero model
 
@@ -394,7 +305,7 @@
         var body: some View {
             ZStack(alignment: .bottomLeading) {
                 if let hero = model.displayedHero {
-                    heroButton(for: hero)
+                    heroContent(for: hero)
                 }
             }
             // Fill the slot so the natural-height link pins to its BOTTOM —
@@ -414,53 +325,29 @@
             }
         }
 
-        /// One STRUCTURALLY STABLE Button for every slide — a plain content swap
-        /// on a stable view, so paging never drops focus. (A `NavigationLink`
-        /// whose branch flips movie⇄series gets a NEW identity on those pages:
-        /// focus falls to the first row, tvOS scrolls down to reveal it and back
-        /// up on re-assert, and the whole home visibly jumps.) Navigation is
-        /// reported via `onSelect` instead.
+        /// The bottom info block (natural height, pinned to the slot's bottom
+        /// by the enclosing ZStack) — NOT the whole slot. Filling the slot
+        /// leaves no room above the focused hero, so "up" stops reaching the
+        /// tab bar and the focus engine remaps it to other keys, breaking
+        /// left/right carousel paging.
         ///
-        /// The label is ONLY the bottom info block (natural height, pinned to
-        /// the slot's bottom by the enclosing ZStack) — NOT the whole slot.
-        /// Filling the slot leaves no room above the focused hero, so "up"
-        /// stops reaching the tab bar and the focus engine remaps it to other
-        /// keys, breaking left/right carousel paging.
-        private func heroButton(for hero: HeroItem) -> some View {
-            Button {
-                onSelect(hero)
-            } label: {
-                VStack(alignment: .leading, spacing: 0) {
-                    info(for: hero)
-                        .opacity(model.infoOpacity)
+        /// Only the Details pill inside is focusable (see `info(for:)`): the
+        /// block itself spans the full width, and a full-width focus target
+        /// projects "down" from the SCREEN CENTER — landing on the third card
+        /// of the first row instead of the first. A full-width focus-section
+        /// band around the pill keeps it reachable from the tab bar above.
+        private func heroContent(for hero: HeroItem) -> some View {
+            VStack(alignment: .leading, spacing: 0) {
+                info(for: hero)
+                    .opacity(model.infoOpacity)
 
-                    TVHeroPageDots(model: model)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 36)
-                        .padding(.bottom, 24)
-                }
-                .padding(.horizontal)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+                TVHeroPageDots(model: model)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 36)
+                    .padding(.bottom, 24)
             }
-            .buttonStyle(TVHeroSurfaceButtonStyle())
-            .focused($heroFocused)
-            .onMoveCommand { direction in
-                // Defer the page OUT of the move-command handler: tvOS delivers
-                // it inside the focus engine's animated update, and every layout
-                // change made there is implicitly animated at the UIKit layer —
-                // the info block visibly floats into place and drags the first
-                // row along. (`Transaction.disablesAnimations` can't reach that
-                // layer; it was tried and failed.) One main-actor hop later the
-                // event context is gone, making manual paging take the exact
-                // same path as auto-advance, which pages from a plain task and
-                // has only the model's own crossfades.
-                switch direction {
-                case .left: Task { model.retreat() }
-                case .right: Task { model.advance() }
-                default: break
-                }
-            }
+            .padding(.horizontal)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
 
         /// CONSTANT HEIGHT across slides: the logo slot is a fixed frame and the
@@ -497,14 +384,64 @@
                     .shadow(radius: 4)
                     .frame(maxWidth: 640, alignment: .leading)
 
-                detailsPill
-                    .padding(.top, 10)
+                // One STRUCTURALLY STABLE Button for every slide — a plain
+                // content swap on a stable view, so paging never drops focus.
+                // (A `NavigationLink` whose branch flips movie⇄series gets a
+                // NEW identity on those pages: focus falls to the first row,
+                // tvOS scrolls down to reveal it and back up on re-assert, and
+                // the whole home visibly jumps.) Navigation is reported via
+                // `onSelect` instead.
+                //
+                // The pill is the ONLY focusable element of the showcase, so
+                // the focus engine projects "down" from its narrow left-edge
+                // frame and lands on the FIRST card of the row below.
+                //
+                // The enclosing FULL-WIDTH `.focusSection()` band is what
+                // keeps the narrow pill reachable from above: the tab bar's
+                // buttons sit near the screen's center, and a vertical focus
+                // search only considers candidates that overlap the source
+                // horizontally — without the band, "down" from the tab bar
+                // skips the left-edge pill and lands mid-row. (The slot-level
+                // section can't catch that move: it ENCLOSES the tab bar, so
+                // it is never "below" it.) The band redirects to its only
+                // focusable child without affecting the pill's own outgoing
+                // projection.
+                HStack {
+                    Button {
+                        onSelect(hero)
+                    } label: {
+                        detailsPill
+                    }
+                    .buttonStyle(TVHeroSurfaceButtonStyle())
+                    .focused($heroFocused)
+                    .onMoveCommand { direction in
+                        // Defer the page OUT of the move-command handler: tvOS
+                        // delivers it inside the focus engine's animated
+                        // update, and every layout change made there is
+                        // implicitly animated at the UIKit layer — the info
+                        // block visibly floats into place and drags the first
+                        // row along. (`Transaction.disablesAnimations` can't
+                        // reach that layer; it was tried and failed.) One
+                        // main-actor hop later the event context is gone,
+                        // making manual paging take the exact same path as
+                        // auto-advance, which pages from a plain task and has
+                        // only the model's own crossfades.
+                        switch direction {
+                        case .left: Task { model.retreat() }
+                        case .right: Task { model.advance() }
+                        default: break
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .focusSection()
+                .padding(.top, 10)
             }
             .foregroundStyle(.white)
         }
 
-        /// A purely visual "Details" affordance. It isn't focusable itself — the
-        /// enclosing hero surface is — so it mirrors the hero's focus state to
+        /// The label of the hero's Button. The focus-neutral button style adds
+        /// no automatic highlight, so the pill mirrors `heroFocused` itself to
         /// flip between a glassy resting style and a solid highlighted style.
         private var detailsPill: some View {
             Label("Details", systemImage: "info.circle")
