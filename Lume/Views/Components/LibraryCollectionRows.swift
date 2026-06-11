@@ -71,8 +71,9 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable, Card: View>: 
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(title)
-                    .font(.title2)
+                    .font(.headline)
                     .fontWeight(.bold)
+                    .foregroundStyle(.secondary)
 
                 Spacer()
 
