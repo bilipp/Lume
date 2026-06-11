@@ -74,8 +74,14 @@
 
             switch zone {
             case .expanded:
-                // Small targets (horizontal focus moves on the hero) stay put.
-                if proposed < showcaseHeight * 0.3 { return }
+                // Small targets (the focus engine nudging the scroll a few
+                // points to track the focused hero while its content swaps)
+                // are pinned BACK to exactly 0 — merely returning would let
+                // each nudge stick and the rows visibly drift while paging.
+                if proposed < showcaseHeight * 0.3 {
+                    target.rect.origin.y = 0
+                    return
+                }
                 // First step down parks at the strip; a bigger jump (rapid
                 // double-press landing two rows deep) skips straight past it.
                 target.rect.origin.y = proposed <= collapsed + 120
@@ -83,8 +89,12 @@
                     : max(proposed, showcaseHeight)
 
             case .strip:
-                // Horizontal moves along the parked row stay put.
-                if abs(proposed - collapsed) < 40 { return }
+                // Horizontal moves along the parked row: pin to the exact
+                // strip offset so focus-tracking nudges can't accumulate.
+                if abs(proposed - collapsed) < 40 {
+                    target.rect.origin.y = collapsed
+                    return
+                }
                 // Up restores the full hero; down hides it completely.
                 target.rect.origin.y = proposed < collapsed ? 0 : max(proposed, showcaseHeight)
 
@@ -219,6 +229,8 @@
     /// adjusts where each focus-driven scroll comes to rest.
     struct TVHomeScreen<Rows: View>: View {
         let heroItems: [HeroItem]
+        /// Called when the hero surface is selected; the owner navigates.
+        let onSelectHero: (HeroItem) -> Void
         @ViewBuilder var rows: Rows
 
         @State private var model = TVHeroModel()
@@ -245,7 +257,7 @@
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: TVHomeMetrics.rowSpacing) {
                         if hasHero {
-                            TVHeroShowcase(model: model)
+                            TVHeroShowcase(model: model, onSelect: onSelectHero)
                         }
                         rows
                     }
@@ -370,18 +382,19 @@
 
     /// The focusable hero surface at the top of the scroll content: title logo,
     /// overview, Details affordance and the slide dots, bottom-aligned inside a
-    /// slot that fills the screen minus the first-row peek. The ENTIRE slot is
-    /// one full-width NavigationLink — the tab bar's downward focus search can't
-    /// miss it, and left/right pages the carousel.
+    /// slot that fills the screen minus the first-row peek. Selecting reports
+    /// the hero via `onSelect` (navigation happens in `HomeView`); left/right
+    /// pages the carousel.
     private struct TVHeroShowcase: View {
         let model: TVHeroModel
+        let onSelect: (HeroItem) -> Void
 
         @FocusState private var heroFocused: Bool
 
         var body: some View {
             ZStack(alignment: .bottomLeading) {
                 if let hero = model.displayedHero {
-                    heroLink(for: hero)
+                    heroButton(for: hero)
                 }
             }
             // Fill the slot so the natural-height link pins to its BOTTOM —
@@ -401,26 +414,22 @@
             }
         }
 
-        @ViewBuilder
-        private func heroLink(for hero: HeroItem) -> some View {
-            if let movie = hero.movie {
-                link(value: movie, hero: hero)
-            } else if let series = hero.series {
-                link(value: series, hero: hero)
-            }
-        }
-
-        /// STABLE label identity (no `.id(hero.id)`) so the focused surface
-        /// survives paging; the link value still changes movie⇄series, so focus
-        /// is re-asserted after every page.
+        /// One STRUCTURALLY STABLE Button for every slide — a plain content swap
+        /// on a stable view, so paging never drops focus. (A `NavigationLink`
+        /// whose branch flips movie⇄series gets a NEW identity on those pages:
+        /// focus falls to the first row, tvOS scrolls down to reveal it and back
+        /// up on re-assert, and the whole home visibly jumps.) Navigation is
+        /// reported via `onSelect` instead.
         ///
         /// The label is ONLY the bottom info block (natural height, pinned to
         /// the slot's bottom by the enclosing ZStack) — NOT the whole slot.
         /// Filling the slot leaves no room above the focused hero, so "up"
         /// stops reaching the tab bar and the focus engine remaps it to other
         /// keys, breaking left/right carousel paging.
-        private func link(value: some Hashable, hero: HeroItem) -> some View {
-            NavigationLink(value: value) {
+        private func heroButton(for hero: HeroItem) -> some View {
+            Button {
+                onSelect(hero)
+            } label: {
                 VStack(alignment: .leading, spacing: 0) {
                     info(for: hero)
                         .opacity(model.infoOpacity)
@@ -437,14 +446,28 @@
             .buttonStyle(TVHeroSurfaceButtonStyle())
             .focused($heroFocused)
             .onMoveCommand { direction in
+                // Defer the page OUT of the move-command handler: tvOS delivers
+                // it inside the focus engine's animated update, and every layout
+                // change made there is implicitly animated at the UIKit layer —
+                // the info block visibly floats into place and drags the first
+                // row along. (`Transaction.disablesAnimations` can't reach that
+                // layer; it was tried and failed.) One main-actor hop later the
+                // event context is gone, making manual paging take the exact
+                // same path as auto-advance, which pages from a plain task and
+                // has only the model's own crossfades.
                 switch direction {
-                case .left: page { model.retreat() }
-                case .right: page { model.advance() }
+                case .left: Task { model.retreat() }
+                case .right: Task { model.advance() }
                 default: break
                 }
             }
         }
 
+        /// CONSTANT HEIGHT across slides: the logo slot is a fixed frame and the
+        /// overview always reserves its three lines. The surface is a focused
+        /// element — if its frame changed per slide, the focus engine would
+        /// re-scroll to track it on every manual page and the rows below would
+        /// visibly jump.
         private func info(for hero: HeroItem) -> some View {
             VStack(alignment: .leading, spacing: 14) {
                 TitleLogo(
@@ -458,15 +481,21 @@
                         .lineLimit(2)
                         .shadow(radius: 6)
                 }
+                // Fresh identity per slide: two logos have different fitted
+                // sizes, and a STABLE image view interpolates between them —
+                // the logo visibly "grows" into place when an animation is in
+                // flight (manual paging inherits one from the focus engine).
+                // The swap happens while `infoOpacity` is 0, so replacing the
+                // view outright is invisible.
+                .id(hero.id)
+                .frame(height: 130, alignment: .bottomLeading)
 
-                if !hero.overview.isEmpty {
-                    Text(hero.overview)
-                        .font(.callout)
-                        .lineLimit(3)
-                        .foregroundStyle(.white.opacity(0.85))
-                        .shadow(radius: 4)
-                        .frame(maxWidth: 640, alignment: .leading)
-                }
+                Text(hero.overview)
+                    .font(.callout)
+                    .lineLimit(3, reservesSpace: true)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .shadow(radius: 4)
+                    .frame(maxWidth: 640, alignment: .leading)
 
                 detailsPill
                     .padding(.top, 10)
@@ -493,23 +522,14 @@
                 .animation(.easeOut(duration: 0.18), value: heroFocused)
         }
 
-        /// Pages the carousel, then re-asserts focus: the link identity changes
-        /// movie⇄series, which would otherwise drop focus off the hero.
-        private func page(_ action: () -> Void) {
-            let wasFocused = heroFocused
-            action()
-            if wasFocused { heroFocused = true }
-        }
-
-        /// Drives the model's auto-advance clock and performs the page from the
-        /// VIEW so hero focus survives the link identity change.
+        /// Drives the model's auto-advance clock.
         private func runAutoAdvance() async {
             guard model.items.count > 1 else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(50))
                 if Task.isCancelled { return }
                 if model.tickAutoAdvance() {
-                    page { model.advance() }
+                    model.advance()
                 }
             }
         }
@@ -557,10 +577,14 @@
             )
         ]
         NavigationStack {
-            TVHomeScreen(heroItems: items) {
-                Text("Rows go here")
-                    .padding(.horizontal)
-            }
+            TVHomeScreen(
+                heroItems: items,
+                onSelectHero: { _ in },
+                rows: {
+                    Text("Rows go here")
+                        .padding(.horizontal)
+                }
+            )
         }
     }
 
