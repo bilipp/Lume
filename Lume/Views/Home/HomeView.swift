@@ -136,14 +136,17 @@ struct HomeView: View {
                             .padding(.bottom)
                         }
                         .scrollIndicators(.hidden)
-                        .ignoresSafeArea(edges: .top)
+                        // Only let content run under the nav bar when the hero
+                        // backdrop is there to fill it; otherwise the first row
+                        // would sit hidden behind the bar.
+                        .ignoresSafeArea(edges: heroItems.isEmpty ? [] : .top)
                     #endif
                 }
             }
             .platformNavigationTitle("Home")
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(.hidden, for: .navigationBar)
+                .toolbarBackground(heroItems.isEmpty ? .automatic : .hidden, for: .navigationBar)
             #endif
                 .libraryToolbar(config: LibraryToolbarConfiguration(
                     playlists: playlists,
