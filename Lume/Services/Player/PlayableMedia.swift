@@ -30,8 +30,12 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
 }
 
 extension PlayableMedia {
+    // m3u content carries its full playback URL on the model (`directURL` /
+    // `directSource`); Xtream content builds one from credentials + stream id.
+
     static func from(movie: Movie, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
-        guard let url = client.buildMovieURL(for: movie, playlist: playlist) else { return nil }
+        let directURL = movie.directURL.flatMap(URL.init(string:))
+        guard let url = directURL ?? client.buildMovieURL(for: movie, playlist: playlist) else { return nil }
         return PlayableMedia(
             id: "movie-\(movie.id)",
             url: url,
@@ -45,7 +49,10 @@ extension PlayableMedia {
     }
 
     static func from(episode: Episode, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
-        guard let url = client.buildEpisodeURL(for: episode, playlist: playlist) else { return nil }
+        let directURL = playlist.sourceType == .m3u
+            ? episode.directSource.flatMap(URL.init(string:))
+            : nil
+        guard let url = directURL ?? client.buildEpisodeURL(for: episode, playlist: playlist) else { return nil }
         let seriesName = episode.series?.name
         let subtitle = "S\(episode.seasonNum) E\(episode.episodeNum) · \(episode.title)"
         return PlayableMedia(
@@ -61,7 +68,8 @@ extension PlayableMedia {
     }
 
     static func from(stream: LiveStream, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
-        guard let url = client.buildLiveStreamURL(for: stream, playlist: playlist) else { return nil }
+        let directURL = stream.directURL.flatMap(URL.init(string:))
+        guard let url = directURL ?? client.buildLiveStreamURL(for: stream, playlist: playlist) else { return nil }
         return PlayableMedia(
             id: "live-\(stream.id)",
             url: url,

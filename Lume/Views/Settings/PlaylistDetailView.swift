@@ -17,8 +17,13 @@ struct PlaylistDetailView: View {
     @State private var editServerURL = ""
     @State private var editUsername = ""
     @State private var editPassword = ""
+    @State private var editEPGURL = ""
     @State private var showDeleteConfirmation = false
     @State private var showSync = false
+
+    private var isM3U: Bool {
+        playlist.sourceType == .m3u
+    }
 
     var body: some View {
         #if os(tvOS)
@@ -101,7 +106,7 @@ struct PlaylistDetailView: View {
         // MARK: - Server Section (Read-only)
 
         private var readOnlySection: some View {
-            Section("Server") {
+            Section(isM3U ? "M3U Playlist" : "Server") {
                 LabeledContent("Name", value: playlist.name)
                 LabeledContent("URL") {
                     Text(playlist.serverURL)
@@ -109,10 +114,19 @@ struct PlaylistDetailView: View {
                         .truncationMode(.middle)
                         .foregroundStyle(.secondary)
                 }
-                LabeledContent("Username", value: playlist.username)
-                LabeledContent("Password") {
-                    Text("••••••••")
-                        .foregroundStyle(.secondary)
+                if isM3U {
+                    LabeledContent("EPG URL") {
+                        Text(playlist.epgURL ?? String(localized: "None"))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    LabeledContent("Username", value: playlist.username)
+                    LabeledContent("Password") {
+                        Text("••••••••")
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 LabeledContent("Added") {
                     Text(playlist.addedAt, style: .date)
@@ -124,23 +138,33 @@ struct PlaylistDetailView: View {
         // MARK: - Server Section (Editing)
 
         private var editingSection: some View {
-            Section("Server") {
+            Section(isM3U ? "M3U Playlist" : "Server") {
                 TextField("Name", text: $editName)
-                TextField("Server URL", text: $editServerURL)
+                TextField(isM3U ? "Playlist URL" : "Server URL", text: $editServerURL)
                 #if os(iOS)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
                 #endif
                     .autocorrectionDisabled()
                     .textContentType(.URL)
-                TextField("Username", text: $editUsername)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.username)
-                SecureField("Password", text: $editPassword)
-                    .textContentType(.password)
+                if isM3U {
+                    TextField("EPG URL (optional)", text: $editEPGURL)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                    #endif
+                        .autocorrectionDisabled()
+                        .textContentType(.URL)
+                } else {
+                    TextField("Username", text: $editUsername)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                    #endif
+                        .autocorrectionDisabled()
+                        .textContentType(.username)
+                    SecureField("Password", text: $editPassword)
+                        .textContentType(.password)
+                }
             }
         }
 
@@ -211,14 +235,18 @@ struct PlaylistDetailView: View {
 
         private var tvServerSection: some View {
             VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel("Server")
+                TVSettingsSectionLabel(isM3U ? "M3U Playlist" : "Server")
 
                 if isEditing {
                     VStack(spacing: 18) {
                         TVSettingsField(title: "Name", placeholder: "Name", text: $editName, contentType: .name)
-                        TVSettingsField(title: "Server URL", placeholder: "Server URL", text: $editServerURL, contentType: .URL)
-                        TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
-                        TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                        TVSettingsField(title: isM3U ? "Playlist URL" : "Server URL", placeholder: isM3U ? "Playlist URL" : "Server URL", text: $editServerURL, contentType: .URL)
+                        if isM3U {
+                            TVSettingsField(title: "EPG URL (optional)", placeholder: "EPG URL", text: $editEPGURL, contentType: .URL)
+                        } else {
+                            TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
+                            TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                        }
                     }
                 } else {
                     VStack(spacing: 2) {
@@ -228,8 +256,16 @@ struct PlaylistDetailView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
-                        TVSettingsValueRow("Username", value: playlist.username)
-                        TVSettingsValueRow("Password") { Text("••••••••") }
+                        if isM3U {
+                            TVSettingsValueRow("EPG URL") {
+                                Text(playlist.epgURL ?? String(localized: "None"))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        } else {
+                            TVSettingsValueRow("Username", value: playlist.username)
+                            TVSettingsValueRow("Password") { Text("••••••••") }
+                        }
                         TVSettingsValueRow("Added") { Text(playlist.addedAt, style: .date) }
                     }
                 }
@@ -325,6 +361,7 @@ struct PlaylistDetailView: View {
         editServerURL = playlist.serverURL
         editUsername = playlist.username
         editPassword = playlist.password
+        editEPGURL = playlist.epgURL ?? ""
         withAnimation { isEditing = true }
     }
 
@@ -335,8 +372,13 @@ struct PlaylistDetailView: View {
     private func saveChanges() {
         playlist.name = editName.trimmingCharacters(in: .whitespacesAndNewlines)
         playlist.serverURL = editServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
-        playlist.password = editPassword
+        if isM3U {
+            let epgURL = editEPGURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            playlist.epgURL = epgURL.isEmpty ? nil : epgURL
+        } else {
+            playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            playlist.password = editPassword
+        }
         playlist.lastUpdated = Date()
         withAnimation { isEditing = false }
     }
