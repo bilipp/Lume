@@ -47,6 +47,15 @@ struct KSPlayerEngineView: View {
     /// Last playhead position seen in `onPlay`, used to detect that frames are
     /// actually advancing. `-1` until the first sample. See `notePlaybackProgress`.
     @State private var lastPlayhead: TimeInterval = -1
+    /// Set once a dead stream is given up on — the initial load never produced a
+    /// frame within `startupTimeout`, or the bounded reconnect budget was spent.
+    /// Swaps the endless spinner for the `PlayerErrorIndicator` (Try Again / Back)
+    /// so a stream that never starts no longer locks the player.
+    @State private var loadFailed = false
+    /// Fires `failPlayback()` if the stream hasn't produced a frame within
+    /// `startupTimeout`. Covers a stream that hangs in `.preparing`/`.buffering`
+    /// forever without ever emitting `.error` (so the reconnector never engages).
+    @State private var startupWatchdog: Task<Void, Never>?
     @State private var isControlsVisible = true
     @State private var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
@@ -85,6 +94,12 @@ struct KSPlayerEngineView: View {
     #endif
 
     private let autoHideInterval: TimeInterval = 4
+    /// How long to wait for the first frame before declaring a stream dead. The
+    /// engine legitimately sits in `.preparing`/`.buffering` for ~10–20s on a
+    /// healthy open, so this is set well clear of that. The reconnect budget
+    /// (~31s of bounded backoff) usually trips first on a stream that *errors*;
+    /// this catches the one that simply never responds.
+    private let startupTimeout: TimeInterval = 40
 
     var body: some View {
         #if os(tvOS)
@@ -129,7 +144,7 @@ struct KSPlayerEngineView: View {
                 // Suppress the controls (and their Play button) until the stream
                 // has actually started, so viewers see a loading indicator
                 // instead of a player that looks paused.
-                if isControlsVisible, hasStartedPlayback {
+                if isControlsVisible, hasStartedPlayback, !loadFailed {
                     TVPlayerControlsOverlay(
                         coordinator: engine,
                         media: media,
@@ -161,15 +176,26 @@ struct KSPlayerEngineView: View {
                     PlayerLoadingIndicator(title: hasStartedPlayback ? nil : media.title)
                         .transition(.opacity)
                 }
+
+                if loadFailed {
+                    PlayerErrorIndicator(
+                        title: media.title,
+                        onRetry: { retryPlayback() },
+                        onClose: { closePlayer() }
+                    )
+                    .transition(.opacity)
+                }
             }
             .preferredColorScheme(.dark)
             .onAppear {
                 engine.attach(coordinator: coordinator)
                 scheduleHide()
+                startStartupWatchdog()
             }
             .onDisappear {
                 hideTask?.cancel()
                 reconnector.cancel()
+                cancelStartupWatchdog()
                 coordinator.resetPlayer()
             }
             .onChange(of: engine.isPlaying) { _, _ in
@@ -189,9 +215,11 @@ struct KSPlayerEngineView: View {
                 isPanelOpen = false
                 hasStartedPlayback = false
                 isBuffering = true
+                loadFailed = false
                 lastPlayhead = -1
                 reconnector.reset()
                 engine.reset()
+                startStartupWatchdog()
                 resetHideTimer()
             }
             .onChange(of: isControlsVisible) { _, visible in
@@ -217,7 +245,8 @@ struct KSPlayerEngineView: View {
                 Color.clear.contentShape(Rectangle())
             }
             .buttonStyle(KSInvisibleButtonStyle())
-            .disabled(isControlsVisible || isChannelBrowserOpen)
+            // Yield focus to the failure overlay's buttons when a stream dies.
+            .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
             .onMoveCommand { direction in
                 // Watching live TV with the controls hidden, left opens the
@@ -248,7 +277,9 @@ struct KSPlayerEngineView: View {
         }
 
         private func handleMenuPress() {
-            if isChannelBrowserOpen {
+            if loadFailed {
+                closePlayer()
+            } else if isChannelBrowserOpen {
                 closeChannelBrowser()
             } else if isPanelOpen {
                 panelCloseToken += 1
@@ -294,7 +325,7 @@ struct KSPlayerEngineView: View {
                 // Hold the controls back until the stream starts, so the loading
                 // indicator stands in for a player that would otherwise look
                 // paused behind its Play button.
-                if isControlsVisible, hasStartedPlayback {
+                if isControlsVisible, hasStartedPlayback, !loadFailed {
                     controlsOverlay
                         .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 }
@@ -312,16 +343,27 @@ struct KSPlayerEngineView: View {
                     PlayerLoadingIndicator(title: hasStartedPlayback ? nil : media.title)
                         .transition(.opacity)
                 }
+
+                if loadFailed {
+                    PlayerErrorIndicator(
+                        title: media.title,
+                        onRetry: { retryPlayback() },
+                        onClose: { closePlayer() }
+                    )
+                    .transition(.opacity)
+                }
             }
             .preferredColorScheme(.dark)
             .onAppear {
                 scheduleHide()
                 observePipState()
+                startStartupWatchdog()
             }
             .onDisappear {
                 hideTask?.cancel()
                 hoverHideTask?.cancel()
                 reconnector.cancel()
+                cancelStartupWatchdog()
                 coordinator.resetPlayer()
             }
             .onTapGesture {
@@ -400,88 +442,6 @@ struct KSPlayerEngineView: View {
             }
         }
     #endif
-
-    // MARK: - Loading state (shared)
-
-    /// Drive the loading indicator + initial controls gate off KSPlayer's state.
-    /// `.bufferFinished` is the first frame actually playing, so it both clears
-    /// the spinner and unlocks the controls for good; a later `.buffering` (a
-    /// mid-stream stall) re-shows the spinner without re-hiding the controls.
-    ///
-    /// This raises the spinner reliably but can't be trusted to lower it: after
-    /// the first `.bufferFinished`, KSPlayer may re-emit a non-playing state
-    /// (`.readyToPlay` on a second-open, a track/subtitle attach) and never emit
-    /// another `.bufferFinished` because it's already effectively playing — which
-    /// left the spinner stuck on over a stream that was running. `notePlaybackProgress`
-    /// is the ground-truth backstop that clears it.
-    private func updateLoadingState(_ state: KSPlayerState) {
-        switch state {
-        case .initialized, .preparing, .readyToPlay, .buffering:
-            if !isBuffering {
-                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = true }
-            }
-        case .bufferFinished:
-            if !hasStartedPlayback { hasStartedPlayback = true }
-            if isBuffering {
-                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
-            }
-        case .paused, .playedToTheEnd:
-            if isBuffering {
-                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
-            }
-        case .error:
-            // Leave the spinner as-is: a drop during initial load keeps spinning
-            // through the bounded reconnect (which returns to `.preparing`).
-            break
-        }
-    }
-
-    /// Ground-truth "frames are rendering" signal that clears the spinner even
-    /// when the state callback settled on a non-`.bufferFinished` state and never
-    /// recovered (see `updateLoadingState`). KSPlayer's 0.1s clock fires `onPlay`
-    /// whenever the player is ready — including during a stall — so the tick alone
-    /// isn't enough; but `currentPlaybackTime` only *advances* while frames are
-    /// actually being presented. An advancing playhead therefore means the stream
-    /// is playing, while a genuine stall or in-flight reconnect leaves it frozen
-    /// (no advance → spinner stays). Cheap no-op once the spinner is already down.
-    private func notePlaybackProgress(_ current: TimeInterval) {
-        guard current.isFinite, !isSeeking else { return }
-        defer { lastPlayhead = current }
-        guard isBuffering, lastPlayhead >= 0, current > lastPlayhead else { return }
-        if !hasStartedPlayback { hasStartedPlayback = true }
-        withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
-    }
-
-    // MARK: - Reconnect (shared)
-
-    /// React to a KSPlayer state change for reconnect purposes. A mid-stream
-    /// failure lands the layer in `.error` and it sits there frozen; we drive a
-    /// bounded backoff reconnect off that, and clear the budget once playback is
-    /// confirmed healthy again. `.playedToTheEnd` is a clean finish, not a drop,
-    /// so it is left alone.
-    private func handleState(_ state: KSPlayerState) {
-        switch state {
-        case .readyToPlay, .bufferFinished:
-            reconnector.reset()
-        case .error:
-            reconnector.scheduleRetry { reconnect() }
-        default:
-            break
-        }
-    }
-
-    /// Re-prepare the current stream in place. `KSPlayerLayer.play()` calls
-    /// `prepareToPlay()` whenever the layer is in `.error`, which rebuilds the
-    /// input from scratch. VOD resumes near the drop point via `startPlayTime`
-    /// (re-read on each prepare); live rejoins the live edge.
-    private func reconnect() {
-        guard let layer = coordinator.playerLayer else { return }
-        if !media.isLive, clock.current > 1 {
-            layer.options.startPlayTime = clock.current
-        }
-        Logger.player.log("reconnect: reloading KSPlayer stream")
-        layer.play()
-    }
 
     // MARK: - Actions (shared)
 

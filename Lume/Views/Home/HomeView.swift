@@ -140,6 +140,7 @@ struct HomeView: View {
                     #endif
                 }
             }
+            .tvPlaylistSwitcher(playlists: playlists, selectedPlaylistID: $selectedPlaylistID)
             .platformNavigationTitle("Home")
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
