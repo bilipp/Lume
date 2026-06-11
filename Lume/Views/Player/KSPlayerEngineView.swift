@@ -30,34 +30,36 @@ struct KSPlayerEngineView: View {
     /// swaps `media` in response. tvOS only.
     var onSelectMedia: ((PlayableMedia) -> Void)?
 
-    @StateObject private var coordinator = KSVideoPlayer.Coordinator()
+    @StateObject var coordinator = KSVideoPlayer.Coordinator()
     /// Drives bounded backoff reconnects when the stream drops (see
     /// `handleState`). KSPlayer otherwise stops dead on a mid-stream failure.
-    @State private var reconnector = PlaybackRetryController()
+    /// Non-private so the playback/reconnect logic in `KSPlayerEngineView+Playback`
+    /// (and the dead-stream handling there) can reach it.
+    @State var reconnector = PlaybackRetryController()
     @State private var isPlaying = false
     /// Initial-load gate. The engine sits in `.preparing` / `.buffering` for
     /// ~10–20s before the first frame (`.bufferFinished`); showing the normal
     /// controls — with their Play button — during that window made viewers think
     /// playback was paused and needed a press. The controls stay suppressed and
     /// a loading indicator shows until the stream first reaches `.bufferFinished`.
-    @State private var hasStartedPlayback = false
+    @State var hasStartedPlayback = false
     /// True while the engine is preparing or (re)buffering, so the spinner shows
     /// both on first open and on a mid-stream stall.
-    @State private var isBuffering = true
+    @State var isBuffering = true
     /// Last playhead position seen in `onPlay`, used to detect that frames are
     /// actually advancing. `-1` until the first sample. See `notePlaybackProgress`.
-    @State private var lastPlayhead: TimeInterval = -1
+    @State var lastPlayhead: TimeInterval = -1
     /// Set once a dead stream is given up on — the initial load never produced a
     /// frame within `startupTimeout`, or the bounded reconnect budget was spent.
     /// Swaps the endless spinner for the `PlayerErrorIndicator` (Try Again / Back)
     /// so a stream that never starts no longer locks the player.
-    @State private var loadFailed = false
+    @State var loadFailed = false
     /// Fires `failPlayback()` if the stream hasn't produced a frame within
     /// `startupTimeout`. Covers a stream that hangs in `.preparing`/`.buffering`
     /// forever without ever emitting `.error` (so the reconnector never engages).
-    @State private var startupWatchdog: Task<Void, Never>?
+    @State var startupWatchdog: Task<Void, Never>?
     @State private var isControlsVisible = true
-    @State private var isSeeking = false
+    @State var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
     @State private var isPipActive = false
     @State var hideTask: Task<Void, Never>?
@@ -66,7 +68,7 @@ struct KSPlayerEngineView: View {
     #if os(tvOS)
         /// Republishes KSPlayer state to the shared overlay (`isPlaying`,
         /// `videoInfo`) and bridges its track / seek API.
-        @StateObject private var engine = KSTVPlaybackEngine()
+        @StateObject var engine = KSTVPlaybackEngine()
         /// While an overlay panel (episodes / info) is open the controls must
         /// not auto-hide out from under the viewer.
         @State private var isPanelOpen = false
@@ -99,7 +101,7 @@ struct KSPlayerEngineView: View {
     /// healthy open, so this is set well clear of that. The reconnect budget
     /// (~31s of bounded backoff) usually trips first on a stream that *errors*;
     /// this catches the one that simply never responds.
-    private let startupTimeout: TimeInterval = 40
+    let startupTimeout: TimeInterval = 40
 
     var body: some View {
         #if os(tvOS)

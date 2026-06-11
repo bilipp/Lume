@@ -118,7 +118,12 @@ extension KSPlayerEngineView {
 
     /// Re-prepare the current stream after a failure (the Try Again button).
     /// Resets the load gates, rearms the watchdog and reconnect budget, and
-    /// reloads the stream in place via `reconnect()`.
+    /// rebuilds the stream in place.
+    ///
+    /// Unlike `reconnect()` — which leans on `play()` re-preparing from `.error`
+    /// — this drives `prepareToPlay()` directly, so it also reloads a stream that
+    /// merely *hung* in `.buffering`/`.preparing` (the startup-watchdog case),
+    /// where `play()` would be a no-op because the layer never reached `.error`.
     func retryPlayback() {
         withAnimation(.easeInOut(duration: 0.25)) {
             loadFailed = false
@@ -131,7 +136,16 @@ extension KSPlayerEngineView {
             engine.reset()
         #endif
         startStartupWatchdog()
-        reconnect()
+
+        guard let layer = coordinator.playerLayer else { return }
+        if !media.isLive, clock.current > 1 {
+            layer.options.startPlayTime = clock.current
+        }
+        Logger.player.log("retry: rebuilding KSPlayer stream from failure overlay")
+        layer.prepareToPlay()
+        // Ensure autoplay once the rebuilt input is ready (prepareToPlay only
+        // arms preparation; play() sets isAutoPlay and resumes on ready).
+        layer.play()
     }
 
     /// Re-prepare the current stream in place. `KSPlayerLayer.play()` calls
