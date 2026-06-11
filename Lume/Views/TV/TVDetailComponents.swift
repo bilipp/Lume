@@ -109,6 +109,43 @@
         }
     }
 
+    // MARK: - External ratings
+
+    /// A row of aggregator-rating chips (IMDb, Rotten Tomatoes, Metacritic)
+    /// sourced from OMDb, sized for the 10-foot UI. Renders nothing when empty.
+    struct TVExternalRatingsView: View {
+        let ratings: [ExternalRating]
+
+        var body: some View {
+            if !ratings.isEmpty {
+                HStack(spacing: 22) {
+                    ForEach(ratings) { rating in
+                        HStack(spacing: 14) {
+                            Circle()
+                                .fill(rating.tint)
+                                .frame(width: 16, height: 16)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(rating.value)
+                                    .font(.system(size: 28, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                // Brand names are proper nouns — never localized.
+                                Text(rating.source.displayName)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                        }
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(.white.opacity(0.08))
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Badge
 
     /// A pill badge for the content rating or a highlight tag.

@@ -4,6 +4,8 @@
 <dict>
 	<key>TMDBAccessToken</key>
 	<string></string>
+	<key>OMDBAPIKey</key>
+	<string></string>
 	<key>CFBundleAllowMixedLocalizations</key>
 	<true/>
 	<key>CFBundleLocalizations</key>

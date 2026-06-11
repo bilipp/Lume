@@ -70,6 +70,7 @@
             }
             .task(id: movie.id) {
                 await enrichIfNeeded()
+                await enrichMovieRatingsIfNeeded(movie, context: modelContext)
                 resolveSimilar()
                 await resolveCollection()
                 resolveOtherSources()
@@ -186,6 +187,11 @@
                         Text("No description available.")
                             .font(.system(size: 26))
                             .foregroundStyle(.white.opacity(0.6))
+                    }
+
+                    if !movie.externalRatings.isEmpty {
+                        TVExternalRatingsView(ratings: movie.externalRatings)
+                            .padding(.top, 8)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

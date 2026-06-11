@@ -28,7 +28,12 @@
         @State private var isLoadingTMDB: Bool
         @State private var showYouTubeUnavailable = false
 
-        private enum FocusTarget: Hashable { case play }
+        private enum FocusTarget: Hashable {
+            case play
+            case season(Int)
+            case episode(String)
+        }
+
         @FocusState private var focus: FocusTarget?
 
         init(series: Series) {
@@ -71,6 +76,7 @@
             .task(id: series.id) {
                 await loadEpisodesIfNeeded()
                 await enrichIfNeeded()
+                await enrichSeriesRatingsIfNeeded(series, context: modelContext)
                 resolveSimilar()
                 resolveOtherSources()
                 withAnimation(.easeInOut(duration: 0.3)) {
@@ -192,12 +198,23 @@
                                     onMarkPreviousWatched: { markPreviousWatched(episode) },
                                     onMarkFollowingUnwatched: { markFollowingUnwatched(episode) }
                                 )
+                                .focused($focus, equals: .episode(episode.id))
                             }
                         }
                         .padding(.horizontal, TVDetailMetrics.horizontalInset)
                         .padding(.vertical, 24)
                     }
                     .scrollClipDisabled()
+                    // When focus moves INTO the rail (e.g. down from Play), the
+                    // enclosing focus section would otherwise pick the card
+                    // nearest the SECTION's center — mid-rail, not the first
+                    // episode. `.userInitiated` re-applies this default on
+                    // user-driven entry, not just on appearance.
+                    .defaultFocus(
+                        $focus,
+                        .episode(seasonEpisodes.first?.id ?? ""),
+                        priority: .userInitiated
+                    )
                 }
             }
             .focusSection()
@@ -211,6 +228,7 @@
                             withAnimation(.easeInOut(duration: 0.2)) { selectedSeason = season }
                         }
                         .buttonStyle(TVChipButtonStyle(isSelected: season == selectedSeason))
+                        .focused($focus, equals: .season(season))
                     }
                 }
                 .padding(.horizontal, TVDetailMetrics.horizontalInset)
@@ -218,6 +236,9 @@
             }
             .scrollClipDisabled()
             .focusSection()
+            // Entering the selector lands on the CURRENT season's chip, not
+            // whichever chip the focus section's center-pick would choose.
+            .defaultFocus($focus, .season(selectedSeason), priority: .userInitiated)
         }
 
         @ViewBuilder
@@ -252,6 +273,11 @@
                         Text("No description available.")
                             .font(.system(size: 26))
                             .foregroundStyle(.white.opacity(0.6))
+                    }
+
+                    if !series.externalRatings.isEmpty {
+                        TVExternalRatingsView(ratings: series.externalRatings)
+                            .padding(.top, 8)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -448,40 +474,38 @@
             try? modelContext.save()
             refreshToken = UUID()
         }
+    }
 
-        // MARK: - Actions
+    // MARK: - Actions & related titles
 
-        private func playEpisode(_ episode: Episode) {
+    private extension TVSeriesDetailView {
+        func playEpisode(_ episode: Episode) {
             guard let playlist = seriesPlaylist,
                   let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
             playingMedia = media
         }
 
-        private func toggleFavorite() {
+        func toggleFavorite() {
             series.isFavorite.toggle()
             series.addedToWatchlistDate = series.isFavorite ? Date() : nil
         }
 
-        private func toggleWatched(_ episode: Episode) {
+        func toggleWatched(_ episode: Episode) {
             episode.setWatched(!episode.isWatched)
             TraktService.shared.syncWatched(episode: episode, watched: episode.isWatched)
             try? modelContext.save()
         }
 
-        private func markPreviousWatched(_ episode: Episode) {
+        func markPreviousWatched(_ episode: Episode) {
             episode.markEarlierEpisodesWatched()
             try? modelContext.save()
         }
 
-        private func markFollowingUnwatched(_ episode: Episode) {
+        func markFollowingUnwatched(_ episode: Episode) {
             episode.markLaterEpisodesUnwatched()
             try? modelContext.save()
         }
-    }
 
-    // MARK: - Related titles
-
-    private extension TVSeriesDetailView {
         func resolveSimilar() {
             let ids = series.similarTMDBIds
             guard !ids.isEmpty else { similar = []; return }
