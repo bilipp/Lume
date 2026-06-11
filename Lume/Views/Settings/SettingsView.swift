@@ -53,6 +53,7 @@ struct SettingsView: View {
                     playlistsSection
                     librarySection
                     autoSyncSection
+                    CloudSyncSection()
                     if trakt.isConfigured {
                         integrationsSection
                     }
@@ -354,6 +355,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 36) {
                 tvPlaylistsList
                 tvAutoSyncSection
+                TVCloudSyncSection()
             }
         }
 
