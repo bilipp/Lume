@@ -17,6 +17,11 @@ final class LiveStream {
 
     var categoryId: String?
 
+    /// Full playback URL for streams that come from an m3u playlist. When set,
+    /// playback uses it verbatim instead of building an Xtream URL from
+    /// credentials and `streamId` (which is a derived hash for m3u sources).
+    var directURL: String?
+
     var isFavorite: Bool = false
     var lastWatchedDate: Date?
     /// Hidden channels are kept in the store but excluded from browsing. Toggled

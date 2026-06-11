@@ -60,7 +60,7 @@ struct SyncProgressTests {
 
     @Test func `overall fraction increases with completed steps`() {
         let progress = SyncProgress()
-        let totalSteps = Double(SyncStep.allCases.count)
+        let totalSteps = Double(progress.steps.count)
 
         progress.complete(.authenticating)
         #expect(progress.overallFraction == 1.0 / totalSteps)
@@ -84,7 +84,7 @@ struct SyncProgressTests {
         progress.start(.seriesCategories)
         progress.update(detail: "", fraction: 0.5)
 
-        let total = Double(SyncStep.allCases.count)
+        let total = Double(progress.steps.count)
         let expected = (2.0 + 0.5) / total
         #expect(progress.overallFraction == expected)
     }

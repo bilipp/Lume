@@ -52,6 +52,11 @@ final class Movie {
 
     var categoryId: String?
 
+    /// Full playback URL for movies that come from an m3u playlist. When set,
+    /// playback uses it verbatim instead of building an Xtream URL from
+    /// credentials and `streamId` (which is a derived hash for m3u sources).
+    var directURL: String?
+
     var isFavorite: Bool = false
     var watchProgress: Double = 0.0
     var isWatched: Bool = false

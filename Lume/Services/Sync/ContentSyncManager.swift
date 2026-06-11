@@ -124,6 +124,27 @@ actor ContentSyncManager {
         playlist.syncStatus = .syncing
         try statusContext.save()
 
+        switch playlist.sourceType {
+        case .xtream:
+            try await performXtreamSync(playlist: playlist, playlistId: playlistId, progress: progress, full: full)
+        case .m3u:
+            try await performM3USync(playlist: playlist, playlistId: playlistId, progress: progress)
+        }
+
+        let doneContext = ModelContext(modelContainer)
+        doneContext.autosaveEnabled = false
+        if let dpl = try doneContext.fetch(
+            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
+        ).first {
+            dpl.syncStatus = .idle
+            dpl.lastSyncDate = Date()
+            try doneContext.save()
+        }
+    }
+
+    /// The Xtream pipeline: authenticate, then pull categories and content
+    /// through the provider's JSON API.
+    private func performXtreamSync(playlist: Playlist, playlistId: UUID, progress: SyncProgress?, full: Bool) async throws {
         await progress?.start(.authenticating)
         let authResponse = try await xtreamClient.getInfo(playlist: playlist)
         updatePlaylistInfo(playlistId, with: authResponse)
@@ -137,16 +158,6 @@ actor ContentSyncManager {
         try await Task.sleep(for: .seconds(2))
         try await syncLiveStreams(for: playlist, playlistId: playlistId, progress: progress)
         try await syncEPG(for: playlist, playlistId: playlistId, progress: progress)
-
-        let doneContext = ModelContext(modelContainer)
-        doneContext.autosaveEnabled = false
-        if let dpl = try doneContext.fetch(
-            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
-        ).first {
-            dpl.syncStatus = .idle
-            dpl.lastSyncDate = Date()
-            try doneContext.save()
-        }
     }
 
     func syncAllCategories(for playlist: Playlist, playlistId: UUID, progress: SyncProgress? = nil, full _: Bool = false) async throws {
@@ -478,81 +489,18 @@ actor ContentSyncManager {
     private func syncEPG(for playlist: Playlist, playlistId _: UUID, progress: SyncProgress? = nil) async throws {
         await progress?.start(.epg)
 
-        // 1. Build a set of channel IDs we care about
-        let knownChannelIDs: Set<String>
-        do {
-            let context = ModelContext(modelContainer)
-            context.autosaveEnabled = false
-            var descriptor = FetchDescriptor<LiveStream>()
-            descriptor.propertiesToFetch = [\.epgChannelId]
-            let streams = try context.fetch(descriptor)
-            knownChannelIDs = Set(streams.compactMap(\.epgChannelId))
-        }
-
-        guard !knownChannelIDs.isEmpty else {
-            Logger.database.info("No live streams with EPG channel IDs, skipping EPG sync")
+        guard let knownChannelIDs = try epgChannelIDs() else {
             await progress?.complete(.epg)
             return
         }
 
-        Logger.database.info("Found \(knownChannelIDs.count) unique EPG channel IDs")
-
-        // 2. Download XMLTV to temp file
+        // Download XMLTV to temp file
         Logger.database.info("Downloading XMLTV EPG data")
         let fileURL = try await xtreamClient.downloadXMLTV(playlist: playlist)
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        // 3. Bulk-delete all existing EPG listings
-        do {
-            let context = ModelContext(modelContainer)
-            context.autosaveEnabled = false
-            try context.delete(model: EPGListing.self)
-            try context.save()
-        }
-
-        // 4. Stream-parse and insert in batches
-        Logger.database.info("Parsing XMLTV and inserting EPG listings")
-        var insertedCount = 0
-        let container = modelContainer
-
-        let totalCount = XMLTVParser.parse(fileURL: fileURL, batchSize: 2000) { batch in
-            insertedCount += Self.insertEPGBatch(batch, knownChannelIDs: knownChannelIDs, into: container)
-        }
-
-        Logger.database.info("Completed EPG sync (\(totalCount) parsed, \(insertedCount) inserted for \(knownChannelIDs.count) channels)")
+        importEPGFile(fileURL, knownChannelIDs: knownChannelIDs)
         await progress?.complete(.epg)
-    }
-
-    /// Filters a parsed batch to known channels and inserts into a fresh context.
-    /// Returns the number of listings inserted.
-    private static func insertEPGBatch(
-        _ batch: [ParsedProgramme],
-        knownChannelIDs: Set<String>,
-        into container: ModelContainer
-    ) -> Int {
-        let relevant = batch.filter { knownChannelIDs.contains($0.channelId) }
-        guard !relevant.isEmpty else { return 0 }
-
-        autoreleasepool {
-            let context = ModelContext(container)
-            context.autosaveEnabled = false
-
-            for programme in relevant {
-                let listingId = "\(programme.channelId)-\(Int(programme.start.timeIntervalSince1970))"
-                let listing = EPGListing(
-                    id: listingId,
-                    channelId: programme.channelId,
-                    title: programme.title,
-                    listingDescription: programme.description,
-                    start: programme.start,
-                    end: programme.end
-                )
-                context.insert(listing)
-            }
-
-            try? context.save()
-        }
-        return relevant.count
     }
 }
 
