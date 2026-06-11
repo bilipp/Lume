@@ -21,27 +21,33 @@ extension KSPlayerEngineView {
     func updateLoadingState(_ state: KSPlayerState) {
         switch state {
         case .initialized, .preparing, .readyToPlay, .buffering:
-            if !isBuffering {
-                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = true }
-            }
+            setBuffering(true)
         case .bufferFinished:
             // Ignore a stale .bufferFinished from the previous session that
             // can arrive in the window between retryPlayback() resetting the
             // state and the new session emitting its own .readyToPlay.
             guard hasSeenReadyToPlay else { return }
             markPlaybackStarted()
-            if isBuffering {
-                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
-            }
-        case .paused, .playedToTheEnd:
-            if isBuffering {
-                withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
-            }
+            setBuffering(false)
+        case .paused:
+            setBuffering(false)
+        case .playedToTheEnd:
+            // Live: server-side drop (404, segmenter restart) — keep the
+            // spinner up while the reconnect delay elapses.
+            // Non-live: normal end of file — clear the spinner.
+            setBuffering(media.isLive)
         case .error:
-            // Leave the spinner as-is: a drop during initial load keeps spinning
-            // through the bounded reconnect (which returns to `.preparing`).
+            // Leave the spinner as-is: a drop during initial load keeps
+            // spinning through the bounded reconnect (returns to .preparing).
             break
         }
+    }
+
+    /// Transition `isBuffering` with a standard ease animation, no-op when
+    /// the value is already correct (avoids redundant SwiftUI diffs).
+    private func setBuffering(_ buffering: Bool) {
+        guard isBuffering != buffering else { return }
+        withAnimation(.easeInOut(duration: 0.25)) { isBuffering = buffering }
     }
 
     /// Ground-truth "frames are rendering" signal that clears the spinner even
@@ -57,7 +63,7 @@ extension KSPlayerEngineView {
         defer { lastPlayhead = current }
         guard isBuffering, lastPlayhead >= 0, current > lastPlayhead else { return }
         markPlaybackStarted()
-        withAnimation(.easeInOut(duration: 0.25)) { isBuffering = false }
+        setBuffering(false)
     }
 
     /// Record that the stream has produced its first frame. Unlocks the controls
@@ -101,6 +107,16 @@ extension KSPlayerEngineView {
             // Budget just exhausted on this drop: the stream is dead, so stop
             // spinning and offer Try Again / Back instead of freezing.
             if reconnector.hasGivenUp { failPlayback() }
+        case .playedToTheEnd:
+            // A live stream that reaches .playedToTheEnd has had its HLS
+            // playlist return 404 (server restart, token expiry, segmenter gap)
+            // — KSPlayer retries the playlist a few times, gives up, and emits
+            // this state rather than .error. Treat it as a recoverable drop and
+            // reconnect with bounded backoff.
+            if media.isLive {
+                reconnector.scheduleRetry { reconnect() }
+                if reconnector.hasGivenUp { failPlayback() }
+            }
         default:
             break
         }
@@ -251,16 +267,24 @@ extension KSPlayerEngineView {
         layer.play()
     }
 
-    /// Re-prepare the current stream in place. `KSPlayerLayer.play()` calls
-    /// `prepareToPlay()` whenever the layer is in `.error`, which rebuilds the
-    /// input from scratch. VOD resumes near the drop point via `startPlayTime`
-    /// (re-read on each prepare); live rejoins the live edge.
+    /// Re-prepare the current stream in place. For `.error` the layer's own
+    /// `play()` calls `prepareToPlay()` internally; VOD resumes near the drop
+    /// point via `startPlayTime` (re-read on each prepare).
+    ///
+    /// For live streams `play()` on a `.playedToTheEnd` layer calls
+    /// `player.seek(time: 0)` — seeking to the DVR start, not the live edge.
+    /// Always calling `prepareToPlay()` first on a live stream rebuilds the HLS
+    /// session from scratch so we correctly rejoin the live edge in both the
+    /// `.error` and `.playedToTheEnd` cases.
     func reconnect() {
         guard let layer = coordinator.playerLayer else { return }
         if !media.isLive, clock.current > 1 {
             layer.options.startPlayTime = clock.current
         }
         Logger.player.log("reconnect: reloading KSPlayer stream")
+        if media.isLive {
+            layer.prepareToPlay()
+        }
         layer.play()
     }
 }
