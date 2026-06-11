@@ -52,6 +52,14 @@ else
     echo "warning: TMDB_ACCESS_TOKEN not set in .env — Trending will be hidden"
 fi
 
+OMDB_API_KEY="$(read_env OMDB_API_KEY)"
+if [ -n "$OMDB_API_KEY" ]; then
+    set_plist OMDBAPIKey "$OMDB_API_KEY"
+    echo "Injected OMDB_API_KEY into Info.plist"
+else
+    echo "warning: OMDB_API_KEY not set in .env — extra ratings will be hidden"
+fi
+
 TRAKT_CLIENT_ID="$(read_env TRAKT_CLIENT_ID)"
 TRAKT_CLIENT_SECRET="$(read_env TRAKT_CLIENT_SECRET)"
 if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then

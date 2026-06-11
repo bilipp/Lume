@@ -74,6 +74,7 @@ struct MovieDetailView: View {
                 .toolbar { toolbarContent }
                 .task(id: movie.id) {
                     await enrichIfNeeded()
+                    await enrichMovieRatingsIfNeeded(movie, context: modelContext)
                     resolveSimilar()
                     await resolveCollection()
                     resolveOtherSources()
@@ -132,6 +133,11 @@ struct MovieDetailView: View {
 
                     if let plot = movie.plot, !plot.isEmpty {
                         ExpandableText(text: plot)
+                            .padding(.horizontal, DetailMetrics.contentPadding)
+                    }
+
+                    if !movie.externalRatings.isEmpty {
+                        ExternalRatingsView(ratings: movie.externalRatings)
                             .padding(.horizontal, DetailMetrics.contentPadding)
                     }
 
