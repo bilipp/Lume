@@ -139,7 +139,9 @@ struct EpisodeCard: View {
                         .trim(from: 0, to: max(0.04, progress))
                         .stroke(.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                        .animation(.linear(duration: 0.1), value: progress)
+                        // Matches the manager's 250 ms progress-publish cadence
+                        // so the ring sweeps continuously between updates.
+                        .animation(.linear(duration: 0.25), value: progress)
                         .frame(width: 16, height: 16)
                 } else {
                     ProgressView()
@@ -170,3 +172,34 @@ struct EpisodeCard: View {
         return min(episode.watchProgress / Double(duration), 1)
     }
 }
+
+#if !os(tvOS)
+    /// Reads `DownloadManager` state in a leaf view so download-progress ticks
+    /// re-render only the episode rows, not the entire detail screen. Reading
+    /// `activeDownloads` directly in `SeriesDetailView.episodesSection` made
+    /// every progress update re-evaluate the whole body (hero, sections, all
+    /// cards), which starved the main thread during active downloads.
+    struct DownloadableEpisodeCard: View {
+        let episode: Episode
+        let playlist: Playlist?
+        var onPlay: () -> Void
+        var onToggleWatched: () -> Void
+        var onMarkPreviousWatched: () -> Void
+        var onMarkFollowingUnwatched: () -> Void
+
+        var body: some View {
+            let downloads = DownloadManager.shared
+            EpisodeCard(
+                episode: episode,
+                onPlay: onPlay,
+                onToggleWatched: onToggleWatched,
+                onMarkPreviousWatched: onMarkPreviousWatched,
+                onMarkFollowingUnwatched: onMarkFollowingUnwatched,
+                onDownload: playlist.map { playlist in { DownloadManager.shared.startDownload(episode: episode, playlist: playlist) } },
+                onDeleteDownload: { DownloadManager.shared.deleteLocalFile(id: episode.id) },
+                downloadProgress: downloads.activeDownloads[episode.id].map(\.fractionCompleted)
+                    ?? (downloads.pendingIDs.contains(episode.id) ? 0 : nil)
+            )
+        }
+    }
+#endif
