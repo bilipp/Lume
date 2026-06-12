@@ -55,6 +55,15 @@ final class Movie {
     /// When ratings were last fetched from OMDb; nil means never.
     var ratingsEnrichedAt: Date?
 
+    // MARK: Content index (built slowly in the background by ContentIndexer)
+
+    /// Mean-pooled `NLContextualEmbedding` vector of the title's index
+    /// document, encoded as a raw Float32 blob. Access through `TextEmbedder`.
+    var embeddingData: Data?
+    /// When the title was last indexed (TMDB resolved + embedding built);
+    /// nil means never.
+    var indexedAt: Date?
+
     // MARK: TMDB collection
 
     var collectionId: Int?

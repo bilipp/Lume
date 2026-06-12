@@ -99,6 +99,12 @@ struct LumeApp: App {
                     // the token if stale) so watched-sync and the watchlist work
                     // from launch.
                     await TraktService.shared.restore()
+
+                    // Resume background content indexing for anything still
+                    // unindexed (the pass waits on its own while a playlist
+                    // sync is running).
+                    ContentIndexingService.shared.configure(container: sharedModelContainer)
+                    ContentIndexingService.shared.kick()
                 }
         }
         .modelContainer(sharedModelContainer)

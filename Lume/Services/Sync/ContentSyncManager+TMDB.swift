@@ -31,9 +31,10 @@ extension ContentSyncManager {
 // MARK: - Direct context apply
 
 /// Applies TMDB movie details directly to the given movie on the caller's
-/// context. Must be called on the MainActor since it touches the view context.
-@MainActor
-func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie, context: ModelContext) {
+/// context — the detail views' main (view) context, or the content indexer's
+/// background context. Nonisolated so it runs in the caller's isolation either
+/// way; the movie and context must belong together.
+nonisolated func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie, context: ModelContext) {
     movie.backdropPath = details.backdropPath ?? movie.backdropPath
     movie.logoPath = details.logoPath ?? movie.logoPath
     movie.tagline = details.tagline ?? movie.tagline
@@ -70,9 +71,10 @@ func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie, context: Mo
 }
 
 /// Applies TMDB TV series details directly to the given series on the caller's
-/// context. Must be called on the MainActor since it touches the view context.
-@MainActor
-func applySeriesDetails(_ details: TMDBTitleDetails, to series: Series, context: ModelContext) {
+/// context — the detail views' main (view) context, or the content indexer's
+/// background context. Nonisolated so it runs in the caller's isolation either
+/// way; the series and context must belong together.
+nonisolated func applySeriesDetails(_ details: TMDBTitleDetails, to series: Series, context: ModelContext) {
     series.backdropPath = details.backdropPath ?? series.backdropPath
     series.logoPath = details.logoPath ?? series.logoPath
     series.tagline = details.tagline ?? series.tagline
@@ -106,7 +108,7 @@ func applySeriesDetails(_ details: TMDBTitleDetails, to series: Series, context:
 
 /// Deletes the existing cast for a title and inserts the fresh TMDB billing,
 /// wiring each new member to its owner via `assign`.
-private func replaceCast(
+private nonisolated func replaceCast(
     of existing: [CastMember],
     with cast: [TMDBCastMember],
     ownerId: String,
