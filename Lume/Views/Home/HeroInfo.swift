@@ -3,8 +3,8 @@
 //  Lume
 //
 //  The title / overview / action block overlaid on `HomeHeroCarousel` on iOS
-//  and macOS, with separate Play and Details buttons. (tvOS renders its own
-//  hero surface inside `TVHomeScreen`.)
+//  and macOS, with a Details button. (tvOS renders its own hero surface
+//  inside `TVHomeScreen`.)
 //
 
 import SwiftUI
@@ -14,7 +14,6 @@ import SwiftUI
 struct HeroInfo: View {
     let hero: HeroItem
     let isCompact: Bool
-    let onPlayMovie: (Movie) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -45,47 +44,17 @@ struct HeroInfo: View {
         .foregroundStyle(.white)
         .padding(.top, isCompact ? 16 : 24)
         .padding(.horizontal, isCompact ? 16 : 24)
-        // Extra bottom inset so the (taller) stacked buttons clear the page
-        // indicator instead of colliding with it / clipping at the edge.
-        .padding(.bottom, 40)
+        // Extra bottom inset so the button clears the page indicator instead
+        // of colliding with it / clipping at the edge.
+        .padding(.bottom, 56)
         // Cap the readable column on wide windows; fill when compact, pin leading.
         .frame(maxWidth: isCompact ? .infinity : 640, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder
     private var actionButtons: some View {
-        if isCompact {
-            // Stacked, full-width buttons so nothing overflows horizontally.
-            VStack(spacing: 12) {
-                playButton(fullWidth: true)
-                detailsButton(fullWidth: true)
-            }
-        } else {
-            HStack(spacing: 12) {
-                playButton(fullWidth: false)
-                detailsButton(fullWidth: false)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func playButton(fullWidth: Bool) -> some View {
-        if let movie = hero.movie {
-            Button {
-                onPlayMovie(movie)
-            } label: {
-                playLabel(fullWidth: fullWidth)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.white)
-        } else if let series = hero.series {
-            NavigationLink(value: series) {
-                playLabel(fullWidth: fullWidth)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.white)
-        }
+        // Full-width when compact so the button spans the stacked layout.
+        detailsButton(fullWidth: isCompact)
     }
 
     @ViewBuilder
@@ -103,13 +72,6 @@ struct HeroInfo: View {
             .buttonStyle(.bordered)
             .tint(.white)
         }
-    }
-
-    private func playLabel(fullWidth: Bool) -> some View {
-        Label("Play", systemImage: "play.fill")
-            .fontWeight(.semibold)
-            .foregroundStyle(.black)
-            .frame(maxWidth: fullWidth ? .infinity : nil)
     }
 
     private func detailsLabel(fullWidth: Bool) -> some View {
