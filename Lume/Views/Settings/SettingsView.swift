@@ -13,8 +13,14 @@ struct SettingsView: View {
     private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
     @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
     private var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
+    @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
+    private var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
+    #if !os(tvOS)
+        @AppStorage(DownloadManager.maxConcurrentKey) private var maxConcurrent = 1
+        @AppStorage(DownloadManager.autoDeleteKey) private var autoDeleteAfterWatching = false
+    #endif
 
     #if os(tvOS)
         /// The category whose content is shown in the right pane. Follows focus
@@ -57,6 +63,7 @@ struct SettingsView: View {
                         integrationsSection
                     }
                     playbackSection
+                    downloadsSection
                     playerSection
                     playerEngineSection
                     aboutSection
@@ -177,10 +184,33 @@ struct SettingsView: View {
             Section {
                 Toggle("Autoplay Next Episode", isOn: $autoPlayNext)
                 Toggle("Show Next Episode Button", isOn: $showNextEpisodeButton)
+                Toggle("Show Skip Intro Button", isOn: $showSkipIntroButton)
             } header: {
                 Text("Playback")
             } footer: {
                 Text("Automatically start the next episode when one finishes, and show a button near the end to skip ahead.")
+            }
+        }
+
+        private var downloadsSection: some View {
+            Section {
+                NavigationLink {
+                    DownloadsView()
+                } label: {
+                    Label("Manage Downloads", systemImage: "arrow.down.circle")
+                }
+
+                Stepper(
+                    "Max Simultaneous Downloads: \(maxConcurrent)",
+                    value: $maxConcurrent,
+                    in: 1 ... 5
+                )
+
+                Toggle("Auto-Delete After Watching", isOn: $autoDeleteAfterWatching)
+            } header: {
+                Text("Downloads")
+            } footer: {
+                Text("Download movies and episodes for offline playback. Auto-delete removes the file once you've finished watching.")
             }
         }
 
@@ -414,6 +444,7 @@ struct SettingsView: View {
                     TVSettingsSectionLabel("Playback")
                     TVOptionToggleRow(title: "Autoplay Next Episode", isOn: $autoPlayNext)
                     TVOptionToggleRow(title: "Show Next Episode Button", isOn: $showNextEpisodeButton)
+                    TVOptionToggleRow(title: "Show Skip Intro Button", isOn: $showSkipIntroButton)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {

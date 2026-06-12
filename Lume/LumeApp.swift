@@ -21,7 +21,7 @@ struct LumeApp: App {
             CastMember.self,
             EPGListing.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
 
         // #if DEBUG
         //     // The schema is still in flux pre-release, so automatic lightweight
@@ -76,6 +76,12 @@ struct LumeApp: App {
             ContentView()
                 .environment(TraktService.shared)
                 .task {
+                    // Give DownloadManager access to the model container so it
+                    // can persist download state from its delegate callbacks.
+                    #if !os(tvOS)
+                        DownloadManager.shared.configure(container: sharedModelContainer)
+                    #endif
+
                     // Commit any watch progress that a previous session buffered
                     // but never flushed to SwiftData (e.g. it was killed mid-
                     // playback). Runs off the main thread before playback starts.

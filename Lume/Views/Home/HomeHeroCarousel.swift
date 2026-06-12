@@ -17,7 +17,6 @@ import SwiftUI
 
 struct HomeHeroCarousel: View {
     let items: [HeroItem]
-    let onPlayMovie: (Movie) -> Void
 
     @State private var currentID: String?
     @State private var isInteracting = false
@@ -98,7 +97,7 @@ struct HomeHeroCarousel: View {
                 if let hero = displayedHero {
                     // Fixed overlay — no `.id`/`.transition` so a stable view can
                     // fade out/in via `infoOpacity` rather than cross-dissolving.
-                    HeroInfo(hero: hero, isCompact: isCompact, onPlayMovie: onPlayMovie)
+                    HeroInfo(hero: hero, isCompact: isCompact)
                         .opacity(infoOpacity)
                 }
 
@@ -289,7 +288,7 @@ private struct HeroSlot: Identifiable {
             overview: "A thief who steals corporate secrets through dream-sharing technology."
         )
     ]
-    HomeHeroCarousel(items: items, onPlayMovie: { _ in })
+    HomeHeroCarousel(items: items)
 }
 
 #Preview("Single Item") {
@@ -300,11 +299,11 @@ private struct HeroSlot: Identifiable {
             overview: "When the menace known as the Joker wreaks havoc on Gotham."
         )
     ]
-    HomeHeroCarousel(items: items, onPlayMovie: { _ in })
+    HomeHeroCarousel(items: items)
 }
 
 #Preview("Empty") {
-    HomeHeroCarousel(items: [], onPlayMovie: { _ in })
+    HomeHeroCarousel(items: [])
 }
 
 // MARK: - Backdrop image

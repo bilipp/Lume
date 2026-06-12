@@ -32,8 +32,26 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
 extension PlayableMedia {
     // m3u content carries its full playback URL on the model (`directURL` /
     // `directSource`); Xtream content builds one from credentials + stream id.
+    // When a local file is available (downloaded for offline viewing), it takes
+    // priority over the remote URL.
 
     static func from(movie: Movie, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
+        // Prefer local file for offline/downloaded playback
+        if let path = movie.localFileURL,
+           movie.downloadStatus == .completed,
+           FileManager.default.fileExists(atPath: path)
+        {
+            return PlayableMedia(
+                id: "movie-\(movie.id)",
+                url: URL(fileURLWithPath: path),
+                title: movie.name,
+                subtitle: movie.releaseDate,
+                posterURL: URL(string: movie.streamIcon ?? ""),
+                kind: .vod,
+                startTime: movie.watchProgress,
+                contentRef: .movie(movie.id)
+            )
+        }
         let directURL = movie.directURL.flatMap(URL.init(string:))
         guard let url = directURL ?? client.buildMovieURL(for: movie, playlist: playlist) else { return nil }
         return PlayableMedia(
@@ -49,6 +67,23 @@ extension PlayableMedia {
     }
 
     static func from(episode: Episode, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
+        // Prefer local file for offline/downloaded playback
+        if let path = episode.localFileURL,
+           episode.downloadStatus == .completed,
+           FileManager.default.fileExists(atPath: path)
+        {
+            let seriesName = episode.series?.name
+            return PlayableMedia(
+                id: "episode-\(episode.id)",
+                url: URL(fileURLWithPath: path),
+                title: seriesName ?? episode.title,
+                subtitle: "S\(episode.seasonNum) E\(episode.episodeNum) · \(episode.title)",
+                posterURL: URL(string: episode.movieImage ?? ""),
+                kind: .vod,
+                startTime: episode.watchProgress,
+                contentRef: .episode(episode.id)
+            )
+        }
         let directURL = playlist.sourceType == .m3u
             ? episode.directSource.flatMap(URL.init(string:))
             : nil

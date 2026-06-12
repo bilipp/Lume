@@ -27,6 +27,8 @@ enum PosterCardMetrics {
         /// Minimum item width for the "Show All" adaptive grid.
         static let gridMinimum: CGFloat = 240
         static let gridSpacing: CGFloat = 48
+        /// Inset between a transparent channel logo and its card plate.
+        static let liveLogoInset: CGFloat = 32
     #else
         static let posterWidth: CGFloat = 120
         static let posterHeight: CGFloat = 180
@@ -39,6 +41,7 @@ enum PosterCardMetrics {
         static let rowHeight: CGFloat = 220
         static let gridMinimum: CGFloat = 100
         static let gridSpacing: CGFloat = 16
+        static let liveLogoInset: CGFloat = 16
     #endif
 }
 

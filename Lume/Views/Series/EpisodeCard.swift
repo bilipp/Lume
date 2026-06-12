@@ -8,6 +8,11 @@ struct EpisodeCard: View {
     var onToggleWatched: () -> Void = {}
     var onMarkPreviousWatched: () -> Void = {}
     var onMarkFollowingUnwatched: () -> Void = {}
+    #if !os(tvOS)
+        var onDownload: (() -> Void)?
+        var onDeleteDownload: (() -> Void)?
+        var downloadProgress: Double?
+    #endif
 
     var body: some View {
         Button(action: onPlay) {
@@ -53,11 +58,34 @@ struct EpisodeCard: View {
                 onMarkPreviousWatched: onMarkPreviousWatched,
                 onMarkFollowingUnwatched: onMarkFollowingUnwatched
             )
+            #if !os(tvOS)
+                Divider()
+                if episode.downloadStatus == .completed {
+                    Button(role: .destructive) {
+                        onDeleteDownload?()
+                    } label: {
+                        Label("Remove Download", systemImage: "trash")
+                    }
+                } else if downloadProgress == nil {
+                    Button {
+                        onDownload?()
+                    } label: {
+                        Label("Download Episode", systemImage: "arrow.down.circle")
+                    }
+                    .disabled(onDownload == nil)
+                } else {
+                    Button(role: .destructive) {
+                        onDeleteDownload?()
+                    } label: {
+                        Label("Cancel Download", systemImage: "xmark.circle")
+                    }
+                }
+            #endif
         }
     }
 
     private var thumbnail: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             CachedAsyncImage(url: URL(string: episode.movieImage ?? ""), maxPixelSize: 142) { phase in
                 switch phase {
                 case let .success(image):
@@ -76,13 +104,55 @@ struct EpisodeCard: View {
             .frame(width: 142, height: 80)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
+            #if !os(tvOS)
+                if let progress = downloadProgress {
+                    downloadBadge(progress: progress)
+                        .padding(5)
+                } else if episode.downloadStatus == .completed {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(.tint.opacity(0.85), in: Circle())
+                        .padding(5)
+                }
+            #endif
+
             Image(systemName: "play.circle.fill")
                 .font(.title2)
                 .foregroundStyle(.white)
                 .shadow(radius: 4)
                 .opacity(0.9)
+                .frame(width: 142, height: 80)
         }
+        .frame(width: 142, height: 80)
     }
+
+    #if !os(tvOS)
+        private func downloadBadge(progress: Double) -> some View {
+            ZStack {
+                Circle()
+                    .stroke(.white.opacity(0.25), lineWidth: 2)
+                    .frame(width: 16, height: 16)
+                if progress > 0 {
+                    Circle()
+                        .trim(from: 0, to: max(0.04, progress))
+                        .stroke(.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 0.1), value: progress)
+                        .frame(width: 16, height: 16)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.mini)
+                        .tint(.white)
+                        .scaleEffect(0.65)
+                }
+            }
+            .frame(width: 24, height: 24)
+            .background(.black.opacity(0.55), in: Circle())
+        }
+    #endif
 
     /// Air date and runtime joined on a single caption line, omitting whichever is missing.
     private var metaLine: String? {
