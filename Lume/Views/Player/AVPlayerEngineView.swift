@@ -27,6 +27,9 @@ struct AVPlayerEngineView: View {
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
     /// next.
     var nextUpMedia: PlayableMedia?
+    /// Intro / recap windows for the active episode (from IntroDB), driving the
+    /// in-player Skip Intro button. `nil` when there is nothing to skip.
+    var skipSegments: IntroSegments?
     /// Invoked when the viewer picks a different stream (another episode, or a
     /// live channel via the Siri remote) from the in-player overlay.
     var onSelectMedia: ((PlayableMedia) -> Void)?
@@ -87,6 +90,22 @@ struct AVPlayerEngineView: View {
                     clock: clock,
                     controlsVisible: isControlsVisible,
                     onPlayNext: { onSelectMedia?($0) }
+                )
+            }
+
+            if let skipSegments {
+                PlayerSkipIntroOverlay(
+                    segments: skipSegments,
+                    clock: clock,
+                    controlsVisible: isControlsVisible,
+                    onSeek: { time in
+                        coordinator.seek(to: time)
+                        #if os(tvOS)
+                            // The skip button held focus; hand it back to the
+                            // tap-catcher so the remote keeps working.
+                            Task { @MainActor in catcherFocused = true }
+                        #endif
+                    }
                 )
             }
 

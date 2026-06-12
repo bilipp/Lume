@@ -59,9 +59,22 @@ enum PlayerSettings {
         /// Surface a focused "Next Episode" button once the current episode is
         /// near its end (mirrors the ≥90% "watched" line).
         static let showNextEpisodeButtonKey = "player.showNextEpisodeButton"
+        /// Surface a "Skip Intro" / "Skip Recap" button while the playhead sits
+        /// inside an intro or recap window known to IntroDB (TV episodes only).
+        static let showSkipIntroButtonKey = "player.showSkipIntroButton"
 
         static let autoPlayNextDefault = true
         static let showNextEpisodeButtonDefault = true
+        static let showSkipIntroButtonDefault = true
+
+        /// Whether the skip-intro affordance is enabled, read off `UserDefaults`
+        /// directly (so the player host needn't hold an `@AppStorage` that would
+        /// re-render the whole player tree when toggled). Honours the default
+        /// when the key was never written.
+        static var showSkipIntroButton: Bool {
+            UserDefaults.standard.object(forKey: showSkipIntroButtonKey) as? Bool
+                ?? showSkipIntroButtonDefault
+        }
     }
 
     /// Legacy top-level key for VLC's deinterlace toggle, kept stable so the
