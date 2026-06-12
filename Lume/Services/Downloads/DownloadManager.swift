@@ -302,39 +302,64 @@ extension DownloadManager: URLSessionDownloadDelegate {
     ) {
         let taskID = downloadTask.taskIdentifier
         let responseURL = downloadTask.response?.url ?? downloadTask.currentRequest?.url
+        let ext = responseURL?.pathExtension.isEmpty == false ? responseURL!.pathExtension : "mp4"
 
-        Task { @MainActor in
-            guard let id = self.taskMap[taskID] else { return }
-
-            let filename: String
-            if let name = self.idToFilename[id] {
-                filename = name
-            } else {
-                let ext = responseURL?.pathExtension ?? "mp4"
-                filename = "\(self.sanitize(id)).\(ext)"
-                self.idToFilename[id] = filename
+        // URLSession deletes `location` the moment this delegate returns — move it
+        // synchronously to a stable interim path before dispatching to the main actor.
+        let interimDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("lume-dl", isDirectory: true)
+        let interim = interimDir.appendingPathComponent("\(taskID).\(ext)")
+        do {
+            try FileManager.default.createDirectory(at: interimDir, withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: interim.path) {
+                try FileManager.default.removeItem(at: interim)
             }
-
-            let destination = self.downloadsDirectory.appendingPathComponent(filename)
-            do {
-                try FileManager.default.createDirectory(
-                    at: self.downloadsDirectory, withIntermediateDirectories: true
-                )
-                if FileManager.default.fileExists(atPath: destination.path) {
-                    try FileManager.default.removeItem(at: destination)
-                }
-                try FileManager.default.moveItem(at: location, to: destination)
-                Logger.downloads.info("Download complete: \(id)")
-                self.activeDownloads.removeValue(forKey: id)
-                self.taskMap.removeValue(forKey: taskID)
-                self.idToTask.removeValue(forKey: id)
-                self.scheduleModelUpdate(id: id, status: .completed, localURL: destination.path)
-            } catch {
-                Logger.downloads.error("Failed to save download for \(id): \(error)")
+            try FileManager.default.moveItem(at: location, to: interim)
+        } catch {
+            Task { @MainActor in
+                guard let id = self.taskMap[taskID] else { return }
+                Logger.downloads.error("Failed to stage download for \(id): \(error)")
                 self.handleFailure(taskID: taskID, id: id)
+                self.promoteIfNeeded()
             }
-            self.promoteIfNeeded()
+            return
         }
+        Task { @MainActor in self.finalizeDownload(taskID: taskID, interim: interim, ext: ext) }
+    }
+
+    @MainActor
+    private func finalizeDownload(taskID: Int, interim: URL, ext: String) {
+        guard let id = taskMap[taskID] else {
+            try? FileManager.default.removeItem(at: interim)
+            return
+        }
+        let filename: String
+        if let name = idToFilename[id] {
+            filename = name
+        } else {
+            filename = "\(sanitize(id)).\(ext)"
+            idToFilename[id] = filename
+        }
+        let destination = downloadsDirectory.appendingPathComponent(filename)
+        do {
+            try FileManager.default.createDirectory(
+                at: downloadsDirectory, withIntermediateDirectories: true
+            )
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.moveItem(at: interim, to: destination)
+            Logger.downloads.info("Download complete: \(id)")
+            activeDownloads.removeValue(forKey: id)
+            taskMap.removeValue(forKey: taskID)
+            idToTask.removeValue(forKey: id)
+            scheduleModelUpdate(id: id, status: .completed, localURL: destination.path)
+        } catch {
+            Logger.downloads.error("Failed to save download for \(id): \(error)")
+            try? FileManager.default.removeItem(at: interim)
+            handleFailure(taskID: taskID, id: id)
+        }
+        promoteIfNeeded()
     }
 
     nonisolated func urlSession(
