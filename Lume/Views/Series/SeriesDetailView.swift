@@ -34,6 +34,9 @@ struct SeriesDetailView: View {
     @State private var otherSources: [HomeMediaItem] = []
     @State private var refreshToken: UUID = .init()
     @State private var isLoadingTMDB: Bool
+    #if !os(tvOS)
+        @State private var downloads = DownloadManager.shared
+    #endif
 
     init(series: Series, animationNamespace: Namespace.ID? = nil) {
         self.series = series
@@ -215,13 +218,27 @@ struct SeriesDetailView: View {
             } else {
                 LazyVStack(spacing: 16) {
                     ForEach(seasonEpisodes) { episode in
-                        EpisodeCard(
-                            episode: episode,
-                            onPlay: { playEpisode(episode) },
-                            onToggleWatched: { toggleWatched(episode) },
-                            onMarkPreviousWatched: { markPreviousWatched(episode) },
-                            onMarkFollowingUnwatched: { markFollowingUnwatched(episode) }
-                        )
+                        #if os(tvOS)
+                            EpisodeCard(
+                                episode: episode,
+                                onPlay: { playEpisode(episode) },
+                                onToggleWatched: { toggleWatched(episode) },
+                                onMarkPreviousWatched: { markPreviousWatched(episode) },
+                                onMarkFollowingUnwatched: { markFollowingUnwatched(episode) }
+                            )
+                        #else
+                            EpisodeCard(
+                                episode: episode,
+                                onPlay: { playEpisode(episode) },
+                                onToggleWatched: { toggleWatched(episode) },
+                                onMarkPreviousWatched: { markPreviousWatched(episode) },
+                                onMarkFollowingUnwatched: { markFollowingUnwatched(episode) },
+                                onDownload: seriesPlaylist.map { playlist in { downloads.startDownload(episode: episode, playlist: playlist) } },
+                                onDeleteDownload: { downloads.deleteLocalFile(id: episode.id) },
+                                downloadProgress: downloads.activeDownloads[episode.id].map(\.fractionCompleted)
+                                    ?? (downloads.pendingIDs.contains(episode.id) ? 0 : nil)
+                            )
+                        #endif
                     }
                 }
                 .padding(.horizontal, DetailMetrics.contentPadding)
@@ -351,10 +368,6 @@ struct SeriesDetailView: View {
         )
     }
 
-    private var seasonCountLabel: String {
-        availableSeasons.count == 1 ? String(localized: "1 Season") : String(localized: "\(availableSeasons.count) Seasons")
-    }
-
     private var availableSeasons: [Int] {
         Set(series.episodes.map(\.seasonNum)).sorted()
     }
@@ -412,12 +425,6 @@ struct SeriesDetailView: View {
               let index = ordered.firstIndex(where: { $0 === watched })
         else { return seasonEpisodes.first ?? ordered.first }
         return index + 1 < ordered.count ? ordered[index + 1] : ordered.first
-    }
-
-    private var playTitle: LocalizedStringKey {
-        guard let episode = nextEpisode else { return "Play" }
-        let resume = !episode.isWatched && episode.watchProgress > 1
-        return resume ? "Resume S\(episode.seasonNum) E\(episode.episodeNum)" : "Play S\(episode.seasonNum) E\(episode.episodeNum)"
     }
 
     private var backgroundColor: Color {
@@ -532,6 +539,11 @@ private extension SeriesDetailView {
     func toggleWatched(_ episode: Episode) {
         episode.setWatched(!episode.isWatched)
         TraktService.shared.syncWatched(episode: episode, watched: episode.isWatched)
+        #if !os(tvOS)
+            if episode.isWatched {
+                downloads.checkAutoDelete(id: episode.id)
+            }
+        #endif
         try? modelContext.save()
     }
 
@@ -546,52 +558,16 @@ private extension SeriesDetailView {
     }
 }
 
-#Preview("Basic") {
-    let container = previewContainer()
-    let series = PreviewData.sampleSeries
-    return NavigationStack {
-        SeriesDetailView(series: series)
-    }
-    .modelContainer(container)
-}
+// MARK: - Derived helpers
 
-#Preview("With TMDB + Episodes") {
-    let container = previewContainer()
-    let series = PreviewData.sampleSeries
-    series.backdropPath = "/abc123backdrop.jpg"
-    series.tagline = "I am the one who knocks."
-    series.contentRating = "TV-MA"
-    series.tmdbId = 1396
-    series.tmdb = "1396"
-    series.tmdbEnrichedAt = Date().addingTimeInterval(-3600)
-    series.isFavorite = true
-    return NavigationStack {
-        SeriesDetailView(series: series)
+private extension SeriesDetailView {
+    var seasonCountLabel: String {
+        availableSeasons.count == 1 ? String(localized: "1 Season") : String(localized: "\(availableSeasons.count) Seasons")
     }
-    .modelContainer(container)
-}
 
-#Preview("No TMDB") {
-    let container = previewContainer()
-    let series = PreviewData.sampleSeries
-    series.plot = nil
-    series.genre = nil
-    series.director = nil
-    return NavigationStack {
-        SeriesDetailView(series: series)
+    var playTitle: LocalizedStringKey {
+        guard let episode = nextEpisode else { return "Play" }
+        let resume = !episode.isWatched && episode.watchProgress > 1
+        return resume ? "Resume S\(episode.seasonNum) E\(episode.episodeNum)" : "Play S\(episode.seasonNum) E\(episode.episodeNum)"
     }
-    .modelContainer(container)
-}
-
-#Preview("Favorite") {
-    let container = previewContainer()
-    let series = PreviewData.sampleSeries
-    series.backdropPath = "/abc123backdrop.jpg"
-    series.tagline = "I am the one who knocks."
-    series.tmdbId = 1396
-    series.isFavorite = true
-    return NavigationStack {
-        SeriesDetailView(series: series)
-    }
-    .modelContainer(container)
 }

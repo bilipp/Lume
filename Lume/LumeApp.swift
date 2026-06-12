@@ -133,6 +133,12 @@ struct LumeApp: App {
                 .environment(TraktService.shared)
                 .environment(cloudSync)
                 .task {
+                    // Give DownloadManager access to the model container so it
+                    // can persist download state from its delegate callbacks.
+                    #if !os(tvOS)
+                        DownloadManager.shared.configure(container: sharedModelContainer)
+                    #endif
+
                     // Commit any watch progress that a previous session buffered
                     // but never flushed to SwiftData (e.g. it was killed mid-
                     // playback). Runs off the main thread before playback starts.
