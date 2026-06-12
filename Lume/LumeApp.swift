@@ -21,7 +21,7 @@ struct LumeApp: App {
             CastMember.self,
             EPGListing.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
 
         // #if DEBUG
         //     // The schema is still in flux pre-release, so automatic lightweight
