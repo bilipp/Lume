@@ -49,6 +49,11 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
 enum PlayerSettings {
     static let engineKey = "player.engine"
 
+    /// Raw value of the `ExternalPlayer` streams are handed off to; any value
+    /// that doesn't name a player (including the empty default) keeps playback
+    /// in the built-in player.
+    static let externalPlayerKey = "player.externalPlayer"
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default

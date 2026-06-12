@@ -410,6 +410,7 @@ struct HomeView: View {
     private func playChannel(_ stream: LiveStream) {
         guard let playlist = activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+        if ExternalPlayback.open(media) { return }
         #if os(macOS)
             openWindow(id: "player", value: media)
         #else
