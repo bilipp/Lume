@@ -86,6 +86,9 @@ struct FullScreenPlayerView: View {
             // Seed the recall pair with the channel we opened on, so the very
             // first in-player recall has somewhere to jump back to.
             LiveChannelHistory.record(activeMedia)
+            // Pause background indexing — its periodic saves merge into the
+            // main context and hitch KSPlayer's render loop.
+            ContentIndexingService.shared.isPlaybackActive = true
             configureAudioSessionForPlayback()
             #if os(macOS)
                 enterMacFullScreen()
@@ -137,6 +140,7 @@ struct FullScreenPlayerView: View {
             // Capture the clock synchronously, then flush off the main thread.
             persistProgressDetached(force: true)
             releaseAudioSession()
+            ContentIndexingService.shared.isPlaybackActive = false
         }
     }
 

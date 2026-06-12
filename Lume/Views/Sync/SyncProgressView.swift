@@ -95,6 +95,9 @@ struct SyncProgressView: View {
                 let syncManager = ContentSyncManager(modelContainer: modelContext.container)
                 try await syncManager.syncPlaylist(playlist, progress: progress, full: true)
                 await MainActor.run {
+                    // Newly synced titles need indexing; the launch-time pass
+                    // may already be finished, so kick a fresh one.
+                    ContentIndexingService.shared.kick()
                     phase = .finished
                     // Auto-sync gets out of the way as soon as it succeeds so the
                     // user can start browsing; the manual flow waits for Done.

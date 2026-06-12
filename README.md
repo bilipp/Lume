@@ -79,6 +79,7 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 
 #### 🔎 Discovery & organization
 - Global search across Movies, Series, and Live channels with type filtering
+- **Background content indexing** — matches the whole library against TMDB and builds on-device embedding vectors (Apple NaturalLanguage) as the foundation for semantic search
 - Configurable sort options per category and content type
 - Hide and reorder categories to taste
 - Favorites and watched markers across every content type

@@ -8,6 +8,8 @@ struct SettingsView: View {
     @Query var playlists: [Playlist]
     @State private var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
+    /// Not `private`: read by the SettingsView+Indexing extension (separate file).
+    @State var indexing = ContentIndexingService.shared
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
@@ -58,6 +60,7 @@ struct SettingsView: View {
                 List {
                     playlistsSection
                     librarySection
+                    indexingSection
                     autoSyncSection
                     if trakt.isConfigured {
                         integrationsSection
@@ -384,6 +387,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 36) {
                 tvPlaylistsList
                 tvAutoSyncSection
+                tvIndexingSection
             }
         }
 
