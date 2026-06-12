@@ -317,6 +317,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
             let destination = self.downloadsDirectory.appendingPathComponent(filename)
             do {
+                try FileManager.default.createDirectory(
+                    at: self.downloadsDirectory, withIntermediateDirectories: true
+                )
                 if FileManager.default.fileExists(atPath: destination.path) {
                     try FileManager.default.removeItem(at: destination)
                 }
