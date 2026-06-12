@@ -36,8 +36,6 @@ struct MovieDetailView: View {
     @State private var isLoadingTMDB: Bool
     #if !os(tvOS)
         @State private var downloads = DownloadManager.shared
-        @AppStorage(DownloadManager.maxConcurrentKey) private var maxConcurrent = 1
-        @AppStorage(DownloadManager.autoDeleteKey) private var autoDeleteAfterWatching = false
     #endif
 
     init(movie: Movie, animationNamespace: Namespace.ID? = nil) {
@@ -210,24 +208,11 @@ struct MovieDetailView: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 12) {
-            PrimaryPlayButton(
-                title: movie.watchProgress > 1 ? "Resume" : "Play",
-                isEnabled: moviePlaylist != nil,
-                action: startPlayback
-            )
-            #if !os(tvOS)
-                if let playlist = moviePlaylist {
-                    DownloadButton(
-                        id: movie.id,
-                        downloadStatus: movie.downloadStatus,
-                        downloads: downloads,
-                        onStart: { downloads.startDownload(movie: movie, playlist: playlist) },
-                        onDelete: { deleteMovieDownload() }
-                    )
-                }
-            #endif
-        }
+        PrimaryPlayButton(
+            title: movie.watchProgress > 1 ? "Resume" : "Play",
+            isEnabled: moviePlaylist != nil,
+            action: startPlayback
+        )
     }
 
     @ViewBuilder
@@ -276,37 +261,71 @@ struct MovieDetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 10) {
+                    if let playlist = moviePlaylist {
+                        DownloadGlassButton(
+                            id: movie.id,
+                            downloadStatus: movie.downloadStatus,
+                            downloads: downloads,
+                            onStart: { downloads.startDownload(movie: movie, playlist: playlist) },
+                            onDelete: { downloads.deleteLocalFile(id: movie.id) }
+                        )
+                    }
                     GlassIconButton(
                         systemImage: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle",
                         accessibilityLabel: movie.isWatched ? "Mark as unwatched" : "Mark as watched"
                     ) { toggleWatched() }
-
                     GlassIconButton(
                         systemImage: movie.isFavorite ? "heart.fill" : "heart",
                         accessibilityLabel: movie.isFavorite ? "Remove from favorites" : "Add to favorites"
                     ) { toggleFavorite() }
                 }
             }
-        #else
+        #elseif os(macOS)
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    toggleWatched()
-                } label: {
+                Button { toggleWatched() } label: {
                     Image(systemName: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
                 }
                 .help(movie.isWatched ? "Mark as Unwatched" : "Mark as Watched")
             }
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    toggleFavorite()
-                } label: {
+                Button { toggleFavorite() } label: {
                     Image(systemName: movie.isFavorite ? "heart.fill" : "heart")
                         .foregroundStyle(movie.isFavorite ? .red : .primary)
                 }
                 .help(movie.isFavorite ? "Remove from Favorites" : "Add to Favorites")
             }
+            ToolbarItem(placement: .primaryAction) {
+                downloadMacItem
+            }
         #endif
     }
+
+    #if !os(tvOS)
+        @ViewBuilder
+        private var downloadMacItem: some View {
+            if let active = downloads.activeDownloads[movie.id] {
+                Button { downloads.cancelDownload(id: movie.id) } label: {
+                    Image(systemName: "stop.circle")
+                }
+                .help("Cancel — \(Int(active.fractionCompleted * 100))%")
+            } else if downloads.pendingIDs.contains(movie.id) {
+                Button { downloads.cancelDownload(id: movie.id) } label: {
+                    Image(systemName: "stop.circle")
+                }
+                .help("Cancel download")
+            } else if movie.downloadStatus == .completed {
+                Button { downloads.deleteLocalFile(id: movie.id) } label: {
+                    Image(systemName: "arrow.down.circle.fill")
+                }
+                .help("Remove download")
+            } else if let playlist = moviePlaylist {
+                Button { downloads.startDownload(movie: movie, playlist: playlist) } label: {
+                    Image(systemName: movie.downloadStatus == .failed ? "exclamationmark.circle" : "arrow.down.circle")
+                }
+                .help("Download")
+            }
+        }
+    #endif
 
     // MARK: - Derived data
 
@@ -456,12 +475,6 @@ struct MovieDetailView: View {
         }
         TraktService.shared.syncWatched(movie: movie, watched: movie.isWatched)
     }
-
-    #if !os(tvOS)
-        private func deleteMovieDownload() {
-            downloads.deleteLocalFile(id: movie.id)
-        }
-    #endif
 }
 
 #Preview("Basic") {
