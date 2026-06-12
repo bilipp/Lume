@@ -9,6 +9,36 @@ struct ActiveDownload: Identifiable {
     let id: String
     let title: String
     var fractionCompleted: Double = 0
+    var bytesWritten: Int64 = 0
+    var totalBytes: Int64 = 0
+    /// Ring-buffer of (timestamp, cumulative bytes) used for speed estimation.
+    /// Capped at 5 seconds of history; populated at most every 500 ms.
+    var samples: [(date: Date, bytes: Int64)] = []
+
+    /// Bytes per second averaged over the sample window, or nil if too few samples.
+    var speedBytesPerSec: Double? {
+        guard samples.count >= 2 else { return nil }
+        let elapsed = samples.last!.date.timeIntervalSince(samples.first!.date)
+        guard elapsed > 0.3 else { return nil }
+        return Double(samples.last!.bytes - samples.first!.bytes) / elapsed
+    }
+
+    /// Estimated seconds remaining based on current speed, or nil if unknown.
+    var estimatedSecondsRemaining: Double? {
+        guard let speed = speedBytesPerSec, speed > 0, totalBytes > bytesWritten else { return nil }
+        return Double(totalBytes - bytesWritten) / speed
+    }
+
+    /// Human-readable "3.2 MB/s · 2 min" caption, or nil while still measuring.
+    var statsLine: String? {
+        guard fractionCompleted > 0, let speed = speedBytesPerSec, speed > 0 else { return nil }
+        let speedStr = ByteCountFormatter.string(fromByteCount: Int64(speed), countStyle: .memory) + "/s"
+        guard let eta = estimatedSecondsRemaining, eta > 1 else { return speedStr }
+        let etaStr = Duration.seconds(eta).formatted(
+            .units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 2)
+        )
+        return "\(speedStr) · \(etaStr)"
+    }
 }
 
 private struct PendingDownload {
@@ -249,8 +279,19 @@ extension DownloadManager: URLSessionDownloadDelegate {
             ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
             : 0
         let taskID = downloadTask.taskIdentifier
+        let now = Date()
         Task { @MainActor in
-            self.activeDownloads[self.taskMap[taskID] ?? ""]?.fractionCompleted = fraction
+            guard let id = self.taskMap[taskID], var download = self.activeDownloads[id] else { return }
+            download.fractionCompleted = fraction
+            download.bytesWritten = totalBytesWritten
+            download.totalBytes = totalBytesExpectedToWrite
+            // Add a speed sample at most every 500 ms to keep the stats stable.
+            let lastSample = download.samples.last?.date ?? .distantPast
+            if now.timeIntervalSince(lastSample) >= 0.5 {
+                download.samples.append((date: now, bytes: totalBytesWritten))
+                download.samples = download.samples.filter { $0.date >= now.addingTimeInterval(-5) }
+            }
+            self.activeDownloads[id] = download
         }
     }
 
