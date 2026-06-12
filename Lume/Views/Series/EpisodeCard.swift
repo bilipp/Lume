@@ -106,24 +106,8 @@ struct EpisodeCard: View {
 
             #if !os(tvOS)
                 if let progress = downloadProgress {
-                    // Actively downloading: show a progress indicator
-                    ZStack {
-                        Rectangle()
-                            .fill(.black.opacity(0.45))
-                        if progress > 0 {
-                            ProgressView(value: progress)
-                                .progressViewStyle(.circular)
-                                .tint(.white)
-                                .scaleEffect(0.6)
-                        } else {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .tint(.white)
-                                .scaleEffect(0.6)
-                        }
-                    }
-                    .frame(width: 142, height: 80)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    downloadBadge(progress: progress)
+                        .padding(5)
                 } else if episode.downloadStatus == .completed {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.caption.weight(.semibold))
@@ -143,6 +127,32 @@ struct EpisodeCard: View {
         }
         .frame(width: 142, height: 80)
     }
+
+    #if !os(tvOS)
+        private func downloadBadge(progress: Double) -> some View {
+            ZStack {
+                Circle()
+                    .stroke(.white.opacity(0.25), lineWidth: 2)
+                    .frame(width: 16, height: 16)
+                if progress > 0 {
+                    Circle()
+                        .trim(from: 0, to: max(0.04, progress))
+                        .stroke(.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 0.1), value: progress)
+                        .frame(width: 16, height: 16)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.mini)
+                        .tint(.white)
+                        .scaleEffect(0.65)
+                }
+            }
+            .frame(width: 24, height: 24)
+            .background(.black.opacity(0.55), in: Circle())
+        }
+    #endif
 
     /// Air date and runtime joined on a single caption line, omitting whichever is missing.
     private var metaLine: String? {
