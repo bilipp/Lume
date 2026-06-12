@@ -2,10 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>TMDBAccessToken</key>
-	<string></string>
-	<key>OMDBAPIKey</key>
-	<string></string>
 	<key>CFBundleAllowMixedLocalizations</key>
 	<true/>
 	<key>CFBundleLocalizations</key>
@@ -40,20 +36,26 @@
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
 	</array>
-	<key>UIBackgroundModes</key>
+	<key>IntroDBAPIKey</key>
+	<string></string>
+	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>audio</string>
-		<string>remote-notification</string>
+		<string>youtube</string>
+		<string>vnd.youtube</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<key>LSApplicationQueriesSchemes</key>
+	<key>OMDBAPIKey</key>
+	<string></string>
+	<key>TMDBAccessToken</key>
+	<string></string>
+	<key>UIBackgroundModes</key>
 	<array>
-		<string>youtube</string>
-		<string>vnd.youtube</string>
+		<string>audio</string>
+		<string>remote-notification</string>
 	</array>
 </dict>
 </plist>

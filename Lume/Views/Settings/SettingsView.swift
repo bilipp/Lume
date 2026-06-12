@@ -13,6 +13,8 @@ struct SettingsView: View {
     private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
     @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
     private var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
+    @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
+    private var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
 
@@ -178,6 +180,7 @@ struct SettingsView: View {
             Section {
                 Toggle("Autoplay Next Episode", isOn: $autoPlayNext)
                 Toggle("Show Next Episode Button", isOn: $showNextEpisodeButton)
+                Toggle("Show Skip Intro Button", isOn: $showSkipIntroButton)
             } header: {
                 Text("Playback")
             } footer: {
@@ -416,6 +419,7 @@ struct SettingsView: View {
                     TVSettingsSectionLabel("Playback")
                     TVOptionToggleRow(title: "Autoplay Next Episode", isOn: $autoPlayNext)
                     TVOptionToggleRow(title: "Show Next Episode Button", isOn: $showNextEpisodeButton)
+                    TVOptionToggleRow(title: "Show Skip Intro Button", isOn: $showSkipIntroButton)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {

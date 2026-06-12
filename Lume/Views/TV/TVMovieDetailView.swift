@@ -91,44 +91,34 @@
                     aboutSection
 
                     if !movie.orderedCast.isEmpty {
-                        TVRail(title: "Cast") {
-                            ForEach(movie.orderedCast) { member in
-                                TVCastCard(member: member)
-                            }
+                        TVRail(title: "Cast", items: movie.orderedCast) { member in
+                            TVCastCard(member: member)
                         }
                     }
 
                     if !movie.trailers.isEmpty {
-                        TVRail(title: "Videos") {
-                            ForEach(movie.trailers) { video in
-                                TVVideoCard(video: video) {
-                                    openVideo(video) { showYouTubeUnavailable = true }
-                                }
+                        TVRail(title: "Videos", items: movie.trailers) { video in
+                            TVVideoCard(video: video) {
+                                openVideo(video) { showYouTubeUnavailable = true }
                             }
                         }
                     }
 
                     if !similar.isEmpty {
-                        TVRail(title: "You May Also Like") {
-                            ForEach(similar) { item in
-                                posterLink(for: item)
-                            }
+                        TVRail(title: "You May Also Like", items: similar) { item in
+                            posterLink(for: item)
                         }
                     }
 
                     if !collectionMovies.isEmpty, let name = movie.collectionName {
-                        TVRail(title: "\(name) Collection") {
-                            ForEach(collectionMovies) { item in
-                                posterLink(for: item)
-                            }
+                        TVRail(title: "\(name) Collection", items: collectionMovies) { item in
+                            posterLink(for: item)
                         }
                     }
 
                     if !otherSources.isEmpty {
-                        TVRail(title: "Other Sources") {
-                            ForEach(otherSources) { item in
-                                posterLink(for: item)
-                            }
+                        TVRail(title: "Other Sources", items: otherSources) { item in
+                            posterLink(for: item)
                         }
                     }
                 }

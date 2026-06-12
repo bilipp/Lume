@@ -81,6 +81,11 @@ private struct HomeItemCell: View {
 
 /// A poster-style card used across all home rows. Shows artwork with an
 /// optional resume progress bar and a "Live" badge.
+///
+/// Live channel logos are mostly transparent PNGs, so unlike movie/series
+/// posters they can't fill the card themselves. They get a full card treatment
+/// instead: a neutral dark gradient plate (consistent next to poster artwork in
+/// any color scheme) and an inset so the logo never touches the edges.
 private struct HomePosterCard: View {
     let title: String
     let imageURL: URL?
@@ -93,19 +98,24 @@ private struct HomePosterCard: View {
                 CachedAsyncImage(url: imageURL, maxPixelSize: PosterCardMetrics.posterHeight) { phase in
                     switch phase {
                     case .empty:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
+                        placeholder
                             .overlay { ProgressView() }
                     case let .success(image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: isLive ? .fit : .fill)
+                        if isLive {
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .padding(PosterCardMetrics.liveLogoInset)
+                        } else {
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        }
                     case .failure:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
+                        placeholder
                             .overlay {
                                 Image(systemName: isLive ? "antenna.radiowaves.left.and.right" : "film")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(isLive ? Color.white.opacity(0.6) : Color.secondary)
                                     .font(.largeTitle)
                             }
                     @unknown default:
@@ -113,6 +123,9 @@ private struct HomePosterCard: View {
                     }
                 }
                 .frame(width: PosterCardMetrics.posterWidth, height: PosterCardMetrics.posterHeight)
+                .background {
+                    if isLive { liveCardBackground }
+                }
 
                 if isLive {
                     Text("LIVE")
@@ -142,5 +155,27 @@ private struct HomePosterCard: View {
                 .lineLimit(2)
                 .frame(width: PosterCardMetrics.posterWidth, alignment: .leading)
         }
+    }
+
+    /// Loading/failure backdrop. Live cards keep their gradient plate so the
+    /// card looks the same before, during and after the logo loads.
+    @ViewBuilder
+    private var placeholder: some View {
+        if isLive {
+            Color.clear
+        } else {
+            Rectangle().fill(Color.gray.opacity(0.3))
+        }
+    }
+
+    /// The plate behind transparent channel logos. Fixed dark grays (not
+    /// scheme-adaptive) so the card reads the same on the tvOS backdrop and in
+    /// iOS/macOS light mode.
+    private var liveCardBackground: some View {
+        LinearGradient(
+            colors: [Color(white: 0.30), Color(white: 0.14)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }

@@ -60,6 +60,14 @@ else
     echo "warning: OMDB_API_KEY not set in .env — extra ratings will be hidden"
 fi
 
+INTRO_DB_API_KEY="$(read_env INTRO_DB_API_KEY)"
+if [ -n "$INTRO_DB_API_KEY" ]; then
+    set_plist IntroDBAPIKey "$INTRO_DB_API_KEY"
+    echo "Injected INTRO_DB_API_KEY into Info.plist"
+else
+    echo "warning: INTRO_DB_API_KEY not set in .env — IntroDB reads still work unauthenticated"
+fi
+
 TRAKT_CLIENT_ID="$(read_env TRAKT_CLIENT_ID)"
 TRAKT_CLIENT_SECRET="$(read_env TRAKT_CLIENT_SECRET)"
 if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then

@@ -101,36 +101,28 @@
                     aboutSection
 
                     if !series.orderedCast.isEmpty {
-                        TVRail(title: "Cast") {
-                            ForEach(series.orderedCast) { member in
-                                TVCastCard(member: member)
-                            }
+                        TVRail(title: "Cast", items: series.orderedCast) { member in
+                            TVCastCard(member: member)
                         }
                     }
 
                     if !series.trailers.isEmpty {
-                        TVRail(title: "Videos") {
-                            ForEach(series.trailers) { video in
-                                TVVideoCard(video: video) {
-                                    openVideo(video) { showYouTubeUnavailable = true }
-                                }
+                        TVRail(title: "Videos", items: series.trailers) { video in
+                            TVVideoCard(video: video) {
+                                openVideo(video) { showYouTubeUnavailable = true }
                             }
                         }
                     }
 
                     if !similar.isEmpty {
-                        TVRail(title: "You May Also Like") {
-                            ForEach(similar) { item in
-                                posterLink(for: item)
-                            }
+                        TVRail(title: "You May Also Like", items: similar) { item in
+                            posterLink(for: item)
                         }
                     }
 
                     if !otherSources.isEmpty {
-                        TVRail(title: "Other Sources") {
-                            ForEach(otherSources) { item in
-                                posterLink(for: item)
-                            }
+                        TVRail(title: "Other Sources", items: otherSources) { item in
+                            posterLink(for: item)
                         }
                     }
                 }

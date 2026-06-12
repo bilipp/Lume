@@ -43,6 +43,13 @@ struct FullScreenPlayerView: View {
     /// the per-tick clock path.
     @State private var nextUpMedia: PlayableMedia?
 
+    /// Intro / recap timestamps for the active episode (from IntroDB), driving
+    /// the in-player Skip Intro button. `nil` for movies, live channels, and
+    /// episodes IntroDB doesn't know — resolved whenever the active stream
+    /// changes. Read only when the player tree is (re)built, never on the
+    /// per-tick clock path. See `PlayerSkipIntroOverlay`.
+    @State private var skipSegments: IntroSegments?
+
     init(media: PlayableMedia) {
         self.media = media
         _activeMedia = State(initialValue: media)
@@ -92,6 +99,19 @@ struct FullScreenPlayerView: View {
                 ? nil
                 : NextEpisodeResolver.nextMedia(after: activeMedia.contentRef, in: modelContext)
         }
+        .task(id: activeMedia.id) {
+            // Resolve the IntroDB skip windows for the active episode. Runs on
+            // appear and whenever the stream swaps. Gated on the user setting so
+            // a disabled feature makes no network call. Resolving the lookup key
+            // touches SwiftData on the main actor; the fetch itself is off it.
+            skipSegments = nil
+            guard PlayerSettings.Playback.showSkipIntroButton, !activeMedia.isLive,
+                  let lookup = IntroSkipResolver.lookup(for: activeMedia.contentRef, in: modelContext)
+            else { return }
+            skipSegments = try? await IntroDBClient.shared.segments(
+                imdbId: lookup.imdbId, season: lookup.season, episode: lookup.episode
+            )
+        }
         .task {
             // Sample progress on a cadence and stash it in `WatchProgressBuffer`
             // (UserDefaults) rather than writing SwiftData. A background-context
@@ -128,6 +148,7 @@ struct FullScreenPlayerView: View {
                 media: activeMedia,
                 clock: clock,
                 nextUpMedia: nextUpMedia,
+                skipSegments: skipSegments,
                 onSelectMedia: switchMedia
             )
         case .ksPlayer:
@@ -135,6 +156,7 @@ struct FullScreenPlayerView: View {
                 media: activeMedia,
                 clock: clock,
                 nextUpMedia: nextUpMedia,
+                skipSegments: skipSegments,
                 onSelectMedia: switchMedia
             )
         case .vlcKit:
@@ -142,6 +164,7 @@ struct FullScreenPlayerView: View {
                 media: activeMedia,
                 clock: clock,
                 nextUpMedia: nextUpMedia,
+                skipSegments: skipSegments,
                 onSelectMedia: switchMedia
             )
         }
