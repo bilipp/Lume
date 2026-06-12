@@ -129,7 +129,7 @@ struct HomeView: View {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 28) {
                                 if !heroItems.isEmpty {
-                                    HomeHeroCarousel(items: heroItems, onPlayMovie: playMovie)
+                                    HomeHeroCarousel(items: heroItems)
                                 }
                                 homeRows
                             }
@@ -410,16 +410,6 @@ struct HomeView: View {
     private func playChannel(_ stream: LiveStream) {
         guard let playlist = activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
-        #if os(macOS)
-            openWindow(id: "player", value: media)
-        #else
-            playingMedia = media
-        #endif
-    }
-
-    private func playMovie(_ movie: Movie) {
-        guard let playlist = activePlaylist,
-              let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
         #if os(macOS)
             openWindow(id: "player", value: media)
         #else
