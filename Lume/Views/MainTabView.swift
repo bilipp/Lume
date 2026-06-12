@@ -70,6 +70,7 @@ struct MainTabView: View {
             // app this is the practical equivalent of "on launch".
             if phase == .active {
                 enqueueDueSyncs(playlists)
+                startNewEpisodeScanIfDue()
             }
         }
         .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
@@ -164,6 +165,19 @@ struct MainTabView: View {
             frequency: syncFrequency,
             alreadyStarted: autoSyncAttempted.contains(playlist.id)
         )
+    }
+
+    /// Runs `scanFavoritesForNewEpisodes` in a detached background task if the
+    /// daily scan is due. Silently skips UI tests and empty playlist lists.
+    private func startNewEpisodeScanIfDue() {
+        guard !isUITesting, !playlists.isEmpty else { return }
+        guard NewEpisodeScanScheduler.isDue() else { return }
+        NewEpisodeScanScheduler.markComplete()
+        let container = modelContext.container
+        Task.detached(priority: .background) {
+            let manager = ContentSyncManager(modelContainer: container)
+            await manager.scanFavoritesForNewEpisodes()
+        }
     }
 
     /// Presents the next queued playlist's sync cover when none is showing. The

@@ -45,6 +45,12 @@ struct SeriesCardView: View {
             #if !os(tvOS)
                 .shadow(radius: 2)
             #endif
+                .overlay(alignment: .topTrailing) {
+                    if series.newEpisodesCount > 0 {
+                        NewEpisodesBadge(count: series.newEpisodesCount)
+                            .padding(6)
+                    }
+                }
 
             // Title
             Text(series.name)
@@ -52,6 +58,29 @@ struct SeriesCardView: View {
                 .lineLimit(2)
                 .frame(width: PosterCardMetrics.posterWidth, alignment: .leading)
         }
+    }
+}
+
+// MARK: - Badge
+
+/// A small pill shown in the top-right corner of a series card when the
+/// background scan has found episodes not yet seen by the user.
+private struct NewEpisodesBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text(count == 1 ? "1 New" : "\(count) New")
+        #if os(tvOS)
+            .font(.system(size: 18, weight: .bold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+        #else
+            .font(.system(size: 9, weight: .bold))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3)
+        #endif
+            .foregroundStyle(.white)
+            .background(.blue, in: Capsule())
     }
 }
 

@@ -445,6 +445,13 @@ struct SeriesDetailView: View {
             await loadEpisodes()
         }
         selectedSeason = determineDefaultSeason()
+        clearNewEpisodesBadge()
+    }
+
+    private func clearNewEpisodesBadge() {
+        guard series.newEpisodesCount > 0 else { return }
+        series.newEpisodesCount = 0
+        try? modelContext.save()
     }
 
     private func loadEpisodes() async {

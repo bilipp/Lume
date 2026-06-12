@@ -55,6 +55,9 @@ final class Series {
 
     var isFavorite: Bool = false
     var lastWatchedDate: Date?
+    /// Episodes found in a background scan that the user hasn't opened yet.
+    /// Reset to 0 when the series detail view is opened.
+    var newEpisodesCount: Int = 0
     var addedToWatchlistDate: Date?
     var traktId: String?
     var tmdbId: Int?
