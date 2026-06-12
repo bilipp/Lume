@@ -54,7 +54,9 @@
                     .trim(from: 0, to: max(0.04, fraction))
                     .stroke(.white, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.1), value: fraction)
+                    // Matches the manager's 250 ms progress-publish cadence
+                    // so the ring sweeps continuously between updates.
+                    .animation(.linear(duration: 0.25), value: fraction)
                     .frame(width: 22, height: 22)
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))

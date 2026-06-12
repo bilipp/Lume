@@ -1,4 +1,5 @@
 import Foundation
+import os
 import OSLog
 import SwiftData
 
@@ -74,6 +75,14 @@ final class DownloadManager: NSObject {
     // MARK: - Private
 
     var modelContainer: ModelContainer?
+
+    /// Per-task time of the last published progress update. `didWriteData`
+    /// fires for every received chunk (often 100+ times per second); publishing
+    /// each one into the observable `activeDownloads` re-rendered every
+    /// observing view per chunk and saturated the main thread — visibly
+    /// delaying unrelated interactions such as opening a context menu. Gates
+    /// updates to one per task per 250 ms.
+    private nonisolated let progressPublishGate = OSAllocatedUnfairLock<[Int: Date]>(initialState: [:])
 
     private var session: URLSession!
     private var taskMap: [Int: String] = [:]
@@ -280,6 +289,12 @@ extension DownloadManager: URLSessionDownloadDelegate {
             : 0
         let taskID = downloadTask.taskIdentifier
         let now = Date()
+        let shouldPublish = progressPublishGate.withLock { lastPublish in
+            if let last = lastPublish[taskID], now.timeIntervalSince(last) < 0.25 { return false }
+            lastPublish[taskID] = now
+            return true
+        }
+        guard shouldPublish else { return }
         Task { @MainActor in
             guard let id = self.taskMap[taskID], var download = self.activeDownloads[id] else { return }
             download.fractionCompleted = fraction
@@ -329,6 +344,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
     @MainActor
     private func finalizeDownload(taskID: Int, interim: URL, ext: String) {
+        _ = progressPublishGate.withLock { $0.removeValue(forKey: taskID) }
         guard let id = taskMap[taskID] else {
             try? FileManager.default.removeItem(at: interim)
             return
@@ -379,6 +395,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
     @MainActor
     private func handleFailure(taskID: Int, id: String) {
+        _ = progressPublishGate.withLock { $0.removeValue(forKey: taskID) }
         activeDownloads.removeValue(forKey: id)
         taskMap.removeValue(forKey: taskID)
         idToTask.removeValue(forKey: id)
