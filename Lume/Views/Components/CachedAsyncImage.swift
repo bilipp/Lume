@@ -42,7 +42,12 @@ struct CachedAsyncImage<Content: View>: View {
     }
 
     var body: some View {
-        content(phase)
+        // Bypass @State entirely when there is no URL: regardless of any stale
+        // phase the SwiftUI state system might have preserved, callers always
+        // receive .failure so they show a static placeholder immediately without
+        // any spinner. The .task still fires so that a later URL change is picked
+        // up, but load() exits immediately for nil URL.
+        content(url == nil ? .failure(URLError(.badURL)) : phase)
             .task(id: taskID) { await load() }
     }
 
@@ -60,7 +65,7 @@ struct CachedAsyncImage<Content: View>: View {
 
     private func load() async {
         guard let url else {
-            phase = .empty
+            phase = .failure(URLError(.badURL))
             return
         }
 
