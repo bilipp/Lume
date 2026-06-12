@@ -1,8 +1,9 @@
 #if !os(tvOS)
     import SwiftUI
 
-    /// Full-width secondary button below the Play button showing download state.
-    struct DownloadButton: View {
+    /// Compact icon button for the toolbar — sits alongside watched/favorite icons.
+    /// Shows a circular progress ring while downloading, a filled icon when complete.
+    struct DownloadGlassButton: View {
         let id: String
         let downloadStatus: DownloadStatus?
         let downloads: DownloadManager
@@ -11,72 +12,63 @@
 
         var body: some View {
             if let active = downloads.activeDownloads[id] {
-                HStack(spacing: 12) {
-                    if active.fractionCompleted > 0 {
-                        ProgressView(value: active.fractionCompleted)
-                            .progressViewStyle(.linear)
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        ProgressView()
-                            .progressViewStyle(.linear)
-                            .frame(maxWidth: .infinity)
-                    }
-                    Button {
-                        downloads.cancelDownload(id: id)
-                    } label: {
-                        Label("Cancel", systemImage: "xmark.circle")
-                            .font(.subheadline)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                Button { downloads.cancelDownload(id: id) } label: {
+                    progressRing(fraction: active.fractionCompleted)
                 }
-                .padding(.horizontal, 4)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel download")
             } else if downloads.pendingIDs.contains(id) {
-                HStack(spacing: 10) {
-                    ProgressView().controlSize(.small)
-                    Text("Waiting…")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                    Button {
-                        downloads.cancelDownload(id: id)
-                    } label: {
-                        Label("Cancel", systemImage: "xmark.circle")
-                            .font(.subheadline)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                Button { downloads.cancelDownload(id: id) } label: {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.mini)
+                        .tint(.white)
+                        .glassCircleFrame()
                 }
-                .padding(.horizontal, 4)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel download")
             } else if downloadStatus == .completed {
-                Button(role: .destructive, action: onDelete) {
-                    Label("Remove Download", systemImage: "trash")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 30)
+                Button(action: onDelete) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.tint)
+                        .glassCircleFrame()
                 }
-                .buttonStyle(.bordered)
-                .tint(.red)
-                .controlSize(.large)
-            } else if downloadStatus == .failed {
-                Button(action: onStart) {
-                    Label("Retry Download", systemImage: "arrow.clockwise.circle")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 30)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove download")
             } else {
-                Button(action: onStart) {
-                    Label("Download", systemImage: "arrow.down.circle")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 30)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                GlassIconButton(
+                    systemImage: downloadStatus == .failed ? "exclamationmark.circle" : "arrow.down.circle",
+                    accessibilityLabel: downloadStatus == .failed ? "Retry download" : "Download",
+                    action: onStart
+                )
             }
+        }
+
+        private func progressRing(fraction: Double) -> some View {
+            ZStack {
+                Circle()
+                    .stroke(.white.opacity(0.25), lineWidth: 2.5)
+                    .frame(width: 22, height: 22)
+                Circle()
+                    .trim(from: 0, to: max(0.04, fraction))
+                    .stroke(.white, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 0.1), value: fraction)
+                    .frame(width: 22, height: 22)
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .glassCircleFrame()
+        }
+    }
+
+    private extension View {
+        func glassCircleFrame() -> some View {
+            frame(width: 34, height: 34)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(.white.opacity(0.15), lineWidth: 0.5))
         }
     }
 #endif
