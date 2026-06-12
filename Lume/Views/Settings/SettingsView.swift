@@ -17,6 +17,10 @@ struct SettingsView: View {
     private var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
+    #if !os(tvOS)
+        @AppStorage(DownloadManager.maxConcurrentKey) private var maxConcurrent = 1
+        @AppStorage(DownloadManager.autoDeleteKey) private var autoDeleteAfterWatching = false
+    #endif
 
     #if os(tvOS)
         /// The category whose content is shown in the right pane. Follows focus
@@ -59,6 +63,7 @@ struct SettingsView: View {
                         integrationsSection
                     }
                     playbackSection
+                    downloadsSection
                     playerSection
                     playerEngineSection
                     aboutSection
@@ -184,6 +189,28 @@ struct SettingsView: View {
                 Text("Playback")
             } footer: {
                 Text("Automatically start the next episode when one finishes, and show a button near the end to skip ahead.")
+            }
+        }
+
+        private var downloadsSection: some View {
+            Section {
+                NavigationLink {
+                    DownloadsView()
+                } label: {
+                    Label("Manage Downloads", systemImage: "arrow.down.circle")
+                }
+
+                Stepper(
+                    "Max Simultaneous Downloads: \(maxConcurrent)",
+                    value: $maxConcurrent,
+                    in: 1 ... 5
+                )
+
+                Toggle("Auto-Delete After Watching", isOn: $autoDeleteAfterWatching)
+            } header: {
+                Text("Downloads")
+            } footer: {
+                Text("Download movies and episodes for offline playback. Auto-delete removes the file once you've finished watching.")
             }
         }
 
