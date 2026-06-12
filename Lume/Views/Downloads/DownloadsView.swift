@@ -194,6 +194,7 @@ import SwiftUI
                         ProgressView()
                             .progressViewStyle(.linear)
                     }
+                    caption
                 }
 
                 Button(action: onCancel) {
@@ -203,6 +204,20 @@ import SwiftUI
                 .buttonStyle(.plain)
             }
             .padding(.vertical, 2)
+        }
+
+        @ViewBuilder
+        private var caption: some View {
+            if let stats = item.statsLine {
+                Text(stats)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            } else if item.fractionCompleted == 0 {
+                Text("Waiting…")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 
