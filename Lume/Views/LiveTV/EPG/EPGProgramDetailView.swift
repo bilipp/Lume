@@ -14,6 +14,9 @@ struct EPGProgramDetailView: View {
     let cell: EPGProgramCell
     let now: Date
     let onPlay: () -> Void
+    /// Non-nil when the channel supports catchup and the programme is within the
+    /// archive window. Calls the caller's handler with the timeshift URL baked in.
+    let onPlayCatchup: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -63,13 +66,14 @@ struct EPGProgramDetailView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        if stream.tvArchive > 0 {
+                        if stream.tvArchive > 0, onPlayCatchup == nil {
                             Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
                                 .font(.subheadline)
                                 .foregroundStyle(.blue)
                         }
 
                         watchButton
+                        catchupButton
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 24)
@@ -123,22 +127,34 @@ struct EPGProgramDetailView: View {
                                 .frame(maxWidth: 520)
                         }
 
-                        if stream.tvArchive > 0 {
+                        if stream.tvArchive > 0, onPlayCatchup == nil {
                             Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
                                 .font(.system(size: 26))
                                 .foregroundStyle(.blue)
                         }
 
-                        // Keep the action above the synopsis. The button is the only
-                        // focusable element here, and on tvOS the ScrollView only
+                        // Keep actions above the synopsis. Buttons are the only
+                        // focusable elements here, and on tvOS the ScrollView only
                         // reveals content as focus moves. A long synopsis below the
-                        // button would otherwise push it off-screen and out of reach.
+                        // buttons would otherwise push them off-screen and out of reach.
                         TVPlayButton(title: "Watch Live", systemImage: "play.fill") {
                             onPlay()
                             dismiss()
                         }
                         .frame(maxWidth: 460)
                         .padding(.top, 16)
+
+                        if let onPlayCatchup {
+                            TVPlayButton(
+                                title: isLive ? "Watch from Start" : "Watch Catchup",
+                                systemImage: isLive ? "arrow.counterclockwise" : "clock.arrow.circlepath"
+                            ) {
+                                onPlayCatchup()
+                                dismiss()
+                            }
+                            .frame(maxWidth: 460)
+                            .padding(.top, 8)
+                        }
 
                         if !cell.detail.isEmpty {
                             Text(cell.detail)
@@ -270,6 +286,25 @@ struct EPGProgramDetailView: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private var catchupButton: some View {
+        if let onPlayCatchup, !cell.isGap {
+            Button {
+                onPlayCatchup()
+                dismiss()
+            } label: {
+                Label(
+                    isLive ? "Watch from Start" : "Watch Catchup",
+                    systemImage: isLive ? "arrow.counterclockwise" : "clock.arrow.circlepath"
+                )
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+        }
     }
 
     private func statusBadge(_ title: LocalizedStringKey, color: Color) -> some View {

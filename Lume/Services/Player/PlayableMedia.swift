@@ -67,6 +67,22 @@ extension PlayableMedia {
         )
     }
 
+    static func from(stream: LiveStream, cell: EPGProgramCell, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
+        let duration = cell.end.timeIntervalSince(cell.start)
+        guard let url = client.buildCatchupURL(for: stream, playlist: playlist, startTime: cell.start, duration: duration) else { return nil }
+        let title = cell.title.isEmpty ? stream.name : cell.title
+        return PlayableMedia(
+            id: "catchup-\(stream.id)-\(Int(cell.start.timeIntervalSince1970))",
+            url: url,
+            title: title,
+            subtitle: stream.name,
+            posterURL: URL(string: stream.streamIcon ?? ""),
+            kind: .vod,
+            startTime: 0,
+            contentRef: .live(stream.id)
+        )
+    }
+
     static func from(stream: LiveStream, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
         let directURL = stream.directURL.flatMap(URL.init(string:))
         guard let url = directURL ?? client.buildLiveStreamURL(for: stream, playlist: playlist) else { return nil }

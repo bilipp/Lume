@@ -76,6 +76,46 @@ struct PlayableMediaTests {
         #expect(media.subtitle == "S2 E3 · Standalone")
     }
 
+    // MARK: - from(stream:cell:playlist:client:) — catchup
+
+    @Test func `from live stream with catchup cell creates vod media`() throws {
+        let playlist = makePlaylist()
+        let stream = LiveStream(id: "l-cu", streamId: 300, name: "Sports",
+                                streamIcon: "http://example.com/sports.png",
+                                tvArchive: 1, tvArchiveDuration: 7)
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let end = start.addingTimeInterval(3600)
+        let cell = EPGProgramCell(
+            id: "prog-1",
+            title: "Match of the Day",
+            detail: "Live football",
+            start: start,
+            end: end,
+            listingID: "prog-1",
+            isGap: false,
+            width: 360
+        )
+
+        let media = try #require(PlayableMedia.from(stream: stream, cell: cell, playlist: playlist))
+        #expect(media.url.absoluteString == "http://example.com:8080/timeshift/user/pass/3600/1700000000/300.m3u8")
+        #expect(media.title == "Match of the Day")
+        #expect(media.subtitle == "Sports")
+        #expect(media.kind == .vod)
+        #expect(media.isLive == false)
+        #expect(media.startTime == 0)
+        #expect(media.contentRef == .live(stream.id))
+    }
+
+    @Test func `from catchup cell uses stream name when title is empty`() throws {
+        let playlist = makePlaylist()
+        let stream = LiveStream(id: "l-notitle", streamId: 301, name: "News")
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let cell = EPGProgramCell(id: "g", title: "", detail: "", start: start, end: start.addingTimeInterval(1800), listingID: "g", isGap: false, width: 180)
+
+        let media = try #require(PlayableMedia.from(stream: stream, cell: cell, playlist: playlist))
+        #expect(media.title == "News")
+    }
+
     // MARK: - from(stream:playlist:client:)
 
     @Test func `from live stream creates media`() throws {

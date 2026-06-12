@@ -55,13 +55,13 @@ struct EPGTimeline: Equatable {
         return result
     }
 
-    /// A guide window anchored around `now`: a little history for context plus a
-    /// day of upcoming programmes, with the leading edge floored to a tidy
-    /// half-hour so the ruler labels read cleanly.
+    /// A guide window anchored around `now`: several hours of history for catchup
+    /// browsing plus a day of upcoming programmes, with the leading edge floored
+    /// to a tidy half-hour so the ruler labels read cleanly.
     static func live(
         now: Date,
         pointsPerMinute: CGFloat,
-        hoursBehind: Double = 1,
+        hoursBehind: Double = 6,
         hoursAhead: Double = 24,
         calendar: Calendar = .current
     ) -> EPGTimeline {

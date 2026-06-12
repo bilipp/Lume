@@ -18,16 +18,20 @@ struct EPGGuideView: View {
     let scope: LiveChannelScope
     let playlistPrefix: String
     let onPlay: (LiveStream) -> Void
+    /// Non-nil for Xtream playlists. The grid passes this to the detail sheet,
+    /// which shows a catchup button only for programmes within the archive window.
+    let onPlayCatchup: ((LiveStream, EPGProgramCell) -> Void)?
 
     @Query private var streams: [LiveStream]
     @Query private var listings: [EPGListing]
 
     private let timeline: EPGTimeline
 
-    init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
+    init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void, onPlayCatchup: ((LiveStream, EPGProgramCell) -> Void)? = nil) {
         self.scope = scope
         self.playlistPrefix = playlistPrefix
         self.onPlay = onPlay
+        self.onPlayCatchup = onPlayCatchup
 
         let timeline = EPGTimeline.live(now: Date(), pointsPerMinute: EPGMetrics.current.pointsPerMinute)
         self.timeline = timeline
@@ -55,7 +59,7 @@ struct EPGGuideView: View {
                 description: Text("This category has no channels")
             )
         } else {
-            EPGGridScroller(rows: buildRows(), timeline: timeline, onPlay: onPlay)
+            EPGGridScroller(rows: buildRows(), timeline: timeline, onPlay: onPlay, onPlayCatchup: onPlayCatchup)
         }
     }
 
@@ -97,6 +101,7 @@ private struct EPGGridScroller: View {
     let rows: [EPGChannelRow]
     let timeline: EPGTimeline
     let onPlay: (LiveStream) -> Void
+    let onPlayCatchup: ((LiveStream, EPGProgramCell) -> Void)?
 
     private let metrics = EPGMetrics.current
     private let now = Date()
@@ -150,9 +155,28 @@ private struct EPGGridScroller: View {
                 stream: selection.stream,
                 cell: selection.cell,
                 now: now,
-                onPlay: { onPlay(selection.stream) }
+                onPlay: { onPlay(selection.stream) },
+                onPlayCatchup: catchupAction(for: selection)
             )
         }
+    }
+
+    /// Returns a catchup action closure when the programme and channel meet all
+    /// eligibility criteria: Xtream handler present, tvArchive enabled, not a gap,
+    /// not in the future, and within the archive window.
+    private func catchupAction(for sel: EPGSelection) -> (() -> Void)? {
+        guard let onPlayCatchup,
+              sel.stream.tvArchive > 0,
+              !sel.cell.isGap,
+              sel.cell.isPast(at: now) || sel.cell.isLive(at: now)
+        else { return nil }
+
+        if sel.stream.tvArchiveDuration > 0 {
+            let archiveSecs = TimeInterval(sel.stream.tvArchiveDuration) * 86400
+            guard now.timeIntervalSince(sel.cell.start) <= archiveSecs else { return nil }
+        }
+
+        return { onPlayCatchup(sel.stream, sel.cell) }
     }
 
     /// Scroll offset that places "now" just inside the leading edge of the grid.
