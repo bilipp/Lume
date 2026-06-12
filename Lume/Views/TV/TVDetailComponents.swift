@@ -530,10 +530,14 @@
     // MARK: - Rail helper
 
     /// A titled horizontal rail wrapped in a focus section so the remote moves
-    /// cleanly between sections.
-    struct TVRail<Content: View>: View {
+    /// cleanly between sections. Data-driven so the rail can bind focus to each
+    /// card and land entry focus on the first item.
+    struct TVRail<Item: Identifiable, Content: View>: View {
         let title: LocalizedStringKey
-        @ViewBuilder var content: () -> Content
+        let items: [Item]
+        @ViewBuilder var content: (Item) -> Content
+
+        @FocusState private var focusedItem: Item.ID?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 22) {
@@ -542,12 +546,21 @@
 
                 ScrollView(.horizontal) {
                     LazyHStack(alignment: .top, spacing: TVDetailMetrics.railSpacing) {
-                        content()
+                        ForEach(items) { item in
+                            content(item)
+                                .focused($focusedItem, equals: item.id)
+                        }
                     }
                     .padding(.horizontal, TVDetailMetrics.horizontalInset)
                     .padding(.vertical, 24) // breathing room for the focus lift
                 }
                 .scrollClipDisabled()
+                // When focus moves INTO the rail from above/below, the enclosing
+                // focus section would otherwise pick the card nearest the
+                // SECTION's center — mid-rail, not the first card. `.userInitiated`
+                // re-applies this default on user-driven entry, not just on
+                // appearance.
+                .defaultFocus($focusedItem, items.first?.id, priority: .userInitiated)
             }
             .focusSection()
         }
