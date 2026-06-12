@@ -227,16 +227,13 @@ struct SeriesDetailView: View {
                                 onMarkFollowingUnwatched: { markFollowingUnwatched(episode) }
                             )
                         #else
-                            EpisodeCard(
+                            DownloadableEpisodeCard(
                                 episode: episode,
+                                playlist: seriesPlaylist,
                                 onPlay: { playEpisode(episode) },
                                 onToggleWatched: { toggleWatched(episode) },
                                 onMarkPreviousWatched: { markPreviousWatched(episode) },
-                                onMarkFollowingUnwatched: { markFollowingUnwatched(episode) },
-                                onDownload: seriesPlaylist.map { playlist in { downloads.startDownload(episode: episode, playlist: playlist) } },
-                                onDeleteDownload: { downloads.deleteLocalFile(id: episode.id) },
-                                downloadProgress: downloads.activeDownloads[episode.id].map(\.fractionCompleted)
-                                    ?? (downloads.pendingIDs.contains(episode.id) ? 0 : nil)
+                                onMarkFollowingUnwatched: { markFollowingUnwatched(episode) }
                             )
                         #endif
                     }
