@@ -1,0 +1,243 @@
+//
+//  CloudSyncTests.swift
+//  LumeTests
+//
+//  Covers the iCloud-sync reconciler: the pure three-way merge (create / update
+//  / delete in both directions, conflict policy) and the engine end-to-end
+//  against an in-memory two-configuration store (no CloudKit needed).
+//
+
+import Foundation
+@testable import Lume
+import SwiftData
+import Testing
+
+// MARK: - Pure three-way merge
+
+struct CloudSyncMergeTests {
+    private func merge(
+        _ local: Int?, _ cloud: Int?, _ shadow: Int?
+    ) -> MergeVerdict<Int> {
+        CloudSyncMerge.reconcile(local: local, cloud: cloud, shadow: shadow) { lhs, _ in lhs }
+    }
+
+    @Test func `nothing changed is a no-op`() {
+        #expect(merge(5, 5, 5) == .noChange)
+        #expect(merge(nil, nil, nil) == .noChange)
+    }
+
+    @Test func `local create pushes to cloud`() {
+        #expect(merge(7, nil, nil) == .pushToCloud(7))
+    }
+
+    @Test func `cloud create pulls to local`() {
+        #expect(merge(nil, 7, nil) == .pullToLocal(7))
+    }
+
+    @Test func `local edit pushes to cloud`() {
+        #expect(merge(9, 5, 5) == .pushToCloud(9))
+    }
+
+    @Test func `cloud edit pulls to local`() {
+        #expect(merge(5, 9, 5) == .pullToLocal(9))
+    }
+
+    @Test func `local delete pushes deletion to cloud`() {
+        #expect(merge(nil, 5, 5) == .pushToCloud(nil))
+    }
+
+    @Test func `cloud delete pulls deletion to local`() {
+        #expect(merge(5, nil, 5) == .pullToLocal(nil))
+    }
+
+    @Test func `both sides converged on the same value just re-baselines`() {
+        #expect(merge(8, 8, 3) == .pushToCloud(8))
+    }
+
+    @Test func `genuine conflict invokes the merge closure`() {
+        // local edited to 10, cloud edited to 20, base was 5.
+        let verdict = CloudSyncMerge.reconcile(local: 10, cloud: 20, shadow: 5) { lhs, rhs in lhs + rhs }
+        #expect(verdict == .writeBoth(30))
+    }
+
+    @Test func `edit versus delete preserves the surviving edit`() {
+        // local edited 5→10, cloud deleted (now nil). Both moved from the base,
+        // so it's a conflict; keep the surviving edit (un-delete) on both sides.
+        #expect(merge(10, nil, 5) == .writeBoth(10))
+        #expect(merge(nil, 10, 5) == .writeBoth(10))
+    }
+}
+
+// MARK: - Conflict policies
+
+struct CloudSyncConflictPolicyTests {
+    @Test func `content conflict keeps furthest progress and merges flags`() {
+        let local = ContentStateValues(
+            watchProgress: 1200, isWatched: false, lastWatchedDate: Date(timeIntervalSince1970: 100),
+            isFavorite: true, addedToWatchlistDate: Date(timeIntervalSince1970: 50), favoriteOrder: nil
+        )
+        let cloud = ContentStateValues(
+            watchProgress: 600, isWatched: true, lastWatchedDate: Date(timeIntervalSince1970: 200),
+            isFavorite: false, addedToWatchlistDate: Date(timeIntervalSince1970: 80), favoriteOrder: 3
+        )
+        let merged = ContentStateValues.mergeConflict(local: local, cloud: cloud)
+
+        #expect(merged.watchProgress == 1200) // furthest
+        #expect(merged.isWatched == true) // OR
+        #expect(merged.isFavorite == true) // OR (never lose a favorite)
+        #expect(merged.lastWatchedDate == Date(timeIntervalSince1970: 200)) // later
+        #expect(merged.addedToWatchlistDate == Date(timeIntervalSince1970: 50)) // earliest add
+        #expect(merged.favoriteOrder == 3) // local nil → cloud
+    }
+
+    @Test func `playlist conflict resolves last-write-wins favouring cloud`() {
+        let local = PlaylistConfigValues(
+            name: "Local", serverURL: "a", username: "u", password: "p",
+            sourceTypeRaw: "xtream", epgURL: nil, syncEnabled: true
+        )
+        let cloud = PlaylistConfigValues(
+            name: "Cloud", serverURL: "b", username: "u2", password: "p2",
+            sourceTypeRaw: "xtream", epgURL: nil, syncEnabled: false
+        )
+        #expect(PlaylistConfigValues.mergeConflict(local: local, cloud: cloud) == cloud)
+    }
+
+    @Test func `empty content state is treated as absent`() {
+        let empty = ContentStateValues(
+            watchProgress: 0, isWatched: false, lastWatchedDate: nil,
+            isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil
+        )
+        #expect(empty.isEmpty)
+    }
+}
+
+// MARK: - Engine integration (in-memory, no CloudKit)
+
+@MainActor
+struct CloudSyncEngineTests {
+    private func makeContainer() throws -> ModelContainer {
+        let fullSchema = Schema([
+            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
+            Series.self, Episode.self, CastMember.self, EPGListing.self,
+            SyncedPlaylist.self, UserContentState.self
+        ])
+        let localConfig = ModelConfiguration(
+            "local",
+            schema: Schema([
+                Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
+                Series.self, Episode.self, CastMember.self, EPGListing.self
+            ]),
+            isStoredInMemoryOnly: true
+        )
+        let cloudConfig = ModelConfiguration(
+            "cloud",
+            schema: Schema([SyncedPlaylist.self, UserContentState.self]),
+            isStoredInMemoryOnly: true
+        )
+        return try ModelContainer(for: fullSchema, configurations: localConfig, cloudConfig)
+    }
+
+    private func freshShadow() -> CloudSyncShadow {
+        let suite = UserDefaults(suiteName: "cloudsync.test.\(UUID().uuidString)")!
+        return CloudSyncShadow(defaults: suite)
+    }
+
+    @Test func `local playlist and favorite export to cloud mirrors`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+
+        let playlist = Playlist(name: "My IPTV", serverURL: "http://x", username: "u", password: "p")
+        let pid = playlist.id
+        ctx.insert(playlist)
+
+        let movie = Movie(id: "\(pid.uuidString)-movie-1", streamId: 1, name: "Film")
+        movie.isFavorite = true
+        movie.watchProgress = 42
+        ctx.insert(movie)
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(result.playlistsPushed == 1)
+        #expect(result.contentPushed == 1)
+
+        let mirrors = try ctx.fetch(FetchDescriptor<SyncedPlaylist>())
+        #expect(mirrors.count == 1)
+        #expect(mirrors.first?.id == pid)
+        #expect(mirrors.first?.password == "p")
+
+        let states = try ctx.fetch(FetchDescriptor<UserContentState>())
+        #expect(states.count == 1)
+        #expect(states.first?.contentId == "\(pid.uuidString)-movie-1")
+        #expect(states.first?.isFavorite == true)
+        #expect(states.first?.watchProgress == 42)
+    }
+
+    @Test func `cloud playlist creates a local playlist`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        let pid = UUID()
+        ctx.insert(SyncedPlaylist(
+            id: pid, name: "Remote", serverURL: "http://r", username: "ru", password: "rp",
+            sourceTypeRaw: "xtream", epgURL: nil, syncEnabled: true
+        ))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(result.playlistsCreatedLocally == 1)
+        let locals = try ctx.fetch(FetchDescriptor<Playlist>())
+        #expect(locals.count == 1)
+        #expect(locals.first?.id == pid)
+        #expect(locals.first?.name == "Remote")
+        #expect(locals.first?.lastSyncDate == nil) // so auto-sync fetches its catalog
+    }
+
+    @Test func `cloud content state stays pending until its catalog item exists`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        let shadow = freshShadow()
+        let pid = UUID()
+        let movieId = "\(pid.uuidString)-movie-7"
+
+        ctx.insert(SyncedPlaylist(
+            id: pid, name: "Remote", serverURL: "http://r", username: "u", password: "p",
+            sourceTypeRaw: "xtream", epgURL: nil, syncEnabled: true
+        ))
+        ctx.insert(UserContentState(contentId: movieId, kind: .movie, isFavorite: true))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: shadow)
+
+        // First pass: playlist created locally, but the movie isn't synced yet.
+        let first = await engine.reconcile()
+        #expect(first.contentPending == 1)
+        #expect(try ctx.fetch(FetchDescriptor<Movie>()).isEmpty)
+
+        // Catalog sync brings the movie in (favorite still off locally).
+        ctx.insert(Movie(id: movieId, streamId: 7, name: "Pending Film"))
+        try ctx.save()
+
+        // Second pass: the pending favorite is applied.
+        let second = await engine.reconcile()
+        #expect(second.contentPulled == 1)
+
+        let movie = try ctx.fetch(FetchDescriptor<Movie>()).first
+        #expect(movie?.isFavorite == true)
+    }
+
+    @Test func `state whose playlist is gone is garbage-collected`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        let pid = UUID() // no playlist (local or cloud) for this id
+        ctx.insert(UserContentState(contentId: "\(pid.uuidString)-movie-1", kind: .movie, isFavorite: true))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        _ = await engine.reconcile()
+
+        #expect(try ctx.fetch(FetchDescriptor<UserContentState>()).isEmpty)
+    }
+}
