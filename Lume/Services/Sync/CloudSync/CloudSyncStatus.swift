@@ -29,6 +29,14 @@ final class CloudSyncStatus {
     /// `NSPersistentCloudKitContainer` events).
     var isSyncing: Bool = false
 
+    /// Whether the launch-time iCloud sync has settled — the first CloudKit
+    /// import finished, the account turned out unusable, or we gave up waiting.
+    /// A fresh install (empty local store) gates the add-playlist form on this,
+    /// so cloud playlists get a chance to arrive before the form is offered,
+    /// instead of it flashing up and then vanishing mid-typing. Set by
+    /// `CloudSyncCoordinator` (immediately when CloudKit is disabled).
+    var hasCompletedInitialSync: Bool = false
+
     /// When the local reconcile last completed successfully.
     var lastReconcile: Date?
 

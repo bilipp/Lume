@@ -241,3 +241,36 @@ struct CloudSyncEngineTests {
         #expect(try ctx.fetch(FetchDescriptor<UserContentState>()).isEmpty)
     }
 }
+
+// MARK: - Initial-sync launch gate
+
+/// The launch gate (`status.hasCompletedInitialSync`) that a fresh install waits
+/// on before showing the add-playlist form. The actual wait fires only when
+/// CloudKit is enabled, which can't run in an un-entitled test binary (it
+/// crashes — the very reason `cloudKitEnabled` exists), so this covers the
+/// disabled path that previews, unit tests and UI tests take: the gate must be
+/// open from the start so the form stays reachable on an empty store.
+@MainActor
+struct CloudSyncInitialGateTests {
+    @Test func `gate is open from init when CloudKit is disabled`() throws {
+        // A complete single-config in-memory schema (all catalog models, so the
+        // Movie/Series → CastMember relationships resolve). The coordinator's
+        // engine only opens a ModelContext at init — it never fetches — and the
+        // CloudKit-disabled path returns before touching the cloud store, so the
+        // cloud-mirror models aren't needed here.
+        let schema = Schema([
+            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
+            Series.self, Episode.self, CastMember.self, EPGListing.self
+        ])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        )
+        let coordinator = CloudSyncCoordinator(
+            container: container,
+            cloudKitContainerIdentifier: "iCloud.test",
+            cloudKitEnabled: false
+        )
+        #expect(coordinator.status.hasCompletedInitialSync)
+    }
+}
