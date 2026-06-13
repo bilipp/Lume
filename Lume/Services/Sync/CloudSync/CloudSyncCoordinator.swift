@@ -127,6 +127,41 @@ final class CloudSyncCoordinator {
         }
     }
 
+    // MARK: - Profiles
+
+    /// Bootstrap the profile store (ensure a default, resolve the active profile,
+    /// claim legacy records). Falls back to the preferred/default id on failure
+    /// so the app still launches into a usable profile.
+    func bootstrapProfiles(preferredActiveID: UUID?, defaultName: String) async -> ProfileBootstrap {
+        do {
+            return try await engine.bootstrapProfiles(preferredActiveID: preferredActiveID, defaultName: defaultName)
+        } catch {
+            Logger.sync.error("Profile bootstrap failed: \(error.localizedDescription)")
+            return ProfileBootstrap(
+                activeProfileID: preferredActiveID ?? UserProfile.defaultProfileID,
+                profileCount: 1
+            )
+        }
+    }
+
+    /// Re-project the catalog from one profile to another (flush, reset, hydrate).
+    func switchProfile(from: UUID, to toID: UUID) async {
+        do {
+            try await engine.switchProfile(from: from, to: toID)
+        } catch {
+            Logger.sync.error("Profile switch failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Delete a profile's content state.
+    func purgeProfileData(_ id: UUID) async {
+        do {
+            try await engine.purgeProfileData(id)
+        } catch {
+            Logger.sync.error("Profile purge failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Initial-sync gate
 
     /// Judge the launch-time iCloud sync settled and open the gate that a fresh

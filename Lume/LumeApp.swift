@@ -17,14 +17,20 @@ struct LumeApp: App {
 
     let sharedModelContainer: ModelContainer
     @State private var cloudSync: CloudSyncCoordinator
+    @State private var profileManager: ProfileManager
 
     init() {
         let container = Self.makeModelContainer()
         sharedModelContainer = container
-        _cloudSync = State(initialValue: CloudSyncCoordinator(
+        let coordinator = CloudSyncCoordinator(
             container: container,
             cloudKitContainerIdentifier: Self.cloudKitContainerIdentifier,
             cloudKitEnabled: Self.isCloudKitEnvironment
+        )
+        _cloudSync = State(initialValue: coordinator)
+        _profileManager = State(initialValue: ProfileManager(
+            container: container,
+            coordinator: coordinator
         ))
     }
 
@@ -51,12 +57,13 @@ struct LumeApp: App {
         ])
         let cloudSchema = Schema([
             SyncedPlaylist.self,
-            UserContentState.self
+            UserContentState.self,
+            UserProfile.self
         ])
         let fullSchema = Schema([
             Playlist.self, Category.self, LiveStream.self, Movie.self,
             Series.self, Episode.self, CastMember.self, EPGListing.self,
-            SyncedPlaylist.self, UserContentState.self
+            SyncedPlaylist.self, UserContentState.self, UserProfile.self
         ])
 
         // Unnamed → keeps the historical `default.store` path (preserves data).
@@ -143,6 +150,7 @@ struct LumeApp: App {
             ContentView()
                 .environment(TraktService.shared)
                 .environment(cloudSync)
+                .environment(profileManager)
                 .task {
                     // Give DownloadManager access to the model container so it
                     // can persist download state from its delegate callbacks.
@@ -167,6 +175,11 @@ struct LumeApp: App {
                     // the token if stale) so watched-sync and the watchlist work
                     // from launch.
                     await TraktService.shared.restore()
+
+                    // Resolve the active profile and claim any pre-profiles
+                    // content state before the first sync, so the catalog the
+                    // reconciler reads is already scoped to a profile.
+                    await profileManager.bootstrap()
 
                     // Kick off iCloud sync: check account reachability, then run
                     // a first reconcile between the local catalog and the cloud

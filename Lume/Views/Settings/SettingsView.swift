@@ -398,6 +398,7 @@ struct SettingsView: View {
                         } else {
                             tvPlaylistsDetail
                         }
+                    case .profiles: TVProfilesSettingsView()
                     case .integrations: tvIntegrationsDetail
                     case .player:
                         if let selectedEngineOptions {

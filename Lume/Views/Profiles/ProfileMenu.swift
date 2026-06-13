@@ -1,0 +1,57 @@
+import SwiftData
+import SwiftUI
+
+/// The top-left profile switcher: the active profile's avatar, tapping it opens
+/// a menu to switch profile or manage profiles. iOS / macOS only — tvOS surfaces
+/// profiles through Settings to avoid disturbing the immersive home's focus.
+struct ProfileMenu: View {
+    @Environment(ProfileManager.self) private var profileManager: ProfileManager?
+    @Query(sort: [SortDescriptor(\UserProfile.sortOrder), SortDescriptor(\UserProfile.createdAt)])
+    private var profiles: [UserProfile]
+
+    @State private var managing = false
+
+    var body: some View {
+        if let profileManager {
+            let active = profiles.first { $0.id == profileManager.activeProfileID }
+            Menu {
+                ForEach(profiles) { profile in
+                    Button {
+                        Task { await profileManager.switchProfile(to: profile.id) }
+                    } label: {
+                        Label(
+                            profile.name,
+                            systemImage: profile.id == profileManager.activeProfileID ? "checkmark" : profile.symbolName
+                        )
+                    }
+                }
+
+                Divider()
+
+                Button {
+                    managing = true
+                } label: {
+                    Label("Manage Profiles", systemImage: "person.2.fill")
+                }
+            } label: {
+                ProfileAvatarView(
+                    symbolName: active?.symbolName ?? UserProfile.defaultSymbol,
+                    tint: active?.tint ?? .blue,
+                    size: 30
+                )
+            }
+            .disabled(profileManager.isSwitching)
+            .accessibilityLabel("Profile: \(active?.name ?? "")")
+            .sheet(isPresented: $managing) {
+                NavigationStack {
+                    ManageProfilesView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { managing = false }
+                            }
+                        }
+                }
+            }
+        }
+    }
+}
