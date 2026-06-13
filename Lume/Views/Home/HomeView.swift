@@ -178,7 +178,7 @@ struct HomeView: View {
                     }
                 }
             #endif
-                .task(id: "\(playlists.count)-\(selectedPlaylistID)") {
+                .task(id: "\(playlists.count)-\(selectedPlaylistID)-\(activePlaylist?.lastSyncDate?.timeIntervalSince1970 ?? 0)") {
                     await loadTrending()
                 }
                 .task(id: "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)") {
