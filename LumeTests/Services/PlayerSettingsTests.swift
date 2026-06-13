@@ -36,9 +36,12 @@ struct PlayerSettingsTests {
     }
 
     @Test func `engine renders own controls`() {
-        #expect(PlayerEngineKind.vlcKit.rendersOwnControls == true)
-        #expect(PlayerEngineKind.ksPlayer.rendersOwnControls == true)
-        #expect(PlayerEngineKind.avPlayer.rendersOwnControls == false)
+        // Every engine now draws its own in-player controls overlay — AVPlayer
+        // gained custom controls in 49c44dd — so the host suppresses its own
+        // close button for each (see FullScreenPlayerView).
+        #expect(PlayerEngineKind.vlcKit.rendersOwnControls)
+        #expect(PlayerEngineKind.ksPlayer.rendersOwnControls)
+        #expect(PlayerEngineKind.avPlayer.rendersOwnControls)
     }
 
     @Test func `engine storage key`() {
