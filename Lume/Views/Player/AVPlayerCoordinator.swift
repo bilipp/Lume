@@ -32,6 +32,21 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
     @Published private(set) var isPipActive = false
     @Published private(set) var isPipSupported = false
 
+    /// True once the stream has actually started playing. The host uses this to
+    /// tell an initial-load failure (eligible for engine fallback) apart from a
+    /// mid-stream drop.
+    @Published private(set) var hasStartedPlayback = false
+
+    /// Invoked when the stream can't be started: the item reports `.failed`, or
+    /// no frame plays within `startupTimeout`. The engine view either falls back
+    /// to the next engine or raises the failure overlay.
+    var onPlaybackFailure: (() -> Void)?
+
+    /// How long to wait for playback to start before declaring the stream dead.
+    /// Set by the host before `configure` — shorter when a fallback engine is
+    /// available so the hand-off is prompt.
+    var startupTimeout: TimeInterval = 40
+
     /// Drives the content-mode (fit / fill) toggle in the overlay; applied to
     /// the player layer's `videoGravity`.
     @Published var isScaleAspectFill = false {
@@ -72,6 +87,13 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
     private var needsResume = false
     private var didSeekResume = false
     private var selectedRate: Float = 1.0
+
+    /// The stream currently loaded, kept so the failure-retry path can rebuild it.
+    private var currentMedia: PlayableMedia?
+    /// Fires `onPlaybackFailure` if playback never starts within `startupTimeout`.
+    private var startupWatchdog: Task<Void, Never>?
+    /// Guards `onPlaybackFailure` so a failure is reported at most once per load.
+    private var didReportFailure = false
 
     // Cached media-selection groups so the overlay can map an opaque option id
     // back to the `AVMediaSelectionOption` to select.
@@ -122,6 +144,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         teardownItemObservers()
         trackLoadTask?.cancel()
 
+        currentMedia = media
         isLive = media.isLive
         startTime = media.startTime
         needsResume = !media.isLive && media.startTime > 1
@@ -130,6 +153,9 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         audioTrackOptions = []
         textTrackOptions = []
         isBuffering = true
+        hasStartedPlayback = false
+        didReportFailure = false
+        startStartupWatchdog()
 
         let asset = AVURLAsset(url: media.url)
         let newItem = AVPlayerItem(asset: asset)
@@ -145,11 +171,48 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         player.playImmediately(atRate: selectedRate)
     }
 
+    // MARK: - Failure handling
+
+    /// Arm the startup watchdog. Cancelled once playback actually starts.
+    private func startStartupWatchdog() {
+        startupWatchdog?.cancel()
+        startupWatchdog = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(startupTimeout * 1_000_000_000))
+            guard !Task.isCancelled, !hasStartedPlayback else { return }
+            Logger.player.error("AVPlayer startup watchdog: no playback within \(startupTimeout, format: .fixed(precision: 0), privacy: .public)s, declaring stream dead")
+            reportFailure()
+        }
+    }
+
+    private func cancelStartupWatchdog() {
+        startupWatchdog?.cancel()
+        startupWatchdog = nil
+    }
+
+    /// Report a stream that couldn't be started. Fires `onPlaybackFailure` at
+    /// most once per load; the engine view decides whether to fall back or show
+    /// the failure overlay.
+    private func reportFailure() {
+        guard !didReportFailure else { return }
+        didReportFailure = true
+        cancelStartupWatchdog()
+        Logger.player.error("AVPlayer playback failure reported")
+        onPlaybackFailure?()
+    }
+
+    /// Re-prepare the current stream after a failure (the Try Again button).
+    func retryAfterFailure() {
+        guard let currentMedia else { return }
+        load(media: currentMedia)
+    }
+
     // MARK: - Teardown
 
     func tearDown() {
         teardownItemObservers()
         trackLoadTask?.cancel()
+        cancelStartupWatchdog()
         pipController?.stopPictureInPicture()
         pipController = nil
         player.pause()
@@ -301,11 +364,18 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         }
 
         statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
-            guard item.status == .readyToPlay else { return }
-            DispatchQueue.main.async { [weak self] in
-                self?.seekToResumeIfNeeded()
-                self?.refreshVideoInfo()
-                self?.refreshTrackSelection()
+            switch item.status {
+            case .readyToPlay:
+                DispatchQueue.main.async { [weak self] in
+                    self?.seekToResumeIfNeeded()
+                    self?.refreshVideoInfo()
+                    self?.refreshTrackSelection()
+                }
+            case .failed:
+                // The item can't be played (bad URL, unsupported container/codec).
+                DispatchQueue.main.async { [weak self] in self?.reportFailure() }
+            default:
+                break
             }
         }
 
@@ -314,6 +384,10 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
                 guard let self else { return }
                 isPlaying = player.timeControlStatus != .paused
                 isBuffering = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                if player.timeControlStatus == .playing {
+                    hasStartedPlayback = true
+                    cancelStartupWatchdog()
+                }
             }
         }
 
