@@ -19,9 +19,13 @@ struct ContentSyncTests {
             Movie.self,
             Series.self,
             Episode.self,
+            CastMember.self,
             EPGListing.self
         ])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        // `cloudKitDatabase: .none` is required: the catalog uses `@Attribute(.unique)`,
+        // which CloudKit forbids. The default `.automatic` mirrors to CloudKit on a
+        // signed/entitled test host and fails the load with `loadIssueModelContainer`.
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
 
