@@ -38,6 +38,9 @@ struct SettingsView: View {
         /// pushing a full-screen view — a push hides the header tab bar and
         /// strands remote focus once the content scrolls.
         @State private var selectedPlaylist: Playlist?
+        /// The engine whose options are drilled into within the Player category,
+        /// replacing the player detail in place (same reasoning as `selectedPlaylist`).
+        @State private var selectedEngineOptions: PlayerEngineKind?
     #endif
 
     /// The user's ordered engine fallback list (migrates the legacy single-engine
@@ -46,12 +49,13 @@ struct SettingsView: View {
         PlayerEnginePriority.resolve(priorityRaw: enginePriorityRaw, legacyEngineRaw: engineRaw)
     }
 
-    /// The primary (most-preferred) engine — the one whose options are shown.
-    private var primaryEngine: PlayerEngineKind {
-        enginePriority.first ?? .defaultValue
-    }
-
     #if os(tvOS)
+        /// The primary (most-preferred) engine — its description is shown under
+        /// the priority list.
+        private var primaryEngine: PlayerEngineKind {
+            enginePriority.first ?? .defaultValue
+        }
+
         /// Move the engine at `index` one slot up or down the priority list,
         /// persisting the new order and keeping the legacy single-engine key in
         /// sync with the primary so other readers (and a downgrade) still resolve it.
@@ -90,7 +94,6 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
-                    playerEngineSection
                     aboutSection
                 }
                 #if os(macOS)
@@ -255,6 +258,9 @@ struct SettingsView: View {
                     }
                 }
 
+                NavigationLink("VLCKit Options") { VLCEngineSettingsScreen() }
+                NavigationLink("KSPlayer Options") { KSEngineSettingsScreen() }
+
                 Picker("External Player", selection: $externalPlayerRaw) {
                     Text("Off").tag("")
                     ForEach(ExternalPlayer.allCases) { player in
@@ -266,20 +272,6 @@ struct SettingsView: View {
                 Text("Player")
             } footer: {
                 Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played. Streams open in the selected external app instead, when one is installed.")
-            }
-        }
-
-        /// Options for the primary engine only — each engine keeps a dedicated
-        /// area, and reordering the priority list swaps which one shows.
-        @ViewBuilder
-        private var playerEngineSection: some View {
-            switch primaryEngine {
-            case .vlcKit:
-                VLCEngineSettingsForm()
-            case .ksPlayer:
-                KSEngineSettingsForm()
-            case .avPlayer:
-                EmptyView()
             }
         }
 
@@ -334,8 +326,10 @@ struct SettingsView: View {
                     if let newValue {
                         selectedCategory = newValue
                         // Returning focus to the sidebar leaves any drilled-in
-                        // playlist, so the pane reverts to the playlist list.
+                        // detail (a playlist, or an engine's options), so the
+                        // pane reverts to its top-level list.
                         selectedPlaylist = nil
+                        selectedEngineOptions = nil
                     }
                 }
                 .fullScreenCover(isPresented: $showingAddPlaylist) {
@@ -405,7 +399,12 @@ struct SettingsView: View {
                             tvPlaylistsDetail
                         }
                     case .integrations: tvIntegrationsDetail
-                    case .player: tvPlayerDetail
+                    case .player:
+                        if let selectedEngineOptions {
+                            tvEngineOptionsDetail(for: selectedEngineOptions)
+                        } else {
+                            tvPlayerDetail
+                        }
                     case .about: tvAboutDetail
                     case .content: EmptyView() // handled by tvDetailContainer
                     }
@@ -520,20 +519,34 @@ struct SettingsView: View {
                         .padding(.top, 6)
                 }
 
-                // Options for the primary engine only — each engine keeps a
-                // dedicated area.
-                switch primaryEngine {
-                case .vlcKit:
-                    VLCEngineSettingsTVDetail()
-                case .ksPlayer:
-                    KSEngineSettingsTVDetail()
-                case .avPlayer:
-                    Text("AVPlayer has no configurable options.")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                // Each engine's options live behind a dedicated row, so they're
+                // all reachable regardless of the priority order. AVPlayer has no
+                // configurable options, so it isn't listed.
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Engine Options")
+                    VStack(spacing: 2) {
+                        tvEngineOptionsRow(.vlcKit)
+                        tvEngineOptionsRow(.ksPlayer)
+                    }
                 }
             }
+        }
+
+        /// A drill-in row that replaces the player detail with the given engine's
+        /// options in place. Returning focus to the sidebar (Menu) restores it.
+        private func tvEngineOptionsRow(_ engine: PlayerEngineKind) -> some View {
+            Button {
+                selectedEngineOptions = engine
+            } label: {
+                HStack(spacing: 16) {
+                    Text("\(engine.displayName) Options")
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(TVSettingsRowButtonStyle())
         }
 
         /// One row of the tvOS engine-priority list: the engine name, a "Primary"
@@ -575,14 +588,6 @@ struct SettingsView: View {
                 RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
                     .fill(Color.white.opacity(0.05))
             )
-        }
-
-        /// Advances Off → Infuse → VLC → Off; the cycle-row pattern used for
-        /// every multi-choice option on tvOS.
-        private func nextExternalPlayerRaw(after raw: String) -> String {
-            let cycle = [""] + ExternalPlayer.allCases.map(\.rawValue)
-            guard let index = cycle.firstIndex(of: raw) else { return "" }
-            return cycle[(index + 1) % cycle.count]
         }
     }
 

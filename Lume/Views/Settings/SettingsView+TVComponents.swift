@@ -33,6 +33,36 @@ import SwiftUI
     }
 
     extension SettingsView {
+        /// The drilled-in options pane for a single engine.
+        func tvEngineOptionsDetail(for engine: PlayerEngineKind) -> some View {
+            VStack(alignment: .leading, spacing: 28) {
+                Text("\(engine.displayName) Options")
+                    .font(.system(size: 34, weight: .bold))
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                switch engine {
+                case .vlcKit:
+                    VLCEngineSettingsTVDetail()
+                case .ksPlayer:
+                    KSEngineSettingsTVDetail()
+                case .avPlayer:
+                    Text("AVPlayer has no configurable options.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+
+        /// Advances Off → Infuse → VLC → Off; the cycle-row pattern used for
+        /// every multi-choice option on tvOS.
+        func nextExternalPlayerRaw(after raw: String) -> String {
+            let cycle = [""] + ExternalPlayer.allCases.map(\.rawValue)
+            guard let index = cycle.firstIndex(of: raw) else { return "" }
+            return cycle[(index + 1) % cycle.count]
+        }
+
         var tvAboutDetail: some View {
             VStack(alignment: .leading, spacing: 8) {
                 TVSettingsSectionLabel("About")
