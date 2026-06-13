@@ -3,8 +3,8 @@
 //  Lume
 //
 //  The per-engine option surfaces shown in Settings. Each engine gets its own
-//  dedicated area; the host (SettingsView) shows only the area for the currently
-//  selected engine. Two presentations share this file: grouped `Form` sections
+//  dedicated screen, reachable from the Player section regardless of the engine
+//  priority order. Two presentations share this file: grouped `Form` sections
 //  for iOS/macOS, and the flat Apple-TV-style detail blocks for tvOS.
 //
 //  Every control is backed directly by `@AppStorage`, so changes persist
@@ -64,11 +64,21 @@ import SwiftUI
                 Picker("Clock Synchronisation", selection: $clockSynchro) {
                     ForEach(VLCClockSynchro.allCases) { Text($0.label).tag($0.rawValue) }
                 }
-            } header: {
-                Text("VLCKit Options")
             } footer: {
                 Text("Applied the next time playback starts.")
             }
+        }
+    }
+
+    /// Dedicated screen wrapping the VLCKit options, pushed from the Player
+    /// settings section so every engine's options are reachable regardless of
+    /// the priority order.
+    struct VLCEngineSettingsScreen: View {
+        var body: some View {
+            Form {
+                VLCEngineSettingsForm()
+            }
+            .platformNavigationTitle("VLCKit Options")
         }
     }
 
@@ -119,12 +129,22 @@ import SwiftUI
                 Picker("Maximum Buffer", selection: $maxBuffer) {
                     ForEach(KSMaxBufferPreset.values, id: \.self) { Text(KSMaxBufferPreset.label($0)).tag($0) }
                 }
-            } header: {
-                Text("KSPlayer Options")
             } footer: {
                 Text("FFmpeg honours every option below for all streams. ")
                     + Text("AVPlayer is more efficient but ignores most of them — including buffering — for formats it plays natively, such as HLS. Applied the next time playback starts.")
             }
+        }
+    }
+
+    /// Dedicated screen wrapping the KSPlayer options, pushed from the Player
+    /// settings section so every engine's options are reachable regardless of
+    /// the priority order.
+    struct KSEngineSettingsScreen: View {
+        var body: some View {
+            Form {
+                KSEngineSettingsForm()
+            }
+            .platformNavigationTitle("KSPlayer Options")
         }
     }
 

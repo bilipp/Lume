@@ -1,4 +1,5 @@
 import AVFoundation
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -18,7 +19,17 @@ struct FullScreenPlayerView: View {
     #if os(macOS)
         @Environment(\.dismissWindow) private var dismissWindow
     #endif
-    @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
+
+    /// The user's ordered engine fallback list, read once when the player opens.
+    /// Settings changes don't reshuffle a session already in flight; reopening
+    /// the player picks up the new order. See `PlayerEnginePriority`.
+    private let enginePriority: [PlayerEngineKind]
+
+    /// Index into `enginePriority` of the engine currently driving playback.
+    /// Advanced when an engine fails to start a stream, falling the player back
+    /// to the next engine in the list. Reset to the primary engine whenever the
+    /// active stream changes.
+    @State private var engineAttempt = 0
 
     /// The only high-frequency playback state. An `@Observable` the host owns
     /// but never reads in its own body, so playback ticks invalidate just the
@@ -53,10 +64,35 @@ struct FullScreenPlayerView: View {
     init(media: PlayableMedia) {
         self.media = media
         _activeMedia = State(initialValue: media)
+        let defaults = UserDefaults.standard
+        enginePriority = PlayerEnginePriority.resolve(
+            priorityRaw: defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? "",
+            legacyEngineRaw: defaults.string(forKey: PlayerSettings.engineKey)
+                ?? PlayerEngineKind.defaultValue.rawValue
+        )
     }
 
+    /// The engine driving the current playback attempt.
     private var engine: PlayerEngineKind {
-        PlayerEngineKind(rawValue: engineRaw) ?? .defaultValue
+        guard enginePriority.indices.contains(engineAttempt) else { return .defaultValue }
+        return enginePriority[engineAttempt]
+    }
+
+    /// Whether another engine remains to fall back to after the current one.
+    private var hasFallbackEngine: Bool {
+        engineAttempt + 1 < enginePriority.count
+    }
+
+    /// Called by an engine when it can't start the stream. Advances to the next
+    /// engine in the priority list if one is available; the engine view rebuilds
+    /// against the new engine. When the list is exhausted this is never called
+    /// (the last engine shows its own error overlay instead), so there's nothing
+    /// to do here in that case.
+    private func fallBackToNextEngine() {
+        guard hasFallbackEngine else { return }
+        let failed = engine
+        engineAttempt += 1
+        Logger.player.log("engine \(failed.rawValue, privacy: .public) could not start the stream; falling back to \(engine.rawValue, privacy: .public)")
     }
 
     var body: some View {
@@ -142,6 +178,8 @@ struct FullScreenPlayerView: View {
 
     @ViewBuilder
     private var playerView: some View {
+        // Keyed on the engine attempt so falling back tears the failed engine
+        // down and builds the next one fresh, rather than reusing in-flight state.
         switch engine {
         case .avPlayer:
             AVPlayerEngineView(
@@ -149,24 +187,33 @@ struct FullScreenPlayerView: View {
                 clock: clock,
                 nextUpMedia: nextUpMedia,
                 skipSegments: skipSegments,
+                fallbackAvailable: hasFallbackEngine,
+                onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia
             )
+            .id(engineAttempt)
         case .ksPlayer:
             KSPlayerEngineView(
                 media: activeMedia,
                 clock: clock,
                 nextUpMedia: nextUpMedia,
                 skipSegments: skipSegments,
+                fallbackAvailable: hasFallbackEngine,
+                onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia
             )
+            .id(engineAttempt)
         case .vlcKit:
             VLCPlayerEngineView(
                 media: activeMedia,
                 clock: clock,
                 nextUpMedia: nextUpMedia,
                 skipSegments: skipSegments,
+                fallbackAvailable: hasFallbackEngine,
+                onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia
             )
+            .id(engineAttempt)
         }
     }
 
@@ -178,6 +225,8 @@ struct FullScreenPlayerView: View {
         // happens synchronously inside `persistProgressDetached`.
         persistProgressDetached(force: true)
         clock.reset()
+        // Restart the fallback chain from the primary engine for the new stream.
+        engineAttempt = 0
         activeMedia = newMedia
         // Slide the outgoing channel into the recall slot so `right` can jump back.
         LiveChannelHistory.record(newMedia)
