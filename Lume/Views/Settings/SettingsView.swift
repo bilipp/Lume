@@ -8,7 +8,11 @@ struct SettingsView: View {
     @Query var playlists: [Playlist]
     @State private var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
+    /// Legacy single-engine key, kept in sync with the primary engine so a
+    /// downgrade still finds the user's preferred engine, and read as the
+    /// migration seed for the priority list. See `PlayerEnginePriority`.
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
+    @AppStorage(PlayerSettings.enginePriorityKey) private var enginePriorityRaw: String = ""
     @AppStorage(PlayerSettings.externalPlayerKey) private var externalPlayerRaw: String = ""
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
@@ -34,14 +38,37 @@ struct SettingsView: View {
         /// pushing a full-screen view — a push hides the header tab bar and
         /// strands remote focus once the content scrolls.
         @State private var selectedPlaylist: Playlist?
+        /// The engine whose options are drilled into within the Player category,
+        /// replacing the player detail in place (same reasoning as `selectedPlaylist`).
+        @State private var selectedEngineOptions: PlayerEngineKind?
     #endif
 
-    private var engine: Binding<PlayerEngineKind> {
-        Binding(
-            get: { PlayerEngineKind(rawValue: engineRaw) ?? .defaultValue },
-            set: { engineRaw = $0.rawValue }
-        )
+    /// The user's ordered engine fallback list (migrates the legacy single-engine
+    /// key on first read). The first entry is the primary engine.
+    private var enginePriority: [PlayerEngineKind] {
+        PlayerEnginePriority.resolve(priorityRaw: enginePriorityRaw, legacyEngineRaw: engineRaw)
     }
+
+    #if os(tvOS)
+        /// The primary (most-preferred) engine — its description is shown under
+        /// the priority list.
+        private var primaryEngine: PlayerEngineKind {
+            enginePriority.first ?? .defaultValue
+        }
+
+        /// Move the engine at `index` one slot up or down the priority list,
+        /// persisting the new order and keeping the legacy single-engine key in
+        /// sync with the primary so other readers (and a downgrade) still resolve it.
+        private func moveEngine(at index: Int, by offset: Int) {
+            var list = enginePriority
+            let target = index + offset
+            guard list.indices.contains(index), list.indices.contains(target) else { return }
+            list.swapAt(index, target)
+            let normalized = PlayerEnginePriority.normalized(list)
+            enginePriorityRaw = PlayerEnginePriority.encode(normalized)
+            engineRaw = normalized.first?.rawValue ?? PlayerEngineKind.defaultValue.rawValue
+        }
+    #endif
 
     var body: some View {
         #if os(tvOS)
@@ -67,7 +94,6 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
-                    playerEngineSection
                     aboutSection
                 }
                 #if os(macOS)
@@ -218,16 +244,22 @@ struct SettingsView: View {
 
         private var playerSection: some View {
             Section {
-                Picker("Engine", selection: engine) {
-                    ForEach(PlayerEngineKind.allCases) { kind in
-                        Text(kind.displayName).tag(kind)
+                NavigationLink {
+                    PlayerEnginePriorityView()
+                } label: {
+                    HStack {
+                        Text("Player Engines")
+                        Spacer()
+                        Text(enginePriority.map(\.displayName).joined(separator: " › "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
-                .pickerStyle(.menu)
 
-                Text(engine.wrappedValue.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                NavigationLink("VLCKit Options") { VLCEngineSettingsScreen() }
+                NavigationLink("KSPlayer Options") { KSEngineSettingsScreen() }
 
                 Picker("External Player", selection: $externalPlayerRaw) {
                     Text("Off").tag("")
@@ -239,21 +271,7 @@ struct SettingsView: View {
             } header: {
                 Text("Player")
             } footer: {
-                Text("Streams open in the selected app instead of Lume's player. Downloads always play in Lume, and the built-in player is used when the app is not installed.")
-            }
-        }
-
-        /// Options for the currently selected engine only — each engine keeps a
-        /// dedicated area, and switching the picker above swaps which one shows.
-        @ViewBuilder
-        private var playerEngineSection: some View {
-            switch engine.wrappedValue {
-            case .vlcKit:
-                VLCEngineSettingsForm()
-            case .ksPlayer:
-                KSEngineSettingsForm()
-            case .avPlayer:
-                EmptyView()
+                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played. Streams open in the selected external app instead, when one is installed.")
             }
         }
 
@@ -308,8 +326,10 @@ struct SettingsView: View {
                     if let newValue {
                         selectedCategory = newValue
                         // Returning focus to the sidebar leaves any drilled-in
-                        // playlist, so the pane reverts to the playlist list.
+                        // detail (a playlist, or an engine's options), so the
+                        // pane reverts to its top-level list.
                         selectedPlaylist = nil
+                        selectedEngineOptions = nil
                     }
                 }
                 .fullScreenCover(isPresented: $showingAddPlaylist) {
@@ -379,7 +399,12 @@ struct SettingsView: View {
                             tvPlaylistsDetail
                         }
                     case .integrations: tvIntegrationsDetail
-                    case .player: tvPlayerDetail
+                    case .player:
+                        if let selectedEngineOptions {
+                            tvEngineOptionsDetail(for: selectedEngineOptions)
+                        } else {
+                            tvPlayerDetail
+                        }
                     case .about: tvAboutDetail
                     case .content: EmptyView() // handled by tvDetailContainer
                     }
@@ -461,27 +486,15 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Engine")
+                    TVSettingsSectionLabel("Engine Priority")
 
                     VStack(spacing: 2) {
-                        ForEach(PlayerEngineKind.allCases) { kind in
-                            Button {
-                                engine.wrappedValue = kind
-                            } label: {
-                                HStack(spacing: 16) {
-                                    Text(kind.displayName)
-                                    Spacer(minLength: 0)
-                                    if engine.wrappedValue == kind {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 24, weight: .semibold))
-                                    }
-                                }
-                            }
-                            .buttonStyle(TVSettingsRowButtonStyle())
+                        ForEach(Array(enginePriority.enumerated()), id: \.element) { index, kind in
+                            tvEnginePriorityRow(kind: kind, index: index)
                         }
                     }
 
-                    Text(engine.wrappedValue.subtitle)
+                    Text(primaryEngine.subtitle)
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -506,96 +519,76 @@ struct SettingsView: View {
                         .padding(.top, 6)
                 }
 
-                // Options for the selected engine only — each engine keeps a
-                // dedicated area.
-                switch engine.wrappedValue {
-                case .vlcKit:
-                    VLCEngineSettingsTVDetail()
-                case .ksPlayer:
-                    KSEngineSettingsTVDetail()
-                case .avPlayer:
-                    Text("AVPlayer has no configurable options.")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                }
-            }
-        }
-
-        /// Advances Off → Infuse → VLC → Off; the cycle-row pattern used for
-        /// every multi-choice option on tvOS.
-        private func nextExternalPlayerRaw(after raw: String) -> String {
-            let cycle = [""] + ExternalPlayer.allCases.map(\.rawValue)
-            guard let index = cycle.firstIndex(of: raw) else { return "" }
-            return cycle[(index + 1) % cycle.count]
-        }
-
-        private var tvAboutDetail: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel("About")
-
-                HStack(spacing: 18) {
-                    Image(systemName: "play.tv.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.tint)
-                        .frame(width: 60, height: 60)
-                        .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Lume")
-                            .font(.system(size: 26, weight: .semibold))
-                        Text("Version 1.0.0")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.secondary)
+                // Each engine's options live behind a dedicated row, so they're
+                // all reachable regardless of the priority order. AVPlayer has no
+                // configurable options, so it isn't listed.
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Engine Options")
+                    VStack(spacing: 2) {
+                        tvEngineOptionsRow(.vlcKit)
+                        tvEngineOptionsRow(.ksPlayer)
                     }
-
-                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                .padding(.vertical, 8)
             }
+        }
+
+        /// A drill-in row that replaces the player detail with the given engine's
+        /// options in place. Returning focus to the sidebar (Menu) restores it.
+        private func tvEngineOptionsRow(_ engine: PlayerEngineKind) -> some View {
+            Button {
+                selectedEngineOptions = engine
+            } label: {
+                HStack(spacing: 16) {
+                    Text("\(engine.displayName) Options")
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(TVSettingsRowButtonStyle())
+        }
+
+        /// One row of the tvOS engine-priority list: the engine name, a "Primary"
+        /// tag on the top entry, and up / down controls that reorder the list.
+        private func tvEnginePriorityRow(kind: PlayerEngineKind, index: Int) -> some View {
+            HStack(spacing: 16) {
+                Text(kind.displayName)
+                    .font(.system(size: TVSettingsMetrics.rowFontSize))
+
+                if index == 0 {
+                    Text("Primary")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    moveEngine(at: index, by: -1)
+                } label: {
+                    Image(systemName: "chevron.up")
+                }
+                .buttonStyle(TVContentIconButtonStyle())
+                .disabled(index == 0)
+                .accessibilityLabel("Move \(kind.displayName) up")
+
+                Button {
+                    moveEngine(at: index, by: 1)
+                } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .buttonStyle(TVContentIconButtonStyle())
+                .disabled(index == enginePriority.count - 1)
+                .accessibilityLabel("Move \(kind.displayName) down")
+            }
+            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            .padding(.vertical, TVSettingsMetrics.rowVPadding)
+            .background(
+                RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+            )
         }
     }
 
 #endif
-
-// MARK: - tvOS settings categories
-
-#if os(tvOS)
-
-    /// The top-level settings categories shown in the tvOS sidebar.
-    private enum SettingsCategory: String, CaseIterable, Identifiable {
-        case playlists, content, integrations, player, about
-
-        var id: String {
-            rawValue
-        }
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .playlists: "Playlists"
-            case .content: "Content"
-            case .integrations: "Integrations"
-            case .player: "Player"
-            case .about: "About"
-            }
-        }
-    }
-
-#endif
-
-#Preview("Empty") {
-    SettingsView()
-}
-
-#Preview("With Playlists") {
-    SettingsView()
-        .modelContainer(for: Playlist.self, inMemory: true) { result in
-            if case let .success(container) = result {
-                let playlist = Playlist(name: "My IPTV", serverURL: "http://example.com:8080", username: "user", password: "pass")
-                let backup = Playlist(name: "Backup", serverURL: "http://backup.com:8080", username: "user2", password: "pass2")
-                container.mainContext.insert(playlist)
-                container.mainContext.insert(backup)
-            }
-        }
-}

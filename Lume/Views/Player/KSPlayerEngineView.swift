@@ -28,6 +28,14 @@ struct KSPlayerEngineView: View {
     /// Intro / recap windows for the active episode (from IntroDB), driving the
     /// in-player Skip Intro button. `nil` when there is nothing to skip.
     var skipSegments: IntroSegments?
+    /// Whether the host has another engine to fall back to if this one can't
+    /// start the stream. When true, an initial-load failure reports to the host
+    /// (which switches engines) instead of raising the error overlay, and the
+    /// startup watchdog uses the shorter fallback timeout so the switch is prompt.
+    var fallbackAvailable = false
+    /// Invoked when this engine can't start the stream and a fallback engine is
+    /// available — see `failPlayback`. The host advances to the next engine.
+    var onPlaybackFailed: (() -> Void)?
     /// Invoked when the viewer picks a different stream (another episode, or a
     /// live channel via the Siri remote) from the in-player overlay. The host
     /// swaps `media` in response. tvOS only.
@@ -125,6 +133,10 @@ struct KSPlayerEngineView: View {
     /// (~31s of bounded backoff) usually trips first on a stream that *errors*;
     /// this catches the one that simply never responds.
     let startupTimeout: TimeInterval = 40
+    /// Shorter startup timeout used when a fallback engine is available: there's
+    /// no point waiting the full `startupTimeout` on a black screen when another
+    /// engine can be tried, so hand off after this if no frame has appeared.
+    let fallbackStartupTimeout: TimeInterval = 15
     /// How long a live stream may sit in `.buffering` mid-playback before the
     /// stall watchdog rebuilds it. A healthy rebuffer only has to reach the
     /// live-buffer target (a few seconds), so 30s of no recovery means the
@@ -568,32 +580,4 @@ struct KSPlayerEngineView: View {
             dismiss()
         #endif
     }
-}
-
-#if os(tvOS)
-    /// Draws only its (clear) label — no focus highlight, scale or background —
-    /// so the full-screen tap-catcher stays invisible even while it holds focus
-    /// with the controls hidden.
-    private struct KSInvisibleButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            configuration.label
-        }
-    }
-#endif
-
-#Preview("Fallback") {
-    KSPlayerEngineView(
-        media: PlayableMedia(
-            id: "preview",
-            url: URL(string: "https://example.com/stream.m3u8")!,
-            title: "Sample Video",
-            subtitle: nil,
-            posterURL: nil,
-            kind: .vod,
-            startTime: 0,
-            contentRef: .movie("preview")
-        ),
-        clock: PlaybackClock()
-    )
-    .preferredColorScheme(.dark)
 }
