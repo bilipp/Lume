@@ -248,7 +248,7 @@ extension KSPlayerEngineView {
     /// rebuilds the stream in place.
     ///
     /// Unlike `reconnect()` — which leans on `play()` re-preparing from `.error`
-    /// — this drives `prepareToPlay()` directly, so it also reloads a stream that
+    /// — this drives a full rebuild directly, so it also reloads a stream that
     /// merely *hung* in `.buffering`/`.preparing` (the startup-watchdog case),
     /// where `play()` would be a no-op because the layer never reached `.error`.
     func retryPlayback() {
@@ -270,6 +270,23 @@ extension KSPlayerEngineView {
             layer.options.startPlayTime = clock.current
         }
         Logger.player.log("retry: rebuilding KSPlayer stream from failure overlay")
+        rebuildStream(on: layer)
+    }
+
+    /// Tear down the current KSPlayer session and rebuild it from a fresh input.
+    ///
+    /// Never re-prepare in place (`layer.prepareToPlay()` on a running session):
+    /// `MEPlayerItem.prepareToPlay()` only queues a new open — it does NOT shut
+    /// down the old session — and the open's first act is `avformat_close_input`,
+    /// freeing the AVStreams the old session's still-running decode threads and
+    /// render loops point into. On an actively playing stream (the clock-drift /
+    /// stall watchdog cases) that's a use-after-free that crashes the app moments
+    /// after the rebuild "succeeds". `replace(url:options:)` is KSPlayer's own
+    /// rebuild path (the layer's `url` didSet): an ordered shutdown of the old
+    /// item — tracks first, format context last, serialized on the item's queue —
+    /// then a fresh `MEPlayerItem`.
+    private func rebuildStream(on layer: KSPlayerLayer) {
+        layer.player.replace(url: layer.url, options: layer.options)
         layer.prepareToPlay()
         // Ensure autoplay once the rebuilt input is ready (prepareToPlay only
         // arms preparation; play() sets isAutoPlay and resumes on ready).
@@ -282,9 +299,9 @@ extension KSPlayerEngineView {
     ///
     /// For live streams `play()` on a `.playedToTheEnd` layer calls
     /// `player.seek(time: 0)` — seeking to the DVR start, not the live edge.
-    /// Always calling `prepareToPlay()` first on a live stream rebuilds the HLS
-    /// session from scratch so we correctly rejoin the live edge in both the
-    /// `.error` and `.playedToTheEnd` cases.
+    /// Always rebuilding a live stream from a fresh input (see `rebuildStream`)
+    /// re-creates the HLS session from scratch so we correctly rejoin the live
+    /// edge in both the `.error` and `.playedToTheEnd` cases.
     func reconnect() {
         guard let layer = coordinator.playerLayer else { return }
         // Reset session gates so stale callbacks from the previous session don't
@@ -296,8 +313,9 @@ extension KSPlayerEngineView {
         }
         Logger.player.log("reconnect: reloading KSPlayer stream")
         if media.isLive {
-            layer.prepareToPlay()
+            rebuildStream(on: layer)
+        } else {
+            layer.play()
         }
-        layer.play()
     }
 }
