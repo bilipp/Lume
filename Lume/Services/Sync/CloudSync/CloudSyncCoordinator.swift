@@ -1,6 +1,7 @@
 import CloudKit
 import CoreData
 import Foundation
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -136,7 +137,7 @@ final class CloudSyncCoordinator {
             else { return }
             // Runs on the main queue; hop to the isolated actor to mutate state.
             let inProgress = event.endDate == nil
-            let errorText = event.error?.localizedDescription
+            let errorText = Self.describe(event.error, eventType: event.type)
             MainActor.assumeIsolated {
                 self?.applyCloudKitEvent(inProgress: inProgress, error: errorText)
             }
@@ -150,6 +151,56 @@ final class CloudSyncCoordinator {
             status.lastError = error
         } else if !inProgress {
             status.lastError = nil
+        }
+    }
+
+    /// Turn a CloudKit sync-event error into a readable message, logging the full
+    /// detail to `Logger.sync`.
+    ///
+    /// A CloudKit `partialFailure` — the opaque "CKErrorDomain error 2" that
+    /// reaches the user — hides the real cause inside `partialErrorsByItemID`;
+    /// `localizedDescription` on its own just repeats "error 2". Unwrapping the
+    /// per-record errors lets the log (and the settings screen) name what
+    /// actually failed — most often a record type that isn't in the deployed
+    /// CloudKit schema yet (e.g. a build pointed at an environment whose schema
+    /// was never deployed: every record is rejected and the batch reports
+    /// `partialFailure`).
+    private nonisolated static func describe(
+        _ error: Error?,
+        eventType: NSPersistentCloudKitContainer.EventType
+    ) -> String? {
+        guard let error else { return nil }
+        let phase = eventName(eventType)
+
+        // Usually the CKError directly; occasionally a Cocoa error wrapping it.
+        let ckError = (error as? CKError)
+            ?? ((error as NSError).userInfo[NSUnderlyingErrorKey] as? Error)
+            .flatMap { $0 as? CKError }
+
+        if let ckError, ckError.code == .partialFailure,
+           let perItem = ckError.partialErrorsByItemID, !perItem.isEmpty
+        {
+            for (itemID, itemError) in perItem {
+                Logger.sync.error(
+                    "CloudKit \(phase, privacy: .public) rejected \(String(describing: itemID), privacy: .public): \(String(reflecting: itemError), privacy: .public)"
+                )
+            }
+            // Records usually all fail identically; collapse to the distinct
+            // underlying messages so the UI shows the cause, not "error 2".
+            let messages = Set(perItem.values.map { ($0 as NSError).localizedDescription })
+            return messages.sorted().joined(separator: "; ")
+        }
+
+        Logger.sync.error("CloudKit \(phase, privacy: .public) failed: \(String(reflecting: error), privacy: .public)")
+        return error.localizedDescription
+    }
+
+    private nonisolated static func eventName(_ type: NSPersistentCloudKitContainer.EventType) -> String {
+        switch type {
+        case .setup: "setup"
+        case .import: "import"
+        case .export: "export"
+        @unknown default: "unknown"
         }
     }
 

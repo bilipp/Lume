@@ -60,7 +60,18 @@ struct LumeApp: App {
         ])
 
         // Unnamed → keeps the historical `default.store` path (preserves data).
-        let localConfiguration = ModelConfiguration(schema: localSchema, isStoredInMemoryOnly: false)
+        // `cloudKitDatabase: .none` is REQUIRED: the default is `.automatic`, which
+        // mirrors the store to CloudKit whenever the binary is CloudKit-entitled. On
+        // a properly-signed build that would force the catalog (with `@Attribute(.unique)`,
+        // non-optional attributes and required relationships) into CloudKit and crash
+        // at load (NSCocoaErrorDomain 134060). Tests/previews are un-entitled so
+        // `.automatic` silently resolves to no-sync there — which is why this only
+        // bites real builds. The catalog must stay strictly local.
+        let localConfiguration = ModelConfiguration(
+            schema: localSchema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
+        )
         let cloudConfiguration = ModelConfiguration(
             "CloudUserData",
             schema: cloudSchema,
