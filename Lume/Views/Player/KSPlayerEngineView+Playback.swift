@@ -112,10 +112,7 @@ extension KSPlayerEngineView {
                 reconnector.reset()
             }
         case .error:
-            reconnector.scheduleRetry { reconnect() }
-            // Budget just exhausted on this drop: the stream is dead, so stop
-            // spinning and offer Try Again / Back instead of freezing.
-            if reconnector.hasGivenUp { failPlayback() }
+            handleErrorState()
         case .playedToTheEnd:
             // A live stream that reaches .playedToTheEnd has had its HLS
             // playlist return 404 (server restart, token expiry, segmenter gap)
@@ -129,6 +126,20 @@ extension KSPlayerEngineView {
         default:
             break
         }
+    }
+
+    /// Handle a `.error` state. A hard error before the first frame means this
+    /// engine can't open the stream: when the host has another engine to try,
+    /// fail fast so it switches promptly rather than burning the ~31s reconnect
+    /// budget on an engine that already gave a definitive "no". Otherwise drive
+    /// the bounded reconnect, surfacing the failure overlay once it's exhausted.
+    private func handleErrorState() {
+        if !hasStartedPlayback, fallbackAvailable {
+            failPlayback()
+            return
+        }
+        reconnector.scheduleRetry { reconnect() }
+        if reconnector.hasGivenUp { failPlayback() }
     }
 
     // MARK: - Mid-stream stall watchdog
@@ -218,10 +229,15 @@ extension KSPlayerEngineView {
     /// first frame (`markPlaybackStarted`) disarms it.
     func startStartupWatchdog() {
         startupWatchdog?.cancel()
+        // With a fallback engine available, wait only the shorter fallback
+        // timeout before declaring the stream dead, so a silently-hanging engine
+        // hands off to the next one promptly instead of stalling on a black
+        // screen for the full startup timeout.
+        let timeout = fallbackAvailable ? fallbackStartupTimeout : startupTimeout
         startupWatchdog = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(startupTimeout * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             guard !Task.isCancelled, !hasStartedPlayback else { return }
-            Logger.player.error("startup watchdog: no first frame within \(startupTimeout, format: .fixed(precision: 0), privacy: .public)s, declaring stream dead")
+            Logger.player.error("startup watchdog: no first frame within \(timeout, format: .fixed(precision: 0), privacy: .public)s, declaring stream dead")
             failPlayback()
         }
     }
@@ -232,11 +248,20 @@ extension KSPlayerEngineView {
     }
 
     /// Give up on a stream that never started (or dropped for good). Tears down
-    /// the spinner and pending reconnects and raises the failure overlay.
+    /// the spinner and pending reconnects.
+    ///
+    /// On an initial-load failure with a fallback engine available, hands off to
+    /// the host (which switches engines) rather than raising the error overlay —
+    /// this view is about to be torn down. Otherwise (mid-stream give-up, or the
+    /// last engine in the priority list) it raises the failure overlay as before.
     func failPlayback() {
         guard !loadFailed else { return }
         cancelStartupWatchdog()
         reconnector.cancel()
+        if !hasStartedPlayback, fallbackAvailable {
+            onPlaybackFailed?()
+            return
+        }
         withAnimation(.easeInOut(duration: 0.25)) {
             isBuffering = false
             loadFailed = true

@@ -2,11 +2,12 @@
 //  HomeView.swift
 //  Lume
 //
-//  Default landing screen. Surfaces four rows:
+//  Default landing screen. Surfaces these rows, in order:
 //    1. Recently Watched — movies, series and live TV ordered by lastWatchedDate.
-//    2. Trending Movies — TMDB-trending movies the user actually owns.
-//    3. Trending Series — TMDB-trending series the user actually owns.
-//    4. Favorites — everything the user has marked as a favorite.
+//    2. Favorites — everything the user has marked as a favorite.
+//    3. Trending Movies — TMDB-trending movies the user actually owns.
+//    4. Trending Series — TMDB-trending series the user actually owns.
+//    5. From Your Trakt Watchlist — owned titles on the connected Trakt watchlist.
 //
 //  Each row only renders when it has content, so a fresh library degrades
 //  gracefully to a friendly empty state.
@@ -199,6 +200,9 @@ struct HomeView: View {
         if !recentlyWatched.isEmpty {
             HomeRow(title: "Recently Watched", items: recentlyWatched, onPlayLive: playChannel, onRemove: removeFromRecentlyWatched, animationNamespace: animationNamespace)
         }
+        if !favorites.isEmpty {
+            HomeRow(title: "Favorites", items: favorites, onPlayLive: playChannel, animationNamespace: animationNamespace)
+        }
         if !trendingMovies.isEmpty {
             HomeRow(title: "Trending Movies", items: trendingMovies, onPlayLive: playChannel, animationNamespace: animationNamespace)
         }
@@ -207,9 +211,6 @@ struct HomeView: View {
         }
         if !watchlist.isEmpty {
             HomeRow(title: "From Your Trakt Watchlist", items: watchlist, onPlayLive: playChannel, animationNamespace: animationNamespace)
-        }
-        if !favorites.isEmpty {
-            HomeRow(title: "Favorites", items: favorites, onPlayLive: playChannel, animationNamespace: animationNamespace)
         }
     }
 
