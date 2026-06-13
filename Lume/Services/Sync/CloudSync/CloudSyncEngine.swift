@@ -19,7 +19,9 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
 /// so a reconcile pass touches the store once per type. `nonisolated` so the
 /// engine actor can hold and read it off the main actor (the project defaults to
 /// main-actor isolation, which would otherwise isolate this struct's members).
-private nonisolated struct LocalContentEntry {
+/// Not `private`: the profile operations in `CloudSyncEngine+Profiles.swift`
+/// read its `kind` / `values`.
+nonisolated struct LocalContentEntry {
     let values: ContentStateValues
     let kind: SyncedContentKind
     let model: any PersistentModel
@@ -38,6 +40,12 @@ actor CloudSyncEngine {
     let context: ModelContext
     let shadow: CloudSyncShadow
 
+    /// The profile whose state the catalog currently projects. Read from
+    /// `ActiveProfileStore` at the start of each reconcile, so content state is
+    /// pushed to / pulled from only this profile's mirror records; other
+    /// profiles' records sync via CloudKit untouched until they become active.
+    private var activeProfileID = UserProfile.defaultProfileID
+
     init(container: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow()) {
         context = ModelContext(container)
         context.autosaveEnabled = false
@@ -49,6 +57,7 @@ actor CloudSyncEngine {
     /// the shadow baseline and saves the context once at the end.
     @discardableResult
     func reconcile() -> CloudSyncReconcileResult {
+        activeProfileID = ActiveProfileStore.current ?? UserProfile.defaultProfileID
         var result = CloudSyncReconcileResult()
         do {
             let livePrefixes = try reconcilePlaylists(into: &result)
@@ -264,7 +273,9 @@ private extension CloudSyncEngine {
 
 // MARK: - Content mutations
 
-private extension CloudSyncEngine {
+/// Not `private`: profile operations in `CloudSyncEngine+Profiles.swift`
+/// reuse these helpers (fetch / reset / apply / value extraction).
+extension CloudSyncEngine {
     static func kind(of model: (any PersistentModel)?) -> SyncedContentKind? {
         switch model {
         case is Movie: .movie
@@ -282,6 +293,7 @@ private extension CloudSyncEngine {
         }
         let kind = kind ?? mirror?.kind ?? .movie
         if let mirror {
+            mirror.profileID = activeProfileID // heals a legacy nil record on first touch
             mirror.kindRaw = kind.rawValue
             mirror.watchProgress = value.watchProgress
             mirror.isWatched = value.isWatched
@@ -294,6 +306,7 @@ private extension CloudSyncEngine {
             context.insert(UserContentState(
                 contentId: id,
                 kind: kind,
+                profileID: activeProfileID,
                 watchProgress: value.watchProgress,
                 isWatched: value.isWatched,
                 lastWatchedDate: value.lastWatchedDate,
@@ -366,7 +379,9 @@ private extension CloudSyncEngine {
 
 // MARK: - Fetch maps
 
-private extension CloudSyncEngine {
+/// Not `private`: profile operations in `CloudSyncEngine+Profiles.swift`
+/// reuse these helpers (fetch / reset / apply / value extraction).
+extension CloudSyncEngine {
     func fetchLocalPlaylists() throws -> [UUID: Playlist] {
         var map: [UUID: Playlist] = [:]
         for playlist in try context.fetch(FetchDescriptor<Playlist>()) {
@@ -383,9 +398,20 @@ private extension CloudSyncEngine {
         return map
     }
 
+    /// Mirrors for the currently active profile only — inactive profiles' state
+    /// must not project onto the (single, active-profile) catalog.
     func fetchContentMirrors() throws -> [String: UserContentState] {
+        try fetchMirrors(forProfile: activeProfileID)
+    }
+
+    /// Content mirrors belonging to `profileID`, keyed by content id. A legacy
+    /// `nil` profileID is treated as the default profile until bootstrap claims
+    /// it, so a reconcile that races ahead of bootstrap still behaves correctly.
+    func fetchMirrors(forProfile profileID: UUID) throws -> [String: UserContentState] {
         var map: [String: UserContentState] = [:]
-        for mirror in try context.fetch(FetchDescriptor<UserContentState>()) {
+        for mirror in try context.fetch(FetchDescriptor<UserContentState>())
+            where (mirror.profileID ?? UserProfile.defaultProfileID) == profileID
+        {
             map[mirror.contentId] = dedupe(mirror, against: map[mirror.contentId])
         }
         return map
@@ -529,7 +555,9 @@ private extension CloudSyncEngine {
 
 // MARK: - Value extraction
 
-private extension CloudSyncEngine {
+/// Not `private`: profile operations in `CloudSyncEngine+Profiles.swift`
+/// reuse these helpers (fetch / reset / apply / value extraction).
+extension CloudSyncEngine {
     static func values(from playlist: Playlist) -> PlaylistConfigValues {
         PlaylistConfigValues(
             name: playlist.name,
