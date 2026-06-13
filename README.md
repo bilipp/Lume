@@ -118,8 +118,8 @@ Lume ships with three interchangeable engines, ordered into a **priority list** 
 **Settings**. Playback starts with your preferred engine and **automatically falls
 back** to the next one whenever an engine can't play a stream, so a codec or stream
 one engine chokes on is retried with another before any error is shown. The default
-order favours the broadest-compatibility engine available on the platform
-(VLCKit → KSPlayer → AVPlayer).
+order is **KSPlayer → VLCKit → AVPlayer** (degrading to whichever engines are
+available on the platform).
 
 | Engine | Backend | Best for | Notes |
 |---|---|---|---|
