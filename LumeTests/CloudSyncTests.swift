@@ -121,18 +121,24 @@ struct CloudSyncEngineTests {
             Series.self, Episode.self, CastMember.self, EPGListing.self,
             SyncedPlaylist.self, UserContentState.self
         ])
+        // `cloudKitDatabase: .none` is required on both stores: the catalog uses
+        // `@Attribute(.unique)`, which CloudKit forbids, and the default
+        // `.automatic` mirrors to CloudKit on a signed/entitled test host and
+        // fails the load with `loadIssueModelContainer`.
         let localConfig = ModelConfiguration(
             "local",
             schema: Schema([
                 Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
                 Series.self, Episode.self, CastMember.self, EPGListing.self
             ]),
-            isStoredInMemoryOnly: true
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
         )
         let cloudConfig = ModelConfiguration(
             "cloud",
             schema: Schema([SyncedPlaylist.self, UserContentState.self]),
-            isStoredInMemoryOnly: true
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
         )
         return try ModelContainer(for: fullSchema, configurations: localConfig, cloudConfig)
     }
@@ -253,21 +259,11 @@ struct CloudSyncEngineTests {
 @MainActor
 struct CloudSyncInitialGateTests {
     @Test func `gate is open from init when CloudKit is disabled`() throws {
-        // A complete single-config in-memory schema (all catalog models, so the
-        // Movie/Series → CastMember relationships resolve). The coordinator's
-        // engine only opens a ModelContext at init — it never fetches — and the
-        // CloudKit-disabled path returns before touching the cloud store, so the
-        // cloud-mirror models aren't needed here.
-        let schema = Schema([
-            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
-            Series.self, Episode.self, CastMember.self, EPGListing.self
-        ])
-        let container = try ModelContainer(
-            for: schema,
-            configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        )
-        let coordinator = CloudSyncCoordinator(
-            container: container,
+        // The coordinator's engine only opens a ModelContext at init (it never
+        // fetches) and the CloudKit-disabled path returns before touching the
+        // cloud store, so the shared catalog container is enough here.
+        let coordinator = try CloudSyncCoordinator(
+            container: makeTestContainer(),
             cloudKitContainerIdentifier: "iCloud.test",
             cloudKitEnabled: false
         )
