@@ -29,6 +29,21 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     @Published var isPipActive = false
     @Published private(set) var isPipSupported = false
 
+    /// True once the stream has actually started rendering. The host uses this
+    /// to decide whether a failure is an initial-load failure (eligible for
+    /// engine fallback) or a mid-stream drop.
+    @Published private(set) var hasStartedPlayback = false
+
+    /// Invoked when the stream can't be started: a hard `.error` before the
+    /// first frame, or no frame at all within `startupTimeout`. The engine view
+    /// either falls back to the next engine or raises the failure overlay.
+    var onPlaybackFailure: (() -> Void)?
+
+    /// How long to wait for the first frame before declaring the stream dead.
+    /// Set by the host before `configure` — shorter when a fallback engine is
+    /// available so the hand-off is prompt.
+    var startupTimeout: TimeInterval = 40
+
     /// Live technical characteristics of the current video track, surfaced in
     /// the tvOS overlay's right-hand caption. `nil` until the demuxer has
     /// parsed the stream.
@@ -64,8 +79,8 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// PiP window controller, delivered by VLC once PiP is ready to use.
     private var pipController: (any VLCPictureInPictureWindowControlling)?
 
-    private var statsTimer: Timer?
-    private var lastStats: VLCMedia.Stats?
+    var statsTimer: Timer?
+    var lastStats: VLCMedia.Stats?
     private var lastStateName: String?
     private var bufferingStartedAt: Date?
 
@@ -81,6 +96,13 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// the old media's trailing `.stopped` callback isn't mistaken for a fresh
     /// drop.
     private var isReloading = false
+
+    /// Fires `onPlaybackFailure` if the stream produces no first frame within
+    /// `startupTimeout` — covers a stream that hangs in `opening`/`buffering`
+    /// forever without ever emitting `.error`.
+    private var startupWatchdog: Task<Void, Never>?
+    /// Guards `onPlaybackFailure` so a failure is reported at most once per load.
+    private var didReportFailure = false
 
     // MARK: - Setup
 
@@ -111,6 +133,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         options = VLCPlayerOptions.load()
         mediaURL = media.url
         retry.reset()
+        hasStartedPlayback = false
+        didReportFailure = false
+        startStartupWatchdog()
         mediaPlayer.delegate = self
 
         let vlcMedia = VLCMedia(url: media.url)
@@ -169,6 +194,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         mediaURL = media.url
         lastKnownTime = 0
         retry.reset()
+        hasStartedPlayback = false
+        didReportFailure = false
+        startStartupWatchdog()
 
         let vlcMedia = VLCMedia(url: media.url)
         applyMediaOptions(to: vlcMedia, isLive: media.isLive)
@@ -192,14 +220,78 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         switch state {
         case .opening, .buffering, .playing:
             isReloading = false
-            if state == .playing { retry.reset() }
+            if state == .playing {
+                retry.reset()
+                hasStartedPlayback = true
+                cancelStartupWatchdog()
+            }
         case .error:
-            retry.scheduleRetry { [weak self] in self?.reconnect() }
+            // A hard error before the first frame means this engine can't open
+            // the stream — report it straight away so the host can fall back
+            // (or raise the overlay) rather than retrying an engine that already
+            // gave a definitive failure. After playback has started, fall back
+            // on the bounded reconnect and only report once it's exhausted.
+            if !hasStartedPlayback {
+                reportFailure()
+            } else {
+                retry.scheduleRetry { [weak self] in self?.reconnect() }
+                if retry.hasGivenUp { reportFailure() }
+            }
         case .stopped where isLive && !isReloading:
             retry.scheduleRetry { [weak self] in self?.reconnect() }
+            if retry.hasGivenUp { reportFailure() }
         default:
             break
         }
+    }
+
+    // MARK: - Failure handling
+
+    /// Arm the startup watchdog. Cancelled once the first frame renders.
+    private func startStartupWatchdog() {
+        startupWatchdog?.cancel()
+        startupWatchdog = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(startupTimeout * 1_000_000_000))
+            guard !Task.isCancelled, !hasStartedPlayback else { return }
+            Logger.player.error("startup watchdog: no first frame within \(startupTimeout, format: .fixed(precision: 0), privacy: .public)s, declaring stream dead")
+            reportFailure()
+        }
+    }
+
+    private func cancelStartupWatchdog() {
+        startupWatchdog?.cancel()
+        startupWatchdog = nil
+    }
+
+    /// Report a stream that couldn't be started. Fires `onPlaybackFailure` at
+    /// most once per load; the engine view decides whether to fall back or show
+    /// the failure overlay.
+    private func reportFailure() {
+        guard !didReportFailure else { return }
+        didReportFailure = true
+        cancelStartupWatchdog()
+        retry.cancel()
+        Logger.player.error("playback failure reported")
+        onPlaybackFailure?()
+    }
+
+    /// Re-prepare the current stream after a failure (the Try Again button).
+    /// Resets the failure gates and reconnect budget and rebuilds in place.
+    func retryAfterFailure() {
+        guard let mediaURL else { return }
+        hasStartedPlayback = false
+        didReportFailure = false
+        retry.reset()
+        startStartupWatchdog()
+
+        let vlcMedia = VLCMedia(url: mediaURL)
+        applyMediaOptions(to: vlcMedia, isLive: isLive)
+        mediaPlayer.media = vlcMedia
+        mediaPlayer.play()
+        applyDeinterlace()
+        isPlaying = true
+        Logger.player.log("retry: reloading VLC stream from failure overlay")
     }
 
     /// Rebuild the current stream and resume playback in place. VOD resumes at
@@ -277,87 +369,10 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         return false
     }
 
-    // MARK: - Diagnostics
-
-    private static var didInstallLogBridge = false
-
-    private static func installLibVLCLogBridgeIfNeeded() {
-        guard !didInstallLogBridge else { return }
-        didInstallLogBridge = true
-        VLCLibrary.shared().loggers = [VLCLogBridge()]
-    }
-
-    /// Begin periodic stream-health sampling. Idempotent. Debug-only: it's
-    /// purely diagnostic and otherwise runs on the main runloop every 2s
-    /// throughout playback, so it's compiled out of release builds.
-    private func startStatsLogging() {
-        lastStats = nil
-        statsTimer?.invalidate()
-        statsTimer = nil
-        #if DEBUG
-            let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
-                self?.logStreamHealth()
-            }
-            // Common mode so sampling continues during scrolling / tracking
-            // runloop activity in the player UI.
-            RunLoop.main.add(timer, forMode: .common)
-            statsTimer = timer
-        #endif
-    }
-
-    private func stopStatsLogging() {
-        statsTimer?.invalidate()
-        statsTimer = nil
-        lastStats = nil
-    }
-
-    #if DEBUG
-        /// Snapshot `VLCMedia.statistics` and log it as deltas since the previous
-        /// sample, so the rate of dropped/late frames and discontinuities — the
-        /// signals behind live-stream stutter — is directly readable. Cumulative
-        /// counters are differenced; bitrates are instantaneous.
-        private func logStreamHealth() {
-            guard let stats = mediaPlayer.media?.statistics else { return }
-            defer { lastStats = stats }
-
-            let position = (mediaPlayer.time.value?.doubleValue ?? 0) / 1000
-            let state = VLCMediaPlayerStateToString(mediaPlayer.state)
-
-            // Deltas over the sample window (≈2s). First sample has no baseline.
-            let prev = lastStats
-            let dDisplayed = stats.displayedPictures - (prev?.displayedPictures ?? stats.displayedPictures)
-            let dLate = stats.latePictures - (prev?.latePictures ?? stats.latePictures)
-            let dLost = stats.lostPictures - (prev?.lostPictures ?? stats.lostPictures)
-            let dLostAudio = stats.lostAudioBuffers - (prev?.lostAudioBuffers ?? stats.lostAudioBuffers)
-            let dDiscont = stats.demuxDiscontinuity - (prev?.demuxDiscontinuity ?? stats.demuxDiscontinuity)
-            let dCorrupt = stats.demuxCorrupted - (prev?.demuxCorrupted ?? stats.demuxCorrupted)
-
-            let inputKbps = stats.inputBitrate * 8000 // bytes/ms → kbit/s
-            let demuxKbps = stats.demuxBitrate * 8000
-
-            Logger.player.debug(
-                """
-                health t=\(position, format: .fixed(precision: 1), privacy: .public)s state=\(state, privacy: .public) \
-                input=\(inputKbps, format: .fixed(precision: 0), privacy: .public)kbps \
-                demux=\(demuxKbps, format: .fixed(precision: 0), privacy: .public)kbps \
-                displayed+\(dDisplayed, privacy: .public) late+\(dLate, privacy: .public) lost+\(dLost, privacy: .public) \
-                audioLost+\(dLostAudio, privacy: .public) discont+\(dDiscont, privacy: .public) corrupt+\(dCorrupt, privacy: .public)
-                """
-            )
-
-            // Call out the symptoms most associated with stutter at a level that
-            // survives release-log filtering.
-            if dLost > 0 || dLate > 0 || dDiscont > 0 || dLostAudio > 0 {
-                Logger.player.warning(
-                    "stutter signals: lost=\(dLost, privacy: .public) late=\(dLate, privacy: .public) discont=\(dDiscont, privacy: .public) audioLost=\(dLostAudio, privacy: .public) over ~2s"
-                )
-            }
-        }
-    #endif
-
     func tearDown() {
         stopStatsLogging()
         retry.cancel()
+        cancelStartupWatchdog()
         Logger.player.log("tearDown")
         mediaPlayer.delegate = nil
         if mediaPlayer.isPlaying { mediaPlayer.stop() }
@@ -567,32 +582,5 @@ extension VLCPlayerCoordinator: VLCDrawable, VLCPictureInPictureDrawable, VLCPic
 
     func isMediaPlaying() -> Bool {
         mediaPlayer.isPlaying
-    }
-}
-
-// MARK: - libvlc log bridge
-
-/// Forwards libvlc's internal log messages into `Logger.player`, mapping VLC
-/// log levels onto the unified-logging levels so decoder/demux failures show
-/// up under the `Player` category alongside our structured samples.
-private final class VLCLogBridge: NSObject, VLCLogging {
-    var level: VLCLogLevel = .warning
-
-    func handleMessage(_ message: String, logLevel: VLCLogLevel, context: VLCLogContext?) {
-        // Keychain HTTP-auth probe (errSecItemNotFound) — emitted per request,
-        // harmless, and drowns out everything else. Drop it.
-        if message.contains("lookup failed (-25300") { return }
-
-        let module = context?.module ?? "vlc"
-        switch logLevel {
-        case .error:
-            Logger.player.error("libvlc[\(module, privacy: .public)] \(message, privacy: .public)")
-        case .warning:
-            Logger.player.warning("libvlc[\(module, privacy: .public)] \(message, privacy: .public)")
-        case .info:
-            Logger.player.info("libvlc[\(module, privacy: .public)] \(message, privacy: .public)")
-        default:
-            Logger.player.debug("libvlc[\(module, privacy: .public)] \(message, privacy: .public)")
-        }
     }
 }
