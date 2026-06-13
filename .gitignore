@@ -10,3 +10,5 @@ ExampleData/
 build/
 
 .muxy/
+
+.vscode/

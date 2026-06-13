@@ -24,10 +24,10 @@ actor ContentIndexer {
 
     /// Items per chunk; the context is saved and progress published once per
     /// chunk so main-context merges stay infrequent.
-    private let chunkSize = 10
+    private let chunkSize = 50
     /// Pause between items — keeps TMDB traffic to a couple of requests per
     /// second at most.
-    private let itemPause: Duration = .milliseconds(400)
+    private let itemPause: Duration = .milliseconds(100)
     /// Pause before re-checking when a sync or playback blocks indexing.
     private let busyPause: Duration = .seconds(20)
     /// First wait before retrying a failed embedding-asset download; doubles
