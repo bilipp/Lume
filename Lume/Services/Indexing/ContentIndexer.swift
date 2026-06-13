@@ -30,6 +30,12 @@ actor ContentIndexer {
     private let itemPause: Duration = .milliseconds(400)
     /// Pause before re-checking when a sync or playback blocks indexing.
     private let busyPause: Duration = .seconds(20)
+    /// First wait before retrying a failed embedding-asset download; doubles
+    /// each attempt up to `assetRetryMaxPause`. The OTA asset request times out
+    /// on slow connections, so we back off and retry in-pass instead of ending
+    /// the run (which would stall indexing until the next launch or sync).
+    private let assetRetryPause: Duration = .seconds(15)
+    private let assetRetryMaxPause: Duration = .seconds(300)
 
     init(modelContainer: ModelContainer, tmdbClient: TMDBClient = .shared) {
         self.modelContainer = modelContainer
@@ -52,7 +58,7 @@ actor ContentIndexer {
 
         await status.setPreparing()
         let embedder = try TextEmbedder()
-        try await embedder.prepare()
+        try await prepareEmbedder(embedder, status: status)
 
         while !Task.isCancelled {
             if try await hasActiveSync() || (status.isPlaybackActive) {
@@ -73,6 +79,32 @@ actor ContentIndexer {
         counts = try currentCounts()
         await status.finish(indexed: counts.indexed, total: counts.total)
         Logger.indexing.info("Content index complete: \(counts.indexed) of \(counts.total) titles")
+    }
+
+    /// Loads the embedding model, waiting and retrying when its assets fail to
+    /// download. The on-device asset request times out on slow connections;
+    /// rather than abandoning the pass (which leaves indexing stalled until the
+    /// next launch or sync) we back off and try again — the download usually
+    /// succeeds on a later attempt. A model that genuinely has no assets for
+    /// this device throws `EmbedderError`, which ends the run for good.
+    private func prepareEmbedder(_ embedder: TextEmbedder, status: ContentIndexingService) async throws {
+        var pause = assetRetryPause
+        while true {
+            try Task.checkCancellation()
+            do {
+                try await embedder.prepare()
+                return
+            } catch let error as TextEmbedder.EmbedderError {
+                throw error
+            } catch {
+                let seconds = pause.components.seconds
+                Logger.indexing.warning("Embedding asset download failed, retrying in \(seconds)s: \(error)")
+                await status.setWaiting()
+                try await Task.sleep(for: pause)
+                pause = min(pause * 2, assetRetryMaxPause)
+                await status.setPreparing()
+            }
+        }
     }
 
     // MARK: - Chunk processing
