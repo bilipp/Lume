@@ -114,9 +114,12 @@ dedicated focus-driven interface and top-shelf branding on tvOS.
 
 ## Playback engines
 
-Lume ships with three interchangeable engines, selectable in **Settings**. It defaults
-to the broadest-compatibility engine available on the platform (VLCKit → KSPlayer →
-AVPlayer).
+Lume ships with three interchangeable engines, ordered into a **priority list** in
+**Settings**. Playback starts with your preferred engine and **automatically falls
+back** to the next one whenever an engine can't play a stream, so a codec or stream
+one engine chokes on is retried with another before any error is shown. The default
+order favours the broadest-compatibility engine available on the platform
+(VLCKit → KSPlayer → AVPlayer).
 
 | Engine | Backend | Best for | Notes |
 |---|---|---|---|

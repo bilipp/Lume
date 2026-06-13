@@ -46,8 +46,58 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
     }
 }
 
+/// The ordered list of engines the player tries, from most to least preferred.
+/// Playback starts with the first engine and falls back to the next whenever an
+/// engine can't start a stream (see `FullScreenPlayerView`). Persisted as a
+/// comma-separated list of `PlayerEngineKind` raw values under
+/// `PlayerSettings.enginePriorityKey`.
+enum PlayerEnginePriority {
+    /// Decode the stored priority into a complete, de-duplicated engine list.
+    /// Falls back to the legacy single-engine key (then the platform default)
+    /// when no priority list has been stored yet, so an upgrade keeps the user's
+    /// previously chosen engine as the primary.
+    static func resolve(priorityRaw: String, legacyEngineRaw: String) -> [PlayerEngineKind] {
+        let stored = decode(priorityRaw)
+        if !stored.isEmpty {
+            return normalized(stored)
+        }
+        let primary = PlayerEngineKind(rawValue: legacyEngineRaw) ?? .defaultValue
+        return normalized([primary])
+    }
+
+    /// Parse the comma-separated raw value into engines, dropping any token that
+    /// doesn't name a known engine.
+    static func decode(_ raw: String) -> [PlayerEngineKind] {
+        raw.split(separator: ",").compactMap { PlayerEngineKind(rawValue: String($0)) }
+    }
+
+    static func encode(_ list: [PlayerEngineKind]) -> String {
+        list.map(\.rawValue).joined(separator: ",")
+    }
+
+    /// Keep the given order but ensure every engine appears exactly once: drop
+    /// duplicates, then append any engine missing from the list in declaration
+    /// order. Guarantees the priority list is always complete even if a new
+    /// engine is added to `PlayerEngineKind` after the user stored their order.
+    static func normalized(_ order: [PlayerEngineKind]) -> [PlayerEngineKind] {
+        var seen = Set<PlayerEngineKind>()
+        var result: [PlayerEngineKind] = []
+        for kind in order where seen.insert(kind).inserted {
+            result.append(kind)
+        }
+        for kind in PlayerEngineKind.allCases where seen.insert(kind).inserted {
+            result.append(kind)
+        }
+        return result
+    }
+}
+
 enum PlayerSettings {
     static let engineKey = "player.engine"
+
+    /// Ordered engine fallback list — see `PlayerEnginePriority`. Stored as a
+    /// comma-separated list of `PlayerEngineKind` raw values.
+    static let enginePriorityKey = "player.enginePriority"
 
     /// Raw value of the `ExternalPlayer` streams are handed off to; any value
     /// that doesn't name a player (including the empty default) keeps playback

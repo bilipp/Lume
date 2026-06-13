@@ -47,4 +47,67 @@ struct PlayerSettingsTests {
     @Test func `engine storage key`() {
         #expect(PlayerSettings.engineKey == "player.engine")
     }
+
+    @Test func `engine priority storage key`() {
+        #expect(PlayerSettings.enginePriorityKey == "player.enginePriority")
+    }
+}
+
+struct PlayerEnginePriorityTests {
+    @Test func `encode and decode round-trips`() {
+        let list: [PlayerEngineKind] = [.avPlayer, .vlcKit, .ksPlayer]
+        let encoded = PlayerEnginePriority.encode(list)
+        #expect(encoded == "avPlayer,vlcKit,ksPlayer")
+        #expect(PlayerEnginePriority.decode(encoded) == list)
+    }
+
+    @Test func `decode drops unknown tokens`() {
+        #expect(PlayerEnginePriority.decode("vlcKit,bogus,avPlayer") == [.vlcKit, .avPlayer])
+        #expect(PlayerEnginePriority.decode("") == [])
+    }
+
+    @Test func `normalized keeps order, dedupes, and appends missing engines`() {
+        // Duplicates collapse to the first occurrence...
+        let deduped = PlayerEnginePriority.normalized([.avPlayer, .avPlayer, .vlcKit])
+        // ...and every remaining engine is appended in declaration order.
+        #expect(deduped == [.avPlayer, .vlcKit, .ksPlayer])
+        // A complete list is returned unchanged.
+        #expect(PlayerEnginePriority.normalized([.ksPlayer, .avPlayer, .vlcKit]) == [.ksPlayer, .avPlayer, .vlcKit])
+        // Every engine always appears exactly once.
+        #expect(Set(PlayerEnginePriority.normalized([])) == Set(PlayerEngineKind.allCases))
+        #expect(PlayerEnginePriority.normalized([]).count == PlayerEngineKind.allCases.count)
+    }
+
+    @Test func `resolve uses the stored priority when present`() {
+        let resolved = PlayerEnginePriority.resolve(
+            priorityRaw: "ksPlayer,avPlayer,vlcKit",
+            legacyEngineRaw: PlayerEngineKind.vlcKit.rawValue
+        )
+        #expect(resolved == [.ksPlayer, .avPlayer, .vlcKit])
+    }
+
+    @Test func `resolve completes a partial stored priority`() {
+        let resolved = PlayerEnginePriority.resolve(
+            priorityRaw: "avPlayer",
+            legacyEngineRaw: PlayerEngineKind.vlcKit.rawValue
+        )
+        #expect(resolved.first == .avPlayer)
+        #expect(Set(resolved) == Set(PlayerEngineKind.allCases))
+        #expect(resolved.count == PlayerEngineKind.allCases.count)
+    }
+
+    @Test func `resolve migrates the legacy engine as primary when no priority stored`() {
+        let resolved = PlayerEnginePriority.resolve(
+            priorityRaw: "",
+            legacyEngineRaw: PlayerEngineKind.avPlayer.rawValue
+        )
+        #expect(resolved.first == .avPlayer)
+        #expect(Set(resolved) == Set(PlayerEngineKind.allCases))
+    }
+
+    @Test func `resolve falls back to the default engine for an unknown legacy value`() {
+        let resolved = PlayerEnginePriority.resolve(priorityRaw: "", legacyEngineRaw: "bogus")
+        #expect(resolved.first == .defaultValue)
+        #expect(resolved.count == PlayerEngineKind.allCases.count)
+    }
 }
