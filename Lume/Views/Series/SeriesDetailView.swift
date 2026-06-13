@@ -521,6 +521,7 @@ private extension SeriesDetailView {
     func playEpisode(_ episode: Episode) {
         guard let playlist = seriesPlaylist,
               let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
+        if ExternalPlayback.open(media) { return }
         #if os(macOS)
             openWindow(id: "player", value: media)
         #else

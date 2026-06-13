@@ -358,6 +358,7 @@
         private func startPlayback() {
             guard let playlist = moviePlaylist,
                   let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
+            if ExternalPlayback.open(media) { return }
             playingMedia = media
         }
 
