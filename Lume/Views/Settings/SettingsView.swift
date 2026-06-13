@@ -11,6 +11,7 @@ struct SettingsView: View {
     /// Not `private`: read by the SettingsView+Indexing extension (separate file).
     @State var indexing = ContentIndexingService.shared
     @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
+    @AppStorage(PlayerSettings.externalPlayerKey) private var externalPlayerRaw: String = ""
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
     @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
@@ -230,8 +231,18 @@ struct SettingsView: View {
                 Text(engine.wrappedValue.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Picker("External Player", selection: $externalPlayerRaw) {
+                    Text("Off").tag("")
+                    ForEach(ExternalPlayer.allCases) { player in
+                        Text(player.displayName).tag(player.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
             } header: {
                 Text("Player")
+            } footer: {
+                Text("Streams open in the selected app instead of Lume's player. Downloads always play in Lume, and the built-in player is used when the app is not installed.")
             }
         }
 
@@ -481,6 +492,24 @@ struct SettingsView: View {
                         .padding(.top, 6)
                 }
 
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("External Player")
+
+                    TVOptionCycleRow(
+                        title: "External Player",
+                        valueLabel: ExternalPlayer(rawValue: externalPlayerRaw)?.displayName
+                            ?? String(localized: "Off")
+                    ) {
+                        externalPlayerRaw = nextExternalPlayerRaw(after: externalPlayerRaw)
+                    }
+
+                    Text("Streams open in the selected app instead of Lume's player. Downloads always play in Lume, and the built-in player is used when the app is not installed.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
                 // Options for the selected engine only — each engine keeps a
                 // dedicated area.
                 switch engine.wrappedValue {
@@ -495,6 +524,14 @@ struct SettingsView: View {
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 }
             }
+        }
+
+        /// Advances Off → Infuse → VLC → Off; the cycle-row pattern used for
+        /// every multi-choice option on tvOS.
+        private func nextExternalPlayerRaw(after raw: String) -> String {
+            let cycle = [""] + ExternalPlayer.allCases.map(\.rawValue)
+            guard let index = cycle.firstIndex(of: raw) else { return "" }
+            return cycle[(index + 1) % cycle.count]
         }
 
         private var tvAboutDetail: some View {

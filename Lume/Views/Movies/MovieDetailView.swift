@@ -368,6 +368,7 @@ struct MovieDetailView: View {
     private func startPlayback() {
         guard let playlist = moviePlaylist,
               let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
+        if ExternalPlayback.open(media) { return }
         #if os(macOS)
             openWindow(id: "player", value: media)
         #else
