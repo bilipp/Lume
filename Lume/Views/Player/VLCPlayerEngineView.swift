@@ -37,12 +37,23 @@ struct VLCPlayerEngineView: View {
     /// Intro / recap windows for the active episode (from IntroDB), driving the
     /// in-player Skip Intro button. `nil` when there is nothing to skip.
     var skipSegments: IntroSegments?
+    /// Whether the host has another engine to fall back to if this one can't
+    /// start the stream. When true, an initial-load failure reports to the host
+    /// (which switches engines) instead of raising the error overlay, and the
+    /// startup watchdog uses the shorter fallback timeout so the switch is prompt.
+    var fallbackAvailable = false
+    /// Invoked when this engine can't start the stream and a fallback engine is
+    /// available. The host advances to the next engine in the priority list.
+    var onPlaybackFailed: (() -> Void)?
     /// Invoked when the viewer picks a different stream (e.g. another episode)
     /// from the in-player overlay. The host swaps `media` in response.
     var onSelectMedia: ((PlayableMedia) -> Void)?
 
     @StateObject private var coordinator = VLCPlayerCoordinator()
     @State private var isControlsVisible = true
+    /// Set once the stream is given up on (initial-load failure with no fallback
+    /// left). Swaps the player for the `PlayerErrorIndicator` (Try Again / Back).
+    @State private var loadFailed = false
     @State private var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
     @State private var hideTask: Task<Void, Never>?
@@ -75,6 +86,12 @@ struct VLCPlayerEngineView: View {
     #endif
 
     private let autoHideInterval: TimeInterval = 4
+    /// How long to wait for the first frame before declaring a stream dead when
+    /// this is the last engine in the priority list.
+    private let startupTimeout: TimeInterval = 40
+    /// Shorter startup timeout used when a fallback engine is available, so a
+    /// hanging engine hands off promptly rather than stalling on a black screen.
+    private let fallbackStartupTimeout: TimeInterval = 15
 
     var body: some View {
         ZStack {
@@ -93,7 +110,7 @@ struct VLCPlayerEngineView: View {
             // leaving no way to summon the controls once they auto-hide.
             tapCatcher
 
-            if isControlsVisible {
+            if isControlsVisible, !loadFailed {
                 controlsOverlay
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
@@ -128,6 +145,15 @@ struct VLCPlayerEngineView: View {
                     channelBrowser
                 }
             #endif
+
+            if loadFailed {
+                PlayerErrorIndicator(
+                    title: media.title,
+                    onRetry: { retryPlayback() },
+                    onClose: { closePlayer() }
+                )
+                .transition(.opacity)
+            }
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -137,6 +163,8 @@ struct VLCPlayerEngineView: View {
             coordinator.onDuration = { total in
                 if total.isFinite, total > 0 { clock.duration = total }
             }
+            coordinator.onPlaybackFailure = { reportFailure() }
+            coordinator.startupTimeout = fallbackAvailable ? fallbackStartupTimeout : startupTimeout
             coordinator.configure(media: media)
             scheduleHide()
         }
@@ -159,6 +187,7 @@ struct VLCPlayerEngineView: View {
             isSeeking = false
             seekPosition = 0
             isPanelOpen = false
+            loadFailed = false
             coordinator.reload(media: newMedia)
             resetHideTimer()
         }
@@ -218,7 +247,8 @@ struct VLCPlayerEngineView: View {
                 Color.clear.contentShape(Rectangle())
             }
             .buttonStyle(InvisibleButtonStyle())
-            .disabled(isControlsVisible || isChannelBrowserOpen)
+            // Yield focus to the failure overlay's buttons when a stream dies.
+            .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
             .onMoveCommand { direction in
                 // While watching live TV with the controls hidden, left opens
@@ -357,6 +387,10 @@ struct VLCPlayerEngineView: View {
     /// then hide the controls, and only dismiss the player once the controls
     /// are already hidden.
     private func handleMenuPress() {
+        if loadFailed {
+            closePlayer()
+            return
+        }
         #if os(tvOS)
             if isChannelBrowserOpen {
                 closeChannelBrowser()
@@ -406,6 +440,24 @@ struct VLCPlayerEngineView: View {
         #else
             dismiss()
         #endif
+    }
+
+    /// The coordinator reported it can't start the stream. On an initial-load
+    /// failure with a fallback engine available, hand off to the host (which
+    /// switches engines); otherwise raise the failure overlay.
+    private func reportFailure() {
+        guard !loadFailed else { return }
+        if fallbackAvailable, !coordinator.hasStartedPlayback {
+            onPlaybackFailed?()
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.25)) { loadFailed = true }
+    }
+
+    /// Re-prepare the current stream after a failure (the Try Again button).
+    private func retryPlayback() {
+        withAnimation(.easeInOut(duration: 0.25)) { loadFailed = false }
+        coordinator.retryAfterFailure()
     }
 }
 
