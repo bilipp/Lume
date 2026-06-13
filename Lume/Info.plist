@@ -42,6 +42,8 @@
 	<array>
 		<string>youtube</string>
 		<string>vnd.youtube</string>
+		<string>infuse</string>
+		<string>vlc-x-callback</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
