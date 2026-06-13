@@ -3,14 +3,25 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    // Optional so previews (which don't inject the coordinator) don't crash;
+    // a missing coordinator reads as "gate open", preserving old behaviour.
+    @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
     @Query private var playlists: [Playlist]
 
     var body: some View {
         Group {
-            if playlists.isEmpty {
+            // A populated local store always wins — returning users go straight
+            // to the app. On an empty store we wait for the launch-time iCloud
+            // sync to settle first, so cloud playlists aren't yanked in
+            // mid-typing on a fresh device. If sync is unavailable, errors, or
+            // times out, the gate opens and the form shows as a fallback (see
+            // CloudSyncCoordinator).
+            if !playlists.isEmpty {
+                MainTabView()
+            } else if cloudSync?.status.hasCompletedInitialSync ?? true {
                 LoginView()
             } else {
-                MainTabView()
+                CloudSyncLaunchView(onSkip: { cloudSync?.skipInitialSyncWait() })
             }
         }
         .task {
