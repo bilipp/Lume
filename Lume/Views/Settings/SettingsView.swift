@@ -62,6 +62,7 @@ struct SettingsView: View {
                     librarySection
                     indexingSection
                     autoSyncSection
+                    CloudSyncSection()
                     if trakt.isConfigured {
                         integrationsSection
                     }
@@ -388,6 +389,7 @@ struct SettingsView: View {
                 tvPlaylistsList
                 tvAutoSyncSection
                 tvIndexingSection
+                TVCloudSyncSection()
             }
         }
 
