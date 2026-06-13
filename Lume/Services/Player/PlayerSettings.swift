@@ -35,11 +35,16 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The default engine, and the primary of the default priority list. KSPlayer
+    /// leads (it handles most IPTV streams while supporting Picture in Picture and
+    /// per-stream decoder tuning), falling back to VLCKit then AVPlayer — the order
+    /// `PlayerEnginePriority.normalized` appends the remaining engines in. The
+    /// `#if` cascade just degrades gracefully if an engine isn't linked.
     static var defaultValue: PlayerEngineKind {
-        #if canImport(VLCKitSPM)
-            return .vlcKit
-        #elseif canImport(KSPlayer)
+        #if canImport(KSPlayer)
             return .ksPlayer
+        #elseif canImport(VLCKitSPM)
+            return .vlcKit
         #else
             return .avPlayer
         #endif

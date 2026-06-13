@@ -110,4 +110,15 @@ struct PlayerEnginePriorityTests {
         #expect(resolved.first == .defaultValue)
         #expect(resolved.count == PlayerEngineKind.allCases.count)
     }
+
+    @Test func `default priority is KSPlayer then VLCKit then AVPlayer`() {
+        #expect(PlayerEngineKind.defaultValue == .ksPlayer)
+        // A fresh install (no stored priority, engine key defaults to the default
+        // engine) resolves to the documented default order.
+        let resolved = PlayerEnginePriority.resolve(
+            priorityRaw: "",
+            legacyEngineRaw: PlayerEngineKind.defaultValue.rawValue
+        )
+        #expect(resolved == [.ksPlayer, .vlcKit, .avPlayer])
+    }
 }
