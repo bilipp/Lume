@@ -41,11 +41,9 @@
             }
             .platformNavigationTitle("Player Engines")
             #if os(iOS)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        EditButton()
-                    }
-                }
+                // Keep the list permanently in edit mode so the rows are always
+                // draggable — no Edit button to enter reorder mode first.
+                .environment(\.editMode, .constant(.active))
             #endif
         }
 
