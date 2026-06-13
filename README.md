@@ -124,6 +124,11 @@ AVPlayer).
 | **KSPlayer** | FFmpeg (FFmpegKit) | Wide IPTV support | Handles most formats common in IPTV streams; configurable decoder (FFmpeg / VideoToolbox) |
 | **AVPlayer** | AVFoundation | HLS & MP4 | Native Apple player with **custom unified overlay** matching the other engines |
 
+Prefer a third-party app? Lume can hand streams off to an **external player** —
+**Infuse** or **VLC** — via their deep-link APIs, selectable in **Settings**.
+Downloads always play in Lume, and playback falls back to the built-in player when
+the selected app is not installed.
+
 ---
 
 ## Architecture
