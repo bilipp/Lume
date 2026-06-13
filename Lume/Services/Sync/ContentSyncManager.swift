@@ -109,6 +109,10 @@ actor ContentSyncManager {
 
         activeSyncTasks.removeValue(forKey: playlistId)
         Logger.database.info("Completed sync for playlist \(playlistId)")
+
+        // Nudge iCloud sync: a freshly fetched catalog may now be able to apply
+        // cloud user state (favorites / progress) that was waiting for it.
+        NotificationCenter.default.post(name: .lumeContentSyncDidComplete, object: nil)
     }
 
     private func performSync(playlistId: UUID, progress: SyncProgress?, full: Bool) async throws {
