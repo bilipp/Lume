@@ -165,7 +165,10 @@ actor ContentIndexer {
                     try await self.tmdbClient.movieDetails(tmdbId)
                 }
                 if let details {
-                    applyMovieDetails(details, to: movie, context: context)
+                    // Background context: skip the cast relationship — see
+                    // applyMovieDetails. The embedding uses `movie.actors`, and
+                    // the detail view fully enriches (incl. cast) on first open.
+                    applyMovieDetails(details, to: movie, context: context, includeCast: false)
                 }
             }
         }
@@ -199,7 +202,10 @@ actor ContentIndexer {
                     try await self.tmdbClient.tvDetails(tmdbId)
                 }
                 if let details {
-                    applySeriesDetails(details, to: series, context: context)
+                    // Background context: skip the cast relationship — see
+                    // applySeriesDetails. The embedding uses the `series.cast`
+                    // string; the detail view fully enriches (incl. cast) later.
+                    applySeriesDetails(details, to: series, context: context, includeCast: false)
                 }
             }
         }
