@@ -114,29 +114,66 @@ struct CategoryGridSection: View {
 private struct CategoryTile: View {
     let name: String
 
+    // On the 10-foot UI the focus engine owns selection feedback: the focused
+    // tile brightens to a solid plate with dark text (the standard tvOS card
+    // affordance), while the rest sit on a quiet material. `isFocused` is set
+    // for the focused button's label subtree, which is where this tile renders.
+    #if os(tvOS)
+        @Environment(\.isFocused) private var isFocused
+    #endif
+
     var body: some View {
         Text(name)
             .font(CategoryTileMetrics.font)
             .fontWeight(.semibold)
             .lineLimit(2)
+            .minimumScaleFactor(0.7)
             .multilineTextAlignment(.center)
+            .foregroundStyle(foreground)
             .frame(maxWidth: .infinity)
             .frame(height: CategoryTileMetrics.height)
             .padding(.horizontal)
-            .background(
-                RoundedRectangle(cornerRadius: CategoryTileMetrics.cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            )
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: CategoryTileMetrics.cornerRadius, style: .continuous))
+        #if os(tvOS)
+            // Animate the brighten in lockstep with the focus scale supplied
+            // by TVCardButtonStyle so the plate and text don't pop.
+            .animation(.easeOut(duration: 0.18), value: isFocused)
+        #endif
+    }
+
+    private var foreground: Color {
+        #if os(tvOS)
+            isFocused ? .black : .primary
+        #else
+            .primary
+        #endif
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        #if os(tvOS)
+            // A solid white layer crossfaded over the resting material — keeping
+            // both layers present (rather than swapping view identity) lets the
+            // focus transition interpolate cleanly.
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(Color.white.opacity(isFocused ? 1 : 0))
+        #else
+            Rectangle().fill(.ultraThinMaterial)
+        #endif
     }
 }
 
 private enum CategoryTileMetrics {
     #if os(tvOS)
-        static let minimum: CGFloat = 360
+        static let minimum: CGFloat = 320
         static let spacing: CGFloat = 36
-        static let height: CGFloat = 120
-        static let cornerRadius: CGFloat = 14
-        static let font: Font = .title3
+        static let height: CGFloat = 100
+        static let cornerRadius: CGFloat = 12
+        /// `.title3` (~38pt on tvOS) overwhelms a name tile; a tighter fixed size
+        /// reads cleanly beside the poster cards and matches their title weight.
+        static let font: Font = .system(size: 26, weight: .semibold)
     #else
         static let minimum: CGFloat = 160
         static let spacing: CGFloat = 16
