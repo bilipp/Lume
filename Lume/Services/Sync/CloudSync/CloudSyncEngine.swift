@@ -411,10 +411,17 @@ extension CloudSyncEngine {
     /// `nil` profileID is treated as the default profile until bootstrap claims
     /// it, so a reconcile that races ahead of bootstrap still behaves correctly.
     func fetchMirrors(forProfile profileID: UUID) throws -> [String: UserContentState] {
+        // Filter in SQLite (profileID is indexed) instead of hydrating every
+        // profile's mirrors and filtering in Swift. Legacy `nil`-profileID records
+        // count as the default profile until bootstrap claims them, so include
+        // them only when the default profile is the one being fetched — exactly
+        // the previous `(profileID ?? default) == profileID` semantics.
+        let includeUnclaimed = profileID == UserProfile.defaultProfileID
+        let descriptor = FetchDescriptor<UserContentState>(
+            predicate: #Predicate { $0.profileID == profileID || ($0.profileID == nil && includeUnclaimed) }
+        )
         var map: [String: UserContentState] = [:]
-        for mirror in try context.fetch(FetchDescriptor<UserContentState>())
-            where (mirror.profileID ?? UserProfile.defaultProfileID) == profileID
-        {
+        for mirror in try context.fetch(descriptor) {
             map[mirror.contentId] = dedupe(mirror, against: map[mirror.contentId])
         }
         return map
@@ -553,46 +560,5 @@ extension CloudSyncEngine {
         var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
-    }
-}
-
-// MARK: - Value extraction
-
-/// Not `private`: profile operations in `CloudSyncEngine+Profiles.swift`
-/// reuse these helpers (fetch / reset / apply / value extraction).
-extension CloudSyncEngine {
-    static func values(from playlist: Playlist) -> PlaylistConfigValues {
-        PlaylistConfigValues(
-            name: playlist.name,
-            serverURL: playlist.serverURL,
-            username: playlist.username,
-            password: playlist.password,
-            sourceTypeRaw: playlist.sourceTypeRaw,
-            epgURL: playlist.epgURL,
-            syncEnabled: playlist.syncEnabled
-        )
-    }
-
-    static func values(from mirror: SyncedPlaylist) -> PlaylistConfigValues {
-        PlaylistConfigValues(
-            name: mirror.name,
-            serverURL: mirror.serverURL,
-            username: mirror.username,
-            password: mirror.password,
-            sourceTypeRaw: mirror.sourceTypeRaw,
-            epgURL: mirror.epgURL,
-            syncEnabled: mirror.syncEnabled
-        )
-    }
-
-    static func values(from mirror: UserContentState) -> ContentStateValues {
-        ContentStateValues(
-            watchProgress: mirror.watchProgress,
-            isWatched: mirror.isWatched,
-            lastWatchedDate: mirror.lastWatchedDate,
-            isFavorite: mirror.isFavorite,
-            addedToWatchlistDate: mirror.addedToWatchlistDate,
-            favoriteOrder: mirror.favoriteOrder
-        )
     }
 }

@@ -26,6 +26,12 @@ enum SyncedContentKind: String, Codable, CaseIterable {
 /// no `@Attribute(.unique)`, no relationships.
 @Model
 final class UserContentState {
+    // The reconciler and every profile operation fetch mirrors scoped to one
+    // `profileID`; index it so SQLite finds the active profile's rows without
+    // scanning every profile's records. Local-only fetch index — it doesn't
+    // alter the CloudKit record schema.
+    #Index<UserContentState>([\.profileID])
+
     var contentId: String = ""
     var kindRaw: String = SyncedContentKind.movie.rawValue
 

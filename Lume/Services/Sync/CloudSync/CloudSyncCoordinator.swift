@@ -34,6 +34,13 @@ final class CloudSyncCoordinator {
     private var isReconciling = false
     private var pendingReconcile = false
 
+    /// Trailing-debounce for notification-driven reconciles. A large CloudKit
+    /// import posts a remote-change notification per batch; without this each one
+    /// would fire its own full reconcile pass. Collapsing a burst into one pass
+    /// matters most now that every pass scans the user-data store.
+    private var reconcileDebounceTask: Task<Void, Never>?
+    private static let reconcileDebounceDelay: Duration = .milliseconds(600)
+
     /// Set once the launch-time sync is judged settled; the initial-sync gate
     /// (`status.hasCompletedInitialSync`) then opens after the next reconcile
     /// finishes, so any imported cloud playlists are already materialised into
@@ -92,7 +99,9 @@ final class CloudSyncCoordinator {
             Task { await refreshAccountStatus() }
             reconcile()
         case .background, .inactive:
-            reconcile()
+            // Flush now, not debounced: the system may suspend the app before a
+            // delayed pass could run.
+            reconcile(debounced: false)
         @unknown default:
             break
         }
@@ -100,9 +109,27 @@ final class CloudSyncCoordinator {
 
     // MARK: - Reconcile
 
-    /// Request a reconcile. Coalesces concurrent requests into at most one
-    /// in-flight pass plus one queued follow-up.
-    func reconcile() {
+    /// Request a reconcile. Notification-driven callers debounce (the default) so
+    /// a burst collapses into a single pass; callers that must run promptly (a
+    /// background flush before suspension) pass `debounced: false`. Either way
+    /// concurrent passes coalesce into at most one in-flight pass plus one queued
+    /// follow-up.
+    func reconcile(debounced: Bool = true) {
+        guard debounced else {
+            reconcileDebounceTask?.cancel()
+            reconcileDebounceTask = nil
+            runReconcile()
+            return
+        }
+        reconcileDebounceTask?.cancel()
+        reconcileDebounceTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.reconcileDebounceDelay)
+            guard !Task.isCancelled else { return }
+            self?.runReconcile()
+        }
+    }
+
+    private func runReconcile() {
         guard !isReconciling else {
             pendingReconcile = true
             return

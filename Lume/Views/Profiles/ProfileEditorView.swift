@@ -49,6 +49,13 @@ struct ProfileEditorView: View {
                     #if os(iOS)
                         .textInputAutocapitalization(.words)
                     #endif
+                    // On tvOS the grouped row draws its own rounded container,
+                    // which sits behind the field's native focus bezel and reads
+                    // as a doubled border. Drop the row fill so only the system
+                    // field treatment shows, matching `TVSettingsField`.
+                    #if os(tvOS)
+                    .listRowBackground(Color.clear)
+                    #endif
                 }
 
                 Section("Icon") {
@@ -116,7 +123,11 @@ struct ProfileEditorView: View {
                 .foregroundStyle(isSelected ? Color.white : Color.primary)
                 .background(background, in: .circle)
         }
+        #if os(tvOS)
+        .buttonStyle(TVProfilePickerButtonStyle())
+        #else
         .buttonStyle(.plain)
+        #endif
         .accessibilityLabel(symbol)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -138,7 +149,11 @@ struct ProfileEditorView: View {
                             }
                         }
                 }
+                #if os(tvOS)
+                .buttonStyle(TVProfilePickerButtonStyle())
+                #else
                 .buttonStyle(.plain)
+                #endif
                 .accessibilityLabel(option.rawValue)
                 .accessibilityAddTraits(option == color ? .isSelected : [])
             }
@@ -162,3 +177,31 @@ struct ProfileEditorView: View {
         dismiss()
     }
 }
+
+#if os(tvOS)
+    /// Flat, self-contained focus treatment for the circular icon/colour picker
+    /// buttons. tvOS's default focus effect scales the focused button up, which
+    /// made the highlight spill over neighbouring items in the tight grid. This
+    /// draws a focus ring *inside* the item's own bounds instead — no scale, no
+    /// overlap — matching the quiet, flat focus look of the tvOS settings screens.
+    private struct TVProfilePickerButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            StyleBody(configuration: configuration)
+        }
+
+        private struct StyleBody: View {
+            let configuration: ButtonStyleConfiguration
+            @Environment(\.isFocused) private var isFocused
+
+            var body: some View {
+                configuration.label
+                    .overlay {
+                        Circle()
+                            .strokeBorder(.white, lineWidth: 4)
+                            .opacity(isFocused ? 1 : 0)
+                    }
+                    .animation(.easeOut(duration: 0.15), value: isFocused)
+            }
+        }
+    }
+#endif
