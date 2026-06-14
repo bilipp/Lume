@@ -25,11 +25,13 @@ struct LibraryCollection: Hashable {
     enum Kind: String, Hashable {
         case recentlyWatched
         case favorites
+        case recentlyAdded
 
         var title: LocalizedStringKey {
             switch self {
             case .recentlyWatched: "Recently Watched"
             case .favorites: "Favorites"
+            case .recentlyAdded: "Recently Added"
             }
         }
 
@@ -37,6 +39,7 @@ struct LibraryCollection: Hashable {
             switch self {
             case .recentlyWatched: "clock.arrow.circlepath"
             case .favorites: "heart"
+            case .recentlyAdded: "sparkles"
             }
         }
     }
@@ -47,6 +50,14 @@ struct LibraryCollection: Hashable {
 
 /// How many items each preview row shows before "Show All".
 private let collectionPreviewLimit = 20
+
+/// Upper bound on the "Recently Added" fetch. Recently Watched and Favorites
+/// match small subsets, but every title carries an `added` timestamp, so that
+/// predicate matches the whole library — an unbounded fetch would hydrate the
+/// entire catalog on every change and stutter badly during sync. We only ever
+/// surface the newest slice, so the query is capped (then scoped in-memory to
+/// the active playlist, like the rest of the app).
+private let recentlyAddedFetchLimit = 200
 
 // MARK: - Shared preview row
 
@@ -170,13 +181,18 @@ struct MovieCollectionView: View {
     }
 
     var body: some View {
+        let emptyDescription: LocalizedStringKey = switch kind {
+        case .favorites: "Movies you mark as favorites will appear here"
+        case .recentlyWatched: "Movies you watch will appear here"
+        case .recentlyAdded: "Movies recently added to your library will appear here"
+        }
         CategoryContentGrid(
             title: kind.localizedTitleString,
             items: scoped,
             animationNamespace: animationNamespace,
             emptyTitle: kind.title,
             emptyIcon: kind.emptyIcon,
-            emptyDescription: kind == .favorites ? "Movies you mark as favorites will appear here" : "Movies you watch will appear here",
+            emptyDescription: emptyDescription,
             sortRaw: .constant(""),
             showsSortMenu: false,
             card: { MovieCardView(movie: $0) }
@@ -186,7 +202,7 @@ struct MovieCollectionView: View {
 
 private enum MovieCollectionQuery {
     static func descriptor(for kind: LibraryCollection.Kind) -> FetchDescriptor<Movie> {
-        switch kind {
+        var descriptor = switch kind {
         case .recentlyWatched:
             FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.lastWatchedDate != nil },
@@ -197,7 +213,14 @@ private enum MovieCollectionQuery {
                 predicate: #Predicate { $0.isFavorite },
                 sortBy: [SortDescriptor(\.name)]
             )
+        case .recentlyAdded:
+            FetchDescriptor<Movie>(
+                predicate: #Predicate { $0.added != nil },
+                sortBy: [SortDescriptor(\.added, order: .reverse), SortDescriptor(\.num)]
+            )
         }
+        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
+        return descriptor
     }
 }
 
@@ -262,13 +285,18 @@ struct SeriesCollectionView: View {
     }
 
     var body: some View {
+        let emptyDescription: LocalizedStringKey = switch kind {
+        case .favorites: "Series you mark as favorites will appear here"
+        case .recentlyWatched: "Series you watch will appear here"
+        case .recentlyAdded: "Series recently added to your library will appear here"
+        }
         CategoryContentGrid(
             title: kind.localizedTitleString,
             items: scoped,
             animationNamespace: animationNamespace,
             emptyTitle: kind.title,
             emptyIcon: kind.emptyIcon,
-            emptyDescription: kind == .favorites ? "Series you mark as favorites will appear here" : "Series you watch will appear here",
+            emptyDescription: emptyDescription,
             sortRaw: .constant(""),
             showsSortMenu: false,
             card: { SeriesCardView(series: $0) }
@@ -278,7 +306,7 @@ struct SeriesCollectionView: View {
 
 private enum SeriesCollectionQuery {
     static func descriptor(for kind: LibraryCollection.Kind) -> FetchDescriptor<Series> {
-        switch kind {
+        var descriptor = switch kind {
         case .recentlyWatched:
             FetchDescriptor<Series>(
                 predicate: #Predicate { $0.lastWatchedDate != nil },
@@ -289,7 +317,14 @@ private enum SeriesCollectionQuery {
                 predicate: #Predicate { $0.isFavorite },
                 sortBy: [SortDescriptor(\.name)]
             )
+        case .recentlyAdded:
+            FetchDescriptor<Series>(
+                predicate: #Predicate { $0.lastModified != nil },
+                sortBy: [SortDescriptor(\.lastModified, order: .reverse), SortDescriptor(\.num)]
+            )
         }
+        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
+        return descriptor
     }
 }
 
@@ -324,6 +359,7 @@ private extension LibraryCollection.Kind {
         switch self {
         case .recentlyWatched: String(localized: "Recently Watched")
         case .favorites: String(localized: "Favorites")
+        case .recentlyAdded: String(localized: "Recently Added")
         }
     }
 }
