@@ -12,6 +12,8 @@ struct ManageProfilesView: View {
     @State private var editingProfile: UserProfile?
     @State private var profilePendingDeletion: UserProfile?
 
+    @AppStorage(ProfileSettings.askOnStartupKey) private var askOnStartup = ProfileSettings.askOnStartupDefault
+
     var body: some View {
         List {
             Section {
@@ -28,6 +30,12 @@ struct ManageProfilesView: View {
                 } label: {
                     Label("Add Profile", systemImage: "plus")
                 }
+            }
+
+            Section {
+                Toggle("Ask on Startup", isOn: $askOnStartup)
+            } footer: {
+                Text("Choose a profile each time Lume launches. When off, Lume resumes the last profile you used.")
             }
         }
         .platformNavigationTitle("Profiles")
