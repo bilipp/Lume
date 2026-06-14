@@ -10,7 +10,7 @@ extension ContentSyncManager {
     /// a crash has the same effect).
     ///
     /// `.syncing` is a runtime-only state: the only thing that sets it is a live
-    /// in-process task tracked in `activeSyncTasks`, which cannot survive a
+    /// in-process sync tracked in `activeSyncPlaylistIDs`, which cannot survive a
     /// process launch. So a `.syncing` status observed at startup is by
     /// definition stale. Left untouched it wedges the playlist permanently —
     /// `AutoSync.shouldSync` skips anything already `.syncing`, so no further
@@ -44,6 +44,19 @@ extension ContentSyncManager {
         ).first {
             epl.syncStatus = .error
             try? errContext.save()
+        }
+    }
+
+    /// Restores a playlist to `.idle` after an aborted sync, leaving whatever was
+    /// already synced in place so the next attempt can pick up cleanly.
+    func markPlaylistIdle(playlistId: UUID) {
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        if let playlist = try? context.fetch(
+            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
+        ).first {
+            playlist.syncStatus = .idle
+            try? context.save()
         }
     }
 
