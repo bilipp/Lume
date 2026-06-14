@@ -94,6 +94,7 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
+                    supportSection
                     aboutSection
                 }
                 #if os(macOS)

@@ -818,6 +818,16 @@
         }
       }
     },
+    "Discord" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discord"
+          }
+        }
+      }
+    },
     "Done" : {
       "localizations" : {
         "de" : {
@@ -985,6 +995,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Playlist bearbeiten"
+          }
+        }
+      }
+    },
+    "Email" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E-Mail"
           }
         }
       }
@@ -1247,6 +1267,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aus deiner Trakt-Watchlist"
+          }
+        }
+      }
+    },
+    "Get help, request a feature, or report a problem." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erhalte Hilfe, wünsche dir eine Funktion oder melde ein Problem."
           }
         }
       }
@@ -2627,6 +2657,16 @@
         }
       }
     },
+    "Scan a code with your phone to open our website or Discord, or email us for help." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanne einen Code mit deinem Handy, um unsere Website oder Discord zu öffnen, oder schreib uns für Hilfe eine E-Mail."
+          }
+        }
+      }
+    },
     "Scan to open" : {
       "localizations" : {
         "de" : {
@@ -2922,6 +2962,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Streams werden in der ausgewählten App statt in Lumes Player geöffnet. Downloads werden immer in Lume abgespielt, und der integrierte Player wird verwendet, wenn die App nicht installiert ist."
+          }
+        }
+      }
+    },
+    "Support" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support"
           }
         }
       }
@@ -3392,6 +3442,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gesehene Filme und Episoden werden mit deinem Trakt-Verlauf synchronisiert."
+          }
+        }
+      }
+    },
+    "Website" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Website"
           }
         }
       }
