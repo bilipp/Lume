@@ -88,6 +88,7 @@ struct SeriesView: View {
                 }
             }
             .platformNavigationTitle("Series")
+            .profileMenuToolbar()
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,

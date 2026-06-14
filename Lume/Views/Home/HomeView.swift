@@ -149,6 +149,7 @@ struct HomeView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(heroItems.isEmpty ? .automatic : .hidden, for: .navigationBar)
             #endif
+                .profileMenuToolbar()
                 .libraryToolbar(config: LibraryToolbarConfiguration(
                     playlists: playlists,
                     selectedPlaylistID: $selectedPlaylistID,

@@ -90,6 +90,11 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - **Next Up** overlay with auto-play for series episodes
 - Optional **Trakt** scrobbling and **TMDB** metadata enrichment
 
+#### 👤 Profiles
+- Multiple **user profiles**, each with its own watch history, progress, and favorites
+- Switch profiles from the top-left of Home (iOS / macOS) or in Settings (tvOS)
+- Profiles and their state **sync across your devices** via iCloud
+
 #### ⚙️ Library management
 - Manage multiple playlists — **Xtream Codes** and **M3U/M3U8** (add / edit / delete / switch)
 - M3U support: URL-based playlists, local file import, URL-tvg EPG auto-detection

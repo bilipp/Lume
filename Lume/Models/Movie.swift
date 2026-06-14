@@ -3,6 +3,10 @@ import SwiftData
 
 @Model
 final class Movie {
+    // Home's trending/watchlist rows look titles up by `tmdbId`; index it so
+    // those per-item lookups don't scan the whole catalog.
+    #Index<Movie>([\.tmdbId])
+
     @Attribute(.unique) var id: String
     var streamId: Int
     var name: String

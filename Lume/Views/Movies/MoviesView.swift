@@ -90,6 +90,7 @@ struct MoviesView: View {
                 }
             }
             .platformNavigationTitle("Movies")
+            .profileMenuToolbar()
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,
