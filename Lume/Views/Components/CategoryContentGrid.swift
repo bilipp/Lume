@@ -74,6 +74,78 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
     }
 }
 
+// MARK: - Category Grid ("Show All" tiles)
+
+/// A grid of lightweight, query-free category tiles shown beneath the inline
+/// preview rows. Each tile behaves exactly like a row's "Show All" link,
+/// navigating to that category's full grid via `NavigationLink(value:)`.
+///
+/// Only the first few categories render as inline preview rows — every preview
+/// row carries its own live `@Query`, so a playlist with dozens of categories
+/// would otherwise spin up dozens of concurrent fetches and stutter the browse
+/// screen. Surfacing the long tail as plain name tiles keeps it fast.
+struct CategoryGridSection: View {
+    let title: LocalizedStringKey
+    let categories: [Category]
+
+    private let columns = [GridItem(.adaptive(minimum: CategoryTileMetrics.minimum), spacing: CategoryTileMetrics.spacing)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
+
+            LazyVGrid(columns: columns, spacing: CategoryTileMetrics.spacing) {
+                ForEach(categories) { category in
+                    NavigationLink(value: category) {
+                        CategoryTile(name: category.name)
+                    }
+                    .posterCardButtonStyle()
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+}
+
+private struct CategoryTile: View {
+    let name: String
+
+    var body: some View {
+        Text(name)
+            .font(CategoryTileMetrics.font)
+            .fontWeight(.semibold)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .frame(height: CategoryTileMetrics.height)
+            .padding(.horizontal)
+            .background(
+                RoundedRectangle(cornerRadius: CategoryTileMetrics.cornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+    }
+}
+
+private enum CategoryTileMetrics {
+    #if os(tvOS)
+        static let minimum: CGFloat = 360
+        static let spacing: CGFloat = 36
+        static let height: CGFloat = 120
+        static let cornerRadius: CGFloat = 14
+        static let font: Font = .title3
+    #else
+        static let minimum: CGFloat = 160
+        static let spacing: CGFloat = 16
+        static let height: CGFloat = 72
+        static let cornerRadius: CGFloat = 10
+        static let font: Font = .subheadline
+    #endif
+}
+
 // MARK: - Category Preview Row
 
 struct CategoryPreviewRow<Item: Identifiable & Hashable, Card: View>: View {

@@ -265,6 +265,16 @@
         }
       }
     },
+    "All Categories" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Kategorien"
+          }
+        }
+      }
+    },
     "All synced content for this playlist will also be removed." : {
       "localizations" : {
         "de" : {
