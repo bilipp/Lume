@@ -4,6 +4,9 @@ import SwiftUI
 /// The top-left profile switcher: the active profile's avatar, tapping it opens
 /// a menu to switch profile or manage profiles. iOS / macOS only — tvOS surfaces
 /// profiles through Settings to avoid disturbing the immersive home's focus.
+///
+/// Hidden while there's only a single profile: there's nothing to switch to, and
+/// creating more profiles stays reachable through Settings.
 struct ProfileMenu: View {
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Query(sort: [SortDescriptor(\UserProfile.sortOrder), SortDescriptor(\UserProfile.createdAt)])
@@ -12,7 +15,7 @@ struct ProfileMenu: View {
     @State private var managing = false
 
     var body: some View {
-        if let profileManager {
+        if let profileManager, profiles.count > 1 {
             let active = profiles.first { $0.id == profileManager.activeProfileID }
             Menu {
                 ForEach(profiles) { profile in
