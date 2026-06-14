@@ -66,6 +66,7 @@ struct SeriesView: View {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             SeriesCollectionRow(kind: .recentlyWatched, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
                             SeriesCollectionRow(kind: .favorites, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+                            SeriesCollectionRow(kind: .recentlyAdded, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
 
                             ForEach(sortedCategories) { category in
                                 SeriesCategoryPreview(category: category, limit: previewLimit, sort: contentSort, animationNamespace: animationNamespace)

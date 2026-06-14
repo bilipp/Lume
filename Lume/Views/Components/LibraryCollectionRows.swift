@@ -25,11 +25,13 @@ struct LibraryCollection: Hashable {
     enum Kind: String, Hashable {
         case recentlyWatched
         case favorites
+        case recentlyAdded
 
         var title: LocalizedStringKey {
             switch self {
             case .recentlyWatched: "Recently Watched"
             case .favorites: "Favorites"
+            case .recentlyAdded: "Recently Added"
             }
         }
 
@@ -37,6 +39,7 @@ struct LibraryCollection: Hashable {
             switch self {
             case .recentlyWatched: "clock.arrow.circlepath"
             case .favorites: "heart"
+            case .recentlyAdded: "sparkles"
             }
         }
     }
@@ -170,13 +173,18 @@ struct MovieCollectionView: View {
     }
 
     var body: some View {
+        let emptyDescription: LocalizedStringKey = switch kind {
+        case .favorites: "Movies you mark as favorites will appear here"
+        case .recentlyWatched: "Movies you watch will appear here"
+        case .recentlyAdded: "Movies recently added to your library will appear here"
+        }
         CategoryContentGrid(
             title: kind.localizedTitleString,
             items: scoped,
             animationNamespace: animationNamespace,
             emptyTitle: kind.title,
             emptyIcon: kind.emptyIcon,
-            emptyDescription: kind == .favorites ? "Movies you mark as favorites will appear here" : "Movies you watch will appear here",
+            emptyDescription: emptyDescription,
             sortRaw: .constant(""),
             showsSortMenu: false,
             card: { MovieCardView(movie: $0) }
@@ -196,6 +204,11 @@ private enum MovieCollectionQuery {
             FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.isFavorite },
                 sortBy: [SortDescriptor(\.name)]
+            )
+        case .recentlyAdded:
+            FetchDescriptor<Movie>(
+                predicate: #Predicate { $0.added != nil },
+                sortBy: [SortDescriptor(\.added, order: .reverse), SortDescriptor(\.num)]
             )
         }
     }
@@ -262,13 +275,18 @@ struct SeriesCollectionView: View {
     }
 
     var body: some View {
+        let emptyDescription: LocalizedStringKey = switch kind {
+        case .favorites: "Series you mark as favorites will appear here"
+        case .recentlyWatched: "Series you watch will appear here"
+        case .recentlyAdded: "Series recently added to your library will appear here"
+        }
         CategoryContentGrid(
             title: kind.localizedTitleString,
             items: scoped,
             animationNamespace: animationNamespace,
             emptyTitle: kind.title,
             emptyIcon: kind.emptyIcon,
-            emptyDescription: kind == .favorites ? "Series you mark as favorites will appear here" : "Series you watch will appear here",
+            emptyDescription: emptyDescription,
             sortRaw: .constant(""),
             showsSortMenu: false,
             card: { SeriesCardView(series: $0) }
@@ -288,6 +306,11 @@ private enum SeriesCollectionQuery {
             FetchDescriptor<Series>(
                 predicate: #Predicate { $0.isFavorite },
                 sortBy: [SortDescriptor(\.name)]
+            )
+        case .recentlyAdded:
+            FetchDescriptor<Series>(
+                predicate: #Predicate { $0.lastModified != nil },
+                sortBy: [SortDescriptor(\.lastModified, order: .reverse), SortDescriptor(\.num)]
             )
         }
     }
@@ -324,6 +347,7 @@ private extension LibraryCollection.Kind {
         switch self {
         case .recentlyWatched: String(localized: "Recently Watched")
         case .favorites: String(localized: "Favorites")
+        case .recentlyAdded: String(localized: "Recently Added")
         }
     }
 }
