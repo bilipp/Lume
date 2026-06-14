@@ -51,6 +51,14 @@ struct LibraryCollection: Hashable {
 /// How many items each preview row shows before "Show All".
 private let collectionPreviewLimit = 20
 
+/// Upper bound on the "Recently Added" fetch. Recently Watched and Favorites
+/// match small subsets, but every title carries an `added` timestamp, so that
+/// predicate matches the whole library — an unbounded fetch would hydrate the
+/// entire catalog on every change and stutter badly during sync. We only ever
+/// surface the newest slice, so the query is capped (then scoped in-memory to
+/// the active playlist, like the rest of the app).
+private let recentlyAddedFetchLimit = 200
+
 // MARK: - Shared preview row
 
 /// A titled horizontal rail with a trailing "Show All" link into the full
@@ -194,7 +202,7 @@ struct MovieCollectionView: View {
 
 private enum MovieCollectionQuery {
     static func descriptor(for kind: LibraryCollection.Kind) -> FetchDescriptor<Movie> {
-        switch kind {
+        var descriptor = switch kind {
         case .recentlyWatched:
             FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.lastWatchedDate != nil },
@@ -211,6 +219,8 @@ private enum MovieCollectionQuery {
                 sortBy: [SortDescriptor(\.added, order: .reverse), SortDescriptor(\.num)]
             )
         }
+        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
+        return descriptor
     }
 }
 
@@ -296,7 +306,7 @@ struct SeriesCollectionView: View {
 
 private enum SeriesCollectionQuery {
     static func descriptor(for kind: LibraryCollection.Kind) -> FetchDescriptor<Series> {
-        switch kind {
+        var descriptor = switch kind {
         case .recentlyWatched:
             FetchDescriptor<Series>(
                 predicate: #Predicate { $0.lastWatchedDate != nil },
@@ -313,6 +323,8 @@ private enum SeriesCollectionQuery {
                 sortBy: [SortDescriptor(\.lastModified, order: .reverse), SortDescriptor(\.num)]
             )
         }
+        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
+        return descriptor
     }
 }
 
