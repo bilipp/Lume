@@ -56,6 +56,7 @@ import SwiftUI
         private var profiles: [UserProfile]
         @State private var creatingProfile = false
         @State private var editingProfile: UserProfile?
+        @AppStorage(ProfileSettings.askOnStartupKey) private var askOnStartup = ProfileSettings.askOnStartupDefault
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -78,6 +79,17 @@ import SwiftUI
                 .buttonStyle(TVSettingsRowButtonStyle())
 
                 Text("Each profile keeps its own watch history, progress and favorites, synced across your devices.")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.top, 6)
+
+                TVSettingsSectionLabel("Startup")
+                    .padding(.top, 24)
+
+                TVOptionToggleRow(title: "Ask on Startup", isOn: $askOnStartup)
+
+                Text("Choose a profile each time Lume launches. When off, Lume resumes the last profile you used.")
                     .font(.system(size: 20))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
