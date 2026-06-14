@@ -83,6 +83,35 @@ struct ProfileEngineTests {
         #expect(profiles.first?.name == "First")
     }
 
+    @Test func `reconcile collapses a duplicate default profile imported from another device`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        // Simulates a freshly-synced device: its own bootstrap-created default
+        // profile, plus the original device's default (same fixed id) that
+        // CloudKit has just imported. They share an id but are distinct rows.
+        ctx.insert(UserProfile(id: UserProfile.defaultProfileID, name: "Original", createdAt: Date(timeIntervalSince1970: 100)))
+        ctx.insert(UserProfile(id: UserProfile.defaultProfileID, name: "This Device", createdAt: Date(timeIntervalSince1970: 200)))
+        // A non-default profile must survive untouched.
+        let keeper = UUID()
+        ctx.insert(UserProfile(id: keeper, name: "Kids", createdAt: Date(timeIntervalSince1970: 150)))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        ActiveProfileStore.current = UserProfile.defaultProfileID
+        defer { ActiveProfileStore.current = saved }
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        _ = await engine.reconcile()
+
+        let profiles = try ctx.fetch(FetchDescriptor<UserProfile>())
+        // One default (the earliest) plus the untouched non-default profile.
+        #expect(profiles.count == 2)
+        let defaults = profiles.filter { $0.id == UserProfile.defaultProfileID }
+        #expect(defaults.count == 1)
+        #expect(defaults.first?.name == "Original")
+        #expect(profiles.contains { $0.id == keeper })
+    }
+
     @Test func `switching profiles flushes the old profile and hydrates the new`() async throws {
         let container = try makeContainer()
         let ctx = container.mainContext

@@ -194,4 +194,65 @@ struct LiveChannelHistoryTests {
 
         #expect(LiveChannelHistory.recentChannelIds(defaults: defaults).isEmpty)
     }
+
+    // MARK: - Profile scoping
+
+    @Test func `recents and recall are isolated per profile`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let defaults = try makeDefaults()
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+        let profileA = UUID()
+        let profileB = UUID()
+
+        LiveChannelHistory.record(alpha, profileID: profileA, defaults: defaults)
+        LiveChannelHistory.record(bravo, profileID: profileA, defaults: defaults)
+
+        // Profile A sees its own recents and recall pair.
+        #expect(LiveChannelHistory.recentChannelIds(profileID: profileA, defaults: defaults) == [
+            channelId(forStreamId: 101, playlist: playlist),
+            channelId(forStreamId: 100, playlist: playlist)
+        ])
+        #expect(LiveChannelHistory.recallMedia(in: context, profileID: profileA, defaults: defaults)?
+            .contentRef == alpha.contentRef)
+
+        // Profile B starts empty — A's history doesn't leak across.
+        #expect(LiveChannelHistory.recentChannelIds(profileID: profileB, defaults: defaults).isEmpty)
+        #expect(LiveChannelHistory.recallMedia(in: context, profileID: profileB, defaults: defaults) == nil)
+    }
+
+    @Test func `the default profile reuses an upgrading user's existing history`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let defaults = try makeDefaults()
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        // Pre-profiles data: recorded with no profile (legacy un-suffixed keys).
+        LiveChannelHistory.record(alpha, profileID: nil, defaults: defaults)
+        LiveChannelHistory.record(bravo, profileID: nil, defaults: defaults)
+
+        // The default profile reads the same un-suffixed keys, so the history
+        // carries over after the upgrade.
+        #expect(LiveChannelHistory.recentChannelIds(
+            profileID: UserProfile.defaultProfileID, defaults: defaults
+        ) == [
+            channelId(forStreamId: 101, playlist: playlist),
+            channelId(forStreamId: 100, playlist: playlist)
+        ])
+    }
+
+    @Test func `purge clears a profile's history`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let defaults = try makeDefaults()
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+        let profile = UUID()
+
+        LiveChannelHistory.record(alpha, profileID: profile, defaults: defaults)
+        LiveChannelHistory.record(bravo, profileID: profile, defaults: defaults)
+        LiveChannelHistory.purge(profileID: profile, defaults: defaults)
+
+        #expect(LiveChannelHistory.recentChannelIds(profileID: profile, defaults: defaults).isEmpty)
+        #expect(LiveChannelHistory.recallMedia(in: context, profileID: profile, defaults: defaults) == nil)
+    }
 }

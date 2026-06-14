@@ -118,6 +118,7 @@ final class ProfileManager {
             await switchProfile(to: fallback.id)
         }
         await coordinator.purgeProfileData(profile.id)
+        LiveChannelHistory.purge(profileID: profile.id)
         context.delete(profile)
         try? context.save()
     }

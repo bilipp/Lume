@@ -60,6 +60,9 @@ actor CloudSyncEngine {
         activeProfileID = ActiveProfileStore.current ?? UserProfile.defaultProfileID
         var result = CloudSyncReconcileResult()
         do {
+            // Collapse any duplicate default profile a freshly-synced device
+            // imported before its own bootstrap-created one could converge.
+            try reconcileProfiles()
             let livePrefixes = try reconcilePlaylists(into: &result)
             try reconcileContent(livePrefixes: livePrefixes, into: &result)
             if context.hasChanges {
