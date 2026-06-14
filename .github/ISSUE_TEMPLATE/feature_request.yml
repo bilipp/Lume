@@ -1,0 +1,60 @@
+name: 💡 Feature request
+description: Suggest an idea or enhancement for Lume.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Please open this **before** starting any implementation work
+        so we can agree on the approach — see [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md).
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched [existing issues](https://github.com/bilipp/Lume/issues) and didn't find a duplicate.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve, or what's missing today?
+      placeholder: "I'm always frustrated when…"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe what you'd like to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or workarounds you've thought about.
+    validations:
+      required: false
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Relevant platforms
+      description: Which platforms does this affect? (Select all that apply.)
+      multiple: true
+      options:
+        - All platforms
+        - iOS / iPadOS
+        - macOS
+        - tvOS
+        - visionOS
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links, or any other context.
+    validations:
+      required: false
