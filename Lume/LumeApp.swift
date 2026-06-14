@@ -18,6 +18,7 @@ struct LumeApp: App {
     let sharedModelContainer: ModelContainer
     @State private var cloudSync: CloudSyncCoordinator
     @State private var profileManager: ProfileManager
+    @State private var parentalControls: ParentalControls
 
     init() {
         let container = Self.makeModelContainer()
@@ -28,10 +29,9 @@ struct LumeApp: App {
             cloudKitEnabled: Self.isCloudKitEnvironment
         )
         _cloudSync = State(initialValue: coordinator)
-        _profileManager = State(initialValue: ProfileManager(
-            container: container,
-            coordinator: coordinator
-        ))
+        let profiles = ProfileManager(container: container, coordinator: coordinator)
+        _profileManager = State(initialValue: profiles)
+        _parentalControls = State(initialValue: ParentalControls(profileManager: profiles))
     }
 
     /// Builds the container with **two configurations**:
@@ -151,6 +151,7 @@ struct LumeApp: App {
                 .environment(TraktService.shared)
                 .environment(cloudSync)
                 .environment(profileManager)
+                .environment(parentalControls)
                 .task {
                     // Give DownloadManager access to the model container so it
                     // can persist download state from its delegate callbacks.

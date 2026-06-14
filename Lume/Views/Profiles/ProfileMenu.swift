@@ -9,10 +9,13 @@ import SwiftUI
 /// creating more profiles stays reachable through Settings.
 struct ProfileMenu: View {
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
+    @Environment(ParentalControls.self) private var parental: ParentalControls?
     @Query(sort: [SortDescriptor(\UserProfile.sortOrder), SortDescriptor(\UserProfile.createdAt)])
     private var profiles: [UserProfile]
 
     @State private var managing = false
+    /// A profile awaiting PIN entry before the switch goes through.
+    @State private var pendingSwitch: UserProfile?
 
     var body: some View {
         if let profileManager, profiles.count > 1 {
@@ -20,7 +23,7 @@ struct ProfileMenu: View {
             Menu {
                 ForEach(profiles) { profile in
                     Button {
-                        Task { await profileManager.switchProfile(to: profile.id) }
+                        attemptSwitch(to: profile, using: profileManager)
                     } label: {
                         Label(
                             profile.name,
@@ -62,6 +65,20 @@ struct ProfileMenu: View {
                 .frame(minWidth: 480, idealWidth: 540, minHeight: 400, idealHeight: 520)
                 #endif
             }
+            .pinPrompt(target: $pendingSwitch) { profile in
+                Task { await profileManager.switchProfile(to: profile.id) }
+            }
+        }
+    }
+
+    /// Switches to `profile`, prompting for the PIN first when leaving a child
+    /// profile requires it.
+    private func attemptSwitch(to profile: UserProfile, using profileManager: ProfileManager) {
+        guard profile.id != profileManager.activeProfileID else { return }
+        if parental?.requiresPIN(toSwitchTo: profile) == true {
+            pendingSwitch = profile
+        } else {
+            Task { await profileManager.switchProfile(to: profile.id) }
         }
     }
 }
