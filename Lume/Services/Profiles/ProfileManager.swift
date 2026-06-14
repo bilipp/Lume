@@ -97,8 +97,15 @@ final class ProfileManager {
         guard id != activeProfileID, !isSwitching else { return }
         let from = activeProfileID
         isSwitching = true
+        // Flush any pending catalog edits (e.g. a favorite toggled moments ago,
+        // not yet autosaved by the main context) so the engine — which reads the
+        // catalog through its own background context — exports the outgoing
+        // profile's *current* state rather than a stale snapshot.
+        try? context.save()
+        // The engine commits `ActiveProfileStore.current = id` atomically with
+        // the projection swap (see `CloudSyncEngine.switchProfile`), so there is
+        // no window where the catalog and the active-profile pointer disagree.
         await coordinator.switchProfile(from: from, to: id)
-        ActiveProfileStore.current = id
         activeProfileID = id
         isSwitching = false
         // Re-baseline the freshly projected state against the cloud.

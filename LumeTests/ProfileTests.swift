@@ -129,8 +129,15 @@ struct ProfileEngineTests {
         ))
         try ctx.save()
 
+        // `switchProfile` now commits the new active profile to `ActiveProfileStore`
+        // atomically with the swap; save/restore it so this serialized suite
+        // doesn't leak the change into other tests.
+        let saved = ActiveProfileStore.current
+        defer { ActiveProfileStore.current = saved }
+
         let engine = CloudSyncEngine(container: container, shadow: freshShadow())
         try await engine.switchProfile(from: profileA, to: profileB)
+        #expect(ActiveProfileStore.current == profileB)
 
         // Profile A's state was flushed into a mirror.
         let states = try ctx.fetch(FetchDescriptor<UserContentState>())
