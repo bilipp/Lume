@@ -149,59 +149,47 @@ struct HomeView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(heroItems.isEmpty ? .automatic : .hidden, for: .navigationBar)
             #endif
-            #if os(iOS)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    ProfileMenu()
-                }
-            }
-            #elseif os(macOS)
-            .toolbar {
-                ToolbarItem(placement: .navigation) {
-                    ProfileMenu()
-                }
-            }
-            #endif
-            .libraryToolbar(config: LibraryToolbarConfiguration(
-                playlists: playlists,
-                selectedPlaylistID: $selectedPlaylistID,
-                categorySortRaw: $categorySortRaw,
-                contentSortRaw: $contentSortRaw,
-                showingSync: $showingSync,
-                showingSettings: $showingSettings,
-                activePlaylist: activePlaylist
-            ))
-            .navigationDestination(for: Movie.self) { movie in
-                MovieDetailView(movie: movie, animationNamespace: animationNamespace)
-                #if os(iOS)
-                    .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))
-                #endif
-            }
-            .navigationDestination(for: Series.self) { series in
-                SeriesDetailView(series: series, animationNamespace: animationNamespace)
-                #if os(iOS)
-                    .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
-                #endif
-            }
-            #if os(tvOS)
-            .navigationDestination(item: $selectedHero) { hero in
-                if let movie = hero.movie {
+                .profileMenuToolbar()
+                .libraryToolbar(config: LibraryToolbarConfiguration(
+                    playlists: playlists,
+                    selectedPlaylistID: $selectedPlaylistID,
+                    categorySortRaw: $categorySortRaw,
+                    contentSortRaw: $contentSortRaw,
+                    showingSync: $showingSync,
+                    showingSettings: $showingSettings,
+                    activePlaylist: activePlaylist
+                ))
+                .navigationDestination(for: Movie.self) { movie in
                     MovieDetailView(movie: movie, animationNamespace: animationNamespace)
-                } else if let series = hero.series {
-                    SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                    #if os(iOS)
+                        .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))
+                    #endif
                 }
-            }
+                .navigationDestination(for: Series.self) { series in
+                    SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                    #if os(iOS)
+                        .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
+                    #endif
+                }
+            #if os(tvOS)
+                .navigationDestination(item: $selectedHero) { hero in
+                    if let movie = hero.movie {
+                        MovieDetailView(movie: movie, animationNamespace: animationNamespace)
+                    } else if let series = hero.series {
+                        SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                    }
+                }
             #endif
-            .task(id: "\(playlists.count)-\(selectedPlaylistID)-\(activePlaylist?.lastSyncDate?.timeIntervalSince1970 ?? 0)") {
-                await loadTrending()
-            }
-            .task(id: "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)") {
-                await loadWatchlist()
-            }
+                .task(id: "\(playlists.count)-\(selectedPlaylistID)-\(activePlaylist?.lastSyncDate?.timeIntervalSince1970 ?? 0)") {
+                    await loadTrending()
+                }
+                .task(id: "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)") {
+                    await loadWatchlist()
+                }
             #if os(iOS) || os(tvOS)
-            .fullScreenCover(item: $playingMedia) { media in
-                FullScreenPlayerView(media: media)
-            }
+                .fullScreenCover(item: $playingMedia) { media in
+                    FullScreenPlayerView(media: media)
+                }
             #endif
         }
     }

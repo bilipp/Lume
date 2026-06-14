@@ -65,3 +65,26 @@ struct ProfileMenu: View {
         }
     }
 }
+
+extension View {
+    /// Places the ``ProfileMenu`` in the navigation bar's leading edge. Shared by
+    /// the top-level library screens (Home, Movies, Series). iOS / macOS only —
+    /// tvOS surfaces profiles through Settings.
+    func profileMenuToolbar() -> some View {
+        #if os(iOS)
+            toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ProfileMenu()
+                }
+            }
+        #elseif os(macOS)
+            toolbar {
+                ToolbarItem(placement: .navigation) {
+                    ProfileMenu()
+                }
+            }
+        #else
+            self
+        #endif
+    }
+}
