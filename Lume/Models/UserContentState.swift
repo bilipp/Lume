@@ -26,8 +26,20 @@ enum SyncedContentKind: String, Codable, CaseIterable {
 /// no `@Attribute(.unique)`, no relationships.
 @Model
 final class UserContentState {
+    // The reconciler and every profile operation fetch mirrors scoped to one
+    // `profileID`; index it so SQLite finds the active profile's rows without
+    // scanning every profile's records. Local-only fetch index — it doesn't
+    // alter the CloudKit record schema.
+    #Index<UserContentState>([\.profileID])
+
     var contentId: String = ""
     var kindRaw: String = SyncedContentKind.movie.rawValue
+
+    /// The profile this state belongs to (`UserProfile.id`). Optional for
+    /// backwards compatibility: records written before profiles existed load
+    /// with `nil` and are claimed by the default profile during bootstrap (see
+    /// `CloudSyncEngine.bootstrapProfiles`). New records are always stamped.
+    var profileID: UUID?
 
     var watchProgress: Double = 0
     var isWatched: Bool = false
@@ -49,6 +61,7 @@ final class UserContentState {
     init(
         contentId: String,
         kind: SyncedContentKind,
+        profileID: UUID? = nil,
         watchProgress: Double = 0,
         isWatched: Bool = false,
         lastWatchedDate: Date? = nil,
@@ -59,6 +72,7 @@ final class UserContentState {
     ) {
         self.contentId = contentId
         kindRaw = kind.rawValue
+        self.profileID = profileID
         self.watchProgress = watchProgress
         self.isWatched = isWatched
         self.lastWatchedDate = lastWatchedDate

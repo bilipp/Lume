@@ -3,6 +3,10 @@ import SwiftData
 
 @Model
 final class Series {
+    // Home's trending/watchlist rows look titles up by `tmdbId`; index it so
+    // those per-item lookups don't scan the whole catalog.
+    #Index<Series>([\.tmdbId])
+
     @Attribute(.unique) var id: String
     var seriesId: Int
     var name: String

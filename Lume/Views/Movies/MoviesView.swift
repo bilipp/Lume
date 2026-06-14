@@ -35,6 +35,11 @@ struct MoviesView: View {
     /// via the per-row "Show All" link.
     private let previewLimit = 20
 
+    /// How many categories render as full inline preview rows. Each preview row
+    /// carries its own live `@Query`, so capping them keeps the browse screen
+    /// fast; the remaining categories surface as lightweight name tiles below.
+    private let previewCategoryLimit = 4
+
     var body: some View {
         NavigationStack {
             Group {
@@ -68,10 +73,16 @@ struct MoviesView: View {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             MovieCollectionRow(kind: .recentlyWatched, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
                             MovieCollectionRow(kind: .favorites, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+                            MovieCollectionRow(kind: .recentlyAdded, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
 
-                            ForEach(sortedCategories) { category in
+                            ForEach(previewCategories) { category in
                                 MovieCategoryPreview(category: category, limit: previewLimit, sort: contentSort, animationNamespace: animationNamespace)
                                     .id("\(category.id)-\(contentSort.rawValue)")
+                            }
+
+                            if !remainingCategories.isEmpty {
+                                CategoryGridSection(title: "All Categories", categories: remainingCategories)
+                                    .padding(.top, 12)
                             }
                         }
                         .padding(.vertical)
@@ -79,6 +90,7 @@ struct MoviesView: View {
                 }
             }
             .platformNavigationTitle("Movies")
+            .profileMenuToolbar()
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,
@@ -122,6 +134,16 @@ struct MoviesView: View {
         guard let playlistId = activePlaylist?.id else { return [] }
         let prefix = "\(playlistId.uuidString)-"
         return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) })
+    }
+
+    /// The categories shown as full inline preview rows (the first few).
+    private var previewCategories: [Category] {
+        Array(sortedCategories.prefix(previewCategoryLimit))
+    }
+
+    /// The long tail of categories, surfaced as name tiles below the rows.
+    private var remainingCategories: [Category] {
+        Array(sortedCategories.dropFirst(previewCategoryLimit))
     }
 }
 

@@ -67,7 +67,7 @@ actor ContentSyncManager {
 
     let modelContainer: ModelContainer
     let xtreamClient: XtreamClient
-    private var activeSyncTasks: [UUID: Task<Void, Error>] = [:]
+    private var activeSyncPlaylistIDs: Set<UUID> = []
 
     /// Number of items to process before saving and resetting the context.
     private let batchSize = 2000
@@ -85,29 +85,29 @@ actor ContentSyncManager {
     func syncPlaylist(_ playlist: Playlist, progress: SyncProgress? = nil, full: Bool = false) async throws {
         let playlistId = playlist.id
 
-        guard activeSyncTasks[playlistId] == nil else {
+        guard !activeSyncPlaylistIDs.contains(playlistId) else {
             throw SyncError.syncInProgress
         }
 
-        let task = Task {
-            do {
-                try await performSync(playlistId: playlistId, progress: progress, full: full)
-            } catch {
-                markPlaylistError(playlistId: playlistId)
-                throw error
-            }
-        }
-
-        activeSyncTasks[playlistId] = task
+        activeSyncPlaylistIDs.insert(playlistId)
+        defer { activeSyncPlaylistIDs.remove(playlistId) }
 
         do {
-            try await task.value
+            // Run directly in the caller's task — no wrapping unstructured Task —
+            // so cancelling the caller (e.g. the user aborting from the progress
+            // sheet) propagates here and tears the sync down.
+            try await performSync(playlistId: playlistId, progress: progress, full: full)
         } catch {
-            activeSyncTasks.removeValue(forKey: playlistId)
+            // An aborted sync isn't a failure: restore the playlist to idle so it
+            // can be retried cleanly, rather than wedging it in the error state.
+            if Task.isCancelled {
+                markPlaylistIdle(playlistId: playlistId)
+            } else {
+                markPlaylistError(playlistId: playlistId)
+            }
             throw error
         }
 
-        activeSyncTasks.removeValue(forKey: playlistId)
         Logger.database.info("Completed sync for playlist \(playlistId)")
 
         // Nudge iCloud sync: a freshly fetched catalog may now be able to apply
@@ -255,6 +255,7 @@ actor ContentSyncManager {
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.vod.rawValue)-"
 
         for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
+            try Task.checkCancellation()
             try autoreleasepool {
                 let batchEnd = min(batchStart + batchSize, totalCount)
                 let batch = movieDTOs[batchStart ..< batchEnd]
@@ -320,6 +321,7 @@ actor ContentSyncManager {
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.series.rawValue)-"
 
         for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
+            try Task.checkCancellation()
             try autoreleasepool {
                 let batchEnd = min(batchStart + batchSize, totalCount)
                 let batch = seriesDTOs[batchStart ..< batchEnd]
@@ -430,6 +432,7 @@ actor ContentSyncManager {
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.live.rawValue)-"
 
         for batchStart in stride(from: 0, to: totalCount, by: batchSize) {
+            try Task.checkCancellation()
             try autoreleasepool {
                 let batchEnd = min(batchStart + batchSize, totalCount)
                 let batch = streamDTOs[batchStart ..< batchEnd]

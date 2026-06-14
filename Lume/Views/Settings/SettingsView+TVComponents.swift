@@ -15,7 +15,7 @@ import SwiftUI
 
     /// The top-level settings categories shown in the tvOS sidebar.
     enum SettingsCategory: String, CaseIterable, Identifiable {
-        case playlists, content, integrations, player, about
+        case playlists, profiles, content, integrations, player, about
 
         var id: String {
             rawValue
@@ -24,6 +24,7 @@ import SwiftUI
         var title: LocalizedStringKey {
             switch self {
             case .playlists: "Playlists"
+            case .profiles: "Profiles"
             case .content: "Content"
             case .integrations: "Integrations"
             case .player: "Player"
@@ -64,28 +65,32 @@ import SwiftUI
         }
 
         var tvAboutDetail: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel("About")
+            VStack(alignment: .leading, spacing: 36) {
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("About")
 
-                HStack(spacing: 18) {
-                    Image(systemName: "play.tv.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.tint)
-                        .frame(width: 60, height: 60)
-                        .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
+                    HStack(spacing: 18) {
+                        Image(systemName: "play.tv.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.tint)
+                            .frame(width: 60, height: 60)
+                            .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Lume")
-                            .font(.system(size: 26, weight: .semibold))
-                        Text("Version 1.0.0")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Lume")
+                                .font(.system(size: 26, weight: .semibold))
+                            Text("Version 1.0.0")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer(minLength: 0)
                     }
-
-                    Spacer(minLength: 0)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.vertical, 8)
                 }
-                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                .padding(.vertical, 8)
+
+                tvSupportSection
             }
         }
     }

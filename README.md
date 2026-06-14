@@ -13,6 +13,7 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)](https://developer.apple.com/xcode/swiftui/)
 [![SwiftData](https://img.shields.io/badge/Persistence-SwiftData-30B0C7)](https://developer.apple.com/documentation/swiftdata)
 [![Issues](https://img.shields.io/github/issues/bilipp/Lume?color=F9EE00&labelColor=1f1f2e)](https://github.com/bilipp/Lume/issues)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue?labelColor=1f1f2e)](LICENSE)
 
 </div>
 
@@ -89,6 +90,11 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - Auto-mark-as-watched at 90% completion
 - **Next Up** overlay with auto-play for series episodes
 - Optional **Trakt** scrobbling and **TMDB** metadata enrichment
+
+#### 👤 Profiles
+- Multiple **user profiles**, each with its own watch history, progress, and favorites
+- Switch profiles from the top-left of Home (iOS / macOS) or in Settings (tvOS)
+- Profiles and their state **sync across your devices** via iCloud
 
 #### ⚙️ Library management
 - Manage multiple playlists — **Xtream Codes** and **M3U/M3U8** (add / edit / delete / switch)
@@ -307,20 +313,42 @@ Planned features and enhancements are tracked as
 
 ## Contributing
 
-Contributions are welcome! If you'd like to help:
+Contributions are welcome! The short version:
 
 1. Open an [issue](https://github.com/bilipp/Lume/issues) to discuss a bug or feature.
-2. Fork the repo and create a feature branch.
-3. Keep the code style consistent (SwiftFormat & SwiftLint configs are included).
+2. Fork the repo and create a feature branch off `main`.
+3. Run `./Scripts/setup.sh` once to install the git hooks and lint/format tooling —
+   [Lefthook](https://lefthook.dev), SwiftFormat, and SwiftLint are all vendored as
+   Swift Package plugins, so you only need Xcode's Swift toolchain (no Homebrew or Mint).
 4. Make sure the test suite passes before opening a pull request.
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full guide — dev setup, coding style,
+localization, commit conventions, and the PR checklist.
 
 ---
 
 ## License
 
-This project does not yet include an open-source license. Until one is added, all
-rights are reserved by the author. If you'd like to use or contribute to Lume, please
-open an issue to discuss.
+Lume is free software, licensed under the **GNU Affero General Public License v3.0
+(AGPL-3.0)**. See [`LICENSE`](LICENSE) for the full text.
+
+In short — you are free to use, study, modify, and redistribute Lume, but **any
+project that incorporates this code must also be released as open source under the
+AGPL-3.0**. This requirement extends to software offered over a network: if you run a
+modified version of Lume as a network service, you must make your modified source
+available to its users.
+
+```
+Copyright (C) 2026 Philipp Bischoff
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+```
 
 <div align="center">
 <br>
