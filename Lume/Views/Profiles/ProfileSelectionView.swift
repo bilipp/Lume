@@ -17,14 +17,21 @@ struct ProfileSelectionView: View {
         private let avatarSize: CGFloat = 180
         private let gridSpacing: CGFloat = 64
         private let titleFont: Font = .system(size: 56, weight: .semibold)
+        private let maxColumns = 6
     #else
         private let avatarSize: CGFloat = 96
         private let gridSpacing: CGFloat = 28
         private let titleFont: Font = .largeTitle.weight(.semibold)
+        private let maxColumns = 4
     #endif
 
+    /// A fixed number of fixed-width columns (capped at `maxColumns`) gives the
+    /// grid a determinate intrinsic width, so the centered parent `VStack`
+    /// centers the whole block instead of letting an adaptive grid stretch
+    /// full-width and pack items against the leading edge. Rows still wrap.
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: avatarSize + 48), spacing: gridSpacing)]
+        let count = max(1, min(profiles.count, maxColumns))
+        return Array(repeating: GridItem(.fixed(avatarSize + 48), spacing: gridSpacing), count: count)
     }
 
     var body: some View {
