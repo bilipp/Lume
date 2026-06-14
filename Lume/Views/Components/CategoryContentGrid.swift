@@ -74,6 +74,115 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
     }
 }
 
+// MARK: - Category Grid ("Show All" tiles)
+
+/// A grid of lightweight, query-free category tiles shown beneath the inline
+/// preview rows. Each tile behaves exactly like a row's "Show All" link,
+/// navigating to that category's full grid via `NavigationLink(value:)`.
+///
+/// Only the first few categories render as inline preview rows — every preview
+/// row carries its own live `@Query`, so a playlist with dozens of categories
+/// would otherwise spin up dozens of concurrent fetches and stutter the browse
+/// screen. Surfacing the long tail as plain name tiles keeps it fast.
+struct CategoryGridSection: View {
+    let title: LocalizedStringKey
+    let categories: [Category]
+
+    private let columns = [GridItem(.adaptive(minimum: CategoryTileMetrics.minimum), spacing: CategoryTileMetrics.spacing)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
+
+            LazyVGrid(columns: columns, spacing: CategoryTileMetrics.spacing) {
+                ForEach(categories) { category in
+                    NavigationLink(value: category) {
+                        CategoryTile(name: category.name)
+                    }
+                    .posterCardButtonStyle()
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+}
+
+private struct CategoryTile: View {
+    let name: String
+
+    // On the 10-foot UI the focus engine owns selection feedback: the focused
+    // tile brightens to a solid plate with dark text (the standard tvOS card
+    // affordance), while the rest sit on a quiet material. `isFocused` is set
+    // for the focused button's label subtree, which is where this tile renders.
+    #if os(tvOS)
+        @Environment(\.isFocused) private var isFocused
+    #endif
+
+    var body: some View {
+        Text(name)
+            .font(CategoryTileMetrics.font)
+            .fontWeight(.semibold)
+            .lineLimit(2)
+            .minimumScaleFactor(0.7)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(foreground)
+            .frame(maxWidth: .infinity)
+            .frame(height: CategoryTileMetrics.height)
+            .padding(.horizontal)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: CategoryTileMetrics.cornerRadius, style: .continuous))
+        #if os(tvOS)
+            // Animate the brighten in lockstep with the focus scale supplied
+            // by TVCardButtonStyle so the plate and text don't pop.
+            .animation(.easeOut(duration: 0.18), value: isFocused)
+        #endif
+    }
+
+    private var foreground: Color {
+        #if os(tvOS)
+            isFocused ? .black : .primary
+        #else
+            .primary
+        #endif
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        #if os(tvOS)
+            // A solid white layer crossfaded over the resting material — keeping
+            // both layers present (rather than swapping view identity) lets the
+            // focus transition interpolate cleanly.
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(Color.white.opacity(isFocused ? 1 : 0))
+        #else
+            Rectangle().fill(.ultraThinMaterial)
+        #endif
+    }
+}
+
+private enum CategoryTileMetrics {
+    #if os(tvOS)
+        static let minimum: CGFloat = 320
+        static let spacing: CGFloat = 36
+        static let height: CGFloat = 100
+        static let cornerRadius: CGFloat = 12
+        /// `.title3` (~38pt on tvOS) overwhelms a name tile; a tighter fixed size
+        /// reads cleanly beside the poster cards and matches their title weight.
+        static let font: Font = .system(size: 26, weight: .semibold)
+    #else
+        static let minimum: CGFloat = 160
+        static let spacing: CGFloat = 16
+        static let height: CGFloat = 72
+        static let cornerRadius: CGFloat = 10
+        static let font: Font = .subheadline
+    #endif
+}
+
 // MARK: - Category Preview Row
 
 struct CategoryPreviewRow<Item: Identifiable & Hashable, Card: View>: View {

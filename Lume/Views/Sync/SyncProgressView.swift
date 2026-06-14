@@ -29,6 +29,7 @@ struct SyncProgressView: View {
     @State private var progress = SyncProgress()
     @State private var phase: Phase
     @State private var syncError: String?
+    @State private var syncTask: Task<Void, Never>?
 
     init(playlist: Playlist, autoStart: Bool = false) {
         self.playlist = playlist
@@ -90,7 +91,7 @@ struct SyncProgressView: View {
         syncError = nil
         phase = .syncing
 
-        Task {
+        syncTask = Task {
             do {
                 let syncManager = ContentSyncManager(modelContainer: modelContext.container)
                 try await syncManager.syncPlaylist(playlist, progress: progress, full: true)
@@ -103,13 +104,26 @@ struct SyncProgressView: View {
                     // user can start browsing; the manual flow waits for Done.
                     if autoStart { dismiss() }
                 }
+            } catch is CancellationError {
+                // User aborted — the sheet is being dismissed, nothing to show.
             } catch {
+                // A cancelled network request surfaces as a non-CancellationError;
+                // swallow it too so an abort never flashes the failure screen.
+                if Task.isCancelled { return }
                 await MainActor.run {
                     syncError = error.localizedDescription
                     phase = .failed
                 }
             }
         }
+    }
+
+    /// Cancels the in-flight sync (if any) and closes the sheet. Cancellation
+    /// propagates into ContentSyncManager, which restores the playlist to idle.
+    private func abortSync() {
+        syncTask?.cancel()
+        syncTask = nil
+        dismiss()
     }
 }
 
@@ -151,11 +165,14 @@ struct SyncProgressView: View {
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel") {
-                                dismiss()
+                                // While syncing, Cancel aborts the in-flight work;
+                                // otherwise it just closes the sheet.
+                                if phase == .syncing {
+                                    abortSync()
+                                } else {
+                                    dismiss()
+                                }
                             }
-                            // Block dismissal while syncing — the user must wait for
-                            // it to finish (or fail) before continuing.
-                            .disabled(phase == .syncing)
                         }
                     }
             }
@@ -429,11 +446,16 @@ struct SyncProgressView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
 
             case .syncing:
-                HStack(spacing: 16) {
-                    ProgressView()
-                    Text("This may take a few minutes…")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.secondary)
+                VStack(spacing: 32) {
+                    HStack(spacing: 16) {
+                        ProgressView()
+                        Text("This may take a few minutes…")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Cancel") { abortSync() }
+                        .buttonStyle(TVSettingsActionButtonStyle())
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
 

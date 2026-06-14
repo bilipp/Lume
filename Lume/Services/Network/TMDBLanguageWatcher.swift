@@ -41,12 +41,18 @@ enum TMDBLanguageWatcher {
 
     private static func resetEnrichment(in context: ModelContext) {
         do {
-            let movies = try context.fetch(FetchDescriptor<Movie>())
-            for movie in movies where movie.tmdbEnrichedAt != nil {
+            // Filter in SQLite so only already-enriched rows are hydrated, instead
+            // of loading the entire catalog onto the main thread to clear a field.
+            let movies = try context.fetch(FetchDescriptor<Movie>(
+                predicate: #Predicate { $0.tmdbEnrichedAt != nil }
+            ))
+            for movie in movies {
                 movie.tmdbEnrichedAt = nil
             }
-            let series = try context.fetch(FetchDescriptor<Series>())
-            for show in series where show.tmdbEnrichedAt != nil {
+            let series = try context.fetch(FetchDescriptor<Series>(
+                predicate: #Predicate { $0.tmdbEnrichedAt != nil }
+            ))
+            for show in series {
                 show.tmdbEnrichedAt = nil
             }
             try context.save()

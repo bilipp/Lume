@@ -4,6 +4,8 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    /// Not `private`: read by the SettingsView+Profiles extension (separate file).
+    @Environment(ProfileManager.self) var profileManager: ProfileManager?
     // Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @Query var playlists: [Playlist]
     @State private var showingAddPlaylist = false
@@ -86,6 +88,7 @@ struct SettingsView: View {
         private var standardBody: some View {
             NavigationStack {
                 List {
+                    profilesSection
                     playlistsSection
                     librarySection
                     indexingSection
@@ -97,6 +100,7 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
+                    supportSection
                     aboutSection
                 }
                 #if os(macOS)
@@ -401,6 +405,7 @@ struct SettingsView: View {
                         } else {
                             tvPlaylistsDetail
                         }
+                    case .profiles: TVProfilesSettingsView()
                     case .integrations: tvIntegrationsDetail
                     case .player:
                         if let selectedEngineOptions {

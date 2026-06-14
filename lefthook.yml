@@ -1,0 +1,31 @@
+# Git hooks for Lume, managed by Lefthook — https://lefthook.dev
+#
+# After cloning, run once:  ./Scripts/setup.sh
+# All tools (Lefthook, SwiftFormat, SwiftLint) are vendored as SPM plugins in
+# Package.swift, so only Xcode's Swift toolchain is required — no Homebrew/Mint.
+# Lefthook auto-resyncs the hooks whenever this file changes.
+
+pre-commit:
+  parallel: false
+  commands:
+    # 1. Normalize String Catalogs to Xcode's exact JSON format (byte-stable diffs).
+    normalize-xcstrings:
+      priority: 1
+      glob: "*.xcstrings"
+      run: swift Scripts/normalize-xcstrings.swift {staged_files}
+      stage_fixed: true
+
+    # 2. Auto-format staged Swift via the vendored SwiftFormat executable, then re-stage.
+    #    (`swift run` is used instead of the SwiftFormat command plugin, which only
+    #    formats SPM targets — this repo's app lives in Lume.xcodeproj, not SPM targets.)
+    swiftformat:
+      priority: 2
+      glob: "*.swift"
+      run: swift run --build-path .build/tools swiftformat {staged_files}
+      stage_fixed: true
+
+    # 3. Lint staged Swift via the SwiftLint binary plugin — strict, so warnings block.
+    swiftlint:
+      priority: 3
+      glob: "*.swift"
+      run: swift package --build-path .build/tools plugin --allow-writing-to-package-directory swiftlint lint --strict --quiet {staged_files}

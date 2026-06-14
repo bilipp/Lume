@@ -54,6 +54,14 @@ final nonisolated class CloudSyncShadow {
         Set(content.keys)
     }
 
+    /// Drop the entire content baseline. Called on a profile switch: the catalog
+    /// has been re-projected to a different profile, so the previous baseline no
+    /// longer describes it. The next reconcile rebuilds it (a one-time union
+    /// merge — never data loss, per this type's contract).
+    func resetContent() {
+        content.removeAll()
+    }
+
     // MARK: Persistence
 
     /// Flush the in-memory baseline to disk. Called once at the end of a
