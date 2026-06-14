@@ -311,8 +311,14 @@ Contributions are welcome! If you'd like to help:
 
 1. Open an [issue](https://github.com/bilipp/Lume/issues) to discuss a bug or feature.
 2. Fork the repo and create a feature branch.
-3. Keep the code style consistent (SwiftFormat & SwiftLint configs are included).
-4. Make sure the test suite passes before opening a pull request.
+3. Run `./Scripts/setup.sh` once to set up your dev environment. [Lefthook](https://lefthook.dev),
+   SwiftFormat and SwiftLint are all vendored as Swift Package plugins (`Package.swift`), so you
+   only need Xcode's Swift toolchain — no Homebrew or Mint. (The first run builds SwiftFormat from
+   source once, ~10 s; it's cached afterwards.) The hooks then auto-format Swift (SwiftFormat),
+   lint it strictly (SwiftLint), and normalize the String Catalog to Xcode's canonical format on
+   every commit.
+4. Keep the code style consistent (SwiftFormat & SwiftLint configs are included).
+5. Make sure the test suite passes before opening a pull request.
 
 ---
 
