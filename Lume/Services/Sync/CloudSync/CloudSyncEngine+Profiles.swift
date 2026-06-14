@@ -65,6 +65,21 @@ extension CloudSyncEngine {
         shadow.persist()
     }
 
+    /// Collapse duplicate profiles that CloudKit surfaced from another device.
+    /// The default profile uses a fixed id, so two devices that each bootstrap
+    /// before syncing both create one; once they sync, the store holds two rows
+    /// sharing that id (CloudKit keys records by its own identifier, not our
+    /// `id`, so it never merges them). Run on every reconcile — mirroring the
+    /// defensive de-dup already applied to `SyncedPlaylist`/`UserContentState` —
+    /// so a duplicate collapses as soon as the original imports, instead of
+    /// lingering until the next launch. `dedupeProfiles` keeps the
+    /// earliest-created, so every device converges on the same survivor.
+    func reconcileProfiles() throws {
+        _ = try dedupeProfiles(context.fetch(
+            FetchDescriptor<UserProfile>(sortBy: [SortDescriptor(\.createdAt)])
+        ))
+    }
+
     /// Delete every content record owned by a profile (called when the profile
     /// itself is deleted). The `UserProfile` row is removed by `ProfileManager`.
     func purgeProfileData(_ profileID: UUID) throws {

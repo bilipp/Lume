@@ -85,6 +85,13 @@ struct ProfileEditorView: View {
             } message: {
                 Text("This permanently removes this profile's watch history, progress and favorites. Your library is not affected.")
             }
+            // The editor is presented as a full-screen cover on tvOS, where a
+            // `Form` is transparent and would let the Settings screen show
+            // through. Give it the same opaque fill as every other tvOS settings
+            // surface so it reads as a self-contained screen.
+            #if os(tvOS)
+            .tvSettingsBackground()
+            #endif
         }
     }
 

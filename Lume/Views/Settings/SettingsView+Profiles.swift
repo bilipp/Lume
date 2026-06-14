@@ -11,6 +11,42 @@
 import SwiftData
 import SwiftUI
 
+#if !os(tvOS)
+
+    extension SettingsView {
+        /// The iOS/macOS Settings entry into profile management (switch / add /
+        /// edit / delete). The top-left `ProfileMenu` is the quick switcher; this
+        /// is the dedicated management surface. Lives here (not in SettingsView.swift)
+        /// to keep that file within the project's line-count cap.
+        var profilesSection: some View {
+            Section {
+                NavigationLink {
+                    ManageProfilesView()
+                } label: {
+                    HStack(spacing: 12) {
+                        if let activeProfile = profileManager?.activeProfile {
+                            ProfileAvatarView(profile: activeProfile, size: 28)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Profiles")
+                                Text(activeProfile.name)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            Label("Profiles", systemImage: "person.crop.circle")
+                        }
+                    }
+                }
+            } header: {
+                Text("Profiles")
+            } footer: {
+                Text("Each profile keeps its own watch history, progress and favorites. Profiles sync across your devices via iCloud.")
+            }
+        }
+    }
+
+#endif
+
 #if os(tvOS)
 
     /// Self-contained Profiles pane shown in the tvOS Settings detail column.
