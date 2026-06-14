@@ -51,6 +51,13 @@ struct ProfileMenu: View {
                             }
                         }
                 }
+                // A macOS sheet sizes to its content's ideal size, and a `List`
+                // reports no useful intrinsic height — so without an explicit
+                // frame the sheet collapses to just the title bar. Match the
+                // sizing SettingsView uses for the same screen.
+                #if os(macOS)
+                .frame(minWidth: 480, idealWidth: 540, minHeight: 400, idealHeight: 520)
+                #endif
             }
         }
     }
