@@ -34,7 +34,21 @@ extension ContentSyncManager {
 /// context — the detail views' main (view) context, or the content indexer's
 /// background context. Nonisolated so it runs in the caller's isolation either
 /// way; the movie and context must belong together.
-nonisolated func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie, context: ModelContext) {
+///
+/// `includeCast` must be `false` when called on a background context (the
+/// indexer). Rewriting the `CastMember` relationship there forces CoreData
+/// inverse-relationship maintenance to fault objects out of this multi-store
+/// CloudKit container, which crashes with an uncatchable `no such table`
+/// NSException. The embedding never reads the relationship (only the `actors`
+/// string), so the indexer skips it — and skips the `tmdbEnrichedAt` stamp so
+/// the detail view still performs a full, cast-included enrichment on the main
+/// context the first time the title is opened.
+nonisolated func applyMovieDetails(
+    _ details: TMDBTitleDetails,
+    to movie: Movie,
+    context: ModelContext,
+    includeCast: Bool = true
+) {
     movie.backdropPath = details.backdropPath ?? movie.backdropPath
     movie.logoPath = details.logoPath ?? movie.logoPath
     movie.tagline = details.tagline ?? movie.tagline
@@ -63,10 +77,13 @@ nonisolated func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie,
         movie.collectionBackdropPath = details.collectionBackdropPath
     }
 
+    guard includeCast else { return }
     replaceCast(of: movie.castMembers, with: details.cast, ownerId: movie.id, context: context) { castMember in
         castMember.movie = movie
     }
 
+    // Stamp "fully enriched" only once cast is applied; the indexer's partial
+    // pass leaves this nil so the detail view completes enrichment later.
     movie.tmdbEnrichedAt = Date()
 }
 
@@ -74,7 +91,16 @@ nonisolated func applyMovieDetails(_ details: TMDBTitleDetails, to movie: Movie,
 /// context — the detail views' main (view) context, or the content indexer's
 /// background context. Nonisolated so it runs in the caller's isolation either
 /// way; the series and context must belong together.
-nonisolated func applySeriesDetails(_ details: TMDBTitleDetails, to series: Series, context: ModelContext) {
+///
+/// `includeCast` must be `false` on a background context — see
+/// `applyMovieDetails` for why. The series embedding reads the enriched `cast`
+/// string (set below, unconditionally), never the `CastMember` relationship.
+nonisolated func applySeriesDetails(
+    _ details: TMDBTitleDetails,
+    to series: Series,
+    context: ModelContext,
+    includeCast: Bool = true
+) {
     series.backdropPath = details.backdropPath ?? series.backdropPath
     series.logoPath = details.logoPath ?? series.logoPath
     series.tagline = details.tagline ?? series.tagline
@@ -97,10 +123,13 @@ nonisolated func applySeriesDetails(_ details: TMDBTitleDetails, to series: Seri
         series.rating = String(format: "%.1f", vote)
     }
 
+    guard includeCast else { return }
     replaceCast(of: series.castMembers, with: details.cast, ownerId: series.id, context: context) { castMember in
         castMember.series = series
     }
 
+    // Stamp "fully enriched" only once cast is applied; the indexer's partial
+    // pass leaves this nil so the detail view completes enrichment later.
     series.tmdbEnrichedAt = Date()
 }
 
