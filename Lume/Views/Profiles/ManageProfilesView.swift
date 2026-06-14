@@ -5,12 +5,15 @@ import SwiftUI
 /// screen from the profile switcher and embedded in Settings.
 struct ManageProfilesView: View {
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
+    @Environment(ParentalControls.self) private var parental: ParentalControls?
     @Query(sort: [SortDescriptor(\UserProfile.sortOrder), SortDescriptor(\UserProfile.createdAt)])
     private var profiles: [UserProfile]
 
     @State private var creatingProfile = false
     @State private var editingProfile: UserProfile?
     @State private var profilePendingDeletion: UserProfile?
+    /// A profile awaiting PIN entry before the switch goes through.
+    @State private var pendingSwitch: UserProfile?
 
     @AppStorage(ProfileSettings.askOnStartupKey) private var askOnStartup = ProfileSettings.askOnStartupDefault
 
@@ -39,6 +42,9 @@ struct ManageProfilesView: View {
             }
         }
         .platformNavigationTitle("Profiles")
+        .pinPrompt(target: $pendingSwitch) { profile in
+            Task { await profileManager?.switchProfile(to: profile.id) }
+        }
         .sheet(isPresented: $creatingProfile) {
             ProfileEditorView()
         }
@@ -68,7 +74,11 @@ struct ManageProfilesView: View {
         let isActive = profile.id == profileManager?.activeProfileID
         Button {
             guard let profileManager, !isActive else { return }
-            Task { await profileManager.switchProfile(to: profile.id) }
+            if parental?.requiresPIN(toSwitchTo: profile) == true {
+                pendingSwitch = profile
+            } else {
+                Task { await profileManager.switchProfile(to: profile.id) }
+            }
         } label: {
             HStack(spacing: 12) {
                 ProfileAvatarView(profile: profile, size: 36)
