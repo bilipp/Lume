@@ -13,6 +13,7 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)](https://developer.apple.com/xcode/swiftui/)
 [![SwiftData](https://img.shields.io/badge/Persistence-SwiftData-30B0C7)](https://developer.apple.com/documentation/swiftdata)
 [![Issues](https://img.shields.io/github/issues/bilipp/Lume?color=F9EE00&labelColor=1f1f2e)](https://github.com/bilipp/Lume/issues)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue?labelColor=1f1f2e)](LICENSE)
 
 </div>
 
@@ -315,16 +316,39 @@ Contributions are welcome! If you'd like to help:
 
 1. Open an [issue](https://github.com/bilipp/Lume/issues) to discuss a bug or feature.
 2. Fork the repo and create a feature branch.
-3. Keep the code style consistent (SwiftFormat & SwiftLint configs are included).
-4. Make sure the test suite passes before opening a pull request.
+3. Run `./Scripts/setup.sh` once to set up your dev environment. [Lefthook](https://lefthook.dev),
+   SwiftFormat and SwiftLint are all vendored as Swift Package plugins (`Package.swift`), so you
+   only need Xcode's Swift toolchain — no Homebrew or Mint. (The first run builds SwiftFormat from
+   source once, ~10 s; it's cached afterwards.) The hooks then auto-format Swift (SwiftFormat),
+   lint it strictly (SwiftLint), and normalize the String Catalog to Xcode's canonical format on
+   every commit.
+4. Keep the code style consistent (SwiftFormat & SwiftLint configs are included).
+5. Make sure the test suite passes before opening a pull request.
 
 ---
 
 ## License
 
-This project does not yet include an open-source license. Until one is added, all
-rights are reserved by the author. If you'd like to use or contribute to Lume, please
-open an issue to discuss.
+Lume is free software, licensed under the **GNU Affero General Public License v3.0
+(AGPL-3.0)**. See [`LICENSE`](LICENSE) for the full text.
+
+In short — you are free to use, study, modify, and redistribute Lume, but **any
+project that incorporates this code must also be released as open source under the
+AGPL-3.0**. This requirement extends to software offered over a network: if you run a
+modified version of Lume as a network service, you must make your modified source
+available to its users.
+
+```
+Copyright (C) 2026 Philipp Bischoff
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+```
 
 <div align="center">
 <br>
