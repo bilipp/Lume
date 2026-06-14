@@ -57,8 +57,13 @@ extension CloudSyncEngine {
     /// reconcile (which re-reads the active profile from `ActiveProfileStore`)
     /// re-baselines against the newly projected state.
     func switchProfile(from: UUID, to toID: UUID) throws {
-        try exportCatalogState(toProfile: from)
-        try resetCatalogUserState()
+        // Gather the catalog's current user-state once and reuse it for both the
+        // export into the outgoing profile's mirrors and the catalog reset — these
+        // each used to re-run the four catalog fetches, tripling the work per
+        // switch.
+        let localValues = try fetchLocalContentValues()
+        try exportCatalogState(toProfile: from, localValues: localValues)
+        resetCatalogUserState(localValues: localValues)
         try importProfileState(toID)
         shadow.resetContent()
         if context.hasChanges { try context.save() }
@@ -129,8 +134,7 @@ private extension CloudSyncEngine {
     /// Precisely sync the catalog's user state into a profile's mirrors: upsert
     /// every non-default catalog item, and delete mirrors whose catalog item was
     /// cleared this session (so an un-favorite during the session sticks).
-    func exportCatalogState(toProfile profileID: UUID) throws {
-        let localValues = try fetchLocalContentValues()
+    func exportCatalogState(toProfile profileID: UUID, localValues: [String: LocalContentEntry]) throws {
         var mirrors = try fetchMirrors(forProfile: profileID)
         for (id, entry) in localValues {
             upsertMirror(&mirrors, id: id, profileID: profileID, kind: entry.kind, values: entry.values)
@@ -140,8 +144,8 @@ private extension CloudSyncEngine {
         }
     }
 
-    func resetCatalogUserState() throws {
-        for entry in try fetchLocalContentValues().values {
+    func resetCatalogUserState(localValues: [String: LocalContentEntry]) {
+        for entry in localValues.values {
             resetLocalContent(entry)
         }
     }

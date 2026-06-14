@@ -15,7 +15,14 @@ import SwiftUI
 @MainActor
 @Observable
 final class ProfileManager {
-    private(set) var activeProfileID: UUID
+    private(set) var activeProfileID: UUID {
+        didSet { activeProfile = profile(with: activeProfileID) }
+    }
+
+    /// Cached active profile, refreshed whenever `activeProfileID` changes. Avoids
+    /// a SwiftData fetch on every SwiftUI body that reads it (the switcher chip
+    /// lives in toolbars and the settings screen, which re-render often).
+    private(set) var activeProfile: UserProfile?
     /// True once launch bootstrap has resolved the active profile and claimed any
     /// legacy records. The switcher waits on this before offering a switch.
     private(set) var isReady = false
@@ -30,6 +37,13 @@ final class ProfileManager {
         self.container = container
         self.coordinator = coordinator
         activeProfileID = ActiveProfileStore.current ?? UserProfile.defaultProfileID
+        // `didSet` doesn't fire for the in-init assignment above, so seed the
+        // cache directly (same single-row fetch shape) — keeps a profile resolved
+        // on a prior launch available before `bootstrap()` runs.
+        let resolvedID = activeProfileID
+        var descriptor = FetchDescriptor<UserProfile>(predicate: #Predicate { $0.id == resolvedID })
+        descriptor.fetchLimit = 1
+        activeProfile = (try? container.mainContext.fetch(descriptor))?.first
     }
 
     private var context: ModelContext {
@@ -65,10 +79,6 @@ final class ProfileManager {
         return try? context.fetch(descriptor).first
     }
 
-    var activeProfile: UserProfile? {
-        profile(with: activeProfileID)
-    }
-
     // MARK: - Mutations
 
     @discardableResult
@@ -77,7 +87,7 @@ final class ProfileManager {
             name: name,
             symbolName: symbolName,
             colorRaw: color.rawValue,
-            sortOrder: allProfiles().count
+            sortOrder: (try? context.fetchCount(FetchDescriptor<UserProfile>())) ?? 0
         )
         context.insert(profile)
         try? context.save()
