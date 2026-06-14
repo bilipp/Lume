@@ -68,6 +68,7 @@ struct MoviesView: View {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             MovieCollectionRow(kind: .recentlyWatched, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
                             MovieCollectionRow(kind: .favorites, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+                            MovieCollectionRow(kind: .recentlyAdded, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
 
                             ForEach(sortedCategories) { category in
                                 MovieCategoryPreview(category: category, limit: previewLimit, sort: contentSort, animationNamespace: animationNamespace)

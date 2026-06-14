@@ -1887,6 +1887,16 @@
         }
       }
     },
+    "Movies recently added to your library will appear here" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filme, die kürzlich zu deiner Bibliothek hinzugefügt wurden, erscheinen hier"
+          }
+        }
+      }
+    },
     "Movies you mark as favorites will appear here" : {
       "localizations" : {
         "de" : {
@@ -2465,6 +2475,16 @@
         }
       }
     },
+    "Recently Added" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kürzlich hinzugefügt"
+          }
+        }
+      }
+    },
     "Recently Watched" : {
       "localizations" : {
         "de" : {
@@ -2743,6 +2763,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Serien-Kategorien"
+          }
+        }
+      }
+    },
+    "Series recently added to your library will appear here" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serien, die kürzlich zu deiner Bibliothek hinzugefügt wurden, erscheinen hier"
           }
         }
       }
