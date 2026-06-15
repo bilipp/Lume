@@ -490,6 +490,16 @@
         }
       }
     },
+    "Browse by Genre" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach Genre"
+          }
+        }
+      }
+    },
     "Cached artwork and metadata are re-downloaded automatically when needed. Your playlists, downloads, watch history and favorites are not affected." : {
       "localizations" : {
         "de" : {
@@ -2563,6 +2573,16 @@
         }
       }
     },
+    "No movies in this genre" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Filme in diesem Genre"
+          }
+        }
+      }
+    },
     "No Playlist" : {
       "localizations" : {
         "de" : {
@@ -2613,6 +2633,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Serien in dieser Kategorie"
+          }
+        }
+      }
+    },
+    "No series in this genre" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Serien in diesem Genre"
           }
         }
       }

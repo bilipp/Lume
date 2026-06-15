@@ -111,7 +111,9 @@ struct CategoryGridSection: View {
     }
 }
 
-private struct CategoryTile: View {
+/// A lightweight, query-free name tile. Shared by `CategoryGridSection` and the
+/// genre browse grid — both surface a flat list of names that navigate onward.
+struct CategoryTile: View {
     let name: String
 
     // On the 10-foot UI the focus engine owns selection feedback: the focused
@@ -165,7 +167,7 @@ private struct CategoryTile: View {
     }
 }
 
-private enum CategoryTileMetrics {
+enum CategoryTileMetrics {
     #if os(tvOS)
         static let minimum: CGFloat = 320
         static let spacing: CGFloat = 36
