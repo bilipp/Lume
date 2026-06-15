@@ -32,6 +32,7 @@ enum LiveTVLayoutMode: String, CaseIterable, Identifiable {
 
 struct LiveTVView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
@@ -265,17 +266,23 @@ struct LiveTVView: View {
     private var sortedCategories: [Category] {
         guard let playlistId = activePlaylist?.id else { return [] }
         let prefix = "\(playlistId.uuidString)-"
-        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) })
+        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) })
     }
 
     /// Whether the active playlist has any favorited / recently-watched channels,
     /// gating the corresponding virtual sections so empty collections never show.
+    /// Channels in restricted categories are excluded while a child profile is
+    /// active, so those collections never surface restricted content.
     private var hasFavorites: Bool {
-        !playlistPrefix.isEmpty && favoriteStreams.contains { $0.id.hasPrefix(playlistPrefix) }
+        !playlistPrefix.isEmpty && favoriteStreams.contains {
+            $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.categoryId)
+        }
     }
 
     private var hasRecents: Bool {
-        !playlistPrefix.isEmpty && recentStreams.contains { $0.id.hasPrefix(playlistPrefix) }
+        !playlistPrefix.isEmpty && recentStreams.contains {
+            $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.categoryId)
+        }
     }
 
     /// The rail's entries: the virtual collections (when non-empty) pinned above
@@ -403,6 +410,7 @@ struct ChannelsList: View {
     let playlistPrefix: String
     let onPlay: (LiveStream) -> Void
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @Query private var streams: [LiveStream]
 
     init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
@@ -414,6 +422,7 @@ struct ChannelsList: View {
 
     private var scopedStreams: [LiveStream] {
         LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
+            .excludingRestricted(restriction)
     }
 
     /// Clears a channel's watch timestamp so it drops out of the Recently
