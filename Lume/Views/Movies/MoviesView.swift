@@ -57,17 +57,6 @@ struct MoviesView: View {
                             systemImage: "film.stack",
                             description: Text("Sync your playlist to load movies")
                         )
-
-                        if let playlist = activePlaylist {
-                            Button {
-                                selectedPlaylistID = playlist.id.uuidString
-                                showingSync = true
-                            } label: {
-                                Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
-                                    .font(.headline)
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
                     }
                 } else {
                     ScrollView {
