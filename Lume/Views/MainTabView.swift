@@ -11,6 +11,8 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    // Optional so previews (which don't inject it) don't crash.
+    @Environment(PlaylistSwitchModel.self) private var playlistSwitch: PlaylistSwitchModel?
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Query private var playlists: [Playlist]
     /// Categories marked restricted. Fetched once here so a single source feeds
@@ -87,6 +89,13 @@ struct MainTabView: View {
                 }
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
+            .overlay {
+                if playlistSwitch?.isSwitching == true {
+                    PlaylistSwitchOverlay(playlistName: playlistSwitch?.targetName ?? "")
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: playlistSwitch?.isSwitching)
     }
 
     #if os(tvOS)
