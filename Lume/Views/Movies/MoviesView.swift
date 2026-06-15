@@ -20,6 +20,7 @@ struct MoviesView: View {
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @State private var showingSync = false
     @State private var showingSettings = false
+    @State private var genres: [String] = []
 
     @AppStorage(SortStorageKey.movieCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
@@ -81,7 +82,9 @@ struct MoviesView: View {
                                     .id("\(category.id)-\(contentSort.rawValue)")
                             }
 
-                            MovieGenreSection(playlistPrefix: playlistPrefix)
+                            if !genres.isEmpty {
+                                GenreGridSection(genres: genres, type: .vod)
+                            }
 
                             if !remainingCategories.isEmpty {
                                 CategoryGridSection(title: "All Categories", categories: remainingCategories)
@@ -89,6 +92,9 @@ struct MoviesView: View {
                             }
                         }
                         .padding(.vertical)
+                    }
+                    .task(id: playlistPrefix) {
+                        genres = GenreDerivation.movieGenres(in: modelContext, playlistPrefix: playlistPrefix, restriction: restriction)
                     }
                 }
             }

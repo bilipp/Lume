@@ -20,6 +20,7 @@ struct SeriesView: View {
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @State private var showingSync = false
     @State private var showingSettings = false
+    @State private var genres: [String] = []
 
     @AppStorage(SortStorageKey.seriesCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
@@ -79,7 +80,9 @@ struct SeriesView: View {
                                     .id("\(category.id)-\(contentSort.rawValue)")
                             }
 
-                            SeriesGenreSection(playlistPrefix: playlistPrefix)
+                            if !genres.isEmpty {
+                                GenreGridSection(genres: genres, type: .series)
+                            }
 
                             if !remainingCategories.isEmpty {
                                 CategoryGridSection(title: "All Categories", categories: remainingCategories)
@@ -87,6 +90,9 @@ struct SeriesView: View {
                             }
                         }
                         .padding(.vertical)
+                    }
+                    .task(id: playlistPrefix) {
+                        genres = GenreDerivation.seriesGenres(in: modelContext, playlistPrefix: playlistPrefix, restriction: restriction)
                     }
                 }
             }
