@@ -66,7 +66,6 @@ struct StorageManagementView: View {
                 Section {
                     LabeledContent("Movies", value: countText(stats?.movieCount))
                     LabeledContent("Series", value: countText(stats?.seriesCount))
-                    LabeledContent("Episodes", value: countText(stats?.episodeCount))
                     LabeledContent("Channels", value: countText(stats?.channelCount))
                 } header: {
                     Text("Library")
@@ -115,7 +114,6 @@ struct StorageManagementView: View {
                     TVSettingsSectionLabel("Library")
                     TVSettingsValueRow("Movies", value: countText(stats?.movieCount))
                     TVSettingsValueRow("Series", value: countText(stats?.seriesCount))
-                    TVSettingsValueRow("Episodes", value: countText(stats?.episodeCount))
                     TVSettingsValueRow("Channels", value: countText(stats?.channelCount))
                 }
 
