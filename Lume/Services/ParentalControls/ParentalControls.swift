@@ -55,9 +55,11 @@ final class ParentalControls {
         return !target.isChild
     }
 
-    /// Whether Content Management should be gated behind the PIN. Gating only
-    /// applies once a PIN exists; without one there's nothing to verify.
+    /// Whether Content Management should be gated behind the PIN. Only a child
+    /// profile is gated — a parent is already past the gate, so they manage
+    /// content freely. Requires a PIN to exist; without one there's nothing to
+    /// verify.
     var contentManagementLocked: Bool {
-        isPINSet
+        isPINSet && profileManager.activeProfile?.isChild == true
     }
 }
