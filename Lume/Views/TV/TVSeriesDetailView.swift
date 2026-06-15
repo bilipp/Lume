@@ -461,9 +461,7 @@
                 return
             }
             let manager = ContentSyncManager(modelContainer: modelContext.container)
-            guard let details = try? await manager.fetchTMDBTVDetails(tmdbId: tmdbId) else { return }
-            applySeriesDetails(details, to: series, context: modelContext)
-            try? modelContext.save()
+            await manager.enrichSeries(id: series.id, tmdbId: tmdbId)
             refreshToken = UUID()
         }
     }

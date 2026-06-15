@@ -23,6 +23,13 @@ final class ProfileManager {
     /// a SwiftData fetch on every SwiftUI body that reads it (the switcher chip
     /// lives in toolbars and the settings screen, which re-render often).
     private(set) var activeProfile: UserProfile?
+
+    /// Whether the active profile is a child — drives content restriction across
+    /// the browse, Home and Search surfaces.
+    var activeProfileIsChild: Bool {
+        activeProfile?.isChild ?? false
+    }
+
     /// True once launch bootstrap has resolved the active profile and claimed any
     /// legacy records. The switcher waits on this before offering a switch.
     private(set) var isReady = false
@@ -82,22 +89,24 @@ final class ProfileManager {
     // MARK: - Mutations
 
     @discardableResult
-    func createProfile(name: String, symbolName: String, color: ProfileColor) -> UserProfile {
+    func createProfile(name: String, symbolName: String, color: ProfileColor, isChild: Bool = false) -> UserProfile {
         let profile = UserProfile(
             name: name,
             symbolName: symbolName,
             colorRaw: color.rawValue,
-            sortOrder: (try? context.fetchCount(FetchDescriptor<UserProfile>())) ?? 0
+            sortOrder: (try? context.fetchCount(FetchDescriptor<UserProfile>())) ?? 0,
+            isChild: isChild
         )
         context.insert(profile)
         try? context.save()
         return profile
     }
 
-    func updateProfile(_ profile: UserProfile, name: String, symbolName: String, color: ProfileColor) {
+    func updateProfile(_ profile: UserProfile, name: String, symbolName: String, color: ProfileColor, isChild: Bool) {
         profile.name = name
         profile.symbolName = symbolName
         profile.colorRaw = color.rawValue
+        profile.isChild = isChild
         profile.updatedAt = Date()
         try? context.save()
     }

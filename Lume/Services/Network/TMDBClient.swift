@@ -290,7 +290,7 @@ struct TrendingTitle: Identifiable, Hashable {
 /// Normalized TMDB detail payload shared by movies and series. Empty/absent
 /// fields are represented as nil / empty arrays so callers can fill gaps in
 /// provider metadata without special-casing the media type.
-struct TMDBTitleDetails {
+nonisolated struct TMDBTitleDetails {
     var backdropPath: String?
     var tagline: String?
     var overview: String?
@@ -315,7 +315,7 @@ struct TMDBTitleDetails {
 }
 
 /// One billed performer from TMDB credits.
-struct TMDBCastMember: Hashable {
+nonisolated struct TMDBCastMember: Hashable {
     let tmdbPersonId: Int
     let name: String
     let character: String?
