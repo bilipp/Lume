@@ -33,6 +33,7 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 - [Testing](#testing)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [Anti-piracy](#anti-piracy)
 - [License](#license)
 
 ---
@@ -52,7 +53,8 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 
 > **Note** — Lume is a player only. It ships with **no channels, streams, or content**
 > of its own. You bring your own Xtream Codes credentials or M3U playlist from a
-> provider you are entitled to use.
+> provider you are entitled to use. We do not condone piracy — please read the
+> [**Anti-Piracy Policy**](ANTI_PIRACY.md).
 
 ---
 
@@ -329,6 +331,23 @@ Contributions are welcome! The short version:
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full guide — dev setup, coding style,
 localization, commit conventions, and the PR checklist.
+
+---
+
+## Anti-piracy
+
+Lume is a **player only** — it ships with no channels, streams, playlists, or media of
+any kind, and it pre-configures no providers. Every stream you watch comes solely from
+the Xtream Codes credentials or M3U playlist **you** supply.
+
+We do **not** condone or support piracy. Use Lume only with content you are legally
+entitled to access — a legitimate IPTV subscription, your own playlists, or
+free-to-air and openly licensed streams. Requesting, sharing, or linking to pirated
+streams, playlists, or credentials is **not allowed** in this repository, issues, pull
+requests, or any community space, and may result in removal and bans.
+
+Please read the full **[Anti-Piracy Policy](ANTI_PIRACY.md)** before opening issues or
+joining the community.
 
 ---
 
