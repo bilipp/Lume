@@ -110,6 +110,7 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
+                    storageSection
                     supportSection
                     aboutSection
                 }
@@ -292,6 +293,18 @@ struct SettingsView: View {
             }
         }
 
+        private var storageSection: some View {
+            Section {
+                NavigationLink {
+                    StorageManagementView()
+                } label: {
+                    Label("Storage & Cache", systemImage: "internaldrive")
+                }
+            } header: {
+                Text("Storage")
+            }
+        }
+
         private var aboutSection: some View {
             Section {
                 HStack(spacing: 12) {
@@ -416,6 +429,7 @@ struct SettingsView: View {
                             tvPlaylistsDetail
                         }
                     case .profiles: TVProfilesSettingsView()
+                    case .storage: StorageManagementView()
                     case .integrations: tvIntegrationsDetail
                     case .player:
                         if let selectedEngineOptions {
