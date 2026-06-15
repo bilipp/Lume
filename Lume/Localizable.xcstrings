@@ -490,6 +490,16 @@
         }
       }
     },
+    "Browse by Genre" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach Genre"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "de" : {
@@ -2469,6 +2479,16 @@
         }
       }
     },
+    "No movies in this genre" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Filme in diesem Genre"
+          }
+        }
+      }
+    },
     "No Playlist" : {
       "localizations" : {
         "de" : {
@@ -2519,6 +2539,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Serien in dieser Kategorie"
+          }
+        }
+      }
+    },
+    "No series in this genre" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Serien in diesem Genre"
           }
         }
       }

@@ -81,6 +81,8 @@ struct MoviesView: View {
                                     .id("\(category.id)-\(contentSort.rawValue)")
                             }
 
+                            MovieGenreSection(playlistPrefix: playlistPrefix)
+
                             if !remainingCategories.isEmpty {
                                 CategoryGridSection(title: "All Categories", categories: remainingCategories)
                                     .padding(.top, 12)
@@ -106,6 +108,9 @@ struct MoviesView: View {
             }
             .navigationDestination(for: LibraryCollection.self) { collection in
                 MovieCollectionView(kind: collection.kind, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+            }
+            .navigationDestination(for: GenreSelection.self) { selection in
+                MovieGenreView(genre: selection.genre, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
