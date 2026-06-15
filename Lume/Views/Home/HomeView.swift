@@ -324,27 +324,24 @@ struct HomeView: View {
     /// same TMDB detail path. Runs after the carousel is shown so backdrops
     /// aren't blocked.
     private func enrichHeroLogos() async {
+        // Enrich on the manager's background context; the saves auto-merge back
+        // so the hero models pick up their logos without a main-thread store
+        // write blocking the carousel.
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        var didChange = false
         for hero in heroItems {
             switch hero {
             case let .movie(movie, _, _):
                 guard heroNeedsLogo(logoPath: movie.logoPath, enrichedAt: movie.tmdbEnrichedAt),
-                      let tmdbId = movie.tmdbId,
-                      let details = try? await manager.fetchTMDBMovieDetails(tmdbId: tmdbId)
+                      let tmdbId = movie.tmdbId
                 else { continue }
-                applyMovieDetails(details, to: movie, context: modelContext)
-                didChange = true
+                await manager.enrichMovie(id: movie.id, tmdbId: tmdbId)
             case let .series(series, _, _):
                 guard heroNeedsLogo(logoPath: series.logoPath, enrichedAt: series.tmdbEnrichedAt),
-                      let tmdbId = series.tmdbId,
-                      let details = try? await manager.fetchTMDBTVDetails(tmdbId: tmdbId)
+                      let tmdbId = series.tmdbId
                 else { continue }
-                applySeriesDetails(details, to: series, context: modelContext)
-                didChange = true
+                await manager.enrichSeries(id: series.id, tmdbId: tmdbId)
             }
         }
-        if didChange { try? modelContext.save() }
     }
 
     /// A hero needs a logo fetch when it has none yet and hasn't been enriched
