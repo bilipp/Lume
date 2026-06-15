@@ -22,6 +22,9 @@ final class UserProfile {
     /// User-facing ordering in the switcher.
     var sortOrder: Int = 0
     var updatedAt: Date = Date()
+    /// A child profile: restricted categories (and their content) are hidden, and
+    /// leaving it for a non-child profile requires the parental-control PIN.
+    var isChild: Bool = false
 
     init(
         id: UUID = UUID(),
@@ -29,6 +32,7 @@ final class UserProfile {
         symbolName: String = UserProfile.defaultSymbol,
         colorRaw: String = ProfileColor.blue.rawValue,
         sortOrder: Int = 0,
+        isChild: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -37,6 +41,7 @@ final class UserProfile {
         self.symbolName = symbolName
         self.colorRaw = colorRaw
         self.sortOrder = sortOrder
+        self.isChild = isChild
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

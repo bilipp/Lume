@@ -19,6 +19,7 @@ import SwiftUI
 struct HomeView: View {
     @Namespace private var animationNamespace
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
@@ -238,9 +239,9 @@ struct HomeView: View {
     // MARK: - Derived content
 
     private var recentlyWatched: [HomeMediaItem] {
-        let items = watchedMovies.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.movie)
-            + watchedSeries.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.series)
-            + watchedStreams.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.live)
+        let items = watchedMovies.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.movie)
+            + watchedSeries.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.series)
+            + watchedStreams.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.live)
         return items
             .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
             .prefix(10)
@@ -248,9 +249,9 @@ struct HomeView: View {
     }
 
     private var favorites: [HomeMediaItem] {
-        favoriteMovies.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.movie)
-            + favoriteSeries.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.series)
-            + favoriteStreams.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.live)
+        favoriteMovies.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.movie)
+            + favoriteSeries.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.series)
+            + favoriteStreams.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.live)
     }
 
     /// Truly empty home — only show the empty state once trending has settled
@@ -382,13 +383,13 @@ struct HomeView: View {
     private func fetchMovie(tmdbId: Int) -> Movie? {
         let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let matches = (try? modelContext.fetch(descriptor)) ?? []
-        return matches.first { belongsToActivePlaylist($0.id) }
+        return matches.first { belongsToActivePlaylist($0.id) && !restriction.hides(categoryID: $0.categoryId) }
     }
 
     private func fetchSeries(tmdbId: Int) -> Series? {
         let descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let matches = (try? modelContext.fetch(descriptor)) ?? []
-        return matches.first { belongsToActivePlaylist($0.id) }
+        return matches.first { belongsToActivePlaylist($0.id) && !restriction.hides(categoryID: $0.categoryId) }
     }
 
     // MARK: - Recently watched

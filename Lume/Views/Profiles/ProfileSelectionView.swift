@@ -7,8 +7,13 @@ import SwiftUI
 /// hands control back to `ContentView` via `onComplete`.
 struct ProfileSelectionView: View {
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
+    @Environment(ParentalControls.self) private var parental: ParentalControls?
     @Query(sort: [SortDescriptor(\UserProfile.sortOrder), SortDescriptor(\UserProfile.createdAt)])
     private var profiles: [UserProfile]
+
+    /// A profile awaiting PIN entry before the switch goes through (leaving a
+    /// child profile for a non-child one).
+    @State private var pendingSwitch: UserProfile?
 
     /// Called once a profile has been chosen (and any switch kicked off).
     let onComplete: () -> Void
@@ -49,6 +54,10 @@ struct ProfileSelectionView: View {
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(background)
+        .pinPrompt(target: $pendingSwitch) { profile in
+            Task { await profileManager?.switchProfile(to: profile.id) }
+            onComplete()
+        }
     }
 
     @ViewBuilder
@@ -78,9 +87,15 @@ struct ProfileSelectionView: View {
     }
 
     private func select(_ profile: UserProfile) {
-        if let profileManager, profile.id != profileManager.activeProfileID {
-            Task { await profileManager.switchProfile(to: profile.id) }
+        guard let profileManager, profile.id != profileManager.activeProfileID else {
+            onComplete()
+            return
         }
-        onComplete()
+        if parental?.requiresPIN(toSwitchTo: profile) == true {
+            pendingSwitch = profile
+        } else {
+            Task { await profileManager.switchProfile(to: profile.id) }
+            onComplete()
+        }
     }
 }

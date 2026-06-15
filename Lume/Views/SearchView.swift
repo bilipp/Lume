@@ -11,6 +11,7 @@ import SwiftUI
 struct SearchView: View {
     @Namespace private var animationNamespace
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
@@ -171,7 +172,7 @@ struct SearchView: View {
                 sortBy: [SortDescriptor(\.name)]
             )
             descriptor.fetchLimit = resultLimit
-            let movies = (try? modelContext.fetch(descriptor)) ?? []
+            let movies = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
             matches.append(contentsOf: movies.map { .movie($0) })
         }
 
@@ -181,7 +182,7 @@ struct SearchView: View {
                 sortBy: [SortDescriptor(\.name)]
             )
             descriptor.fetchLimit = resultLimit
-            let series = (try? modelContext.fetch(descriptor)) ?? []
+            let series = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
             matches.append(contentsOf: series.map { .series($0) })
         }
 
@@ -191,7 +192,7 @@ struct SearchView: View {
                 sortBy: [SortDescriptor(\.name)]
             )
             descriptor.fetchLimit = resultLimit
-            let streams = (try? modelContext.fetch(descriptor)) ?? []
+            let streams = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
             matches.append(contentsOf: streams.map { .liveStream($0) })
         }
 

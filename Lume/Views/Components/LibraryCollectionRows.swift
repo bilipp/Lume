@@ -129,6 +129,7 @@ struct MovieCollectionRow: View {
     let playlistPrefix: String
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @Query private var movies: [Movie]
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
@@ -139,7 +140,7 @@ struct MovieCollectionRow: View {
     }
 
     private var scoped: [Movie] {
-        movies.filter { $0.id.hasPrefix(playlistPrefix) }
+        movies.filter { $0.id.hasPrefix(playlistPrefix) }.excludingRestricted(restriction)
     }
 
     var body: some View {
@@ -167,6 +168,7 @@ struct MovieCollectionView: View {
     let kind: LibraryCollection.Kind
     let playlistPrefix: String
     var animationNamespace: Namespace.ID?
+    @Environment(\.contentRestriction) private var restriction
     @Query private var movies: [Movie]
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
@@ -177,7 +179,7 @@ struct MovieCollectionView: View {
     }
 
     private var scoped: [Movie] {
-        movies.filter { $0.id.hasPrefix(playlistPrefix) }
+        movies.filter { $0.id.hasPrefix(playlistPrefix) }.excludingRestricted(restriction)
     }
 
     var body: some View {
@@ -233,6 +235,7 @@ struct SeriesCollectionRow: View {
     let playlistPrefix: String
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @Query private var series: [Series]
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
@@ -243,7 +246,7 @@ struct SeriesCollectionRow: View {
     }
 
     private var scoped: [Series] {
-        series.filter { $0.id.hasPrefix(playlistPrefix) }
+        series.filter { $0.id.hasPrefix(playlistPrefix) }.excludingRestricted(restriction)
     }
 
     var body: some View {
@@ -271,6 +274,7 @@ struct SeriesCollectionView: View {
     let kind: LibraryCollection.Kind
     let playlistPrefix: String
     var animationNamespace: Namespace.ID?
+    @Environment(\.contentRestriction) private var restriction
     @Query private var series: [Series]
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
@@ -281,7 +285,7 @@ struct SeriesCollectionView: View {
     }
 
     private var scoped: [Series] {
-        series.filter { $0.id.hasPrefix(playlistPrefix) }
+        series.filter { $0.id.hasPrefix(playlistPrefix) }.excludingRestricted(restriction)
     }
 
     var body: some View {
