@@ -201,6 +201,10 @@ struct LumeApp: App {
                     // sync is running).
                     ContentIndexingService.shared.configure(container: sharedModelContainer)
                     ContentIndexingService.shared.kick()
+
+                    // Point semantic search at the same store so it can rank
+                    // the embeddings the indexer builds.
+                    await SemanticSearchService.shared.configure(container: sharedModelContainer)
                 }
                 .onChange(of: scenePhase) { _, phase in
                     cloudSync.handleScenePhaseChange(to: phase)
