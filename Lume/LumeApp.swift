@@ -5,6 +5,7 @@
 //  Created by Philipp Bischoff on 09.04.26.
 //
 
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -101,7 +102,12 @@ struct LumeApp: App {
         } catch {
             #if DEBUG
                 // Init-time migration failure: wipe the local store and retry
-                // once. The cloud store is CloudKit-backed and re-hydrates.
+                // once. The cloud store is CloudKit-backed and re-hydrates, and
+                // the reconcile engine's empty-store recovery (CloudSyncEngine's
+                // `LocalCatalogReadiness`) pulls the catalog back rather than
+                // pushing the now-empty store's "deletions" to iCloud. Logged
+                // loudly so a destructive local wipe is never silent.
+                Logger.sync.error("Local store load failed (\(error.localizedDescription, privacy: .public)) — DEBUG: wiping default.store and retrying once")
                 destroyStore(at: localConfiguration.url)
                 if let container = try? build() {
                     return container
