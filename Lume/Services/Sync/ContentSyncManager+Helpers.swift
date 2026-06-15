@@ -139,7 +139,10 @@ extension ContentSyncManager {
         series.plot = dto.plot
         series.cast = dto.cast
         series.director = dto.director
-        series.genre = dto.genre
+        // Provider genre is the fallback only: it seeds an unset genre but never
+        // overwrites one TMDB has supplied — TMDB is the primary source (see
+        // `GenreParser.providerFallback`).
+        series.genre = GenreParser.providerFallback(current: series.genre, provider: dto.genre)
         series.releaseDate = dto.releaseDate
         series.lastModified = dto.lastModified
         series.rating = dto.rating
