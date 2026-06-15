@@ -91,7 +91,10 @@ nonisolated func applyMovieDetails(
     if (movie.plot ?? "").isEmpty, let overview = details.overview {
         movie.plot = overview
     }
-    if (movie.genre ?? "").isEmpty, !details.genreNames.isEmpty {
+    // TMDB is the primary genre source: its normalized genre names overwrite any
+    // provider-supplied genre once enrichment runs. The provider value is only a
+    // fallback shown until then (see `applySeriesFields`; VOD lists carry no genre).
+    if !details.genreNames.isEmpty {
         movie.genre = details.genreNames.joined(separator: ", ")
     }
     if (movie.durationSecs ?? 0) == 0, let mins = details.runtimeMinutes, mins > 0 {
@@ -143,7 +146,9 @@ nonisolated func applySeriesDetails(
     if (series.plot ?? "").isEmpty, let overview = details.overview {
         series.plot = overview
     }
-    if (series.genre ?? "").isEmpty, !details.genreNames.isEmpty {
+    // TMDB is the primary genre source: it overwrites the provider genre seeded
+    // at sync (see `applySeriesFields`), which serves only as the fallback.
+    if !details.genreNames.isEmpty {
         series.genre = details.genreNames.joined(separator: ", ")
     }
     if (series.cast ?? "").isEmpty, !details.cast.isEmpty {

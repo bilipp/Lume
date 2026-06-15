@@ -30,6 +30,17 @@ enum GenreParser {
         return result
     }
 
+    /// The genre to store after seeing a provider (playlist) value, given what is
+    /// already set. TMDB is the primary source, so the provider value is a fallback
+    /// only: it seeds an empty genre (so something shows before enrichment) but
+    /// never overwrites a genre already set — which TMDB enrichment owns and must
+    /// keep across re-syncs.
+    static func providerFallback(current: String?, provider: String?) -> String? {
+        if let current, !current.isEmpty { return current }
+        if let provider, !provider.isEmpty { return provider }
+        return current
+    }
+
     /// Whether `raw` carries `genre` as a whole token (case-insensitive). Used to
     /// re-filter a `localizedStandardContains` fetch down to exact-token matches,
     /// so a tile for "Action" never sweeps in a stray substring hit.
