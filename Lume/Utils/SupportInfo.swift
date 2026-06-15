@@ -16,7 +16,7 @@ nonisolated enum SupportInfo {
     static let discord = "https://discord.gg/DMnQfr69Ug"
 
     /// Scheme-stripped forms for compact on-screen display.
-    static let websiteDisplay = "getlume.org"
+    static let websiteDisplay = "GetLume.org"
     static let discordDisplay = "discord.gg/DMnQfr69Ug"
 
     static var websiteURL: URL? {
