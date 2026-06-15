@@ -20,6 +20,11 @@ final nonisolated class CloudSyncShadow {
     private var playlists: [String: PlaylistConfigValues]
     private var content: [String: ContentStateValues]
 
+    /// Set whenever a setter actually changes the baseline; cleared on `persist()`.
+    /// A steady-state reconcile (every verdict `.noChange`) mutates nothing, so
+    /// `persist()` then skips re-encoding the entire baseline to JSON for no gain.
+    private var isDirty = false
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         playlists = Self.decode(defaults.data(forKey: playlistsKey)) ?? [:]
@@ -33,7 +38,9 @@ final nonisolated class CloudSyncShadow {
     }
 
     func setPlaylistShadow(_ id: String, _ value: PlaylistConfigValues?) {
+        guard playlists[id] != value else { return }
         playlists[id] = value
+        isDirty = true
     }
 
     func playlistShadowIDs() -> Set<String> {
@@ -47,7 +54,9 @@ final nonisolated class CloudSyncShadow {
     }
 
     func setContentShadow(_ id: String, _ value: ContentStateValues?) {
+        guard content[id] != value else { return }
         content[id] = value
+        isDirty = true
     }
 
     func contentShadowIDs() -> Set<String> {
@@ -59,16 +68,21 @@ final nonisolated class CloudSyncShadow {
     /// longer describes it. The next reconcile rebuilds it (a one-time union
     /// merge — never data loss, per this type's contract).
     func resetContent() {
+        guard !content.isEmpty else { return }
         content.removeAll()
+        isDirty = true
     }
 
     // MARK: Persistence
 
     /// Flush the in-memory baseline to disk. Called once at the end of a
-    /// reconcile pass.
+    /// reconcile pass; a no-op when nothing changed since the last flush, so a
+    /// steady-state pass doesn't re-encode the whole baseline to JSON.
     func persist() {
+        guard isDirty else { return }
         defaults.set(Self.encode(playlists), forKey: playlistsKey)
         defaults.set(Self.encode(content), forKey: contentKey)
+        isDirty = false
     }
 
     private static func encode(_ value: some Encodable) -> Data? {
