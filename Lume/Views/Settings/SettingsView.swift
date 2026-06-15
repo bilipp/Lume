@@ -87,7 +87,6 @@ struct SettingsView: View {
             NavigationStack {
                 List {
                     profilesSection
-                    parentalControlsSection
                     playlistsSection
                     librarySection
                     autoSyncSection

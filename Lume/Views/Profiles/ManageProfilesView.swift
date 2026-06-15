@@ -14,6 +14,8 @@ struct ManageProfilesView: View {
     @State private var profilePendingDeletion: UserProfile?
     /// A profile awaiting PIN entry before the switch goes through.
     @State private var pendingSwitch: UserProfile?
+    /// The PIN operation being run (set / change / turn off).
+    @State private var pinFlow: ParentalPINFlow?
 
     @AppStorage(ProfileSettings.askOnStartupKey) private var askOnStartup = ProfileSettings.askOnStartupDefault
 
@@ -40,10 +42,23 @@ struct ManageProfilesView: View {
             } footer: {
                 Text("Choose a profile each time Lume launches. When off, Lume resumes the last profile you used.")
             }
+
+            parentalControlsSection
         }
         .platformNavigationTitle("Profiles")
         .pinPrompt(target: $pendingSwitch) { profile in
             Task { await profileManager?.switchProfile(to: profile.id) }
+        }
+        // Attached to the List (not a Section): a sheet attached to a Section
+        // inside a List presents then immediately dismisses.
+        .sheet(item: $pinFlow) { flow in
+            NavigationStack {
+                ParentalPINFlowView(flow: flow) { pinFlow = nil }
+                    .platformNavigationTitle("Parental Controls")
+            }
+            #if os(macOS)
+            .frame(minWidth: 380, idealWidth: 420, minHeight: 460, idealHeight: 520)
+            #endif
         }
         .sheet(isPresented: $creatingProfile) {
             ProfileEditorView()
@@ -66,6 +81,33 @@ struct ManageProfilesView: View {
             Button("Cancel", role: .cancel) {}
         } message: { profile in
             Text("This permanently removes \(profile.name)'s watch history, progress and favorites. Your library is not affected.")
+        }
+    }
+
+    private var parentalControlsSection: some View {
+        Section {
+            if parental?.isPINSet == true {
+                Button {
+                    pinFlow = .change
+                } label: {
+                    Label("Change PIN", systemImage: "lock.rotation")
+                }
+                Button(role: .destructive) {
+                    pinFlow = .remove
+                } label: {
+                    Label("Turn Off PIN", systemImage: "lock.open")
+                }
+            } else {
+                Button {
+                    pinFlow = .set
+                } label: {
+                    Label("Set a PIN", systemImage: "lock")
+                }
+            }
+        } header: {
+            Text("Parental Controls")
+        } footer: {
+            Text("A PIN is required to switch away from a child profile and to open Content Management. Mark a profile as a child profile by editing it.")
         }
     }
 
