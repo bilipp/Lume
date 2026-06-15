@@ -329,7 +329,7 @@ struct SettingsView: View {
         private func deletePlaylists(offsets: IndexSet) {
             withAnimation {
                 for index in offsets {
-                    modelContext.delete(playlists[index])
+                    PlaylistDeletion.delete(playlists[index], in: modelContext)
                 }
             }
         }

@@ -270,7 +270,9 @@ private extension CloudSyncEngine {
     /// `lastSyncDate`, so the UI's auto-sync will fetch its catalog).
     func applyPlaylistToLocal(_ value: PlaylistConfigValues?, id: UUID, local: Playlist?) -> Bool {
         guard let value else {
-            if let local { context.delete(local) }
+            // Mirror the local-deletion path: remove the playlist's orphaned
+            // catalog content too, not just the `Playlist` row.
+            if let local { PlaylistDeletion.delete(local, in: context) }
             return false
         }
         if let local {
