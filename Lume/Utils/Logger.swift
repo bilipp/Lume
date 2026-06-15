@@ -7,4 +7,5 @@ nonisolated extension Logger {
     static let player = Logger(subsystem: subsystem, category: "Player")
     static let sync = Logger(subsystem: subsystem, category: "CloudSync")
     static let downloads = Logger(subsystem: subsystem, category: "Downloads")
+    static let indexing = Logger(subsystem: subsystem, category: "Indexing")
 }
