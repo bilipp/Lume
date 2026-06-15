@@ -47,6 +47,11 @@
         var toggleAccessibility: (Bool, String) -> String = { $0 ? "Show \($1)" : "Hide \($1)" }
         /// Commit the final arrangement (single batched persistence pass).
         let onCommitOrder: ([Item]) -> Void
+        /// When both are provided, each row gains a second toggle (a lock) to
+        /// restrict the item from child profiles. nil for lists where restriction
+        /// doesn't apply (the channel list).
+        var isRestricted: ((Item) -> Bool)?
+        var onToggleRestricted: ((Item) -> Void)?
         /// Lets the host disable its type picker / Reset while a row is lifted,
         /// so they can't steal focus mid-move.
         @Binding var isReordering: Bool
@@ -71,6 +76,8 @@
             onCommitOrder: @escaping ([Item]) -> Void,
             isReordering: Binding<Bool>,
             scrollProxy: ScrollViewProxy,
+            isRestricted: ((Item) -> Bool)? = nil,
+            onToggleRestricted: ((Item) -> Void)? = nil,
             toggleImage: @escaping (Bool) -> String = { $0 ? "eye.slash" : "eye" },
             toggleAccessibility: @escaping (Bool, String) -> String = { $0 ? "Show \($1)" : "Hide \($1)" }
         ) {
@@ -82,6 +89,8 @@
             self.onCommitOrder = onCommitOrder
             _isReordering = isReordering
             self.scrollProxy = scrollProxy
+            self.isRestricted = isRestricted
+            self.onToggleRestricted = onToggleRestricted
             self.toggleImage = toggleImage
             self.toggleAccessibility = toggleAccessibility
         }
@@ -121,6 +130,9 @@
                         drillValue: drillValue?(item),
                         toggleImageName: toggleImage(isHidden(item)),
                         toggleAccessibilityLabel: toggleAccessibility(isHidden(item), title(item)),
+                        isRestricted: isRestricted?(item),
+                        restrictionAccessibilityLabel: (isRestricted?(item) ?? false) ? "Unrestrict \(title(item))" : "Restrict \(title(item))",
+                        onToggleRestricted: onToggleRestricted.map { toggle in { toggle(item) } },
                         focus: $focusedID,
                         onGrabOrDrop: { lifted ? drop() : lift(item) },
                         onToggleHidden: { onToggleHidden(item) },
@@ -230,6 +242,10 @@
         let drillValue: Category?
         let toggleImageName: String
         let toggleAccessibilityLabel: String
+        /// nil when the row has no restriction toggle (e.g. the channel list).
+        let isRestricted: Bool?
+        let restrictionAccessibilityLabel: String
+        let onToggleRestricted: (() -> Void)?
         var focus: FocusState<String?>.Binding
         let onGrabOrDrop: () -> Void
         let onToggleHidden: () -> Void
@@ -262,6 +278,14 @@
                     }
                     .buttonStyle(TVContentIconButtonStyle())
                     .accessibilityLabel(toggleAccessibilityLabel)
+
+                    if let isRestricted, let onToggleRestricted {
+                        Button(action: onToggleRestricted) {
+                            Image(systemName: isRestricted ? "lock.fill" : "lock.open")
+                        }
+                        .buttonStyle(TVContentIconButtonStyle())
+                        .accessibilityLabel(restrictionAccessibilityLabel)
+                    }
 
                     if let drillValue {
                         NavigationLink(value: drillValue) {

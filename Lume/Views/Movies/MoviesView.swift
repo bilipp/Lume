@@ -12,6 +12,7 @@ import SwiftUI
 struct MoviesView: View {
     @Namespace private var animationNamespace
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @Query private var playlists: [Playlist]
     @Query(filter: #Predicate<Category> { $0.typeRaw == "vod" && $0.isHidden == false })
     private var categories: [Category]
@@ -133,7 +134,7 @@ struct MoviesView: View {
     private var sortedCategories: [Category] {
         guard let playlistId = activePlaylist?.id else { return [] }
         let prefix = "\(playlistId.uuidString)-"
-        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) })
+        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) })
     }
 
     /// The categories shown as full inline preview rows (the first few).

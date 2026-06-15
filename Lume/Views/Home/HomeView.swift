@@ -19,6 +19,7 @@ import SwiftUI
 struct HomeView: View {
     @Namespace private var animationNamespace
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
@@ -238,9 +239,9 @@ struct HomeView: View {
     // MARK: - Derived content
 
     private var recentlyWatched: [HomeMediaItem] {
-        let items = watchedMovies.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.movie)
-            + watchedSeries.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.series)
-            + watchedStreams.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.live)
+        let items = watchedMovies.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.movie)
+            + watchedSeries.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.series)
+            + watchedStreams.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.live)
         return items
             .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
             .prefix(10)
@@ -248,9 +249,9 @@ struct HomeView: View {
     }
 
     private var favorites: [HomeMediaItem] {
-        favoriteMovies.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.movie)
-            + favoriteSeries.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.series)
-            + favoriteStreams.filter { belongsToActivePlaylist($0.id) }.map(HomeMediaItem.live)
+        favoriteMovies.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.movie)
+            + favoriteSeries.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.series)
+            + favoriteStreams.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.live)
     }
 
     /// Truly empty home — only show the empty state once trending has settled
@@ -323,27 +324,24 @@ struct HomeView: View {
     /// same TMDB detail path. Runs after the carousel is shown so backdrops
     /// aren't blocked.
     private func enrichHeroLogos() async {
+        // Enrich on the manager's background context; the saves auto-merge back
+        // so the hero models pick up their logos without a main-thread store
+        // write blocking the carousel.
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        var didChange = false
         for hero in heroItems {
             switch hero {
             case let .movie(movie, _, _):
                 guard heroNeedsLogo(logoPath: movie.logoPath, enrichedAt: movie.tmdbEnrichedAt),
-                      let tmdbId = movie.tmdbId,
-                      let details = try? await manager.fetchTMDBMovieDetails(tmdbId: tmdbId)
+                      let tmdbId = movie.tmdbId
                 else { continue }
-                applyMovieDetails(details, to: movie, context: modelContext)
-                didChange = true
+                await manager.enrichMovie(id: movie.id, tmdbId: tmdbId)
             case let .series(series, _, _):
                 guard heroNeedsLogo(logoPath: series.logoPath, enrichedAt: series.tmdbEnrichedAt),
-                      let tmdbId = series.tmdbId,
-                      let details = try? await manager.fetchTMDBTVDetails(tmdbId: tmdbId)
+                      let tmdbId = series.tmdbId
                 else { continue }
-                applySeriesDetails(details, to: series, context: modelContext)
-                didChange = true
+                await manager.enrichSeries(id: series.id, tmdbId: tmdbId)
             }
         }
-        if didChange { try? modelContext.save() }
     }
 
     /// A hero needs a logo fetch when it has none yet and hasn't been enriched
@@ -385,13 +383,13 @@ struct HomeView: View {
     private func fetchMovie(tmdbId: Int) -> Movie? {
         let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let matches = (try? modelContext.fetch(descriptor)) ?? []
-        return matches.first { belongsToActivePlaylist($0.id) }
+        return matches.first { belongsToActivePlaylist($0.id) && !restriction.hides(categoryID: $0.categoryId) }
     }
 
     private func fetchSeries(tmdbId: Int) -> Series? {
         let descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let matches = (try? modelContext.fetch(descriptor)) ?? []
-        return matches.first { belongsToActivePlaylist($0.id) }
+        return matches.first { belongsToActivePlaylist($0.id) && !restriction.hides(categoryID: $0.categoryId) }
     }
 
     // MARK: - Recently watched

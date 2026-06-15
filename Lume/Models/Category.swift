@@ -38,6 +38,10 @@ final class Category {
     var playlist: Playlist?
 
     var isHidden: Bool = false
+    /// Restricted from child profiles: while a child profile is active this
+    /// category, and every title in it, is hidden from browsing and search.
+    /// Toggling it is gated behind the parental-control PIN.
+    var isRestricted: Bool = false
     /// The playlist's own order, refreshed from the provider on every sync.
     var sortOrder: Int = 0
     /// A user-defined order set in Content Management. `nil` means "follow the
