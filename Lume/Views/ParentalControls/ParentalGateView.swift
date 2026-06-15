@@ -14,18 +14,19 @@
 import SwiftUI
 
 struct ParentalGateView<Content: View>: View {
+    var subtitle: LocalizedStringKey = "Enter your PIN to manage content."
     @ViewBuilder let content: () -> Content
 
     @Environment(ParentalControls.self) private var parental: ParentalControls?
     @State private var unlocked = false
 
     var body: some View {
-        if unlocked || !(parental?.contentManagementLocked ?? false) {
+        if unlocked || !(parental?.restrictedSurfacesLocked ?? false) {
             content()
         } else {
             PINUnlockView(
                 title: "Enter PIN",
-                subtitle: "Enter your PIN to manage content.",
+                subtitle: subtitle,
                 onUnlock: { unlocked = true }
             )
         }

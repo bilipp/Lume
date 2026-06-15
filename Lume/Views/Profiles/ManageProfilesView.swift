@@ -20,6 +20,15 @@ struct ManageProfilesView: View {
     @AppStorage(ProfileSettings.askOnStartupKey) private var askOnStartup = ProfileSettings.askOnStartupDefault
 
     var body: some View {
+        // A child profile can't manage profiles (it could otherwise edit itself
+        // to drop the child flag); the PIN unlocks the screen, same as Content
+        // Management. A parent passes straight through.
+        ParentalGateView(subtitle: "Enter your PIN to manage profiles.") {
+            managementList
+        }
+    }
+
+    private var managementList: some View {
         List {
             Section {
                 ForEach(profiles) { profile in
