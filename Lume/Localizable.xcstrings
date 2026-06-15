@@ -3457,6 +3457,17 @@
         }
       }
     },
+    "Switching to %@" : {
+      "comment" : "Loading message shown while the app switches to another IPTV playlist",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wechsle zu %@"
+          }
+        }
+      }
+    },
     "Sync" : {
       "localizations" : {
         "de" : {
