@@ -95,6 +95,7 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - Multiple **user profiles**, each with its own watch history, progress, and favorites
 - Switch profiles from the top-left of Home (iOS / macOS) or in Settings (tvOS)
 - Profiles and their state **sync across your devices** via iCloud
+- **Parental controls**: mark profiles as child profiles, restrict categories (hidden from browsing and search), and protect them with a PIN required to leave a child profile or open Content Management
 
 #### ⚙️ Library management
 - Manage multiple playlists — **Xtream Codes** and **M3U/M3U8** (add / edit / delete / switch)

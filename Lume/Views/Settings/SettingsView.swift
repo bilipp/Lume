@@ -178,7 +178,7 @@ struct SettingsView: View {
         private var librarySection: some View {
             Section {
                 NavigationLink {
-                    ContentManagementView()
+                    ParentalGateView { ContentManagementView() }
                 } label: {
                     Label("Content Management", systemImage: "slider.horizontal.3")
                 }
@@ -383,7 +383,7 @@ struct SettingsView: View {
         private var tvDetailContainer: some View {
             switch selectedCategory {
             case .content:
-                ContentManagementView()
+                ParentalGateView { ContentManagementView() }
                     .focusSection()
             default:
                 tvDetail

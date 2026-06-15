@@ -11,7 +11,11 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Query private var playlists: [Playlist]
+    /// Categories marked restricted. Fetched once here so a single source feeds
+    /// the restriction context every content surface reads from the environment.
+    @Query(filter: #Predicate<Category> { $0.isRestricted }) private var restrictedCategories: [Category]
 
     @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
@@ -49,30 +53,40 @@ struct MainTabView: View {
         }
     #endif
 
+    /// Hides restricted categories (and their content) from every browse, Home
+    /// and Search surface while a child profile is active.
+    private var contentRestriction: ContentRestriction {
+        ContentRestriction(
+            isActive: profileManager?.activeProfileIsChild ?? false,
+            restrictedCategoryIDs: Set(restrictedCategories.map(\.id))
+        )
+    }
+
     var body: some View {
         tabView
+            .environment(\.contentRestriction, contentRestriction)
         #if os(iOS)
-        .tabBarMinimizeBehavior(.onScrollDown)
+            .tabBarMinimizeBehavior(.onScrollDown)
         #endif
-        .task(id: playlists.count) {
-            // On launch (and whenever a playlist is added) sync any playlist that
-            // is due per the configured frequency.
-            enqueueDueSyncs(playlists)
-        }
-        .onChange(of: selectedPlaylistID) {
-            // On playlist switch, sync the newly selected one if it's due.
-            if let playlist = playlists.active(for: selectedPlaylistID) {
-                enqueueDueSyncs([playlist])
-            }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            // Returning to the foreground re-checks staleness — for a long-lived
-            // app this is the practical equivalent of "on launch".
-            if phase == .active {
+            .task(id: playlists.count) {
+                // On launch (and whenever a playlist is added) sync any playlist that
+                // is due per the configured frequency.
                 enqueueDueSyncs(playlists)
             }
-        }
-        .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
+            .onChange(of: selectedPlaylistID) {
+                // On playlist switch, sync the newly selected one if it's due.
+                if let playlist = playlists.active(for: selectedPlaylistID) {
+                    enqueueDueSyncs([playlist])
+                }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // Returning to the foreground re-checks staleness — for a long-lived
+                // app this is the practical equivalent of "on launch".
+                if phase == .active {
+                    enqueueDueSyncs(playlists)
+                }
+            }
+            .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
     }
 
     #if os(tvOS)
