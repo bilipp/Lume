@@ -120,7 +120,7 @@ struct SearchView: View {
                 .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter)) {
                     // Re-run whenever the settled query or the filter changes.
                     // Filter changes are instant (no debounce on the segmented control).
-                    updateResults()
+                    await updateResults()
                 }
         }
         #if os(iOS)
@@ -149,24 +149,68 @@ struct SearchView: View {
 
     // MARK: - Searching
 
-    /// Runs the search against SwiftData using bounded, predicate-based fetches.
+    /// Runs a hybrid search: an exact lexical pass plus a semantic ranking pass.
     ///
-    /// Filtering happens in SQLite (via `localizedStandardContains`) instead of
-    /// loading every Movie/Series/LiveStream into memory and scanning on the main
-    /// thread. Combined with the debounce above, this keeps typing smooth no matter
-    /// how large the library is — the work runs once, after input settles, and
-    /// returns at most `resultLimit` rows per content type.
+    /// 1. **Lexical** — bounded `localizedStandardContains` fetches in SQLite,
+    ///    exactly as before. These always lead the results: they cover the
+    ///    "I know the title" case, live channels (which are never embedded), and
+    ///    titles the background indexer hasn't reached yet.
+    /// 2. **Semantic** — `SemanticSearchService` embeds the query and ranks the
+    ///    stored vectors by meaning, surfacing related titles whose name doesn't
+    ///    contain the query. Anything already shown lexically is skipped.
+    ///
+    /// The semantic pass runs off the main thread; when the embedding model is
+    /// unavailable it returns nil and the results are simply the lexical ones.
     @MainActor
-    private func updateResults() {
+    private func updateResults() async {
         let query = debouncedSearchText
         guard !query.isEmpty else {
             results = []
             return
         }
 
+        let includeMovies = selectedFilter == .all || selectedFilter == .movies
+        let includeSeries = selectedFilter == .all || selectedFilter == .series
+        let includeLive = selectedFilter == .all || selectedFilter == .liveTV
+
+        // 1. Lexical matches — fast, exact, always included.
+        var matches = lexicalMatches(
+            query: query,
+            includeMovies: includeMovies,
+            includeSeries: includeSeries,
+            includeLive: includeLive
+        )
+
+        // 2. Semantic matches — ranked by meaning, off the main thread.
+        let semantic = await SemanticSearchService.shared.search(
+            query: query,
+            includeMovies: includeMovies,
+            includeSeries: includeSeries,
+            limit: resultLimit
+        )
+
+        // The settled query or filter may have changed while we awaited; the
+        // .task(id:) cancels us then, so don't publish stale results.
+        guard !Task.isCancelled, debouncedSearchText == query else { return }
+
+        if let semantic {
+            matches.append(contentsOf: semanticMatches(semantic, excluding: matches, limit: resultLimit))
+        }
+
+        results = matches
+    }
+
+    /// The lexical (substring) matches, in name order per content type.
+    @MainActor
+    private func lexicalMatches(
+        query: String,
+        includeMovies: Bool,
+        includeSeries: Bool,
+        includeLive: Bool
+    ) -> [SearchResult] {
         var matches: [SearchResult] = []
 
-        if selectedFilter == .all || selectedFilter == .movies {
+        if includeMovies {
             var descriptor = FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.name.localizedStandardContains(query) },
                 sortBy: [SortDescriptor(\.name)]
@@ -176,7 +220,7 @@ struct SearchView: View {
             matches.append(contentsOf: movies.map { .movie($0) })
         }
 
-        if selectedFilter == .all || selectedFilter == .series {
+        if includeSeries {
             var descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { $0.name.localizedStandardContains(query) },
                 sortBy: [SortDescriptor(\.name)]
@@ -186,7 +230,7 @@ struct SearchView: View {
             matches.append(contentsOf: series.map { .series($0) })
         }
 
-        if selectedFilter == .all || selectedFilter == .liveTV {
+        if includeLive {
             var descriptor = FetchDescriptor<LiveStream>(
                 predicate: #Predicate { $0.name.localizedStandardContains(query) },
                 sortBy: [SortDescriptor(\.name)]
@@ -196,7 +240,56 @@ struct SearchView: View {
             matches.append(contentsOf: streams.map { .liveStream($0) })
         }
 
-        results = matches
+        return matches
+    }
+
+    /// Turns the semantic ranking into `SearchResult`s, dropping anything
+    /// already present in `existing` and preserving the score order the service
+    /// returned. Capped at `limit` semantic-only additions.
+    @MainActor
+    private func semanticMatches(
+        _ semantic: SemanticSearchService.Results,
+        excluding existing: [SearchResult],
+        limit: Int
+    ) -> [SearchResult] {
+        let existingIDs = Set(existing.map(\.id))
+
+        // Re-fetch the ranked titles on the view context, preserving order.
+        let movies = fetchMovies(ids: semantic.movies.map(\.id)).map { SearchResult.movie($0) }
+        let series = fetchSeries(ids: semantic.series.map(\.id)).map { SearchResult.series($0) }
+
+        // Interleave the two ranked lists by their original score so the most
+        // relevant title of either type leads, then drop the lexical overlap.
+        let scoreByID = Dictionary(
+            (semantic.movies + semantic.series).map { ($0.id, $0.score) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let merged = (movies + series)
+            .filter { !existingIDs.contains($0.id) }
+            .sorted { (scoreByID[$0.id] ?? 0) > (scoreByID[$1.id] ?? 0) }
+
+        return Array(merged.prefix(limit))
+    }
+
+    /// Fetches movies by id and returns them in the given id order, applying the
+    /// content restriction. Realises semantic-search hits for display.
+    @MainActor
+    private func fetchMovies(ids: [String]) -> [Movie] {
+        guard !ids.isEmpty else { return [] }
+        let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { ids.contains($0.id) })
+        let fetched = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
+        let byID = Dictionary(fetched.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return ids.compactMap { byID[$0] }
+    }
+
+    /// Fetches series by id, in the given id order, applying the restriction.
+    @MainActor
+    private func fetchSeries(ids: [String]) -> [Series] {
+        guard !ids.isEmpty else { return [] }
+        let descriptor = FetchDescriptor<Series>(predicate: #Predicate { ids.contains($0.id) })
+        let fetched = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
+        let byID = Dictionary(fetched.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return ids.compactMap { byID[$0] }
     }
 }
 
