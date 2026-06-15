@@ -234,6 +234,65 @@ struct CloudSyncEngineTests {
         #expect(movie?.isFavorite == true)
     }
 
+    @Test func `empty local catalog with a populated shadow never deletes cloud mirrors`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        let shadow = freshShadow()
+
+        // Seed a playlist + a favorite movie and reconcile once, so the cloud
+        // mirrors exist and the shadow records a baseline for both.
+        let playlist = Playlist(name: "My IPTV", serverURL: "http://x", username: "u", password: "p")
+        let pid = playlist.id
+        ctx.insert(playlist)
+        let movie = Movie(id: "\(pid.uuidString)-movie-1", streamId: 1, name: "Film")
+        movie.isFavorite = true
+        ctx.insert(movie)
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: shadow)
+        _ = await engine.reconcile()
+        #expect(try ctx.fetch(FetchDescriptor<SyncedPlaylist>()).count == 1)
+        #expect(try ctx.fetch(FetchDescriptor<UserContentState>()).count == 1)
+
+        // Simulate the catastrophe: the local catalog comes up empty (a vanished
+        // or recreated `default.store`) while the shadow and the CloudKit mirrors
+        // still hold the data. A naive merge would read every absent local item
+        // as a deletion and push it to the cloud, wiping every device.
+        ctx.delete(playlist)
+        ctx.delete(movie)
+        try ctx.save()
+
+        let result = await engine.reconcile()
+
+        #expect(result.recoveredFromEmptyLocalStore)
+        // The irreplaceable cloud copy must survive — no deletions pushed.
+        #expect(try ctx.fetch(FetchDescriptor<SyncedPlaylist>()).count == 1)
+        #expect(try ctx.fetch(FetchDescriptor<UserContentState>()).count == 1)
+        // …and the device recovers: the cloud playlist is pulled back locally.
+        let recovered = try ctx.fetch(FetchDescriptor<Playlist>())
+        #expect(recovered.count == 1)
+        #expect(recovered.first?.id == pid)
+    }
+
+    @Test func `empty local catalog with an empty shadow still pulls from the cloud`() async throws {
+        // A genuinely fresh device (or a clean reinstall) has an empty shadow, so
+        // the integrity gate must NOT block it — it has to pull cloud playlists in.
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        let pid = UUID()
+        ctx.insert(SyncedPlaylist(
+            id: pid, name: "Remote", serverURL: "http://r", username: "ru", password: "rp",
+            sourceTypeRaw: "xtream", epgURL: nil, syncEnabled: true
+        ))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(!result.skippedUntrustworthyLocalStore)
+        #expect(result.playlistsCreatedLocally == 1)
+    }
+
     @Test func `state whose playlist is gone is garbage-collected`() async throws {
         let container = try makeContainer()
         let ctx = container.mainContext
