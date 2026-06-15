@@ -3218,6 +3218,16 @@
         }
       }
     },
+    "Switching to %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wechsle zu %@"
+          }
+        }
+      }
+    },
     "Sync" : {
       "localizations" : {
         "de" : {
