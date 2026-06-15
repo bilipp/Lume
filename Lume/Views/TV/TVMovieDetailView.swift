@@ -281,9 +281,7 @@
                 return
             }
             let manager = ContentSyncManager(modelContainer: modelContext.container)
-            guard let details = try? await manager.fetchTMDBMovieDetails(tmdbId: tmdbId) else { return }
-            applyMovieDetails(details, to: movie, context: modelContext)
-            try? modelContext.save()
+            await manager.enrichMovie(id: movie.id, tmdbId: tmdbId)
             refreshToken = UUID()
         }
 
