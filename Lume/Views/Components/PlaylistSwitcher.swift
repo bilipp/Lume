@@ -35,13 +35,16 @@ extension [Playlist] {
 struct PlaylistSwitcher: View {
     let playlists: [Playlist]
     @Binding var selectedPlaylistID: String
+    /// Optional so previews (and any host that doesn't inject it) still switch
+    /// instantly; when present, the switch routes through the blocking overlay.
+    @Environment(PlaylistSwitchModel.self) private var switchModel: PlaylistSwitchModel?
 
     var body: some View {
         if !playlists.isEmpty {
             Menu {
                 ForEach(playlists) { playlist in
                     Button {
-                        selectedPlaylistID = playlist.id.uuidString
+                        select(playlist)
                     } label: {
                         Label(
                             playlist.name,
@@ -57,6 +60,18 @@ struct PlaylistSwitcher: View {
                         .font(.caption)
                 }
             }
+        }
+    }
+
+    /// Switches the global selection to `playlist`, surfacing the re-render as a
+    /// blocking overlay when a switch model is available.
+    private func select(_ playlist: Playlist) {
+        let id = playlist.id.uuidString
+        guard id != effectiveID else { return }
+        if let switchModel {
+            switchModel.switchTo(name: playlist.name) { selectedPlaylistID = id }
+        } else {
+            selectedPlaylistID = id
         }
     }
 
