@@ -196,6 +196,12 @@ struct SettingsView: View {
                     Label("Content Management", systemImage: "slider.horizontal.3")
                 }
                 .disabled(playlists.isEmpty)
+
+                NavigationLink {
+                    StorageManagementView()
+                } label: {
+                    Label("Storage & Cache", systemImage: "internaldrive")
+                }
             } header: {
                 Text("Library")
             } footer: {
@@ -416,6 +422,7 @@ struct SettingsView: View {
                             tvPlaylistsDetail
                         }
                     case .profiles: TVProfilesSettingsView()
+                    case .storage: StorageManagementView()
                     case .integrations: tvIntegrationsDetail
                     case .player:
                         if let selectedEngineOptions {
