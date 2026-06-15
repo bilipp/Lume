@@ -384,7 +384,7 @@ struct PlaylistDetailView: View {
     }
 
     private func deletePlaylist() {
-        modelContext.delete(playlist)
+        PlaylistDeletion.delete(playlist, in: modelContext)
         #if os(tvOS)
             onClose?()
         #else
