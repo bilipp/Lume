@@ -18,6 +18,7 @@ struct LumeApp: App {
     let sharedModelContainer: ModelContainer
     @State private var cloudSync: CloudSyncCoordinator
     @State private var profileManager: ProfileManager
+    @State private var playlistSwitch = PlaylistSwitchModel()
 
     init() {
         let container = Self.makeModelContainer()
@@ -151,6 +152,7 @@ struct LumeApp: App {
                 .environment(TraktService.shared)
                 .environment(cloudSync)
                 .environment(profileManager)
+                .environment(playlistSwitch)
                 .task {
                     // Give DownloadManager access to the model container so it
                     // can persist download state from its delegate callbacks.
