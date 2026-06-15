@@ -52,13 +52,25 @@ import SwiftUI
     /// Self-contained Profiles pane shown in the tvOS Settings detail column.
     struct TVProfilesSettingsView: View {
         @Environment(ProfileManager.self) private var profileManager: ProfileManager?
+        @Environment(ParentalControls.self) private var parental: ParentalControls?
         @Query(sort: [SortDescriptor(\UserProfile.sortOrder), SortDescriptor(\UserProfile.createdAt)])
         private var profiles: [UserProfile]
         @State private var creatingProfile = false
         @State private var editingProfile: UserProfile?
+        @State private var pendingSwitch: UserProfile?
+        @State private var pinFlow: ParentalPINFlow?
         @AppStorage(ProfileSettings.askOnStartupKey) private var askOnStartup = ProfileSettings.askOnStartupDefault
 
         var body: some View {
+            // A child profile can't manage profiles (it could otherwise edit
+            // itself to drop the child flag); the PIN unlocks the pane, same as
+            // Content Management. A parent passes straight through.
+            ParentalGateView(subtitle: "Enter your PIN to manage profiles.") {
+                profilesPane
+            }
+        }
+
+        private var profilesPane: some View {
             VStack(alignment: .leading, spacing: 8) {
                 TVSettingsSectionLabel("Profiles")
 
@@ -94,12 +106,58 @@ import SwiftUI
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                     .padding(.top, 6)
+
+                parentalControls
             }
             .fullScreenCover(isPresented: $creatingProfile) {
                 ProfileEditorView()
             }
             .fullScreenCover(item: $editingProfile) { profile in
                 ProfileEditorView(profile: profile)
+            }
+            .pinPrompt(target: $pendingSwitch) { profile in
+                Task { await profileManager?.switchProfile(to: profile.id) }
+            }
+            .fullScreenCover(item: $pinFlow) { flow in
+                ParentalPINFlowView(flow: flow) { pinFlow = nil }
+            }
+        }
+
+        @ViewBuilder
+        private var parentalControls: some View {
+            TVSettingsSectionLabel("Parental Controls")
+                .padding(.top, 24)
+
+            if parental?.isPINSet == true {
+                Button { pinFlow = .change } label: {
+                    parentalRowLabel("Change PIN", systemImage: "lock.rotation")
+                }
+                .buttonStyle(TVSettingsRowButtonStyle())
+
+                Button { pinFlow = .remove } label: {
+                    parentalRowLabel("Turn Off PIN", systemImage: "lock.open")
+                }
+                .buttonStyle(TVSettingsRowButtonStyle())
+            } else {
+                Button { pinFlow = .set } label: {
+                    parentalRowLabel("Set a PIN", systemImage: "lock")
+                }
+                .buttonStyle(TVSettingsRowButtonStyle())
+            }
+
+            Text("A PIN is required to switch away from a child profile and to open Content Management.")
+                .font(.system(size: 20))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                .padding(.top, 6)
+        }
+
+        private func parentalRowLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
+            HStack(spacing: 16) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 22, weight: .medium))
+                Text(title)
+                Spacer(minLength: 0)
             }
         }
 
@@ -108,7 +166,11 @@ import SwiftUI
             return HStack(spacing: 16) {
                 Button {
                     guard let profileManager, !isActive else { return }
-                    Task { await profileManager.switchProfile(to: profile.id) }
+                    if parental?.requiresPIN(toSwitchTo: profile) == true {
+                        pendingSwitch = profile
+                    } else {
+                        Task { await profileManager.switchProfile(to: profile.id) }
+                    }
                 } label: {
                     HStack(spacing: 16) {
                         ProfileAvatarView(profile: profile, size: 44)

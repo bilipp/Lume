@@ -204,7 +204,9 @@ struct ContentManagementView: View {
                     onToggleHidden: { $0.isHidden.toggle() },
                     onCommitOrder: { ContentOrganizer.commitOrder($0) },
                     isReordering: $isReordering,
-                    scrollProxy: proxy
+                    scrollProxy: proxy,
+                    isRestricted: { $0.isRestricted },
+                    onToggleRestricted: { $0.isRestricted.toggle() }
                 )
             }
         }
@@ -255,8 +257,10 @@ struct ContentManagementView: View {
                             ContentManageRow(
                                 title: category.name,
                                 isHidden: category.isHidden,
+                                isRestricted: category.isRestricted,
                                 drillInValue: selectedType == .live ? category : nil,
                                 onToggleHidden: { category.isHidden.toggle() },
+                                onToggleRestricted: { category.isRestricted.toggle() },
                                 onDrillIn: { selectedCategory = $0 }
                             )
                         }
@@ -289,12 +293,10 @@ struct ContentManagementView: View {
         }
 
         private var footerText: String {
-            switch selectedType {
-            case .live:
-                "Hide categories to remove them from Live TV, or drag to reorder. Tap a category to manage its channels. Reset restores the playlist's order and shows everything."
-            default:
-                "Hide categories to remove them from \(selectedType.label), or drag to reorder. Reset restores the playlist's order and shows everything."
-            }
+            let lead = selectedType == .live
+                ? String(localized: "Hide categories to remove them from Live TV, or tap a category to manage its channels.")
+                : String(localized: "Hide categories to remove them from \(selectedType.label).")
+            return lead + " " + String(localized: "Lock a category to hide it from child profiles. Drag to reorder. Reset restores the playlist's order and shows everything.")
         }
     #endif
 }
@@ -310,8 +312,10 @@ struct ContentManagementView: View {
     private struct ContentManageRow: View {
         let title: String
         let isHidden: Bool
+        let isRestricted: Bool
         let drillInValue: Category?
         let onToggleHidden: () -> Void
+        let onToggleRestricted: () -> Void
         let onDrillIn: (Category) -> Void
 
         var body: some View {
@@ -322,6 +326,13 @@ struct ContentManagementView: View {
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(isHidden ? "Show \(title)" : "Hide \(title)")
+
+                Button(action: onToggleRestricted) {
+                    Image(systemName: isRestricted ? "lock.fill" : "lock.open")
+                        .foregroundStyle(isRestricted ? Color.orange : Color.secondary)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(isRestricted ? "Unrestrict \(title)" : "Restrict \(title)")
 
                 Text(title)
                     .foregroundStyle(isHidden ? .secondary : .primary)
