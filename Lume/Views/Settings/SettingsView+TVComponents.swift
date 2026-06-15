@@ -15,7 +15,7 @@ import SwiftUI
 
     /// The top-level settings categories shown in the tvOS sidebar.
     enum SettingsCategory: String, CaseIterable, Identifiable {
-        case playlists, profiles, content, integrations, player, about
+        case playlists, profiles, content, integrations, player, storage, about
 
         var id: String {
             rawValue
@@ -26,6 +26,7 @@ import SwiftUI
             case .playlists: "Playlists"
             case .profiles: "Profiles"
             case .content: "Content"
+            case .storage: "Storage"
             case .integrations: "Integrations"
             case .player: "Player"
             case .about: "About"
