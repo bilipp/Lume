@@ -125,17 +125,6 @@ struct LiveTVView: View {
                             systemImage: "antenna.radiowaves.left.and.right",
                             description: Text("Sync your playlist to load live TV channels")
                         )
-
-                        if let playlist = activePlaylist {
-                            Button {
-                                selectedPlaylistID = playlist.id.uuidString
-                                showingSync = true
-                            } label: {
-                                Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
-                                    .font(.headline)
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
                     }
                 } else {
                     #if os(iOS)
