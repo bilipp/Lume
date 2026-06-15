@@ -61,7 +61,7 @@ actor ContentIndexer {
         try await prepareEmbedder(embedder, status: status)
 
         while !Task.isCancelled {
-            if try await hasActiveSync() || (status.isPlaybackActive) {
+            if try await hasActiveSync() || status.isPlaybackActive || status.isCloudSyncActive {
                 await status.setWaiting()
                 try await Task.sleep(for: busyPause)
                 continue
@@ -109,119 +109,213 @@ actor ContentIndexer {
 
     // MARK: - Chunk processing
 
-    /// Indexes up to `chunkSize` pending titles (movies first, then series) on
-    /// a fresh context and saves once. Returns the number processed; 0 means
-    /// the index is complete. Work already done in the chunk is saved even
-    /// when an item throws, so a transient failure never loses progress.
+    /// What a title is, and the few fields the TMDB lookup needs — copied out of
+    /// SwiftData as plain values so the network phase never touches a managed
+    /// object. `title`/`year` are the cleaned search query; they also seed the
+    /// embedding document.
+    private enum ItemKind { case movie, series }
+
+    private struct PendingItem {
+        let kind: ItemKind
+        let id: String
+        let title: String
+        let year: Int?
+        let existingTMDBId: Int?
+        let needsEnrichment: Bool
+    }
+
+    /// The TMDB data resolved for a pending item, ready to write back.
+    private struct IndexResult {
+        let item: PendingItem
+        let resolvedTMDBId: Int?
+        let details: TMDBTitleDetails?
+    }
+
+    /// Indexes up to `chunkSize` pending titles (movies first, then series).
+    /// Returns the number processed; 0 means the index is complete.
+    ///
+    /// Split into two phases so a managed object is never accessed across an
+    /// `await`. The original loop held the fetched `Movie`/`Series` objects on a
+    /// single context while awaiting TMDB over the network; resuming and then
+    /// touching a property re-faulted it from the store — and if CloudKit had
+    /// torn down and re-added stores on the shared coordinator in the meantime
+    /// (the multi-store container shares one coordinator), the fault threw an
+    /// uncatchable `no such table` `NSException` that terminated the app. Here
+    /// the only phase that suspends works purely on value snapshots; the
+    /// objects are re-fetched and mutated synchronously while the store is open.
     private func indexNextChunk(embedder: TextEmbedder) async throws -> Int {
+        let pending = try fetchPending()
+        guard !pending.isEmpty else { return 0 }
+
+        // Phase 1 — network only. Touches no SwiftData object, so nothing can
+        // fault against the store across a suspension point.
+        var resolved: [IndexResult] = []
+        var failure: Error?
+        for item in pending {
+            do {
+                try Task.checkCancellation()
+                try await resolved.append(resolve(item))
+                try await Task.sleep(for: itemPause)
+            } catch {
+                // Transient failure or cancellation: stop fetching, but still
+                // write the items already resolved so progress isn't lost.
+                failure = error
+                break
+            }
+        }
+
+        // Phase 2 — write back fully synchronously (re-fetch → apply → embed →
+        // stamp), then save once. No `await` here means the objects are
+        // realised while the store is open, and one save per chunk keeps
+        // main-context merges (which re-run every @Query) infrequent.
+        if !resolved.isEmpty {
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+            for result in resolved {
+                write(result, context: context, embedder: embedder)
+            }
+            do {
+                try context.save()
+            } catch {
+                failure = failure ?? error
+            }
+        }
+
+        if let failure { throw failure }
+        return resolved.count
+    }
+
+    /// Snapshots the next chunk of unindexed titles into plain values.
+    private func fetchPending() throws -> [PendingItem] {
         let context = ModelContext(modelContainer)
-        context.autosaveEnabled = false
 
         var movieDescriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.indexedAt == nil })
         movieDescriptor.fetchLimit = chunkSize
         let movies = try context.fetch(movieDescriptor)
-
-        var seriesDescriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.indexedAt == nil })
-        seriesDescriptor.fetchLimit = chunkSize - movies.count
-        let series = movies.count < chunkSize ? try context.fetch(seriesDescriptor) : []
-
-        var processed = 0
-        do {
-            for movie in movies {
-                try Task.checkCancellation()
-                try await index(movie: movie, context: context, embedder: embedder)
-                processed += 1
-                try await Task.sleep(for: itemPause)
-            }
-            for item in series {
-                try Task.checkCancellation()
-                try await index(series: item, context: context, embedder: embedder)
-                processed += 1
-                try await Task.sleep(for: itemPause)
-            }
-        } catch {
-            try? context.save()
-            throw error
+        var items: [PendingItem] = movies.map { movie in
+            let query = ContentIndexText.searchQuery(for: movie.name)
+            return PendingItem(
+                kind: .movie,
+                id: movie.id,
+                title: query.title,
+                year: ContentIndexText.year(fromReleaseDate: movie.releaseDate) ?? query.year,
+                existingTMDBId: movie.tmdbId,
+                needsEnrichment: movie.tmdbEnrichedAt == nil
+            )
         }
 
-        if processed > 0 {
-            try context.save()
+        if movies.count < chunkSize {
+            var seriesDescriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.indexedAt == nil })
+            seriesDescriptor.fetchLimit = chunkSize - movies.count
+            let series = try context.fetch(seriesDescriptor)
+            items += series.map { item in
+                let query = ContentIndexText.searchQuery(for: item.name)
+                return PendingItem(
+                    kind: .series,
+                    id: item.id,
+                    title: query.title,
+                    year: ContentIndexText.year(fromReleaseDate: item.releaseDate) ?? query.year,
+                    existingTMDBId: item.tmdbId,
+                    needsEnrichment: item.tmdbEnrichedAt == nil
+                )
+            }
         }
-        return processed
+
+        return items
     }
 
-    private func index(movie: Movie, context: ModelContext, embedder: TextEmbedder) async throws {
-        let query = ContentIndexText.searchQuery(for: movie.name)
+    /// Resolves an item's TMDB id (searching when absent) and detail payload
+    /// (when not yet enriched) over the network, working only on values.
+    private func resolve(_ item: PendingItem) async throws -> IndexResult {
+        guard tmdbClient.isConfigured else {
+            return IndexResult(item: item, resolvedTMDBId: item.existingTMDBId, details: nil)
+        }
 
-        if tmdbClient.isConfigured {
-            if movie.tmdbId == nil {
-                let year = ContentIndexText.year(fromReleaseDate: movie.releaseDate) ?? query.year
-                movie.tmdbId = try await skippingPermanentFailures {
-                    try await self.searchMovieID(query: query.title, year: year)
-                }
-            }
-            if movie.tmdbEnrichedAt == nil, let tmdbId = movie.tmdbId {
-                let details = try await skippingPermanentFailures {
-                    try await self.tmdbClient.movieDetails(tmdbId)
-                }
-                if let details {
-                    // Background context: skip the cast relationship — see
-                    // applyMovieDetails. The embedding uses `movie.actors`, and
-                    // the detail view fully enriches (incl. cast) on first open.
-                    applyMovieDetails(details, to: movie, context: context, includeCast: false)
+        var tmdbId = item.existingTMDBId
+        if tmdbId == nil {
+            tmdbId = try await skippingPermanentFailures {
+                switch item.kind {
+                case .movie: try await self.searchMovieID(query: item.title, year: item.year)
+                case .series: try await self.searchTVID(query: item.title, year: item.year)
                 }
             }
         }
 
-        let document = ContentIndexText.document(for: .init(
-            name: query.title,
-            year: ContentIndexText.year(fromReleaseDate: movie.releaseDate) ?? query.year,
-            genre: movie.genre,
-            tagline: movie.tagline,
-            plot: movie.plot,
-            cast: movie.actors
-        ))
-        if let vector = try? embedder.vector(for: document) {
-            movie.embeddingData = TextEmbedder.encode(vector)
+        var details: TMDBTitleDetails?
+        if item.needsEnrichment, let tmdbId {
+            details = try await skippingPermanentFailures {
+                switch item.kind {
+                case .movie: try await self.tmdbClient.movieDetails(tmdbId)
+                case .series: try await self.tmdbClient.tvDetails(tmdbId)
+                }
+            }
         }
-        movie.indexedAt = Date()
+
+        return IndexResult(item: item, resolvedTMDBId: tmdbId, details: details)
     }
 
-    private func index(series: Series, context: ModelContext, embedder: TextEmbedder) async throws {
-        let query = ContentIndexText.searchQuery(for: series.name)
+    /// Re-fetches the title on the write context and applies the resolved TMDB
+    /// data, embedding and index stamp. Synchronous: the object is realised and
+    /// mutated while the store is open, never across an `await`. A title that
+    /// vanished since Phase 1 (deleted by a sync) is silently skipped.
+    private func write(_ result: IndexResult, context: ModelContext, embedder: TextEmbedder) {
+        switch result.item.kind {
+        case .movie:
+            let id = result.item.id
+            var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            guard let movie = try? context.fetch(descriptor).first else { return }
 
-        if tmdbClient.isConfigured {
-            if series.tmdbId == nil {
-                let year = ContentIndexText.year(fromReleaseDate: series.releaseDate) ?? query.year
-                series.tmdbId = try await skippingPermanentFailures {
-                    try await self.searchTVID(query: query.title, year: year)
-                }
+            if movie.tmdbId == nil, let tmdbId = result.resolvedTMDBId {
+                movie.tmdbId = tmdbId
             }
-            if series.tmdbEnrichedAt == nil, let tmdbId = series.tmdbId {
-                let details = try await skippingPermanentFailures {
-                    try await self.tmdbClient.tvDetails(tmdbId)
-                }
-                if let details {
-                    // Background context: skip the cast relationship — see
-                    // applySeriesDetails. The embedding uses the `series.cast`
-                    // string; the detail view fully enriches (incl. cast) later.
-                    applySeriesDetails(details, to: series, context: context, includeCast: false)
-                }
+            if let details = result.details {
+                // Background context: skip the cast relationship — see
+                // applyMovieDetails. The embedding uses `movie.actors`, and the
+                // detail view fully enriches (incl. cast) on first open.
+                applyMovieDetails(details, to: movie, context: context, includeCast: false)
             }
-        }
+            let document = ContentIndexText.document(for: .init(
+                name: result.item.title,
+                year: result.item.year,
+                genre: movie.genre,
+                tagline: movie.tagline,
+                plot: movie.plot,
+                cast: movie.actors
+            ))
+            if let vector = try? embedder.vector(for: document) {
+                movie.embeddingData = TextEmbedder.encode(vector)
+            }
+            movie.indexedAt = Date()
 
-        let document = ContentIndexText.document(for: .init(
-            name: query.title,
-            year: ContentIndexText.year(fromReleaseDate: series.releaseDate) ?? query.year,
-            genre: series.genre,
-            tagline: series.tagline,
-            plot: series.plot,
-            cast: series.cast
-        ))
-        if let vector = try? embedder.vector(for: document) {
-            series.embeddingData = TextEmbedder.encode(vector)
+        case .series:
+            let id = result.item.id
+            var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            guard let series = try? context.fetch(descriptor).first else { return }
+
+            if series.tmdbId == nil, let tmdbId = result.resolvedTMDBId {
+                series.tmdbId = tmdbId
+            }
+            if let details = result.details {
+                // Background context: skip the cast relationship — see
+                // applySeriesDetails. The embedding uses the `series.cast`
+                // string; the detail view fully enriches (incl. cast) later.
+                applySeriesDetails(details, to: series, context: context, includeCast: false)
+            }
+            let document = ContentIndexText.document(for: .init(
+                name: result.item.title,
+                year: result.item.year,
+                genre: series.genre,
+                tagline: series.tagline,
+                plot: series.plot,
+                cast: series.cast
+            ))
+            if let vector = try? embedder.vector(for: document) {
+                series.embeddingData = TextEmbedder.encode(vector)
+            }
+            series.indexedAt = Date()
         }
-        series.indexedAt = Date()
     }
 
     // MARK: - TMDB search with year fallback
