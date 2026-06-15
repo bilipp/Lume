@@ -79,6 +79,8 @@ struct SeriesView: View {
                                     .id("\(category.id)-\(contentSort.rawValue)")
                             }
 
+                            SeriesGenreSection(playlistPrefix: playlistPrefix)
+
                             if !remainingCategories.isEmpty {
                                 CategoryGridSection(title: "All Categories", categories: remainingCategories)
                                     .padding(.top, 12)
@@ -104,6 +106,9 @@ struct SeriesView: View {
             }
             .navigationDestination(for: LibraryCollection.self) { collection in
                 SeriesCollectionView(kind: collection.kind, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+            }
+            .navigationDestination(for: GenreSelection.self) { selection in
+                SeriesGenreView(genre: selection.genre, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: Series.self) { series in
                 SeriesDetailView(series: series, animationNamespace: animationNamespace)
