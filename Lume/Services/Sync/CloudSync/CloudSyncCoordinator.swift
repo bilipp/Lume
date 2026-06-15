@@ -47,6 +47,16 @@ final class CloudSyncCoordinator {
     /// local `Playlist` records before the UI decides what to show.
     private var shouldOpenInitialSyncGate = false
 
+    /// Minimum gap before a *foregrounding* re-triggers a reconcile. A foreground
+    /// pull is largely redundant with the remote-change observer — when CloudKit
+    /// reconnects and imports remote changes it posts its own
+    /// `.NSPersistentStoreRemoteChange`, which reconciles regardless of this gate.
+    /// So reconciling on *every* activation only re-merges into the main context
+    /// (re-running every on-screen `@Query`) for no new data, which is the lag the
+    /// user feels when flipping back into the app. Quick app-switches inside this
+    /// window are skipped; genuine remote changes still pull immediately.
+    private static let minForegroundReconcileInterval: TimeInterval = 30
+
     private var observers: [NSObjectProtocol] = []
 
     init(container: ModelContainer, cloudKitContainerIdentifier: String, cloudKitEnabled: Bool) {
@@ -97,7 +107,13 @@ final class CloudSyncCoordinator {
         switch phase {
         case .active:
             Task { await refreshAccountStatus() }
-            reconcile()
+            // Skip the pull if we reconciled very recently (e.g. a quick
+            // app-switch): there's nothing new to merge and the merge is what
+            // hitches the UI. A real remote import still pulls via its own
+            // remote-change notification.
+            if shouldReconcileOnForeground {
+                reconcile()
+            }
         case .background, .inactive:
             // Flush now, not debounced: the system may suspend the app before a
             // delayed pass could run.
@@ -105,6 +121,15 @@ final class CloudSyncCoordinator {
         @unknown default:
             break
         }
+    }
+
+    /// True when enough time has elapsed since the last completed reconcile to
+    /// justify a fresh foreground pull. First foreground after a cold launch
+    /// (no `lastReconcile` yet, or one already ran at launch) is covered by
+    /// `start()`, so the gate only suppresses rapid re-activations.
+    private var shouldReconcileOnForeground: Bool {
+        guard let last = status.lastReconcile else { return true }
+        return Date().timeIntervalSince(last) >= Self.minForegroundReconcileInterval
     }
 
     // MARK: - Reconcile
