@@ -48,14 +48,17 @@ final class CloudSyncCoordinator {
     private var shouldOpenInitialSyncGate = false
 
     /// Minimum gap before a *foregrounding* re-triggers a reconcile. A foreground
-    /// pull is largely redundant with the remote-change observer — when CloudKit
-    /// reconnects and imports remote changes it posts its own
-    /// `.NSPersistentStoreRemoteChange`, which reconciles regardless of this gate.
-    /// So reconciling on *every* activation only re-merges into the main context
-    /// (re-running every on-screen `@Query`) for no new data, which is the lag the
-    /// user feels when flipping back into the app. Quick app-switches inside this
-    /// window are skipped; genuine remote changes still pull immediately.
-    private static let minForegroundReconcileInterval: TimeInterval = 30
+    /// pull is essentially redundant with the remote-change observer — when
+    /// CloudKit reconnects and imports remote changes it posts its own
+    /// `.NSPersistentStoreRemoteChange`, which reconciles regardless of this gate,
+    /// so a change made on another device while this one was backgrounded still
+    /// lands promptly without the foreground pass. That makes the foreground
+    /// reconcile a pure safety net, so the gap is deliberately long (30 minutes):
+    /// reopening the app no longer kicks off a sync, which is what makes it *feel*
+    /// like it syncs too often. Remote changes (cross-device freshness) and the
+    /// background flush (pushing local edits before suspension) are intentionally
+    /// NOT throttled — capping those would delay sync or drop local changes.
+    private static let minForegroundReconcileInterval: TimeInterval = 30 * 60
 
     private var observers: [NSObjectProtocol] = []
 
@@ -107,10 +110,9 @@ final class CloudSyncCoordinator {
         switch phase {
         case .active:
             Task { await refreshAccountStatus() }
-            // Skip the pull if we reconciled very recently (e.g. a quick
-            // app-switch): there's nothing new to merge and the merge is what
-            // hitches the UI. A real remote import still pulls via its own
-            // remote-change notification.
+            // Skip the pull if we reconciled within the throttle window: there's
+            // nothing new to merge and the merge is what hitches the UI. A real
+            // remote import still pulls via its own remote-change notification.
             if shouldReconcileOnForeground {
                 reconcile()
             }
@@ -123,10 +125,10 @@ final class CloudSyncCoordinator {
         }
     }
 
-    /// True when enough time has elapsed since the last completed reconcile to
-    /// justify a fresh foreground pull. First foreground after a cold launch
-    /// (no `lastReconcile` yet, or one already ran at launch) is covered by
-    /// `start()`, so the gate only suppresses rapid re-activations.
+    /// True when at least `minForegroundReconcileInterval` has elapsed since the
+    /// last completed reconcile, so a foreground pull is worth running. The first
+    /// foreground after a cold launch (no `lastReconcile` yet) is allowed; the
+    /// launch reconcile itself runs from `start()`.
     private var shouldReconcileOnForeground: Bool {
         guard let last = status.lastReconcile else { return true }
         return Date().timeIntervalSince(last) >= Self.minForegroundReconcileInterval
