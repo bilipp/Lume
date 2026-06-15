@@ -11,6 +11,8 @@ struct SettingsView: View {
     /// Not `private`: read by the SettingsView+Playlists extension (separate file).
     @State var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
+    /// Not `private`: read by the SettingsView+Indexing extension (separate file).
+    @State var indexing = ContentIndexingService.shared
     /// Legacy single-engine key, kept in sync with the primary engine so a
     /// downgrade still finds the user's preferred engine, and read as the
     /// migration seed for the priority list. See `PlayerEnginePriority`.
@@ -99,6 +101,7 @@ struct SettingsView: View {
                     profilesSection
                     playlistsSection
                     librarySection
+                    indexingSection
                     autoSyncSection
                     CloudSyncSection()
                     if trakt.isConfigured {

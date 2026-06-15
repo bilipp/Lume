@@ -211,6 +211,38 @@ nonisolated struct TMDBClient {
         return "&include_image_language=\(code),en,null&include_video_language=\(code),en"
     }
 
+    // MARK: - Search
+
+    /// Returns the TMDB id of the best (first) search match for a movie title.
+    /// Used by the content indexer for titles whose provider supplies no id.
+    func searchMovieID(query: String, year: Int? = nil) async throws -> Int? {
+        var path = "/search/movie?query=\(Self.encodedQuery(query))&include_adult=false"
+        if let year {
+            path += "&primary_release_year=\(year)"
+        }
+        let response: SearchResponse = try await get(path)
+        return response.results.first?.id
+    }
+
+    /// Returns the TMDB id of the best (first) search match for a TV series.
+    func searchTVID(query: String, year: Int? = nil) async throws -> Int? {
+        var path = "/search/tv?query=\(Self.encodedQuery(query))&include_adult=false"
+        if let year {
+            path += "&first_air_date_year=\(year)"
+        }
+        let response: SearchResponse = try await get(path)
+        return response.results.first?.id
+    }
+
+    /// Percent-encodes a search term for use as a query-item value —
+    /// `.urlQueryAllowed` alone would pass `&`/`+`/`=` through and corrupt
+    /// the query string.
+    private static func encodedQuery(_ query: String) -> String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&+=?#")
+        return query.addingPercentEncoding(withAllowedCharacters: allowed) ?? query
+    }
+
     /// Returns the list of TMDB movie IDs that belong to a collection.
     func collectionMovieIDs(_ id: Int) async throws -> [Int] {
         let response: CollectionDetailsResponse = try await get("/collection/\(id)")
@@ -404,6 +436,14 @@ private nonisolated struct TMDBCastMemberDTO: Decodable {
 }
 
 private nonisolated struct SimilarItem: Decodable { let id: Int }
+
+private nonisolated struct SearchResponse: Decodable {
+    let results: [SearchMatch]
+}
+
+private nonisolated struct SearchMatch: Decodable {
+    let id: Int
+}
 
 private nonisolated struct VideoEntry: Decodable {
     let key: String

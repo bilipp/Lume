@@ -189,6 +189,12 @@ struct LumeApp: App {
                     // mirrors. Runs after progress reconciliation so a fresh
                     // device's user state lands on a settled local store.
                     await cloudSync.start()
+
+                    // Resume background content indexing for anything still
+                    // unindexed (the pass waits on its own while a playlist
+                    // sync is running).
+                    ContentIndexingService.shared.configure(container: sharedModelContainer)
+                    ContentIndexingService.shared.kick()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     cloudSync.handleScenePhaseChange(to: phase)
