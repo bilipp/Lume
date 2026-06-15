@@ -168,10 +168,7 @@ struct SearchView: View {
 
         if selectedFilter == .all || selectedFilter == .movies {
             var descriptor = FetchDescriptor<Movie>(
-                predicate: #Predicate {
-                    $0.name.localizedStandardContains(query)
-                        || ($0.genre?.localizedStandardContains(query) ?? false)
-                },
+                predicate: #Predicate { $0.name.localizedStandardContains(query) },
                 sortBy: [SortDescriptor(\.name)]
             )
             descriptor.fetchLimit = resultLimit
@@ -181,10 +178,7 @@ struct SearchView: View {
 
         if selectedFilter == .all || selectedFilter == .series {
             var descriptor = FetchDescriptor<Series>(
-                predicate: #Predicate {
-                    $0.name.localizedStandardContains(query)
-                        || ($0.genre?.localizedStandardContains(query) ?? false)
-                },
+                predicate: #Predicate { $0.name.localizedStandardContains(query) },
                 sortBy: [SortDescriptor(\.name)]
             )
             descriptor.fetchLimit = resultLimit
