@@ -302,6 +302,11 @@ final class CloudSyncCoordinator {
         error: String?
     ) {
         status.isSyncing = inProgress
+        // Pause background indexing while CloudKit imports/exports: it tears
+        // down and re-adds stores on the shared coordinator, and a catalog
+        // fault during that window throws an uncatchable `no such table`
+        // NSException (see ContentIndexer).
+        ContentIndexingService.shared.isCloudSyncActive = inProgress
         if let error {
             status.lastError = error
         } else if !inProgress {
