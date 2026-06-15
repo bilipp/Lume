@@ -6,9 +6,10 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     /// Not `private`: read by the SettingsView+Profiles extension (separate file).
     @Environment(ProfileManager.self) var profileManager: ProfileManager?
-    // Not `private`: read by the SettingsView+AutoSync extension (separate file).
+    /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @Query var playlists: [Playlist]
-    @State private var showingAddPlaylist = false
+    /// Not `private`: read by the SettingsView+Playlists extension (separate file).
+    @State var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
     /// Not `private`: read by the SettingsView+Indexing extension (separate file).
     @State var indexing = ContentIndexingService.shared
@@ -32,6 +33,14 @@ struct SettingsView: View {
     #endif
 
     #if os(tvOS)
+        /// The globally-selected playlist, shared with the content tabs. tvOS has
+        /// no toolbar switcher, so the Playlists settings pane is where the active
+        /// playlist is chosen. Not `private`: read by the SettingsView+Playlists
+        /// extension (separate file).
+        @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
+        /// Routes the switch through the blocking overlay (see PlaylistSwitchModel).
+        /// Not `private`: read by the SettingsView+Playlists extension.
+        @Environment(PlaylistSwitchModel.self) var playlistSwitch: PlaylistSwitchModel?
         /// The category whose content is shown in the right pane. Follows focus
         /// in the sidebar (Apple TV Settings behaviour) and persists once focus
         /// moves into the detail pane.
@@ -40,8 +49,9 @@ struct SettingsView: View {
         /// The playlist drilled into within the Playlists category. When set, its
         /// settings replace the playlist list *in the detail pane* rather than
         /// pushing a full-screen view — a push hides the header tab bar and
-        /// strands remote focus once the content scrolls.
-        @State private var selectedPlaylist: Playlist?
+        /// strands remote focus once the content scrolls. Not `private`: read by
+        /// the SettingsView+Playlists extension (separate file).
+        @State var selectedPlaylist: Playlist?
         /// The engine whose options are drilled into within the Player category,
         /// replacing the player detail in place (same reasoning as `selectedPlaylist`).
         @State private var selectedEngineOptions: PlayerEngineKind?
@@ -423,62 +433,6 @@ struct SettingsView: View {
                 .padding(.vertical, 72)
             }
             .focusSection()
-        }
-
-        private var tvPlaylistsDetail: some View {
-            VStack(alignment: .leading, spacing: 36) {
-                tvPlaylistsList
-                tvAutoSyncSection
-                tvIndexingSection
-                TVCloudSyncSection()
-            }
-        }
-
-        private var tvPlaylistsList: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel("Playlists")
-
-                if playlists.isEmpty {
-                    Text("No playlists yet. Add your IPTV provider to start streaming.")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
-                } else {
-                    ForEach(playlists) { playlist in
-                        Button {
-                            selectedPlaylist = playlist
-                        } label: {
-                            HStack(spacing: 16) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(playlist.name)
-                                    Text(playlist.serverURL)
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                        .truncationMode(.middle)
-                                }
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(TVSettingsRowButtonStyle())
-                    }
-                }
-
-                Button {
-                    showingAddPlaylist = true
-                } label: {
-                    HStack(spacing: 16) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 22, weight: .medium))
-                        Text("Add Playlist")
-                        Spacer(minLength: 0)
-                    }
-                }
-                .buttonStyle(TVSettingsRowButtonStyle())
-            }
         }
 
         private var tvIntegrationsDetail: some View {
