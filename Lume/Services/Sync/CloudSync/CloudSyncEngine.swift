@@ -13,6 +13,14 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
     /// Cloud states whose local catalog item hasn't synced yet — left pending
     /// (shadow untouched) so a later pass applies them once the catalog lands.
     var contentPending = 0
+    /// Set when the pass was aborted because the local catalog store was
+    /// unreadable (a fetch threw — a transient `no such table` detach or a
+    /// corrupt store). No stores or shadow were touched; a later pass retries.
+    var skippedUntrustworthyLocalStore = false
+    /// Set when the local catalog came up empty after previously holding data (a
+    /// lost or recreated `default.store`): the stale shadow was dropped so this
+    /// pass pulls the surviving cloud records back instead of pushing deletions.
+    var recoveredFromEmptyLocalStore = false
 }
 
 /// A local catalog item paired with its current syncable state, gathered up-front
@@ -59,6 +67,25 @@ actor CloudSyncEngine {
     func reconcile() -> CloudSyncReconcileResult {
         activeProfileID = ActiveProfileStore.current ?? UserProfile.defaultProfileID
         var result = CloudSyncReconcileResult()
+        switch localCatalogReadiness() {
+        case .ready:
+            break
+        case .unreadable:
+            // The store is mid-detach or corrupt. Trust nothing: skip without
+            // touching either store or the shadow, and retry on a later pass.
+            result.skippedUntrustworthyLocalStore = true
+            return result
+        case .emptiedButHadData:
+            // The catalog file was lost or recreated empty while the cloud and
+            // the shadow survived. Drop the stale baseline so the merge below
+            // pulls the surviving cloud records back into the catalog instead of
+            // reading their absent local counterparts as deletions and wiping
+            // every device. With an empty shadow every verdict is a pull — a
+            // cloud-mirror deletion (`pushToCloud(nil)`) is now impossible.
+            Logger.sync.error("Local catalog empty but shadow had baselines — recovering from cloud, dropping stale shadow (no deletions pushed)")
+            shadow.reset()
+            result.recoveredFromEmptyLocalStore = true
+        }
         do {
             // Collapse any duplicate default profile a freshly-synced device
             // imported before its own bootstrap-created one could converge.

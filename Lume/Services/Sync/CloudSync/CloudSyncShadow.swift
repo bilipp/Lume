@@ -73,6 +73,20 @@ final nonisolated class CloudSyncShadow {
         isDirty = true
     }
 
+    /// Drop the entire baseline — both playlists and content. Called when the
+    /// local catalog store has come up empty after previously holding data (a
+    /// lost or recreated `default.store`): with no baseline, the next reconcile
+    /// reads the surviving cloud records as values to *pull back*, never as local
+    /// deletions to push — so a vanished store recovers from the cloud instead of
+    /// wiping it. Safe by this type's contract (degrades to a one-time union
+    /// merge, never data loss).
+    func reset() {
+        guard !playlists.isEmpty || !content.isEmpty else { return }
+        playlists.removeAll()
+        content.removeAll()
+        isDirty = true
+    }
+
     // MARK: Persistence
 
     /// Flush the in-memory baseline to disk. Called once at the end of a
