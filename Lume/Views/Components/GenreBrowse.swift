@@ -21,7 +21,7 @@ import SwiftUI
 /// trade-off `LibraryCollectionRows` makes for "Recently Added".
 private let genreSampleLimit = 5000
 
-private enum GenreDerivation {
+enum GenreDerivation {
     static func movieGenres(in context: ModelContext, playlistPrefix: String, restriction: ContentRestriction) -> [String] {
         var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.genre != nil })
         descriptor.fetchLimit = genreSampleLimit
@@ -44,65 +44,36 @@ private enum GenreDerivation {
 // MARK: - Browse-by-genre section
 
 /// A tile grid of the genres present in the active playlist, most-common first.
-/// Each tile navigates to that genre's full grid. Renders nothing until at least
-/// one genre is known, so a fresh or un-enriched library degrades gracefully.
-private struct GenreGridSection: View {
+/// Each tile navigates to that genre's full grid.
+///
+/// The owning view derives the genres and renders this only when the list is
+/// non-empty: a view that collapses to nothing never receives `.task`/`.onAppear`
+/// (the same EmptyView lifecycle trap `CachedAsyncImage` hit), so the derivation
+/// must live on an always-present host — the browse `ScrollView` — not here.
+struct GenreGridSection: View {
     let genres: [String]
     let type: CategoryType
 
     private let columns = [GridItem(.adaptive(minimum: CategoryTileMetrics.minimum), spacing: CategoryTileMetrics.spacing)]
 
     var body: some View {
-        if !genres.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Browse by Genre")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
-
-                LazyVGrid(columns: columns, spacing: CategoryTileMetrics.spacing) {
-                    ForEach(genres, id: \.self) { genre in
-                        NavigationLink(value: GenreSelection(genre: genre, type: type)) {
-                            CategoryTile(name: genre)
-                        }
-                        .posterCardButtonStyle()
-                    }
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Browse by Genre")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal)
+
+            LazyVGrid(columns: columns, spacing: CategoryTileMetrics.spacing) {
+                ForEach(genres, id: \.self) { genre in
+                    NavigationLink(value: GenreSelection(genre: genre, type: type)) {
+                        CategoryTile(name: genre)
+                    }
+                    .posterCardButtonStyle()
+                }
             }
+            .padding(.horizontal)
         }
-    }
-}
-
-/// The Movies-tab "Browse by Genre" section. Owns the genre derivation so the
-/// fetch stays lazy and re-runs only when the active playlist changes.
-struct MovieGenreSection: View {
-    let playlistPrefix: String
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.contentRestriction) private var restriction
-    @State private var genres: [String] = []
-
-    var body: some View {
-        GenreGridSection(genres: genres, type: .vod)
-            .task(id: playlistPrefix) {
-                genres = GenreDerivation.movieGenres(in: modelContext, playlistPrefix: playlistPrefix, restriction: restriction)
-            }
-    }
-}
-
-/// The Series-tab "Browse by Genre" section.
-struct SeriesGenreSection: View {
-    let playlistPrefix: String
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.contentRestriction) private var restriction
-    @State private var genres: [String] = []
-
-    var body: some View {
-        GenreGridSection(genres: genres, type: .series)
-            .task(id: playlistPrefix) {
-                genres = GenreDerivation.seriesGenres(in: modelContext, playlistPrefix: playlistPrefix, restriction: restriction)
-            }
     }
 }
 
