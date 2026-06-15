@@ -110,6 +110,7 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
+                    storageSection
                     supportSection
                     aboutSection
                 }
@@ -196,12 +197,6 @@ struct SettingsView: View {
                     Label("Content Management", systemImage: "slider.horizontal.3")
                 }
                 .disabled(playlists.isEmpty)
-
-                NavigationLink {
-                    StorageManagementView()
-                } label: {
-                    Label("Storage & Cache", systemImage: "internaldrive")
-                }
             } header: {
                 Text("Library")
             } footer: {
@@ -295,6 +290,18 @@ struct SettingsView: View {
                 Text("Player")
             } footer: {
                 Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played. Streams open in the selected external app instead, when one is installed.")
+            }
+        }
+
+        private var storageSection: some View {
+            Section {
+                NavigationLink {
+                    StorageManagementView()
+                } label: {
+                    Label("Storage & Cache", systemImage: "internaldrive")
+                }
+            } header: {
+                Text("Storage")
             }
         }
 
