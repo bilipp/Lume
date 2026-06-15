@@ -41,6 +41,13 @@ final class ContentIndexingService {
     /// main-context merge that re-runs every @Query and hitches KSPlayer.
     var isPlaybackActive = false
 
+    /// Set by `CloudSyncCoordinator` while `NSPersistentCloudKitContainer` is
+    /// mid import/export. The indexer pauses then: CloudKit tears down and
+    /// re-adds stores on the coordinator shared by the multi-store container,
+    /// and faulting a catalog object during that window throws an uncatchable
+    /// `no such table` `NSException`.
+    var isCloudSyncActive = false
+
     private var container: ModelContainer?
     private var task: Task<Void, Never>?
 
