@@ -87,6 +87,11 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
+    /// The on-disk cache directory, exposed so the Storage screen can sum its size.
+    var directoryURL: URL {
+        directory
+    }
+
     func data(for key: String) -> Data? {
         try? Data(contentsOf: fileURL(for: key))
     }
