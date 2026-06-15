@@ -62,6 +62,15 @@ import SwiftUI
         @AppStorage(ProfileSettings.askOnStartupKey) private var askOnStartup = ProfileSettings.askOnStartupDefault
 
         var body: some View {
+            // A child profile can't manage profiles (it could otherwise edit
+            // itself to drop the child flag); the PIN unlocks the pane, same as
+            // Content Management. A parent passes straight through.
+            ParentalGateView(subtitle: "Enter your PIN to manage profiles.") {
+                profilesPane
+            }
+        }
+
+        private var profilesPane: some View {
             VStack(alignment: .leading, spacing: 8) {
                 TVSettingsSectionLabel("Profiles")
 

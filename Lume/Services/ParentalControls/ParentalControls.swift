@@ -55,11 +55,13 @@ final class ParentalControls {
         return !target.isChild
     }
 
-    /// Whether Content Management should be gated behind the PIN. Only a child
-    /// profile is gated — a parent is already past the gate, so they manage
-    /// content freely. Requires a PIN to exist; without one there's nothing to
-    /// verify.
-    var contentManagementLocked: Bool {
+    /// Whether the child-restricted settings surfaces — Content Management and
+    /// profile management — should be gated behind the PIN. Only a child profile
+    /// is gated: a parent is already past the gate, so they manage content and
+    /// profiles freely (and would otherwise be locked out of the very screen that
+    /// sets the PIN). Requires a PIN to exist; without one there's nothing to
+    /// verify, and a child could edit their own profile to remove the flag.
+    var restrictedSurfacesLocked: Bool {
         isPINSet && profileManager.activeProfile?.isChild == true
     }
 }
