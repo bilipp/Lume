@@ -3457,6 +3457,16 @@
         }
       }
     },
+    "Switching playlist changes the content shown across Home, Movies, Series and Live TV." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beim Wechsel der Playlist ändern sich die Inhalte in Start, Filme, Serien und Live-TV."
+          }
+        }
+      }
+    },
     "Switching to %@" : {
       "comment" : "Loading message shown while the app switches to another IPTV playlist",
       "localizations" : {
