@@ -96,7 +96,6 @@ struct LoginView: View {
                                 Spacer()
                             }
                         }
-                        .buttonStyle(.borderedProminent)
                         .controlSize(.large)
                         .disabled(!isFormValid || isLoading)
                     }
