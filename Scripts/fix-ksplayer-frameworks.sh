@@ -90,8 +90,15 @@ process_framework() {
 restructure_to_deep_bundle() {
     fw="$1"
     [ -d "$fw" ] || return 0
-    # Already deep — leave alone.
-    [ -d "$fw/Versions" ] && return 0
+    # Already deep — leave alone, but a correctly-signed versioned bundle never
+    # keeps a _CodeSignature at the root. If one survived from a shallow-layout
+    # restructure (older builds left it behind), strip it so codesign won't
+    # reject the embedded framework with "unsealed contents in the root
+    # directory". The bundle gets re-signed afterwards when its id changes.
+    if [ -d "$fw/Versions" ]; then
+        [ -d "$fw/_CodeSignature" ] && { chmod -R u+w "$fw" 2>/dev/null || true; rm -rf "$fw/_CodeSignature"; }
+        return 0
+    fi
 
     fw_name=$(basename "$fw" .framework)
     binary="$fw/$fw_name"
@@ -99,6 +106,13 @@ restructure_to_deep_bundle() {
     [ -f "$binary" ] || return 0
 
     chmod -R u+w "$fw" 2>/dev/null || true
+
+    # Drop the shallow-layout code signature. It lived at the framework root,
+    # which is illegal for a versioned (deep) bundle — codesign rejects the
+    # embedded framework with "unsealed contents present in the root directory"
+    # if it survives. We re-sign afterwards, writing Versions/A/_CodeSignature.
+    rm -rf "$fw/_CodeSignature"
+
     mkdir -p "$fw/Versions/A/Resources"
 
     if [ -f "$fw/Info.plist" ]; then
