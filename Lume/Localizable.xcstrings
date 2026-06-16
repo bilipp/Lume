@@ -3640,6 +3640,16 @@
         }
       }
     },
+    "Search All Playlists" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Wiedergabelisten durchsuchen"
+          }
+        }
+      }
+    },
     "Search for movies, series, or live TV channels" : {
       "localizations" : {
         "de" : {
@@ -4628,6 +4638,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Website"
+          }
+        }
+      }
+    },
+    "When off, search only finds content in the active playlist. Turn this on to search across all your playlists." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn deaktiviert, durchsucht die Suche nur Inhalte der aktiven Wiedergabeliste. Aktiviere diese Option, um alle deine Wiedergabelisten zu durchsuchen."
           }
         }
       }
