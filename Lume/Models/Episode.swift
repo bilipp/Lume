@@ -3,6 +3,11 @@ import SwiftData
 
 @Model
 final class Episode {
+    // The iCloud reconciler scans episodes by watch state on every pass; index
+    // those columns so it seeks the in-progress / watched rows instead of
+    // scanning every episode in the catalog.
+    #Index<Episode>([\.isWatched], [\.watchProgress])
+
     @Attribute(.unique) var id: String
     var episodeId: String
     var title: String
