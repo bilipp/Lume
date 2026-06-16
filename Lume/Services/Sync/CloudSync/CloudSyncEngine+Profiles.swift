@@ -17,14 +17,14 @@ extension CloudSyncEngine {
     /// both create) are collapsed, the active profile is resolved, and any
     /// legacy `nil`-profileID content records are claimed by it. Idempotent.
     func bootstrapProfiles(preferredActiveID: UUID?, defaultName: String) throws -> ProfileBootstrap {
-        var profiles = try dedupeProfiles(context.fetch(
+        var profiles = try dedupeProfiles(cloudContext.fetch(
             FetchDescriptor<UserProfile>(sortBy: [SortDescriptor(\.createdAt)])
         ))
 
         let defaultProfile: UserProfile
         if profiles.isEmpty {
             let created = UserProfile(id: UserProfile.defaultProfileID, name: defaultName)
-            context.insert(created)
+            cloudContext.insert(created)
             profiles = [created]
             defaultProfile = created
         } else {
@@ -41,13 +41,13 @@ extension CloudSyncEngine {
 
         // An upgrading user's existing catalog is, by definition, the resolved
         // active profile's state — claim every unowned record for it.
-        for record in try context.fetch(FetchDescriptor<UserContentState>())
+        for record in try cloudContext.fetch(FetchDescriptor<UserContentState>())
             where record.profileID == nil
         {
             record.profileID = resolvedActive
         }
 
-        if context.hasChanges { try context.save() }
+        try saveStores()
         return ProfileBootstrap(activeProfileID: resolvedActive, profileCount: profiles.count)
     }
 
@@ -66,7 +66,7 @@ extension CloudSyncEngine {
         resetCatalogUserState(localValues: localValues)
         try importProfileState(toID)
         shadow.resetContent()
-        if context.hasChanges { try context.save() }
+        try saveStores()
         shadow.persist()
         // Flip the active-profile pointer *inside* this actor-isolated critical
         // section, atomically with the projection swap and shadow reset — not
@@ -93,7 +93,7 @@ extension CloudSyncEngine {
     /// lingering until the next launch. `dedupeProfiles` keeps the
     /// earliest-created, so every device converges on the same survivor.
     func reconcileProfiles() throws {
-        _ = try dedupeProfiles(context.fetch(
+        _ = try dedupeProfiles(cloudContext.fetch(
             FetchDescriptor<UserProfile>(sortBy: [SortDescriptor(\.createdAt)])
         ))
     }
@@ -101,12 +101,12 @@ extension CloudSyncEngine {
     /// Delete every content record owned by a profile (called when the profile
     /// itself is deleted). The `UserProfile` row is removed by `ProfileManager`.
     func purgeProfileData(_ profileID: UUID) throws {
-        for mirror in try context.fetch(FetchDescriptor<UserContentState>())
+        for mirror in try cloudContext.fetch(FetchDescriptor<UserContentState>())
             where (mirror.profileID ?? UserProfile.defaultProfileID) == profileID
         {
-            context.delete(mirror)
+            cloudContext.delete(mirror)
         }
-        if context.hasChanges { try context.save() }
+        try saveStores()
     }
 }
 
@@ -119,10 +119,10 @@ private extension CloudSyncEngine {
         for profile in profiles {
             if let existing = kept[profile.id] {
                 if profile.createdAt < existing.createdAt {
-                    context.delete(existing)
+                    cloudContext.delete(existing)
                     kept[profile.id] = profile
                 } else {
-                    context.delete(profile)
+                    cloudContext.delete(profile)
                 }
             } else {
                 kept[profile.id] = profile
@@ -140,7 +140,7 @@ private extension CloudSyncEngine {
             upsertMirror(&mirrors, id: id, profileID: profileID, kind: entry.kind, values: entry.values)
         }
         for (id, mirror) in mirrors where localValues[id] == nil {
-            context.delete(mirror)
+            cloudContext.delete(mirror)
         }
     }
 
@@ -185,7 +185,7 @@ private extension CloudSyncEngine {
                 addedToWatchlistDate: values.addedToWatchlistDate,
                 favoriteOrder: values.favoriteOrder
             )
-            context.insert(mirror)
+            cloudContext.insert(mirror)
             map[id] = mirror
         }
     }

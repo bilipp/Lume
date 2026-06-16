@@ -321,8 +321,10 @@ struct CloudSyncInitialGateTests {
         // The coordinator's engine only opens a ModelContext at init (it never
         // fetches) and the CloudKit-disabled path returns before touching the
         // cloud store, so the shared catalog container is enough here.
-        let coordinator = try CloudSyncCoordinator(
-            container: makeTestContainer(),
+        let container = try makeTestContainer()
+        let coordinator = CloudSyncCoordinator(
+            catalogContainer: container,
+            cloudContainer: container,
             cloudKitContainerIdentifier: "iCloud.test",
             cloudKitEnabled: false
         )

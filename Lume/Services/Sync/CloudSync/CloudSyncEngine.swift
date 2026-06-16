@@ -39,34 +39,60 @@ nonisolated struct LocalContentEntry {
 /// mirror models (`SyncedPlaylist`, `UserContentState`) using the three-way
 /// merge in `CloudSyncMerge`.
 ///
-/// An `actor` that owns its own background `ModelContext` — the same pattern as
-/// `ContentSyncManager` / `WatchProgressWriter` — so all store work stays off the
-/// main thread. Saves on this context auto-merge into the main context, so
-/// `@Query`-driven UI updates after a pull, and a newly pulled playlist trips
-/// `MainTabView`'s auto-sync to fetch its catalog.
+/// An `actor` that owns background `ModelContext`s — one per store, the same
+/// pattern as `ContentSyncManager` / `WatchProgressWriter` — so all store work
+/// stays off the main thread. Saves on these contexts auto-merge into their
+/// container's main context, so `@Query`-driven UI updates after a pull, and a
+/// newly pulled playlist trips `MainTabView`'s auto-sync to fetch its catalog.
+///
+/// Two contexts because the catalog and the CloudKit mirrors now live in separate
+/// containers (so CloudKit's churn can't invalidate catalog `@Query`s). Each store
+/// op routes to its own context; a reconcile saves both, then persists the shadow.
 actor CloudSyncEngine {
-    let context: ModelContext
+    /// The local-only catalog store (Playlist, Movie, Series, Episode, LiveStream).
+    let catalogContext: ModelContext
+    /// The CloudKit-mirrored store (SyncedPlaylist, UserContentState, UserProfile).
+    let cloudContext: ModelContext
     let shadow: CloudSyncShadow
 
     /// The profile whose state the catalog currently projects. Read from
     /// `ActiveProfileStore` at the start of each reconcile, so content state is
     /// pushed to / pulled from only this profile's mirror records; other
     /// profiles' records sync via CloudKit untouched until they become active.
-    private var activeProfileID = UserProfile.defaultProfileID
+    /// Not `private`: `CloudSyncEngine+Fetch.swift` reads it (`fetchContentMirrors`).
+    var activeProfileID = UserProfile.defaultProfileID
 
-    init(container: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow()) {
-        context = ModelContext(container)
-        context.autosaveEnabled = false
+    init(catalogContainer: ModelContainer, cloudContainer: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow()) {
+        catalogContext = ModelContext(catalogContainer)
+        catalogContext.autosaveEnabled = false
+        cloudContext = ModelContext(cloudContainer)
+        cloudContext.autosaveEnabled = false
         self.shadow = shadow
     }
 
+    #if DEBUG
+        /// Test/preview convenience: one container holding every model, shared by
+        /// both store roles via a single background context — exactly the pre-split
+        /// behavior. Production uses the two-container designated init above so
+        /// CloudKit's churn can't invalidate the catalog; the reconcile/merge logic
+        /// the tests exercise routes identically either way.
+        init(container: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow()) {
+            let ctx = ModelContext(container)
+            ctx.autosaveEnabled = false
+            catalogContext = ctx
+            cloudContext = ctx
+            self.shadow = shadow
+        }
+    #endif
+
     /// Run a full bidirectional reconcile: playlists first (so content can scope
-    /// to the resulting live playlists), then per-content user state. Persists
-    /// the shadow baseline and saves the context once at the end.
+    /// to the resulting live playlists), then per-content user state. Persists the
+    /// shadow baseline and saves both stores at the end.
     @discardableResult
     func reconcile() -> CloudSyncReconcileResult {
         activeProfileID = ActiveProfileStore.current ?? UserProfile.defaultProfileID
         var result = CloudSyncReconcileResult()
+
         switch localCatalogReadiness() {
         case .ready:
             break
@@ -92,15 +118,26 @@ actor CloudSyncEngine {
             try reconcileProfiles()
             let livePrefixes = try reconcilePlaylists(into: &result)
             try reconcileContent(livePrefixes: livePrefixes, into: &result)
-            if context.hasChanges {
-                try context.save()
-            }
+            // Two stores → two saves (`saveStores`, catalog first). Persist the
+            // shadow only after both succeed, so a half-applied pass is never
+            // baselined: if either save throws we fall to the catch, leave the
+            // shadow untouched, and the next pass re-derives and re-applies (the
+            // 3-way merge is idempotent).
+            try saveStores()
             shadow.persist()
             Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending)")
         } catch {
             Logger.sync.error("Reconcile failed: \(error.localizedDescription)")
         }
         return result
+    }
+
+    /// Persist pending changes in both stores, catalog first so a pulled cloud
+    /// change lands locally before its mirror state is acknowledged. Callers that
+    /// also persist the shadow must do so only after this returns without throwing.
+    func saveStores() throws {
+        if catalogContext.hasChanges { try catalogContext.save() }
+        if cloudContext.hasChanges { try cloudContext.save() }
     }
 
     // MARK: - Playlists
@@ -147,7 +184,7 @@ actor CloudSyncEngine {
             // either side (deleted however). Clear the cloud record, reset any
             // local orphan, and drop the shadow.
             guard livePrefixes.contains(String(id.prefix(36))) else {
-                if let mirror = mirrors[id] { context.delete(mirror) }
+                if let mirror = mirrors[id] { cloudContext.delete(mirror) }
                 if let entry = localValues[id] { resetLocalContent(entry) }
                 shadow.setContentShadow(id, nil)
                 continue
@@ -240,7 +277,7 @@ private extension CloudSyncEngine {
 private extension CloudSyncEngine {
     func applyPlaylistToCloud(_ value: PlaylistConfigValues?, id: UUID, mirror: SyncedPlaylist?) {
         guard let value else {
-            if let mirror { context.delete(mirror) }
+            if let mirror { cloudContext.delete(mirror) }
             return
         }
         if let mirror {
@@ -253,7 +290,7 @@ private extension CloudSyncEngine {
             mirror.syncEnabled = value.syncEnabled
             mirror.updatedAt = Date()
         } else {
-            context.insert(SyncedPlaylist(
+            cloudContext.insert(SyncedPlaylist(
                 id: id,
                 name: value.name,
                 serverURL: value.serverURL,
@@ -272,7 +309,7 @@ private extension CloudSyncEngine {
         guard let value else {
             // Mirror the local-deletion path: remove the playlist's orphaned
             // catalog content too, not just the `Playlist` row.
-            if let local { PlaylistDeletion.delete(local, in: context) }
+            if let local { PlaylistDeletion.delete(local, in: catalogContext) }
             return false
         }
         if let local {
@@ -290,7 +327,7 @@ private extension CloudSyncEngine {
         playlist.sourceTypeRaw = value.sourceTypeRaw
         playlist.epgURL = value.epgURL
         playlist.syncEnabled = value.syncEnabled
-        context.insert(playlist)
+        catalogContext.insert(playlist)
         return true
     }
 
@@ -320,7 +357,7 @@ extension CloudSyncEngine {
 
     func applyContentToCloud(_ value: ContentStateValues?, id: String, kind: SyncedContentKind?, mirror: UserContentState?) {
         guard let value, !value.isEmpty else {
-            if let mirror { context.delete(mirror) }
+            if let mirror { cloudContext.delete(mirror) }
             return
         }
         let kind = kind ?? mirror?.kind ?? .movie
@@ -335,7 +372,7 @@ extension CloudSyncEngine {
             mirror.favoriteOrder = value.favoriteOrder
             mirror.updatedAt = Date()
         } else {
-            context.insert(UserContentState(
+            cloudContext.insert(UserContentState(
                 contentId: id,
                 kind: kind,
                 profileID: activeProfileID,
@@ -406,188 +443,5 @@ extension CloudSyncEngine {
         default:
             break
         }
-    }
-}
-
-// MARK: - Fetch maps
-
-/// Not `private`: profile operations in `CloudSyncEngine+Profiles.swift`
-/// reuse these helpers (fetch / reset / apply / value extraction).
-extension CloudSyncEngine {
-    func fetchLocalPlaylists() throws -> [UUID: Playlist] {
-        var map: [UUID: Playlist] = [:]
-        for playlist in try context.fetch(FetchDescriptor<Playlist>()) {
-            map[playlist.id] = playlist
-        }
-        return map
-    }
-
-    func fetchPlaylistMirrors() throws -> [UUID: SyncedPlaylist] {
-        var map: [UUID: SyncedPlaylist] = [:]
-        for mirror in try context.fetch(FetchDescriptor<SyncedPlaylist>()) {
-            map[mirror.id] = dedupe(mirror, against: map[mirror.id])
-        }
-        return map
-    }
-
-    /// Mirrors for the currently active profile only — inactive profiles' state
-    /// must not project onto the (single, active-profile) catalog.
-    func fetchContentMirrors() throws -> [String: UserContentState] {
-        try fetchMirrors(forProfile: activeProfileID)
-    }
-
-    /// Content mirrors belonging to `profileID`, keyed by content id. A legacy
-    /// `nil` profileID is treated as the default profile until bootstrap claims
-    /// it, so a reconcile that races ahead of bootstrap still behaves correctly.
-    func fetchMirrors(forProfile profileID: UUID) throws -> [String: UserContentState] {
-        // Filter in SQLite (profileID is indexed) instead of hydrating every
-        // profile's mirrors and filtering in Swift. Legacy `nil`-profileID records
-        // count as the default profile until bootstrap claims them, so include
-        // them only when the default profile is the one being fetched — exactly
-        // the previous `(profileID ?? default) == profileID` semantics.
-        let includeUnclaimed = profileID == UserProfile.defaultProfileID
-        let descriptor = FetchDescriptor<UserContentState>(
-            predicate: #Predicate { $0.profileID == profileID || ($0.profileID == nil && includeUnclaimed) }
-        )
-        var map: [String: UserContentState] = [:]
-        for mirror in try context.fetch(descriptor) {
-            map[mirror.contentId] = dedupe(mirror, against: map[mirror.contentId])
-        }
-        return map
-    }
-
-    /// Defensive de-duplication: CloudKit can momentarily surface two records for
-    /// one key — keep the most recently updated and delete the loser.
-    func dedupe<T: PersistentModel>(_ candidate: T, against existing: T?, updatedAt: (T) -> Date) -> T {
-        guard let existing else { return candidate }
-        if updatedAt(candidate) > updatedAt(existing) {
-            context.delete(existing)
-            return candidate
-        }
-        context.delete(candidate)
-        return existing
-    }
-
-    func dedupe(_ candidate: SyncedPlaylist, against existing: SyncedPlaylist?) -> SyncedPlaylist {
-        dedupe(candidate, against: existing, updatedAt: \.updatedAt)
-    }
-
-    func dedupe(_ candidate: UserContentState, against existing: UserContentState?) -> UserContentState {
-        dedupe(candidate, against: existing, updatedAt: \.updatedAt)
-    }
-
-    func fetchLocalContentValues() throws -> [String: LocalContentEntry] {
-        var map: [String: LocalContentEntry] = [:]
-        try movieEntries().forEach { map[$0] = $1 }
-        try seriesEntries().forEach { map[$0] = $1 }
-        try episodeEntries().forEach { map[$0] = $1 }
-        try liveEntries().forEach { map[$0] = $1 }
-        return map
-    }
-
-    func movieEntries() throws -> [(String, LocalContentEntry)] {
-        let movies = try context.fetch(FetchDescriptor<Movie>(
-            predicate: #Predicate { $0.isFavorite || $0.watchProgress > 0 || $0.isWatched || $0.addedToWatchlistDate != nil }
-        ))
-        return movies.map { movie in
-            (movie.id, LocalContentEntry(
-                values: ContentStateValues(
-                    watchProgress: movie.watchProgress,
-                    isWatched: movie.isWatched,
-                    lastWatchedDate: movie.lastWatchedDate,
-                    isFavorite: movie.isFavorite,
-                    addedToWatchlistDate: movie.addedToWatchlistDate,
-                    favoriteOrder: nil
-                ),
-                kind: .movie,
-                model: movie
-            ))
-        }
-    }
-
-    func seriesEntries() throws -> [(String, LocalContentEntry)] {
-        let series = try context.fetch(FetchDescriptor<Series>(
-            predicate: #Predicate { $0.isFavorite || $0.addedToWatchlistDate != nil || $0.lastWatchedDate != nil }
-        ))
-        return series.map { item in
-            (item.id, LocalContentEntry(
-                values: ContentStateValues(
-                    watchProgress: 0,
-                    isWatched: false,
-                    lastWatchedDate: item.lastWatchedDate,
-                    isFavorite: item.isFavorite,
-                    addedToWatchlistDate: item.addedToWatchlistDate,
-                    favoriteOrder: nil
-                ),
-                kind: .series,
-                model: item
-            ))
-        }
-    }
-
-    func episodeEntries() throws -> [(String, LocalContentEntry)] {
-        let episodes = try context.fetch(FetchDescriptor<Episode>(
-            predicate: #Predicate { $0.watchProgress > 0 || $0.isWatched }
-        ))
-        return episodes.map { episode in
-            (episode.id, LocalContentEntry(
-                values: ContentStateValues(
-                    watchProgress: episode.watchProgress,
-                    isWatched: episode.isWatched,
-                    lastWatchedDate: episode.lastWatchedDate,
-                    isFavorite: false,
-                    addedToWatchlistDate: nil,
-                    favoriteOrder: nil
-                ),
-                kind: .episode,
-                model: episode
-            ))
-        }
-    }
-
-    /// Live streams sync only their favorite flag/order — channel-surfing
-    /// "recently watched" stays device-local to avoid mirror bloat.
-    func liveEntries() throws -> [(String, LocalContentEntry)] {
-        let streams = try context.fetch(FetchDescriptor<LiveStream>(
-            predicate: #Predicate { $0.isFavorite }
-        ))
-        return streams.map { stream in
-            (stream.id, LocalContentEntry(
-                values: ContentStateValues(
-                    watchProgress: 0,
-                    isWatched: false,
-                    lastWatchedDate: nil,
-                    isFavorite: stream.isFavorite,
-                    addedToWatchlistDate: nil,
-                    favoriteOrder: stream.favoriteOrder
-                ),
-                kind: .live,
-                model: stream
-            ))
-        }
-    }
-
-    func fetchMovie(_ id: String) throws -> Movie? {
-        var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first
-    }
-
-    func fetchSeries(_ id: String) throws -> Series? {
-        var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first
-    }
-
-    func fetchEpisode(_ id: String) throws -> Episode? {
-        var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first
-    }
-
-    func fetchLiveStream(_ id: String) throws -> LiveStream? {
-        var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first
     }
 }

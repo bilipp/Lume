@@ -57,8 +57,8 @@ final class CloudSyncCoordinator {
 
     private var observers: [NSObjectProtocol] = []
 
-    init(container: ModelContainer, cloudKitContainerIdentifier: String, cloudKitEnabled: Bool) {
-        engine = CloudSyncEngine(container: container)
+    init(catalogContainer: ModelContainer, cloudContainer: ModelContainer, cloudKitContainerIdentifier: String, cloudKitEnabled: Bool) {
+        engine = CloudSyncEngine(catalogContainer: catalogContainer, cloudContainer: cloudContainer)
         self.cloudKitContainerIdentifier = cloudKitContainerIdentifier
         self.cloudKitEnabled = cloudKitEnabled
         // Nothing to sync under previews / tests: open the launch gate now so an

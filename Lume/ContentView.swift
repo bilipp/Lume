@@ -66,7 +66,9 @@ struct ContentView: View {
     private func resolveStartupProfileChooser() {
         guard !startupChoiceResolved, profileManager?.isReady == true else { return }
         startupChoiceResolved = true
-        let profileCount = (try? modelContext.fetchCount(FetchDescriptor<UserProfile>())) ?? 0
+        // UserProfile lives in the cloud store (a separate container); read the
+        // count through ProfileManager rather than the catalog env context.
+        let profileCount = profileManager?.allProfiles().count ?? 0
         showStartupProfileChooser = askOnStartup && profileCount > 1
     }
 

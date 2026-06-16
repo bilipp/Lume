@@ -1,3 +1,4 @@
+import CoreData
 import Foundation
 import OSLog
 import SwiftData
@@ -37,11 +38,27 @@ final class ProfileManager {
     /// interaction so a half-projected catalog is never shown.
     private(set) var isSwitching = false
 
-    private let container: ModelContainer
-    private let coordinator: CloudSyncCoordinator
+    /// The profile roster the UI reads (instead of a `@Query`). `UserProfile`
+    /// lives in the cloud store — a separate container the browse `@Query`s don't
+    /// bind to — so the profile views can't query it directly; they observe this
+    /// instead. Refreshed after each mutation and on CloudKit remote-change. Field
+    /// edits to existing profiles propagate via the `@Model`'s own observation, so
+    /// this array only changes when the *set* of profiles does.
+    private(set) var profiles: [UserProfile] = []
 
-    init(container: ModelContainer, coordinator: CloudSyncCoordinator) {
-        self.container = container
+    /// Holds `UserProfile` (the CloudKit-mirrored store); all profile CRUD runs on
+    /// its main context.
+    private let cloudContainer: ModelContainer
+    /// The local-only catalog store. Used only to flush pending catalog edits
+    /// before a profile switch, so the engine's background pass reads current state.
+    private let catalogContainer: ModelContainer
+    private let coordinator: CloudSyncCoordinator
+    /// Process-lifetime; never removed (this manager lives for the whole app).
+    private var remoteChangeObserver: NSObjectProtocol?
+
+    init(catalogContainer: ModelContainer, cloudContainer: ModelContainer, coordinator: CloudSyncCoordinator) {
+        self.catalogContainer = catalogContainer
+        self.cloudContainer = cloudContainer
         self.coordinator = coordinator
         activeProfileID = ActiveProfileStore.current ?? UserProfile.defaultProfileID
         // `didSet` doesn't fire for the in-init assignment above, so seed the
@@ -50,11 +67,25 @@ final class ProfileManager {
         let resolvedID = activeProfileID
         var descriptor = FetchDescriptor<UserProfile>(predicate: #Predicate { $0.id == resolvedID })
         descriptor.fetchLimit = 1
-        activeProfile = (try? container.mainContext.fetch(descriptor))?.first
+        activeProfile = (try? cloudContainer.mainContext.fetch(descriptor))?.first
+        profiles = allProfiles()
+        // `UserProfile` syncs via CloudKit; refresh the roster when a remote change
+        // (a profile added/removed on another device) lands. Only the cloud store
+        // posts this — the catalog store is local-only. Cheap (a few rows) and
+        // guarded, so the constant import churn doesn't re-render the profile UI.
+        remoteChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreRemoteChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshProfiles() }
+        }
     }
 
+    /// `UserProfile` lives in the cloud store, so all profile CRUD runs on the
+    /// cloud container's main context.
     private var context: ModelContext {
-        container.mainContext
+        cloudContainer.mainContext
     }
 
     // MARK: - Launch
@@ -69,6 +100,7 @@ final class ProfileManager {
         ActiveProfileStore.current = result.activeProfileID
         activeProfileID = result.activeProfileID
         isReady = true
+        refreshProfiles()
     }
 
     // MARK: - Queries
@@ -78,6 +110,16 @@ final class ProfileManager {
             sortBy: [SortDescriptor(\.sortOrder), SortDescriptor(\.createdAt)]
         )
         return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Re-read the roster from the cloud store, reassigning `profiles` only when
+    /// the *set* changed — so CloudKit's constant remote-change churn doesn't
+    /// needlessly re-render the profile UI (field edits propagate via `@Model`).
+    private func refreshProfiles() {
+        let latest = allProfiles()
+        if latest.map(\.persistentModelID) != profiles.map(\.persistentModelID) {
+            profiles = latest
+        }
     }
 
     func profile(with id: UUID) -> UserProfile? {
@@ -99,6 +141,7 @@ final class ProfileManager {
         )
         context.insert(profile)
         try? context.save()
+        refreshProfiles()
         return profile
     }
 
@@ -117,10 +160,11 @@ final class ProfileManager {
         let from = activeProfileID
         isSwitching = true
         // Flush any pending catalog edits (e.g. a favorite toggled moments ago,
-        // not yet autosaved by the main context) so the engine — which reads the
-        // catalog through its own background context — exports the outgoing
-        // profile's *current* state rather than a stale snapshot.
-        try? context.save()
+        // not yet autosaved) so the engine — which reads the catalog through its
+        // own background context — exports the outgoing profile's *current* state
+        // rather than a stale snapshot. This flushes the CATALOG main context;
+        // profile rows live in the separate cloud store.
+        try? catalogContainer.mainContext.save()
         // The engine commits `ActiveProfileStore.current = id` atomically with
         // the projection swap (see `CloudSyncEngine.switchProfile`), so there is
         // no window where the catalog and the active-profile pointer disagree.
@@ -147,5 +191,6 @@ final class ProfileManager {
         LiveChannelHistory.purge(profileID: profile.id)
         context.delete(profile)
         try? context.save()
+        refreshProfiles()
     }
 }
