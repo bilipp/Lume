@@ -3,9 +3,18 @@ import SwiftData
 
 @Model
 final class Series {
-    // Home's trending/watchlist rows look titles up by `tmdbId`; index it so
-    // those per-item lookups don't scan the whole catalog.
-    #Index<Series>([\.tmdbId])
+    // Home's trending/watchlist rows look titles up by `tmdbId`. The home
+    // screen's `@Query`s (Recently Watched / Favorites) and the iCloud
+    // reconciler also filter by user-state columns; index those so a foreground
+    // CloudKit merge seeks instead of scanning the whole catalog on the main
+    // thread (the unindexed scan froze the app on tvOS returning from
+    // background).
+    #Index<Series>(
+        [\.tmdbId],
+        [\.isFavorite],
+        [\.lastWatchedDate],
+        [\.addedToWatchlistDate]
+    )
 
     @Attribute(.unique) var id: String
     var seriesId: Int

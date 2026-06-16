@@ -3,9 +3,21 @@ import SwiftData
 
 @Model
 final class Movie {
-    // Home's trending/watchlist rows look titles up by `tmdbId`; index it so
-    // those per-item lookups don't scan the whole catalog.
-    #Index<Movie>([\.tmdbId])
+    // Home's trending/watchlist rows look titles up by `tmdbId`. The home
+    // screen's `@Query`s (Recently Watched / Favorites) and the iCloud
+    // reconciler also filter the catalog by user-state columns. Index every
+    // column those predicates touch so a foreground CloudKit merge seeks the
+    // handful of favorited / in-progress rows instead of scanning the whole
+    // catalog on the main thread — the unindexed scan is what froze the app on
+    // tvOS when returning from background.
+    #Index<Movie>(
+        [\.tmdbId],
+        [\.isFavorite],
+        [\.lastWatchedDate],
+        [\.isWatched],
+        [\.addedToWatchlistDate],
+        [\.watchProgress]
+    )
 
     @Attribute(.unique) var id: String
     var streamId: Int

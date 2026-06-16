@@ -47,18 +47,13 @@ final class CloudSyncCoordinator {
     /// local `Playlist` records before the UI decides what to show.
     private var shouldOpenInitialSyncGate = false
 
-    /// Minimum gap before a *foregrounding* re-triggers a reconcile. A foreground
-    /// pull is essentially redundant with the remote-change observer — when
-    /// CloudKit reconnects and imports remote changes it posts its own
-    /// `.NSPersistentStoreRemoteChange`, which reconciles regardless of this gate,
-    /// so a change made on another device while this one was backgrounded still
-    /// lands promptly without the foreground pass. That makes the foreground
-    /// reconcile a pure safety net, so the gap is deliberately long (30 minutes):
-    /// reopening the app no longer kicks off a sync, which is what makes it *feel*
-    /// like it syncs too often. Remote changes (cross-device freshness) and the
-    /// background flush (pushing local edits before suspension) are intentionally
-    /// NOT throttled — capping those would delay sync or drop local changes.
-    private static let minForegroundReconcileInterval: TimeInterval = 30 * 60
+    /// Set while CloudKit is importing remote data, so a foreground return or a
+    /// bare `.NSPersistentStoreRemoteChange` knows there is actually something new
+    /// to pull. Consumed (reset) when a reconcile pass starts. Export acks and
+    /// setup events don't set it, so pushing our own changes no longer
+    /// self-triggers an empty pass — and a foreground with nothing imported skips
+    /// the catalog scan and the `@Query` refresh that froze the UI on tvOS.
+    private var cloudImportPending = false
 
     private var observers: [NSObjectProtocol] = []
 
@@ -88,7 +83,7 @@ final class CloudSyncCoordinator {
         await refreshAccountStatus()
         guard cloudKitEnabled else {
             // Gate already open from `init`; just reconcile the local store.
-            reconcile()
+            reconcile(reason: .launch)
             return
         }
         guard status.account.canSync else {
@@ -101,7 +96,7 @@ final class CloudSyncCoordinator {
         // Account is usable: pull anything CloudKit already imported, and arm a
         // safety-net timeout so an offline launch (or a brand-new empty account
         // that never reports an import) can't spin forever.
-        reconcile()
+        reconcile(reason: .launch)
         scheduleInitialSyncTimeout()
     }
 
@@ -110,28 +105,21 @@ final class CloudSyncCoordinator {
         switch phase {
         case .active:
             Task { await refreshAccountStatus() }
-            // Skip the pull if we reconciled within the throttle window: there's
-            // nothing new to merge and the merge is what hitches the UI. A real
-            // remote import still pulls via its own remote-change notification.
-            if shouldReconcileOnForeground {
-                reconcile()
-            }
+            // Don't scan on a bare foreground. CloudKit's reconnect posts its own
+            // import event when remote data actually arrives, and that drives the
+            // pull; a foreground with nothing imported has nothing to merge, and
+            // that empty pass — plus the `@Query` refresh it triggers over the
+            // whole catalog — is what froze the app on tvOS.
+            reconcile(reason: .foreground)
         case .background, .inactive:
-            // Flush now, not debounced: the system may suspend the app before a
-            // delayed pass could run.
-            reconcile(debounced: false)
+            // Flush local edits now, not debounced: the system may suspend the app
+            // before a delayed pass could run. Always runs — this is how a toggled
+            // favorite or watch-progress reaches the cloud, and the safety net that
+            // lets foreground / remote-change passes skip freely.
+            reconcile(reason: .backgroundFlush, debounced: false)
         @unknown default:
             break
         }
-    }
-
-    /// True when at least `minForegroundReconcileInterval` has elapsed since the
-    /// last completed reconcile, so a foreground pull is worth running. The first
-    /// foreground after a cold launch (no `lastReconcile` yet) is allowed; the
-    /// launch reconcile itself runs from `start()`.
-    private var shouldReconcileOnForeground: Bool {
-        guard let last = status.lastReconcile else { return true }
-        return Date().timeIntervalSince(last) >= Self.minForegroundReconcileInterval
     }
 
     // MARK: - Reconcile
@@ -141,7 +129,11 @@ final class CloudSyncCoordinator {
     /// background flush before suspension) pass `debounced: false`. Either way
     /// concurrent passes coalesce into at most one in-flight pass plus one queued
     /// follow-up.
-    func reconcile(debounced: Bool = true) {
+    func reconcile(reason: ReconcileReason = .queued, debounced: Bool = true) {
+        guard shouldRun(reason) else {
+            Logger.sync.debug("Reconcile skipped (\(String(describing: reason), privacy: .public)) — no pending CloudKit import")
+            return
+        }
         guard debounced else {
             reconcileDebounceTask?.cancel()
             reconcileDebounceTask = nil
@@ -156,12 +148,29 @@ final class CloudSyncCoordinator {
         }
     }
 
+    /// A foreground return or a bare store-change notification only merits a pass
+    /// when CloudKit has imported remote data since the last one; everything else
+    /// always runs. Keeping the pre-suspension flush unconditional is what makes
+    /// skipping safe — a local edit still reaches the cloud when the app
+    /// backgrounds, even if every foreground / remote-change pass was skipped.
+    private func shouldRun(_ reason: ReconcileReason) -> Bool {
+        switch reason {
+        case .launch, .backgroundFlush, .contentSync, .queued:
+            true
+        case .foreground, .remoteChange:
+            cloudImportPending
+        }
+    }
+
     private func runReconcile() {
         guard !isReconciling else {
             pendingReconcile = true
             return
         }
         isReconciling = true
+        // This pass pulls whatever CloudKit imported, so consume the flag now; an
+        // import that lands mid-pass sets it again and queues a follow-up.
+        cloudImportPending = false
 
         Task {
             let result = await engine.reconcile()
@@ -227,7 +236,7 @@ final class CloudSyncCoordinator {
     private func completeInitialSync() {
         guard cloudKitEnabled, !status.hasCompletedInitialSync, !shouldOpenInitialSyncGate else { return }
         shouldOpenInitialSyncGate = true
-        reconcile()
+        reconcile(reason: .launch)
     }
 
     /// Safety net: open the gate after a bounded wait so a brand-new but empty
@@ -312,6 +321,16 @@ final class CloudSyncCoordinator {
         } else if !inProgress {
             status.lastError = nil
         }
+        // An import means remote data is actually landing in the local store — arm
+        // the gate so the foreground / remote-change passes know to pull, and run
+        // one when the import finishes. Export acks and `.setup` don't arm it, so
+        // pushing our own edits no longer self-triggers an empty reconcile.
+        if type == .import {
+            cloudImportPending = true
+            if !inProgress {
+                reconcile(reason: .remoteChange)
+            }
+        }
         // The launch-time fetch from iCloud has settled once the first import
         // completes (the data has landed) or any event errors (so we fall back
         // rather than spin). A finished `.setup` is too early — the import that
@@ -372,7 +391,9 @@ final class CloudSyncCoordinator {
     }
 
     /// CloudKit merged remote changes into the local store — pull them through
-    /// the reconciler so they reach the catalog models and the UI.
+    /// the reconciler so they reach the catalog models and the UI. Gated on an
+    /// actual import (`.remoteChange`): this fires for our own export acks too,
+    /// and reconciling on those is the redundant pass we want to avoid.
     private func observeRemoteChanges() {
         let observer = NotificationCenter.default.addObserver(
             forName: .NSPersistentStoreRemoteChange,
@@ -380,7 +401,7 @@ final class CloudSyncCoordinator {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.reconcile()
+                self?.reconcile(reason: .remoteChange)
             }
         }
         observers.append(observer)
@@ -395,11 +416,33 @@ final class CloudSyncCoordinator {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.reconcile()
+                self?.reconcile(reason: .contentSync)
             }
         }
         observers.append(observer)
     }
+}
+
+/// Why a reconcile was requested — determines whether a pass with nothing to do
+/// can be skipped. A foreground return and a bare `.NSPersistentStoreRemoteChange`
+/// only run when CloudKit actually imported remote data (`cloudImportPending`);
+/// launch, the pre-suspension flush, a finished catalog sync, and a queued
+/// follow-up always run.
+enum ReconcileReason {
+    /// Cold-launch first pass — establishes the baseline and pulls anything
+    /// CloudKit already imported.
+    case launch
+    /// App returned to the foreground.
+    case foreground
+    /// App is suspending — flush local edits to the cloud before it does.
+    case backgroundFlush
+    /// CloudKit reported a store change (import, or our own export ack).
+    case remoteChange
+    /// A playlist's catalog finished syncing, so pending cloud state can apply.
+    case contentSync
+    /// An internal follow-up pass (coalesced overlap, or a post-profile-switch
+    /// re-baseline) — always runs.
+    case queued
 }
 
 extension Notification.Name {

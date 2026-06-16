@@ -3,6 +3,11 @@ import SwiftData
 
 @Model
 final class LiveStream {
+    // Live TV's Favorites / Recently Watched rows and the iCloud reconciler
+    // filter channels by these columns; index them so a foreground refresh
+    // seeks instead of scanning every channel on the main thread.
+    #Index<LiveStream>([\.isFavorite], [\.lastWatchedDate])
+
     @Attribute(.unique) var id: String
     var streamId: Int
     var name: String
