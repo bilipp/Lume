@@ -7,7 +7,11 @@ struct ProfileEditorView: View {
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Environment(\.dismiss) private var dismiss
 
-    @Query private var allProfiles: [UserProfile]
+    /// The roster comes from `ProfileManager` — `UserProfile` lives in the cloud
+    /// store (a separate container this view's env context doesn't bind to).
+    private var allProfiles: [UserProfile] {
+        profileManager?.profiles ?? []
+    }
 
     /// The profile being edited, or nil to create a new one.
     let profile: UserProfile?

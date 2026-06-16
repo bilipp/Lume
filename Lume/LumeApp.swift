@@ -16,58 +16,57 @@ struct LumeApp: App {
     /// CloudKit Console (schema deployed to Production before App Store release).
     static let cloudKitContainerIdentifier = "iCloud.bilipp.Lume"
 
-    let sharedModelContainer: ModelContainer
+    /// The local-only catalog store. The app's environment container — every
+    /// browse `@Query` binds to it, so CloudKit's churn (which only touches the
+    /// cloud store) can no longer invalidate it. This is the foreground-freeze fix.
+    let catalogContainer: ModelContainer
+    /// The CloudKit-mirrored user-data store. Only `CloudSyncEngine` and the
+    /// profile views touch it.
+    let cloudContainer: ModelContainer
     @State private var cloudSync: CloudSyncCoordinator
     @State private var profileManager: ProfileManager
     @State private var playlistSwitch = PlaylistSwitchModel()
     @State private var parentalControls: ParentalControls
 
     init() {
-        let container = Self.makeModelContainer()
-        sharedModelContainer = container
+        let (catalog, cloud) = Self.makeModelContainers()
+        catalogContainer = catalog
+        cloudContainer = cloud
         let coordinator = CloudSyncCoordinator(
-            container: container,
+            catalogContainer: catalog,
+            cloudContainer: cloud,
             cloudKitContainerIdentifier: Self.cloudKitContainerIdentifier,
             cloudKitEnabled: Self.isCloudKitEnvironment
         )
         _cloudSync = State(initialValue: coordinator)
-        let profiles = ProfileManager(container: container, coordinator: coordinator)
+        let profiles = ProfileManager(catalogContainer: catalog, cloudContainer: cloud, coordinator: coordinator)
         _profileManager = State(initialValue: profiles)
         _parentalControls = State(initialValue: ParentalControls(profileManager: profiles))
     }
 
-    /// Builds the container with **two configurations**:
+    /// Builds **two separate containers** (the foreground-freeze fix):
     ///
-    /// 1. A local-only store for the catalog (`Playlist`, `Movie`, …). It is
-    ///    large, re-derivable from the provider, and uses `@Attribute(.unique)`
-    ///    which CloudKit forbids — so it must NOT sync. This configuration is
-    ///    left unnamed to preserve the existing on-disk `default.store`, so the
-    ///    upgrade doesn't strand current users' data.
-    /// 2. A CloudKit-synced store holding only the lightweight user-data mirrors
-    ///    (`SyncedPlaylist`, `UserContentState`), reconciled against the catalog
-    ///    by `CloudSyncEngine`.
-    private static func makeModelContainer() -> ModelContainer {
-        let localSchema = Schema([
-            Playlist.self,
-            Category.self,
-            LiveStream.self,
-            Movie.self,
-            Series.self,
-            Episode.self,
-            CastMember.self,
-            EPGListing.self
-        ])
-        let cloudSchema = Schema([
-            SyncedPlaylist.self,
-            UserContentState.self,
-            UserProfile.self
-        ])
-        let fullSchema = Schema([
+    /// 1. `catalog` — a local-only store for the catalog (`Playlist`, `Movie`, …).
+    ///    It is large, re-derivable from the provider, and uses `@Attribute(.unique)`
+    ///    which CloudKit forbids — so it must NOT sync. Left unnamed to preserve the
+    ///    existing on-disk `default.store`, so the upgrade doesn't strand users' data.
+    /// 2. `cloud` — a CloudKit-synced store holding only the lightweight user-data
+    ///    mirrors (`SyncedPlaylist`, `UserContentState`, `UserProfile`), reconciled
+    ///    against the catalog by `CloudSyncEngine`.
+    ///
+    /// These were previously two *configurations* of one container. Splitting them
+    /// into two containers gives the catalog its own `ModelContext` /
+    /// `NSPersistentStoreCoordinator`, so `NSPersistentCloudKitContainer`'s
+    /// continuous foreground import/export handshake (on the cloud store) no longer
+    /// churns the catalog's `mainContext` — which is what re-evaluated every browse
+    /// `@Query` dozens of times per foreground and pinned the main thread on tvOS.
+    /// Both stores keep their existing files and schemas, so there is no migration.
+    private static func makeModelContainers() -> (catalog: ModelContainer, cloud: ModelContainer) {
+        let cloud = makeCloudContainer()
+        let catalogSchema = Schema([
             Playlist.self, Category.self, LiveStream.self, Movie.self,
-            Series.self, Episode.self, CastMember.self, EPGListing.self,
-            SyncedPlaylist.self, UserContentState.self, UserProfile.self
+            Series.self, Episode.self, CastMember.self, EPGListing.self
         ])
-
         // Unnamed → keeps the historical `default.store` path (preserves data).
         // `cloudKitDatabase: .none` is REQUIRED: the default is `.automatic`, which
         // mirrors the store to CloudKit whenever the binary is CloudKit-entitled. On
@@ -76,44 +75,54 @@ struct LumeApp: App {
         // at load (NSCocoaErrorDomain 134060). Tests/previews are un-entitled so
         // `.automatic` silently resolves to no-sync there — which is why this only
         // bites real builds. The catalog must stay strictly local.
-        let localConfiguration = ModelConfiguration(
-            schema: localSchema,
+        let catalogConfiguration = ModelConfiguration(
+            schema: catalogSchema,
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none
         )
+        func buildCatalog() throws -> ModelContainer {
+            try ModelContainer(for: catalogSchema, configurations: catalogConfiguration)
+        }
+        do {
+            let catalog = try buildCatalog()
+            // A `.syncing` status in the freshly opened store is stale by
+            // definition — its owning task died with the previous process. Reset
+            // it now, before MainTabView's auto-sync gate reads playlist status,
+            // or the playlist stays wedged out of all future syncs.
+            ContentSyncManager.recoverInterruptedSyncs(in: ModelContext(catalog))
+            return (catalog, cloud)
+        } catch {
+            #if DEBUG
+                // Init-time migration failure: wipe the local catalog store and
+                // retry once. The cloud store is CloudKit-backed and re-hydrates,
+                // and the reconcile engine's empty-store recovery (CloudSyncEngine's
+                // `LocalCatalogReadiness`) pulls the catalog back rather than
+                // pushing the now-empty store's "deletions" to iCloud. Logged
+                // loudly so a destructive local wipe is never silent.
+                Logger.sync.error("Local catalog store load failed (\(error.localizedDescription, privacy: .public)) — DEBUG: wiping default.store and retrying once")
+                destroyStore(at: catalogConfiguration.url)
+                if let catalog = try? buildCatalog() {
+                    return (catalog, cloud)
+                }
+            #endif
+            fatalError("Could not create catalog ModelContainer: \(error)")
+        }
+    }
+
+    /// The CloudKit-mirrored user-data container (`SyncedPlaylist`,
+    /// `UserContentState`, `UserProfile`). Small and CloudKit-backed; a load
+    /// failure is unexpected, so fail loudly rather than risk a silent empty store.
+    private static func makeCloudContainer() -> ModelContainer {
+        let cloudSchema = Schema([SyncedPlaylist.self, UserContentState.self, UserProfile.self])
         let cloudConfiguration = ModelConfiguration(
             "CloudUserData",
             schema: cloudSchema,
             cloudKitDatabase: cloudKitDatabase
         )
-
-        func build() throws -> ModelContainer {
-            try ModelContainer(for: fullSchema, configurations: localConfiguration, cloudConfiguration)
-        }
-
         do {
-            let container = try build()
-            // A `.syncing` status in the freshly opened store is stale by
-            // definition — its owning task died with the previous process. Reset
-            // it now, before MainTabView's auto-sync gate reads playlist status,
-            // or the playlist stays wedged out of all future syncs.
-            ContentSyncManager.recoverInterruptedSyncs(in: ModelContext(container))
-            return container
+            return try ModelContainer(for: cloudSchema, configurations: cloudConfiguration)
         } catch {
-            #if DEBUG
-                // Init-time migration failure: wipe the local store and retry
-                // once. The cloud store is CloudKit-backed and re-hydrates, and
-                // the reconcile engine's empty-store recovery (CloudSyncEngine's
-                // `LocalCatalogReadiness`) pulls the catalog back rather than
-                // pushing the now-empty store's "deletions" to iCloud. Logged
-                // loudly so a destructive local wipe is never silent.
-                Logger.sync.error("Local store load failed (\(error.localizedDescription, privacy: .public)) — DEBUG: wiping default.store and retrying once")
-                destroyStore(at: localConfiguration.url)
-                if let container = try? build() {
-                    return container
-                }
-            #endif
-            fatalError("Could not create ModelContainer: \(error)")
+            fatalError("Could not create cloud ModelContainer: \(error)")
         }
     }
 
@@ -164,20 +173,20 @@ struct LumeApp: App {
                     // Give DownloadManager access to the model container so it
                     // can persist download state from its delegate callbacks.
                     #if !os(tvOS)
-                        DownloadManager.shared.configure(container: sharedModelContainer)
+                        DownloadManager.shared.configure(container: catalogContainer)
                     #endif
 
                     // Commit any watch progress that a previous session buffered
                     // but never flushed to SwiftData (e.g. it was killed mid-
                     // playback). Runs off the main thread before playback starts.
-                    await WatchProgressWriter.reconcilePending(container: sharedModelContainer)
+                    await WatchProgressWriter.reconcilePending(container: catalogContainer)
 
                     // If the preferred language changed since last launch (e.g.
                     // via the per-app language override in iOS Settings), drop
                     // cached TMDB enrichment so detail views re-fetch text,
                     // videos and artwork in the new language.
                     TMDBLanguageWatcher.invalidateEnrichmentIfLanguageChanged(
-                        in: sharedModelContainer.mainContext
+                        in: catalogContainer.mainContext
                     )
 
                     // Restore a previously connected Trakt session (refreshing
@@ -199,14 +208,14 @@ struct LumeApp: App {
                     // Resume background content indexing for anything still
                     // unindexed (the pass waits on its own while a playlist
                     // sync is running).
-                    ContentIndexingService.shared.configure(container: sharedModelContainer)
+                    ContentIndexingService.shared.configure(container: catalogContainer)
                     ContentIndexingService.shared.kick()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     cloudSync.handleScenePhaseChange(to: phase)
                 }
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(catalogContainer)
 
         #if os(macOS)
             WindowGroup(id: "player", for: PlayableMedia.self) { $media in
@@ -215,7 +224,7 @@ struct LumeApp: App {
                         .frame(minWidth: 800, minHeight: 450)
                 }
             }
-            .modelContainer(sharedModelContainer)
+            .modelContainer(catalogContainer)
             .environment(TraktService.shared)
             .windowStyle(.hiddenTitleBar)
             .windowResizability(.contentMinSize)

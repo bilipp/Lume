@@ -31,11 +31,11 @@ extension CloudSyncEngine {
     func localCatalogReadiness() -> LocalCatalogReadiness {
         let catalogCount: Int
         do {
-            catalogCount = try context.fetchCount(FetchDescriptor<Playlist>())
-                + context.fetchCount(FetchDescriptor<Movie>())
-                + context.fetchCount(FetchDescriptor<Series>())
-                + context.fetchCount(FetchDescriptor<Episode>())
-                + context.fetchCount(FetchDescriptor<LiveStream>())
+            catalogCount = try catalogContext.fetchCount(FetchDescriptor<Playlist>())
+                + catalogContext.fetchCount(FetchDescriptor<Movie>())
+                + catalogContext.fetchCount(FetchDescriptor<Series>())
+                + catalogContext.fetchCount(FetchDescriptor<Episode>())
+                + catalogContext.fetchCount(FetchDescriptor<LiveStream>())
         } catch {
             Logger.sync.error("Local catalog unreadable (\(error.localizedDescription, privacy: .public)) — skipping reconcile, not pushing deletions to iCloud")
             return .unreadable

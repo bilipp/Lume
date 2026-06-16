@@ -6,8 +6,11 @@ import SwiftUI
 struct ManageProfilesView: View {
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Environment(ParentalControls.self) private var parental: ParentalControls?
-    @Query(sort: [SortDescriptor(\UserProfile.sortOrder), SortDescriptor(\UserProfile.createdAt)])
-    private var profiles: [UserProfile]
+    /// The roster comes from `ProfileManager` — `UserProfile` lives in the cloud
+    /// store (a separate container this view's env context doesn't bind to).
+    private var profiles: [UserProfile] {
+        profileManager?.profiles ?? []
+    }
 
     @State private var creatingProfile = false
     @State private var editingProfile: UserProfile?
