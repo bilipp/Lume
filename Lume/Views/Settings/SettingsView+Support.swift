@@ -32,6 +32,11 @@ extension SettingsView {
                         Label("Discord", systemImage: "bubble.left.and.bubble.right")
                     }
                 }
+                if let url = SupportInfo.appStoreReviewURL {
+                    Link(destination: url) {
+                        Label("Rate Lume", systemImage: "star")
+                    }
+                }
             } header: {
                 Text("Support")
             } footer: {
@@ -74,7 +79,7 @@ extension SettingsView {
             VStack(alignment: .leading, spacing: 16) {
                 TVSettingsSectionLabel("Support")
 
-                Text("Scan a code with your phone to open our website or Discord, or email us for help.")
+                Text("Scan a code with your phone to open our website, Discord, or rate Lume — or email us for help.")
                     .font(.system(size: 22))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -82,6 +87,7 @@ extension SettingsView {
                 HStack(alignment: .top, spacing: 40) {
                     supportQRCode(caption: "Website", value: SupportInfo.websiteDisplay, link: SupportInfo.website)
                     supportQRCode(caption: "Discord", value: SupportInfo.discordDisplay, link: SupportInfo.discord)
+                    supportQRCode(caption: "Rate Lume", value: SupportInfo.appStoreDisplay, link: SupportInfo.appStoreReview)
                 }
                 .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 .padding(.top, 4)
