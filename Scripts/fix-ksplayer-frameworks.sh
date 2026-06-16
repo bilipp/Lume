@@ -13,9 +13,68 @@ set -e
 
 # ---- helpers -----------------------------------------------------------------
 
-# Set to 1 by fix_bundle_id when it actually rewrites a bundle id, so callers
-# only re-sign the frameworks that changed.
+# Set to 1 by fix_bundle_id / fix_min_os when they actually rewrite a plist, so
+# callers only re-sign the frameworks that changed.
 BUNDLE_ID_PATCHED=0
+MIN_OS_PATCHED=0
+
+# Resolve the Info.plist for a framework, deep (macOS) or shallow layout.
+framework_plist() {
+    fw="$1"
+    if [ -f "$fw/Versions/Current/Resources/Info.plist" ]; then
+        echo "$fw/Versions/Current/Resources/Info.plist"
+    elif [ -f "$fw/Versions/A/Resources/Info.plist" ]; then
+        echo "$fw/Versions/A/Resources/Info.plist"
+    elif [ -f "$fw/Resources/Info.plist" ]; then
+        echo "$fw/Resources/Info.plist"
+    else
+        echo "$fw/Info.plist"
+    fi
+}
+
+# Resolve the Mach-O binary for a framework, deep (macOS) or shallow layout.
+framework_binary() {
+    fw="$1"
+    name=$(basename "$fw" .framework)
+    if [ -f "$fw/Versions/Current/$name" ]; then
+        echo "$fw/Versions/Current/$name"
+    elif [ -f "$fw/Versions/A/$name" ]; then
+        echo "$fw/Versions/A/$name"
+    else
+        echo "$fw/$name"
+    fi
+}
+
+fix_min_os() {
+    # App Store upload rejects (ITMS-90208) any embedded framework whose
+    # Info.plist MinimumOSVersion is lower than what its Mach-O slice actually
+    # supports. The KSPlayer / FFmpegKit XCFrameworks ship a generic
+    # MinimumOSVersion of 13.0, but their tvOS slices are compiled with
+    # minos 26.0 — so the binary "does not support" the 13.0 the plist claims.
+    # (iOS/macOS slices happen to match their plist, which is why only the tvOS
+    # upload was rejected.) Sync the plist to the binary's real minos.
+    fw="$1"
+    plist=$(framework_plist "$fw")
+    bin=$(framework_binary "$fw")
+    [ -f "$plist" ] || return 0
+    [ -f "$bin" ] || return 0
+
+    minos=$(otool -l "$bin" 2>/dev/null | awk '
+        /LC_BUILD_VERSION/{mode="build"}
+        /LC_VERSION_MIN_/{mode="min"}
+        mode=="build" && $1=="minos"{print $2; exit}
+        mode=="min" && $1=="version"{print $2; exit}')
+    [ -n "$minos" ] || return 0
+
+    current=$(/usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$plist" 2>/dev/null || echo "")
+    [ "$current" = "$minos" ] && return 0
+
+    chmod u+w "$plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion $minos" "$plist" 2>/dev/null \
+        || /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string $minos" "$plist"
+    MIN_OS_PATCHED=1
+    echo "[fix-ksplayer] MinimumOSVersion patched in $plist ($current -> $minos)"
+}
 
 fix_bundle_id() {
     plist="$1"
@@ -75,15 +134,17 @@ process_framework() {
     do_resign="${2:-0}"
     [ -d "$fw" ] || return 0
     BUNDLE_ID_PATCHED=0
+    MIN_OS_PATCHED=0
     if is_macos_build; then
         restructure_to_deep_bundle "$fw"
         fix_bundle_id "$fw/Versions/A/Resources/Info.plist"
     else
         fix_bundle_id "$fw/Info.plist"
     fi
-    # Only re-seal the bundle when we actually changed its id — re-signing every
+    fix_min_os "$fw"
+    # Only re-seal the bundle when we actually changed a plist — re-signing every
     # embedded framework is unnecessary (and slow for the big VLCKit slices).
-    [ "$do_resign" = "1" ] && [ "$BUNDLE_ID_PATCHED" = "1" ] && resign_framework "$fw"
+    [ "$do_resign" = "1" ] && { [ "$BUNDLE_ID_PATCHED" = "1" ] || [ "$MIN_OS_PATCHED" = "1" ]; } && resign_framework "$fw"
     return 0
 }
 
