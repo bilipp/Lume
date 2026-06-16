@@ -18,6 +18,8 @@ struct SearchView: View {
     @Query private var playlists: [Playlist]
 
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+    @AppStorage(SearchSettings.searchAllPlaylistsKey)
+    private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
     @State private var selectedFilter: ContentFilter = .all
@@ -117,7 +119,7 @@ struct SearchView: View {
                     guard !Task.isCancelled else { return }
                     debouncedSearchText = trimmed
                 }
-                .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter)) {
+                .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter, allPlaylists: searchAllPlaylists)) {
                     // Re-run whenever the settled query or the filter changes.
                     // Filter changes are instant (no debounce on the segmented control).
                     updateResults()
@@ -164,11 +166,21 @@ struct SearchView: View {
             return
         }
 
+        // Unless the user has opted into cross-playlist search, scope results to
+        // the active playlist. Every category id is prefixed with its playlist's
+        // UUID (see Category.id), and that UUID appears nowhere else, so matching
+        // it within categoryId limits results to the active playlist's content.
+        let playlistID = activePlaylist?.id.uuidString ?? ""
+        let restrictToPlaylist = !searchAllPlaylists && activePlaylist != nil
+
         var matches: [SearchResult] = []
 
         if selectedFilter == .all || selectedFilter == .movies {
             var descriptor = FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.name.localizedStandardContains(query) },
+                predicate: #Predicate { movie in
+                    movie.name.localizedStandardContains(query)
+                        && (!restrictToPlaylist || (movie.categoryId?.localizedStandardContains(playlistID) ?? false))
+                },
                 sortBy: [SortDescriptor(\.name)]
             )
             descriptor.fetchLimit = resultLimit
@@ -178,7 +190,10 @@ struct SearchView: View {
 
         if selectedFilter == .all || selectedFilter == .series {
             var descriptor = FetchDescriptor<Series>(
-                predicate: #Predicate { $0.name.localizedStandardContains(query) },
+                predicate: #Predicate { series in
+                    series.name.localizedStandardContains(query)
+                        && (!restrictToPlaylist || (series.categoryId?.localizedStandardContains(playlistID) ?? false))
+                },
                 sortBy: [SortDescriptor(\.name)]
             )
             descriptor.fetchLimit = resultLimit
@@ -188,7 +203,10 @@ struct SearchView: View {
 
         if selectedFilter == .all || selectedFilter == .liveTV {
             var descriptor = FetchDescriptor<LiveStream>(
-                predicate: #Predicate { $0.name.localizedStandardContains(query) },
+                predicate: #Predicate { stream in
+                    stream.name.localizedStandardContains(query)
+                        && (!restrictToPlaylist || (stream.categoryId?.localizedStandardContains(playlistID) ?? false))
+                },
                 sortBy: [SortDescriptor(\.name)]
             )
             descriptor.fetchLimit = resultLimit
@@ -202,11 +220,21 @@ struct SearchView: View {
 
 // MARK: - Search Key
 
-/// Identity for the fetch task: re-run when either the settled query text or the
-/// active content filter changes.
+/// Identity for the fetch task: re-run when the settled query text, the active
+/// content filter, or the cross-playlist search preference changes.
 private struct SearchKey: Equatable {
     let text: String
     let filter: ContentFilter
+    let allPlaylists: Bool
+}
+
+// MARK: - Search Settings
+
+enum SearchSettings {
+    /// When enabled, search spans every configured playlist. Off by default, so
+    /// results stay scoped to the active playlist unless the user opts in.
+    static let searchAllPlaylistsKey = "search.allPlaylists"
+    static let searchAllPlaylistsDefault = false
 }
 
 // MARK: - Content Filter
