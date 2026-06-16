@@ -290,7 +290,11 @@ struct MovieDetailView: View {
             return
         }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        await manager.enrichMovie(id: movie.id, tmdbId: tmdbId)
+        // Same fix as SeriesDetailView: apply on the view's own context to avoid
+        // the fault-after-background-deletion race (see SeriesDetailView).
+        guard let details = try? await manager.fetchTMDBMovieDetails(tmdbId: tmdbId) else { return }
+        applyMovieDetails(details, to: movie, context: modelContext)
+        try? modelContext.save()
         refreshToken = UUID()
     }
 

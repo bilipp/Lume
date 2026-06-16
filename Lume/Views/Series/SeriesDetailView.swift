@@ -471,7 +471,14 @@ struct SeriesDetailView: View {
             return
         }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        await manager.enrichSeries(id: series.id, tmdbId: tmdbId)
+        // Fetch off-thread, then apply on the view's own context. Using the
+        // background enrichSeries() path deletes-and-reinserts CastMember rows
+        // from a separate ModelContext; if the main context holds faulted
+        // references to those objects and a render fires before the merge lands,
+        // SwiftData fires a fault against a deleted store row → _assertionFailure.
+        guard let details = try? await manager.fetchTMDBTVDetails(tmdbId: tmdbId) else { return }
+        applySeriesDetails(details, to: series, context: modelContext)
+        try? modelContext.save()
         refreshToken = UUID()
     }
 }
