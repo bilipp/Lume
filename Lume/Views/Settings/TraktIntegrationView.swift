@@ -48,7 +48,7 @@
                         showPaywall = true
                     }
                 } label: {
-                    Label("Connect Trakt Account", systemImage: premium.isPremium ? "link" : "crown.fill")
+                    Label("Connect Trakt Account", systemImage: premium.isPremium ? "link" : "sparkles")
                 }
                 .disabled(trakt.isConnecting)
             } header: {

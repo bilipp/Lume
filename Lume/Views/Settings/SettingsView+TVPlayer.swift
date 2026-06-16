@@ -47,7 +47,7 @@ import SwiftUI
                             presentPaywall(.playbackControls)
                         } label: {
                             HStack(spacing: 16) {
-                                Image(systemName: "crown.fill")
+                                Image(systemName: "sparkles")
                                     .font(.system(size: 22, weight: .medium))
                                 Text("Unlock with Premium")
                                 Spacer(minLength: 0)

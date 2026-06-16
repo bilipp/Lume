@@ -41,7 +41,7 @@ extension SettingsView {
             Section {
                 if premium.isPremium {
                     HStack(spacing: 12) {
-                        Image(systemName: "crown.fill")
+                        Image(systemName: "sparkles")
                             .foregroundStyle(.tint)
                             .font(.title3)
                             .frame(width: 30)
@@ -58,7 +58,7 @@ extension SettingsView {
                         presentPaywall(nil)
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "crown.fill")
+                            Image(systemName: "sparkles")
                                 .foregroundStyle(.tint)
                                 .font(.title3)
                                 .frame(width: 30)
@@ -113,7 +113,7 @@ extension SettingsView {
                     TVSettingsSectionLabel("Premium")
 
                     HStack(spacing: 18) {
-                        Image(systemName: "crown.fill")
+                        Image(systemName: "sparkles")
                             .font(.system(size: 28))
                             .foregroundStyle(.tint)
                             .frame(width: 60, height: 60)
@@ -159,7 +159,7 @@ extension SettingsView {
                         presentPaywall(nil)
                     } label: {
                         HStack(spacing: 16) {
-                            Image(systemName: "crown.fill")
+                            Image(systemName: "sparkles")
                                 .font(.system(size: 22, weight: .medium))
                             Text("Upgrade to Premium")
                             Spacer(minLength: 0)
