@@ -38,6 +38,35 @@ extension SettingsView {
                 Text("Get help, request a feature, or report a problem.")
             }
         }
+
+        /// iOS / macOS About section: app identity plus a link to the credits /
+        /// licenses screen.
+        var aboutSection: some View {
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: "play.tv.fill")
+                        .font(.title2)
+                        .foregroundStyle(.tint)
+                        .frame(width: 28, height: 28)
+                        .background(.tint.opacity(0.1), in: .rect(cornerRadius: 6))
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Lume")
+                        Text("Version 1.0.0")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+
+                NavigationLink {
+                    CreditsView()
+                } label: {
+                    Label("Acknowledgements", systemImage: "doc.text.magnifyingglass")
+                }
+            }
+        }
     #else
         /// tvOS About-pane section. Apple TV can't open a URL, so the website and
         /// Discord are scannable QR codes and the support address is a read-only row.

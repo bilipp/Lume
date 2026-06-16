@@ -92,8 +92,57 @@ import SwiftUI
                     .padding(.vertical, 8)
                 }
 
+                tvCreditsSection
+
                 tvSupportSection
             }
+        }
+
+        /// Read-only acknowledgements for the tvOS About pane. Apple TV can't open
+        /// a URL, so the licences and source address are shown as plain text;
+        /// names / licences / URLs come from `CreditsInfo` to match the iOS list.
+        private var tvCreditsSection: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                TVSettingsSectionLabel("Acknowledgements")
+
+                Text("Lume is free, open-source software, licensed under the GNU Affero General Public License v3.")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                VStack(spacing: 2) {
+                    ForEach(CreditsInfo.libraries) { library in
+                        tvCreditRow(name: library.name, license: library.license)
+                    }
+                }
+
+                Text("Artwork, ratings and details are provided by TMDB, the OMDb API, and Trakt. This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                TVSettingsValueRow("Source", value: CreditsInfo.sourceCode)
+            }
+        }
+
+        /// A read-only name / licence row styled like `TVSettingsValueRow`, but
+        /// with verbatim text on both sides (the library name is a proper noun and
+        /// the licence label isn't translated).
+        private func tvCreditRow(name: String, license: String) -> some View {
+            HStack(spacing: 16) {
+                Text(verbatim: name)
+                Spacer(minLength: 16)
+                Text(verbatim: license)
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: TVSettingsMetrics.rowFontSize))
+            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            .padding(.vertical, TVSettingsMetrics.rowVPadding + 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+            )
         }
     }
 
