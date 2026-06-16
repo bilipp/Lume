@@ -36,6 +36,9 @@ struct MovieDetailView: View {
     @State private var isLoadingTMDB: Bool
     #if !os(tvOS)
         @State private var downloads = DownloadManager.shared
+        /// Offline downloads are a Premium feature; free users get the paywall.
+        @State private var premium = PremiumManager.shared
+        @State private var showDownloadPaywall = false
     #endif
 
     init(movie: Movie, animationNamespace: Namespace.ID? = nil) {
@@ -69,6 +72,7 @@ struct MovieDetailView: View {
                 }
             }
             .background(backgroundColor)
+            .paywall(isPresented: $showDownloadPaywall, highlight: .downloads)
             #if os(iOS)
                 .toolbar(.hidden, for: .tabBar)
                 .navigationBarBackButtonHidden(true)
@@ -423,7 +427,7 @@ struct MovieDetailView: View {
                                 id: movie.id,
                                 downloadStatus: movie.downloadStatus,
                                 downloads: downloads,
-                                onStart: { downloads.startDownload(movie: movie, playlist: playlist) },
+                                onStart: { startDownloadGated(playlist: playlist) },
                                 onDelete: { downloads.deleteLocalFile(id: movie.id) }
                             )
                         }
@@ -475,10 +479,19 @@ struct MovieDetailView: View {
                 }
                 .help("Remove download")
             } else if let playlist = moviePlaylist {
-                Button { downloads.startDownload(movie: movie, playlist: playlist) } label: {
+                Button { startDownloadGated(playlist: playlist) } label: {
                     Image(systemName: movie.downloadStatus == .failed ? "exclamationmark.circle" : "arrow.down.circle")
                 }
                 .help("Download")
+            }
+        }
+
+        /// Start a movie download, or present the paywall for free users.
+        private func startDownloadGated(playlist: Playlist) {
+            if premium.isPremium {
+                downloads.startDownload(movie: movie, playlist: playlist)
+            } else {
+                showDownloadPaywall = true
             }
         }
     }

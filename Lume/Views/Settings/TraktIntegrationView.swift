@@ -14,6 +14,9 @@
 
     struct TraktIntegrationView: View {
         @State private var trakt = TraktService.shared
+        /// Trakt is a Premium feature.
+        @State private var premium = PremiumManager.shared
+        @State private var showPaywall = false
         @Environment(\.openURL) private var openURL
 
         var body: some View {
@@ -27,6 +30,7 @@
                 }
             }
             .platformNavigationTitle("Trakt")
+            .paywall(isPresented: $showPaywall, highlight: .trakt)
             .onDisappear {
                 // Stop polling if the user backs out mid-connect.
                 if !trakt.isConnected { trakt.cancelConnect() }
@@ -38,9 +42,13 @@
         private var connectSection: some View {
             Section {
                 Button {
-                    trakt.connect()
+                    if premium.isPremium {
+                        trakt.connect()
+                    } else {
+                        showPaywall = true
+                    }
                 } label: {
-                    Label("Connect Trakt Account", systemImage: "link")
+                    Label("Connect Trakt Account", systemImage: premium.isPremium ? "link" : "crown.fill")
                 }
                 .disabled(trakt.isConnecting)
             } header: {

@@ -38,10 +38,14 @@ import SwiftUI
                 }
 
                 Button {
-                    showingAddPlaylist = true
+                    if canAddPlaylist {
+                        showingAddPlaylist = true
+                    } else {
+                        presentPaywall(.multiplePlaylists)
+                    }
                 } label: {
                     HStack(spacing: 16) {
-                        Image(systemName: "plus")
+                        Image(systemName: canAddPlaylist ? "plus" : "crown.fill")
                             .font(.system(size: 22, weight: .medium))
                         Text("Add Playlist")
                         Spacer(minLength: 0)
@@ -49,7 +53,13 @@ import SwiftUI
                 }
                 .buttonStyle(TVSettingsRowButtonStyle())
 
-                if playlists.count > 1 {
+                if !premium.isPremium {
+                    Text("Free includes one playlist. Upgrade to Lume Premium to add more.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                } else if playlists.count > 1 {
                     Text("Switching playlist changes the content shown across Home, Movies, Series and Live TV.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)

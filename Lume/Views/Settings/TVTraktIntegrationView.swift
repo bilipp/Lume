@@ -13,6 +13,9 @@
 
     struct TVTraktIntegrationView: View {
         @State private var trakt = TraktService.shared
+        /// Trakt is a Premium feature.
+        @State private var premium = PremiumManager.shared
+        @State private var showPaywall = false
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -26,6 +29,7 @@
                     connect
                 }
             }
+            .paywall(isPresented: $showPaywall, highlight: .trakt)
         }
 
         private var connect: some View {
@@ -36,10 +40,14 @@
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
                 Button {
-                    trakt.connect()
+                    if premium.isPremium {
+                        trakt.connect()
+                    } else {
+                        showPaywall = true
+                    }
                 } label: {
                     HStack(spacing: 16) {
-                        Image(systemName: "link")
+                        Image(systemName: premium.isPremium ? "link" : "crown.fill")
                             .font(.system(size: 22, weight: .medium))
                         Text("Connect Trakt Account")
                         Spacer(minLength: 0)

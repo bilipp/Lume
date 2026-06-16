@@ -144,7 +144,7 @@ struct FullScreenPlayerView: View {
             // a disabled feature makes no network call. Resolving the lookup key
             // touches SwiftData on the main actor; the fetch itself is off it.
             skipSegments = nil
-            guard PlayerSettings.Playback.showSkipIntroButton, !activeMedia.isLive,
+            guard PremiumManager.shared.isPremium, PlayerSettings.Playback.showSkipIntroButton, !activeMedia.isLive,
                   let lookup = IntroSkipResolver.lookup(for: activeMedia.contentRef, in: modelContext)
             else { return }
             skipSegments = try? await IntroDBClient.shared.segments(

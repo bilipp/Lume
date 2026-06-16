@@ -11,20 +11,27 @@ struct SettingsView: View {
     /// Not `private`: read by the SettingsView+Playlists extension (separate file).
     @State var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
+    /// Premium entitlement + paywall presentation. Not `private`: read by the
+    /// SettingsView+Playlists / +TVComponents extensions (separate files).
+    @State var premium = PremiumManager.shared
+    @State var showPaywall = false
+    @State var paywallHighlight: PremiumFeature?
     /// Not `private`: read by the SettingsView+Indexing extension (separate file).
     @State var indexing = ContentIndexingService.shared
     /// Legacy single-engine key, kept in sync with the primary engine so a
     /// downgrade still finds the user's preferred engine, and read as the
     /// migration seed for the priority list. See `PlayerEnginePriority`.
-    @AppStorage(PlayerSettings.engineKey) private var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
-    @AppStorage(PlayerSettings.enginePriorityKey) private var enginePriorityRaw: String = ""
-    @AppStorage(PlayerSettings.externalPlayerKey) private var externalPlayerRaw: String = ""
+    /// Not `private`: engine / playback preferences are read by the
+    /// SettingsView+TVPlayer extension (separate file, tvOS player pane).
+    @AppStorage(PlayerSettings.engineKey) var engineRaw: String = PlayerEngineKind.defaultValue.rawValue
+    @AppStorage(PlayerSettings.enginePriorityKey) var enginePriorityRaw: String = ""
+    @AppStorage(PlayerSettings.externalPlayerKey) var externalPlayerRaw: String = ""
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
-    private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
+    var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
     @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
-    private var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
+    var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
     @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
-    private var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+    var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
     @AppStorage(SearchSettings.searchAllPlaylistsKey)
     private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
@@ -46,7 +53,7 @@ struct SettingsView: View {
         /// The category whose content is shown in the right pane. Follows focus
         /// in the sidebar (Apple TV Settings behaviour) and persists once focus
         /// moves into the detail pane.
-        @State private var selectedCategory: SettingsCategory = .playlists
+        @State private var selectedCategory: SettingsCategory = .premium
         @FocusState private var focusedCategory: SettingsCategory?
         /// The playlist drilled into within the Playlists category. When set, its
         /// settings replace the playlist list *in the detail pane* rather than
@@ -56,35 +63,16 @@ struct SettingsView: View {
         @State var selectedPlaylist: Playlist?
         /// The engine whose options are drilled into within the Player category,
         /// replacing the player detail in place (same reasoning as `selectedPlaylist`).
-        @State private var selectedEngineOptions: PlayerEngineKind?
+        /// Not `private`: read by the SettingsView+TVPlayer extension (separate file).
+        @State var selectedEngineOptions: PlayerEngineKind?
     #endif
 
     /// The user's ordered engine fallback list (migrates the legacy single-engine
-    /// key on first read). The first entry is the primary engine.
-    private var enginePriority: [PlayerEngineKind] {
+    /// key on first read). The first entry is the primary engine. Not `private`:
+    /// read by the SettingsView+TVPlayer extension (separate file).
+    var enginePriority: [PlayerEngineKind] {
         PlayerEnginePriority.resolve(priorityRaw: enginePriorityRaw, legacyEngineRaw: engineRaw)
     }
-
-    #if os(tvOS)
-        /// The primary (most-preferred) engine — its description is shown under
-        /// the priority list.
-        private var primaryEngine: PlayerEngineKind {
-            enginePriority.first ?? .defaultValue
-        }
-
-        /// Move the engine at `index` one slot up or down the priority list,
-        /// persisting the new order and keeping the legacy single-engine key in
-        /// sync with the primary so other readers (and a downgrade) still resolve it.
-        private func moveEngine(at index: Int, by offset: Int) {
-            var list = enginePriority
-            let target = index + offset
-            guard list.indices.contains(index), list.indices.contains(target) else { return }
-            list.swapAt(index, target)
-            let normalized = PlayerEnginePriority.normalized(list)
-            enginePriorityRaw = PlayerEnginePriority.encode(normalized)
-            engineRaw = normalized.first?.rawValue ?? PlayerEngineKind.defaultValue.rawValue
-        }
-    #endif
 
     var body: some View {
         #if os(tvOS)
@@ -100,6 +88,7 @@ struct SettingsView: View {
         private var standardBody: some View {
             NavigationStack {
                 List {
+                    premiumStatusSection
                     profilesSection
                     playlistsSection
                     librarySection
@@ -116,6 +105,9 @@ struct SettingsView: View {
                     storageSection
                     supportSection
                     aboutSection
+                    #if DEBUG && !SIDE_LOAD
+                        developerSection
+                    #endif
                 }
                 #if os(macOS)
                 .listStyle(.inset(alternatesRowBackgrounds: true))
@@ -126,6 +118,7 @@ struct SettingsView: View {
                 }
                 #endif
                 .platformNavigationTitle("Settings")
+                .paywall(isPresented: $showPaywall, highlight: paywallHighlight)
                 .sheet(isPresented: $showingAddPlaylist) {
                     LoginView(isModal: true)
                 }
@@ -178,16 +171,24 @@ struct SettingsView: View {
                     .onDelete(perform: deletePlaylists)
 
                     Button {
-                        showingAddPlaylist = true
+                        if canAddPlaylist {
+                            showingAddPlaylist = true
+                        } else {
+                            presentPaywall(.multiplePlaylists)
+                        }
                     } label: {
-                        Label("Add Playlist", systemImage: "plus")
+                        Label("Add Playlist", systemImage: canAddPlaylist ? "plus" : "crown.fill")
                     }
                 }
             } header: {
                 Text("Playlists")
             } footer: {
-                if !playlists.isEmpty {
+                if playlists.isEmpty {
+                    EmptyView()
+                } else if premium.isPremium {
                     Text("\(playlists.count) playlist\(playlists.count == 1 ? "" : "s")")
+                } else {
+                    Text("Free includes one playlist. Upgrade to Lume Premium to add more.")
                 }
             }
         }
@@ -242,8 +243,18 @@ struct SettingsView: View {
         private var playbackSection: some View {
             Section {
                 Toggle("Autoplay Next Episode", isOn: $autoPlayNext)
+                    .disabled(!premium.isPremium)
                 Toggle("Show Next Episode Button", isOn: $showNextEpisodeButton)
+                    .disabled(!premium.isPremium)
                 Toggle("Show Skip Intro Button", isOn: $showSkipIntroButton)
+                    .disabled(!premium.isPremium)
+                if !premium.isPremium {
+                    Button {
+                        presentPaywall(.playbackControls)
+                    } label: {
+                        Label("Unlock with Premium", systemImage: "crown.fill")
+                    }
+                }
             } header: {
                 Text("Playback")
             } footer: {
@@ -340,7 +351,8 @@ struct SettingsView: View {
                     tvDetailContainer
                 }
                 .tvSettingsBackground()
-                .defaultFocus($focusedCategory, .playlists)
+                .paywall(isPresented: $showPaywall, highlight: paywallHighlight)
+                .defaultFocus($focusedCategory, .premium)
                 .onChange(of: focusedCategory) { _, newValue in
                     // Follow focus so the detail pane mirrors the highlighted
                     // category. Ignore nil (focus moved into the detail pane),
@@ -412,6 +424,8 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 36) {
                     switch selectedCategory {
+                    case .premium:
+                        tvPremiumDetail
                     case .playlists:
                         if let selectedPlaylist {
                             PlaylistDetailView(playlist: selectedPlaylist) {
@@ -456,120 +470,6 @@ struct SettingsView: View {
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                     .padding(.top, 6)
             }
-        }
-
-        private var tvPlayerDetail: some View {
-            VStack(alignment: .leading, spacing: 28) {
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Playback")
-                    TVOptionToggleRow(title: "Autoplay Next Episode", isOn: $autoPlayNext)
-                    TVOptionToggleRow(title: "Show Next Episode Button", isOn: $showNextEpisodeButton)
-                    TVOptionToggleRow(title: "Show Skip Intro Button", isOn: $showSkipIntroButton)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Engine Priority")
-
-                    VStack(spacing: 2) {
-                        ForEach(Array(enginePriority.enumerated()), id: \.element) { index, kind in
-                            tvEnginePriorityRow(kind: kind, index: index)
-                        }
-                    }
-
-                    Text(primaryEngine.subtitle)
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 6)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("External Player")
-
-                    TVOptionCycleRow(
-                        title: "External Player",
-                        valueLabel: ExternalPlayer(rawValue: externalPlayerRaw)?.displayName
-                            ?? String(localized: "Off")
-                    ) {
-                        externalPlayerRaw = nextExternalPlayerRaw(after: externalPlayerRaw)
-                    }
-
-                    Text("Streams open in the selected app instead of Lume's player. Downloads always play in Lume, and the built-in player is used when the app is not installed.")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 6)
-                }
-
-                // Each engine's options live behind a dedicated row, so they're
-                // all reachable regardless of the priority order. AVPlayer has no
-                // configurable options, so it isn't listed.
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Engine Options")
-                    VStack(spacing: 2) {
-                        tvEngineOptionsRow(.vlcKit)
-                        tvEngineOptionsRow(.ksPlayer)
-                    }
-                }
-            }
-        }
-
-        /// A drill-in row that replaces the player detail with the given engine's
-        /// options in place. Returning focus to the sidebar (Menu) restores it.
-        private func tvEngineOptionsRow(_ engine: PlayerEngineKind) -> some View {
-            Button {
-                selectedEngineOptions = engine
-            } label: {
-                HStack(spacing: 16) {
-                    Text("\(engine.displayName) Options")
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .buttonStyle(TVSettingsRowButtonStyle())
-        }
-
-        /// One row of the tvOS engine-priority list: the engine name, a "Primary"
-        /// tag on the top entry, and up / down controls that reorder the list.
-        private func tvEnginePriorityRow(kind: PlayerEngineKind, index: Int) -> some View {
-            HStack(spacing: 16) {
-                Text(kind.displayName)
-                    .font(.system(size: TVSettingsMetrics.rowFontSize))
-
-                if index == 0 {
-                    Text("Primary")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    moveEngine(at: index, by: -1)
-                } label: {
-                    Image(systemName: "chevron.up")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-                .disabled(index == 0)
-                .accessibilityLabel("Move \(kind.displayName) up")
-
-                Button {
-                    moveEngine(at: index, by: 1)
-                } label: {
-                    Image(systemName: "chevron.down")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-                .disabled(index == enginePriority.count - 1)
-                .accessibilityLabel("Move \(kind.displayName) down")
-            }
-            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-            .padding(.vertical, TVSettingsMetrics.rowVPadding)
-            .background(
-                RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
-            )
         }
     }
 

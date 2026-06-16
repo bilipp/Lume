@@ -187,6 +187,10 @@ struct EpisodeCard: View {
         var onMarkPreviousWatched: () -> Void
         var onMarkFollowingUnwatched: () -> Void
 
+        /// Offline downloads are a Premium feature; free users get the paywall.
+        @State private var premium = PremiumManager.shared
+        @State private var showPaywall = false
+
         var body: some View {
             let downloads = DownloadManager.shared
             EpisodeCard(
@@ -195,11 +199,20 @@ struct EpisodeCard: View {
                 onToggleWatched: onToggleWatched,
                 onMarkPreviousWatched: onMarkPreviousWatched,
                 onMarkFollowingUnwatched: onMarkFollowingUnwatched,
-                onDownload: playlist.map { playlist in { DownloadManager.shared.startDownload(episode: episode, playlist: playlist) } },
+                onDownload: playlist.map { playlist in
+                    {
+                        if premium.isPremium {
+                            DownloadManager.shared.startDownload(episode: episode, playlist: playlist)
+                        } else {
+                            showPaywall = true
+                        }
+                    }
+                },
                 onDeleteDownload: { DownloadManager.shared.deleteLocalFile(id: episode.id) },
                 downloadProgress: downloads.activeDownloads[episode.id].map(\.fractionCompleted)
                     ?? (downloads.pendingIDs.contains(episode.id) ? 0 : nil)
             )
+            .paywall(isPresented: $showPaywall, highlight: .downloads)
         }
     }
 #endif

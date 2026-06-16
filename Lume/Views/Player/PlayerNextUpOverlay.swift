@@ -35,6 +35,10 @@ struct PlayerNextUpOverlay: View {
     /// in, possibly reusing this view's identity).
     @State private var didAutoAdvance = false
 
+    /// The next-up affordances are a Premium feature. Free users never see the
+    /// button and never auto-advance, regardless of the stored toggle values.
+    @State private var premium = PremiumManager.shared
+
     #if os(tvOS)
         @FocusState private var buttonFocused: Bool
         /// Set when the viewer presses Menu on the button, so it stays dismissed
@@ -85,7 +89,7 @@ struct PlayerNextUpOverlay: View {
     }
 
     private var showsButton: Bool {
-        guard showNextButton, !controlsVisible, clock.current > 0, fraction >= buttonThreshold else {
+        guard premium.isPremium, showNextButton, !controlsVisible, clock.current > 0, fraction >= buttonThreshold else {
             return false
         }
         #if os(tvOS)
@@ -97,7 +101,7 @@ struct PlayerNextUpOverlay: View {
     /// True as the episode reaches its end: within the last few seconds, or past
     /// 99.5% for content whose final ticks land short of the reported duration.
     private var shouldAutoAdvance: Bool {
-        guard autoPlayNext, clock.duration > 1, clock.current > 0 else { return false }
+        guard premium.isPremium, autoPlayNext, clock.duration > 1, clock.current > 0 else { return false }
         let remaining = clock.duration - clock.current
         return remaining <= 3 || fraction >= 0.995
     }

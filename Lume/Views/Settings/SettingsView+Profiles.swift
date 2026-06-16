@@ -63,6 +63,9 @@ import SwiftUI
         @State private var editingProfile: UserProfile?
         @State private var pendingSwitch: UserProfile?
         @State private var pinFlow: ParentalPINFlow?
+        /// Multiple profiles are a Premium feature; free users keep one profile.
+        @State private var premium = PremiumManager.shared
+        @State private var showPaywall = false
         @AppStorage(ProfileSettings.askOnStartupKey) private var askOnStartup = ProfileSettings.askOnStartupDefault
 
         var body: some View {
@@ -83,10 +86,14 @@ import SwiftUI
                 }
 
                 Button {
-                    creatingProfile = true
+                    if premium.isPremium || profiles.isEmpty {
+                        creatingProfile = true
+                    } else {
+                        showPaywall = true
+                    }
                 } label: {
                     HStack(spacing: 16) {
-                        Image(systemName: "plus")
+                        Image(systemName: premium.isPremium ? "plus" : "crown.fill")
                             .font(.system(size: 22, weight: .medium))
                         Text("Add Profile")
                         Spacer(minLength: 0)
@@ -119,6 +126,7 @@ import SwiftUI
             .fullScreenCover(item: $editingProfile) { profile in
                 ProfileEditorView(profile: profile)
             }
+            .paywall(isPresented: $showPaywall, highlight: .multipleProfiles)
             .pinPrompt(target: $pendingSwitch) { profile in
                 Task { await profileManager?.switchProfile(to: profile.id) }
             }

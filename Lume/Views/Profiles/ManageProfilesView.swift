@@ -15,6 +15,9 @@ struct ManageProfilesView: View {
     @State private var creatingProfile = false
     @State private var editingProfile: UserProfile?
     @State private var profilePendingDeletion: UserProfile?
+    /// Multiple profiles are a Premium feature; free users keep one profile.
+    @State private var premium = PremiumManager.shared
+    @State private var showPaywall = false
     /// A profile awaiting PIN entry before the switch goes through.
     @State private var pendingSwitch: UserProfile?
     /// The PIN operation being run (set / change / turn off).
@@ -43,9 +46,17 @@ struct ManageProfilesView: View {
 
             Section {
                 Button {
-                    creatingProfile = true
+                    if premium.isPremium || profiles.isEmpty {
+                        creatingProfile = true
+                    } else {
+                        showPaywall = true
+                    }
                 } label: {
-                    Label("Add Profile", systemImage: "plus")
+                    Label("Add Profile", systemImage: premium.isPremium ? "plus" : "crown.fill")
+                }
+            } footer: {
+                if !premium.isPremium {
+                    Text("Free includes one profile. Upgrade to Lume Premium for the whole household.")
                 }
             }
 
@@ -58,6 +69,7 @@ struct ManageProfilesView: View {
             parentalControlsSection
         }
         .platformNavigationTitle("Profiles")
+        .paywall(isPresented: $showPaywall, highlight: .multipleProfiles)
         .pinPrompt(target: $pendingSwitch) { profile in
             Task { await profileManager?.switchProfile(to: profile.id) }
         }
