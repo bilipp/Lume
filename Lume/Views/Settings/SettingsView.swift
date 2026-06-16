@@ -25,6 +25,8 @@ struct SettingsView: View {
     private var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
     @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
     private var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+    @AppStorage(SearchSettings.searchAllPlaylistsKey)
+    private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     #if !os(tvOS)
@@ -101,6 +103,7 @@ struct SettingsView: View {
                     profilesSection
                     playlistsSection
                     librarySection
+                    searchSection
                     indexingSection
                     autoSyncSection
                     CloudSyncSection()
@@ -201,6 +204,16 @@ struct SettingsView: View {
                 Text("Library")
             } footer: {
                 Text("Hide and reorder categories and channels for the active playlist.")
+            }
+        }
+
+        private var searchSection: some View {
+            Section {
+                Toggle("Search All Playlists", isOn: $searchAllPlaylists)
+            } header: {
+                Text("Search")
+            } footer: {
+                Text("When off, search only finds content in the active playlist. Turn this on to search across all your playlists.")
             }
         }
 
@@ -429,6 +442,7 @@ struct SettingsView: View {
                             tvPlaylistsDetail
                         }
                     case .profiles: TVProfilesSettingsView()
+                    case .search: tvSearchDetail
                     case .storage: StorageManagementView()
                     case .integrations: tvIntegrationsDetail
                     case .player:
@@ -451,6 +465,18 @@ struct SettingsView: View {
 
         private var tvIntegrationsDetail: some View {
             TVTraktIntegrationView()
+        }
+
+        private var tvSearchDetail: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                TVSettingsSectionLabel("Search")
+                TVOptionToggleRow(title: "Search All Playlists", isOn: $searchAllPlaylists)
+                Text("When off, search only finds content in the active playlist. Turn this on to search across all your playlists.")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.top, 6)
+            }
         }
 
         private var tvPlayerDetail: some View {
