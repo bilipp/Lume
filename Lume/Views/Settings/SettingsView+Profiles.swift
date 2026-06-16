@@ -93,7 +93,7 @@ import SwiftUI
                     }
                 } label: {
                     HStack(spacing: 16) {
-                        Image(systemName: premium.isPremium ? "plus" : "sparkles")
+                        Image(systemName: premium.isPremium ? "plus" : "crown")
                             .font(.system(size: 22, weight: .medium))
                         Text("Add Profile")
                         Spacer(minLength: 0)

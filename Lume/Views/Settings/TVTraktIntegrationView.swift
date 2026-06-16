@@ -47,7 +47,7 @@
                     }
                 } label: {
                     HStack(spacing: 16) {
-                        Image(systemName: premium.isPremium ? "link" : "sparkles")
+                        Image(systemName: premium.isPremium ? "link" : "crown")
                             .font(.system(size: 22, weight: .medium))
                         Text("Connect Trakt Account")
                         Spacer(minLength: 0)

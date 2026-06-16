@@ -52,7 +52,7 @@ struct ManageProfilesView: View {
                         showPaywall = true
                     }
                 } label: {
-                    Label("Add Profile", systemImage: premium.isPremium ? "plus" : "sparkles")
+                    Label("Add Profile", systemImage: premium.isPremium ? "plus" : "crown")
                 }
             } footer: {
                 if !premium.isPremium {

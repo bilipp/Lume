@@ -45,7 +45,7 @@ import SwiftUI
                     }
                 } label: {
                     HStack(spacing: 16) {
-                        Image(systemName: canAddPlaylist ? "plus" : "sparkles")
+                        Image(systemName: canAddPlaylist ? "plus" : "crown")
                             .font(.system(size: 22, weight: .medium))
                         Text("Add Playlist")
                         Spacer(minLength: 0)

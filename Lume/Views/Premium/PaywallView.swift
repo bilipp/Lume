@@ -82,7 +82,7 @@ struct PaywallView: View {
 
         private var header: some View {
             VStack(spacing: 10) {
-                Image(systemName: "sparkles")
+                Image(systemName: "crown")
                     .font(.system(size: 44))
                     .foregroundStyle(.tint)
                 Text("Unlock Lume Premium")
@@ -157,7 +157,7 @@ struct PaywallView: View {
             ScrollView {
                 HStack(alignment: .top, spacing: 60) {
                     VStack(alignment: .leading, spacing: 18) {
-                        Image(systemName: "sparkles")
+                        Image(systemName: "crown")
                             .font(.system(size: 56))
                             .foregroundStyle(.tint)
                         Text("Lume Premium")

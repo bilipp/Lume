@@ -177,7 +177,7 @@ struct SettingsView: View {
                             presentPaywall(.multiplePlaylists)
                         }
                     } label: {
-                        Label("Add Playlist", systemImage: canAddPlaylist ? "plus" : "sparkles")
+                        Label("Add Playlist", systemImage: canAddPlaylist ? "plus" : "crown")
                     }
                 }
             } header: {
@@ -252,7 +252,7 @@ struct SettingsView: View {
                     Button {
                         presentPaywall(.playbackControls)
                     } label: {
-                        Label("Unlock with Premium", systemImage: "sparkles")
+                        Label("Unlock with Premium", systemImage: "crown")
                     }
                 }
             } header: {
