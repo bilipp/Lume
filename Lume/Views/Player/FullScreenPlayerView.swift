@@ -171,6 +171,16 @@ struct FullScreenPlayerView: View {
             // Leaving the foreground is a safe moment to flush; covers the user
             // backgrounding the app mid-playback without closing the player.
             if phase != .active { persistProgressDetached(force: true) }
+            #if os(tvOS)
+                // tvOS has no background playback for any engine, so a stream
+                // left running behind the Home screen just keeps buffering and
+                // holding the decoder. When the app actually leaves the
+                // foreground, close the player so every engine tears its stream
+                // down via `onDisappear`. `.inactive` is a transient transition
+                // (a system overlay, the screensaver arming) where the app is
+                // still foreground, so only act on a real `.background` move.
+                if phase == .background { closePlayer() }
+            #endif
         }
         .onDisappear {
             // Capture the clock synchronously, then flush off the main thread.
