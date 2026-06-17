@@ -42,7 +42,11 @@ struct HomeView: View {
     @State private var trendingMovies: [HomeMediaItem] = []
     @State private var trendingSeries: [HomeMediaItem] = []
     @State private var watchlist: [HomeMediaItem] = []
+    @AppStorage(RecommendationSettings.enabledKey) private var recommendationsEnabled = RecommendationSettings.enabledDefault
     @State private var recommendations: [HomeMediaItem] = []
+    /// False until the first recommendations pass completes, so the row can show
+    /// a progress placeholder rather than an empty state on launch.
+    @State private var recommendationsLoaded = false
     @State private var heroItems: [HeroItem] = []
     @State private var trendingState: LoadState = .idle
     @State private var trakt = TraktService.shared
@@ -209,8 +213,14 @@ struct HomeView: View {
         if !favorites.isEmpty {
             HomeRow(title: "Favorites", items: favorites, onPlayLive: playChannel, animationNamespace: animationNamespace)
         }
-        if !recommendations.isEmpty {
-            HomeRow(title: "For You", items: recommendations, onPlayLive: playChannel, onVote: vote, animationNamespace: animationNamespace)
+        if recommendationsEnabled {
+            ForYouRow(
+                items: recommendations,
+                isLoading: !recommendationsLoaded,
+                onPlayLive: playChannel,
+                onVote: vote,
+                animationNamespace: animationNamespace
+            )
         }
         if !trendingMovies.isEmpty {
             HomeRow(title: "Trending Movies", items: trendingMovies, onPlayLive: playChannel, animationNamespace: animationNamespace)
@@ -406,7 +416,7 @@ struct HomeView: View {
     /// against live state) — the engine still throttles the actual re-ranking to
     /// its recalculation interval.
     private var recommendationsKey: String {
-        "rec-\(watchedMovies.count)-\(watchedSeries.count)-\(favoriteMovies.count)-\(favoriteSeries.count)-\(selectedPlaylistID)"
+        "rec-\(recommendationsEnabled)-\(watchedMovies.count)-\(watchedSeries.count)-\(favoriteMovies.count)-\(favoriteSeries.count)-\(selectedPlaylistID)"
     }
 
     /// Resolves the engine's (throttled, possibly cached) list to local models,
@@ -414,6 +424,10 @@ struct HomeView: View {
     /// voted on since the list was computed. That live re-validation is what lets
     /// a vote remove a card without forcing a full re-rank.
     private func loadRecommendations() async {
+        guard recommendationsEnabled else {
+            recommendations = []
+            return
+        }
         let engine = RecommendationEngine(modelContainer: modelContext.container)
         let scored = await engine.recommendations()
         var items: [HomeMediaItem] = []
@@ -427,6 +441,7 @@ struct HomeView: View {
             if items.count >= 10 { break }
         }
         recommendations = items
+        recommendationsLoaded = true
     }
 
     private func isRecommendable(_ movie: Movie) -> Bool {
@@ -511,72 +526,6 @@ private enum LoadState {
         switch self {
         case .idle, .loading: false
         case .loaded, .failed: true
-        }
-    }
-}
-
-// MARK: - Mixed media item
-
-/// A type-erased wrapper over the three playable content kinds so a single
-/// horizontal row can present movies, series and live channels together.
-enum HomeMediaItem: Identifiable, Hashable {
-    case movie(Movie)
-    case series(Series)
-    case live(LiveStream)
-
-    var id: String {
-        switch self {
-        case let .movie(movie): "movie-\(movie.id)"
-        case let .series(series): "series-\(series.id)"
-        case let .live(stream): "live-\(stream.id)"
-        }
-    }
-
-    var title: String {
-        switch self {
-        case let .movie(movie): movie.name
-        case let .series(series): series.name
-        case let .live(stream): stream.name
-        }
-    }
-
-    var imageURL: URL? {
-        switch self {
-        case let .movie(movie): URL(string: movie.streamIcon ?? "")
-        case let .series(series): URL(string: series.cover ?? "")
-        case let .live(stream): URL(string: stream.streamIcon ?? "")
-        }
-    }
-
-    var lastWatchedDate: Date? {
-        switch self {
-        case let .movie(movie): movie.lastWatchedDate
-        case let .series(series): series.lastWatchedDate
-        case let .live(stream): stream.lastWatchedDate
-        }
-    }
-
-    var isLive: Bool {
-        if case .live = self { return true }
-        return false
-    }
-
-    /// Resume fraction for partially-watched movies or series (0...1), otherwise nil.
-    var progress: Double? {
-        switch self {
-        case let .movie(movie):
-            guard let duration = movie.durationSecs, duration > 0,
-                  movie.watchProgress > 0, !movie.isWatched else { return nil }
-            return min(movie.watchProgress / Double(duration), 1)
-        case let .series(series):
-            let inProgressEpisodes = series.episodes
-                .filter { $0.watchProgress > 0 && !$0.isWatched }
-                .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
-            guard let activeEpisode = inProgressEpisodes.first,
-                  let duration = activeEpisode.durationSecs, duration > 0 else { return nil }
-            return min(activeEpisode.watchProgress / Double(duration), 1)
-        case .live:
-            return nil
         }
     }
 }

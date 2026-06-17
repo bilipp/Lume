@@ -88,7 +88,7 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - Personalized dashboard with a hero carousel
 - **Immersive full-screen tvOS home** with TMDB backdrop, crossfading hero, and fold-based scroll snapping
 - Continue Watching, Favorites, Recently Watched, and Trending rails
-- **For You** rail — on-device recommendations from your watch history and favorites; thumbs-up / thumbs-down a suggestion to tune what you see next, with your votes syncing across devices via iCloud
+- **For You** rail — on-device recommendations from your watch history and favorites; thumbs-up / thumbs-down a suggestion to tune what you see next, with your votes syncing across devices via iCloud (can be turned off in Settings)
 
 #### 🔎 Discovery & organization
 - Global search across Movies, Series, and Live channels with type filtering

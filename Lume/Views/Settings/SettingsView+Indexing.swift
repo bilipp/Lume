@@ -24,10 +24,12 @@ extension SettingsView {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                Toggle("Show Recommendations", isOn: $recommendationsEnabled)
             } header: {
                 Text("Indexing")
             } footer: {
-                Text("Matches your library against TMDB and builds an on-device index for smarter search. Runs slowly in the background.")
+                Text("Matches your library against TMDB and builds an on-device index for smarter search and a \"For You\" row on Home. Runs slowly in the background.")
             }
         }
     #endif
@@ -48,7 +50,9 @@ extension SettingsView {
                 .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 .padding(.vertical, 4)
 
-                Text("Matches your library against TMDB and builds an on-device index for smarter search. Runs slowly in the background.")
+                TVOptionToggleRow(title: "Show Recommendations", isOn: $recommendationsEnabled)
+
+                Text("Matches your library against TMDB and builds an on-device index for smarter search and a \"For You\" row on Home. Runs slowly in the background.")
                     .font(.system(size: 20))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)

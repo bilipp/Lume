@@ -82,6 +82,53 @@ private struct HomeItemCell: View {
     }
 }
 
+// MARK: - For You row
+
+/// The "For You" rail. Unlike the other rows it always renders when
+/// recommendations are enabled: while the first list is still being computed it
+/// shows a progress placeholder, and when there's nothing to suggest yet it
+/// nudges the user toward the actions that seed recommendations.
+struct ForYouRow: View {
+    let items: [HomeMediaItem]
+    let isLoading: Bool
+    let onPlayLive: (LiveStream) -> Void
+    let onVote: (HomeMediaItem, RecommendationVote) -> Void
+    var animationNamespace: Namespace.ID?
+
+    var body: some View {
+        if items.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("For You")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+                placeholder
+                    .padding(.horizontal)
+            }
+        } else {
+            HomeRow(title: "For You", items: items, onPlayLive: onPlayLive, onVote: onVote, animationNamespace: animationNamespace)
+        }
+    }
+
+    private var placeholder: some View {
+        HStack(spacing: 12) {
+            if isLoading {
+                ProgressView()
+                Text("Finding recommendations…")
+            } else {
+                Image(systemName: "sparkles")
+                Text("Watch, favorite, or rate titles and we'll suggest more here.")
+            }
+        }
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
 // MARK: - Recommendation vote menu
 
 extension View {

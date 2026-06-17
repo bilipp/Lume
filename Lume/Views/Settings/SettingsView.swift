@@ -18,6 +18,9 @@ struct SettingsView: View {
     @State var paywallHighlight: PremiumFeature?
     /// Not `private`: read by the SettingsView+Indexing extension (separate file).
     @State var indexing = ContentIndexingService.shared
+    /// Whether the Home "For You" row is shown. Not `private`: the toggle lives in
+    /// the SettingsView+Indexing extension (separate file).
+    @AppStorage(RecommendationSettings.enabledKey) var recommendationsEnabled = RecommendationSettings.enabledDefault
     /// Legacy single-engine key, kept in sync with the primary engine so a
     /// downgrade still finds the user's preferred engine, and read as the
     /// migration seed for the priority list. See `PlayerEnginePriority`.
