@@ -2,13 +2,13 @@
 //  PremiumManager.swift
 //  Lume
 //
-//  The single source of truth for whether the user has Lume Premium, and the
+//  The single source of truth for whether the user has Lume Pro, and the
 //  StoreKit 2 layer behind it (monthly subscription + one-time lifetime).
 //
 //  Business model: Lume is free, open-source software. Builds the user compiles
 //  and sideloads themselves are fully unlocked (the `SIDE_LOAD` compilation
 //  condition, set only in the "Sideload" build configuration). The App Store
-//  build gates a handful of convenience features behind Lume Premium — see
+//  build gates a handful of convenience features behind Lume Pro — see
 //  `PremiumFeature`.
 //
 

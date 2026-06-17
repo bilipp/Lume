@@ -2,7 +2,7 @@
 //  SettingsView+Premium.swift
 //  Lume
 //
-//  The Lume Premium surfaces in Settings: the shared paywall helpers, the
+//  The Lume Pro surfaces in Settings: the shared paywall helpers, the
 //  status / upgrade row that sits first in the iOS/macOS list, the DEBUG-only
 //  developer override, and the tvOS Premium pane. Split out of SettingsView to
 //  keep that file within the project's line-count cap.
@@ -46,7 +46,7 @@ extension SettingsView {
                             .font(.title3)
                             .frame(width: 30)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Lume Premium")
+                            Text("Lume Pro")
                             Text(premiumStatusDetail)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -63,7 +63,7 @@ extension SettingsView {
                                 .font(.title3)
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Unlock Lume Premium")
+                                Text("Unlock Lume Pro")
                                     .foregroundStyle(.primary)
                                 Text("Free plan · See what's included")
                                     .font(.caption)
@@ -120,7 +120,7 @@ extension SettingsView {
                             .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(premium.isPremium ? "Lume Premium" : "Free Plan")
+                            Text(premium.isPremium ? "Lume Pro" : "Free Plan")
                                 .font(.system(size: 26, weight: .semibold))
                             Text(premium.isPremium
                                 ? premiumStatusDetail

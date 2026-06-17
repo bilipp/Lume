@@ -2,7 +2,7 @@
 //  PremiumFeature.swift
 //  Lume
 //
-//  The catalogue of features gated behind Lume Premium on the App Store build.
+//  The catalogue of features gated behind Lume Pro on the App Store build.
 //  Drives both the paywall's benefits list and the per-feature highlight shown
 //  when a gate is hit. Sideloaded builds never see any of this (everything is
 //  unlocked), so the copy speaks to the App Store audience.

@@ -1882,22 +1882,22 @@
         }
       }
     },
-    "Free includes one playlist. Upgrade to Lume Premium to add more." : {
+    "Free includes one playlist. Upgrade to Lume Pro to add more." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kostenlos enthält eine Playlist. Mit Lume Premium kannst du weitere hinzufügen."
+            "value" : "Kostenlos enthält eine Playlist. Mit Lume Pro kannst du weitere hinzufügen."
           }
         }
       }
     },
-    "Free includes one profile. Upgrade to Lume Premium for the whole household." : {
+    "Free includes one profile. Upgrade to Lume Pro for the whole household." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kostenlos enthält ein Profil. Mit Lume Premium für den ganzen Haushalt."
+            "value" : "Kostenlos enthält ein Profil. Mit Lume Pro für den ganzen Haushalt."
           }
         }
       }
@@ -2561,12 +2561,12 @@
         }
       }
     },
-    "Lume Premium" : {
+    "Lume Pro" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume Premium"
+            "value" : "Lume Pro"
           }
         }
       }
@@ -4906,12 +4906,12 @@
         }
       }
     },
-    "Unlock Lume Premium" : {
+    "Unlock Lume Pro" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume Premium freischalten"
+            "value" : "Lume Pro freischalten"
           }
         }
       }

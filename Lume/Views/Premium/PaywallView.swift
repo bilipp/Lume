@@ -2,7 +2,7 @@
 //  PaywallView.swift
 //  Lume
 //
-//  The Lume Premium paywall: benefits list + the two plans (monthly subscription,
+//  The Lume Pro paywall: benefits list + the two plans (monthly subscription,
 //  one-time lifetime). Presented as a sheet whenever a free user reaches a gated
 //  feature, and from the Premium status row in Settings. Never shown in sideloaded
 //  builds (those are always Premium).
@@ -56,7 +56,7 @@ struct PaywallView: View {
                     .frame(maxWidth: 520)
                     .frame(maxWidth: .infinity)
                 }
-                .navigationTitle("Lume Premium")
+                .navigationTitle("Lume Pro")
                 #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
                 #endif
@@ -85,10 +85,10 @@ struct PaywallView: View {
                 Image(systemName: "crown")
                     .font(.system(size: 44))
                     .foregroundStyle(.tint)
-                Text("Unlock Lume Premium")
+                Text("Unlock Lume Pro")
                     .font(.title.bold())
                     .multilineTextAlignment(.center)
-                Text("Lume is free and open source. Premium supports development and unlocks a few extra conveniences.")
+                Text("Lume is free and open source. Pro supports development and unlocks a few extra conveniences.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -160,9 +160,9 @@ struct PaywallView: View {
                         Image(systemName: "crown")
                             .font(.system(size: 56))
                             .foregroundStyle(.tint)
-                        Text("Lume Premium")
+                        Text("Lume Pro")
                             .font(.system(size: 48, weight: .bold))
-                        Text("Lume is free and open source. Premium supports development and unlocks a few extra conveniences.")
+                        Text("Lume is free and open source. Pro supports development and unlocks a few extra conveniences.")
                             .font(.system(size: 24))
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: 560, alignment: .leading)

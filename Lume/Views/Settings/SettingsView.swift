@@ -188,7 +188,7 @@ struct SettingsView: View {
                 } else if premium.isPremium {
                     Text("\(playlists.count) playlist\(playlists.count == 1 ? "" : "s")")
                 } else {
-                    Text("Free includes one playlist. Upgrade to Lume Premium to add more.")
+                    Text("Free includes one playlist. Upgrade to Lume Pro to add more.")
                 }
             }
         }
