@@ -1139,6 +1139,16 @@
         }
       }
     },
+    "Couldn't import from Trakt. Please try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import von Trakt fehlgeschlagen. Bitte versuche es erneut."
+          }
+        }
+      }
+    },
     "Creator" : {
       "localizations" : {
         "de" : {
@@ -2224,6 +2234,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bild-Cache"
+          }
+        }
+      }
+    },
+    "Import Watched from Trakt" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angesehenes von Trakt importieren"
+          }
+        }
+      }
+    },
+    "Imported %lld movie%@ and %lld episode%@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld Filme und %3$lld Episoden importiert."
           }
         }
       }
@@ -5399,6 +5429,16 @@
         }
       }
     },
+    "Watched movies and episodes sync to your Trakt history. Import marks titles you've already watched on Trakt as watched here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesehene Filme und Episoden werden mit deinem Trakt-Verlauf synchronisiert. Beim Import werden Titel, die du auf Trakt bereits gesehen hast, hier als gesehen markiert."
+          }
+        }
+      }
+    },
     "Website" : {
       "localizations" : {
         "de" : {
@@ -5479,6 +5519,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deine Wiedergabelisten, Fortschritt, Favoriten und Merkliste werden über deinen privaten iCloud-Account auf deinen Geräten synchronisiert. Der Videokatalog wird auf jedem Gerät abgerufen und nicht hochgeladen."
+          }
+        }
+      }
+    },
+    "Your watched history is already up to date." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Verlauf ist bereits auf dem neuesten Stand."
           }
         }
       }

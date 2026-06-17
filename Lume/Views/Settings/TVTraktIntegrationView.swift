@@ -16,6 +16,7 @@
         /// Trakt is a Premium feature.
         @State private var premium = PremiumManager.shared
         @State private var showPaywall = false
+        @Environment(\.modelContext) private var modelContext
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -117,10 +118,30 @@
             VStack(alignment: .leading, spacing: 16) {
                 TVSettingsValueRow("Connected", value: trakt.username.map { "@\($0)" } ?? "—")
 
-                Text("Watched movies and episodes sync to your Trakt history.")
+                Text("Watched movies and episodes sync to your Trakt history. Import marks titles you've already watched on Trakt as watched here.")
                     .font(.system(size: 22))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                Button {
+                    Task { await trakt.importWatched(into: modelContext) }
+                } label: {
+                    HStack(spacing: 16) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.system(size: 22, weight: .medium))
+                        Text("Import Watched from Trakt")
+                        Spacer(minLength: 0)
+                        if trakt.isImporting {
+                            ProgressView()
+                        }
+                    }
+                }
+                .buttonStyle(TVSettingsRowButtonStyle())
+                .disabled(trakt.isImporting)
+
+                if let summary = trakt.lastImport {
+                    importStatus(summary)
+                }
 
                 Button {
                     Task { await trakt.disconnect() }
@@ -134,6 +155,21 @@
                 }
                 .buttonStyle(TVSettingsRowButtonStyle(isDestructive: true))
             }
+        }
+
+        @ViewBuilder
+        private func importStatus(_ summary: TraktImportSummary) -> some View {
+            let text = if summary.failed {
+                Text("Couldn't import from Trakt. Please try again.")
+            } else if summary.markedNothing {
+                Text("Your watched history is already up to date.")
+            } else {
+                Text("Imported \(summary.moviesMarked) movie\(summary.moviesMarked == 1 ? "" : "s") and \(summary.episodesMarked) episode\(summary.episodesMarked == 1 ? "" : "s").")
+            }
+            text
+                .font(.system(size: 22))
+                .foregroundStyle(summary.failed ? .red : .green)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
         }
     }
 

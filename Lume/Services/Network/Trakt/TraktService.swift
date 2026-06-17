@@ -14,6 +14,7 @@
 //
 
 import Foundation
+import SwiftData
 import SwiftUI
 
 @MainActor
@@ -33,6 +34,13 @@ final class TraktService {
 
     /// Whether a device-code authorization is currently being polled.
     private(set) var isConnecting = false
+
+    /// Whether a watched-history import is currently running.
+    private(set) var isImporting = false
+
+    /// The result of the most recent import, surfaced in the Settings UI.
+    /// Cleared when a new import begins.
+    private(set) var lastImport: TraktImportSummary?
 
     private var tokens: TraktTokens?
     private var pollingTask: Task<Void, Never>?
@@ -209,6 +217,32 @@ final class TraktService {
     func fetchWatchlist() async -> [TraktWatchlistItem] {
         guard let accessToken = await validAccessToken() else { return [] }
         return await (try? client.watchlist(accessToken: accessToken)) ?? []
+    }
+
+    // MARK: - Watched import
+
+    /// Imports the user's Trakt watched history into the local catalog, marking
+    /// matching movies and episodes as watched. Writes through `context` (the
+    /// catalog container's context the UI binds to); the iCloud reconciler then
+    /// mirrors the change to the user's other devices. No-ops when not connected
+    /// or an import is already running.
+    func importWatched(into context: ModelContext) async {
+        guard isConnected, !isImporting else { return }
+        isImporting = true
+        lastImport = nil
+        defer { isImporting = false }
+
+        guard let accessToken = await validAccessToken() else {
+            lastImport = .failure
+            return
+        }
+        do {
+            let movies = try await client.watchedMovies(accessToken: accessToken)
+            let shows = try await client.watchedShows(accessToken: accessToken)
+            lastImport = TraktWatchedImporter.apply(movies: movies, shows: shows, in: context)
+        } catch {
+            lastImport = .failure
+        }
     }
 
     // MARK: - Tokens

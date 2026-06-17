@@ -18,6 +18,7 @@
         @State private var premium = PremiumManager.shared
         @State private var showPaywall = false
         @Environment(\.openURL) private var openURL
+        @Environment(\.modelContext) private var modelContext
 
         var body: some View {
             List {
@@ -126,6 +127,20 @@
                     Spacer()
                 }
 
+                Button {
+                    Task { await trakt.importWatched(into: modelContext) }
+                } label: {
+                    HStack {
+                        Label("Import Watched from Trakt", systemImage: "arrow.down.circle")
+                        if trakt.isImporting {
+                            Spacer()
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+                }
+                .disabled(trakt.isImporting)
+
                 Button(role: .destructive) {
                     Task { await trakt.disconnect() }
                 } label: {
@@ -134,7 +149,26 @@
             } header: {
                 Text("Trakt")
             } footer: {
-                Text("Watched movies and episodes sync to your Trakt history.")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Watched movies and episodes sync to your Trakt history. Import marks titles you've already watched on Trakt as watched here.")
+                    if let summary = trakt.lastImport {
+                        importStatus(summary)
+                    }
+                }
+            }
+        }
+
+        @ViewBuilder
+        private func importStatus(_ summary: TraktImportSummary) -> some View {
+            if summary.failed {
+                Text("Couldn't import from Trakt. Please try again.")
+                    .foregroundStyle(.red)
+            } else if summary.markedNothing {
+                Text("Your watched history is already up to date.")
+                    .foregroundStyle(.green)
+            } else {
+                Text("Imported \(summary.moviesMarked) movie\(summary.moviesMarked == 1 ? "" : "s") and \(summary.episodesMarked) episode\(summary.episodesMarked == 1 ? "" : "s").")
+                    .foregroundStyle(.green)
             }
         }
     }

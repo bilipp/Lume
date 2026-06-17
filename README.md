@@ -100,7 +100,7 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - Automatic resume playback and progress tracking
 - Auto-mark-as-watched at 90% completion
 - **Next Up** overlay with auto-play for series episodes
-- Optional **Trakt** scrobbling and **TMDB** metadata enrichment
+- Optional **Trakt** scrobbling — plus one-tap import of your existing Trakt watched history — and **TMDB** metadata enrichment
 
 #### 👤 Profiles
 - Multiple **user profiles**, each with its own watch history, progress, and favorites
