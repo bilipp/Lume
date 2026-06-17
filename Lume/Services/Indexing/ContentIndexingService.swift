@@ -79,6 +79,21 @@ final class ContentIndexingService {
         }
     }
 
+    #if DEBUG
+        /// DEBUG-only: cancels any in-flight pass and clears progress so the
+        /// status reflects a freshly-wiped index. Pair with
+        /// `StorageManager.clearIndex` then `kick()` to rebuild from scratch.
+        func reset() {
+            task?.cancel()
+            task = nil
+            if state != .unavailable {
+                state = .idle
+            }
+            indexedCount = 0
+            totalCount = 0
+        }
+    #endif
+
     // MARK: - Progress (called by ContentIndexer)
 
     func setPreparing() {

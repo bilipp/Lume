@@ -68,7 +68,7 @@ struct MainTabView: View {
         tabView
             .environment(\.contentRestriction, contentRestriction)
         #if os(iOS)
-            .tabBarMinimizeBehavior(.onScrollDown)
+            .tabBarMinimizeOnScrollDownIfAvailable()
         #endif
             .task(id: playlists.count) {
                 // On launch (and whenever a playlist is added) sync any playlist that

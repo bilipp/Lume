@@ -128,6 +128,40 @@ enum StorageManager {
         }
     }
 
+    #if DEBUG
+        /// DEBUG-only: wipes the on-device search index end to end — the TMDB/OMDb
+        /// enrichment (via `clearMetadataEnrichment`), the embedding vectors, the
+        /// resolved `tmdbId` links and each title's `indexedAt` stamp — so the
+        /// next indexing pass rebuilds everything from scratch. Used to exercise
+        /// the indexer during development.
+        static func clearIndex(in context: ModelContext) {
+            clearMetadataEnrichment(in: context)
+            do {
+                let movies = try context.fetch(FetchDescriptor<Movie>(
+                    predicate: #Predicate { $0.indexedAt != nil || $0.embeddingData != nil || $0.tmdbId != nil }
+                ))
+                for movie in movies {
+                    movie.tmdbId = nil
+                    movie.embeddingData = nil
+                    movie.indexedAt = nil
+                }
+
+                let series = try context.fetch(FetchDescriptor<Series>(
+                    predicate: #Predicate { $0.indexedAt != nil || $0.embeddingData != nil || $0.tmdbId != nil }
+                ))
+                for show in series {
+                    show.tmdbId = nil
+                    show.embeddingData = nil
+                    show.indexedAt = nil
+                }
+
+                try context.save()
+            } catch {
+                logger.error("Failed to clear index: \(error.localizedDescription)")
+            }
+        }
+    #endif
+
     // MARK: - Disk sizing (off the main actor)
 
     /// The URL of the local catalog store (the configuration that isn't the

@@ -16,11 +16,6 @@ struct SettingsView: View {
     @State var premium = PremiumManager.shared
     @State var showPaywall = false
     @State var paywallHighlight: PremiumFeature?
-    /// Not `private`: read by the SettingsView+Indexing extension (separate file).
-    @State var indexing = ContentIndexingService.shared
-    /// Whether the Home "For You" row is shown. Not `private`: the toggle lives in
-    /// the SettingsView+Indexing extension (separate file).
-    @AppStorage(RecommendationSettings.enabledKey) var recommendationsEnabled = RecommendationSettings.enabledDefault
     #if DEBUG && !SIDE_LOAD
         /// Force-recompute counter for the DEBUG developer section (separate file).
         @AppStorage(RecommendationSettings.manualRecalculationKey) var recommendationsRecalcToken = 0
@@ -100,7 +95,6 @@ struct SettingsView: View {
                     playlistsSection
                     librarySection
                     searchSection
-                    indexingSection
                     autoSyncSection
                     epgSection
                     CloudSyncSection()

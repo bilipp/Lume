@@ -105,7 +105,7 @@ struct PlayerErrorIndicator: View {
                     .padding(.horizontal, 18)
                     .padding(.vertical, 12)
                     .contentShape(Capsule())
-                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .glassEffectCompat(.regularInteractive, in: Capsule())
             }
             .buttonStyle(.plain)
         }

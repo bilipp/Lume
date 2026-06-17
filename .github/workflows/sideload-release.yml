@@ -14,7 +14,10 @@ permissions:
 jobs:
   build:
     name: Build ${{ matrix.platform }} Sideload
-    runs-on: macos-15
+    # macos-26 (matching the macOS 26 deployment target): on macos-15 the macOS
+    # icon's AssetCatalogAgent compile crashes with a dyld MediaToolbox/AVFCore
+    # symbol mismatch. iOS/tvOS build here too, so all platforms share one image.
+    runs-on: macos-26
 
     strategy:
       fail-fast: false

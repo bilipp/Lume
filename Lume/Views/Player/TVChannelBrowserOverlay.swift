@@ -125,7 +125,7 @@
             }
             .frame(width: width)
             .frame(maxHeight: .infinity)
-            .glassEffect(.regular, in: .rect(cornerRadius: 36))
+            .glassEffectCompat(.regular, in: RoundedRectangle(cornerRadius: 36))
             .focusSection()
         }
 

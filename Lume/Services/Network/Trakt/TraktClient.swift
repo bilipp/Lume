@@ -157,6 +157,20 @@ nonisolated struct TraktClient {
         try await get("/sync/watchlist?extended=full", accessToken: accessToken)
     }
 
+    // MARK: - Watched history (import)
+
+    /// Every movie in the user's watched history, each carrying its TMDB id so
+    /// the import can match it against the local library.
+    func watchedMovies(accessToken: String) async throws -> [TraktWatchedMovie] {
+        try await get("/sync/watched/movies", accessToken: accessToken)
+    }
+
+    /// Every show in the user's watched history with the watched seasons and
+    /// episodes nested, so the import can mark the matching local episodes.
+    func watchedShows(accessToken: String) async throws -> [TraktWatchedShow] {
+        try await get("/sync/watched/shows", accessToken: accessToken)
+    }
+
     // MARK: - Networking
 
     private func get<T: Decodable>(_ path: String, accessToken: String? = nil) async throws -> T {
@@ -346,6 +360,48 @@ struct TraktWatchlistItem: Decodable {
 struct TraktWatchlistMedia: Decodable {
     let title: String?
     let year: Int?
+    let ids: TraktIDs
+}
+
+// MARK: - Watched history
+
+/// One entry from `/sync/watched/movies`. `lastWatchedAt` is kept as the raw
+/// ISO-8601 string (Trakt includes fractional seconds); the importer parses it.
+struct TraktWatchedMovie: Decodable {
+    let movie: TraktWatchedMedia
+    let lastWatchedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case movie
+        case lastWatchedAt = "last_watched_at"
+    }
+}
+
+/// One entry from `/sync/watched/shows`, with the watched seasons and episodes
+/// nested beneath it.
+struct TraktWatchedShow: Decodable {
+    let show: TraktWatchedMedia
+    let seasons: [TraktWatchedSeason]
+}
+
+struct TraktWatchedSeason: Decodable {
+    let number: Int
+    let episodes: [TraktWatchedEpisode]
+}
+
+struct TraktWatchedEpisode: Decodable {
+    let number: Int
+    let lastWatchedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case number
+        case lastWatchedAt = "last_watched_at"
+    }
+}
+
+/// The id bag shared by watched movies and shows. Only the TMDB id is used to
+/// match against the local library.
+struct TraktWatchedMedia: Decodable {
     let ids: TraktIDs
 }
 

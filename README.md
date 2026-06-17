@@ -101,7 +101,7 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - Automatic resume playback and progress tracking
 - Auto-mark-as-watched at 90% completion
 - **Next Up** overlay with auto-play for series episodes
-- Optional **Trakt** scrobbling and **TMDB** metadata enrichment
+- Optional **Trakt** scrobbling — plus one-tap import of your existing Trakt watched history — and **TMDB** metadata enrichment
 
 #### 👤 Profiles
 - Multiple **user profiles**, each with its own watch history, progress, and favorites
@@ -125,10 +125,12 @@ dedicated focus-driven interface and top-shelf branding on tvOS.
 
 | Platform | Minimum OS | Devices |
 |---|---|---|
-| iOS / iPadOS | 26.4 | iPhone, iPad |
-| macOS | 26.4 | Apple Silicon & Intel |
-| tvOS | 26.4 | Apple TV 4K |
-| visionOS | 26.4 | Apple Vision Pro |
+| iOS / iPadOS | 18.0 | iPhone, iPad |
+| macOS | 15.0 | Apple Silicon & Intel |
+| tvOS | 18.0 | Apple TV 4K |
+| visionOS | 2.0 | Apple Vision Pro |
+
+> Liquid Glass and the iOS 26 navigation refinements are used where available and fall back to standard system materials on older OS versions.
 
 ---
 
