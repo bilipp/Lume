@@ -34,6 +34,14 @@ extension CloudSyncEngine {
         )
     }
 
+    static func values(from source: EPGSource) -> EPGSourceValues {
+        EPGSourceValues(name: source.name, url: source.url, isEnabled: source.isEnabled)
+    }
+
+    static func values(from mirror: SyncedEPGSource) -> EPGSourceValues {
+        EPGSourceValues(name: mirror.name, url: mirror.url, isEnabled: mirror.isEnabled)
+    }
+
     static func values(from mirror: UserContentState) -> ContentStateValues {
         ContentStateValues(
             watchProgress: mirror.watchProgress,

@@ -16,9 +16,11 @@ final nonisolated class CloudSyncShadow {
     private let defaults: UserDefaults
     private let playlistsKey = "cloudsync.shadow.playlists.v1"
     private let contentKey = "cloudsync.shadow.content.v1"
+    private let epgSourcesKey = "cloudsync.shadow.epgsources.v1"
 
     private var playlists: [String: PlaylistConfigValues]
     private var content: [String: ContentStateValues]
+    private var epgSources: [String: EPGSourceValues]
 
     /// Set whenever a setter actually changes the baseline; cleared on `persist()`.
     /// A steady-state reconcile (every verdict `.noChange`) mutates nothing, so
@@ -29,6 +31,7 @@ final nonisolated class CloudSyncShadow {
         self.defaults = defaults
         playlists = Self.decode(defaults.data(forKey: playlistsKey)) ?? [:]
         content = Self.decode(defaults.data(forKey: contentKey)) ?? [:]
+        epgSources = Self.decode(defaults.data(forKey: epgSourcesKey)) ?? [:]
     }
 
     // MARK: Playlists (keyed by UUID string)
@@ -63,6 +66,22 @@ final nonisolated class CloudSyncShadow {
         Set(content.keys)
     }
 
+    // MARK: Manual EPG sources (keyed by UUID string)
+
+    func epgSourceShadow(_ id: String) -> EPGSourceValues? {
+        epgSources[id]
+    }
+
+    func setEPGSourceShadow(_ id: String, _ value: EPGSourceValues?) {
+        guard epgSources[id] != value else { return }
+        epgSources[id] = value
+        isDirty = true
+    }
+
+    func epgSourceShadowIDs() -> Set<String> {
+        Set(epgSources.keys)
+    }
+
     /// Drop the entire content baseline. Called on a profile switch: the catalog
     /// has been re-projected to a different profile, so the previous baseline no
     /// longer describes it. The next reconcile rebuilds it (a one-time union
@@ -81,9 +100,10 @@ final nonisolated class CloudSyncShadow {
     /// wiping it. Safe by this type's contract (degrades to a one-time union
     /// merge, never data loss).
     func reset() {
-        guard !playlists.isEmpty || !content.isEmpty else { return }
+        guard !playlists.isEmpty || !content.isEmpty || !epgSources.isEmpty else { return }
         playlists.removeAll()
         content.removeAll()
+        epgSources.removeAll()
         isDirty = true
     }
 
@@ -96,6 +116,7 @@ final nonisolated class CloudSyncShadow {
         guard isDirty else { return }
         defaults.set(Self.encode(playlists), forKey: playlistsKey)
         defaults.set(Self.encode(content), forKey: contentKey)
+        defaults.set(Self.encode(epgSources), forKey: epgSourcesKey)
         isDirty = false
     }
 

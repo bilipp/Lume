@@ -18,28 +18,36 @@ import SwiftData
 /// the same reconciliation.
 nonisolated enum EPGSourceReconciler {
     /// Creates, updates, or removes the EPG source linked to `playlist` so it
-    /// matches the playlist's current guide configuration. Idempotent.
+    /// matches the playlist's current guide configuration, then saves. Idempotent.
     static func reconcile(_ playlist: Playlist, in context: ModelContext) {
+        guard apply(playlist, in: context) else { return }
+        try? context.save()
+    }
+
+    /// The mutation half of `reconcile`, without saving — for callers (the iCloud
+    /// reconcile engine) that batch their own save. Returns whether anything
+    /// changed.
+    @discardableResult
+    static func apply(_ playlist: Playlist, in context: ModelContext) -> Bool {
         let playlistID = playlist.id
         let existing = linkedSource(playlistID: playlistID, in: context)
 
         guard let desiredURL = guideURL(for: playlist) else {
-            if let existing {
-                context.delete(existing)
-                try? context.save()
-                Logger.sync.info("Removed EPG source for playlist with no guide URL")
-            }
-            return
+            guard let existing else { return false }
+            context.delete(existing)
+            Logger.sync.info("Removed EPG source for playlist with no guide URL")
+            return true
         }
 
         if let existing {
             // Preserve the user's enabled choice; only refresh the derived fields.
+            guard existing.name != sourceName(for: playlist) || existing.url != desiredURL else { return false }
             existing.name = sourceName(for: playlist)
             existing.url = desiredURL
         } else {
             context.insert(EPGSource(name: sourceName(for: playlist), url: desiredURL, playlistID: playlistID))
         }
-        try? context.save()
+        return true
     }
 
     /// Removes a playlist's linked EPG source. Called from `PlaylistDeletion`.

@@ -32,6 +32,29 @@ extension CloudSyncEngine {
         return map
     }
 
+    /// Manual EPG sources (no owning playlist) keyed by id. Playlist-linked
+    /// sources are derived locally and never synced, so they're excluded here.
+    /// Filtered in memory — an optional-`UUID?` `#Predicate` is brittle.
+    func fetchLocalManualEPGSources() throws -> [UUID: EPGSource] {
+        var map: [UUID: EPGSource] = [:]
+        for source in try catalogContext.fetch(FetchDescriptor<EPGSource>()) where source.playlistID == nil {
+            map[source.id] = source
+        }
+        return map
+    }
+
+    func fetchEPGSourceMirrors() throws -> [UUID: SyncedEPGSource] {
+        var map: [UUID: SyncedEPGSource] = [:]
+        for mirror in try cloudContext.fetch(FetchDescriptor<SyncedEPGSource>()) {
+            map[mirror.id] = dedupe(mirror, against: map[mirror.id])
+        }
+        return map
+    }
+
+    func dedupe(_ candidate: SyncedEPGSource, against existing: SyncedEPGSource?) -> SyncedEPGSource {
+        dedupe(candidate, against: existing, updatedAt: \.updatedAt)
+    }
+
     /// Mirrors for the currently active profile only — inactive profiles' state
     /// must not project onto the (single, active-profile) catalog.
     func fetchContentMirrors() throws -> [String: UserContentState] {

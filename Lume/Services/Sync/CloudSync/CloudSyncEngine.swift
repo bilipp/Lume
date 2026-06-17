@@ -10,6 +10,8 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
     var playlistsCreatedLocally = 0
     var contentPushed = 0
     var contentPulled = 0
+    var epgSourcesPushed = 0
+    var epgSourcesPulled = 0
     /// Cloud states whose local catalog item hasn't synced yet — left pending
     /// (shadow untouched) so a later pass applies them once the catalog lands.
     var contentPending = 0
@@ -118,6 +120,11 @@ actor CloudSyncEngine {
             try reconcileProfiles()
             let livePrefixes = try reconcilePlaylists(into: &result)
             try reconcileContent(livePrefixes: livePrefixes, into: &result)
+            // Manual EPG sources sync as their own lightweight mirror; each
+            // playlist's derived (linked) source is regenerated locally so it
+            // appears on every device that has the playlist.
+            try reconcileEPGSources(into: &result)
+            regenerateLinkedEPGSources()
             // Two stores → two saves (`saveStores`, catalog first). Persist the
             // shadow only after both succeed, so a half-applied pass is never
             // baselined: if either save throws we fall to the catch, leave the
@@ -125,7 +132,7 @@ actor CloudSyncEngine {
             // 3-way merge is idempotent).
             try saveStores()
             shadow.persist()
-            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending)")
+            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled)") // swiftlint:disable:this line_length
         } catch {
             Logger.sync.error("Reconcile failed: \(error.localizedDescription)")
         }
@@ -205,6 +212,39 @@ actor CloudSyncEngine {
             )
         }
     }
+
+    // MARK: - Manual EPG sources
+
+    /// Three-way-merges manual EPG sources (those with no owning playlist) with
+    /// their cloud mirror, so a custom XMLTV feed added on one device reaches the
+    /// others — and a fresh device that's never seen one pulls it in.
+    private func reconcileEPGSources(into result: inout CloudSyncReconcileResult) throws {
+        let localByID = try fetchLocalManualEPGSources()
+        let mirrorsByID = try fetchEPGSourceMirrors()
+
+        var ids = Set(localByID.keys).union(mirrorsByID.keys)
+        ids.formUnion(shadow.epgSourceShadowIDs().compactMap(UUID.init(uuidString:)))
+
+        for id in ids {
+            let verdict = CloudSyncMerge.reconcile(
+                local: localByID[id].map(Self.values(from:)),
+                cloud: mirrorsByID[id].map(Self.values(from:)),
+                shadow: shadow.epgSourceShadow(id.uuidString),
+                mergeConflict: EPGSourceValues.mergeConflict
+            )
+            applyEPGSourceVerdict(verdict, id: id, local: localByID[id], mirror: mirrorsByID[id], into: &result)
+        }
+    }
+
+    /// Rebuilds each playlist's derived (linked) EPG source from its current
+    /// config, so a playlist pulled in from iCloud gets its guide source on this
+    /// device too. Idempotent — only writes when something actually changed.
+    private func regenerateLinkedEPGSources() {
+        guard let playlists = try? catalogContext.fetch(FetchDescriptor<Playlist>()) else { return }
+        for playlist in playlists {
+            EPGSourceReconciler.apply(playlist, in: catalogContext)
+        }
+    }
 }
 
 // MARK: - Verdict application
@@ -234,6 +274,33 @@ private extension CloudSyncEngine {
             if applyPlaylistToLocal(value, id: id, local: local) { result.playlistsCreatedLocally += 1 }
             result.playlistsPushed += 1
             shadow.setPlaylistShadow(key, value)
+        }
+    }
+
+    func applyEPGSourceVerdict(
+        _ verdict: MergeVerdict<EPGSourceValues>,
+        id: UUID,
+        local: EPGSource?,
+        mirror: SyncedEPGSource?,
+        into result: inout CloudSyncReconcileResult
+    ) {
+        let key = id.uuidString
+        switch verdict {
+        case .noChange:
+            break
+        case let .pushToCloud(value):
+            applyEPGSourceToCloud(value, id: id, mirror: mirror)
+            if value != nil { result.epgSourcesPushed += 1 }
+            shadow.setEPGSourceShadow(key, value)
+        case let .pullToLocal(value):
+            applyEPGSourceToLocal(value, id: id, local: local)
+            if value != nil { result.epgSourcesPulled += 1 }
+            shadow.setEPGSourceShadow(key, value)
+        case let .writeBoth(value):
+            applyEPGSourceToCloud(value, id: id, mirror: mirror)
+            applyEPGSourceToLocal(value, id: id, local: local)
+            result.epgSourcesPushed += 1
+            shadow.setEPGSourceShadow(key, value)
         }
     }
 
@@ -329,6 +396,38 @@ private extension CloudSyncEngine {
         playlist.syncEnabled = value.syncEnabled
         catalogContext.insert(playlist)
         return true
+    }
+
+    func applyEPGSourceToCloud(_ value: EPGSourceValues?, id: UUID, mirror: SyncedEPGSource?) {
+        guard let value else {
+            if let mirror { cloudContext.delete(mirror) }
+            return
+        }
+        if let mirror {
+            mirror.name = value.name
+            mirror.url = value.url
+            mirror.isEnabled = value.isEnabled
+            mirror.updatedAt = Date()
+        } else {
+            cloudContext.insert(SyncedEPGSource(id: id, name: value.name, url: value.url, isEnabled: value.isEnabled))
+        }
+    }
+
+    func applyEPGSourceToLocal(_ value: EPGSourceValues?, id: UUID, local: EPGSource?) {
+        guard let value else {
+            if let local { catalogContext.delete(local) }
+            return
+        }
+        if let local {
+            local.name = value.name
+            local.url = value.url
+            local.isEnabled = value.isEnabled
+        } else {
+            let source = EPGSource(name: value.name, url: value.url, playlistID: nil)
+            source.id = id
+            source.isEnabled = value.isEnabled
+            catalogContext.insert(source)
+        }
     }
 
     static func playlistRemains(verdict: MergeVerdict<PlaylistConfigValues>, hadLocal: Bool, hadCloud: Bool) -> Bool {

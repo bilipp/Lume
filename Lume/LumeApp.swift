@@ -114,7 +114,7 @@ struct LumeApp: App {
     /// `UserContentState`, `UserProfile`). Small and CloudKit-backed; a load
     /// failure is unexpected, so fail loudly rather than risk a silent empty store.
     private static func makeCloudContainer() -> ModelContainer {
-        let cloudSchema = Schema([SyncedPlaylist.self, UserContentState.self, UserProfile.self])
+        let cloudSchema = Schema([SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self])
         let cloudConfiguration = ModelConfiguration(
             "CloudUserData",
             schema: cloudSchema,

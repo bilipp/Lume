@@ -106,6 +106,21 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
     }
 }
 
+// MARK: - Manual EPG source
+
+/// The syncable fields of a *manual* `EPGSource`. Conflicts resolve cloud-wins,
+/// like playlist config — EPG sources are shared truth that rarely change on two
+/// devices at once.
+nonisolated struct EPGSourceValues: Codable, Equatable {
+    var name: String
+    var url: String
+    var isEnabled: Bool
+
+    static func mergeConflict(local _: EPGSourceValues, cloud: EPGSourceValues) -> EPGSourceValues {
+        cloud
+    }
+}
+
 // MARK: - Per-content user state
 
 /// The syncable user state of a single catalog item. Fields irrelevant to a

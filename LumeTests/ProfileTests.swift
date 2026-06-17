@@ -23,7 +23,7 @@ struct ProfileEngineTests {
         let fullSchema = Schema([
             Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
             Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self,
-            SyncedPlaylist.self, UserContentState.self, UserProfile.self
+            SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self
         ])
         let localConfig = ModelConfiguration(
             "local",
@@ -36,7 +36,7 @@ struct ProfileEngineTests {
         )
         let cloudConfig = ModelConfiguration(
             "cloud",
-            schema: Schema([SyncedPlaylist.self, UserContentState.self, UserProfile.self]),
+            schema: Schema([SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self]),
             isStoredInMemoryOnly: true,
             cloudKitDatabase: .none
         )

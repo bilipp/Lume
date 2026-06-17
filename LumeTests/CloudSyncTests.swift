@@ -119,7 +119,7 @@ struct CloudSyncEngineTests {
         let fullSchema = Schema([
             Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
             Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self,
-            SyncedPlaylist.self, UserContentState.self
+            SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self
         ])
         // `cloudKitDatabase: .none` is required on both stores: the catalog uses
         // `@Attribute(.unique)`, which CloudKit forbids, and the default
@@ -136,7 +136,7 @@ struct CloudSyncEngineTests {
         )
         let cloudConfig = ModelConfiguration(
             "cloud",
-            schema: Schema([SyncedPlaylist.self, UserContentState.self]),
+            schema: Schema([SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self]),
             isStoredInMemoryOnly: true,
             cloudKitDatabase: .none
         )
@@ -304,6 +304,67 @@ struct CloudSyncEngineTests {
         _ = await engine.reconcile()
 
         #expect(try ctx.fetch(FetchDescriptor<UserContentState>()).isEmpty)
+    }
+
+    // MARK: - EPG sources
+
+    @Test func `manual EPG source exports to a cloud mirror`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        let source = EPGSource(name: "Custom", url: "http://x/guide.xml")
+        let sid = source.id
+        ctx.insert(source)
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(result.epgSourcesPushed == 1)
+        let mirrors = try ctx.fetch(FetchDescriptor<SyncedEPGSource>())
+        #expect(mirrors.count == 1)
+        #expect(mirrors.first?.id == sid)
+        #expect(mirrors.first?.url == "http://x/guide.xml")
+    }
+
+    @Test func `cloud EPG source creates a local manual source`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        let sid = UUID()
+        ctx.insert(SyncedEPGSource(id: sid, name: "Remote Guide", url: "http://r/epg.xml", isEnabled: true))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(result.epgSourcesPulled == 1)
+        let locals = try ctx.fetch(FetchDescriptor<EPGSource>())
+        #expect(locals.count == 1)
+        #expect(locals.first?.id == sid)
+        #expect(locals.first?.isManual == true)
+        #expect(locals.first?.url == "http://r/epg.xml")
+    }
+
+    @Test func `a pulled playlist regenerates its linked EPG source locally`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+        let pid = UUID()
+        ctx.insert(SyncedPlaylist(
+            id: pid, name: "Remote", serverURL: "http://host:8080", username: "u", password: "p",
+            sourceTypeRaw: "xtream", epgURL: nil, syncEnabled: true
+        ))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        _ = await engine.reconcile()
+
+        let sources = try ctx.fetch(FetchDescriptor<EPGSource>())
+        #expect(sources.count == 1)
+        let linked = try #require(sources.first)
+        #expect(linked.playlistID == pid)
+        #expect(linked.url.contains("xmltv.php"))
+
+        // The derived source is local-only — it must not be mirrored to the cloud.
+        #expect(try ctx.fetch(FetchDescriptor<SyncedEPGSource>()).isEmpty)
     }
 }
 
