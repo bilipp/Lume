@@ -57,6 +57,22 @@ extension ContentSyncManager {
         guard client.isConfigured else { return [] }
         return try await client.collectionMovieIDs(collectionId)
     }
+
+    /// The streaming services available in the user's region, merging the movie
+    /// and TV provider lists (most services carry both) and de-duplicating by id.
+    /// Used to populate the local `WatchProvider` catalog for the picker.
+    func fetchWatchProviderList() async -> [WatchProviderInfo] {
+        let client = TMDBClient.shared
+        guard client.isConfigured else { return [] }
+        async let moviesTask = client.watchProviderList(.movie)
+        async let showsTask = client.watchProviderList(.tvShow)
+        let combined = await ((try? moviesTask) ?? []) + ((try? showsTask) ?? [])
+        var byId: [Int: WatchProviderInfo] = [:]
+        for provider in combined where byId[provider.id] == nil {
+            byId[provider.id] = provider
+        }
+        return byId.values.sorted { $0.displayPriority < $1.displayPriority }
+    }
 }
 
 // MARK: - Direct context apply
@@ -111,6 +127,13 @@ nonisolated func applyMovieDetails(
         movie.collectionBackdropPath = details.collectionBackdropPath
     }
 
+    // Set before the cast guard so the background indexer's partial pass still
+    // populates watch providers across the whole catalog (browse-by-provider
+    // needs them ahead of any detail open) — no extra API call, they ride along
+    // on the details fetch the indexer already makes.
+    movie.watchProviderIds = details.watchProviderIds
+    movie.watchProvidersEnrichedAt = Date()
+
     guard includeCast else { return }
     replaceCast(of: movie.castMembers, with: details.cast, ownerId: movie.id, context: context) { castMember in
         castMember.movie = movie
@@ -158,6 +181,12 @@ nonisolated func applySeriesDetails(
     if currentRating == 0, let vote = details.voteAverage, vote > 0 {
         series.rating = String(format: "%.1f", vote)
     }
+
+    // Set before the cast guard so the background indexer's partial pass still
+    // populates watch providers across the whole catalog — see
+    // `applyMovieDetails` for why.
+    series.watchProviderIds = details.watchProviderIds
+    series.watchProvidersEnrichedAt = Date()
 
     guard includeCast else { return }
     replaceCast(of: series.castMembers, with: details.cast, ownerId: series.id, context: context) { castMember in

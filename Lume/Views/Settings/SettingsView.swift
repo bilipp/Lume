@@ -202,6 +202,14 @@ struct SettingsView: View {
                     Label("Content Management", systemImage: "slider.horizontal.3")
                 }
                 .disabled(playlists.isEmpty)
+
+                if TMDBClient.shared.isConfigured {
+                    NavigationLink {
+                        WatchProviderSettingsView()
+                    } label: {
+                        Label("Streaming Providers", systemImage: "play.tv")
+                    }
+                }
             } header: {
                 Text("Library")
             } footer: {
@@ -403,9 +411,12 @@ struct SettingsView: View {
         }
 
         /// The sidebar categories. Integrations is hidden unless the build has
-        /// Trakt credentials configured.
+        /// Trakt credentials configured; Providers unless TMDB is configured.
         private var availableCategories: [SettingsCategory] {
-            SettingsCategory.allCases.filter { $0 != .integrations || trakt.isConfigured }
+            SettingsCategory.allCases.filter {
+                ($0 != .integrations || trakt.isConfigured)
+                    && ($0 != .providers || TMDBClient.shared.isConfigured)
+            }
         }
 
         /// Content Management brings its own scroll/background, so it replaces the
@@ -436,6 +447,7 @@ struct SettingsView: View {
                             tvPlaylistsDetail
                         }
                     case .profiles: TVProfilesSettingsView()
+                    case .providers: WatchProviderSettingsView()
                     case .epg: EPGSettingsView()
                     case .search: tvSearchDetail
                     case .storage: StorageManagementView()

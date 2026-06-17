@@ -21,6 +21,8 @@ struct MoviesView: View {
     @State private var showingSync = false
     @State private var showingSettings = false
     @State private var genres: [String] = []
+    @State private var providers: [WatchProvider] = []
+    @State private var providerSettings = WatchProviderSettings.shared
 
     @AppStorage(SortStorageKey.movieCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
@@ -71,6 +73,10 @@ struct MoviesView: View {
                                     .id("\(category.id)-\(contentSort.rawValue)")
                             }
 
+                            if !providers.isEmpty {
+                                WatchProviderGridSection(providers: providers, type: .vod)
+                            }
+
                             if !genres.isEmpty {
                                 GenreGridSection(genres: genres, type: .vod)
                             }
@@ -84,6 +90,14 @@ struct MoviesView: View {
                     }
                     .task(id: playlistPrefix) {
                         genres = GenreDerivation.movieGenres(in: modelContext, playlistPrefix: playlistPrefix, restriction: restriction)
+                    }
+                    .task(id: providerTaskID) {
+                        providers = WatchProviderDerivation.movieProviders(
+                            in: modelContext,
+                            playlistPrefix: playlistPrefix,
+                            restriction: restriction,
+                            selected: providerSettings.selectedIDs
+                        )
                     }
                 }
             }
@@ -107,6 +121,9 @@ struct MoviesView: View {
             .navigationDestination(for: GenreSelection.self) { selection in
                 MovieGenreView(genre: selection.genre, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
             }
+            .navigationDestination(for: WatchProviderSelection.self) { selection in
+                MovieWatchProviderView(providerId: selection.providerId, name: selection.name, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+            }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
                 #if os(iOS)
@@ -126,6 +143,12 @@ struct MoviesView: View {
     /// scope the cross-category collection rows in-memory.
     private var playlistPrefix: String {
         activePlaylist.map { "\($0.id.uuidString)-" } ?? ""
+    }
+
+    /// Re-derives the provider browse section when the playlist or the user's
+    /// provider selection changes.
+    private var providerTaskID: String {
+        "\(playlistPrefix)|\(providerSettings.selectedIDs.sorted().map(String.init).joined(separator: ","))"
     }
 
     /// Categories scoped to the active playlist. The `@Query` fetches every
