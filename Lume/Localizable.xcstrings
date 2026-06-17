@@ -708,6 +708,16 @@
         }
       }
     },
+    "Browse by Provider" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach Anbieter"
+          }
+        }
+      }
+    },
     "Cached artwork and metadata are re-downloaded automatically when needed. Your playlists, downloads, watch history and favorites are not affected." : {
       "localizations" : {
         "de" : {
@@ -2597,6 +2607,16 @@
         }
       }
     },
+    "Loading providers…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anbieter werden geladen…"
+          }
+        }
+      }
+    },
     "Lock a category to hide it from child profiles. Drag to reorder. Reset restores the playlist's order and shows everything." : {
       "localizations" : {
         "de" : {
@@ -3243,6 +3263,16 @@
         }
       }
     },
+    "No movies on this provider yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Filme bei diesem Anbieter"
+          }
+        }
+      }
+    },
     "No Playlist" : {
       "localizations" : {
         "de" : {
@@ -3285,6 +3315,16 @@
         }
       }
     },
+    "No providers loaded yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Anbieter geladen."
+          }
+        }
+      }
+    },
     "No Series" : {
       "localizations" : {
         "de" : {
@@ -3311,6 +3351,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Serien in diesem Genre"
+          }
+        }
+      }
+    },
+    "No series on this provider yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Serien bei diesem Anbieter"
           }
         }
       }
@@ -3595,6 +3645,16 @@
         }
       }
     },
+    "Pick the streaming services you subscribe to. The Movies and Series tabs add a section for each, grouping titles available on that service in your region." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle die Streaming-Dienste aus, die du abonniert hast. Die Tabs „Filme“ und „Serien“ zeigen für jeden einen Bereich mit den in deiner Region dort verfügbaren Titeln."
+          }
+        }
+      }
+    },
     "Picture in Picture" : {
       "localizations" : {
         "de" : {
@@ -3852,6 +3912,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Profile"
+          }
+        }
+      }
+    },
+    "Providers" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anbieter"
           }
         }
       }
@@ -4662,6 +4732,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Belegter Speicher"
+          }
+        }
+      }
+    },
+    "Streaming Providers" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streaming-Anbieter"
+          }
+        }
+      }
+    },
+    "Streaming providers are unavailable because TMDB is not configured in this build." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streaming-Anbieter sind nicht verfügbar, da TMDB in diesem Build nicht konfiguriert ist."
           }
         }
       }

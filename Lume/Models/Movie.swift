@@ -59,6 +59,16 @@ final class Movie {
     @Relationship(deleteRule: .cascade, inverse: \CastMember.movie)
     var castMembers: [CastMember] = []
 
+    // MARK: Watch providers (TMDB flatrate streaming services for the user's region)
+
+    /// Pipe-delimited flatrate watch-provider ids (e.g. `|8|337|`), set during
+    /// TMDB enrichment. Stored as a string so a `localizedStandardContains`
+    /// predicate can group titles by provider in SQLite. Access through
+    /// `watchProviderIds`.
+    var watchProviderIdsRaw: String?
+    /// When watch providers were last resolved from TMDB; nil means never.
+    var watchProvidersEnrichedAt: Date?
+
     // MARK: External ratings (OMDb, keyed by IMDb id — lazy-fetched on detail)
 
     /// IMDb id (e.g. `tt3896198`), resolved from TMDB's external ids. Required
@@ -158,6 +168,13 @@ extension Movie {
     /// Cast in TMDB billing order (top-billed first).
     var orderedCast: [CastMember] {
         castMembers.sorted { $0.order < $1.order }
+    }
+
+    /// Flatrate watch-provider ids for the user's region, in TMDB display order.
+    /// Backed by `watchProviderIdsRaw`.
+    var watchProviderIds: [Int] {
+        get { WatchProviderIDs.decode(watchProviderIdsRaw) }
+        set { watchProviderIdsRaw = WatchProviderIDs.encode(newValue) }
     }
 
     /// External aggregator ratings, in display order. Backed by

@@ -35,7 +35,9 @@ nonisolated struct TMDBClient {
     }
 
     private let baseURL = "https://api.themoviedb.org/3"
-    private static let imageBaseURL = "https://image.tmdb.org/t/p/"
+    /// Not `private`: the watch-providers extension (separate file) builds
+    /// provider-logo URLs from it.
+    static let imageBaseURL = "https://image.tmdb.org/t/p/"
     private let session: URLSession
     private let token: String?
 
@@ -53,14 +55,20 @@ nonisolated struct TMDBClient {
         String(language.prefix { $0 != "-" })
     }
 
+    /// ISO 3166-1 region (e.g. `US`, `DE`) for watch-provider lookups, from the
+    /// user's locale. Not `private`: read by the watch-providers extension.
+    let region: String
+
     init(
         session: URLSession = .shared,
         token: String? = TMDBClient.tokenFromBundle(),
-        language: String = TMDBClient.preferredLanguageCode()
+        language: String = TMDBClient.preferredLanguageCode(),
+        region: String = TMDBClient.preferredRegionCode()
     ) {
         self.session = session
         self.token = token
         self.language = language
+        self.region = region
     }
 
     /// Whether a usable token is present. When false the trending section is
@@ -185,19 +193,19 @@ nonisolated struct TMDBClient {
     /// US content rating folded in via `append_to_response`.
     func movieDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
-            "/movie/\(id)?append_to_response=credits,similar,release_dates,images,videos,external_ids"
+            "/movie/\(id)?append_to_response=credits,similar,release_dates,images,videos,external_ids,watch/providers"
                 + imageAndVideoLanguageQuery
         )
-        return response.normalized(isMovie: true, preferredLanguage: languageCode)
+        return response.normalized(isMovie: true, preferredLanguage: languageCode, region: region)
     }
 
     /// Full detail payload for a TV series.
     func tvDetails(_ id: Int) async throws -> TMDBTitleDetails {
         let response: TitleDetailsResponse = try await get(
-            "/tv/\(id)?append_to_response=credits,similar,content_ratings,images,videos,external_ids"
+            "/tv/\(id)?append_to_response=credits,similar,content_ratings,images,videos,external_ids,watch/providers"
                 + imageAndVideoLanguageQuery
         )
-        return response.normalized(isMovie: false, preferredLanguage: languageCode)
+        return response.normalized(isMovie: false, preferredLanguage: languageCode, region: region)
     }
 
     /// Widens the appended `images`/`videos` to the user's language, English,
@@ -251,7 +259,9 @@ nonisolated struct TMDBClient {
 
     // MARK: - Networking
 
-    private func get<T: Decodable>(_ path: String) async throws -> T {
+    /// Not `private`: the watch-providers extension (separate file) issues its
+    /// list request through it.
+    func get<T: Decodable>(_ path: String) async throws -> T {
         guard isConfigured, let token else { throw TMDBError.missingToken }
         let localizedPath = TMDBClient.pathWithLanguage(path, language: language)
         guard let url = URL(string: baseURL + localizedPath) else { throw TMDBError.invalidURL }
@@ -306,6 +316,9 @@ nonisolated struct TMDBTitleDetails {
     var logoPath: String?
     /// IMDb id (e.g. `tt3896198`), used to query OMDb for aggregator ratings.
     var imdbId: String?
+    /// TMDB ids of the `flatrate` streaming services the title is on in the
+    /// user's region, in display-priority order (rent/buy offers are ignored).
+    var watchProviderIds: [Int] = []
 
     /// Collection this movie belongs to (only for movies, nil for series).
     var collectionId: Int?
@@ -368,6 +381,7 @@ private nonisolated struct TitleDetailsResponse: Decodable {
     let images: ImagesEntry?
     let imdbId: String? // movies expose it top-level
     let externalIds: ExternalIds? // tv (and movies) expose it under external_ids
+    let watchProviders: WatchProvidersEntry? // appended under "watch/providers"
 
     struct Genre: Decodable { let name: String }
     struct Credits: Decodable { let cast: [TMDBCastMemberDTO]? }
@@ -384,6 +398,7 @@ private nonisolated struct TitleDetailsResponse: Decodable {
         case belongsToCollection = "belongs_to_collection"
         case imdbId = "imdb_id"
         case externalIds = "external_ids"
+        case watchProviders = "watch/providers"
     }
 }
 
@@ -480,7 +495,7 @@ private nonisolated struct CollectionPart: Decodable {
 }
 
 nonisolated extension TitleDetailsResponse {
-    func normalized(isMovie: Bool, preferredLanguage: String = "en") -> TMDBTitleDetails {
+    func normalized(isMovie: Bool, preferredLanguage: String = "en", region: String = "US") -> TMDBTitleDetails {
         let cast = (credits?.cast ?? [])
             .sorted { ($0.order ?? .max) < ($1.order ?? .max) }
             .prefix(20)
@@ -507,6 +522,8 @@ nonisolated extension TitleDetailsResponse {
             videos: mappedVideos(),
             logoPath: bestLogoPath(preferredLanguage: preferredLanguage),
             imdbId: resolvedIMDbId(),
+            watchProviderIds: (watchProviders?.results[region]?.flatrate ?? [])
+                .sorted { ($0.displayPriority ?? .max) < ($1.displayPriority ?? .max) }.map(\.providerId),
             collectionId: isMovie ? belongsToCollection?.id : nil,
             collectionName: isMovie ? belongsToCollection?.name : nil,
             collectionPosterPath: isMovie ? belongsToCollection?.posterPath : nil,

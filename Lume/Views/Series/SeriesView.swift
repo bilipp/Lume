@@ -21,6 +21,8 @@ struct SeriesView: View {
     @State private var showingSync = false
     @State private var showingSettings = false
     @State private var genres: [String] = []
+    @State private var providers: [WatchProvider] = []
+    @State private var providerSettings = WatchProviderSettings.shared
 
     @AppStorage(SortStorageKey.seriesCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
@@ -69,6 +71,10 @@ struct SeriesView: View {
                                     .id("\(category.id)-\(contentSort.rawValue)")
                             }
 
+                            if !providers.isEmpty {
+                                WatchProviderGridSection(providers: providers, type: .series)
+                            }
+
                             if !genres.isEmpty {
                                 GenreGridSection(genres: genres, type: .series)
                             }
@@ -82,6 +88,14 @@ struct SeriesView: View {
                     }
                     .task(id: playlistPrefix) {
                         genres = GenreDerivation.seriesGenres(in: modelContext, playlistPrefix: playlistPrefix, restriction: restriction)
+                    }
+                    .task(id: providerTaskID) {
+                        providers = WatchProviderDerivation.seriesProviders(
+                            in: modelContext,
+                            playlistPrefix: playlistPrefix,
+                            restriction: restriction,
+                            selected: providerSettings.selectedIDs
+                        )
                     }
                 }
             }
@@ -105,6 +119,9 @@ struct SeriesView: View {
             .navigationDestination(for: GenreSelection.self) { selection in
                 SeriesGenreView(genre: selection.genre, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
             }
+            .navigationDestination(for: WatchProviderSelection.self) { selection in
+                SeriesWatchProviderView(providerId: selection.providerId, name: selection.name, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+            }
             .navigationDestination(for: Series.self) { series in
                 SeriesDetailView(series: series, animationNamespace: animationNamespace)
                 #if os(iOS)
@@ -124,6 +141,12 @@ struct SeriesView: View {
     /// scope the cross-category collection rows in-memory.
     private var playlistPrefix: String {
         activePlaylist.map { "\($0.id.uuidString)-" } ?? ""
+    }
+
+    /// Re-derives the provider browse section when the playlist or the user's
+    /// provider selection changes.
+    private var providerTaskID: String {
+        "\(playlistPrefix)|\(providerSettings.selectedIDs.sorted().map(String.init).joined(separator: ","))"
     }
 
     /// Categories scoped to the active playlist. The `@Query` fetches every
