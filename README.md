@@ -8,6 +8,13 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 
 <br>
 
+<a href="https://apps.apple.com/us/app/lume-iptv-player/id6779551584">
+  <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1700000000" alt="Download Lume on the App Store" height="48">
+</a>
+
+<br><br>
+
+[![App Store](https://img.shields.io/badge/Download-App%20Store-0A84FF?logo=apple&logoColor=white&labelColor=1f1f2e)](https://apps.apple.com/us/app/lume-iptv-player/id6779551584)
 [![Platforms](https://img.shields.io/badge/platforms-iOS%20·%20iPadOS%20·%20macOS%20·%20tvOS%20·%20visionOS-1f1f2e?labelColor=1f1f2e)](#supported-platforms)
 [![Swift](https://img.shields.io/badge/Swift-5.x-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)](https://developer.apple.com/xcode/swiftui/)
@@ -217,6 +224,8 @@ Scripts/                     Build helpers (env injection, frameworks)
 ---
 
 ## Getting started
+
+The easiest way to use Lume is to [**download it from the App Store**](https://apps.apple.com/us/app/lume-iptv-player/id6779551584) — available on iPhone, iPad, Mac, Apple TV, and Apple Vision Pro. To build from source, follow the steps below.
 
 ### Requirements
 

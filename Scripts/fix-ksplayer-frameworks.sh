@@ -13,6 +13,69 @@ set -e
 
 # ---- helpers -----------------------------------------------------------------
 
+# Set to 1 by fix_bundle_id / fix_min_os when they actually rewrite a plist, so
+# callers only re-sign the frameworks that changed.
+BUNDLE_ID_PATCHED=0
+MIN_OS_PATCHED=0
+
+# Resolve the Info.plist for a framework, deep (macOS) or shallow layout.
+framework_plist() {
+    fw="$1"
+    if [ -f "$fw/Versions/Current/Resources/Info.plist" ]; then
+        echo "$fw/Versions/Current/Resources/Info.plist"
+    elif [ -f "$fw/Versions/A/Resources/Info.plist" ]; then
+        echo "$fw/Versions/A/Resources/Info.plist"
+    elif [ -f "$fw/Resources/Info.plist" ]; then
+        echo "$fw/Resources/Info.plist"
+    else
+        echo "$fw/Info.plist"
+    fi
+}
+
+# Resolve the Mach-O binary for a framework, deep (macOS) or shallow layout.
+framework_binary() {
+    fw="$1"
+    name=$(basename "$fw" .framework)
+    if [ -f "$fw/Versions/Current/$name" ]; then
+        echo "$fw/Versions/Current/$name"
+    elif [ -f "$fw/Versions/A/$name" ]; then
+        echo "$fw/Versions/A/$name"
+    else
+        echo "$fw/$name"
+    fi
+}
+
+fix_min_os() {
+    # App Store upload rejects (ITMS-90208) any embedded framework whose
+    # Info.plist MinimumOSVersion is lower than what its Mach-O slice actually
+    # supports. The KSPlayer / FFmpegKit XCFrameworks ship a generic
+    # MinimumOSVersion of 13.0, but their tvOS slices are compiled with
+    # minos 26.0 — so the binary "does not support" the 13.0 the plist claims.
+    # (iOS/macOS slices happen to match their plist, which is why only the tvOS
+    # upload was rejected.) Sync the plist to the binary's real minos.
+    fw="$1"
+    plist=$(framework_plist "$fw")
+    bin=$(framework_binary "$fw")
+    [ -f "$plist" ] || return 0
+    [ -f "$bin" ] || return 0
+
+    minos=$(otool -l "$bin" 2>/dev/null | awk '
+        /LC_BUILD_VERSION/{mode="build"}
+        /LC_VERSION_MIN_/{mode="min"}
+        mode=="build" && $1=="minos"{print $2; exit}
+        mode=="min" && $1=="version"{print $2; exit}')
+    [ -n "$minos" ] || return 0
+
+    current=$(/usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$plist" 2>/dev/null || echo "")
+    [ "$current" = "$minos" ] && return 0
+
+    chmod u+w "$plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion $minos" "$plist" 2>/dev/null \
+        || /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string $minos" "$plist"
+    MIN_OS_PATCHED=1
+    echo "[fix-ksplayer] MinimumOSVersion patched in $plist ($current -> $minos)"
+}
+
 fix_bundle_id() {
     plist="$1"
     [ -f "$plist" ] || return 0
@@ -22,16 +85,81 @@ fix_bundle_id() {
             fixed=$(echo "$current" | tr '_' '-')
             chmod u+w "$plist" 2>/dev/null || true
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $fixed" "$plist"
+            BUNDLE_ID_PATCHED=1
             echo "[fix-ksplayer] CFBundleIdentifier patched in $plist ($current -> $fixed)"
             ;;
     esac
 }
 
+resign_framework() {
+    # Re-seal a framework so its code-signature identifier matches the
+    # (already underscore-free) CFBundleIdentifier. fix_bundle_id rewrites the
+    # plist *after* the package build signed the bundle, so the signature keeps
+    # the original `..._combined` identifier while the plist says `...-combined`.
+    # App Store upload then fails with error 90334 (identifier mismatch), since
+    # export re-signs with --preserve-metadata=identifier and carries the stale
+    # id forward. Forcing --identifier here fixes it at the source.
+    fw="$1"
+    [ -d "$fw" ] || return 0
+    [ "${CODE_SIGNING_ALLOWED:-YES}" = "YES" ] || return 0
+    identity="${EXPANDED_CODE_SIGN_IDENTITY:-}"
+    [ -n "$identity" ] || return 0
+
+    if [ -f "$fw/Versions/Current/Resources/Info.plist" ]; then
+        plist="$fw/Versions/Current/Resources/Info.plist"
+    elif [ -f "$fw/Resources/Info.plist" ]; then
+        plist="$fw/Resources/Info.plist"
+    else
+        plist="$fw/Info.plist"
+    fi
+    [ -f "$plist" ] || return 0
+
+    bid=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$plist" 2>/dev/null || echo "")
+    [ -n "$bid" ] || return 0
+
+    chmod -R u+w "$fw" 2>/dev/null || true
+    codesign --force \
+        --sign "$identity" \
+        --identifier "$bid" \
+        --preserve-metadata=entitlements,flags \
+        --timestamp=none \
+        "$fw"
+    echo "[fix-ksplayer] re-signed $(basename "$fw") with identifier $bid"
+}
+
+process_framework() {
+    # $2 == 1 -> re-sign after patching (staged / embedded copies that Xcode
+    # ships); the source XCFramework slice (0) is re-signed by Xcode on embed.
+    fw="$1"
+    do_resign="${2:-0}"
+    [ -d "$fw" ] || return 0
+    BUNDLE_ID_PATCHED=0
+    MIN_OS_PATCHED=0
+    if is_macos_build; then
+        restructure_to_deep_bundle "$fw"
+        fix_bundle_id "$fw/Versions/A/Resources/Info.plist"
+    else
+        fix_bundle_id "$fw/Info.plist"
+    fi
+    fix_min_os "$fw"
+    # Only re-seal the bundle when we actually changed a plist — re-signing every
+    # embedded framework is unnecessary (and slow for the big VLCKit slices).
+    [ "$do_resign" = "1" ] && { [ "$BUNDLE_ID_PATCHED" = "1" ] || [ "$MIN_OS_PATCHED" = "1" ]; } && resign_framework "$fw"
+    return 0
+}
+
 restructure_to_deep_bundle() {
     fw="$1"
     [ -d "$fw" ] || return 0
-    # Already deep — leave alone.
-    [ -d "$fw/Versions" ] && return 0
+    # Already deep — leave alone, but a correctly-signed versioned bundle never
+    # keeps a _CodeSignature at the root. If one survived from a shallow-layout
+    # restructure (older builds left it behind), strip it so codesign won't
+    # reject the embedded framework with "unsealed contents in the root
+    # directory". The bundle gets re-signed afterwards when its id changes.
+    if [ -d "$fw/Versions" ]; then
+        [ -d "$fw/_CodeSignature" ] && { chmod -R u+w "$fw" 2>/dev/null || true; rm -rf "$fw/_CodeSignature"; }
+        return 0
+    fi
 
     fw_name=$(basename "$fw" .framework)
     binary="$fw/$fw_name"
@@ -39,6 +167,13 @@ restructure_to_deep_bundle() {
     [ -f "$binary" ] || return 0
 
     chmod -R u+w "$fw" 2>/dev/null || true
+
+    # Drop the shallow-layout code signature. It lived at the framework root,
+    # which is illegal for a versioned (deep) bundle — codesign rejects the
+    # embedded framework with "unsealed contents present in the root directory"
+    # if it survives. We re-sign afterwards, writing Versions/A/_CodeSignature.
+    rm -rf "$fw/_CodeSignature"
+
     mkdir -p "$fw/Versions/A/Resources"
 
     if [ -f "$fw/Info.plist" ]; then
@@ -103,13 +238,7 @@ if [ -d "$CHECKOUTS" ]; then
         for slice in "$xcf"/$slice_pattern; do
             [ -d "$slice" ] || continue
             for fw in "$slice"/*.framework; do
-                [ -d "$fw" ] || continue
-                if is_macos_build; then
-                    restructure_to_deep_bundle "$fw"
-                    fix_bundle_id "$fw/Versions/A/Resources/Info.plist"
-                else
-                    fix_bundle_id "$fw/Info.plist"
-                fi
+                process_framework "$fw" 0
             done
         done
     done
@@ -118,13 +247,7 @@ fi
 # ---- patch frameworks already staged in BUILT_PRODUCTS_DIR ------------------
 
 for fw in "${BUILT_PRODUCTS_DIR}"/*.framework; do
-    [ -d "$fw" ] || continue
-    if is_macos_build; then
-        restructure_to_deep_bundle "$fw"
-        fix_bundle_id "$fw/Versions/A/Resources/Info.plist"
-    else
-        fix_bundle_id "$fw/Info.plist"
-    fi
+    process_framework "$fw" 1
 done
 
 # ---- patch frameworks already embedded into the app bundle ------------------
@@ -137,12 +260,6 @@ if [ -n "${TARGET_BUILD_DIR:-}" ] && [ -n "${FRAMEWORKS_FOLDER_PATH:-}" ]; then
 fi
 if [ -n "$EMBED_DIR" ] && [ -d "$EMBED_DIR" ]; then
     for fw in "$EMBED_DIR"/*.framework; do
-        [ -d "$fw" ] || continue
-        if is_macos_build; then
-            restructure_to_deep_bundle "$fw"
-            fix_bundle_id "$fw/Versions/A/Resources/Info.plist"
-        else
-            fix_bundle_id "$fw/Info.plist"
-        fi
+        process_framework "$fw" 1
     done
 fi
