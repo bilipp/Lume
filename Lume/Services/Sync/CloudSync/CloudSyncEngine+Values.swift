@@ -49,7 +49,8 @@ extension CloudSyncEngine {
             lastWatchedDate: mirror.lastWatchedDate,
             isFavorite: mirror.isFavorite,
             addedToWatchlistDate: mirror.addedToWatchlistDate,
-            favoriteOrder: mirror.favoriteOrder
+            favoriteOrder: mirror.favoriteOrder,
+            recommendationVoteRaw: mirror.recommendationVoteRaw
         )
     }
 }

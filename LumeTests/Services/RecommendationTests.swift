@@ -49,12 +49,20 @@ struct RecommendationScoringTests {
 @MainActor
 @Suite(.serialized)
 struct RecommendationEngineTests {
-    private func makeMovie(_ container: ModelContainer, id: String, vector: [Float], favorite: Bool = false, watched: Bool = false) {
+    private func makeMovie(
+        _ container: ModelContainer,
+        id: String,
+        vector: [Float],
+        favorite: Bool = false,
+        watched: Bool = false,
+        vote: RecommendationVote? = nil
+    ) {
         let movie = Movie(id: id, streamId: 1, name: id)
         movie.embeddingData = TextEmbedder.encode(vector)
         movie.indexedAt = Date()
         movie.isFavorite = favorite
         movie.isWatched = watched
+        movie.recommendationVote = vote
         container.mainContext.insert(movie)
     }
 
@@ -89,13 +97,24 @@ struct RecommendationEngineTests {
     @Test func `downvoted titles are excluded`() async throws {
         let container = try makeTestContainer()
         makeMovie(container, id: "liked", vector: [1, 0, 0, 0], favorite: true)
-        makeMovie(container, id: "similar", vector: [0.9, 0.1, 0, 0])
-        let profileID = ActiveProfileStore.current
-        container.mainContext.insert(RecommendationFeedback(contentId: "similar", profileID: profileID, vote: .downvote))
+        makeMovie(container, id: "similar", vector: [0.9, 0.1, 0, 0], vote: .downvote)
         try container.mainContext.save()
 
         let engine = RecommendationEngine(modelContainer: container)
         let ids = await engine.recommendations().map(\.id)
         #expect(!ids.contains("similar"))
+    }
+
+    @Test func `an upvote alone is a taste signal`() async throws {
+        let container = try makeTestContainer()
+        // No favorites or watch history — only an upvote seeds the taste profile.
+        makeMovie(container, id: "upvoted", vector: [1, 0, 0, 0], vote: .upvote)
+        makeMovie(container, id: "similar", vector: [0.9, 0.1, 0, 0])
+        makeMovie(container, id: "different", vector: [0, 0, 0, 1])
+        try container.mainContext.save()
+
+        let engine = RecommendationEngine(modelContainer: container)
+        let ids = await engine.recommendations().map(\.id)
+        #expect(ids.first == "similar")
     }
 }

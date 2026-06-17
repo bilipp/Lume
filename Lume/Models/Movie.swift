@@ -16,7 +16,8 @@ final class Movie {
         [\.lastWatchedDate],
         [\.isWatched],
         [\.addedToWatchlistDate],
-        [\.watchProgress]
+        [\.watchProgress],
+        [\.recommendationVoteRaw]
     )
 
     @Attribute(.unique) var id: String
@@ -98,6 +99,11 @@ final class Movie {
     var watchProgress: Double = 0.0
     var isWatched: Bool = false
 
+    /// The user's "For You" vote, as a raw value (`0` none, `1` up, `-1` down).
+    /// Mirrored to `UserContentState` so it syncs via iCloud. Access through
+    /// `recommendationVote`.
+    var recommendationVoteRaw: Int = 0
+
     var downloadStatusRaw: String?
     var localFileURL: String?
     var downloadedAt: Date?
@@ -176,5 +182,11 @@ extension Movie {
             return DownloadStatus(rawValue: raw)
         }
         set { downloadStatusRaw = newValue?.rawValue }
+    }
+
+    /// The user's "For You" vote, or nil when unvoted.
+    var recommendationVote: RecommendationVote? {
+        get { RecommendationVote(rawValue: recommendationVoteRaw) }
+        set { recommendationVoteRaw = newValue?.rawValue ?? 0 }
     }
 }

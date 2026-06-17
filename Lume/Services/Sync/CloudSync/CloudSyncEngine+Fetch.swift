@@ -112,7 +112,7 @@ extension CloudSyncEngine {
 
     func movieEntries() throws -> [(String, LocalContentEntry)] {
         let movies = try catalogContext.fetch(FetchDescriptor<Movie>(
-            predicate: #Predicate { $0.isFavorite || $0.watchProgress > 0 || $0.isWatched || $0.addedToWatchlistDate != nil }
+            predicate: #Predicate { $0.isFavorite || $0.watchProgress > 0 || $0.isWatched || $0.addedToWatchlistDate != nil || $0.recommendationVoteRaw != 0 }
         ))
         return movies.map { movie in
             (movie.id, LocalContentEntry(
@@ -122,7 +122,8 @@ extension CloudSyncEngine {
                     lastWatchedDate: movie.lastWatchedDate,
                     isFavorite: movie.isFavorite,
                     addedToWatchlistDate: movie.addedToWatchlistDate,
-                    favoriteOrder: nil
+                    favoriteOrder: nil,
+                    recommendationVoteRaw: movie.recommendationVoteRaw
                 ),
                 kind: .movie,
                 model: movie
@@ -132,7 +133,7 @@ extension CloudSyncEngine {
 
     func seriesEntries() throws -> [(String, LocalContentEntry)] {
         let series = try catalogContext.fetch(FetchDescriptor<Series>(
-            predicate: #Predicate { $0.isFavorite || $0.addedToWatchlistDate != nil || $0.lastWatchedDate != nil }
+            predicate: #Predicate { $0.isFavorite || $0.addedToWatchlistDate != nil || $0.lastWatchedDate != nil || $0.recommendationVoteRaw != 0 }
         ))
         return series.map { item in
             (item.id, LocalContentEntry(
@@ -142,7 +143,8 @@ extension CloudSyncEngine {
                     lastWatchedDate: item.lastWatchedDate,
                     isFavorite: item.isFavorite,
                     addedToWatchlistDate: item.addedToWatchlistDate,
-                    favoriteOrder: nil
+                    favoriteOrder: nil,
+                    recommendationVoteRaw: item.recommendationVoteRaw
                 ),
                 kind: .series,
                 model: item

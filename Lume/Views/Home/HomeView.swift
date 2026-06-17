@@ -445,32 +445,20 @@ struct HomeView: View {
         return series
     }
 
-    /// Records an up/down vote for a recommendation. A downvote drops the title
-    /// from the row immediately and excludes it from future passes; both votes
-    /// feed the taste profile on the next recompute.
+    /// Records an up/down vote for a recommendation. Either vote drops the title
+    /// from the row immediately (it's been acted on) and steers future passes —
+    /// an upvote pulls the taste profile toward it, a downvote away.
     private func vote(_ item: HomeMediaItem, _ vote: RecommendationVote) {
-        let contentId: String
         switch item {
-        case let .movie(movie): contentId = movie.id
-        case let .series(series): contentId = series.id
+        case let .movie(movie): movie.recommendationVote = vote
+        case let .series(series): series.recommendationVote = vote
         case .live: return
         }
-
-        let profileID = ActiveProfileStore.current
-        let identity = RecommendationFeedback.identity(contentId: contentId, profileID: profileID)
-        var descriptor = FetchDescriptor<RecommendationFeedback>(predicate: #Predicate { $0.id == identity })
-        descriptor.fetchLimit = 1
-        if let existing = try? modelContext.fetch(descriptor).first {
-            existing.vote = vote
-            existing.updatedAt = Date()
-        } else {
-            modelContext.insert(RecommendationFeedback(contentId: contentId, profileID: profileID, vote: vote))
-        }
+        // Persisted on the catalog model like favorites/watch state; the iCloud
+        // reconciler mirrors it to UserContentState so the vote syncs.
         try? modelContext.save()
 
-        if vote == .downvote {
-            recommendations.removeAll { $0.id == item.id }
-        }
+        recommendations.removeAll { $0.id == item.id }
         recommendationsReloadToken += 1
     }
 

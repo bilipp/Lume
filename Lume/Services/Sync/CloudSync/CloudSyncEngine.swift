@@ -469,6 +469,7 @@ extension CloudSyncEngine {
             mirror.isFavorite = value.isFavorite
             mirror.addedToWatchlistDate = value.addedToWatchlistDate
             mirror.favoriteOrder = value.favoriteOrder
+            mirror.recommendationVoteRaw = value.recommendationVoteRaw
             mirror.updatedAt = Date()
         } else {
             cloudContext.insert(UserContentState(
@@ -480,7 +481,8 @@ extension CloudSyncEngine {
                 lastWatchedDate: value.lastWatchedDate,
                 isFavorite: value.isFavorite,
                 addedToWatchlistDate: value.addedToWatchlistDate,
-                favoriteOrder: value.favoriteOrder
+                favoriteOrder: value.favoriteOrder,
+                recommendationVoteRaw: value.recommendationVoteRaw
             ))
         }
     }
@@ -500,11 +502,13 @@ extension CloudSyncEngine {
             movie.lastWatchedDate = values.lastWatchedDate
             movie.isFavorite = values.isFavorite
             movie.addedToWatchlistDate = values.addedToWatchlistDate
+            movie.recommendationVoteRaw = values.recommendationVoteRaw
         case .series:
             guard let series = try (loaded as? Series) ?? fetchSeries(id) else { return false }
             series.isFavorite = values.isFavorite
             series.addedToWatchlistDate = values.addedToWatchlistDate
             series.lastWatchedDate = values.lastWatchedDate
+            series.recommendationVoteRaw = values.recommendationVoteRaw
         case .episode:
             guard let episode = try (loaded as? Episode) ?? fetchEpisode(id) else { return false }
             episode.watchProgress = values.watchProgress
@@ -528,10 +532,12 @@ extension CloudSyncEngine {
             movie.lastWatchedDate = nil
             movie.isFavorite = false
             movie.addedToWatchlistDate = nil
+            movie.recommendationVoteRaw = 0
         case let series as Series:
             series.isFavorite = false
             series.addedToWatchlistDate = nil
             series.lastWatchedDate = nil
+            series.recommendationVoteRaw = 0
         case let episode as Episode:
             episode.watchProgress = 0
             episode.isWatched = false

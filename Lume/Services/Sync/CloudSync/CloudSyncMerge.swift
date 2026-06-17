@@ -133,6 +133,10 @@ nonisolated struct ContentStateValues: Codable, Equatable {
     var isFavorite: Bool
     var addedToWatchlistDate: Date?
     var favoriteOrder: Int?
+    /// "For You" vote (`0` none, `1` up, `-1` down). Defaulted so the many
+    /// call sites that don't carry a vote (episodes, live, older code) stay
+    /// unchanged.
+    var recommendationVoteRaw: Int = 0
 
     /// Whether every field is at its default — such an item carries no user
     /// state and is represented as *absent* (nil) so it never gets a cloud
@@ -140,6 +144,7 @@ nonisolated struct ContentStateValues: Codable, Equatable {
     var isEmpty: Bool {
         watchProgress == 0 && !isWatched && lastWatchedDate == nil
             && !isFavorite && addedToWatchlistDate == nil && favoriteOrder == nil
+            && recommendationVoteRaw == 0
     }
 
     /// Conflict policy (both devices changed this item since the last sync):
@@ -155,8 +160,19 @@ nonisolated struct ContentStateValues: Codable, Equatable {
             // Keep the earliest "added" stamp so a re-favorite on one device
             // doesn't reset the position of an older watchlist entry.
             addedToWatchlistDate: earlierDate(local.addedToWatchlistDate, cloud.addedToWatchlistDate),
-            favoriteOrder: local.favoriteOrder ?? cloud.favoriteOrder
+            favoriteOrder: local.favoriteOrder ?? cloud.favoriteOrder,
+            recommendationVoteRaw: mergeVote(local.recommendationVoteRaw, cloud.recommendationVoteRaw)
         )
+    }
+
+    /// Vote conflict policy: an explicit vote beats none, and a genuine up/down
+    /// clash resolves to "not interested" (`-1`) — once a user rejects a title
+    /// on any device, keep it out of recommendations.
+    private static func mergeVote(_ lhs: Int, _ rhs: Int) -> Int {
+        if lhs == rhs { return lhs }
+        if lhs == 0 { return rhs }
+        if rhs == 0 { return lhs }
+        return min(lhs, rhs)
     }
 
     private static func laterDate(_ lhs: Date?, _ rhs: Date?) -> Date? {
@@ -171,5 +187,27 @@ nonisolated struct ContentStateValues: Codable, Equatable {
         case let (lhs?, rhs?): min(lhs, rhs)
         default: lhs ?? rhs
         }
+    }
+}
+
+extension ContentStateValues {
+    enum CodingKeys: String, CodingKey {
+        case watchProgress, isWatched, lastWatchedDate, isFavorite
+        case addedToWatchlistDate, favoriteOrder, recommendationVoteRaw
+    }
+
+    /// Hand-rolled decode so a shadow baseline persisted before votes existed
+    /// (no `recommendationVoteRaw` key) still decodes — the field falls back to
+    /// `0` instead of failing the whole baseline and forcing a re-merge. The
+    /// synthesized decode would treat the missing key as an error.
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        watchProgress = try container.decode(Double.self, forKey: .watchProgress)
+        isWatched = try container.decode(Bool.self, forKey: .isWatched)
+        lastWatchedDate = try container.decodeIfPresent(Date.self, forKey: .lastWatchedDate)
+        isFavorite = try container.decode(Bool.self, forKey: .isFavorite)
+        addedToWatchlistDate = try container.decodeIfPresent(Date.self, forKey: .addedToWatchlistDate)
+        favoriteOrder = try container.decodeIfPresent(Int.self, forKey: .favoriteOrder)
+        recommendationVoteRaw = try container.decodeIfPresent(Int.self, forKey: .recommendationVoteRaw) ?? 0
     }
 }

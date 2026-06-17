@@ -13,7 +13,8 @@ final class Series {
         [\.tmdbId],
         [\.isFavorite],
         [\.lastWatchedDate],
-        [\.addedToWatchlistDate]
+        [\.addedToWatchlistDate],
+        [\.recommendationVoteRaw]
     )
 
     @Attribute(.unique) var id: String
@@ -81,6 +82,11 @@ final class Series {
     var traktId: String?
     var tmdbId: Int?
 
+    /// The user's "For You" vote, as a raw value (`0` none, `1` up, `-1` down).
+    /// Mirrored to `UserContentState` so it syncs via iCloud. Access through
+    /// `recommendationVote`.
+    var recommendationVoteRaw: Int = 0
+
     init(
         id: String,
         seriesId: Int,
@@ -140,5 +146,11 @@ extension Series {
             return (try? JSONDecoder().decode([ExternalRating].self, from: externalRatingsData)) ?? []
         }
         set { externalRatingsData = try? JSONEncoder().encode(newValue) }
+    }
+
+    /// The user's "For You" vote, or nil when unvoted.
+    var recommendationVote: RecommendationVote? {
+        get { RecommendationVote(rawValue: recommendationVoteRaw) }
+        set { recommendationVoteRaw = newValue?.rawValue ?? 0 }
     }
 }

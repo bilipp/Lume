@@ -51,6 +51,11 @@ final class UserContentState {
     /// kinds.
     var favoriteOrder: Int?
 
+    /// The user's "For You" vote (`0` none, `1` up, `-1` down). Defaulted for
+    /// CloudKit and additive, so records written before recommendations existed
+    /// load as unvoted. Only movies and series ever set it.
+    var recommendationVoteRaw: Int = 0
+
     var updatedAt: Date = Date()
 
     var kind: SyncedContentKind {
@@ -68,6 +73,7 @@ final class UserContentState {
         isFavorite: Bool = false,
         addedToWatchlistDate: Date? = nil,
         favoriteOrder: Int? = nil,
+        recommendationVoteRaw: Int = 0,
         updatedAt: Date = Date()
     ) {
         self.contentId = contentId
@@ -79,6 +85,7 @@ final class UserContentState {
         self.isFavorite = isFavorite
         self.addedToWatchlistDate = addedToWatchlistDate
         self.favoriteOrder = favoriteOrder
+        self.recommendationVoteRaw = recommendationVoteRaw
         self.updatedAt = updatedAt
     }
 }

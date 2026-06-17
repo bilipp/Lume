@@ -90,6 +90,27 @@ struct CloudSyncConflictPolicyTests {
         #expect(merged.favoriteOrder == 3) // local nil → cloud
     }
 
+    @Test func `recommendation vote conflict resolves an up-down clash to not-interested`() {
+        let upvoted = ContentStateValues(
+            watchProgress: 0, isWatched: false, lastWatchedDate: nil,
+            isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil,
+            recommendationVoteRaw: RecommendationVote.upvote.rawValue
+        )
+        let downvoted = ContentStateValues(
+            watchProgress: 0, isWatched: false, lastWatchedDate: nil,
+            isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil,
+            recommendationVoteRaw: RecommendationVote.downvote.rawValue
+        )
+        // Up/down clash → keep "not interested".
+        #expect(ContentStateValues.mergeConflict(local: upvoted, cloud: downvoted).recommendationVoteRaw == RecommendationVote.downvote.rawValue)
+        // An explicit vote beats none.
+        let unvoted = ContentStateValues(
+            watchProgress: 0, isWatched: false, lastWatchedDate: nil,
+            isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil
+        )
+        #expect(ContentStateValues.mergeConflict(local: unvoted, cloud: upvoted).recommendationVoteRaw == RecommendationVote.upvote.rawValue)
+    }
+
     @Test func `playlist conflict resolves last-write-wins favouring cloud`() {
         let local = PlaylistConfigValues(
             name: "Local", serverURL: "a", username: "u", password: "p",
