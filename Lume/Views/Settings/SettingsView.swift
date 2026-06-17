@@ -16,8 +16,6 @@ struct SettingsView: View {
     @State var premium = PremiumManager.shared
     @State var showPaywall = false
     @State var paywallHighlight: PremiumFeature?
-    /// Not `private`: read by the SettingsView+Indexing extension (separate file).
-    @State var indexing = ContentIndexingService.shared
     /// Legacy single-engine key, kept in sync with the primary engine so a
     /// downgrade still finds the user's preferred engine, and read as the
     /// migration seed for the priority list. See `PlayerEnginePriority`.
@@ -93,7 +91,6 @@ struct SettingsView: View {
                     playlistsSection
                     librarySection
                     searchSection
-                    indexingSection
                     autoSyncSection
                     epgSection
                     CloudSyncSection()

@@ -18,9 +18,16 @@ struct StorageManagementView: View {
     @State private var isClearing = false
     @State private var confirmImageClear = false
     @State private var confirmMetadataClear = false
+    @State private var indexing = ContentIndexingService.shared
+    #if DEBUG
+        @State private var confirmIndexClear = false
+    #endif
 
     private enum ClearAction {
         case imageCache, metadata
+        #if DEBUG
+            case index
+        #endif
     }
 
     var body: some View {
@@ -44,6 +51,12 @@ struct StorageManagementView: View {
             await StorageManager.clearImageCache()
         case .metadata:
             StorageManager.clearMetadataEnrichment(in: modelContext)
+        #if DEBUG
+            case .index:
+                indexing.reset()
+                StorageManager.clearIndex(in: modelContext)
+                indexing.kick()
+        #endif
         }
         await load()
         isClearing = false
@@ -79,6 +92,33 @@ struct StorageManagementView: View {
                 }
 
                 Section {
+                    HStack {
+                        Label("Content Indexing", systemImage: "sparkles")
+                        Spacer()
+                        if indexing.state == .indexing || indexing.state == .preparing {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(.trailing, 2)
+                        }
+                        Text(indexing.statusText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    #if DEBUG
+                        Button(role: .destructive) {
+                            confirmIndexClear = true
+                        } label: {
+                            Label("Clear Index", systemImage: "trash")
+                        }
+                        .disabled(isClearing)
+                    #endif
+                } header: {
+                    Text("Indexing")
+                } footer: {
+                    Text("Matches your library against TMDB and builds an on-device index for smarter search. Runs slowly in the background.")
+                }
+
+                Section {
                     Button(role: .destructive) {
                         confirmImageClear = true
                     } label: {
@@ -102,6 +142,14 @@ struct StorageManagementView: View {
                 onClearImageCache: { Task { await perform(.imageCache) } },
                 onClearMetadata: { Task { await perform(.metadata) } }
             )
+            #if DEBUG
+            .alert("Clear Index", isPresented: $confirmIndexClear) {
+                    Button("Clear", role: .destructive) { Task { await perform(.index) } }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("The TMDB metadata and on-device embeddings for every title will be wiped, then re-indexed from scratch in the background.")
+                }
+            #endif
         }
     #endif
 
@@ -121,6 +169,34 @@ struct StorageManagementView: View {
                     TVSettingsSectionLabel("Storage Used")
                     TVSettingsValueRow("Library Data", value: sizeText(stats?.catalogBytes))
                     TVSettingsValueRow("Image Cache", value: sizeText(stats?.imageCacheBytes))
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Content Indexing")
+
+                    HStack(spacing: 12) {
+                        if indexing.state == .indexing || indexing.state == .preparing {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(indexing.statusText)
+                            .font(.system(size: 24))
+                    }
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.vertical, 4)
+
+                    Text("Matches your library against TMDB and builds an on-device index for smarter search. Runs slowly in the background.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+
+                    #if DEBUG
+                        tvClearRow(title: "Clear Index", size: nil) {
+                            confirmIndexClear = true
+                        }
+                        .disabled(isClearing)
+                    #endif
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -147,6 +223,14 @@ struct StorageManagementView: View {
                 onClearImageCache: { Task { await perform(.imageCache) } },
                 onClearMetadata: { Task { await perform(.metadata) } }
             )
+            #if DEBUG
+            .alert("Clear Index", isPresented: $confirmIndexClear) {
+                    Button("Clear", role: .destructive) { Task { await perform(.index) } }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("The TMDB metadata and on-device embeddings for every title will be wiped, then re-indexed from scratch in the background.")
+                }
+            #endif
         }
 
         private func tvClearRow(title: LocalizedStringKey, size: Int64?, action: @escaping () -> Void) -> some View {
