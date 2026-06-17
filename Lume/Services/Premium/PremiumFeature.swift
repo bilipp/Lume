@@ -16,6 +16,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     case multipleProfiles
     case trakt
     case playbackControls
+    case recommendations
 
     var id: String {
         rawValue
@@ -28,6 +29,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .multipleProfiles: "Multiple Profiles"
         case .trakt: "Trakt Integration"
         case .playbackControls: "Smart Playback"
+        case .recommendations: "For You Recommendations"
         }
     }
 
@@ -38,6 +40,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .multipleProfiles: "Give everyone their own watch history, progress and favorites."
         case .trakt: "Scrobble what you watch and surface your Trakt watchlist on Home."
         case .playbackControls: "Autoplay the next episode, skip intros, and jump ahead with one tap."
+        case .recommendations: "Get an on-device \"For You\" row tuned to your taste from your library and what you watch."
         }
     }
 
@@ -48,6 +51,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .multipleProfiles: "person.2.crop.square.stack"
         case .trakt: "rectangle.stack.badge.play"
         case .playbackControls: "forward.end.alt"
+        case .recommendations: "sparkles"
         }
     }
 }

@@ -2,15 +2,10 @@
 //  HomeView.swift
 //  Lume
 //
-//  Default landing screen. Surfaces these rows, in order:
-//    1. Recently Watched — movies, series and live TV ordered by lastWatchedDate.
-//    2. Favorites — everything the user has marked as a favorite.
-//    3. Trending Movies — TMDB-trending movies the user actually owns.
-//    4. Trending Series — TMDB-trending series the user actually owns.
-//    5. From Your Trakt Watchlist — owned titles on the connected Trakt watchlist.
-//
-//  Each row only renders when it has content, so a fresh library degrades
-//  gracefully to a friendly empty state.
+//  Default landing screen. Shows Recently Watched, Favorites, For You (opt-in
+//  Pro recommendations), Trending Movies/Series and the Trakt watchlist. Which
+//  rows appear and their order are user-configurable (Settings › Layout › Home,
+//  see HomeLayoutSettings); each row only renders when it has content.
 //
 
 import SwiftData
@@ -43,6 +38,12 @@ struct HomeView: View {
     @State private var trendingSeries: [HomeMediaItem] = []
     @State private var watchlist: [HomeMediaItem] = []
     @AppStorage(RecommendationSettings.enabledKey) private var recommendationsEnabled = RecommendationSettings.enabledDefault
+    /// The user's chosen Home row order (Settings › Layout › Home). Falls back to
+    /// the declaration order of `HomeSection` until they reorder.
+    @AppStorage(HomeLayoutSettings.sectionOrderKey) private var sectionOrderRaw = ""
+    /// Sections the user switched off (Settings › Layout › Home). "For You" is
+    /// gated by `recommendationsEnabled` instead — see `HomeLayoutSettings`.
+    @AppStorage(HomeLayoutSettings.disabledSectionsKey) private var disabledSectionsRaw = ""
     /// Bumped by the DEBUG "Recalculate" action in Settings (always 0 otherwise);
     /// part of the task id so the row recomputes on demand.
     @AppStorage(RecommendationSettings.manualRecalculationKey) private var recommendationsRecalcToken = 0
@@ -53,6 +54,9 @@ struct HomeView: View {
     @State private var heroItems: [HeroItem] = []
     @State private var trendingState: LoadState = .idle
     @State private var trakt = TraktService.shared
+    /// "For You" is a Lume Pro feature; observed so the row appears/disappears
+    /// when entitlement changes.
+    @State private var premium = PremiumManager.shared
     // Observed so the For You row defers its (potentially heavy) recompute while
     // the device is busy syncing — and retries automatically once it isn't.
     @State private var indexing = ContentIndexingService.shared
@@ -211,32 +215,59 @@ struct HomeView: View {
     }
 
     /// The horizontal rails, shared by the iOS/macOS scroll layout and the tvOS
-    /// immersive home. Each row only renders when it has content.
-    @ViewBuilder
+    /// immersive home. Rows render in the user's chosen order (Settings › Layout ›
+    /// Home); each only appears when it has content.
     private var homeRows: some View {
-        if !recentlyWatched.isEmpty {
-            HomeRow(title: "Recently Watched", items: recentlyWatched, onPlayLive: playChannel, onRemove: removeFromRecentlyWatched, animationNamespace: animationNamespace)
+        ForEach(HomeLayoutSettings.resolve(orderRaw: sectionOrderRaw)) { section in
+            homeRow(for: section)
         }
-        if !favorites.isEmpty {
-            HomeRow(title: "Favorites", items: favorites, onPlayLive: playChannel, animationNamespace: animationNamespace)
+    }
+
+    @ViewBuilder
+    private func homeRow(for section: HomeSection) -> some View {
+        if isSectionEnabled(section) {
+            switch section {
+            case .recentlyWatched:
+                rail("Recently Watched", recentlyWatched, onRemove: removeFromRecentlyWatched)
+            case .favorites:
+                rail("Favorites", favorites)
+            case .forYou:
+                ForYouRow(
+                    items: recommendations,
+                    isLoading: !recommendationsLoaded,
+                    onPlayLive: playChannel,
+                    onVote: vote,
+                    animationNamespace: animationNamespace
+                )
+            case .trendingMovies:
+                rail("Trending Movies", trendingMovies)
+            case .trendingSeries:
+                rail("Trending Series", trendingSeries)
+            case .traktWatchlist:
+                rail("From Your Trakt Watchlist", watchlist)
+            }
         }
-        if recommendationsEnabled {
-            ForYouRow(
-                items: recommendations,
-                isLoading: !recommendationsLoaded,
-                onPlayLive: playChannel,
-                onVote: vote,
-                animationNamespace: animationNamespace
-            )
-        }
-        if !trendingMovies.isEmpty {
-            HomeRow(title: "Trending Movies", items: trendingMovies, onPlayLive: playChannel, animationNamespace: animationNamespace)
-        }
-        if !trendingSeries.isEmpty {
-            HomeRow(title: "Trending Series", items: trendingSeries, onPlayLive: playChannel, animationNamespace: animationNamespace)
-        }
-        if !watchlist.isEmpty {
-            HomeRow(title: "From Your Trakt Watchlist", items: watchlist, onPlayLive: playChannel, animationNamespace: animationNamespace)
+    }
+
+    /// Whether `section` should render. "For You" follows the recommendations
+    /// opt-in (which also gates its recompute); the rest follow the user's
+    /// per-section switches.
+    private func isSectionEnabled(_ section: HomeSection) -> Bool {
+        section == .forYou
+            ? (recommendationsEnabled && premium.isPremium)
+            : HomeLayoutSettings.isEnabled(section, disabledRaw: disabledSectionsRaw)
+    }
+
+    /// A standard Home rail that only renders when it has items. The Recently
+    /// Watched rail passes `onRemove` to add its remove-from-history action.
+    @ViewBuilder
+    private func rail(
+        _ title: LocalizedStringKey,
+        _ items: [HomeMediaItem],
+        onRemove: ((HomeMediaItem) -> Void)? = nil
+    ) -> some View {
+        if !items.isEmpty {
+            HomeRow(title: title, items: items, onPlayLive: playChannel, onRemove: onRemove, animationNamespace: animationNamespace)
         }
     }
 
@@ -451,7 +482,8 @@ private extension HomeView {
     /// against live state) — the engine still throttles the actual re-ranking to
     /// its recalculation interval.
     var recommendationsKey: String {
-        "rec-\(recommendationsEnabled)-\(isSyncBusy)-\(recommendationsRecalcToken)-\(watchedMovies.count)-\(watchedSeries.count)-\(favoriteMovies.count)-\(favoriteSeries.count)-\(selectedPlaylistID)"
+        let counts = "\(watchedMovies.count)-\(watchedSeries.count)-\(favoriteMovies.count)-\(favoriteSeries.count)"
+        return "rec-\(recommendationsEnabled)-\(premium.isPremium)-\(isSyncBusy)-\(recommendationsRecalcToken)-\(counts)-\(selectedPlaylistID)"
     }
 
     /// True while a playlist sync, iCloud sync or EPG import is running. The For
@@ -470,7 +502,7 @@ private extension HomeView {
     /// voted on since the list was computed. That live re-validation is what lets
     /// a vote remove a card without forcing a full re-rank.
     func loadRecommendations() async {
-        guard recommendationsEnabled else {
+        guard recommendationsEnabled, premium.isPremium else {
             recommendations = []
             return
         }

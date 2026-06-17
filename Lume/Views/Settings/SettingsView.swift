@@ -67,6 +67,12 @@ struct SettingsView: View {
         /// replacing the player detail in place (same reasoning as `selectedPlaylist`).
         /// Not `private`: read by the SettingsView+TVPlayer extension (separate file).
         @State var selectedEngineOptions: PlayerEngineKind?
+        /// Home layout preferences, shown in the Home category. Not `private`: read
+        /// by the SettingsView+TVHome extension (separate file). The iOS/macOS build
+        /// has its own `HomeLayoutSettingsView`, so these live in the tvOS block.
+        @AppStorage(RecommendationSettings.enabledKey) var recommendationsEnabled = RecommendationSettings.enabledDefault
+        @AppStorage(HomeLayoutSettings.sectionOrderKey) var homeSectionOrderRaw = ""
+        @AppStorage(HomeLayoutSettings.disabledSectionsKey) var homeDisabledSectionsRaw = ""
     #endif
 
     /// The user's ordered engine fallback list (migrates the legacy single-engine
@@ -94,6 +100,7 @@ struct SettingsView: View {
                     profilesSection
                     playlistsSection
                     librarySection
+                    layoutSection
                     searchSection
                     autoSyncSection
                     epgSection
@@ -207,6 +214,20 @@ struct SettingsView: View {
                 Text("Library")
             } footer: {
                 Text("Hide and reorder categories and channels for the active playlist.")
+            }
+        }
+
+        private var layoutSection: some View {
+            Section {
+                NavigationLink {
+                    HomeLayoutSettingsView()
+                } label: {
+                    Label("Home", systemImage: "house")
+                }
+            } header: {
+                Text("Layout")
+            } footer: {
+                Text("Choose which sections appear on Home and in what order.")
             }
         }
 
@@ -437,6 +458,7 @@ struct SettingsView: View {
                             tvPlaylistsDetail
                         }
                     case .profiles: TVProfilesSettingsView()
+                    case .home: tvHomeLayoutDetail
                     case .epg: EPGSettingsView()
                     case .search: tvSearchDetail
                     case .storage: StorageManagementView()

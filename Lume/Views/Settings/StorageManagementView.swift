@@ -19,9 +19,6 @@ struct StorageManagementView: View {
     @State private var confirmImageClear = false
     @State private var confirmMetadataClear = false
     @State private var indexing = ContentIndexingService.shared
-    /// Whether the Home "For You" row is shown. Lives next to the indexing status
-    /// it depends on (indexing powers the recommendations).
-    @AppStorage(RecommendationSettings.enabledKey) private var recommendationsEnabled = RecommendationSettings.enabledDefault
     #if DEBUG
         @State private var confirmIndexClear = false
     #endif
@@ -107,7 +104,6 @@ struct StorageManagementView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Toggle("Show Recommendations", isOn: $recommendationsEnabled)
                     #if DEBUG
                         Button(role: .destructive) {
                             confirmIndexClear = true
@@ -119,7 +115,7 @@ struct StorageManagementView: View {
                 } header: {
                     Text("Indexing")
                 } footer: {
-                    Text("Matches your library against TMDB and builds an on-device index for smarter search and a \"For You\" row on Home. Runs slowly in the background.")
+                    Text("Matches your library against TMDB and builds an on-device index for smarter search. Runs slowly in the background.")
                 }
 
                 Section {
@@ -189,9 +185,7 @@ struct StorageManagementView: View {
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                     .padding(.vertical, 4)
 
-                    TVOptionToggleRow(title: "Show Recommendations", isOn: $recommendationsEnabled)
-
-                    Text("Matches your library against TMDB and builds an on-device index for smarter search and a \"For You\" row on Home. Runs slowly in the background.")
+                    Text("Matches your library against TMDB and builds an on-device index for smarter search. Runs slowly in the background.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
