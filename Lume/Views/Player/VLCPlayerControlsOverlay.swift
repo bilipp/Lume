@@ -203,7 +203,7 @@ struct VLCPlayerControlsOverlay: View {
             favoriteButton
         }
         .padding(.horizontal, 4)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .glassEffectCompat(.regularInteractive, in: Capsule())
     }
 
     private var favoriteButton: some View {
@@ -346,7 +346,7 @@ struct VLCPlayerControlsOverlay: View {
             .foregroundStyle(dimmed ? .white.opacity(0.55) : .white)
             .frame(width: diameter, height: diameter)
             .contentShape(Circle())
-            .glassEffect(.regular.interactive(), in: .circle)
+            .glassEffectCompat(.regularInteractive, in: Circle())
     }
 
     /// A white glyph sized for the grouped track pill. Carries no glass of its

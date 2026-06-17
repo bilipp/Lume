@@ -92,7 +92,7 @@ struct SearchView: View {
             .platformNavigationTitle("Search")
             .searchable(text: $searchText, prompt: "Movies, Series, Live TV...")
             #if os(iOS)
-                .searchToolbarBehavior(.minimize)
+                .searchToolbarMinimizeIfAvailable()
             #endif
                 .navigationDestination(for: Movie.self) { movie in
                     MovieDetailView(movie: movie, animationNamespace: animationNamespace)

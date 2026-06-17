@@ -63,21 +63,12 @@
                     .font(.system(size: glyphSize, weight: .semibold))
                     .foregroundStyle(isFocused ? .black : .white)
                     .frame(width: diameter, height: diameter)
-                    .glassEffect(glass, in: .circle)
+                    .glassEffectCompat(isFocused ? .tintedInteractive(.white) : .regularInteractive, in: Circle())
                     .scaleEffect(pressed ? 1.05 : (isFocused ? 1.14 : 1.0))
                     .opacity(isEnabled ? 1 : 0.35)
                     .shadow(color: .black.opacity(isFocused ? 0.4 : 0), radius: 16, y: 8)
                     .animation(.easeOut(duration: 0.18), value: isFocused)
                     .animation(.easeOut(duration: 0.1), value: pressed)
-            }
-
-            /// Interactive so the material lenses and lifts under interaction;
-            /// white-tinted on focus to read as the highlighted control without
-            /// collapsing into a flat opaque fill.
-            private var glass: Glass {
-                isFocused
-                    ? .regular.tint(.white).interactive()
-                    : .regular.interactive()
             }
         }
     }

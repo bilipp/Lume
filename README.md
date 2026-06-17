@@ -124,10 +124,12 @@ dedicated focus-driven interface and top-shelf branding on tvOS.
 
 | Platform | Minimum OS | Devices |
 |---|---|---|
-| iOS / iPadOS | 26.4 | iPhone, iPad |
-| macOS | 26.4 | Apple Silicon & Intel |
-| tvOS | 26.4 | Apple TV 4K |
-| visionOS | 26.4 | Apple Vision Pro |
+| iOS / iPadOS | 18.0 | iPhone, iPad |
+| macOS | 15.0 | Apple Silicon & Intel |
+| tvOS | 18.0 | Apple TV 4K |
+| visionOS | 2.0 | Apple Vision Pro |
+
+> Liquid Glass and the iOS 26 navigation refinements are used where available and fall back to standard system materials on older OS versions.
 
 ---
 
