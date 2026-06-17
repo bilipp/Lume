@@ -3703,6 +3703,16 @@
         }
       }
     },
+    "Rate Lume" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume bewerten"
+          }
+        }
+      }
+    },
     "Rated" : {
       "localizations" : {
         "de" : {
@@ -4003,12 +4013,12 @@
         }
       }
     },
-    "Scan a code with your phone to open our website or Discord, or email us for help." : {
+    "Scan a code with your phone to open our website, Discord, or rate Lume — or email us for help." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scanne einen Code mit deinem Handy, um unsere Website oder Discord zu öffnen, oder schreib uns für Hilfe eine E-Mail."
+            "value" : "Scanne einen Code mit deinem Handy, um unsere Website oder Discord zu öffnen oder Lume zu bewerten – oder schreib uns für Hilfe eine E-Mail."
           }
         }
       }
