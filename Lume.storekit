@@ -20,13 +20,13 @@
       "internalID" : "5001",
       "localizations" : [
         {
-          "description" : "Unlock every Lume Premium feature forever with a single payment.",
-          "displayName" : "Lume Premium (Lifetime)",
+          "description" : "Unlock every Lume Pro feature forever with a single payment.",
+          "displayName" : "Lume Pro (Lifetime)",
           "locale" : "en_US"
         }
       ],
       "productID" : "com.bilipp.lume.premium.lifetime",
-      "referenceName" : "Lume Premium Lifetime",
+      "referenceName" : "Lume Pro Lifetime",
       "type" : "NonConsumable"
     }
   ],
@@ -112,14 +112,14 @@
           ],
           "localizations" : [
             {
-              "description" : "Unlock every Lume Premium feature, billed monthly.",
-              "displayName" : "Lume Premium (Monthly)",
+              "description" : "Unlock every Lume Pro feature, billed monthly.",
+              "displayName" : "Lume Pro (Monthly)",
               "locale" : "en_US"
             }
           ],
           "productID" : "com.bilipp.lume.premium.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Lume Premium Monthly",
+          "referenceName" : "Lume Pro Monthly",
           "subscriptionGroupID" : "21111111",
           "type" : "RecurringSubscription",
           "winbackOffers" : [
