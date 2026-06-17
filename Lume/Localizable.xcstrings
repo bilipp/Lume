@@ -5060,6 +5060,7 @@
       }
     },
     "TV guide" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
