@@ -29,14 +29,14 @@ final class SportTeamBrowser {
         self.client = client
     }
 
-    func load(leagueID: String) async {
-        guard leagueID != loadedLeagueID else { return }
+    func load(league: SportLeague) async {
+        guard league.id != loadedLeagueID else { return }
         isLoading = true
         failed = false
         defer { isLoading = false }
         do {
-            teams = try await client.teams(leagueID: leagueID)
-            loadedLeagueID = leagueID
+            teams = try await client.teams(leagueName: league.searchName)
+            loadedLeagueID = league.id
         } catch {
             teams = []
             failed = true
@@ -50,7 +50,7 @@ final class SportTeamBrowser {
         @Environment(\.modelContext) private var modelContext
         @Query(sort: \SportFavorite.addedAt) private var favorites: [SportFavorite]
         @State private var browser = SportTeamBrowser()
-        @State private var browseLeagueID = SportCatalog.leagues.first?.id ?? ""
+        @State private var browseLeagueID = SportCatalog.defaultTeamLeagueID
 
         var body: some View {
             List {
@@ -59,7 +59,9 @@ final class SportTeamBrowser {
             }
             .platformNavigationTitle("Sports")
             .task(id: browseLeagueID) {
-                await browser.load(leagueID: browseLeagueID)
+                if let league = SportCatalog.league(id: browseLeagueID) {
+                    await browser.load(league: league)
+                }
             }
         }
 

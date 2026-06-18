@@ -73,8 +73,12 @@ nonisolated struct SportsDBClient {
 
     /// The teams that play in a league, for the Sports settings "Teams" picker.
     /// Filtered to football (soccer), since the catalog is football-only.
-    func teams(leagueID: String) async throws -> [SportTeam] {
-        guard let url = makeURL(path: "lookup_all_teams.php", query: "id", value: leagueID) else {
+    ///
+    /// Uses `search_all_teams.php?l=` keyed by the league's canonical name: the
+    /// id-based `lookup_all_teams.php?id=` is demo-locked on the free key (it
+    /// ignores the id and always returns the same sample league).
+    func teams(leagueName: String) async throws -> [SportTeam] {
+        guard let url = makeURL(path: "search_all_teams.php", query: "l", value: leagueName) else {
             throw SportsDBError.invalidURL
         }
         let response: TeamsResponse = try await get(url)

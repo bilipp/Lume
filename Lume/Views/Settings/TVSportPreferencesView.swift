@@ -17,7 +17,7 @@ import SwiftUI
         @Environment(\.modelContext) private var modelContext
         @Query(sort: \SportFavorite.addedAt) private var favorites: [SportFavorite]
         @State private var browser = SportTeamBrowser()
-        @State private var browseLeagueID = SportCatalog.leagues.first?.id ?? ""
+        @State private var browseLeagueID = SportCatalog.defaultTeamLeagueID
 
         var body: some View {
             VStack(alignment: .leading, spacing: 36) {
@@ -25,7 +25,9 @@ import SwiftUI
                 teamsSection
             }
             .task(id: browseLeagueID) {
-                await browser.load(leagueID: browseLeagueID)
+                if let league = SportCatalog.league(id: browseLeagueID) {
+                    await browser.load(league: league)
+                }
             }
         }
 
