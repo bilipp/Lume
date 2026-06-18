@@ -29,6 +29,8 @@ nonisolated enum SportCatalog {
     /// leagues and UEFA cups come first (the feature's priority), followed by a
     /// few widely-followed leagues from other regions.
     static let leagues: [SportLeague] = [
+        // International (cups: no fixed team list to browse)
+        SportLeague(id: "4429", name: "FIFA World Cup", searchName: "FIFA World Cup", region: "International"),
         // UEFA club competitions (cups: no fixed team list to browse)
         SportLeague(id: "4480", name: "UEFA Champions League", searchName: "UEFA Champions League", region: "Europe"),
         SportLeague(id: "4481", name: "UEFA Europa League", searchName: "UEFA Europa League", region: "Europe"),
