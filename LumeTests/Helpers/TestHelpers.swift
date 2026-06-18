@@ -12,7 +12,8 @@ func makeTestContainer() throws -> ModelContainer {
         Episode.self,
         CastMember.self,
         EPGListing.self,
-        EPGSource.self
+        EPGSource.self,
+        SportFavorite.self
     ])
     // `cloudKitDatabase: .none` is required: the catalog uses `@Attribute(.unique)`,
     // which CloudKit forbids. The default `.automatic` mirrors to CloudKit on a

@@ -65,7 +65,8 @@ struct LumeApp: App {
         let cloud = makeCloudContainer()
         let catalogSchema = Schema([
             Playlist.self, Category.self, LiveStream.self, Movie.self,
-            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
+            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self,
+            SportFavorite.self
         ])
         // Unnamed → keeps the historical `default.store` path (preserves data).
         // `cloudKitDatabase: .none` is REQUIRED: the default is `.automatic`, which

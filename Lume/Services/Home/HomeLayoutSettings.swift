@@ -16,6 +16,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
     case recentlyWatched
     case favorites
     case forYou
+    case sportAnnouncements
     case trendingMovies
     case trendingSeries
     case traktWatchlist
@@ -31,6 +32,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .recentlyWatched: "Recently Watched"
         case .favorites: "Favorites"
         case .forYou: "For You"
+        case .sportAnnouncements: "Upcoming Matches"
         case .trendingMovies: "Trending Movies"
         case .trendingSeries: "Trending Series"
         case .traktWatchlist: "Trakt Watchlist"
@@ -45,6 +47,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .recentlyWatched: String(localized: "Recently Watched")
         case .favorites: String(localized: "Favorites")
         case .forYou: String(localized: "For You")
+        case .sportAnnouncements: String(localized: "Upcoming Matches")
         case .trendingMovies: String(localized: "Trending Movies")
         case .trendingSeries: String(localized: "Trending Series")
         case .traktWatchlist: String(localized: "Trakt Watchlist")
@@ -56,6 +59,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .recentlyWatched: "clock.arrow.circlepath"
         case .favorites: "star"
         case .forYou: "sparkles"
+        case .sportAnnouncements: "sportscourt"
         case .trendingMovies: "film"
         case .trendingSeries: "tv"
         case .traktWatchlist: "rectangle.stack.badge.play"

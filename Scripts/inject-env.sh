@@ -68,6 +68,14 @@ else
     echo "warning: INTRO_DB_API_KEY not set in .env — IntroDB reads still work unauthenticated"
 fi
 
+SPORTSDB_API_KEY="$(read_env SPORTSDB_API_KEY)"
+if [ -n "$SPORTSDB_API_KEY" ]; then
+    set_plist SportsDBAPIKey "$SPORTSDB_API_KEY"
+    echo "Injected SPORTSDB_API_KEY into Info.plist"
+else
+    echo "info: SPORTSDB_API_KEY not set in .env — Upcoming Matches uses TheSportsDB's free shared key"
+fi
+
 TRAKT_CLIENT_ID="$(read_env TRAKT_CLIENT_ID)"
 TRAKT_CLIENT_SECRET="$(read_env TRAKT_CLIENT_SECRET)"
 if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then
