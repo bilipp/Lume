@@ -23,6 +23,9 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
     /// the Favorites / Recently Watched collections have an intrinsic order
     /// (alphabetical / most-recent-first) and pass `false` to hide it.
     var showsSortMenu: Bool = true
+    /// Called when the last item appears, so a paginating caller can fetch the
+    /// next page. Nil callers load their full set up front (unchanged behavior).
+    var onLoadMore: (() -> Void)?
     @ViewBuilder let card: (Item) -> Card
 
     private let columns = [GridItem(.adaptive(minimum: PosterCardMetrics.gridMinimum), spacing: PosterCardMetrics.gridSpacing)]
@@ -56,6 +59,9 @@ struct CategoryContentGrid<Item: Identifiable & Hashable, Card: View>: View {
                                 .matchedTransitionSourceIfAvailable(id: item.id, in: animationNamespace)
                         }
                         .posterCardButtonStyle()
+                        .onAppear {
+                            if let onLoadMore, item.id == items.last?.id { onLoadMore() }
+                        }
                     }
                 }
                 .padding()
@@ -251,6 +257,13 @@ struct MovieCategoryView: View {
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
 
     @State private var movies: [Movie] = []
+    @State private var canLoadMore = true
+    @State private var isLoadingPage = false
+
+    /// A category in a large IPTV playlist can hold thousands of titles; fetch a
+    /// page at a time and load the next as the grid nears the end, rather than
+    /// hydrating the whole category into memory at once.
+    private let pageSize = 100
 
     private var contentSort: ContentSortOption {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
@@ -265,16 +278,30 @@ struct MovieCategoryView: View {
             emptyIcon: "film.stack",
             emptyDescription: "This category has no movies",
             sortRaw: $contentSortRaw,
+            onLoadMore: { loadNextPage() },
             card: { MovieCardView(movie: $0) }
         )
         .task(id: contentSortRaw) {
-            let categoryId = category.id
-            let descriptor = FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.categoryId == categoryId },
-                sortBy: contentSort.movieDescriptors
-            )
-            movies = (try? modelContext.fetch(descriptor)) ?? []
+            movies = []
+            canLoadMore = true
+            loadNextPage()
         }
+    }
+
+    private func loadNextPage() {
+        guard canLoadMore, !isLoadingPage else { return }
+        isLoadingPage = true
+        defer { isLoadingPage = false }
+        let categoryId = category.id
+        var descriptor = FetchDescriptor<Movie>(
+            predicate: #Predicate { $0.categoryId == categoryId },
+            sortBy: contentSort.movieDescriptors
+        )
+        descriptor.fetchOffset = movies.count
+        descriptor.fetchLimit = pageSize
+        let page = (try? modelContext.fetch(descriptor)) ?? []
+        movies.append(contentsOf: page)
+        if page.count < pageSize { canLoadMore = false }
     }
 }
 
@@ -322,6 +349,13 @@ struct SeriesCategoryView: View {
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
 
     @State private var series: [Series] = []
+    @State private var canLoadMore = true
+    @State private var isLoadingPage = false
+
+    /// A category in a large IPTV playlist can hold thousands of titles; fetch a
+    /// page at a time and load the next as the grid nears the end, rather than
+    /// hydrating the whole category into memory at once.
+    private let pageSize = 100
 
     private var contentSort: ContentSortOption {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
@@ -336,16 +370,30 @@ struct SeriesCategoryView: View {
             emptyIcon: "tv.fill",
             emptyDescription: "This category has no series",
             sortRaw: $contentSortRaw,
+            onLoadMore: { loadNextPage() },
             card: { SeriesCardView(series: $0) }
         )
         .task(id: contentSortRaw) {
-            let categoryId = category.id
-            let descriptor = FetchDescriptor<Series>(
-                predicate: #Predicate { $0.categoryId == categoryId },
-                sortBy: contentSort.seriesDescriptors
-            )
-            series = (try? modelContext.fetch(descriptor)) ?? []
+            series = []
+            canLoadMore = true
+            loadNextPage()
         }
+    }
+
+    private func loadNextPage() {
+        guard canLoadMore, !isLoadingPage else { return }
+        isLoadingPage = true
+        defer { isLoadingPage = false }
+        let categoryId = category.id
+        var descriptor = FetchDescriptor<Series>(
+            predicate: #Predicate { $0.categoryId == categoryId },
+            sortBy: contentSort.seriesDescriptors
+        )
+        descriptor.fetchOffset = series.count
+        descriptor.fetchLimit = pageSize
+        let page = (try? modelContext.fetch(descriptor)) ?? []
+        series.append(contentsOf: page)
+        if page.count < pageSize { canLoadMore = false }
     }
 }
 

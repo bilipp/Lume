@@ -122,7 +122,7 @@ struct SearchView: View {
                 .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter, allPlaylists: searchAllPlaylists)) {
                     // Re-run whenever the settled query or the filter changes.
                     // Filter changes are instant (no debounce on the segmented control).
-                    updateResults()
+                    await updateResults()
                 }
         }
         #if os(iOS)
@@ -153,13 +153,13 @@ struct SearchView: View {
 
     /// Runs the search against SwiftData using bounded, predicate-based fetches.
     ///
-    /// Filtering happens in SQLite (via `localizedStandardContains`) instead of
-    /// loading every Movie/Series/LiveStream into memory and scanning on the main
-    /// thread. Combined with the debounce above, this keeps typing smooth no matter
-    /// how large the library is — the work runs once, after input settles, and
-    /// returns at most `resultLimit` rows per content type.
-    @MainActor
-    private func updateResults() {
+    /// Filtering happens in SQLite (via `localizedStandardContains`) — but even a
+    /// bounded `LIKE '%q%'` scan can't use an index, so on a large library it has
+    /// real cost. The fetch runs on a background context (returning only the
+    /// matched rows' identifiers, which are `Sendable`); the view context then
+    /// hydrates just those rows by id. Combined with the debounce above, typing
+    /// never blocks the main thread no matter how large the library is.
+    private func updateResults() async {
         let query = debouncedSearchText
         guard !query.isEmpty else {
             results = []
@@ -172,10 +172,83 @@ struct SearchView: View {
         // it within categoryId limits results to the active playlist's content.
         let playlistID = activePlaylist?.id.uuidString ?? ""
         let restrictToPlaylist = !searchAllPlaylists && activePlaylist != nil
+        let filter = selectedFilter
+        let limit = resultLimit
+        let container = modelContext.container
 
+        let request = SearchRequest(
+            query: query,
+            playlistID: playlistID,
+            restrictToPlaylist: restrictToPlaylist,
+            wantMovies: filter == .all || filter == .movies,
+            wantSeries: filter == .all || filter == .series,
+            wantLive: filter == .all || filter == .liveTV,
+            limit: limit
+        )
+        let hits = await Task.detached(priority: .userInitiated) {
+            SearchFetcher.fetch(container: container, request: request)
+        }.value
+
+        guard !Task.isCancelled else { return }
+
+        // Hydrate the matched rows in the view context (a cheap by-identifier
+        // lookup) and drop any in a restricted category for the active profile.
         var matches: [SearchResult] = []
+        for id in hits.movies {
+            if let movie = modelContext.model(for: id) as? Movie, !restriction.hides(categoryID: movie.categoryId) {
+                matches.append(.movie(movie))
+            }
+        }
+        for id in hits.series {
+            if let series = modelContext.model(for: id) as? Series, !restriction.hides(categoryID: series.categoryId) {
+                matches.append(.series(series))
+            }
+        }
+        for id in hits.streams {
+            if let stream = modelContext.model(for: id) as? LiveStream, !restriction.hides(categoryID: stream.categoryId) {
+                matches.append(.liveStream(stream))
+            }
+        }
 
-        if selectedFilter == .all || selectedFilter == .movies {
+        results = matches
+    }
+}
+
+// MARK: - Off-main search fetch
+
+/// The matched rows' persistent identifiers, grouped by type. Plain value type
+/// so it can cross back from the background fetch context.
+private nonisolated struct SearchHits {
+    var movies: [PersistentIdentifier] = []
+    var series: [PersistentIdentifier] = []
+    var streams: [PersistentIdentifier] = []
+}
+
+/// The settled query and the per-type toggles, bundled so the off-main fetch
+/// takes a single `Sendable` value.
+private nonisolated struct SearchRequest {
+    let query: String
+    let playlistID: String
+    let restrictToPlaylist: Bool
+    let wantMovies: Bool
+    let wantSeries: Bool
+    let wantLive: Bool
+    let limit: Int
+}
+
+/// Runs the bounded `localizedStandardContains` fetches on a background
+/// `ModelContext` and returns only identifiers — never managed objects, which
+/// can't cross actor boundaries.
+private nonisolated enum SearchFetcher {
+    static func fetch(container: ModelContainer, request: SearchRequest) -> SearchHits {
+        let query = request.query
+        let playlistID = request.playlistID
+        let restrictToPlaylist = request.restrictToPlaylist
+        let limit = request.limit
+        let context = ModelContext(container)
+        var hits = SearchHits()
+
+        if request.wantMovies {
             var descriptor = FetchDescriptor<Movie>(
                 predicate: #Predicate { movie in
                     movie.name.localizedStandardContains(query)
@@ -183,12 +256,11 @@ struct SearchView: View {
                 },
                 sortBy: [SortDescriptor(\.name)]
             )
-            descriptor.fetchLimit = resultLimit
-            let movies = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
-            matches.append(contentsOf: movies.map { .movie($0) })
+            descriptor.fetchLimit = limit
+            hits.movies = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
         }
 
-        if selectedFilter == .all || selectedFilter == .series {
+        if request.wantSeries {
             var descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { series in
                     series.name.localizedStandardContains(query)
@@ -196,12 +268,11 @@ struct SearchView: View {
                 },
                 sortBy: [SortDescriptor(\.name)]
             )
-            descriptor.fetchLimit = resultLimit
-            let series = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
-            matches.append(contentsOf: series.map { .series($0) })
+            descriptor.fetchLimit = limit
+            hits.series = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
         }
 
-        if selectedFilter == .all || selectedFilter == .liveTV {
+        if request.wantLive {
             var descriptor = FetchDescriptor<LiveStream>(
                 predicate: #Predicate { stream in
                     stream.name.localizedStandardContains(query)
@@ -209,12 +280,11 @@ struct SearchView: View {
                 },
                 sortBy: [SortDescriptor(\.name)]
             )
-            descriptor.fetchLimit = resultLimit
-            let streams = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
-            matches.append(contentsOf: streams.map { .liveStream($0) })
+            descriptor.fetchLimit = limit
+            hits.streams = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
         }
 
-        results = matches
+        return hits
     }
 }
 

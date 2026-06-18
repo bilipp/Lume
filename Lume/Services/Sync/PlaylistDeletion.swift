@@ -31,19 +31,30 @@ nonisolated enum PlaylistDeletion {
     static func delete(_ playlist: Playlist, in context: ModelContext) {
         let prefix = playlist.id.uuidString
 
-        let movies = (try? context.fetch(FetchDescriptor<Movie>())) ?? []
-        for movie in movies where movie.id.hasPrefix(prefix) {
+        // Scope each fetch to the playlist in SQLite via the playlist-prefixed
+        // id (a UUID, which appears nowhere else, so a substring match is exact)
+        // instead of hydrating the whole catalog into memory just to filter it —
+        // on a large library that was a multi-table full dump per deletion.
+        let movieDescriptor = FetchDescriptor<Movie>(
+            predicate: #Predicate { $0.id.localizedStandardContains(prefix) }
+        )
+        for movie in (try? context.fetch(movieDescriptor)) ?? [] {
             context.delete(movie)
         }
 
-        let series = (try? context.fetch(FetchDescriptor<Series>())) ?? []
-        for show in series where show.id.hasPrefix(prefix) {
+        let seriesDescriptor = FetchDescriptor<Series>(
+            predicate: #Predicate { $0.id.localizedStandardContains(prefix) }
+        )
+        for show in (try? context.fetch(seriesDescriptor)) ?? [] {
             context.delete(show)
         }
 
-        // Capture the channel ids of the streams being removed so we can drop
-        // their guide listings, then keep the ids still owned by other playlists
-        // so a shared channel's EPG survives.
+        // LiveStream is far smaller than the catalog and EPG tables, and the
+        // shared-channel partition below is simplest (and a predicate scoping a
+        // fetch on an optional via `?? ""` can't be expressed in SwiftData's SQL
+        // anyway), so fetch the streams once and split in memory: the channels
+        // this playlist brought in, and the ones still owned elsewhere — a
+        // channel another playlist also carries keeps its guide listings.
         let streams = (try? context.fetch(FetchDescriptor<LiveStream>())) ?? []
         let removedChannelIDs = Set(
             streams.filter { $0.id.hasPrefix(prefix) }.compactMap(\.epgChannelId)
@@ -60,10 +71,15 @@ nonisolated enum PlaylistDeletion {
 
         context.delete(playlist)
 
-        let orphanedChannelIDs = removedChannelIDs.subtracting(survivingChannelIDs)
+        // Prune the guide listings for channels no surviving playlist carries.
+        // Scoped by `channelId` (now indexed) so this seeks the orphaned rows
+        // instead of hydrating the entire — potentially huge — guide table.
+        let orphanedChannelIDs = Array(removedChannelIDs.subtracting(survivingChannelIDs))
         if !orphanedChannelIDs.isEmpty {
-            let listings = (try? context.fetch(FetchDescriptor<EPGListing>())) ?? []
-            for listing in listings where orphanedChannelIDs.contains(listing.channelId) {
+            let listingDescriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate { orphanedChannelIDs.contains($0.channelId) }
+            )
+            for listing in (try? context.fetch(listingDescriptor)) ?? [] {
                 context.delete(listing)
             }
         }
