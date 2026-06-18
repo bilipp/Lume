@@ -28,6 +28,11 @@ struct SeriesDetailView: View {
     @Query private var playlists: [Playlist]
 
     @State private var selectedSeason: Int = 1
+    /// The series' distinct season numbers, cached so the body (season menu,
+    /// metadata) doesn't rebuild a Set over every episode on each render — a real
+    /// cost for long-running shows with hundreds of episodes. Recomputed when the
+    /// episodes relationship changes (see `recomputeSeasons`).
+    @State private var availableSeasons: [Int] = []
     @State private var isLoadingEpisodes = false
     @State private var playingMedia: PlayableMedia?
     @State private var similar: [HomeMediaItem] = []
@@ -87,6 +92,7 @@ struct SeriesDetailView: View {
                 }
                 .onChange(of: series.similarTMDBIds) { resolveSimilar() }
                 .onChange(of: refreshToken) { resolveSimilar() }
+                .onChange(of: series.episodes.count) { recomputeSeasons() }
             #if os(iOS)
                 .fullScreenCover(item: $playingMedia) { media in
                     FullScreenPlayerView(media: media)
@@ -365,8 +371,8 @@ struct SeriesDetailView: View {
         )
     }
 
-    private var availableSeasons: [Int] {
-        Set(series.episodes.map(\.seasonNum)).sorted()
+    private func recomputeSeasons() {
+        availableSeasons = Set(series.episodes.map(\.seasonNum)).sorted()
     }
 
     private func determineDefaultSeason() -> Int {
@@ -444,6 +450,7 @@ struct SeriesDetailView: View {
         if series.episodes.isEmpty {
             await loadEpisodes()
         }
+        recomputeSeasons()
         selectedSeason = determineDefaultSeason()
     }
 
@@ -460,7 +467,6 @@ struct SeriesDetailView: View {
         // Insert through the view's own context, attaching to `series`, so its
         // episodes relationship — and this view — update synchronously.
         await MainActor.run { series.insertEpisodes(parsed, into: modelContext) }
-        selectedSeason = determineDefaultSeason()
     }
 
     private func enrichIfNeeded() async {
