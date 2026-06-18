@@ -18,6 +18,13 @@ import SwiftUI
         @Query(sort: \SportFavorite.addedAt) private var favorites: [SportFavorite]
         @State private var browser = SportTeamBrowser()
         @State private var browseLeagueID = SportCatalog.defaultTeamLeagueID
+        @State private var teamQuery = ""
+        @State private var searchResults: [SportTeam] = []
+        @State private var isSearching = false
+
+        private var isSearchActive: Bool {
+            !teamQuery.trimmingCharacters(in: .whitespaces).isEmpty
+        }
 
         var body: some View {
             VStack(alignment: .leading, spacing: 36) {
@@ -28,6 +35,9 @@ import SwiftUI
                 if let league = SportCatalog.league(id: browseLeagueID) {
                     await browser.load(league: league)
                 }
+            }
+            .task(id: teamQuery) {
+                await runSearch()
             }
         }
 
@@ -63,46 +73,102 @@ import SwiftUI
             VStack(alignment: .leading, spacing: 8) {
                 TVSettingsSectionLabel("Teams")
 
-                Button {
-                    browseLeagueID = nextLeagueID(after: browseLeagueID)
-                } label: {
-                    HStack {
-                        Text("Browse League")
-                        Spacer(minLength: 16)
-                        Text(SportCatalog.league(id: browseLeagueID)?.name ?? "")
-                            .foregroundStyle(.secondary)
-                    }
+                TextField("Search teams", text: $teamQuery)
+                    .textFieldStyle(.plain)
                     .font(.system(size: TVSettingsMetrics.rowFontSize))
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.vertical, TVSettingsMetrics.rowVPadding)
+                    .background(
+                        RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
 
-                teamList
+                if isSearchActive {
+                    searchResultList
+                } else {
+                    browseControl
+                    teamList
+                }
             }
+        }
+
+        private var browseControl: some View {
+            Button {
+                browseLeagueID = nextLeagueID(after: browseLeagueID)
+            } label: {
+                HStack {
+                    Text("Browse League")
+                    Spacer(minLength: 16)
+                    Text(SportCatalog.league(id: browseLeagueID)?.name ?? "")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.system(size: TVSettingsMetrics.rowFontSize))
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
         }
 
         @ViewBuilder
         private var teamList: some View {
             if browser.isLoading {
-                HStack(spacing: 12) {
-                    ProgressView()
-                    Text("Loading teams…").foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                .padding(.top, 8)
+                tvProgress("Loading teams…")
             } else if browser.failed {
                 tvHint("Couldn't load teams. Check your connection and try again.")
             } else if browser.teams.isEmpty {
                 tvHint("No teams found for this league.")
             } else {
-                VStack(spacing: 2) {
-                    ForEach(browser.teams) { team in
-                        toggleRow(title: team.name, subtitle: nil, isOn: isFavorite(.team, externalID: team.id)) {
-                            toggle(.team, externalID: team.id, name: team.name, badgeURL: team.badgeURL?.absoluteString)
-                        }
+                teamRows(browser.teams)
+            }
+        }
+
+        @ViewBuilder
+        private var searchResultList: some View {
+            if isSearching {
+                tvProgress("Searching…")
+            } else if searchResults.isEmpty {
+                tvHint("No teams found.")
+            } else {
+                teamRows(searchResults)
+            }
+        }
+
+        private func teamRows(_ teams: [SportTeam]) -> some View {
+            VStack(spacing: 2) {
+                ForEach(teams) { team in
+                    toggleRow(
+                        title: team.name,
+                        subtitle: team.leagueName.flatMap { $0 == "_No League Soccer" ? nil : $0 },
+                        isOn: isFavorite(.team, externalID: team.id)
+                    ) {
+                        toggle(.team, externalID: team.id, name: team.name, badgeURL: team.badgeURL?.absoluteString)
                     }
                 }
             }
+        }
+
+        private func tvProgress(_ text: LocalizedStringKey) -> some View {
+            HStack(spacing: 12) {
+                ProgressView()
+                Text(text).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            .padding(.top, 8)
+        }
+
+        // MARK: - Search
+
+        private func runSearch() async {
+            let query = teamQuery.trimmingCharacters(in: .whitespaces)
+            guard !query.isEmpty else {
+                searchResults = []
+                isSearching = false
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(350))
+            if Task.isCancelled { return }
+            isSearching = true
+            defer { isSearching = false }
+            searchResults = await (try? SportsDBClient.shared.searchTeams(query)) ?? []
         }
 
         // MARK: - Rows

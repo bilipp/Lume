@@ -52,15 +52,19 @@ nonisolated struct SportFixture: Identifiable, Hashable {
     }
 }
 
-/// A football team the user can follow, as returned when browsing a league.
+/// A football team the user can follow, from a league browse or a name search.
 nonisolated struct SportTeam: Identifiable, Hashable {
     let id: String
     let name: String
+    /// The team's league, shown as a subtitle to tell apart search hits like a
+    /// senior side from its youth/reserve team.
+    let leagueName: String?
     let badgeURL: URL?
 
-    init(id: String, name: String, badgeURL: URL? = nil) {
+    init(id: String, name: String, leagueName: String? = nil, badgeURL: URL? = nil) {
         self.id = id
         self.name = name
+        self.leagueName = leagueName
         self.badgeURL = badgeURL
     }
 }

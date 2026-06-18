@@ -51,17 +51,32 @@ final class SportTeamBrowser {
         @Query(sort: \SportFavorite.addedAt) private var favorites: [SportFavorite]
         @State private var browser = SportTeamBrowser()
         @State private var browseLeagueID = SportCatalog.defaultTeamLeagueID
+        @State private var teamQuery = ""
+        @State private var searchResults: [SportTeam] = []
+        @State private var isSearching = false
+
+        private var isSearchActive: Bool {
+            !teamQuery.trimmingCharacters(in: .whitespaces).isEmpty
+        }
 
         var body: some View {
             List {
-                leaguesSection
-                teamsSection
+                if isSearchActive {
+                    searchResultsSection
+                } else {
+                    leaguesSection
+                    teamsSection
+                }
             }
             .platformNavigationTitle("Sports")
+            .searchable(text: $teamQuery, prompt: "Search teams")
             .task(id: browseLeagueID) {
                 if let league = SportCatalog.league(id: browseLeagueID) {
                     await browser.load(league: league)
                 }
+            }
+            .task(id: teamQuery) {
+                await runSearch()
             }
         }
 
@@ -115,27 +130,72 @@ final class SportTeamBrowser {
                     Text("No teams found for this league.")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(browser.teams) { team in
-                        Button {
-                            toggle(.team, externalID: team.id, name: team.name, badgeURL: team.badgeURL?.absoluteString)
-                        } label: {
-                            HStack {
-                                Text(team.name)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if isFavorite(.team, externalID: team.id) {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(.tint)
-                                }
-                            }
-                        }
-                    }
+                    ForEach(browser.teams, content: teamRow)
                 }
             } header: {
                 Text("Teams")
             } footer: {
-                Text("Follow specific teams to catch their matches even when you don't follow the whole league.")
+                Text("Browse a league, or search above to follow any team — including ones beyond this list.")
             }
+        }
+
+        private var searchResultsSection: some View {
+            Section {
+                if isSearching {
+                    HStack {
+                        ProgressView()
+                        Text("Searching…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if searchResults.isEmpty {
+                    Text("No teams found.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(searchResults, content: teamRow)
+                }
+            } header: {
+                Text("Teams")
+            }
+        }
+
+        private func teamRow(_ team: SportTeam) -> some View {
+            Button {
+                toggle(.team, externalID: team.id, name: team.name, badgeURL: team.badgeURL?.absoluteString)
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(team.name)
+                            .foregroundStyle(.primary)
+                        if let league = team.leagueName, !league.isEmpty, league != "_No League Soccer" {
+                            Text(league)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if isFavorite(.team, externalID: team.id) {
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(.tint)
+                    }
+                }
+            }
+        }
+
+        // MARK: - Search
+
+        private func runSearch() async {
+            let query = teamQuery.trimmingCharacters(in: .whitespaces)
+            guard !query.isEmpty else {
+                searchResults = []
+                isSearching = false
+                return
+            }
+            // Debounce so we don't fire a request on every keystroke.
+            try? await Task.sleep(for: .milliseconds(350))
+            if Task.isCancelled { return }
+            isSearching = true
+            defer { isSearching = false }
+            searchResults = await (try? SportsDBClient.shared.searchTeams(query)) ?? []
         }
 
         // MARK: - Favorites

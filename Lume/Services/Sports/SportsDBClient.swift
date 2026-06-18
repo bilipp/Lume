@@ -88,6 +88,21 @@ nonisolated struct SportsDBClient {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    /// Searches teams by name (`searchteams.php?t=`), filtered to football. This
+    /// is how a user follows a club the league browse can't reach: the free key
+    /// caps `search_all_teams` at ten alphabetical results, but name search has
+    /// no such cap.
+    func searchTeams(_ query: String) async throws -> [SportTeam] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let url = makeURL(path: "searchteams.php", query: "t", value: trimmed) else {
+            return []
+        }
+        let response: TeamsResponse = try await get(url)
+        return (response.teams ?? [])
+            .filter { ($0.strSport ?? "").caseInsensitiveCompare("Soccer") == .orderedSame }
+            .compactMap(SportTeam.init(team:))
+    }
+
     // MARK: - Networking
 
     private func fetchEvents(path: String, query: String, value: String) async throws -> [SportsDBEvent] {
@@ -151,6 +166,7 @@ private nonisolated struct SportsDBTeam: Decodable {
     let idTeam: String?
     let strTeam: String?
     let strSport: String?
+    let strLeague: String?
     /// TheSportsDB renamed the badge field from `strTeamBadge` to `strBadge`; v1
     /// responses still carry the old key, so we accept either.
     let strBadge: String?
@@ -181,7 +197,7 @@ private extension SportTeam {
     nonisolated init?(team: SportsDBTeam) {
         guard let id = team.idTeam, let name = team.strTeam, !name.isEmpty else { return nil }
         let badge = (team.strBadge ?? team.strTeamBadge).flatMap { $0.isEmpty ? nil : URL(string: $0) }
-        self.init(id: id, name: name, badgeURL: badge)
+        self.init(id: id, name: name, leagueName: team.strLeague, badgeURL: badge)
     }
 }
 
