@@ -30,6 +30,11 @@ enum CategoryType: String, Codable, CaseIterable, Identifiable {
 
 @Model
 final class Category {
+    // `MainTabView` queries restricted categories on every Category-table change
+    // (i.e. every sync) to build the child-profile restriction set; index
+    // `isRestricted` so that query seeks instead of scanning all categories.
+    #Index<Category>([\.isRestricted])
+
     @Attribute(.unique) var id: String
     var apiId: String
     var name: String

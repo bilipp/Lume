@@ -10,6 +10,10 @@ final class Movie {
     // handful of favorited / in-progress rows instead of scanning the whole
     // catalog on the main thread — the unindexed scan is what froze the app on
     // tvOS when returning from background.
+    // `categoryId` is the primary filter for every category browse/preview and
+    // `genre` for the browse-by-genre derivation; index both so opening a
+    // category or switching playlists seeks instead of scanning the whole
+    // catalog on a large library.
     #Index<Movie>(
         [\.tmdbId],
         [\.isFavorite],
@@ -17,7 +21,9 @@ final class Movie {
         [\.isWatched],
         [\.addedToWatchlistDate],
         [\.watchProgress],
-        [\.recommendationVoteRaw]
+        [\.recommendationVoteRaw],
+        [\.categoryId],
+        [\.genre]
     )
 
     @Attribute(.unique) var id: String

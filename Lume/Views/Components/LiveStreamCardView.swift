@@ -5,37 +5,20 @@
 //  Card view for displaying a live stream channel
 //
 
-import SwiftData
 import SwiftUI
 
 struct LiveStreamCardView: View {
     let stream: LiveStream
+    /// The channel's now/next programmes, resolved once by the parent list (see
+    /// `ChannelEPGSnapshot`) rather than by a per-card `@Query`.
+    var epg: ChannelEPG?
 
-    @Query private var epgListings: [EPGListing]
-
-    private var now: Date {
-        Date()
+    private var currentEPG: EPGSlot? {
+        epg?.current
     }
 
-    private var currentEPG: EPGListing? {
-        epgListings.first { $0.start <= now && now < $0.end }
-    }
-
-    private var nextEPG: EPGListing? {
-        epgListings
-            .filter { $0.start > now }
-            .sorted { $0.start < $1.start }
-            .first
-    }
-
-    init(stream: LiveStream) {
-        self.stream = stream
-        let channelId = stream.epgChannelId ?? ""
-        let now = Date()
-        _epgListings = Query(
-            filter: #Predicate<EPGListing> { $0.channelId == channelId && $0.end > now },
-            sort: [SortDescriptor(\.start)]
-        )
+    private var nextEPG: EPGSlot? {
+        epg?.next
     }
 
     var body: some View {

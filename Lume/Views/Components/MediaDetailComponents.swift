@@ -454,17 +454,23 @@ enum DetailFormat {
     }
 
     /// A localized abbreviated date ("Mar 15, 2021") from a release-date string.
+    /// Uses shared, pre-configured parsers — allocating a `DateFormatter` per
+    /// call is expensive, and this runs for every episode card in a season list.
     static func date(from dateString: String?) -> String? {
         guard let dateString, !dateString.isEmpty else { return nil }
-        let parser = DateFormatter()
-        parser.locale = Locale(identifier: "en_US_POSIX")
-        for format in ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"] {
-            parser.dateFormat = format
-            if let date = parser.date(from: dateString) {
-                return date.formatted(date: .abbreviated, time: .omitted)
-            }
+        if let date = dateTimeParser.date(from: dateString) ?? dateParser.date(from: dateString) {
+            return date.formatted(date: .abbreviated, time: .omitted)
         }
         return nil
+    }
+
+    private static let dateTimeParser = parser(format: "yyyy-MM-dd HH:mm:ss")
+    private static let dateParser = parser(format: "yyyy-MM-dd")
+    private static func parser(format: String) -> DateFormatter {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = format
+        return parser
     }
 }
 

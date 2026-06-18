@@ -19,6 +19,11 @@
         let onPlay: (LiveStream) -> Void
         @Environment(\.modelContext) private var modelContext
         @Query private var streams: [LiveStream]
+        /// Now/next EPG for the visible channels, resolved in one off-main fetch
+        /// (see `ChannelEPGSnapshot`) instead of a per-row `@Query`.
+        @State private var epgByChannel: [String: ChannelEPG] = [:]
+        /// Observed so the EPG lookup refreshes when a guide import finishes.
+        @State private var epgSync = EPGSyncService.shared
 
         init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
             self.scope = scope
@@ -32,9 +37,10 @@
         }
 
         var body: some View {
+            let channels = scopedStreams
             ScrollView {
                 LazyVStack(spacing: 14) {
-                    if scopedStreams.isEmpty {
+                    if channels.isEmpty {
                         ContentUnavailableView(
                             "No Channels",
                             systemImage: "antenna.radiowaves.left.and.right",
@@ -42,9 +48,10 @@
                         )
                         .padding(.top, 80)
                     } else {
-                        ForEach(scopedStreams) { stream in
+                        ForEach(channels) { stream in
                             TVChannelRow(
                                 stream: stream,
+                                epg: epgByChannel[stream.epgChannelId ?? ""],
                                 onRemove: scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil
                             ) {
                                 onPlay(stream)
@@ -56,6 +63,23 @@
                 .padding(.vertical, 40)
             }
             .focusSection()
+            // Reload when the channel set changes or a guide import settles.
+            .task(id: "\(channels.count)-\(epgSync.isSyncing)") {
+                await loadEPG(for: channels)
+            }
+        }
+
+        private func loadEPG(for channels: [LiveStream]) async {
+            let channelIds = Array(Set(channels.compactMap(\.epgChannelId).filter { !$0.isEmpty }))
+            guard !channelIds.isEmpty else {
+                epgByChannel = [:]
+                return
+            }
+            let container = modelContext.container
+            let now = Date()
+            epgByChannel = await Task.detached(priority: .userInitiated) {
+                ChannelEPGLoader.load(container: container, channelIds: channelIds, now: now)
+            }.value
         }
 
         /// Clears a channel's watch timestamp so it drops out of the Recently
@@ -68,34 +92,20 @@
 
     private struct TVChannelRow: View {
         let stream: LiveStream
+        /// The channel's now/next programmes, resolved once by the parent list
+        /// (see `ChannelEPGSnapshot`) rather than by a per-row `@Query`.
+        var epg: ChannelEPG?
         var onRemove: (() -> Void)?
         let onPlay: () -> Void
 
-        @Query private var epgListings: [EPGListing]
         @FocusState private var isFocused: Bool
 
-        init(stream: LiveStream, onRemove: (() -> Void)? = nil, onPlay: @escaping () -> Void) {
-            self.stream = stream
-            self.onRemove = onRemove
-            self.onPlay = onPlay
-            let channelId = stream.epgChannelId ?? ""
-            let now = Date()
-            _epgListings = Query(
-                filter: #Predicate<EPGListing> { $0.channelId == channelId && $0.end > now },
-                sort: [SortDescriptor(\.start)]
-            )
+        private var currentEPG: EPGSlot? {
+            epg?.current
         }
 
-        private var now: Date {
-            Date()
-        }
-
-        private var currentEPG: EPGListing? {
-            epgListings.first { $0.start <= now && now < $0.end }
-        }
-
-        private var nextEPG: EPGListing? {
-            epgListings.filter { $0.start > now }.min { $0.start < $1.start }
+        private var nextEPG: EPGSlot? {
+            epg?.next
         }
 
         var body: some View {

@@ -6,7 +6,16 @@ final class LiveStream {
     // Live TV's Favorites / Recently Watched rows and the iCloud reconciler
     // filter channels by these columns; index them so a foreground refresh
     // seeks instead of scanning every channel on the main thread.
-    #Index<LiveStream>([\.isFavorite], [\.lastWatchedDate])
+    // Selecting a Live TV category filters on `categoryId` (the single most
+    // common Live TV query). Index it — and pair it with `isHidden`, which the
+    // category predicate also tests — so a tap seeks the category's channels
+    // instead of scanning every channel in a large playlist.
+    #Index<LiveStream>(
+        [\.isFavorite],
+        [\.lastWatchedDate],
+        [\.categoryId],
+        [\.categoryId, \.isHidden]
+    )
 
     @Attribute(.unique) var id: String
     var streamId: Int

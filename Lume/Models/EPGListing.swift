@@ -3,6 +3,18 @@ import SwiftData
 
 @Model
 final class EPGListing {
+    // EPG is the largest, fastest-growing table for big playlists (a multi-week
+    // XMLTV guide for thousands of channels runs to hundreds of thousands of
+    // rows). Every now/next lookup and the guide window query filter by
+    // `channelId` and the `start`/`end` time bounds, so index them — without
+    // these, each channel card and guide open scans the whole guide table.
+    #Index<EPGListing>(
+        [\.channelId],
+        [\.start],
+        [\.end],
+        [\.channelId, \.start]
+    )
+
     @Attribute(.unique) var id: String
 
     /// The XMLTV channel ID this listing belongs to.

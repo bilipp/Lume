@@ -40,10 +40,14 @@ extension CloudSyncEngine {
         }
 
         // An upgrading user's existing catalog is, by definition, the resolved
-        // active profile's state — claim every unowned record for it.
-        for record in try cloudContext.fetch(FetchDescriptor<UserContentState>())
-            where record.profileID == nil
-        {
+        // active profile's state — claim every unowned record for it. Filter to
+        // `nil`-profileID records in the predicate (served by the
+        // `UserContentState.profileID` index) so launch seeks the legacy rows
+        // instead of scanning every per-item mirror.
+        let unownedDescriptor = FetchDescriptor<UserContentState>(
+            predicate: #Predicate { $0.profileID == nil }
+        )
+        for record in try cloudContext.fetch(unownedDescriptor) {
             record.profileID = resolvedActive
         }
 
@@ -101,9 +105,17 @@ extension CloudSyncEngine {
     /// Delete every content record owned by a profile (called when the profile
     /// itself is deleted). The `UserProfile` row is removed by `ProfileManager`.
     func purgeProfileData(_ profileID: UUID) throws {
-        for mirror in try cloudContext.fetch(FetchDescriptor<UserContentState>())
-            where (mirror.profileID ?? UserProfile.defaultProfileID) == profileID
-        {
+        // Scope the fetch with a predicate (served by the
+        // `UserContentState.profileID` index) instead of scanning every mirror.
+        // Records with a `nil` profileID are treated as belonging to the default
+        // profile, so include them only when purging the default.
+        let isDefault = profileID == UserProfile.defaultProfileID
+        let descriptor = FetchDescriptor<UserContentState>(
+            predicate: #Predicate {
+                $0.profileID == profileID || (isDefault && $0.profileID == nil)
+            }
+        )
+        for mirror in try cloudContext.fetch(descriptor) {
             cloudContext.delete(mirror)
         }
         try saveStores()

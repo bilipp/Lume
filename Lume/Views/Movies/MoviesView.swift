@@ -43,6 +43,10 @@ struct MoviesView: View {
     private let previewCategoryLimit = 4
 
     var body: some View {
+        // Resolve once per render — `sortedCategories` filters + sorts every
+        // playlist's categories, so reading it three times (the emptiness check
+        // plus the preview/remaining splits) tripled that work.
+        let sorted = sortedCategories
         NavigationStack {
             Group {
                 if playlists.isEmpty {
@@ -51,7 +55,7 @@ struct MoviesView: View {
                         systemImage: "film.stack",
                         description: Text("Add a playlist in Settings to start browsing movies")
                     )
-                } else if sortedCategories.isEmpty {
+                } else if sorted.isEmpty {
                     VStack(spacing: 20) {
                         ContentUnavailableView(
                             "No Movies",
@@ -60,13 +64,14 @@ struct MoviesView: View {
                         )
                     }
                 } else {
+                    let remaining = Array(sorted.dropFirst(previewCategoryLimit))
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             MovieCollectionRow(kind: .recentlyWatched, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
                             MovieCollectionRow(kind: .favorites, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
                             MovieCollectionRow(kind: .recentlyAdded, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
 
-                            ForEach(previewCategories) { category in
+                            ForEach(sorted.prefix(previewCategoryLimit)) { category in
                                 MovieCategoryPreview(category: category, limit: previewLimit, sort: contentSort, animationNamespace: animationNamespace)
                                     .id("\(category.id)-\(contentSort.rawValue)")
                             }
@@ -75,8 +80,8 @@ struct MoviesView: View {
                                 GenreGridSection(genres: genres, type: .vod)
                             }
 
-                            if !remainingCategories.isEmpty {
-                                CategoryGridSection(title: "All Categories", categories: remainingCategories)
+                            if !remaining.isEmpty {
+                                CategoryGridSection(title: "All Categories", categories: remaining)
                                     .padding(.top, 12)
                             }
                         }
@@ -135,16 +140,6 @@ struct MoviesView: View {
         guard let playlistId = activePlaylist?.id else { return [] }
         let prefix = "\(playlistId.uuidString)-"
         return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) })
-    }
-
-    /// The categories shown as full inline preview rows (the first few).
-    private var previewCategories: [Category] {
-        Array(sortedCategories.prefix(previewCategoryLimit))
-    }
-
-    /// The long tail of categories, surfaced as name tiles below the rows.
-    private var remainingCategories: [Category] {
-        Array(sortedCategories.dropFirst(previewCategoryLimit))
     }
 }
 

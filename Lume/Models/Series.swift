@@ -9,12 +9,18 @@ final class Series {
     // CloudKit merge seeks instead of scanning the whole catalog on the main
     // thread (the unindexed scan froze the app on tvOS returning from
     // background).
+    // `categoryId` is the primary filter for every category browse/preview and
+    // `genre` for the browse-by-genre derivation; index both so opening a
+    // category or switching playlists seeks instead of scanning the whole
+    // catalog on a large library.
     #Index<Series>(
         [\.tmdbId],
         [\.isFavorite],
         [\.lastWatchedDate],
         [\.addedToWatchlistDate],
-        [\.recommendationVoteRaw]
+        [\.recommendationVoteRaw],
+        [\.categoryId],
+        [\.genre]
     )
 
     @Attribute(.unique) var id: String

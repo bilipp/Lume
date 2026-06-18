@@ -127,12 +127,17 @@ struct LiveTVView: View {
                         )
                     }
                 } else {
+                    // Resolve the rail's sections (and the displayed one) once
+                    // per render — both `displayedSection` and the layouts read
+                    // them, and each resolve filters + sorts the categories.
+                    let sections = sortedSections
+                    let displayed = displayedSection(in: sections)
                     #if os(iOS)
-                        iOSLayout
+                        iOSLayout(sections: sections, displayed: displayed)
                     #elseif os(tvOS)
-                        tvOSLayout
+                        tvOSLayout(sections: sections, displayed: displayed)
                     #else
-                        macOSLayout
+                        macOSLayout(sections: sections, displayed: displayed)
                     #endif
                 }
             }
@@ -178,15 +183,15 @@ struct LiveTVView: View {
     // MARK: - Platform-specific layouts
 
     #if os(iOS)
-        private var iOSLayout: some View {
+        private func iOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
             VStack(spacing: 0) {
                 CategoryBar(
-                    sections: sortedSections,
+                    sections: sections,
                     selectedSection: $selectedSection
                 )
 
-                if let section = displayedSection {
-                    detail(for: section)
+                if let displayed {
+                    detail(for: displayed)
                 } else {
                     ContentUnavailableView(
                         "Select a Category",
@@ -198,18 +203,18 @@ struct LiveTVView: View {
         }
     #endif
 
-    private var macOSLayout: some View {
+    private func macOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
         HStack(spacing: 0) {
             CategorySidebar(
-                sections: sortedSections,
+                sections: sections,
                 selectedSection: $selectedSection
             )
             .frame(width: 200)
 
             Divider()
 
-            if let section = displayedSection {
-                detail(for: section)
+            if let displayed {
+                detail(for: displayed)
             } else {
                 ContentUnavailableView(
                     "Select a Category",
@@ -225,11 +230,11 @@ struct LiveTVView: View {
         /// topped by a single List/Guide switch — beside the content area, which
         /// shows either the channel list or the programme guide. Sharing one rail
         /// and one switch keeps moving between the two views consistent.
-        private var tvOSLayout: some View {
+        private func tvOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
             TVLiveTVScreen(
-                sections: sortedSections,
+                sections: sections,
                 selectedSection: $selectedSection,
-                displayedSection: displayedSection,
+                displayedSection: displayed,
                 layoutModeRaw: $layoutModeRaw,
                 contentSort: contentSort,
                 onPlay: { playChannel($0) },
@@ -288,11 +293,11 @@ struct LiveTVView: View {
     /// but if that section just disappeared (a category hidden in Content
     /// Management, or the last favorite removed) fall back to the first available
     /// one rather than keep showing stale content.
-    private var displayedSection: LiveTVSection? {
-        guard let selectedSection else { return sortedSections.first }
-        return sortedSections.contains { $0.id == selectedSection.id }
+    private func displayedSection(in sections: [LiveTVSection]) -> LiveTVSection? {
+        guard let selectedSection else { return sections.first }
+        return sections.contains { $0.id == selectedSection.id }
             ? selectedSection
-            : sortedSections.first
+            : sections.first
     }
 
     private func playChannel(_ stream: LiveStream) {
@@ -401,6 +406,11 @@ struct ChannelsList: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
     @Query private var streams: [LiveStream]
+    /// Now/next EPG for the visible channels, resolved in one off-main fetch
+    /// (see `ChannelEPGSnapshot`) instead of a per-card `@Query`.
+    @State private var epgByChannel: [String: ChannelEPG] = [:]
+    /// Observed so the EPG lookup refreshes when a guide import finishes.
+    @State private var epgSync = EPGSyncService.shared
 
     init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
         self.scope = scope
@@ -422,20 +432,21 @@ struct ChannelsList: View {
     }
 
     var body: some View {
+        let channels = scopedStreams
         ScrollView {
             LazyVStack(spacing: 0) {
-                if scopedStreams.isEmpty {
+                if channels.isEmpty {
                     ContentUnavailableView(
                         "No Channels",
                         systemImage: "antenna.radiowaves.left.and.right",
                         description: Text("This category has no channels")
                     )
                 } else {
-                    ForEach(scopedStreams) { stream in
+                    ForEach(channels) { stream in
                         Button {
                             onPlay(stream)
                         } label: {
-                            LiveStreamCardView(stream: stream)
+                            LiveStreamCardView(stream: stream, epg: epgByChannel[stream.epgChannelId ?? ""])
                                 .padding(.horizontal)
                                 .contentShape(Rectangle())
                         }
@@ -448,6 +459,23 @@ struct ChannelsList: View {
                 }
             }
         }
+        // Reload when the channel set changes or a guide import settles.
+        .task(id: "\(channels.count)-\(epgSync.isSyncing)") {
+            await loadEPG(for: channels)
+        }
+    }
+
+    private func loadEPG(for channels: [LiveStream]) async {
+        let channelIds = Array(Set(channels.compactMap(\.epgChannelId).filter { !$0.isEmpty }))
+        guard !channelIds.isEmpty else {
+            epgByChannel = [:]
+            return
+        }
+        let container = modelContext.container
+        let now = Date()
+        epgByChannel = await Task.detached(priority: .userInitiated) {
+            ChannelEPGLoader.load(container: container, channelIds: channelIds, now: now)
+        }.value
     }
 }
 
