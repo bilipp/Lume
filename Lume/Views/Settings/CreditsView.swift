@@ -19,6 +19,7 @@
                 lumeSection
                 librariesSection
                 metadataSection
+                designSection
             }
             .platformNavigationTitle("Acknowledgements")
         }
@@ -81,6 +82,20 @@
                 Text("Metadata")
             } footer: {
                 Text("Artwork, ratings and details are provided by these services. This product uses the TMDB API but is not endorsed or certified by TMDB.")
+            }
+        }
+
+        private var designSection: some View {
+            Section {
+                HStack {
+                    Label("Icon Colors", systemImage: "paintpalette")
+                    Spacer()
+                    Text(verbatim: CreditsInfo.iconColorsContributor.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Design")
             }
         }
     }

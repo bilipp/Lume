@@ -1306,6 +1306,16 @@
         }
       }
     },
+    "Design" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Design"
+          }
+        }
+      }
+    },
     "Details" : {
       "localizations" : {
         "de" : {
@@ -2274,6 +2284,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Symbol"
+          }
+        }
+      }
+    },
+    "Icon Colors" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icon Farben"
           }
         }
       }

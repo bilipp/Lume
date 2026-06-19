@@ -48,6 +48,23 @@ nonisolated enum CreditsInfo {
         Library(name: "VLCKit", license: "LGPL v2.1", urlString: "https://github.com/virtualox/vlckit-spm")
     ]
 
+    // MARK: - Contributors
+
+    /// A person who contributed to Lume outside the codebase (artwork, design,
+    /// etc.). Name is a proper noun — never localised; the contribution copy is
+    /// localised in the views.
+    struct Contributor: Identifiable {
+        /// Proper-noun name — never localised.
+        let name: String
+
+        var id: String {
+            name
+        }
+    }
+
+    /// People credited for non-code contributions.
+    static let iconColorsContributor = Contributor(name: "Toni")
+
     // MARK: - Metadata providers (attribution required by their terms)
 
     static let tmdb = "https://www.themoviedb.org"
