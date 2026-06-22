@@ -3,13 +3,15 @@
 //  Lume
 //
 //  The in-player channel browser for live TV on tvOS, raised by a left press
-//  on the Siri remote while watching with the controls hidden. Two Liquid
+//  on the Siri remote while watching with the controls hidden. Three Liquid
 //  Glass columns slide in over the leading edge: the category rail (the same
 //  sections the Live TV screen shows — Favorites / Recently Watched / synced
-//  categories) and the channels of the focused category. The playing channel's
-//  category and the channel itself are pre-selected; moving focus across
-//  categories loads their channels in place, and selecting a channel switches
-//  the stream without leaving the player.
+//  categories), the channels of the focused category, and the guide of the
+//  focused channel. The playing channel's category and the channel itself are
+//  pre-selected; moving focus across categories loads their channels in place,
+//  and selecting a channel switches the stream without leaving the player.
+//  Channels with an archive (`tvArchive`) are flagged, and their guide lets the
+//  viewer pick an already-aired programme to replay via catch-up.
 //
 
 #if os(tvOS)
@@ -34,15 +36,20 @@
         private var contentSortRaw: String = ContentSortOption.playlist.rawValue
 
         @State private var sections: [LiveTVSection] = []
-        /// The section whose channels fill the right column.
+        /// The section whose channels fill the middle column.
         @State private var selectedSectionID: String?
         @State private var channels: [LiveStream] = []
         /// Programme titles airing now, keyed by EPG channel id.
         @State private var nowTitles: [String: String] = [:]
         @State private var playlistPrefix = ""
+        /// The channel whose guide fills the trailing column.
+        @State private var guideChannelID: String?
+        @State private var guideEntries: [GuideEntry] = []
         /// Debounces category-focus loads so sweeping down the rail doesn't
         /// fetch every category it passes.
         @State private var loadTask: Task<Void, Never>?
+        /// Debounces guide loads the same way as the channel column sweeps.
+        @State private var guideLoadTask: Task<Void, Never>?
 
         @FocusState private var focus: FocusTarget?
 
@@ -50,6 +57,30 @@
         enum FocusTarget: Hashable {
             case section(String)
             case channel(String)
+            case guide(String)
+        }
+
+        /// A guide programme as plain values, so the trailing column doesn't hold
+        /// managed `EPGListing` objects across focus changes.
+        struct GuideEntry: Identifiable, Equatable {
+            let id: String
+            let title: String
+            let start: Date
+            let end: Date
+
+            func isLive(at now: Date) -> Bool {
+                start <= now && now < end
+            }
+
+            func isPast(at now: Date) -> Bool {
+                end <= now
+            }
+        }
+
+        /// The focused channel's model, resolved from the loaded column — the
+        /// source of truth for catch-up availability and building playback.
+        private var guideStream: LiveStream? {
+            channels.first { $0.id == guideChannelID }
         }
 
         private var currentChannelID: String? {
@@ -62,14 +93,18 @@
                 scrim
 
                 ScrollViewReader { proxy in
-                    HStack(alignment: .top, spacing: 28) {
-                        column(title: "Categories", width: 440) { categoryRows }
-                        column(title: "Channels", width: 600) { channelRows }
+                    HStack(alignment: .top, spacing: 24) {
+                        column(title: "Categories", width: 400) { categoryRows }
+                        column(title: "Channels", width: 520) { channelRows }
                             // Fresh scroll position whenever another category's
                             // channels replace the list.
                             .id(selectedSectionID)
+                        column(title: "Guide", width: 600) { guideRows }
+                            // Fresh scroll position whenever another channel's
+                            // guide replaces the list.
+                            .id(guideChannelID)
                     }
-                    .padding(.leading, 80)
+                    .padding(.leading, 72)
                     .padding(.vertical, 48)
                     .onAppear {
                         loadInitialContent()
@@ -78,10 +113,19 @@
                 }
             }
             .onChange(of: focus) { _, target in
-                guard case let .section(id) = target, id != selectedSectionID else { return }
-                scheduleChannelLoad(sectionID: id)
+                switch target {
+                case let .section(id) where id != selectedSectionID:
+                    scheduleChannelLoad(sectionID: id)
+                case let .channel(id):
+                    scheduleGuideLoad(channelID: id)
+                default:
+                    break
+                }
             }
-            .onDisappear { loadTask?.cancel() }
+            .onDisappear {
+                loadTask?.cancel()
+                guideLoadTask?.cancel()
+            }
         }
 
         // MARK: - Chrome
@@ -204,11 +248,79 @@
 
                 Spacer(minLength: 0)
 
+                // Flag channels with an archive so the viewer knows the guide
+                // column offers replays before they move into it.
+                if channel.tvArchive > 0 {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.blue)
+                        .accessibilityLabel("Catch-up available")
+                }
+
                 if isCurrent {
                     Image(systemName: "play.fill")
                         .font(.system(size: 18, weight: .semibold))
                 }
             }
+        }
+
+        @ViewBuilder
+        private var guideRows: some View {
+            if guideEntries.isEmpty {
+                Text("No Guide")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 40)
+            } else {
+                let now = Date()
+                let hasCatchup = (guideStream?.tvArchive ?? 0) > 0
+                ForEach(guideEntries) { entry in
+                    Button {
+                        selectGuide(entry)
+                    } label: {
+                        guideRowLabel(entry, now: now, hasCatchup: hasCatchup)
+                    }
+                    .buttonStyle(TVBrowserRowStyle(isSelected: entry.isLive(at: now)))
+                    .focused($focus, equals: .guide(entry.id))
+                    .id(FocusTarget.guide(entry.id))
+                }
+            }
+        }
+
+        private func guideRowLabel(_ entry: GuideEntry, now: Date, hasCatchup: Bool) -> some View {
+            let isLive = entry.isLive(at: now)
+            let isPast = entry.isPast(at: now)
+            // A past programme is replayable only on a catch-up channel; the live
+            // one always plays; an upcoming one can't be played yet.
+            let playable = isLive || (isPast && hasCatchup)
+            return HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(entry.title)
+                        .lineLimit(1)
+                    HStack(spacing: 8) {
+                        Text(entry.start, format: .dateTime.weekday(.abbreviated).hour().minute())
+                        if isLive {
+                            Text("Live")
+                                .foregroundStyle(EPGColors.live)
+                        }
+                    }
+                    .font(.system(size: 19))
+                    .opacity(0.65)
+                }
+
+                Spacer(minLength: 0)
+
+                if isPast, hasCatchup {
+                    Image(systemName: "play.circle")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.blue)
+                } else if isLive {
+                    Image(systemName: "dot.radiowaves.left.and.right")
+                        .font(.system(size: 20, weight: .semibold))
+                }
+            }
+            .opacity(playable ? 1 : 0.5)
         }
 
         // MARK: - Data
@@ -243,6 +355,12 @@
                 channels = fetchChannels(scope: section.scope)
                 nowTitles = TVPlayerContent.nowProgrammeTitles(for: channels, in: modelContext)
             }
+
+            // Fill the guide column with the playing channel up front, so the
+            // third column isn't blank before focus first settles on a channel.
+            if let currentChannelID, channels.contains(where: { $0.id == currentChannelID }) {
+                loadGuide(channelID: currentChannelID)
+            }
         }
 
         private func fetchChannels(scope: LiveChannelScope) -> [LiveStream] {
@@ -266,6 +384,41 @@
                 selectedSectionID = sectionID
                 channels = fetchChannels(scope: section.scope)
                 nowTitles = TVPlayerContent.nowProgrammeTitles(for: channels, in: modelContext)
+                // The previous channel's guide no longer belongs to this column;
+                // clear it until focus lands on a channel in the new category.
+                guideChannelID = nil
+                guideEntries = []
+            }
+        }
+
+        /// Swap the trailing column to the focused channel's guide, debounced the
+        /// same way as the channel column so sweeping the list doesn't fetch a
+        /// guide for every channel it passes.
+        private func scheduleGuideLoad(channelID: String) {
+            guard channelID != guideChannelID else { return }
+            guideLoadTask?.cancel()
+            guideLoadTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                guard !Task.isCancelled else { return }
+                loadGuide(channelID: channelID)
+            }
+        }
+
+        /// Fetch the focused channel's guide. Catch-up channels reach back over
+        /// their archive window so aired programmes are replayable; others show
+        /// only what's on now and next.
+        private func loadGuide(channelID: String) {
+            guideChannelID = channelID
+            guard let stream = channels.first(where: { $0.id == channelID }) else {
+                guideEntries = []
+                return
+            }
+            let archiveDays = stream.tvArchive > 0 ? max(1, stream.tvArchiveDuration) : 0
+            let listings = TVPlayerContent.guideListings(
+                channelId: stream.epgChannelId, archiveDays: archiveDays, in: modelContext
+            )
+            guideEntries = listings.map {
+                GuideEntry(id: $0.id, title: $0.title, start: $0.start, end: $0.end)
             }
         }
 
@@ -306,6 +459,27 @@
             guard let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext),
                   let target = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
             onSelect(target)
+        }
+
+        /// Act on a guide entry: a past programme starts catch-up playback (when
+        /// the channel has an archive), the live one plays the channel, and an
+        /// upcoming one isn't playable yet.
+        private func selectGuide(_ entry: GuideEntry) {
+            guard let stream = guideStream,
+                  let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext) else { return }
+            let now = Date()
+            if entry.isLive(at: now) {
+                select(channel: stream)
+            } else if entry.isPast(at: now) {
+                guard let target = PlayableMedia.catchup(
+                    stream: stream,
+                    playlist: playlist,
+                    programTitle: entry.title,
+                    start: entry.start,
+                    end: entry.end
+                ) else { return }
+                onSelect(target)
+            }
         }
     }
 

@@ -107,15 +107,24 @@ struct XtreamClientURLTests {
 
     // MARK: - Catchup URL
 
-    @Test func `build catchup URL`() {
+    @Test func `build catchup URL uses timeshift path with minutes`() throws {
         let client = makeClient()
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-3", streamId: 777, name: "Catchup Channel")
-        let startTime = Date(timeIntervalSince1970: 1_700_000_000)
-        let url = client.buildCatchupURL(for: stream, playlist: playlist, startTime: startTime)
-        #expect(url?.absoluteString.contains("timeshift") == true)
-        #expect(url?.absoluteString.contains("777") == true)
-        #expect(url?.absoluteString.contains("m3u8") == true)
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let url = try #require(client.buildCatchupURL(for: stream, playlist: playlist, start: start, durationMinutes: 90))
+        let string = url.absoluteString
+        #expect(string.hasPrefix("http://example.com:8080/timeshift/testuser/testpass/90/"))
+        #expect(string.hasSuffix("/777.m3u8"))
+        // The start segment is the Xtream `Y-m-d:H-i` wall-clock format.
+        #expect(string.range(of: #"/\d{4}-\d{2}-\d{2}:\d{2}-\d{2}/777\.m3u8$"#, options: .regularExpression) != nil)
+    }
+
+    @Test func `build catchup URL rejects non-positive duration`() {
+        let client = makeClient()
+        let playlist = makePlaylist()
+        let stream = LiveStream(id: "l-4", streamId: 778, name: "Catchup Channel")
+        #expect(client.buildCatchupURL(for: stream, playlist: playlist, start: Date(), durationMinutes: 0) == nil)
     }
 
     // MARK: - Server URL trailing slash handling

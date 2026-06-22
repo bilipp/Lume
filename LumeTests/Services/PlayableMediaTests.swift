@@ -101,6 +101,50 @@ struct PlayableMediaTests {
         #expect(media?.posterURL == nil)
     }
 
+    // MARK: - catchup(stream:playlist:...)
+
+    @Test func `catchup builds seekable vod media for archive channel`() throws {
+        let playlist = makePlaylist()
+        let stream = LiveStream(id: "l-3", streamId: 300, name: "Archive Channel",
+                                streamIcon: "http://example.com/logo.png",
+                                tvArchive: 1, tvArchiveDuration: 7)
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let end = start.addingTimeInterval(3600)
+
+        let media = try #require(PlayableMedia.catchup(
+            stream: stream, playlist: playlist, programTitle: "Evening News", start: start, end: end
+        ))
+        #expect(media.kind == .vod)
+        #expect(media.isLive == false)
+        #expect(media.title == "Archive Channel")
+        #expect(media.subtitle == "Evening News")
+        #expect(media.contentRef == .live("l-3"))
+        #expect(media.startTime == 0)
+        #expect(media.url.absoluteString.contains("/timeshift/user/pass/60/"))
+        #expect(media.url.absoluteString.hasSuffix("/300.m3u8"))
+    }
+
+    @Test func `catchup returns nil without archive`() {
+        let playlist = makePlaylist()
+        let stream = LiveStream(id: "l-4", streamId: 301, name: "No Archive")
+        let media = PlayableMedia.catchup(
+            stream: stream, playlist: playlist, programTitle: "x",
+            start: Date(), end: Date().addingTimeInterval(3600)
+        )
+        #expect(media == nil)
+    }
+
+    @Test func `catchup returns nil for m3u direct stream`() {
+        let playlist = makePlaylist()
+        let stream = LiveStream(id: "l-5", streamId: 302, name: "M3U", tvArchive: 1, tvArchiveDuration: 7)
+        stream.directURL = "http://example.com/live/stream.m3u8"
+        let media = PlayableMedia.catchup(
+            stream: stream, playlist: playlist, programTitle: "x",
+            start: Date(), end: Date().addingTimeInterval(3600)
+        )
+        #expect(media == nil)
+    }
+
     // MARK: - Codable
 
     @Test func `playable media codable round trip`() throws {

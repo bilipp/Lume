@@ -116,4 +116,34 @@ extension PlayableMedia {
             contentRef: .live(stream.id)
         )
     }
+
+    /// A past programme played from the channel's catch-up archive. Modelled as
+    /// VOD — the archive is a finite, seekable asset, so the player gives it a
+    /// scrubber rather than the live banner, and channel surfing stays disabled.
+    /// Returns `nil` for m3u streams (catch-up needs Xtream credentials) or when
+    /// the channel doesn't advertise an archive.
+    static func catchup(
+        stream: LiveStream,
+        playlist: Playlist,
+        programTitle: String,
+        start: Date,
+        end: Date,
+        client: XtreamClient = XtreamClient()
+    ) -> PlayableMedia? {
+        guard stream.tvArchive > 0, stream.directURL == nil else { return nil }
+        let durationMinutes = max(1, Int((end.timeIntervalSince(start) / 60).rounded(.up)))
+        guard let url = client.buildCatchupURL(
+            for: stream, playlist: playlist, start: start, durationMinutes: durationMinutes
+        ) else { return nil }
+        return PlayableMedia(
+            id: "catchup-\(stream.id)-\(Int(start.timeIntervalSince1970))",
+            url: url,
+            title: stream.name,
+            subtitle: programTitle,
+            posterURL: URL(string: stream.streamIcon ?? ""),
+            kind: .vod,
+            startTime: 0,
+            contentRef: .live(stream.id)
+        )
+    }
 }
