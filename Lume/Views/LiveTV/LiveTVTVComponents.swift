@@ -24,6 +24,9 @@
         @State private var epgByChannel: [String: ChannelEPG] = [:]
         /// Observed so the EPG lookup refreshes when a guide import finishes.
         @State private var epgSync = EPGSyncService.shared
+        /// How many channels are currently rendered. Grows by a page as the list
+        /// nears its end so a large category loads lazily instead of all at once.
+        @State private var visibleCount = LiveChannelQuery.pageSize
 
         init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
             self.scope = scope
@@ -38,6 +41,7 @@
 
         var body: some View {
             let channels = scopedStreams
+            let visible = Array(channels.prefix(visibleCount))
             ScrollView {
                 LazyVStack(spacing: 14) {
                     if channels.isEmpty {
@@ -48,13 +52,18 @@
                         )
                         .padding(.top, 80)
                     } else {
-                        ForEach(channels) { stream in
+                        ForEach(visible) { stream in
                             TVChannelRow(
                                 stream: stream,
                                 epg: epgByChannel[stream.epgChannelId ?? ""],
                                 onRemove: scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil
                             ) {
                                 onPlay(stream)
+                            }
+                            .onAppear {
+                                if stream.id == visible.last?.id, visibleCount < channels.count {
+                                    visibleCount = min(visibleCount + LiveChannelQuery.pageSize, channels.count)
+                                }
                             }
                         }
                     }
@@ -63,9 +72,10 @@
                 .padding(.vertical, 40)
             }
             .focusSection()
-            // Reload when the channel set changes or a guide import settles.
-            .task(id: "\(channels.count)-\(epgSync.isSyncing)") {
-                await loadEPG(for: channels)
+            // Reload when the visible window or channel set changes, or a guide
+            // import settles — EPG is resolved only for the channels on screen.
+            .task(id: "\(channels.count)-\(visible.count)-\(epgSync.isSyncing)") {
+                await loadEPG(for: visible)
             }
         }
 

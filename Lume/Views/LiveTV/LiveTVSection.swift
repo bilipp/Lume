@@ -98,6 +98,12 @@ enum LiveChannelQuery {
     /// bounded but we don't want it to grow without limit.
     static let recentLimit = 50
 
+    /// Channel lists mount in pages as they scroll. A live category can hold
+    /// hundreds of channels; building every row — and resolving now/next EPG
+    /// for every channel — before the first paint stalls the browse. The list
+    /// renders a window that grows by this many channels as it nears the end.
+    static let pageSize = 50
+
     /// Builds the `@Query` descriptor for a scope. The category scope sorts by
     /// the user's content-sort choice; the virtual collections have an intrinsic
     /// order (favorites by their own custom order, recents by most-recent-first).
