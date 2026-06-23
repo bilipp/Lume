@@ -22,7 +22,9 @@ struct MainTabView: View {
     @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
 
-    @State private var navigationPath = NavigationPath()
+    /// Selected tab and the Movies/Series navigation stacks, shared so an
+    /// `onOpenURL` deep link can switch tabs and push a detail screen.
+    @State private var router = DeepLinkRouter()
 
     /// Playlists waiting to be auto-synced, and the one currently shown in the
     /// blocking progress cover. Auto-sync is presented (not silent) so the user
@@ -46,15 +48,6 @@ struct MainTabView: View {
         CommandLine.arguments.contains("-ui-testing")
     }
 
-    #if os(tvOS)
-        /// Default to Home even though Search is placed first in the tab bar.
-        @State private var selectedTab: TabSelection = .home
-
-        private enum TabSelection: Hashable {
-            case search, home, movies, series, liveTV, settings
-        }
-    #endif
-
     /// Hides restricted categories (and their content) from every browse, Home
     /// and Search surface while a child profile is active.
     private var contentRestriction: ContentRestriction {
@@ -65,11 +58,16 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        tabView
+        @Bindable var router = router
+        return tabView(selection: $router.selectedTab)
+            .environment(router)
             .environment(\.contentRestriction, contentRestriction)
         #if os(iOS)
             .tabBarMinimizeOnScrollDownIfAvailable()
         #endif
+            .onOpenURL { url in
+                handleDeepLink(url)
+            }
             .task(id: playlists.count) {
                 // On launch (and whenever a playlist is added) sync any playlist that
                 // is due per the configured frequency.
@@ -99,39 +97,39 @@ struct MainTabView: View {
     }
 
     #if os(tvOS)
-        private var tabView: some View {
-            TabView(selection: $selectedTab) {
-                Tab(value: TabSelection.search) {
+        private func tabView(selection: Binding<AppTab>) -> some View {
+            TabView(selection: selection) {
+                Tab(value: AppTab.search) {
                     SearchView()
                 } label: {
                     Image(systemName: "magnifyingglass")
                 }
 
-                Tab(value: TabSelection.home) {
+                Tab(value: AppTab.home) {
                     HomeView()
                 } label: {
                     Text("Home")
                 }
 
-                Tab(value: TabSelection.movies) {
+                Tab(value: AppTab.movies) {
                     MoviesView()
                 } label: {
                     Text("Movies")
                 }
 
-                Tab(value: TabSelection.series) {
+                Tab(value: AppTab.series) {
                     SeriesView()
                 } label: {
                     Text("Series")
                 }
 
-                Tab(value: TabSelection.liveTV) {
+                Tab(value: AppTab.liveTV) {
                     LiveTVView()
                 } label: {
                     Text("Live TV")
                 }
 
-                Tab(value: TabSelection.settings) {
+                Tab(value: AppTab.settings) {
                     SettingsView()
                 } label: {
                     Image(systemName: "gear")
@@ -139,30 +137,76 @@ struct MainTabView: View {
             }
         }
     #else
-        private var tabView: some View {
-            TabView {
-                Tab("Home", systemImage: "house") {
+        private func tabView(selection: Binding<AppTab>) -> some View {
+            TabView(selection: selection) {
+                Tab("Home", systemImage: "house", value: AppTab.home) {
                     HomeView()
                 }
 
-                Tab("Movies", systemImage: "film") {
+                Tab("Movies", systemImage: "film", value: AppTab.movies) {
                     MoviesView()
                 }
 
-                Tab("Series", systemImage: "tv") {
+                Tab("Series", systemImage: "tv", value: AppTab.series) {
                     SeriesView()
                 }
 
-                Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right") {
+                Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.liveTV) {
                     LiveTVView()
                 }
 
-                Tab(role: .search) {
+                Tab(value: AppTab.search, role: .search) {
                     SearchView()
                 }
             }
         }
     #endif
+
+    // MARK: - Deep links
+
+    /// Resolves a `lume://movie/{tmdbId}` / `lume://series/{tmdbId}` link to a
+    /// catalog item, switches to the matching tab and pushes its detail screen.
+    /// Silently ignores unknown links and titles not present in the catalog
+    /// (e.g. a tmdbId that was never synced or enriched).
+    private func handleDeepLink(_ url: URL) {
+        guard let link = DeepLink(url: url) else { return }
+        switch link {
+        case let .movie(tmdbId):
+            guard let movie = resolveMovie(tmdbId: tmdbId) else { return }
+            router.selectedTab = .movies
+            router.moviesPath = NavigationPath()
+            router.moviesPath.append(movie)
+        case let .series(tmdbId):
+            guard let series = resolveSeries(tmdbId: tmdbId) else { return }
+            router.selectedTab = .series
+            router.seriesPath = NavigationPath()
+            router.seriesPath.append(series)
+        }
+    }
+
+    /// Finds a movie by `tmdbId`, preferring the active playlist but falling back
+    /// to any other playlist's copy. Restricted categories stay hidden for a
+    /// child profile.
+    private func resolveMovie(tmdbId: Int) -> Movie? {
+        let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
+        let restriction = contentRestriction
+        let matches = ((try? modelContext.fetch(descriptor)) ?? [])
+            .filter { !restriction.hides(categoryID: $0.categoryId) }
+        return matches.first { belongsToActivePlaylist($0.id) } ?? matches.first
+    }
+
+    private func resolveSeries(tmdbId: Int) -> Series? {
+        let descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
+        let restriction = contentRestriction
+        let matches = ((try? modelContext.fetch(descriptor)) ?? [])
+            .filter { !restriction.hides(categoryID: $0.categoryId) }
+        return matches.first { belongsToActivePlaylist($0.id) } ?? matches.first
+    }
+
+    private func belongsToActivePlaylist(_ id: String) -> Bool {
+        guard let activePlaylist = playlists.active(for: selectedPlaylistID) else { return true }
+        return id.hasPrefix("\(activePlaylist.id.uuidString)-")
+    }
 
     // MARK: - Automatic sync
 

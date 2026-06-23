@@ -4,6 +4,19 @@
 <dict>
 	<key>CFBundleAllowMixedLocalizations</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>bilipp.Lume.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>lume</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>

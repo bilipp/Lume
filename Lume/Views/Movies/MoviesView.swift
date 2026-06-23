@@ -13,6 +13,9 @@ struct MoviesView: View {
     @Namespace private var animationNamespace
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
+    // Optional so previews (which don't inject it) fall back to a local path.
+    @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
+    @State private var fallbackPath = NavigationPath()
     @Query private var playlists: [Playlist]
     @Query(filter: #Predicate<Category> { $0.typeRaw == "vod" && $0.isHidden == false })
     private var categories: [Category]
@@ -47,7 +50,7 @@ struct MoviesView: View {
         // playlist's categories, so reading it three times (the emptiness check
         // plus the preview/remaining splits) tripled that work.
         let sorted = sortedCategories
-        NavigationStack {
+        NavigationStack(path: navigationPath) {
             Group {
                 if playlists.isEmpty {
                     ContentUnavailableView(
@@ -119,6 +122,13 @@ struct MoviesView: View {
                 #endif
             }
         }
+    }
+
+    /// Drives the stack from the shared `DeepLinkRouter` so an `onOpenURL` push
+    /// lands here; falls back to a local path in previews where no router exists.
+    private var navigationPath: Binding<NavigationPath> {
+        guard let router else { return $fallbackPath }
+        return Binding(get: { router.moviesPath }, set: { router.moviesPath = $0 })
     }
 
     /// The playlist whose content is currently shown, resolved from the global
