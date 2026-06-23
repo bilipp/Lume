@@ -128,6 +128,58 @@ enum StorageManager {
         }
     }
 
+    /// Wipes the active profile's watch history: resets `watchProgress`,
+    /// `isWatched` and `lastWatchedDate` on every movie and episode, and clears
+    /// `lastWatchedDate` on every series and channel. Favorites, watchlist and
+    /// recommendation votes are left untouched.
+    ///
+    /// Runs on the passed-in (main) context — like `clearMetadataEnrichment` —
+    /// so the Continue Watching / Recently Watched rows update immediately. The
+    /// iCloud reconciler picks up the cleared local state on its next pass and
+    /// mirrors the reset to CloudKit (and thus the user's other devices), the
+    /// same way an individual "remove from recently watched" does. The
+    /// `#Predicate` filters keep only rows that actually carry watch state out of
+    /// the fetch, so an untouched catalog isn't hydrated wholesale.
+    static func clearWatchHistory(in context: ModelContext) {
+        do {
+            let movies = try context.fetch(FetchDescriptor<Movie>(
+                predicate: #Predicate { $0.watchProgress != 0 || $0.isWatched || $0.lastWatchedDate != nil }
+            ))
+            for movie in movies {
+                movie.watchProgress = 0
+                movie.isWatched = false
+                movie.lastWatchedDate = nil
+            }
+
+            let episodes = try context.fetch(FetchDescriptor<Episode>(
+                predicate: #Predicate { $0.watchProgress != 0 || $0.isWatched || $0.lastWatchedDate != nil }
+            ))
+            for episode in episodes {
+                episode.watchProgress = 0
+                episode.isWatched = false
+                episode.lastWatchedDate = nil
+            }
+
+            let series = try context.fetch(FetchDescriptor<Series>(
+                predicate: #Predicate { $0.lastWatchedDate != nil }
+            ))
+            for show in series {
+                show.lastWatchedDate = nil
+            }
+
+            let channels = try context.fetch(FetchDescriptor<LiveStream>(
+                predicate: #Predicate { $0.lastWatchedDate != nil }
+            ))
+            for channel in channels {
+                channel.lastWatchedDate = nil
+            }
+
+            try context.save()
+        } catch {
+            logger.error("Failed to clear watch history: \(error.localizedDescription)")
+        }
+    }
+
     #if DEBUG
         /// DEBUG-only: wipes the on-device search index end to end — the TMDB/OMDb
         /// enrichment (via `clearMetadataEnrichment`), the embedding vectors, the

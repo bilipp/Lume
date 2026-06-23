@@ -98,6 +98,24 @@
             )
             return (try? context.fetch(descriptor)) ?? []
         }
+
+        /// EPG listings for the in-player guide, oldest first. With
+        /// `archiveDays > 0` (a catch-up channel) it reaches back that many days
+        /// so already-aired programmes are available to replay; otherwise it
+        /// returns only what's airing now and later. The `channelId + end` index
+        /// keeps this to a small slice of the guide table.
+        static func guideListings(channelId: String?, archiveDays: Int, in context: ModelContext) -> [EPGListing] {
+            guard let channelId, !channelId.isEmpty else { return [] }
+            let now = Date()
+            let earliest = archiveDays > 0
+                ? Calendar.current.date(byAdding: .day, value: -archiveDays, to: now) ?? now
+                : now
+            let descriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate { $0.channelId == channelId && $0.end > earliest },
+                sortBy: [SortDescriptor(\.start)]
+            )
+            return (try? context.fetch(descriptor)) ?? []
+        }
     }
 
 #endif

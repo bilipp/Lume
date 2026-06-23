@@ -263,40 +263,6 @@ struct DetailSectionHeader: View {
     }
 }
 
-// MARK: - Expandable synopsis
-
-/// A synopsis that collapses to a few lines with a "more" affordance. Uses a
-/// length heuristic to decide whether the toggle is worth showing.
-struct ExpandableText: View {
-    let text: String
-    var collapsedLineLimit: Int = 3
-
-    @State private var isExpanded = false
-
-    private var isExpandable: Bool {
-        text.count > 160
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(text)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .lineLimit(isExpanded ? nil : collapsedLineLimit)
-                .animation(.easeInOut(duration: 0.2), value: isExpanded)
-
-            if isExpandable {
-                Button(LocalizedStringKey(isExpanded ? "less" : "more")) {
-                    isExpanded.toggle()
-                }
-                .font(.callout.weight(.semibold))
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-            }
-        }
-    }
-}
-
 // MARK: - Cast
 
 struct CastRow: View {
@@ -555,21 +521,6 @@ enum DetailFormat {
     }
     .padding()
     .background(Color.black)
-}
-
-#Preview("ExpandableText - Short") {
-    ExpandableText(text: "A short synopsis that doesn't need a more/less toggle.")
-        .padding()
-}
-
-#Preview("ExpandableText - Long") {
-    ExpandableText(
-        text: "This is a very long synopsis that will definitely need a more/less toggle to expand or collapse "
-            + "because it exceeds the character limit we've set. The quick brown fox jumps over the lazy dog. "
-            + "This text keeps going and going until it crosses the threshold where the toggle becomes useful "
-            + "for the user to read the full content without taking up too much space initially."
-    )
-    .padding()
 }
 
 #Preview("CastRow") {

@@ -18,13 +18,14 @@ struct StorageManagementView: View {
     @State private var isClearing = false
     @State private var confirmImageClear = false
     @State private var confirmMetadataClear = false
+    @State private var confirmHistoryClear = false
     @State private var indexing = ContentIndexingService.shared
     #if DEBUG
         @State private var confirmIndexClear = false
     #endif
 
     private enum ClearAction {
-        case imageCache, metadata
+        case imageCache, metadata, watchHistory
         #if DEBUG
             case index
         #endif
@@ -51,6 +52,8 @@ struct StorageManagementView: View {
             await StorageManager.clearImageCache()
         case .metadata:
             StorageManager.clearMetadataEnrichment(in: modelContext)
+        case .watchHistory:
+            StorageManager.clearWatchHistory(in: modelContext)
         #if DEBUG
             case .index:
                 indexing.reset()
@@ -133,6 +136,19 @@ struct StorageManagementView: View {
                     Text("Clearing caches frees up space. Artwork and metadata re-download automatically when needed. Your playlists, downloads, watch history and favorites are not affected.")
                 }
                 .disabled(isClearing)
+
+                Section {
+                    Button(role: .destructive) {
+                        confirmHistoryClear = true
+                    } label: {
+                        Label("Clear Watch History", systemImage: "clock.arrow.circlepath")
+                    }
+                    .disabled(isClearing)
+                } header: {
+                    Text("Watch History")
+                } footer: {
+                    Text("Removes watch progress and the watched status of every title, and empties your Continue Watching and Recently Watched lists. Favorites and your watchlist aren't affected.")
+                }
             }
             .platformNavigationTitle("Storage & Cache")
             .task { await load() }
@@ -141,6 +157,10 @@ struct StorageManagementView: View {
                 confirmMetadataClear: $confirmMetadataClear,
                 onClearImageCache: { Task { await perform(.imageCache) } },
                 onClearMetadata: { Task { await perform(.metadata) } }
+            )
+            .watchHistoryConfirmation(
+                isPresented: $confirmHistoryClear,
+                onClear: { Task { await perform(.watchHistory) } }
             )
             #if DEBUG
             .alert("Clear Index", isPresented: $confirmIndexClear) {
@@ -215,6 +235,20 @@ struct StorageManagementView: View {
                         .padding(.top, 6)
                 }
                 .disabled(isClearing)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Watch History")
+                    tvClearRow(title: "Clear Watch History", size: nil) {
+                        confirmHistoryClear = true
+                    }
+
+                    Text("Removes watch progress and the watched status of every title, and empties your Continue Watching and Recently Watched lists. Favorites and your watchlist aren't affected.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+                .disabled(isClearing)
             }
             .task { await load() }
             .clearConfirmations(
@@ -222,6 +256,10 @@ struct StorageManagementView: View {
                 confirmMetadataClear: $confirmMetadataClear,
                 onClearImageCache: { Task { await perform(.imageCache) } },
                 onClearMetadata: { Task { await perform(.metadata) } }
+            )
+            .watchHistoryConfirmation(
+                isPresented: $confirmHistoryClear,
+                onClear: { Task { await perform(.watchHistory) } }
             )
             #if DEBUG
             .alert("Clear Index", isPresented: $confirmIndexClear) {
@@ -270,6 +308,21 @@ private extension View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Cached posters, cast, trailers and ratings from TMDB and OMDb will be removed. They are re-fetched when you open a movie or show.")
+        }
+    }
+
+    /// The watch-history clear confirmation, shared by both platform layouts.
+    /// Kept separate from `clearConfirmations` because it wipes user data rather
+    /// than a re-derivable cache.
+    func watchHistoryConfirmation(
+        isPresented: Binding<Bool>,
+        onClear: @escaping () -> Void
+    ) -> some View {
+        alert("Clear Watch History", isPresented: isPresented) {
+            Button("Clear", role: .destructive, action: onClear)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your watch progress and watched status for every title will be removed. This can't be undone.")
         }
     }
 }
