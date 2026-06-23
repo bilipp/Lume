@@ -440,11 +440,34 @@ class XtreamClient: APIClient {
         URL(string: "\(playlist.serverURL)/live/\(playlist.username)/\(playlist.password)/\(stream.streamId).\(format.rawValue)")
     }
 
-    /// Builds a catchup/timeshift URL for a live stream
-    func buildCatchupURL(for stream: LiveStream, playlist: Playlist, startTime: Date, duration: TimeInterval = 3600) -> URL? {
-        let timestamp = Int(startTime.timeIntervalSince1970)
-        let durationInt = Int(duration)
-        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationInt)/\(timestamp)/\(stream.streamId).m3u8")
+    /// `Y-m-d:H-i` is the start format Xtream Codes panels expect in a timeshift
+    /// path. Formatted in the device's local timezone — the panel interprets the
+    /// value as wall-clock time, and EPG `start` dates are absolute instants, so
+    /// this keeps the requested moment aligned with what the guide showed.
+    private nonisolated static let timeshiftStartFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd:HH-mm"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    /// Builds a catch-up / timeshift URL for a past programme on a live stream.
+    ///
+    /// Uses the Xtream Codes timeshift path
+    /// `…/timeshift/user/pass/{durationMinutes}/{Y-m-d:H-i}/{streamId}.{ext}`,
+    /// where the duration is the programme length in minutes and the start is the
+    /// programme's air time. Only meaningful for Xtream streams (m3u channels
+    /// carry no credentials).
+    nonisolated func buildCatchupURL(
+        for stream: LiveStream,
+        playlist: Playlist,
+        start: Date,
+        durationMinutes: Int,
+        format: StreamFormat = .m3u8
+    ) -> URL? {
+        guard durationMinutes > 0 else { return nil }
+        let startString = Self.timeshiftStartFormatter.string(from: start)
+        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(format.rawValue)")
     }
 }
 
