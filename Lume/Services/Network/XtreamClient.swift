@@ -104,6 +104,9 @@ class XtreamClient: APIClient {
         config.httpMaximumConnectionsPerHost = 1
         config.timeoutIntervalForRequest = timeout
         config.timeoutIntervalForResource = 120
+        // Some panels only return JSON to a recognized player UA; the default
+        // CFNetwork UA gets an HTML block page that fails to decode.
+        config.httpAdditionalHeaders = ["User-Agent": lumeCatalogUserAgent]
         return URLSession(configuration: config)
     }
 

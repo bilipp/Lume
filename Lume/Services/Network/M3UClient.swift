@@ -49,6 +49,9 @@ nonisolated class M3UClient {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 600
+        // Match the Xtream client: some providers serve a block page to an
+        // unrecognized UA, breaking the playlist download/parse.
+        config.httpAdditionalHeaders = ["User-Agent": lumeCatalogUserAgent]
         return URLSession(configuration: config)
     }
 
