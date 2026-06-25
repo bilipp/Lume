@@ -2426,106 +2426,106 @@
         }
       }
     },
-    "Artwork, ratings and details are provided by these services. This product uses the TMDB API but is not endorsed or certified by TMDB." : {
+    "Artwork, ratings and details are provided by TMDB, the OMDb API, and Trakt, and intro/recap skip data by IntroDB. This product uses the TMDB API but is not endorsed or certified by TMDB." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bilder, Bewertungen und Details werden von diesen Diensten bereitgestellt. Dieses Produkt nutzt die TMDB-API, wird aber von TMDB weder unterstützt noch zertifiziert."
+            "value" : "Bilder, Bewertungen und Details werden von TMDB, der OMDb-API und Trakt bereitgestellt, Daten zum Überspringen von Intros/Rückblicken von IntroDB. Dieses Produkt nutzt die TMDB-API, wird aber von TMDB weder unterstützt noch zertifiziert."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Las ilustraciones, las valoraciones y los detalles los proporcionan estos servicios. Este producto utiliza la API de TMDB, pero no cuenta con el respaldo ni la certificación de TMDB."
+            "value" : "Las ilustraciones, las valoraciones y los detalles los proporcionan TMDB, la API de OMDb y Trakt, y los datos para saltar introducciones/resúmenes, IntroDB. Este producto utiliza la API de TMDB, pero no cuenta con el respaldo ni la certificación de TMDB."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les visuels, les notes et les détails sont fournis par ces services. Ce produit utilise l’API TMDB, mais n’est ni approuvé ni certifié par TMDB."
+            "value" : "Les visuels, les notes et les détails sont fournis par TMDB, l’API OMDb et Trakt, et les données de saut d’intro/résumé par IntroDB. Ce produit utilise l’API TMDB, mais n’est ni approuvé ni certifié par TMDB."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Immagini, valutazioni e dettagli sono forniti da questi servizi. Questo prodotto utilizza l'API di TMDB ma non è approvato o certificato da TMDB."
+            "value" : "Immagini, valutazioni e dettagli sono forniti da TMDB, dall'API di OMDb e da Trakt, e i dati per saltare intro/riepiloghi da IntroDB. Questo prodotto utilizza l'API di TMDB ma non è approvato o certificato da TMDB."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アートワーク、評価、詳細情報はこれらのサービスによって提供されています。本製品はTMDB APIを使用していますが、TMDBによる承認や認定を受けたものではありません。"
+            "value" : "アートワーク、評価、詳細情報はTMDB、OMDb API、Traktによって、イントロ/振り返りのスキップデータはIntroDBによって提供されています。本製品はTMDB APIを使用していますが、TMDBによる承認や認定を受けたものではありません。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "아트워크, 평점, 세부 정보는 이러한 서비스에서 제공합니다. 이 제품은 TMDB API를 사용하지만 TMDB의 보증이나 인증을 받지 않았습니다."
+            "value" : "아트워크, 평점, 세부 정보는 TMDB, OMDb API, Trakt에서 제공하며, 인트로/요약 건너뛰기 데이터는 IntroDB에서 제공합니다. 이 제품은 TMDB API를 사용하지만 TMDB의 보증이나 인증을 받지 않았습니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As imagens, avaliações e detalhes são fornecidos por estes serviços. Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB."
+            "value" : "As imagens, avaliações e detalhes são fornecidos pelo TMDB, pela API do OMDb e pelo Trakt, e os dados de pular introdução/recapitulação pelo IntroDB. Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "封面、评分和详细信息由这些服务提供。本产品使用TMDB API，但未获得TMDB的认可或认证。"
+            "value" : "封面、评分和详细信息由TMDB、OMDb API和Trakt提供，片头/回顾跳过数据由IntroDB提供。本产品使用TMDB API，但未获得TMDB的认可或认证。"
           }
         }
       }
     },
-    "Artwork, ratings and details are provided by TMDB, the OMDb API, and Trakt. This product uses the TMDB API but is not endorsed or certified by TMDB." : {
+    "Artwork, ratings, details and intro/recap skip data are provided by these services. This product uses the TMDB API but is not endorsed or certified by TMDB." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bilder, Bewertungen und Details werden von TMDB, der OMDb-API und Trakt bereitgestellt. Dieses Produkt nutzt die TMDB-API, wird aber von TMDB weder unterstützt noch zertifiziert."
+            "value" : "Bilder, Bewertungen, Details und Daten zum Überspringen von Intros/Rückblicken werden von diesen Diensten bereitgestellt. Dieses Produkt nutzt die TMDB-API, wird aber von TMDB weder unterstützt noch zertifiziert."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Las ilustraciones, las valoraciones y los detalles los proporcionan TMDB, la API de OMDb y Trakt. Este producto utiliza la API de TMDB, pero no cuenta con el respaldo ni la certificación de TMDB."
+            "value" : "Las ilustraciones, las valoraciones, los detalles y los datos para saltar introducciones/resúmenes los proporcionan estos servicios. Este producto utiliza la API de TMDB, pero no cuenta con el respaldo ni la certificación de TMDB."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les visuels, les notes et les détails sont fournis par TMDB, l’API OMDb et Trakt. Ce produit utilise l’API TMDB, mais n’est ni approuvé ni certifié par TMDB."
+            "value" : "Les visuels, les notes, les détails et les données de saut d’intro/résumé sont fournis par ces services. Ce produit utilise l’API TMDB, mais n’est ni approuvé ni certifié par TMDB."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Immagini, valutazioni e dettagli sono forniti da TMDB, dall'API di OMDb e da Trakt. Questo prodotto utilizza l'API di TMDB ma non è approvato o certificato da TMDB."
+            "value" : "Immagini, valutazioni, dettagli e dati per saltare intro/riepiloghi sono forniti da questi servizi. Questo prodotto utilizza l'API di TMDB ma non è approvato o certificato da TMDB."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アートワーク、評価、詳細情報はTMDB、OMDb API、Traktによって提供されています。本製品はTMDB APIを使用していますが、TMDBによる承認や認定を受けたものではありません。"
+            "value" : "アートワーク、評価、詳細情報、イントロ/振り返りのスキップデータはこれらのサービスによって提供されています。本製品はTMDB APIを使用していますが、TMDBによる承認や認定を受けたものではありません。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "아트워크, 평점, 세부 정보는 TMDB, OMDb API, Trakt에서 제공합니다. 이 제품은 TMDB API를 사용하지만 TMDB의 보증이나 인증을 받지 않았습니다."
+            "value" : "아트워크, 평점, 세부 정보 및 인트로/요약 건너뛰기 데이터는 이러한 서비스에서 제공합니다. 이 제품은 TMDB API를 사용하지만 TMDB의 보증이나 인증을 받지 않았습니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As imagens, avaliações e detalhes são fornecidos pelo TMDB, pela API do OMDb e pelo Trakt. Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB."
+            "value" : "As imagens, avaliações, detalhes e dados de pular introdução/recapitulação são fornecidos por estes serviços. Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "封面、评分和详细信息由TMDB、OMDb API和Trakt提供。本产品使用TMDB API，但未获得TMDB的认可或认证。"
+            "value" : "封面、评分、详细信息以及片头/回顾跳过数据由这些服务提供。本产品使用TMDB API，但未获得TMDB的认可或认证。"
           }
         }
       }
@@ -12294,6 +12294,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已中断 — 稍后将重试"
+          }
+        }
+      }
+    },
+    "IntroDB" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IntroDB"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IntroDB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IntroDB"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IntroDB"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IntroDB"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IntroDB"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IntroDB"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IntroDB"
           }
         }
       }

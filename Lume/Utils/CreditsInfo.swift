@@ -70,6 +70,7 @@ nonisolated enum CreditsInfo {
     static let tmdb = "https://www.themoviedb.org"
     static let omdb = "https://www.omdbapi.com"
     static let trakt = "https://trakt.tv"
+    static let introDB = "https://introdb.app"
 
     static var tmdbURL: URL? {
         URL(string: tmdb)
@@ -81,6 +82,10 @@ nonisolated enum CreditsInfo {
 
     static var traktURL: URL? {
         URL(string: trakt)
+    }
+
+    static var introDBURL: URL? {
+        URL(string: introDB)
     }
 
     // MARK: - Lume

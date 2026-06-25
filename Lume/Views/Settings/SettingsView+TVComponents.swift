@@ -119,7 +119,8 @@ import SwiftUI
                     }
                 }
 
-                Text("Artwork, ratings and details are provided by TMDB, the OMDb API, and Trakt. This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                // swiftlint:disable:next line_length
+                Text("Artwork, ratings and details are provided by TMDB, the OMDb API, and Trakt, and intro/recap skip data by IntroDB. This product uses the TMDB API but is not endorsed or certified by TMDB.")
                     .font(.system(size: 22))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)

@@ -78,10 +78,15 @@
                         Label("Trakt", systemImage: "rectangle.stack.badge.play")
                     }
                 }
+                if let url = CreditsInfo.introDBURL {
+                    Link(destination: url) {
+                        Label("IntroDB", systemImage: "forward.end")
+                    }
+                }
             } header: {
                 Text("Metadata")
             } footer: {
-                Text("Artwork, ratings and details are provided by these services. This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                Text("Artwork, ratings, details and intro/recap skip data are provided by these services. This product uses the TMDB API but is not endorsed or certified by TMDB.")
             }
         }
 
