@@ -3,6 +3,15 @@ name: Sideload Release
 on:
   release:
     types: [published]
+  # Manual re-run against an existing release tag — e.g. when a runner-side
+  # build issue (missing Metal toolchain, transient SPM checkout) failed the
+  # original release-triggered run. Builds the tagged code and attaches the
+  # sideload assets to that release without re-cutting or moving the tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to (re)build sideload assets for (e.g. v1.2.0)
+        required: true
 
 # The build jobs attach assets to the release, which requires write access to
 # repo contents. The default GITHUB_TOKEN is read-only when the repo's default
@@ -10,6 +19,11 @@ on:
 # integration" on upload.
 permissions:
   contents: write
+
+# Resolved once and shared by every step (incl. checkout ref). On a release
+# event this is the published tag; on manual dispatch it's the input.
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
 
 jobs:
   build:
@@ -36,11 +50,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+
+      # ── Metal Toolchain ──────────────────────────────────────────────────────
+      # Xcode 26 no longer bundles the Metal toolchain; without it KSPlayer's
+      # Shaders.metal fails to compile ("cannot execute tool 'metal' due to
+      # missing Metal Toolchain"). Download it before archiving.
+      - name: Download Metal Toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
 
       # ── Inject API key secrets (optional) ───────────────────────────────────
       # Features degrade gracefully when absent (see Scripts/inject-env.sh).
@@ -83,7 +106,7 @@ jobs:
       - name: Package IPA
         if: matrix.format == 'ipa'
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="$RELEASE_TAG"
           APP=$(find "$RUNNER_TEMP/Lume-Sideload.xcarchive/Products" -name "*.app" | head -1)
 
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
@@ -97,7 +120,7 @@ jobs:
       - name: Package zip
         if: matrix.format == 'zip'
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="$RELEASE_TAG"
           APP=$(find "$RUNNER_TEMP/Lume-Sideload.xcarchive/Products" -name "*.app" | head -1)
 
           ditto -c -k --sequesterRsrc --keepParent \
@@ -108,4 +131,5 @@ jobs:
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ runner.temp }}/Lume-${{ github.event.release.tag_name }}-${{ matrix.platform }}-Sideload.${{ matrix.format }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: ${{ runner.temp }}/Lume-${{ env.RELEASE_TAG }}-${{ matrix.platform }}-Sideload.${{ matrix.format }}
