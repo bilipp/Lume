@@ -102,7 +102,9 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - Automatic resume playback and progress tracking
 - Auto-mark-as-watched at 90% completion
 - **Next Up** overlay with auto-play for series episodes
+- **Skip Intro / Recap** overlay during playback, powered by IntroDB skip windows
 - Optional **Trakt** scrobbling — plus one-tap import of your existing Trakt watched history — and **TMDB** metadata enrichment
+- **Clear watch history** from Settings to reset progress, watched markers, and last-watched dates across all content
 
 #### 👤 Profiles
 - Multiple **user profiles**, each with its own watch history, progress, and favorites
@@ -114,7 +116,7 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - Manage multiple playlists — **Xtream Codes** and **M3U/M3U8** (add / edit / delete / switch)
 - M3U support: URL-based playlists, local file import, URL-tvg EPG auto-detection
 - Server info at a glance: status, active connections, expiry
-- Background **content sync** with step-by-step progress
+- Background **content sync** with step-by-step progress, which **prunes stale titles** the provider has dropped so the local catalog stays in step
 - Scheduled **auto-sync** (every 6 hours, daily, every 3 days, or weekly)
 
 ---
@@ -187,7 +189,7 @@ Lume follows a clean, layered SwiftUI architecture:
 - **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer
 - **Networking** — `URLSession` with typed endpoints, retry/backoff, and error classification
 - **Integrations** — TMDB (metadata), OMDb (ratings), Trakt (device OAuth + scrobbling)
-- **Localization** — English & German via String Catalogs
+- **Localization** — 9 languages via String Catalogs (English, German, French, Spanish, Italian, Portuguese, Japanese, Korean, Simplified Chinese)
 
 **Dependencies** (Swift Package Manager)
 
