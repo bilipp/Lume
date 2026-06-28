@@ -142,40 +142,46 @@ struct LiveTVView: View {
                 }
             }
             .platformNavigationTitle("Live TV")
-            #if os(iOS) || os(macOS)
-                .toolbar {
-                    if !playlists.isEmpty, !categories.isEmpty {
-                        ToolbarItem(placement: .principal) {
-                            layoutModePicker
-                                .frame(maxWidth: 240)
-                        }
-                    }
-                }
+            #if os(iOS)
+                // Inline title: the category selector sits directly below the
+                // nav bar, so a large title would rubber-band down and float
+                // behind the selector when the channel list is overscrolled.
+                .navigationBarTitleDisplayMode(.inline)
             #endif
-                .libraryToolbar(config: LibraryToolbarConfiguration(
-                    playlists: playlists,
-                    selectedPlaylistID: $selectedPlaylistID,
-                    categorySortRaw: $categorySortRaw,
-                    contentSortRaw: $contentSortRaw,
-                    showingSync: $showingSync,
-                    showingSettings: $showingSettings,
-                    activePlaylist: activePlaylist
-                ))
-                .task {
-                    if selectedSection == nil, let first = sortedSections.first {
-                        selectedSection = first
+            #if os(iOS) || os(macOS)
+            .toolbar {
+                if !playlists.isEmpty, !categories.isEmpty {
+                    ToolbarItem(placement: .principal) {
+                        layoutModePicker
+                            .frame(maxWidth: 240)
                     }
                 }
-                .onChange(of: selectedPlaylistID) {
-                    // Switching playlists invalidates the current selection, which
-                    // belongs to the previous playlist. Reset to the new playlist's
-                    // first section so the channel list stays in sync.
-                    selectedSection = sortedSections.first
+            }
+            #endif
+            .libraryToolbar(config: LibraryToolbarConfiguration(
+                playlists: playlists,
+                selectedPlaylistID: $selectedPlaylistID,
+                categorySortRaw: $categorySortRaw,
+                contentSortRaw: $contentSortRaw,
+                showingSync: $showingSync,
+                showingSettings: $showingSettings,
+                activePlaylist: activePlaylist
+            ))
+            .task {
+                if selectedSection == nil, let first = sortedSections.first {
+                    selectedSection = first
                 }
+            }
+            .onChange(of: selectedPlaylistID) {
+                // Switching playlists invalidates the current selection, which
+                // belongs to the previous playlist. Reset to the new playlist's
+                // first section so the channel list stays in sync.
+                selectedSection = sortedSections.first
+            }
             #if os(iOS) || os(tvOS)
-                .fullScreenCover(item: $playingMedia) { media in
-                    FullScreenPlayerView(media: media)
-                }
+            .fullScreenCover(item: $playingMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
             #endif
         }
     }
@@ -353,46 +359,113 @@ struct CategorySidebar: View {
 // MARK: - iOS Category Bar
 
 #if os(iOS)
+    /// iOS category selector. A horizontal pill strip is unscannable once a
+    /// playlist syncs hundreds of categories, so the current section is shown as a
+    /// single button that opens a searchable list of every section instead.
     struct CategoryBar: View {
         let sections: [LiveTVSection]
         @Binding var selectedSection: LiveTVSection?
 
+        @State private var showingPicker = false
+
+        /// The section the button reflects — the user's selection, or the first
+        /// available one if that selection has since disappeared (mirrors
+        /// `displayedSection(in:)`).
+        private var currentSection: LiveTVSection? {
+            guard let selectedSection else { return sections.first }
+            return sections.first { $0.id == selectedSection.id } ?? sections.first
+        }
+
         var body: some View {
-            ScrollView(.horizontal, showsIndicators: false) {
+            Button {
+                showingPicker = true
+            } label: {
                 HStack(spacing: 8) {
-                    ForEach(sections) { section in
-                        let isSelected = selectedSection?.id == section.id
-                        Button {
-                            selectedSection = section
-                        } label: {
-                            HStack(spacing: 5) {
-                                if let icon = section.icon {
-                                    Image(systemName: icon)
-                                        .font(.caption)
-                                }
-                                section.titleText
-                                    .font(.subheadline)
-                            }
-                            .fontWeight(isSelected ? .semibold : .regular)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                isSelected
-                                    ? Color.accentColor
-                                    : Color.gray.opacity(0.15)
-                            )
-                            .foregroundStyle(isSelected ? .white : .primary)
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
+                    if let icon = currentSection?.icon {
+                        Image(systemName: icon)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
+                    (currentSection?.titleText ?? Text("Select a Category"))
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .background(.bar)
+            .sheet(isPresented: $showingPicker) {
+                CategoryPickerSheet(sections: sections, selectedSection: $selectedSection)
+            }
 
             Divider()
+        }
+    }
+
+    /// Searchable list of every Live TV section. Type to filter hundreds of
+    /// synced categories down to a handful; the virtual collections stay pinned
+    /// at the top while the search field is empty.
+    private struct CategoryPickerSheet: View {
+        let sections: [LiveTVSection]
+        @Binding var selectedSection: LiveTVSection?
+
+        @Environment(\.dismiss) private var dismiss
+        @State private var query = ""
+
+        private var filteredSections: [LiveTVSection] {
+            let trimmed = query.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return sections }
+            return sections.filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
+        }
+
+        var body: some View {
+            NavigationStack {
+                List(filteredSections) { section in
+                    let isSelected = selectedSection?.id == section.id
+                    Button {
+                        selectedSection = section
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 12) {
+                            if let icon = section.icon {
+                                Image(systemName: icon)
+                                    .foregroundStyle(.secondary)
+                            }
+                            section.titleText
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if isSelected {
+                                Image(systemName: "checkmark")
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.tint)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .listStyle(.plain)
+                .overlay {
+                    if filteredSections.isEmpty {
+                        ContentUnavailableView.search(text: query)
+                    }
+                }
+                .searchable(text: $query, prompt: "Search categories")
+                .navigationTitle("Categories")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+            }
         }
     }
 #endif
