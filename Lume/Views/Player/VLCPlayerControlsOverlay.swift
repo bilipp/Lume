@@ -83,6 +83,7 @@ struct VLCPlayerControlsOverlay: View {
 
             #if !os(tvOS)
                 AirPlayRouteButton()
+                ChromecastButton()
             #endif
         }
         .padding(.horizontal, 20)
