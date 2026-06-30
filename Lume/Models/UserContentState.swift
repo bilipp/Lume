@@ -9,6 +9,9 @@ enum SyncedContentKind: String, Codable, CaseIterable {
     case series
     case episode
     case live
+    /// A `Category` row. Carries its Content Management visibility (`isHidden`)
+    /// and ordering (`customOrder`) so those customizations sync across devices.
+    case category
 }
 
 /// CloudKit-synced per-content user state — the parts of the catalog the user
@@ -51,6 +54,17 @@ final class UserContentState {
     /// kinds.
     var favoriteOrder: Int?
 
+    /// Content Management visibility (`Category.isHidden` / `LiveStream.isHidden`).
+    /// Synced so hiding a category or channel on one device hides it everywhere.
+    /// Defaulted for CloudKit and additive, so records written before this
+    /// existed load as visible.
+    var isHidden: Bool = false
+    /// Content Management ordering for *categories* (`Category.customOrder`); nil
+    /// for other kinds. Per-channel within-category order is intentionally not
+    /// synced — it would write one record per channel in a reordered category —
+    /// so only category order rides here.
+    var customOrder: Int?
+
     /// The user's "For You" vote (`0` none, `1` up, `-1` down). Defaulted for
     /// CloudKit and additive, so records written before recommendations existed
     /// load as unvoted. Only movies and series ever set it.
@@ -74,6 +88,8 @@ final class UserContentState {
         addedToWatchlistDate: Date? = nil,
         favoriteOrder: Int? = nil,
         recommendationVoteRaw: Int = 0,
+        isHidden: Bool = false,
+        customOrder: Int? = nil,
         updatedAt: Date = Date()
     ) {
         self.contentId = contentId
@@ -86,6 +102,8 @@ final class UserContentState {
         self.addedToWatchlistDate = addedToWatchlistDate
         self.favoriteOrder = favoriteOrder
         self.recommendationVoteRaw = recommendationVoteRaw
+        self.isHidden = isHidden
+        self.customOrder = customOrder
         self.updatedAt = updatedAt
     }
 }

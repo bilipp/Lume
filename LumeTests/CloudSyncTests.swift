@@ -130,6 +130,51 @@ struct CloudSyncConflictPolicyTests {
         )
         #expect(empty.isEmpty)
     }
+
+    @Test func `a hidden or reordered item carries state and is not empty`() {
+        var hidden = ContentStateValues(
+            watchProgress: 0, isWatched: false, lastWatchedDate: nil,
+            isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil
+        )
+        hidden.isHidden = true
+        #expect(!hidden.isEmpty)
+
+        var ordered = ContentStateValues(
+            watchProgress: 0, isWatched: false, lastWatchedDate: nil,
+            isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil
+        )
+        ordered.customOrder = 3
+        #expect(!ordered.isEmpty)
+    }
+
+    @Test func `content management conflict keeps a hide and a concrete order`() {
+        var local = ContentStateValues(
+            watchProgress: 0, isWatched: false, lastWatchedDate: nil,
+            isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil
+        )
+        local.isHidden = true
+        local.customOrder = nil
+        var cloud = ContentStateValues(
+            watchProgress: 0, isWatched: false, lastWatchedDate: nil,
+            isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil
+        )
+        cloud.isHidden = false
+        cloud.customOrder = 5
+
+        let merged = ContentStateValues.mergeConflict(local: local, cloud: cloud)
+        #expect(merged.isHidden == true) // union — either side hiding wins
+        #expect(merged.customOrder == 5) // local nil → cloud's concrete order
+    }
+
+    @Test func `content state decodes a baseline written before hide and order existed`() throws {
+        // A shadow baseline persisted before these fields shipped has no
+        // `isHidden` / `customOrder` keys — it must still decode to defaults.
+        let legacy = #"{"watchProgress":0,"isWatched":false,"isFavorite":true}"#
+        let decoded = try JSONDecoder().decode(ContentStateValues.self, from: Data(legacy.utf8))
+        #expect(decoded.isFavorite)
+        #expect(decoded.isHidden == false)
+        #expect(decoded.customOrder == nil)
+    }
 }
 
 // MARK: - Engine integration (in-memory, no CloudKit)
@@ -325,6 +370,86 @@ struct CloudSyncEngineTests {
         _ = await engine.reconcile()
 
         #expect(try ctx.fetch(FetchDescriptor<UserContentState>()).isEmpty)
+    }
+
+    // MARK: - Content Management (hidden categories / channels, category order)
+
+    @Test func `a hidden category exports to a cloud mirror`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+
+        let playlist = Playlist(name: "My IPTV", serverURL: "http://x", username: "u", password: "p")
+        ctx.insert(playlist)
+
+        let category = Lume.Category(apiId: "12", name: "Sports", parentId: 0, type: .live, playlist: playlist)
+        category.isHidden = true
+        category.customOrder = 2
+        ctx.insert(category)
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(result.contentPushed == 1)
+        let states = try ctx.fetch(FetchDescriptor<UserContentState>())
+        let mirror = try #require(states.first { $0.kind == .category })
+        #expect(mirror.contentId == category.id)
+        #expect(mirror.isHidden == true)
+        #expect(mirror.customOrder == 2)
+    }
+
+    @Test func `a cloud category state hides the matching local category`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+
+        // The catalog already has the playlist + a visible category (as a fresh
+        // device would after its first content sync).
+        let playlist = Playlist(name: "My IPTV", serverURL: "http://x", username: "u", password: "p")
+        ctx.insert(playlist)
+        let category = Lume.Category(apiId: "12", name: "Sports", parentId: 0, type: .live, playlist: playlist)
+        ctx.insert(category)
+
+        // The cloud mirror says it should be hidden and reordered.
+        ctx.insert(UserContentState(contentId: category.id, kind: .category, isHidden: true, customOrder: 4))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(result.contentPulled == 1)
+        let updated = try #require(try ctx.fetch(FetchDescriptor<Lume.Category>()).first)
+        #expect(updated.isHidden == true)
+        #expect(updated.customOrder == 4)
+    }
+
+    @Test func `a hidden channel syncs but its per-category order does not`() async throws {
+        let container = try makeContainer()
+        let ctx = container.mainContext
+
+        let playlist = Playlist(name: "My IPTV", serverURL: "http://x", username: "u", password: "p")
+        let pid = playlist.id
+        ctx.insert(playlist)
+
+        // Hidden channel → mirrored. A channel that's only reordered (customOrder
+        // set, not hidden, not favorite) must NOT produce a mirror record.
+        let hidden = LiveStream(id: "\(pid.uuidString)-live-1", streamId: 1, name: "Hidden")
+        hidden.isHidden = true
+        hidden.customOrder = 0
+        ctx.insert(hidden)
+        let reorderedOnly = LiveStream(id: "\(pid.uuidString)-live-2", streamId: 2, name: "Reordered")
+        reorderedOnly.customOrder = 1
+        ctx.insert(reorderedOnly)
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        _ = await engine.reconcile()
+
+        let states = try ctx.fetch(FetchDescriptor<UserContentState>())
+        #expect(states.count == 1)
+        let mirror = try #require(states.first)
+        #expect(mirror.contentId == "\(pid.uuidString)-live-1")
+        #expect(mirror.isHidden == true)
+        #expect(mirror.customOrder == nil) // per-channel order stays device-local
     }
 
     // MARK: - EPG sources

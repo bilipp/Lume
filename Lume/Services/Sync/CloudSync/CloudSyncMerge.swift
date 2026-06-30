@@ -174,6 +174,14 @@ nonisolated struct ContentStateValues: Codable, Equatable {
     /// call sites that don't carry a vote (episodes, live, older code) stay
     /// unchanged.
     var recommendationVoteRaw: Int = 0
+    /// Content Management visibility — categories and live channels. Defaulted so
+    /// call sites for kinds that can't be hidden (movie/series/episode) stay
+    /// unchanged.
+    var isHidden: Bool = false
+    /// Content Management ordering for *categories* only. Per-channel
+    /// within-category order is intentionally device-local (it would write one
+    /// record per channel), so live entries always leave this nil.
+    var customOrder: Int?
 
     /// Whether every field is at its default — such an item carries no user
     /// state and is represented as *absent* (nil) so it never gets a cloud
@@ -182,6 +190,7 @@ nonisolated struct ContentStateValues: Codable, Equatable {
         watchProgress == 0 && !isWatched && lastWatchedDate == nil
             && !isFavorite && addedToWatchlistDate == nil && favoriteOrder == nil
             && recommendationVoteRaw == 0
+            && !isHidden && customOrder == nil
     }
 
     /// Conflict policy (both devices changed this item since the last sync):
@@ -198,7 +207,15 @@ nonisolated struct ContentStateValues: Codable, Equatable {
             // doesn't reset the position of an older watchlist entry.
             addedToWatchlistDate: earlierDate(local.addedToWatchlistDate, cloud.addedToWatchlistDate),
             favoriteOrder: local.favoriteOrder ?? cloud.favoriteOrder,
-            recommendationVoteRaw: mergeVote(local.recommendationVoteRaw, cloud.recommendationVoteRaw)
+            recommendationVoteRaw: mergeVote(local.recommendationVoteRaw, cloud.recommendationVoteRaw),
+            // Union, matching the never-lose-a-favorite policy: if either device
+            // hid the item, keep it hidden. A genuine toggle conflict between two
+            // devices in one sync window is the only case this can't resolve
+            // perfectly, and it's vanishingly rare for a hide/show toggle.
+            isHidden: local.isHidden || cloud.isHidden,
+            // Prefer a concrete order; only one device realistically reorders a
+            // given group between syncs, so a non-nil value is the intended one.
+            customOrder: local.customOrder ?? cloud.customOrder
         )
     }
 
@@ -231,12 +248,14 @@ extension ContentStateValues {
     enum CodingKeys: String, CodingKey {
         case watchProgress, isWatched, lastWatchedDate, isFavorite
         case addedToWatchlistDate, favoriteOrder, recommendationVoteRaw
+        case isHidden, customOrder
     }
 
-    /// Hand-rolled decode so a shadow baseline persisted before votes existed
-    /// (no `recommendationVoteRaw` key) still decodes — the field falls back to
-    /// `0` instead of failing the whole baseline and forcing a re-merge. The
-    /// synthesized decode would treat the missing key as an error.
+    /// Hand-rolled decode so a shadow baseline persisted before a field existed
+    /// (no `recommendationVoteRaw` / `isHidden` / `customOrder` key) still
+    /// decodes — the field falls back to its default instead of failing the whole
+    /// baseline and forcing a re-merge. The synthesized decode would treat the
+    /// missing key as an error.
     nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         watchProgress = try container.decode(Double.self, forKey: .watchProgress)
@@ -246,5 +265,7 @@ extension ContentStateValues {
         addedToWatchlistDate = try container.decodeIfPresent(Date.self, forKey: .addedToWatchlistDate)
         favoriteOrder = try container.decodeIfPresent(Int.self, forKey: .favoriteOrder)
         recommendationVoteRaw = try container.decodeIfPresent(Int.self, forKey: .recommendationVoteRaw) ?? 0
+        isHidden = try container.decodeIfPresent(Bool.self, forKey: .isHidden) ?? false
+        customOrder = try container.decodeIfPresent(Int.self, forKey: .customOrder)
     }
 }

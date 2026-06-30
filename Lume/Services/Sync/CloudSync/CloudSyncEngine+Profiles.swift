@@ -185,6 +185,8 @@ private extension CloudSyncEngine {
             mirror.addedToWatchlistDate = values.addedToWatchlistDate
             mirror.favoriteOrder = values.favoriteOrder
             mirror.recommendationVoteRaw = values.recommendationVoteRaw
+            mirror.isHidden = values.isHidden
+            mirror.customOrder = values.customOrder
             mirror.updatedAt = Date()
         } else {
             let mirror = UserContentState(
@@ -197,7 +199,9 @@ private extension CloudSyncEngine {
                 isFavorite: values.isFavorite,
                 addedToWatchlistDate: values.addedToWatchlistDate,
                 favoriteOrder: values.favoriteOrder,
-                recommendationVoteRaw: values.recommendationVoteRaw
+                recommendationVoteRaw: values.recommendationVoteRaw,
+                isHidden: values.isHidden,
+                customOrder: values.customOrder
             )
             cloudContext.insert(mirror)
             map[id] = mirror

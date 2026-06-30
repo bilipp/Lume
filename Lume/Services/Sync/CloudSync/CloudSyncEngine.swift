@@ -454,6 +454,7 @@ extension CloudSyncEngine {
         case is Series: .series
         case is Episode: .episode
         case is LiveStream: .live
+        case is Category: .category
         default: nil
         }
     }
@@ -474,6 +475,8 @@ extension CloudSyncEngine {
             mirror.addedToWatchlistDate = value.addedToWatchlistDate
             mirror.favoriteOrder = value.favoriteOrder
             mirror.recommendationVoteRaw = value.recommendationVoteRaw
+            mirror.isHidden = value.isHidden
+            mirror.customOrder = value.customOrder
             mirror.updatedAt = Date()
         } else {
             cloudContext.insert(UserContentState(
@@ -486,7 +489,9 @@ extension CloudSyncEngine {
                 isFavorite: value.isFavorite,
                 addedToWatchlistDate: value.addedToWatchlistDate,
                 favoriteOrder: value.favoriteOrder,
-                recommendationVoteRaw: value.recommendationVoteRaw
+                recommendationVoteRaw: value.recommendationVoteRaw,
+                isHidden: value.isHidden,
+                customOrder: value.customOrder
             ))
         }
     }
@@ -498,31 +503,59 @@ extension CloudSyncEngine {
         guard let kind else { return true } // nothing to apply (shadow-only id)
         let values = value ?? ContentStateValues(watchProgress: 0, isWatched: false, lastWatchedDate: nil, isFavorite: false, addedToWatchlistDate: nil, favoriteOrder: nil)
 
+        // Each helper returns false when its catalog item hasn't synced yet, so
+        // the change stays pending for a later pass.
         switch kind {
-        case .movie:
-            guard let movie = try (loaded as? Movie) ?? fetchMovie(id) else { return false }
-            movie.watchProgress = values.watchProgress
-            movie.isWatched = values.isWatched
-            movie.lastWatchedDate = values.lastWatchedDate
-            movie.isFavorite = values.isFavorite
-            movie.addedToWatchlistDate = values.addedToWatchlistDate
-            movie.recommendationVoteRaw = values.recommendationVoteRaw
-        case .series:
-            guard let series = try (loaded as? Series) ?? fetchSeries(id) else { return false }
-            series.isFavorite = values.isFavorite
-            series.addedToWatchlistDate = values.addedToWatchlistDate
-            series.lastWatchedDate = values.lastWatchedDate
-            series.recommendationVoteRaw = values.recommendationVoteRaw
-        case .episode:
-            guard let episode = try (loaded as? Episode) ?? fetchEpisode(id) else { return false }
-            episode.watchProgress = values.watchProgress
-            episode.isWatched = values.isWatched
-            episode.lastWatchedDate = values.lastWatchedDate
-        case .live:
-            guard let stream = try (loaded as? LiveStream) ?? fetchLiveStream(id) else { return false }
-            stream.isFavorite = values.isFavorite
-            stream.favoriteOrder = values.favoriteOrder
+        case .movie: return try applyMovieToLocal(values, id: id, loaded: loaded)
+        case .series: return try applySeriesToLocal(values, id: id, loaded: loaded)
+        case .episode: return try applyEpisodeToLocal(values, id: id, loaded: loaded)
+        case .live: return try applyLiveToLocal(values, id: id, loaded: loaded)
+        case .category: return try applyCategoryToLocal(values, id: id, loaded: loaded)
         }
+    }
+
+    private func applyMovieToLocal(_ values: ContentStateValues, id: String, loaded: (any PersistentModel)?) throws -> Bool {
+        guard let movie = try (loaded as? Movie) ?? fetchMovie(id) else { return false }
+        movie.watchProgress = values.watchProgress
+        movie.isWatched = values.isWatched
+        movie.lastWatchedDate = values.lastWatchedDate
+        movie.isFavorite = values.isFavorite
+        movie.addedToWatchlistDate = values.addedToWatchlistDate
+        movie.recommendationVoteRaw = values.recommendationVoteRaw
+        return true
+    }
+
+    private func applySeriesToLocal(_ values: ContentStateValues, id: String, loaded: (any PersistentModel)?) throws -> Bool {
+        guard let series = try (loaded as? Series) ?? fetchSeries(id) else { return false }
+        series.isFavorite = values.isFavorite
+        series.addedToWatchlistDate = values.addedToWatchlistDate
+        series.lastWatchedDate = values.lastWatchedDate
+        series.recommendationVoteRaw = values.recommendationVoteRaw
+        return true
+    }
+
+    private func applyEpisodeToLocal(_ values: ContentStateValues, id: String, loaded: (any PersistentModel)?) throws -> Bool {
+        guard let episode = try (loaded as? Episode) ?? fetchEpisode(id) else { return false }
+        episode.watchProgress = values.watchProgress
+        episode.isWatched = values.isWatched
+        episode.lastWatchedDate = values.lastWatchedDate
+        return true
+    }
+
+    private func applyLiveToLocal(_ values: ContentStateValues, id: String, loaded: (any PersistentModel)?) throws -> Bool {
+        guard let stream = try (loaded as? LiveStream) ?? fetchLiveStream(id) else { return false }
+        stream.isFavorite = values.isFavorite
+        stream.favoriteOrder = values.favoriteOrder
+        stream.isHidden = values.isHidden
+        // `customOrder` (per-category channel order) is intentionally
+        // device-local — not pulled from the mirror.
+        return true
+    }
+
+    private func applyCategoryToLocal(_ values: ContentStateValues, id: String, loaded: (any PersistentModel)?) throws -> Bool {
+        guard let category = try (loaded as? Category) ?? fetchCategory(id) else { return false }
+        category.isHidden = values.isHidden
+        category.customOrder = values.customOrder
         return true
     }
 
@@ -549,6 +582,13 @@ extension CloudSyncEngine {
         case let stream as LiveStream:
             stream.isFavorite = false
             stream.favoriteOrder = nil
+            stream.isHidden = false
+        // `customOrder` is device-local (not projected per profile) — leave it.
+        case let category as Category:
+            // `isRestricted` is a device-global parental control, not synced
+            // per-profile state — leave it untouched.
+            category.isHidden = false
+            category.customOrder = nil
         default:
             break
         }
