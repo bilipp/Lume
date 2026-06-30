@@ -18,7 +18,7 @@ struct GenreDerivationTests {
         Series(id: "\(prefix)series-\(seriesId)", seriesId: seriesId, name: "Series \(seriesId)", genre: genre)
     }
 
-    @Test func `derives distinct movie genres for the active playlist, most-common first`() throws {
+    @Test func `derives distinct movie genres for the active playlist, most-common first`() async throws {
         let container = try makeTestContainer()
         let context = container.mainContext
         context.insert(makeMovie(streamId: 1, genre: "Action, Drama", prefix: prefix))
@@ -27,27 +27,31 @@ struct GenreDerivationTests {
         context.insert(makeMovie(streamId: 4, genre: nil, prefix: prefix))
         // A different playlist's movie must not leak into the result.
         context.insert(makeMovie(streamId: 5, genre: "Horror", prefix: otherPrefix))
+        try context.save()
 
-        let genres = GenreDerivation.movieGenres(in: context, playlistPrefix: prefix, restriction: ContentRestriction())
+        let genres = await GenreDerivation.movieGenres(in: container, playlistPrefix: prefix, restriction: ContentRestriction())
         #expect(genres == ["Action", "Comedy", "Drama"])
     }
 
-    @Test func `derives distinct series genres for the active playlist`() throws {
+    @Test func `derives distinct series genres for the active playlist`() async throws {
         let container = try makeTestContainer()
         let context = container.mainContext
         context.insert(makeSeries(seriesId: 1, genre: "Sci-Fi & Fantasy, Drama", prefix: prefix))
         context.insert(makeSeries(seriesId: 2, genre: "Drama", prefix: prefix))
         context.insert(makeSeries(seriesId: 3, genre: "Horror", prefix: otherPrefix))
+        try context.save()
 
-        let genres = GenreDerivation.seriesGenres(in: context, playlistPrefix: prefix, restriction: ContentRestriction())
+        let genres = await GenreDerivation.seriesGenres(in: container, playlistPrefix: prefix, restriction: ContentRestriction())
         #expect(genres == ["Drama", "Sci-Fi & Fantasy"])
     }
 
-    @Test func `is empty when no title in the playlist carries a genre`() throws {
+    @Test func `is empty when no title in the playlist carries a genre`() async throws {
         let container = try makeTestContainer()
         let context = container.mainContext
         context.insert(makeMovie(streamId: 1, genre: nil, prefix: prefix))
+        try context.save()
 
-        #expect(GenreDerivation.movieGenres(in: context, playlistPrefix: prefix, restriction: ContentRestriction()).isEmpty)
+        let genres = await GenreDerivation.movieGenres(in: container, playlistPrefix: prefix, restriction: ContentRestriction())
+        #expect(genres.isEmpty)
     }
 }
