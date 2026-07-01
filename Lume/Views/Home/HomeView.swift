@@ -33,6 +33,7 @@ struct HomeView: View {
     @Query private var favoriteMovies: [Movie]
     @Query private var favoriteSeries: [Series]
     @Query private var favoriteStreams: [LiveStream]
+    @Query private var sportFavorites: [SportFavorite] // followed leagues/teams (Upcoming Matches row)
 
     @State private var trendingMovies: [HomeMediaItem] = []
     @State private var trendingSeries: [HomeMediaItem] = []
@@ -239,6 +240,7 @@ struct HomeView: View {
                     onVote: vote,
                     animationNamespace: animationNamespace
                 )
+            case .sportAnnouncements: SportAnnouncementsRow(playlist: activePlaylist, onPlay: playChannel)
             case .trendingMovies:
                 rail("Trending Movies", trendingMovies)
             case .trendingSeries:
@@ -316,7 +318,7 @@ struct HomeView: View {
             && favorites.isEmpty
             && trendingMovies.isEmpty
             && trendingSeries.isEmpty
-            && watchlist.isEmpty
+            && watchlist.isEmpty && sportFavorites.isEmpty
             && trendingState.isSettled
     }
 

@@ -89,6 +89,7 @@ Metacritic), and your viewing activity can be scrobbled to **Trakt**.
 - **Immersive full-screen tvOS home** with TMDB backdrop, crossfading hero, and fold-based scroll snapping
 - Continue Watching, Favorites, Recently Watched, and Trending rails
 - **For You** rail — on-device recommendations from your watch history and favorites; thumbs-up / thumbs-down a suggestion to tune what you see next, with your votes syncing across devices via iCloud (can be turned off in Settings)
+- **Upcoming Matches** rail — follow football leagues, cups, and teams (Settings › Sports) to see their next fixtures, each matched against your EPG so it links straight to the channel that carries the game
 
 #### 🔎 Discovery & organization
 - Global search across Movies, Series, and Live channels with type filtering
@@ -294,6 +295,10 @@ INTRO_DB_API_KEY=your_introdb_api_key
 # Trakt — watch scrobbling (device OAuth flow)
 TRAKT_CLIENT_ID=your_trakt_client_id
 TRAKT_CLIENT_SECRET=your_trakt_client_secret
+
+# TheSportsDB — football fixtures for the Upcoming Matches rail (optional;
+# falls back to TheSportsDB's free shared key when omitted)
+SPORTSDB_API_KEY=your_thesportsdb_key
 ```
 
 Every key is optional — Lume builds and runs fine with an empty `.env` or none at all.

@@ -101,6 +101,7 @@ struct SettingsView: View {
                     playlistsSection
                     librarySection
                     layoutSection
+                    sportsSection
                     searchSection
                     autoSyncSection
                     epgSection
@@ -228,6 +229,20 @@ struct SettingsView: View {
                 Text("Layout")
             } footer: {
                 Text("Choose which sections appear on Home and in what order.")
+            }
+        }
+
+        private var sportsSection: some View {
+            Section {
+                NavigationLink {
+                    SportPreferencesView()
+                } label: {
+                    Label("Sports", systemImage: "sportscourt")
+                }
+            } header: {
+                Text("Sports")
+            } footer: {
+                Text("Follow football leagues and teams to see their upcoming matches on Home.")
             }
         }
 
@@ -459,6 +474,7 @@ struct SettingsView: View {
                         }
                     case .profiles: TVProfilesSettingsView()
                     case .home: tvHomeLayoutDetail
+                    case .sports: TVSportPreferencesView()
                     case .epg: EPGSettingsView()
                     case .search: tvSearchDetail
                     case .storage: StorageManagementView()
