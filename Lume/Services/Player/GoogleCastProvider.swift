@@ -1,20 +1,17 @@
 import Foundation
 import OSLog
 
-// Chromecast support is delivered through the Google Cast SDK, a third-party
-// iOS-only dependency that is **not bundled** in this repo. Everything in this
-// file is gated behind `canImport(GoogleCast)`, so the app compiles and runs
-// unchanged until a developer adds the SDK (see `Docs/Chromecast.md`). Once the
-// `GoogleCast` product is linked, `CastService.configureGoogleCast()` registers
-// this provider against the `CastProvider` seam and the overlay's Chromecast
-// button comes to life.
+// Chromecast is delivered through the Google Cast SDK (v4.8.4), an iOS-only
+// dependency bundled at `Vendor/GoogleCast` and linked with `platformFilter =
+// ios` (see `Docs/Chromecast.md`). This file is gated behind
+// `os(iOS) && canImport(GoogleCast)` so the macOS/tvOS/visionOS builds never
+// compile it. `CastService.configureGoogleCast()` registers this provider on the
+// `CastProvider` seam and the overlay's Chromecast button comes to life.
 //
-// This scaffold targets Google Cast SDK v4 (GCKMediaLoadRequestDataBuilder,
-// GCKMediaInformationBuilder). It has not been compiled or run on a device in
-// this environment — treat it as the integration starting point, not a verified
-// implementation.
+// Verified to build/link/embed on the iOS simulator; casting to a physical
+// receiver and full transport/watch-progress bridging remain (see the doc).
 
-#if canImport(GoogleCast)
+#if os(iOS) && canImport(GoogleCast)
     import GoogleCast
 
     /// Bridges the Google Cast SDK to the engine-agnostic `CastProvider` seam.

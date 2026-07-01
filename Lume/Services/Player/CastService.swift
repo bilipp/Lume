@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 import OSLog
 
-#if canImport(GoogleCast)
+#if os(iOS) && canImport(GoogleCast)
     import GoogleCast
 #endif
 
@@ -71,7 +71,7 @@ final class CastService {
     /// the `GoogleCast` product is linked (the SDK is not bundled — see
     /// `Docs/Chromecast.md`), so it is safe to call unconditionally.
     func configureGoogleCast() {
-        #if canImport(GoogleCast)
+        #if os(iOS) && canImport(GoogleCast)
             let criteria = GCKDiscoveryCriteria(applicationID: kGCKDefaultMediaReceiverApplicationID)
             let options = GCKCastOptions(discoveryCriteria: criteria)
             GCKCastContext.setSharedInstanceWith(options)
