@@ -1,68 +1,74 @@
 # Chromecast integration
 
-Lume ships the **wiring** for Chromecast but not the **Google Cast SDK** itself.
-The SDK is a heavyweight, iOS-only, closed-source binary with its own
-privacy-manifest footprint, so it is left out of the default build. Everything in
-the codebase is gated behind `#if canImport(GoogleCast)`, so the app compiles and
-runs unchanged until you add the dependency by following the steps below.
+Lume bundles the **Google Cast SDK** (v4.8.4, dynamic XCFramework) so Chromecast
+works out of the box on **iOS / iPadOS**. The Cast SDK has no macOS, tvOS, or
+visionOS build, so it is linked with an `ios` platform filter and all Cast code
+is gated behind `#if canImport(GoogleCast)` — the other platforms compile exactly
+as before. This complements the native **AirPlay** support, which needs no
+third-party SDK.
 
-This complements the native **AirPlay** support, which needs no third-party SDK
-(see the player overlay's AirPlay button). Chromecast targets **iOS / iPadOS
-only** — the Cast SDK has no macOS, tvOS, or visionOS build.
+## Where it lives
 
-## What's already in place
-
-| Piece | File | Role |
+| Piece | Path | Role |
 |---|---|---|
-| Casting seam | `Lume/Services/Player/CastService.swift` | `CastProvider` protocol + `configureGoogleCast()` registration (no-op without the SDK) |
-| Provider | `Lume/Services/Player/GoogleCastProvider.swift` | `GCKSessionManager` / `GCKRemoteMediaClient` bridge to `CastProvider`; loads the current `PlayableMedia`, exposes play/pause/seek and a progress callback |
-| Cast button | `Lume/Views/Player/ChromecastButton.swift` | `GCKUICastButton` styled to match the overlay; renders nothing until the SDK is linked |
+| Vendored SDK | `Vendor/GoogleCast/GoogleCast.xcframework` | Google Cast SDK v4.8.4 (dynamic); linked + embedded on iOS only (`platformFilter = ios`) |
+| Casting seam | `Lume/Services/Player/CastService.swift` | `CastProvider` protocol + `configureGoogleCast()` registration |
+| Provider | `Lume/Services/Player/GoogleCastProvider.swift` | `GCKSessionManager` / `GCKRemoteMediaClient` bridge; loads the current `PlayableMedia`, exposes play/pause/seek + a progress callback |
+| Cast button | `Lume/Views/Player/ChromecastButton.swift` | `GCKUICastButton` styled to match the overlay |
 | Launch hook | `Lume/LumeApp.swift` | calls `CastService.shared.configureGoogleCast()` |
-| Discovery keys | `Lume/Info.plist` | `NSBonjourServices` + `NSLocalNetworkUsageDescription` |
+| Discovery keys | `Lume/Info.plist` | `NSBonjourServices`, `NSLocalNetworkUsageDescription`, `NSBluetoothAlwaysUsageDescription` |
 
-## Adding the SDK
+The XCFramework carries its own `PrivacyInfo.xcprivacy`, so its required-reason
+API and data-use declarations are covered without editing Lume's manifest.
 
-1. **Add the Swift Package** in Xcode (File ▸ Add Package Dependencies):
+## Project wiring (already done)
 
-   ```
-   https://github.com/google/cast-sdk-ios
-   ```
+The `xcodeproj` wiring was applied by `Scripts`-style automation, but for
+reference it is: a file reference to `Vendor/GoogleCast/GoogleCast.xcframework`,
+added to the **Lume** target's *Frameworks* (link) and an *Embed Frameworks* copy
+phase with **Code Sign On Copy**, both with `platformFilter = ios`. The
+*Embed Frameworks* phase is ordered **before** the "Inject .env secrets" run
+script to avoid a build-phase dependency cycle. Build settings gained
+`FRAMEWORK_SEARCH_PATHS = $(PROJECT_DIR)/Vendor/GoogleCast` and `-ObjC` in
+`OTHER_LDFLAGS`.
 
-   Add the **`GoogleCast`** product to the **Lume** target's iOS destination only.
-   (If you prefer the no-Bluetooth variant to avoid the Bluetooth privacy prompt,
-   use that product instead — both define the `GoogleCast` module the gates check.)
+## Receiver app ID
 
-2. **Build for an iOS destination.** `canImport(GoogleCast)` now resolves true, so
-   `GoogleCastProvider`, the `ChromecastButton`, and `configureGoogleCast()` start
-   compiling and the cast button appears in the player overlay when a receiver is
-   on the network.
+Uses Google's Default Media Receiver (`kGCKDefaultMediaReceiverApplicationID`,
+id `CC1AD845`). To use a styled/custom receiver from the
+[Google Cast Developer Console](https://cast.google.com/publish), change the id in
+`CastService.configureGoogleCast()` **and** the `_CC1AD845._googlecast._tcp`
+entry in `Info.plist`.
 
-3. **Receiver app ID.** The scaffold uses Google's Default Media Receiver
-   (`kGCKDefaultMediaReceiverApplicationID`, id `CC1AD845`). If you register a
-   styled/custom receiver in the [Google Cast Developer Console](https://cast.google.com/publish),
-   swap the id in `CastService.configureGoogleCast()` **and** the
-   `_CC1AD845._googlecast._tcp` entry in `Info.plist`.
+## Updating the SDK
 
-## Privacy manifest
+Download a newer dynamic XCFramework and replace the vendored copy:
 
-The Google Cast SDK accesses the local network and (in the full variant)
-Bluetooth, and may declare required-reason APIs. Before shipping:
+```bash
+curl -L -o gcast.zip \
+  "https://dl.google.com/dl/chromecast/sdk/ios/GoogleCastSDK-ios-<version>_dynamic.zip"
+unzip gcast.zip
+rm -rf Vendor/GoogleCast/GoogleCast.xcframework
+cp -R GoogleCastSDK-ios-<version>_dynamic_xcframework/GoogleCast.xcframework Vendor/GoogleCast/
+```
 
-- Confirm the SDK bundles its own `PrivacyInfo.xcprivacy` (recent versions do); if
-  not, account for its data use in Lume's `PrivacyInfo.xcprivacy`.
-- The `NSLocalNetworkUsageDescription` string in `Info.plist` is English-only —
-  localize it alongside the other catalog strings before release.
-- Re-run the privacy report (see the `privacy-manifest` skill) after linking.
+Update `Vendor/GoogleCast/VERSION.txt`. No project changes are needed unless the
+framework layout changes.
 
-## Remaining work
+## Remaining work (not yet wired)
 
-- **Transport mirroring:** the overlay's transport controls (play/pause/seek) act
-  on the local engine. Route them to `GoogleCastProvider` while a session is
-  active, and reflect the receiver's `GCKMediaStatus` back into the overlay.
-- **Watch progress:** `GoogleCastProvider.onProgress` reports the receiver's
-  position; wire it to `WatchProgressWriter` so casting updates resume points and
-  the 90%-watched / NextUp flow, the same way local playback does.
-- **Engine pause:** when a cast session starts, pause the on-device engine so the
-  stream isn't decoded twice.
-- **On-device verification:** none of the gated code has been compiled or run in
-  CI — exercise it against a real Cast device before release.
+The SDK links and the cast button discovers/starts sessions, but the transport is
+not yet fully bridged — verify and finish on a real Cast device:
+
+- **Transport mirroring:** the overlay's play/pause/seek act on the local engine.
+  Route them to the active `GoogleCastProvider` session and reflect the receiver's
+  `GCKMediaStatus` back into the overlay.
+- **Watch progress:** wire `GoogleCastProvider.onProgress` to `WatchProgressWriter`
+  so casting updates resume points and the 90%-watched / NextUp flow.
+- **Engine pause:** pause the on-device engine when a cast session starts so the
+  stream isn't decoded in two places.
+- **Localize** the `NSLocalNetworkUsageDescription` / `NSBluetoothAlwaysUsageDescription`
+  strings (currently English-only).
+- **On-device verification:** the integration is verified to build, link, and
+  embed on the iOS simulator, but casting to a physical receiver has not been
+  exercised.

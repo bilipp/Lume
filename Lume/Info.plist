@@ -45,8 +45,9 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<!-- Chromecast (Google Cast SDK) device discovery. Only used once the
-	     GoogleCast product is linked — see Docs/Chromecast.md. -->
+	<!-- Chromecast (Google Cast SDK) device discovery — see Docs/Chromecast.md. -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Lume uses Bluetooth to discover nearby Chromecast devices.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_googlecast._tcp</string>
