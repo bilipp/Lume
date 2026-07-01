@@ -12,10 +12,11 @@ import OSLog
 /// integration plugs in without the overlay needing to know which casting
 /// ecosystem is in use — see issue #103.
 ///
-/// Per-engine AirPlay reality: the AVPlayer engine enables `allowsExternal
-/// Playback`, so picking an AirPlay receiver hands it the full video. The
-/// KSPlayer and VLCKit engines render into their own layers, so on those a
-/// chosen route carries the audio while video stays on the device. The route
+/// Per-engine AirPlay reality: only the AVPlayer engine can hand full-screen
+/// video to an AirPlay receiver (it enables `allowsExternalPlayback`). KSPlayer
+/// and VLCKit render into their own layers, so AirPlay would carry only their
+/// audio — so when `isAirPlayActive` flips, `FullScreenPlayerView` drives the
+/// stream through the AVPlayer engine for the duration of the cast. The route
 /// state tracked here is engine-agnostic because AirPlay always reshapes the
 /// shared audio route.
 @MainActor

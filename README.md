@@ -158,9 +158,10 @@ Downloads always play in Lume, and playback falls back to the built-in player wh
 the selected app is not installed.
 
 Send playback to the TV with **AirPlay** — a route picker sits in the player overlay
-on iOS, iPadOS, and macOS. The **AVPlayer** engine streams full video to the
-receiver; on the KSPlayer and VLCKit engines the picker routes the audio while video
-stays on the device. (Chromecast support is on the [roadmap](#roadmap).)
+on iOS, iPadOS, and macOS. Full-screen video is delivered through Apple's AVPlayer,
+so when you pick a receiver while on the KSPlayer or VLCKit engine the current stream
+is handed to AVPlayer for the cast and resumes where it left off (formats AVPlayer
+can't decode fall back to audio-only). (Chromecast support is on the [roadmap](#roadmap).)
 
 ---
 

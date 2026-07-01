@@ -31,6 +31,13 @@ struct FullScreenPlayerView: View {
     /// active stream changes.
     @State private var engineAttempt = 0
 
+    /// Observes the active AirPlay route. Full-screen AirPlay *video* is only
+    /// possible through `AVPlayer` (KSPlayer/VLCKit render into their own layers,
+    /// so AirPlay would carry only their audio), so while a route is active the
+    /// stream is driven through the AVPlayer engine regardless of the user's
+    /// engine preference. See `engine` / `castService`.
+    @State private var castService = CastService.shared
+
     /// The only high-frequency playback state. An `@Observable` the host owns
     /// but never reads in its own body, so playback ticks invalidate just the
     /// scrubber/time labels rather than re-rendering the whole player tree. See
@@ -72,15 +79,32 @@ struct FullScreenPlayerView: View {
         )
     }
 
-    /// The engine driving the current playback attempt.
-    private var engine: PlayerEngineKind {
+    /// The engine the user's priority list selects for the current attempt,
+    /// before any AirPlay override.
+    private var priorityEngine: PlayerEngineKind {
         guard enginePriority.indices.contains(engineAttempt) else { return .defaultValue }
         return enginePriority[engineAttempt]
     }
 
+    /// The engine driving the current playback attempt. While an AirPlay route is
+    /// active, this forces `.avPlayer` — the only engine that can hand full-screen
+    /// video to an AirPlay receiver (see `castService`).
+    private var engine: PlayerEngineKind {
+        isAirPlayOverride ? .avPlayer : priorityEngine
+    }
+
+    /// True when AirPlay is active and the user's engine isn't already AVPlayer,
+    /// so the stream is being force-routed through AVPlayer for the cast.
+    private var isAirPlayOverride: Bool {
+        castService.isAirPlayActive && priorityEngine != .avPlayer
+    }
+
     /// Whether another engine remains to fall back to after the current one.
+    /// Suppressed during an AirPlay override: the forced AVPlayer either casts or
+    /// shows its error overlay, rather than looping through the fallback chain
+    /// (which would only land back on engines that can't cast video).
     private var hasFallbackEngine: Bool {
-        engineAttempt + 1 < enginePriority.count
+        !isAirPlayOverride && engineAttempt + 1 < enginePriority.count
     }
 
     /// Called by an engine when it can't start the stream. Advances to the next
@@ -181,6 +205,15 @@ struct FullScreenPlayerView: View {
                 // still foreground, so only act on a real `.background` move.
                 if phase == .background { closePlayer() }
             #endif
+        }
+        .onChange(of: castService.isAirPlayActive) { _, _ in
+            // Toggling AirPlay swaps the engine (see `engine`), which rebuilds the
+            // player. Carry the current position across so a VOD stream resumes
+            // where it was rather than jumping back to the saved resume point.
+            // Live streams have no position, and if the user is already on
+            // AVPlayer there's no swap to bridge.
+            guard priorityEngine != .avPlayer, !activeMedia.isLive, clock.current > 1 else { return }
+            activeMedia = activeMedia.resuming(at: clock.current)
         }
         .onDisappear {
             // Capture the clock synchronously, then flush off the main thread.

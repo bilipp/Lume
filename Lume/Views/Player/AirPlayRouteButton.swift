@@ -12,10 +12,10 @@
     /// to match the overlay's glass circle buttons. Tapping it presents the
     /// system AirPlay route picker.
     ///
-    /// The AVPlayer engine enables `allowsExternalPlayback`, so a chosen
-    /// receiver gets the full video; the KSPlayer and VLCKit engines render into
-    /// their own layers, so on those a route carries the audio while video stays
-    /// on the device. See `CastService` and #103.
+    /// Picking a receiver drives full-screen video: the AVPlayer engine enables
+    /// `allowsExternalPlayback`, and on the KSPlayer/VLCKit engines (which render
+    /// into their own layers) `FullScreenPlayerView` hands the stream to AVPlayer
+    /// for the cast. See `CastService` and #103.
     struct AirPlayRouteButton: View {
         /// The AVPlayer the route picker drives on macOS, where the picker is
         /// bound to a specific player. `nil` on the engines that don't expose an
