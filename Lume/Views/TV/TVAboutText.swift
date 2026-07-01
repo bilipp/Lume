@@ -11,10 +11,14 @@
     import SwiftUI
 
     /// The "About" paragraph. tvOS can't hover, so this is a focusable button
-    /// that expands the full text inline when selected. The "More" affordance is
-    /// only shown when the text actually overflows the collapsed line limit, the
-    /// focus state paints a legible dark-on-light card (instead of the default
-    /// white-on-white highlight), and selecting it toggles the expansion.
+    /// that expands the full text inline when selected. It stays focusable even
+    /// when the text isn't truncated so the focus engine never skips it — that
+    /// way navigating down from the action buttons always lands here and scrolls
+    /// the paragraph fully into view. The "More" affordance is only shown (and
+    /// selecting only toggles expansion) when the text actually overflows the
+    /// collapsed line limit. Focus keeps the same colors as the resting state
+    /// and just zooms the card slightly (via ``AboutCardButtonStyle``, which
+    /// opts out of tvOS's default white focus highlight).
     struct TVAboutText: View {
         let text: String
         var collapsedLineLimit: Int = 4
@@ -31,12 +35,13 @@
 
         var body: some View {
             Button {
+                guard isTruncated else { return }
                 withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
             } label: {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(text)
                         .font(.system(size: 26))
-                        .foregroundStyle(isFocused ? .white : .white.opacity(0.85))
+                        .foregroundStyle(.white.opacity(0.85))
                         .lineLimit(isExpanded ? nil : collapsedLineLimit)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,15 +61,14 @@
                 .padding(28)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(isFocused ? AnyShapeStyle(.clear) : AnyShapeStyle(.white.opacity(0.06)))
+                        .fill(.white.opacity(0.06))
                 )
-                .scaleEffect(isFocused ? 1.02 : 1.0)
-                .shadow(color: .black.opacity(isFocused ? 0.4 : 0), radius: 18, y: 10)
+                .scaleEffect(isFocused ? 1.05 : 1.0)
+                .shadow(color: .black.opacity(isFocused ? 0.45 : 0), radius: 24, y: 12)
                 .animation(.easeOut(duration: 0.18), value: isFocused)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AboutCardButtonStyle())
             .focused($isFocused)
-            .disabled(!isTruncated)
         }
 
         /// Two hidden copies laid out at the same width as the visible text: one
@@ -93,6 +97,15 @@
             .hidden()
             .onPreferenceChange(CollapsedHeightKey.self) { collapsedHeight = $0 }
             .onPreferenceChange(FullHeightKey.self) { fullHeight = $0 }
+        }
+    }
+
+    /// A bare style that renders only the label, so tvOS doesn't overlay its
+    /// default focus treatment (the white highlight + border). The card owns its
+    /// own focus appearance — same colors as at rest, just a slight zoom.
+    private struct AboutCardButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
         }
     }
 

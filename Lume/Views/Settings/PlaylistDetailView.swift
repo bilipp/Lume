@@ -201,14 +201,6 @@ struct PlaylistDetailView: View {
             }
         }
 
-        private var serverURLFieldTitle: LocalizedStringKey {
-            switch playlist.sourceType {
-            case .xtream: "Server URL"
-            case .m3u: "Playlist URL"
-            case .stalker: "Portal URL"
-            }
-        }
-
         // MARK: - Sync Section
 
         private var syncSection: some View {
@@ -242,6 +234,16 @@ struct PlaylistDetailView: View {
             }
         }
     #endif
+
+    /// Field label for the primary URL, shared across the iOS/macOS and tvOS
+    /// layouts — its wording depends on the playlist's source type.
+    private var serverURLFieldTitle: LocalizedStringKey {
+        switch playlist.sourceType {
+        case .xtream: "Server URL"
+        case .m3u: "Playlist URL"
+        case .stalker: "Portal URL"
+        }
+    }
 
     // MARK: - tvOS layout
 
