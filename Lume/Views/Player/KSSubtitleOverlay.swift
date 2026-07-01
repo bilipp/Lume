@@ -15,6 +15,28 @@
 import KSPlayer
 import SwiftUI
 
+/// Which content a subtitle cue renders as. Bitmap cues (PGS / VobSub) take
+/// precedence over text, matching KSPlayer's own `SubtitlePart` layout; a cue
+/// carrying neither renders nothing. Extracted from the view body so the
+/// decision that fixed the subtitles-never-appear bug — a text cue must map to a
+/// render path rather than be silently dropped — is unit-testable without a
+/// running player.
+enum KSSubtitleCue: Equatable {
+    case image
+    case text
+    case empty
+
+    init(hasImage: Bool, hasText: Bool) {
+        if hasImage {
+            self = .image
+        } else if hasText {
+            self = .text
+        } else {
+            self = .empty
+        }
+    }
+}
+
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
 struct KSSubtitleOverlay: View {
     @ObservedObject var subtitleModel: SubtitleModel
@@ -45,34 +67,47 @@ private struct KSSubtitlePartView: View {
 
     var body: some View {
         VStack {
-            if let image = part.image {
-                Spacer()
-                GeometryReader { geometry in
-                    let fitRect = image.fitRect(geometry.size)
-                    Image(uiImage: image)
-                        .resizable()
-                        .offset(CGSize(width: fitRect.origin.x, height: fitRect.origin.y))
-                        .frame(width: fitRect.size.width, height: fitRect.size.height)
-                }
-                .padding()
-            } else if let text = part.text {
-                let position = part.textPosition ?? SubtitleModel.textPosition
-                if position.verticalAlign == .bottom || position.verticalAlign == .center {
-                    Spacer()
-                }
-                Text(AttributedString(text))
-                    .font(Font(SubtitleModel.textFont))
-                    .shadow(color: .black.opacity(0.9), radius: 1, x: 1, y: 1)
-                    .foregroundStyle(SubtitleModel.textColor)
-                    .italic(SubtitleModel.textItalic)
-                    .background(SubtitleModel.textBackgroundColor)
-                    .multilineTextAlignment(.center)
-                    .alignmentGuide(position.horizontalAlign) { $0[.leading] }
-                    .padding(position.edgeInsets)
-                if position.verticalAlign == .top || position.verticalAlign == .center {
-                    Spacer()
-                }
+            switch KSSubtitleCue(hasImage: part.image != nil, hasText: part.text != nil) {
+            case .image:
+                if let image = part.image { imageCue(image) }
+            case .text:
+                if let text = part.text { textCue(text) }
+            case .empty:
+                EmptyView()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func imageCue(_ image: UIImage) -> some View {
+        Spacer()
+        GeometryReader { geometry in
+            let fitRect = image.fitRect(geometry.size)
+            Image(uiImage: image)
+                .resizable()
+                .offset(CGSize(width: fitRect.origin.x, height: fitRect.origin.y))
+                .frame(width: fitRect.size.width, height: fitRect.size.height)
+        }
+        .padding()
+    }
+
+    @ViewBuilder
+    private func textCue(_ text: NSAttributedString) -> some View {
+        let position = part.textPosition ?? SubtitleModel.textPosition
+        if position.verticalAlign == .bottom || position.verticalAlign == .center {
+            Spacer()
+        }
+        Text(AttributedString(text))
+            .font(Font(SubtitleModel.textFont))
+            .shadow(color: .black.opacity(0.9), radius: 1, x: 1, y: 1)
+            .foregroundStyle(SubtitleModel.textColor)
+            .italic(SubtitleModel.textItalic)
+            .background(SubtitleModel.textBackgroundColor)
+            .multilineTextAlignment(.center)
+            .alignmentGuide(position.horizontalAlign) { $0[.leading] }
+            .padding(position.edgeInsets)
+        if position.verticalAlign == .top || position.verticalAlign == .center {
+            Spacer()
         }
     }
 }
