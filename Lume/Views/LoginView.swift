@@ -378,7 +378,9 @@ struct LoginView: View {
         errorMessage = nil
 
         let playlistName = trimmedName.isEmpty ? "My Playlist" : trimmedName
-        let urlString = m3uURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Rewrite Xtream bouquet types (type=gigablue/dreambox → m3u_plus) up
+        // front so the stored URL is the one that actually parses.
+        let urlString = M3UClient.normalizedPlaylistURL(m3uURL.trimmingCharacters(in: .whitespacesAndNewlines))
         let epgURLString = epgURL.trimmingCharacters(in: .whitespacesAndNewlines)
 
         Task {

@@ -241,4 +241,32 @@ struct M3UClientValidationTests {
         #expect(!M3UClient.looksLikePlaylist(Data("<html><body>nope</body></html>".utf8)))
         #expect(!M3UClient.looksLikePlaylist(Data()))
     }
+
+    @Test func `an enigma2 bouquet is not a playlist`() {
+        let bouquet = Data("""
+        #NAME 5gTvOnline
+        #SERVICE 4097:0:1:0:0:0:0:0:0:0:http%3A//host%3A80/live/u/p/1.m3u8
+        #DESCRIPTION Channel One
+        """.utf8)
+        #expect(!M3UClient.looksLikePlaylist(bouquet))
+        #expect(M3UClient.looksLikeEnigma2Bouquet(bouquet))
+        // A real playlist must not be misread as a bouquet.
+        #expect(!M3UClient.looksLikeEnigma2Bouquet(Data("#EXTM3U\n#EXTINF:-1,A\nhttp://x/a.ts".utf8)))
+        #expect(!M3UClient.looksLikeEnigma2Bouquet(Data()))
+    }
+
+    @Test func `rewrites xtream bouquet type to m3u_plus`() {
+        let base = "http://host/get.php?username=u&password=p&output=ts"
+        #expect(M3UClient.normalizedPlaylistURL(base + "&type=gigablue")
+            == base + "&type=m3u_plus")
+        #expect(M3UClient.normalizedPlaylistURL(base + "&type=dreambox")
+            == base + "&type=m3u_plus")
+        // Already-valid types and non-get.php URLs pass through untouched.
+        let valid = base + "&type=m3u_plus"
+        #expect(M3UClient.normalizedPlaylistURL(valid) == valid)
+        #expect(M3UClient.normalizedPlaylistURL(base + "&type=m3u") == base + "&type=m3u")
+        let plain = "http://host/playlist.m3u?type=gigablue"
+        #expect(M3UClient.normalizedPlaylistURL(plain) == plain)
+        #expect(M3UClient.normalizedPlaylistURL("not a url") == "not a url")
+    }
 }

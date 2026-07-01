@@ -27,6 +27,8 @@ struct GenreDerivationTests {
         context.insert(makeMovie(streamId: 4, genre: nil, prefix: prefix))
         // A different playlist's movie must not leak into the result.
         context.insert(makeMovie(streamId: 5, genre: "Horror", prefix: otherPrefix))
+        // Derivation samples on a background context off the container, so the
+        // inserts must be persisted before it can see them.
         try context.save()
 
         let genres = await GenreDerivation.movieGenres(in: container, playlistPrefix: prefix, restriction: ContentRestriction())
