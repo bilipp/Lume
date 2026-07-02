@@ -1,5 +1,6 @@
 import AVFoundation
 import OSLog
+import StoreKit
 import SwiftData
 import SwiftUI
 
@@ -18,6 +19,10 @@ struct FullScreenPlayerView: View {
     @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
         @Environment(\.dismissWindow) private var dismissWindow
+    #endif
+    #if !os(tvOS)
+        /// tvOS has no App Store rating prompt, so the action only exists elsewhere.
+        @Environment(\.requestReview) private var requestReview
     #endif
 
     /// The user's ordered engine fallback list, read once when the player opens.
@@ -401,8 +406,23 @@ struct FullScreenPlayerView: View {
                 ref: ref, progress: now, duration: total, force: force
             )
             WatchProgressBuffer.remove(ref: ref)
-            if let completion { syncTraktWatched(ref: completion.ref) }
+            if let completion {
+                syncTraktWatched(ref: completion.ref)
+                requestReviewIfAppropriate()
+            }
         }
+    }
+
+    /// Finishing a movie or episode is a clearly positive moment, so it's a good
+    /// time to (maybe) ask for an App Store rating — subject to
+    /// `AppStoreReviewTrigger`'s throttling. Only completions reach here (live
+    /// channels never produce one), and tvOS has no rating prompt at all.
+    private func requestReviewIfAppropriate() {
+        #if !os(tvOS)
+            guard AppStoreReviewTrigger.registerSignificantEvent() else { return }
+            requestReview()
+            AppStoreReviewTrigger.markPromptShown()
+        #endif
     }
 
     /// One-time "watched" sync on Trakt. Runs at most once per title (when it
