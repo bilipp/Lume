@@ -23,3 +23,26 @@ final class PlaybackClock {
         duration = 0
     }
 }
+
+/// Mutable scratch written from KSPlayer's 10 Hz `onPlay` callback — see
+/// `KSPlayerEngineView.tick` for why this lives in a reference type outside
+/// SwiftUI's change tracking.
+final class PlaybackTickScratch {
+    /// Last playhead position seen in `onPlay`, used to detect that frames are
+    /// actually advancing. `-1` until the first sample. See `notePlaybackProgress`.
+    var lastPlayhead: TimeInterval = -1
+    /// When a runaway live A/V clock split was first observed, `nil` while in
+    /// sync (see `noteClockDrift` — frozen image with healthy audio after an
+    /// HLS timestamp discontinuity).
+    var driftSince: TimeInterval?
+    /// When the last drift-triggered stream rebuild fired, for the re-fire
+    /// cooldown in `noteClockDrift`.
+    var lastDriftRecovery: TimeInterval = -.infinity
+
+    /// Back to the fresh-session baseline, for stream swaps.
+    func reset() {
+        lastPlayhead = -1
+        driftSince = nil
+        lastDriftRecovery = -.infinity
+    }
+}

@@ -60,8 +60,8 @@ extension KSPlayerEngineView {
     /// (no advance → spinner stays). Cheap no-op once the spinner is already down.
     func notePlaybackProgress(_ current: TimeInterval) {
         guard current.isFinite, !isSeeking else { return }
-        defer { lastPlayhead = current }
-        guard isBuffering, lastPlayhead >= 0, current > lastPlayhead else { return }
+        defer { tick.lastPlayhead = current }
+        guard isBuffering, tick.lastPlayhead >= 0, current > tick.lastPlayhead else { return }
         markPlaybackStarted()
         setBuffering(false)
     }
@@ -207,18 +207,18 @@ extension KSPlayerEngineView {
               let diff = coordinator.playerLayer?.player.dynamicInfo?.audioVideoSyncDiff,
               abs(diff) > Self.driftTolerance
         else {
-            driftSince = nil
+            tick.driftSince = nil
             return
         }
         let now = CACurrentMediaTime()
-        guard let since = driftSince else {
-            driftSince = now
+        guard let since = tick.driftSince else {
+            tick.driftSince = now
             return
         }
         guard now - since >= Self.driftPersistence else { return }
-        driftSince = nil
-        guard now - lastDriftRecovery >= Self.driftRecoveryCooldown else { return }
-        lastDriftRecovery = now
+        tick.driftSince = nil
+        guard now - tick.lastDriftRecovery >= Self.driftRecoveryCooldown else { return }
+        tick.lastDriftRecovery = now
         Logger.player.error("clock-drift watchdog: A/V sync diff \(diff, format: .fixed(precision: 1), privacy: .public)s persisted, rebuilding live stream")
         retryPlayback()
     }
@@ -283,7 +283,7 @@ extension KSPlayerEngineView {
         }
         hasStartedPlayback = false
         hasSeenReadyToPlay = false
-        lastPlayhead = -1
+        tick.lastPlayhead = -1
         reconnector.reset()
         #if os(tvOS)
             engine.reset()
@@ -332,7 +332,7 @@ extension KSPlayerEngineView {
         // Reset session gates so stale callbacks from the previous session don't
         // prematurely clear the spinner or reset the reconnect budget.
         hasSeenReadyToPlay = false
-        lastPlayhead = -1
+        tick.lastPlayhead = -1
         if !media.isLive, clock.current > 1 {
             layer.options.startPlayTime = clock.current
         }

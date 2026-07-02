@@ -20,8 +20,13 @@ import SwiftUI
         @Binding var isPlaying: Bool
         @Binding var isSeeking: Bool
         @Binding var seekPosition: TimeInterval
-        @Binding var currentTime: TimeInterval
-        @Binding var duration: TimeInterval
+        /// The 10 Hz playback clock. Deliberately the `@Observable` object, not
+        /// `$clock.current` bindings: reading a tick-driven value in this body
+        /// would re-render the whole overlay — and an open `Menu` whose host
+        /// keeps re-rendering flickers its items and cancels in-flight taps
+        /// (the audio/subtitle pickers were near-unusable). Only the
+        /// `PlaybackTimeline` leaf reads the clock; this body must never.
+        let clock: PlaybackClock
         @Binding var isPipActive: Bool
         @Binding var hideTask: Task<Void, Never>?
         var onClose: () -> Void
@@ -33,6 +38,13 @@ import SwiftUI
         /// Mirrors the backing model's favorite flag; refreshed when the media
         /// changes and updated locally on toggle so the heart re-renders.
         @State private var isFavorite = false
+        /// Local mirrors of `SubtitleModel`'s published track list / selection.
+        /// The model can't be an `@ObservedObject` here: its `parts` (the live
+        /// subtitle text) also publishes, which would re-render the overlay —
+        /// and flicker an open menu — on every subtitle line. `onReceive` keeps
+        /// the overlay updated exactly when the list or selection changes.
+        @State private var subtitleTracks: [any SubtitleInfo] = []
+        @State private var selectedSubtitle: (any SubtitleInfo)?
 
         var body: some View {
             ZStack {
@@ -49,6 +61,8 @@ import SwiftUI
             .task(id: media.id) {
                 isFavorite = PlayerFavorites.isFavorite(for: media.contentRef, in: modelContext)
             }
+            .onReceive(coordinator.subtitleModel.$subtitleInfos) { subtitleTracks = $0 }
+            .onReceive(coordinator.subtitleModel.$selectedSubtitleInfo) { selectedSubtitle = $0 }
         }
 
         // MARK: - Scrim
@@ -152,8 +166,12 @@ import SwiftUI
                 if media.isLive {
                     liveIndicator
                 } else {
-                    scrubber
-                    timeLabels
+                    PlaybackTimeline(
+                        clock: clock,
+                        isSeeking: $isSeeking,
+                        seekPosition: $seekPosition,
+                        onEditingChanged: onSliderEditingChanged
+                    )
                 }
             }
             .padding(.horizontal, 20)
@@ -193,7 +211,7 @@ import SwiftUI
 
         private var secondaryControls: some View {
             HStack(spacing: 4) {
-                if !coordinator.subtitleModel.subtitleInfos.isEmpty { subtitleMenu }
+                if !subtitleTracks.isEmpty { subtitleMenu }
                 if audioTracks.count > 1 { audioTrackMenu }
                 if !media.isLive { playbackRateMenu }
                 contentModeButton
@@ -216,21 +234,20 @@ import SwiftUI
 
         @ViewBuilder
         private var subtitleMenu: some View {
-            let model = coordinator.subtitleModel
-            let hasSelection = model.selectedSubtitleInfo != nil
+            let hasSelection = selectedSubtitle != nil
             Menu {
                 Button {
-                    model.selectedSubtitleInfo = nil
+                    coordinator.subtitleModel.selectedSubtitleInfo = nil
                     onResetHideTimer()
                 } label: {
                     checkmarkLabel("Off", checked: !hasSelection)
                 }
-                ForEach(model.subtitleInfos, id: \.subtitleID) { track in
+                ForEach(subtitleTracks, id: \.subtitleID) { track in
                     Button {
-                        model.selectedSubtitleInfo = track
+                        coordinator.subtitleModel.selectedSubtitleInfo = track
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.name, checked: model.selectedSubtitleInfo?.subtitleID == track.subtitleID)
+                        checkmarkLabel(track.name, checked: selectedSubtitle?.subtitleID == track.subtitleID)
                     }
                 }
             } label: {
@@ -240,9 +257,10 @@ import SwiftUI
         }
 
         /// KSPlayer exposes the demuxed audio streams on the player itself —
-        /// unlike subtitles there is no observable model object, so the list is
-        /// re-read on render (the overlay re-renders every time tick) and the
-        /// menu appears once demuxing has surfaced more than one stream.
+        /// unlike subtitles there is no observable model object. Re-read on
+        /// render: demuxing completes before the first frame, and the overlay
+        /// only mounts after playback starts, so the list is present whenever
+        /// this evaluates.
         private var audioTracks: [MediaPlayerTrack] {
             coordinator.playerLayer?.player.tracks(mediaType: .audio) ?? []
         }
@@ -299,31 +317,6 @@ import SwiftUI
 
         // MARK: - Scrubber
 
-        private var scrubber: some View {
-            Slider(
-                value: Binding<TimeInterval>(
-                    get: { isSeeking ? seekPosition : (currentTime.isFinite ? currentTime : 0) },
-                    set: { seekPosition = $0 }
-                ),
-                in: 0 ... max(duration.isFinite ? duration : 1, 1),
-                onEditingChanged: onSliderEditingChanged
-            )
-            .tint(.white)
-        }
-
-        private var timeLabels: some View {
-            HStack {
-                Text(timeString(from: isSeeking ? seekPosition : currentTime))
-                    .contentTransition(.numericText())
-                    .foregroundStyle(.white)
-                Spacer()
-                Text(timeString(from: max(duration, 0)))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .font(.caption.monospacedDigit())
-            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-        }
-
         private func onSliderEditingChanged(editing: Bool) {
             isSeeking = editing
             if editing {
@@ -331,7 +324,7 @@ import SwiftUI
                 coordinator.playerLayer?.pause()
             } else {
                 coordinator.seek(time: seekPosition)
-                currentTime = seekPosition
+                clock.current = seekPosition
                 if isPlaying {
                     coordinator.playerLayer?.play()
                 }
@@ -380,6 +373,44 @@ import SwiftUI
             } else {
                 Text(title)
             }
+        }
+    }
+
+    // MARK: - Playback Timeline (tick-following leaf)
+
+    /// The scrubber and time labels — the only part of the overlay that follows
+    /// the 10 Hz playback clock. Isolated in its own view so each tick
+    /// invalidates just this leaf: the overlay above (menus, buttons) never
+    /// re-renders with it, which is what keeps an open track menu stable and
+    /// tappable.
+    @available(iOS 16.0, macOS 13.0, *)
+    private struct PlaybackTimeline: View {
+        var clock: PlaybackClock
+        @Binding var isSeeking: Bool
+        @Binding var seekPosition: TimeInterval
+        var onEditingChanged: (Bool) -> Void
+
+        var body: some View {
+            Slider(
+                value: Binding<TimeInterval>(
+                    get: { isSeeking ? seekPosition : (clock.current.isFinite ? clock.current : 0) },
+                    set: { seekPosition = $0 }
+                ),
+                in: 0 ... max(clock.duration.isFinite ? clock.duration : 1, 1),
+                onEditingChanged: onEditingChanged
+            )
+            .tint(.white)
+
+            HStack {
+                Text(timeString(from: isSeeking ? seekPosition : clock.current))
+                    .contentTransition(.numericText())
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(timeString(from: max(clock.duration, 0)))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            .font(.caption.monospacedDigit())
+            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
         }
 
         private func timeString(from time: TimeInterval) -> String {

@@ -13,14 +13,15 @@ import SwiftUI
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
 struct KSPlayerEngineView: View {
     let media: PlayableMedia
-    /// High-frequency playback clock, held as the `@Observable` object rather
-    /// than as `@Binding` scalars. A `@Binding` whose root is an `@Observable`
-    /// re-renders the *holding* view on every change — which rebuilt the controls
-    /// overlay / menus on every playback tick. Holding the object and never
-    /// reading `current`/`duration` in this body keeps the engine view off the
-    /// tick path; only the scrubber leaf reads it. `@Bindable` so the iOS/macOS
-    /// overlay can still take plain bindings.
-    @Bindable var clock: PlaybackClock
+    /// High-frequency playback clock, threaded down as the `@Observable` object
+    /// rather than as `@Binding` scalars. A `@Binding` whose root is an
+    /// `@Observable` re-renders the *holding* view on every change — which
+    /// rebuilt the controls overlay / menus on every playback tick (KSPlayer
+    /// ticks at 10 Hz, and a re-rendering host makes an open `Menu` flicker and
+    /// drop taps). Neither this body nor the overlay's reads `current` /
+    /// `duration`; only the scrubber leaf does, so a tick invalidates nothing
+    /// but that leaf.
+    var clock: PlaybackClock
     /// The episode queued after `media`, resolved by the host. Drives the
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
     /// next.
@@ -57,9 +58,13 @@ struct KSPlayerEngineView: View {
     /// True while the engine is preparing or (re)buffering, so the spinner shows
     /// both on first open and on a mid-stream stall.
     @State var isBuffering = true
-    /// Last playhead position seen in `onPlay`, used to detect that frames are
-    /// actually advancing. `-1` until the first sample. See `notePlaybackProgress`.
-    @State var lastPlayhead: TimeInterval = -1
+    /// Per-tick bookkeeping for the 10 Hz `onPlay` callback (progress detection
+    /// and the clock-drift watchdog). A reference type held in `@State` on
+    /// purpose: mutating its properties — unlike writing `@State` scalars —
+    /// does not invalidate this view. Keeping `lastPlayhead` as `@State`
+    /// re-rendered the whole engine view (and with it the controls overlay and
+    /// any open track menu) ten times a second.
+    @State var tick = PlaybackTickScratch()
     /// Set once a dead stream is given up on — the initial load never produced a
     /// frame within `startupTimeout`, or the bounded reconnect budget was spent.
     /// Swaps the endless spinner for the `PlayerErrorIndicator` (Try Again / Back)
@@ -76,13 +81,6 @@ struct KSPlayerEngineView: View {
     /// `startupTimeout`. Covers a stream that hangs in `.preparing`/`.buffering`
     /// forever without ever emitting `.error` (so the reconnector never engages).
     @State var startupWatchdog: Task<Void, Never>?
-    /// When a runaway live A/V clock split was first observed, `nil` while in
-    /// sync (see `noteClockDrift` — frozen image with healthy audio after an
-    /// HLS timestamp discontinuity).
-    @State var driftSince: TimeInterval?
-    /// When the last drift-triggered stream rebuild fired, for the re-fire
-    /// cooldown in `noteClockDrift`.
-    @State var lastDriftRecovery: TimeInterval = -.infinity
     /// Fires `retryPlayback()` if a live stream sits in `.buffering` for
     /// `stallTimeout` after playback had started. A mid-stream decode failure
     /// wedges KSPlayer in `.buffering` forever without ever emitting `.error`
@@ -288,9 +286,7 @@ struct KSPlayerEngineView: View {
                 hasSeenReadyToPlay = false
                 isBuffering = true
                 loadFailed = false
-                lastPlayhead = -1
-                driftSince = nil
-                lastDriftRecovery = -.infinity
+                tick.reset()
                 cancelStallWatchdog()
                 reconnector.reset()
                 engine.reset()
@@ -493,8 +489,7 @@ struct KSPlayerEngineView: View {
                 isPlaying: $isPlaying,
                 isSeeking: $isSeeking,
                 seekPosition: $seekPosition,
-                currentTime: $clock.current,
-                duration: $clock.duration,
+                clock: clock,
                 isPipActive: $isPipActive,
                 hideTask: $hideTask,
                 onClose: { closePlayer() },
