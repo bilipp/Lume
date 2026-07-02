@@ -85,9 +85,13 @@ struct LiveTVView: View {
     private func detail(for section: LiveTVSection) -> some View {
         Group {
             if layoutMode == .guide {
-                EPGGuideView(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                    playChannel(stream)
-                }
+                EPGGuideView(
+                    scope: section.scope,
+                    playlistPrefix: playlistPrefix,
+                    sort: contentSort,
+                    onPlay: { playChannel($0) },
+                    onPlayCatchup: { playCatchup($0, cell: $1) }
+                )
             } else {
                 channelList(for: section)
             }
@@ -244,6 +248,7 @@ struct LiveTVView: View {
                 layoutModeRaw: $layoutModeRaw,
                 contentSort: contentSort,
                 onPlay: { playChannel($0) },
+                onPlayCatchup: { playCatchup($0, cell: $1) },
                 playlistPrefix: playlistPrefix
             )
         }
@@ -309,6 +314,23 @@ struct LiveTVView: View {
     private func playChannel(_ stream: LiveStream) {
         guard let playlist = activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+        present(media)
+    }
+
+    /// Replays a past programme from the channel's catch-up archive.
+    private func playCatchup(_ stream: LiveStream, cell: EPGProgramCell) {
+        guard let playlist = activePlaylist,
+              let media = PlayableMedia.catchup(
+                  stream: stream,
+                  playlist: playlist,
+                  programTitle: cell.title,
+                  start: cell.start,
+                  end: cell.end
+              ) else { return }
+        present(media)
+    }
+
+    private func present(_ media: PlayableMedia) {
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
             openWindow(id: "player", value: media)

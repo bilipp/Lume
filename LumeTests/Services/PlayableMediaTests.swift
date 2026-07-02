@@ -145,6 +145,46 @@ struct PlayableMediaTests {
         #expect(media == nil)
     }
 
+    // MARK: - isCatchupAvailable(stream:start:now:)
+
+    @Test func `catchup availability inside archive window`() {
+        let stream = LiveStream(id: "l-6", streamId: 303, name: "Archive",
+                                tvArchive: 1, tvArchiveDuration: 7)
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let start = now.addingTimeInterval(-3 * 86400)
+        #expect(PlayableMedia.isCatchupAvailable(stream: stream, start: start, now: now))
+    }
+
+    @Test func `catchup availability rejects start beyond archive window`() {
+        let stream = LiveStream(id: "l-7", streamId: 304, name: "Archive",
+                                tvArchive: 1, tvArchiveDuration: 7)
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let start = now.addingTimeInterval(-8 * 86400)
+        #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: start, now: now))
+    }
+
+    @Test func `catchup availability treats zero duration as one day`() {
+        let stream = LiveStream(id: "l-8", streamId: 305, name: "Archive",
+                                tvArchive: 1, tvArchiveDuration: 0)
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        #expect(PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-3600), now: now))
+        #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-2 * 86400), now: now))
+    }
+
+    @Test func `catchup availability rejects channels without archive`() {
+        let stream = LiveStream(id: "l-9", streamId: 306, name: "No Archive")
+        let now = Date()
+        #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-3600), now: now))
+    }
+
+    @Test func `catchup availability rejects m3u direct streams`() {
+        let stream = LiveStream(id: "l-10", streamId: 307, name: "M3U",
+                                tvArchive: 1, tvArchiveDuration: 7)
+        stream.directURL = "http://example.com/live/stream.m3u8"
+        let now = Date()
+        #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-3600), now: now))
+    }
+
     // MARK: - Codable
 
     @Test func `playable media codable round trip`() throws {

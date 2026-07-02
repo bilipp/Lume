@@ -237,6 +237,7 @@
         @Binding var layoutModeRaw: String
         let contentSort: ContentSortOption
         let onPlay: (LiveStream) -> Void
+        let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
 
         /// The active playlist's id prefix, needed to scope the virtual
         /// (favorites / recently watched) collections in-memory.
@@ -266,7 +267,7 @@
             if let section = displayedSection {
                 switch layoutMode {
                 case .guide:
-                    EPGGuideView(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort, onPlay: onPlay)
+                    EPGGuideView(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort, onPlay: onPlay, onPlayCatchup: onPlayCatchup)
                         .id("\(section.id)-\(contentSort.rawValue)-guide")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .list:

@@ -161,6 +161,17 @@ extension PlayableMedia {
         )
     }
 
+    /// Whether a programme that started at `start` is still replayable from the
+    /// channel's catch-up archive at `now`. Mirrors the guards in
+    /// `catchup(stream:...)` so UI can offer the action only where construction
+    /// would succeed: catch-up needs Xtream credentials (no direct URL), an
+    /// advertised archive, and a start inside the archive window.
+    static func isCatchupAvailable(stream: LiveStream, start: Date, now: Date) -> Bool {
+        guard stream.tvArchive > 0, stream.directURL == nil else { return false }
+        let archiveDays = max(1, stream.tvArchiveDuration)
+        return start >= now.addingTimeInterval(-TimeInterval(archiveDays) * 86400)
+    }
+
     /// A past programme played from the channel's catch-up archive. Modelled as
     /// VOD — the archive is a finite, seekable asset, so the player gives it a
     /// scrubber rather than the live banner, and channel surfing stays disabled.

@@ -3,8 +3,9 @@
 //  Lume
 //
 //  Programme detail presented when a guide cell is selected: channel, title,
-//  airing time, live progress, synopsis, and a "Watch Live" action that hands
-//  back to the caller to start playback.
+//  airing time, live progress, synopsis, and a watch action that hands back to
+//  the caller to start playback — live for the current programme, catch-up for
+//  a past one still inside the channel's archive.
 //
 
 import SwiftUI
@@ -14,11 +15,17 @@ struct EPGProgramDetailView: View {
     let cell: EPGProgramCell
     let now: Date
     let onPlay: () -> Void
+    var onPlayCatchup: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
 
     private var isLive: Bool {
         cell.isLive(at: now)
+    }
+
+    private var canPlayCatchup: Bool {
+        !cell.isGap && cell.isPast(at: now)
+            && PlayableMedia.isCatchupAvailable(stream: stream, start: cell.start, now: now)
     }
 
     var body: some View {
@@ -129,13 +136,27 @@ struct EPGProgramDetailView: View {
                                 .foregroundStyle(.blue)
                         }
 
-                        // Keep the action above the synopsis. The button is the only
-                        // focusable element here, and on tvOS the ScrollView only
-                        // reveals content as focus moves. A long synopsis below the
-                        // button would otherwise push it off-screen and out of reach.
-                        TVPlayButton(title: "Watch Live", systemImage: "play.fill") {
-                            onPlay()
-                            dismiss()
+                        // Keep the actions above the synopsis. The buttons are the
+                        // only focusable elements here, and on tvOS the ScrollView
+                        // only reveals content as focus moves. A long synopsis below
+                        // them would otherwise push them off-screen and out of reach.
+                        VStack(alignment: .leading, spacing: 20) {
+                            if canPlayCatchup {
+                                TVPlayButton(title: "Watch", systemImage: "play.fill") {
+                                    onPlayCatchup()
+                                    dismiss()
+                                }
+
+                                TVPlayButton(title: "Watch Live", systemImage: "dot.radiowaves.left.and.right") {
+                                    onPlay()
+                                    dismiss()
+                                }
+                            } else {
+                                TVPlayButton(title: "Watch Live", systemImage: "play.fill") {
+                                    onPlay()
+                                    dismiss()
+                                }
+                            }
                         }
                         .frame(maxWidth: 460)
                         .padding(.top, 16)
@@ -258,18 +279,47 @@ struct EPGProgramDetailView: View {
         return "\(minutes)m"
     }
 
+    /// The primary action: catch-up for a replayable past programme (with a
+    /// secondary "Watch Live" escape hatch to the channel), live otherwise.
+    @ViewBuilder
     private var watchButton: some View {
-        Button {
-            onPlay()
-            dismiss()
-        } label: {
-            Label("Watch Live", systemImage: "play.fill")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
+        if canPlayCatchup {
+            VStack(spacing: 10) {
+                Button {
+                    onPlayCatchup()
+                    dismiss()
+                } label: {
+                    Label("Watch", systemImage: "play.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    onPlay()
+                    dismiss()
+                } label: {
+                    Label("Watch Live", systemImage: "dot.radiowaves.left.and.right")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+            .controlSize(.large)
+            .padding(.top, 4)
+        } else {
+            Button {
+                onPlay()
+                dismiss()
+            } label: {
+                Label("Watch Live", systemImage: "play.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.top, 4)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .padding(.top, 4)
     }
 
     private func statusBadge(_ title: LocalizedStringKey, color: Color) -> some View {

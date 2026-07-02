@@ -202,12 +202,15 @@ struct EPGChannelCell: View {
 // MARK: - Programme block
 
 /// A single programme in the grid. Live programmes are tinted and carry a
-/// progress bar; past programmes are dimmed; gaps are inert.
+/// progress bar; past programmes are dimmed — except replayable ones (inside
+/// the channel's catch-up archive), which stay brighter and carry a replay
+/// glyph; gaps are inert.
 struct EPGProgramBlockView: View {
     let cell: EPGProgramCell
     let metrics: EPGMetrics
     let now: Date
     let isFocused: Bool
+    var canReplay = false
 
     private var isLive: Bool {
         cell.isLive(at: now)
@@ -232,9 +235,14 @@ struct EPGProgramBlockView: View {
                     .lineLimit(lineLimit)
 
                 if showsTime {
-                    Text(cell.start, format: .dateTime.hour().minute())
-                        .font(timeFont)
-                        .foregroundStyle(timeColor)
+                    HStack(spacing: 4) {
+                        if canReplay {
+                            Image(systemName: "clock.arrow.circlepath")
+                        }
+                        Text(cell.start, format: .dateTime.hour().minute())
+                    }
+                    .font(timeFont)
+                    .foregroundStyle(timeColor)
                 }
             }
             .padding(.horizontal, metrics.blockInset)
@@ -248,7 +256,7 @@ struct EPGProgramBlockView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(background)
         .clipShape(RoundedRectangle(cornerRadius: metrics.blockCornerRadius, style: .continuous))
-        .opacity(cell.isGap ? 0.5 : (isPast && !isFocused ? 0.55 : 1))
+        .opacity(cell.isGap ? 0.5 : (isPast && !isFocused ? (canReplay ? 0.8 : 0.55) : 1))
         .padding(.trailing, gap)
         .padding(.vertical, gap / 2)
         .frame(width: cell.width, height: metrics.rowHeight, alignment: .leading)
@@ -374,21 +382,23 @@ struct EPGBlockButtonStyle: ButtonStyle {
     let cell: EPGProgramCell
     let metrics: EPGMetrics
     let now: Date
+    var canReplay = false
 
     func makeBody(configuration: Configuration) -> some View {
-        StyleBody(cell: cell, metrics: metrics, now: now, isPressed: configuration.isPressed)
+        StyleBody(cell: cell, metrics: metrics, now: now, canReplay: canReplay, isPressed: configuration.isPressed)
     }
 
     private struct StyleBody: View {
         let cell: EPGProgramCell
         let metrics: EPGMetrics
         let now: Date
+        let canReplay: Bool
         let isPressed: Bool
         @Environment(\.isFocused) private var isFocused
 
         var body: some View {
             let scale = isFocused ? 1.04 : (isPressed ? 0.97 : 1.0)
-            EPGProgramBlockView(cell: cell, metrics: metrics, now: now, isFocused: isFocused)
+            EPGProgramBlockView(cell: cell, metrics: metrics, now: now, isFocused: isFocused, canReplay: canReplay)
                 .shadow(color: .black.opacity(isFocused ? 0.4 : 0), radius: 10, y: 6)
                 .scaleEffect(scale)
                 .animation(.easeOut(duration: 0.18), value: isFocused)

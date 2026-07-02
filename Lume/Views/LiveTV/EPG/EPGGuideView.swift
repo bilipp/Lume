@@ -18,6 +18,7 @@ struct EPGGuideView: View {
     let scope: LiveChannelScope
     let playlistPrefix: String
     let onPlay: (LiveStream) -> Void
+    let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Query private var streams: [LiveStream]
@@ -33,12 +34,24 @@ struct EPGGuideView: View {
     /// Observed so the guide refreshes once a guide import settles.
     @State private var epgSync = EPGSyncService.shared
 
-    init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
+    init(
+        scope: LiveChannelScope,
+        playlistPrefix: String,
+        sort: ContentSortOption,
+        onPlay: @escaping (LiveStream) -> Void,
+        onPlayCatchup: @escaping (LiveStream, EPGProgramCell) -> Void = { _, _ in }
+    ) {
         self.scope = scope
         self.playlistPrefix = playlistPrefix
         self.onPlay = onPlay
+        self.onPlayCatchup = onPlayCatchup
 
-        let timeline = EPGTimeline.live(now: Date(), pointsPerMinute: EPGMetrics.current.pointsPerMinute)
+        // A longer reach into the past than the default: aired programmes on
+        // archive channels are replayable from here, so the window doubles as a
+        // catch-up browser.
+        let timeline = EPGTimeline.live(
+            now: Date(), pointsPerMinute: EPGMetrics.current.pointsPerMinute, hoursBehind: 12
+        )
         self.timeline = timeline
 
         _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
@@ -58,7 +71,7 @@ struct EPGGuideView: View {
                     description: Text("This category has no channels")
                 )
             } else {
-                EPGGridScroller(rows: buildRows(for: channels), timeline: timeline, onPlay: onPlay)
+                EPGGridScroller(rows: buildRows(for: channels), timeline: timeline, onPlay: onPlay, onPlayCatchup: onPlayCatchup)
             }
         }
         // Reload when the channel set changes or a guide import settles. Keyed on
@@ -125,6 +138,7 @@ private struct EPGGridScroller: View {
     let rows: [EPGChannelRow]
     let timeline: EPGTimeline
     let onPlay: (LiveStream) -> Void
+    let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
 
     private let metrics = EPGMetrics.current
     private let now = Date()
@@ -163,7 +177,17 @@ private struct EPGGridScroller: View {
                     sync: sync,
                     jumpToken: jumpToken,
                     nowTarget: nowScrollTarget,
-                    onPlay: { row, _ in onPlay(row.stream) },
+                    // A past programme still inside the channel's archive plays
+                    // as catch-up; everything else plays the channel live.
+                    onPlay: { row, cell in
+                        if !cell.isGap, cell.isPast(at: now),
+                           PlayableMedia.isCatchupAvailable(stream: row.stream, start: cell.start, now: now)
+                        {
+                            onPlayCatchup(row.stream, cell)
+                        } else {
+                            onPlay(row.stream)
+                        }
+                    },
                     onShowDetails: { row, cell in
                         selection = EPGSelection(id: cell.id, stream: row.stream, cell: cell)
                     }
@@ -178,7 +202,8 @@ private struct EPGGridScroller: View {
                 stream: selection.stream,
                 cell: selection.cell,
                 now: now,
-                onPlay: { onPlay(selection.stream) }
+                onPlay: { onPlay(selection.stream) },
+                onPlayCatchup: { onPlayCatchup(selection.stream, selection.cell) }
             )
         }
     }
@@ -421,12 +446,14 @@ private struct EPGProgramStrip: View {
                     .accessibilityLabel(Text(row.name))
                     .accessibilityHint(Text("No programme information"))
                 } else {
+                    let canReplay = cell.isPast(at: now)
+                        && PlayableMedia.isCatchupAvailable(stream: row.stream, start: cell.start, now: now)
                     Button {
                         onPlay(cell)
                     } label: {
                         Color.clear.frame(width: cell.width, height: metrics.rowHeight)
                     }
-                    .buttonStyle(EPGBlockButtonStyle(cell: cell, metrics: metrics, now: now))
+                    .buttonStyle(EPGBlockButtonStyle(cell: cell, metrics: metrics, now: now, canReplay: canReplay))
                     // Long press (press-and-hold Select on tvOS) opens the detail
                     // sheet. The gesture takes the press once it recognizes, so a
                     // hold doesn't also fire the button's play action.
