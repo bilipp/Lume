@@ -29,8 +29,16 @@ nonisolated enum EPGSourceReconciler {
     /// changed.
     @discardableResult
     static func apply(_ playlist: Playlist, in context: ModelContext) -> Bool {
+        apply(playlist, existing: linkedSource(playlistID: playlist.id, in: context), in: context)
+    }
+
+    /// `apply` with the playlist's linked source already resolved — for callers
+    /// iterating every playlist (the iCloud reconcile engine), which would
+    /// otherwise re-fetch the source table once per playlist. Pair with
+    /// `linkedSourcesByPlaylist(in:)`.
+    @discardableResult
+    static func apply(_ playlist: Playlist, existing: EPGSource?, in context: ModelContext) -> Bool {
         let playlistID = playlist.id
-        let existing = linkedSource(playlistID: playlistID, in: context)
 
         guard let desiredURL = guideURL(for: playlist) else {
             guard let existing else { return false }
@@ -80,5 +88,17 @@ nonisolated enum EPGSourceReconciler {
         // predicate comparison is brittle to translate.
         let all = (try? context.fetch(FetchDescriptor<EPGSource>())) ?? []
         return all.first { $0.playlistID == playlistID }
+    }
+
+    /// Every playlist-linked source keyed by its playlist, from one fetch — for
+    /// callers reconciling all playlists in a pass.
+    static func linkedSourcesByPlaylist(in context: ModelContext) -> [UUID: EPGSource] {
+        let all = (try? context.fetch(FetchDescriptor<EPGSource>())) ?? []
+        var byPlaylist: [UUID: EPGSource] = [:]
+        for source in all {
+            guard let playlistID = source.playlistID else { continue }
+            if byPlaylist[playlistID] == nil { byPlaylist[playlistID] = source }
+        }
+        return byPlaylist
     }
 }

@@ -241,8 +241,11 @@ actor CloudSyncEngine {
     /// device too. Idempotent — only writes when something actually changed.
     private func regenerateLinkedEPGSources() {
         guard let playlists = try? catalogContext.fetch(FetchDescriptor<Playlist>()) else { return }
+        // One source fetch for the whole pass — `apply(_:in:)` would re-fetch
+        // the source table once per playlist, on every reconcile.
+        let linked = EPGSourceReconciler.linkedSourcesByPlaylist(in: catalogContext)
         for playlist in playlists {
-            EPGSourceReconciler.apply(playlist, in: catalogContext)
+            EPGSourceReconciler.apply(playlist, existing: linked[playlist.id], in: catalogContext)
         }
     }
 }
