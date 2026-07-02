@@ -5,16 +5,31 @@ import SwiftData
 
 // MARK: - Data types
 
-/// Progress snapshot for a single active or queued download.
-struct ActiveDownload: Identifiable {
+/// Live progress for a single active or queued download.
+///
+/// A per-item `@Observable` box rather than a value in the `activeDownloads`
+/// dictionary: `@Observable` tracks access at stored-property granularity, so
+/// views that read a *value* out of the dictionary observe the whole
+/// dictionary — every progress tick for any download re-rendered every
+/// visible episode card. With a box, ticks mutate the box's own properties
+/// and only the card rendering that download re-renders; the dictionary
+/// itself changes only when a download starts, finishes, or fails.
+@Observable
+final class ActiveDownload: Identifiable {
     let id: String
     let title: String
-    var fractionCompleted: Double = 0
+    var fractionCompleted: Double
     var bytesWritten: Int64 = 0
     var totalBytes: Int64 = 0
     /// Ring-buffer of (timestamp, cumulative bytes) used for speed estimation.
     /// Capped at 5 seconds of history; populated at most every 500 ms.
     var samples: [(date: Date, bytes: Int64)] = []
+
+    init(id: String, title: String, fractionCompleted: Double = 0) {
+        self.id = id
+        self.title = title
+        self.fractionCompleted = fractionCompleted
+    }
 
     /// Bytes per second averaged over the sample window, or nil if too few samples.
     var speedBytesPerSec: Double? {
@@ -300,7 +315,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         }
         guard shouldPublish else { return }
         Task { @MainActor in
-            guard let id = self.taskMap[taskID], var download = self.activeDownloads[id] else { return }
+            guard let id = self.taskMap[taskID], let download = self.activeDownloads[id] else { return }
             download.fractionCompleted = fraction
             download.bytesWritten = totalBytesWritten
             download.totalBytes = totalBytesExpectedToWrite
@@ -310,7 +325,6 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 download.samples.append((date: now, bytes: totalBytesWritten))
                 download.samples = download.samples.filter { $0.date >= now.addingTimeInterval(-5) }
             }
-            self.activeDownloads[id] = download
         }
     }
 
