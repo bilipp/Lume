@@ -13,6 +13,8 @@ final class Series {
     // `genre` for the browse-by-genre derivation; index both so opening a
     // category or switching playlists seeks instead of scanning the whole
     // catalog on a large library.
+    // `indexedAt` backs the content indexer's pending/progress scans, run once
+    // per chunk for a whole indexing pass.
     #Index<Series>(
         [\.tmdbId],
         [\.isFavorite],
@@ -20,7 +22,8 @@ final class Series {
         [\.addedToWatchlistDate],
         [\.recommendationVoteRaw],
         [\.categoryId],
-        [\.genre]
+        [\.genre],
+        [\.indexedAt]
     )
 
     @Attribute(.unique) var id: String

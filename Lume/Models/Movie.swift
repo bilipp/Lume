@@ -14,6 +14,9 @@ final class Movie {
     // `genre` for the browse-by-genre derivation; index both so opening a
     // category or switching playlists seeks instead of scanning the whole
     // catalog on a large library.
+    // `indexedAt` backs the content indexer's pending/progress scans (run once
+    // per chunk for a whole indexing pass) and `downloadStatusRaw` the Downloads
+    // screen's live `@Query`, which re-evaluates during catalog syncs.
     #Index<Movie>(
         [\.tmdbId],
         [\.isFavorite],
@@ -23,7 +26,9 @@ final class Movie {
         [\.watchProgress],
         [\.recommendationVoteRaw],
         [\.categoryId],
-        [\.genre]
+        [\.genre],
+        [\.indexedAt],
+        [\.downloadStatusRaw]
     )
 
     @Attribute(.unique) var id: String
