@@ -90,9 +90,12 @@ struct KSPlayerEngineView: View {
     @State private var isControlsVisible = true
     @State var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
-    @State private var isPipActive = false
+    /// PiP state and its observer task are `internal` (not `private`) so the
+    /// PiP observation in `KSPlayerEngineView+Playback.swift` can drive them.
+    @State var isPipActive = false
     @State var hideTask: Task<Void, Never>?
     @State private var hoverHideTask: Task<Void, Never>?
+    @State var pipObservationTask: Task<Void, Never>?
 
     #if os(tvOS)
         /// Republishes KSPlayer state to the shared overlay (`isPlaying`,
@@ -445,6 +448,7 @@ struct KSPlayerEngineView: View {
             .onDisappear {
                 hideTask?.cancel()
                 hoverHideTask?.cancel()
+                pipObservationTask?.cancel()
                 reconnector.cancel()
                 cancelStartupWatchdog()
                 cancelStallWatchdog()
@@ -508,22 +512,6 @@ struct KSPlayerEngineView: View {
             }
         }
 
-        // MARK: PiP
-
-        private func observePipState() {
-            // Poll until playerLayer is available, then observe its published isPipActive
-            Task { @MainActor in
-                var attempts = 0
-                while coordinator.playerLayer == nil, attempts < 50 {
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                    attempts += 1
-                }
-                guard let playerLayer = coordinator.playerLayer else { return }
-                for await active in playerLayer.$isPipActive.values {
-                    isPipActive = active
-                }
-            }
-        }
     #endif
 
     // MARK: - Actions (shared)

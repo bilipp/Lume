@@ -1,3 +1,4 @@
+import Combine
 import KSPlayer
 import OSLog
 import QuartzCore
@@ -344,3 +345,29 @@ extension KSPlayerEngineView {
         }
     }
 }
+
+// MARK: - PiP observation
+
+#if !os(tvOS)
+    @available(iOS 16.0, macOS 13.0, *)
+    extension KSPlayerEngineView {
+        /// Poll until playerLayer is available, then observe its published isPipActive.
+        /// The `for await` holds the layer strongly, so this task must be cancelled on
+        /// disappear or the KSPlayerLayer (and its decoder session) outlives playback.
+        func observePipState() {
+            pipObservationTask?.cancel()
+            pipObservationTask = Task { @MainActor in
+                var attempts = 0
+                while coordinator.playerLayer == nil, attempts < 50 {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    attempts += 1
+                }
+                guard !Task.isCancelled, let playerLayer = coordinator.playerLayer else { return }
+                for await active in playerLayer.$isPipActive.values {
+                    guard !Task.isCancelled else { return }
+                    isPipActive = active
+                }
+            }
+        }
+    }
+#endif
