@@ -366,7 +366,8 @@
             // Open on the season of the furthest point reached in the series, so
             // progress in a later season always wins over progress in an earlier
             // one — regardless of which was watched more recently.
-            let target = furthestInProgressEpisode ?? furthestProgressEpisode
+            let markers = SeriesEpisodeProgress.markers(in: series.episodes)
+            let target = markers.furthestInProgress ?? markers.furthestAnyProgress
             if let target, seasons.contains(target.seasonNum) {
                 return target.seasonNum
             }
@@ -380,38 +381,11 @@
                 .sorted { $0.episodeNum < $1.episodeNum }
         }
 
-        /// The furthest partially-watched (not completed) episode in the
-        /// series, ordered by season then episode.
-        private var furthestInProgressEpisode: Episode? {
-            series.episodes
-                .filter { $0.watchProgress > 1 && !$0.isWatched }
-                .max { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
-        }
-
-        /// The furthest episode with any watch progress, including completed.
-        private var furthestProgressEpisode: Episode? {
-            series.episodes
-                .filter { $0.watchProgress > 0 || $0.isWatched }
-                .max { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
-        }
-
-        /// The furthest fully-watched episode in the series.
-        private var furthestWatchedEpisode: Episode? {
-            series.episodes
-                .filter(\.isWatched)
-                .max { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
-        }
-
-        /// Play button target: resume the furthest in-progress episode; else the
-        /// episode after the furthest watched one (overflowing seasons, wrapping
-        /// to the premiere after the finale); else the selected season's first.
+        /// Play button target — see `SeriesEpisodeProgress.nextEpisode`. Read
+        /// more than once per body evaluation (play button + `playTitle`), so
+        /// it must stay O(episodes) with no sorting.
         private var nextEpisode: Episode? {
-            if let inProgress = furthestInProgressEpisode { return inProgress }
-            let ordered = series.episodes.sorted { ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum) }
-            guard let watched = furthestWatchedEpisode,
-                  let index = ordered.firstIndex(where: { $0 === watched })
-            else { return seasonEpisodes.first ?? ordered.first }
-            return index + 1 < ordered.count ? ordered[index + 1] : ordered.first
+            SeriesEpisodeProgress.nextEpisode(in: series.episodes, fallback: seasonEpisodes.first)
         }
 
         private var playTitle: LocalizedStringKey {

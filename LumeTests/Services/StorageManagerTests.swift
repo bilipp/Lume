@@ -28,7 +28,7 @@ struct StorageManagerTests {
         #expect(stats.channelCount == 1)
     }
 
-    @Test func `clearMetadataEnrichment resets enrichment but keeps the title`() throws {
+    @Test func `clearMetadataEnrichment resets enrichment but keeps the title`() async throws {
         let container = try makeTestContainer()
         let context = container.mainContext
 
@@ -51,10 +51,14 @@ struct StorageManagerTests {
         context.insert(CastMember(id: "m1-cast-0", tmdbPersonId: 5, name: "Actor", order: 0, movie: movie))
         try context.save()
 
-        StorageManager.clearMetadataEnrichment(in: context)
+        await StorageManager.clearMetadataEnrichment(container: container)
 
+        // Verify against a fresh context: the clear ran on its own background
+        // context, and the main context's registered objects may not have
+        // merged the change yet.
+        let verifyContext = ModelContext(container)
         let refetched = try #require(
-            try context.fetch(FetchDescriptor<Movie>(predicate: #Predicate { $0.id == "m1" })).first
+            try verifyContext.fetch(FetchDescriptor<Movie>(predicate: #Predicate { $0.id == "m1" })).first
         )
         // Title and user data survive.
         #expect(refetched.name == "Keep Me")
@@ -75,7 +79,7 @@ struct StorageManagerTests {
         #expect(refetched.collectionName == nil)
         #expect(refetched.castMembers.isEmpty)
 
-        let remainingCast = try context.fetch(FetchDescriptor<CastMember>())
+        let remainingCast = try verifyContext.fetch(FetchDescriptor<CastMember>())
         #expect(remainingCast.isEmpty)
     }
 }

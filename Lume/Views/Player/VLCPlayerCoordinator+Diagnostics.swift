@@ -32,6 +32,9 @@ extension VLCPlayerCoordinator {
             let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
                 self?.logStreamHealth()
             }
+            // Diagnostic sampling doesn't need exact firing; a tolerance lets
+            // the system coalesce the wake-up with other timers.
+            timer.tolerance = 0.2
             // Common mode so sampling continues during scrolling / tracking
             // runloop activity in the player UI.
             RunLoop.main.add(timer, forMode: .common)

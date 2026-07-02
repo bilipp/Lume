@@ -20,6 +20,9 @@ struct HomeHeroCarousel: View {
 
     @State private var currentID: String?
     @State private var isInteracting = false
+    /// False while the hero is scrolled out of view, so the carousel doesn't
+    /// page (and animate the crossfade + loading bar) where nobody can see it.
+    @State private var isVisible = true
 
     /// Fill of the active page indicator (0…1). Driven by `autoAdvance()` and
     /// reset on every page change, it doubles as the auto-advance clock so the
@@ -133,6 +136,9 @@ struct HomeHeroCarousel: View {
         .task(id: items.count) {
             await autoAdvance()
         }
+        .onScrollVisibilityChange { visible in
+            isVisible = visible
+        }
     }
 
     /// Warms the cache for the slides on either side so they appear instantly.
@@ -238,7 +244,10 @@ struct HomeHeroCarousel: View {
             // let go fired `advance()` immediately — off a still-settling
             // `currentID` — which read as random forward/backward jumps. Keeping
             // it at zero guarantees a full dwell on the slide they land on.
-            if isInteracting {
+            // Same hold while scrolled off-screen (mirroring tvOS's fold pause):
+            // no paging, prefetching or crossfades where nobody can see them,
+            // and a full dwell once the hero scrolls back into view.
+            if isInteracting || !isVisible {
                 progress = 0
                 continue
             }
