@@ -106,18 +106,39 @@ extension ContentSyncManager {
         var seenIds = Set<String>()
         var imported = 0
 
+        // Accumulate items across categories and save in fixed-size batches
+        // (mirroring `syncStalkerChannels` and the Xtream/m3u pipelines).
+        // Saving once per category produced one main-context merge — and the
+        // browse-view `@Query` re-evaluation it triggers — per category, which
+        // adds up on portals with many small categories.
+        let batchSize = 2000
+        var pending: [(item: StalkerVODItem, categoryId: String)] = []
+
         for category in categories where !category.id.isEmpty {
             try Task.checkCancellation()
             let items = await (try? client.getAllOrderedItems(type: "vod", categoryId: category.id)) ?? []
             guard !items.isEmpty else { continue }
 
+            pending.append(contentsOf: items.map { (item: $0, categoryId: category.id) })
+            while pending.count >= batchSize {
+                let batch = Array(pending.prefix(batchSize))
+                pending.removeFirst(batchSize)
+                autoreleasepool {
+                    imported += upsertStalkerMovies(
+                        batch, playlistPrefix: playlistPrefix,
+                        playlistId: playlistId, seenIds: &seenIds
+                    )
+                }
+            }
+            await progress?.update(detail: "\(imported + pending.count) items")
+        }
+        if !pending.isEmpty {
             autoreleasepool {
                 imported += upsertStalkerMovies(
-                    items, categoryId: category.id, playlistPrefix: playlistPrefix,
+                    pending, playlistPrefix: playlistPrefix,
                     playlistId: playlistId, seenIds: &seenIds
                 )
             }
-            await progress?.update(detail: "\(imported) items")
         }
 
         if !seenIds.isEmpty {
@@ -127,19 +148,18 @@ extension ContentSyncManager {
         await progress?.complete(.movies)
     }
 
-    /// Upserts one category's worth of VOD items on a fresh context and returns
-    /// how many were imported.
+    /// Upserts one batch of VOD items (each carrying its category) on a fresh
+    /// context and returns how many were imported.
     private func upsertStalkerMovies(
-        _ items: [StalkerVODItem],
-        categoryId: String,
+        _ items: [(item: StalkerVODItem, categoryId: String)],
         playlistPrefix: String,
         playlistId: UUID,
         seenIds: inout Set<String>
     ) -> Int {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
-        let ids = items.compactMap { item -> String? in
-            guard let stalkerId = item.id else { return nil }
+        let ids = items.compactMap { entry -> String? in
+            guard let stalkerId = entry.item.id else { return nil }
             return "\(playlistId.uuidString)-movie-\(Self.streamId(for: stalkerId))"
         }
         var existing: [String: Movie] = [:]
@@ -151,7 +171,7 @@ extension ContentSyncManager {
         }
 
         var imported = 0
-        for item in items {
+        for (item, categoryId) in items {
             guard let stalkerId = item.id, let cmd = item.cmd else { continue }
             let streamId = Self.streamId(for: stalkerId)
             let movieId = "\(playlistId.uuidString)-movie-\(streamId)"
@@ -190,49 +210,37 @@ extension ContentSyncManager {
         var seenIds = Set<String>()
         var imported = 0
 
+        // Same cross-category batching as `syncStalkerMovies`, for the same
+        // reason: one save (and main-context merge) per fixed-size batch
+        // instead of one per category.
+        let batchSize = 2000
+        var pending: [(item: StalkerVODItem, categoryId: String)] = []
+
         for category in categories where !category.id.isEmpty {
             try Task.checkCancellation()
             let items = await (try? client.getAllOrderedItems(type: "series", categoryId: category.id)) ?? []
             guard !items.isEmpty else { continue }
 
-            try autoreleasepool {
-                let context = ModelContext(modelContainer)
-                context.autosaveEnabled = false
-                let ids = items.compactMap { item -> String? in
-                    guard let stalkerId = item.id else { return nil }
-                    return "\(playlistId.uuidString)-series-\(Self.streamId(for: stalkerId))"
+            pending.append(contentsOf: items.map { (item: $0, categoryId: category.id) })
+            while pending.count >= batchSize {
+                let batch = Array(pending.prefix(batchSize))
+                pending.removeFirst(batchSize)
+                autoreleasepool {
+                    imported += upsertStalkerSeries(
+                        batch, playlistPrefix: playlistPrefix,
+                        playlistId: playlistId, seenIds: &seenIds
+                    )
                 }
-                var existing: [String: Series] = [:]
-                let fetched = (try? context.fetch(
-                    FetchDescriptor<Series>(predicate: #Predicate { ids.contains($0.id) })
-                )) ?? []
-                for series in fetched {
-                    existing[series.id] = series
-                }
-
-                for item in items {
-                    guard let stalkerId = item.id else { continue }
-                    let seriesId = Self.streamId(for: stalkerId)
-                    let id = "\(playlistId.uuidString)-series-\(seriesId)"
-                    seenIds.insert(id)
-
-                    let series: Series
-                    if let found = existing[id] {
-                        series = found
-                    } else {
-                        series = Series(id: id, seriesId: seriesId, name: "")
-                        context.insert(series)
-                    }
-                    series.name = item.name ?? ""
-                    series.cover = item.screenshot
-                    series.plot = item.description
-                    series.releaseDate = item.year
-                    series.categoryId = playlistPrefix + category.id
-                    imported += 1
-                }
-                try context.save()
             }
-            await progress?.update(detail: "\(imported) items")
+            await progress?.update(detail: "\(imported + pending.count) items")
+        }
+        if !pending.isEmpty {
+            autoreleasepool {
+                imported += upsertStalkerSeries(
+                    pending, playlistPrefix: playlistPrefix,
+                    playlistId: playlistId, seenIds: &seenIds
+                )
+            }
         }
 
         if !seenIds.isEmpty {
@@ -240,6 +248,53 @@ extension ContentSyncManager {
         }
         Logger.database.info("Stalker: synced \(imported) series")
         await progress?.complete(.series)
+    }
+
+    /// Upserts one batch of series items (each carrying its category) on a
+    /// fresh context and returns how many were imported.
+    private func upsertStalkerSeries(
+        _ items: [(item: StalkerVODItem, categoryId: String)],
+        playlistPrefix: String,
+        playlistId: UUID,
+        seenIds: inout Set<String>
+    ) -> Int {
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        let ids = items.compactMap { entry -> String? in
+            guard let stalkerId = entry.item.id else { return nil }
+            return "\(playlistId.uuidString)-series-\(Self.streamId(for: stalkerId))"
+        }
+        var existing: [String: Series] = [:]
+        let fetched = (try? context.fetch(
+            FetchDescriptor<Series>(predicate: #Predicate { ids.contains($0.id) })
+        )) ?? []
+        for series in fetched {
+            existing[series.id] = series
+        }
+
+        var imported = 0
+        for (item, categoryId) in items {
+            guard let stalkerId = item.id else { continue }
+            let seriesId = Self.streamId(for: stalkerId)
+            let id = "\(playlistId.uuidString)-series-\(seriesId)"
+            seenIds.insert(id)
+
+            let series: Series
+            if let found = existing[id] {
+                series = found
+            } else {
+                series = Series(id: id, seriesId: seriesId, name: "")
+                context.insert(series)
+            }
+            series.name = item.name ?? ""
+            series.cover = item.screenshot
+            series.plot = item.description
+            series.releaseDate = item.year
+            series.categoryId = playlistPrefix + categoryId
+            imported += 1
+        }
+        try? context.save()
+        return imported
     }
 
     /// Fetches a Stalker series' episodes on demand (the series detail screen

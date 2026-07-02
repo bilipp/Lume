@@ -51,13 +51,13 @@ struct StorageManagementView: View {
         case .imageCache:
             await StorageManager.clearImageCache()
         case .metadata:
-            StorageManager.clearMetadataEnrichment(in: modelContext)
+            await StorageManager.clearMetadataEnrichment(container: modelContext.container)
         case .watchHistory:
-            StorageManager.clearWatchHistory(in: modelContext)
+            await StorageManager.clearWatchHistory(container: modelContext.container)
         #if DEBUG
             case .index:
                 indexing.reset()
-                StorageManager.clearIndex(in: modelContext)
+                await StorageManager.clearIndex(container: modelContext.container)
                 indexing.kick()
         #endif
         }

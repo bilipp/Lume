@@ -69,63 +69,83 @@ enum StorageManager {
         }.value
     }
 
+    /// Rows mutated between intermediate saves during the clear operations, so
+    /// one clear doesn't build a single giant transaction in memory.
+    private static let clearBatchSize = 1000
+
     /// Drops cached TMDB/OMDb enrichment (artwork paths, cast, trailers, ratings
     /// and collection info) from every enriched movie and series so it re-fetches
-    /// lazily on the next detail-screen visit. Runs on the passed-in (main)
-    /// context — like `TMDBLanguageWatcher` — so browse views reflect the cleared
-    /// artwork immediately rather than after a relaunch.
-    static func clearMetadataEnrichment(in context: ModelContext) {
-        do {
-            // Filter in SQLite so only already-enriched rows are hydrated.
-            let movies = try context.fetch(FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.tmdbEnrichedAt != nil || $0.ratingsEnrichedAt != nil }
-            ))
-            for movie in movies {
-                // Clearing the relationship array only disassociates the rows;
-                // delete them explicitly so the orphaned cast doesn't linger and
-                // keep occupying the store.
-                for cast in movie.castMembers {
-                    context.delete(cast)
+    /// lazily on the next detail-screen visit. Runs on a private background
+    /// context — hydrating and mutating every enriched title (plus cascade-
+    /// deleting its cast) on the main context froze the UI for seconds on a
+    /// large library. The saves merge back into the main context, so browse
+    /// views still reflect the cleared artwork as soon as they land.
+    static func clearMetadataEnrichment(container: ModelContainer) async {
+        await Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
+            do {
+                // Filter in SQLite so only already-enriched rows are hydrated.
+                let movies = try context.fetch(FetchDescriptor<Movie>(
+                    predicate: #Predicate { $0.tmdbEnrichedAt != nil || $0.ratingsEnrichedAt != nil }
+                ))
+                for (index, movie) in movies.enumerated() {
+                    clearEnrichment(of: movie, in: context)
+                    if (index + 1).isMultiple(of: clearBatchSize) { try context.save() }
                 }
-                movie.backdropPath = nil
-                movie.logoPath = nil
-                movie.tagline = nil
-                movie.contentRating = nil
-                movie.tmdbEnrichedAt = nil
-                movie.similarTMDBIds = []
-                movie.trailersData = nil
-                movie.imdbId = nil
-                movie.externalRatingsData = nil
-                movie.ratingsEnrichedAt = nil
-                movie.collectionId = nil
-                movie.collectionName = nil
-                movie.collectionPosterPath = nil
-                movie.collectionBackdropPath = nil
-            }
+                try context.save()
 
-            let series = try context.fetch(FetchDescriptor<Series>(
-                predicate: #Predicate { $0.tmdbEnrichedAt != nil || $0.ratingsEnrichedAt != nil }
-            ))
-            for show in series {
-                for cast in show.castMembers {
-                    context.delete(cast)
+                let series = try context.fetch(FetchDescriptor<Series>(
+                    predicate: #Predicate { $0.tmdbEnrichedAt != nil || $0.ratingsEnrichedAt != nil }
+                ))
+                for (index, show) in series.enumerated() {
+                    clearEnrichment(of: show, in: context)
+                    if (index + 1).isMultiple(of: clearBatchSize) { try context.save() }
                 }
-                show.backdropPath = nil
-                show.logoPath = nil
-                show.tagline = nil
-                show.contentRating = nil
-                show.tmdbEnrichedAt = nil
-                show.similarTMDBIds = []
-                show.trailersData = nil
-                show.imdbId = nil
-                show.externalRatingsData = nil
-                show.ratingsEnrichedAt = nil
+                try context.save()
+            } catch {
+                logger.error("Failed to clear metadata enrichment: \(error.localizedDescription)")
             }
+        }.value
+    }
 
-            try context.save()
-        } catch {
-            logger.error("Failed to clear metadata enrichment: \(error.localizedDescription)")
+    private nonisolated static func clearEnrichment(of movie: Movie, in context: ModelContext) {
+        // Clearing the relationship array only disassociates the rows; delete
+        // them explicitly so the orphaned cast doesn't linger and keep
+        // occupying the store.
+        for cast in movie.castMembers {
+            context.delete(cast)
         }
+        movie.backdropPath = nil
+        movie.logoPath = nil
+        movie.tagline = nil
+        movie.contentRating = nil
+        movie.tmdbEnrichedAt = nil
+        movie.similarTMDBIds = []
+        movie.trailersData = nil
+        movie.imdbId = nil
+        movie.externalRatingsData = nil
+        movie.ratingsEnrichedAt = nil
+        movie.collectionId = nil
+        movie.collectionName = nil
+        movie.collectionPosterPath = nil
+        movie.collectionBackdropPath = nil
+    }
+
+    private nonisolated static func clearEnrichment(of show: Series, in context: ModelContext) {
+        for cast in show.castMembers {
+            context.delete(cast)
+        }
+        show.backdropPath = nil
+        show.logoPath = nil
+        show.tagline = nil
+        show.contentRating = nil
+        show.tmdbEnrichedAt = nil
+        show.similarTMDBIds = []
+        show.trailersData = nil
+        show.imdbId = nil
+        show.externalRatingsData = nil
+        show.ratingsEnrichedAt = nil
     }
 
     /// Wipes the active profile's watch history: resets `watchProgress`,
@@ -133,51 +153,60 @@ enum StorageManager {
     /// `lastWatchedDate` on every series and channel. Favorites, watchlist and
     /// recommendation votes are left untouched.
     ///
-    /// Runs on the passed-in (main) context — like `clearMetadataEnrichment` —
-    /// so the Continue Watching / Recently Watched rows update immediately. The
-    /// iCloud reconciler picks up the cleared local state on its next pass and
+    /// Runs on a private background context — like `clearMetadataEnrichment` —
+    /// whose saves merge back into the main context, so the Continue Watching /
+    /// Recently Watched rows still update as soon as they land. The iCloud
+    /// reconciler picks up the cleared local state on its next pass and
     /// mirrors the reset to CloudKit (and thus the user's other devices), the
     /// same way an individual "remove from recently watched" does. The
     /// `#Predicate` filters keep only rows that actually carry watch state out of
     /// the fetch, so an untouched catalog isn't hydrated wholesale.
-    static func clearWatchHistory(in context: ModelContext) {
-        do {
-            let movies = try context.fetch(FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.watchProgress != 0 || $0.isWatched || $0.lastWatchedDate != nil }
-            ))
-            for movie in movies {
-                movie.watchProgress = 0
-                movie.isWatched = false
-                movie.lastWatchedDate = nil
-            }
+    static func clearWatchHistory(container: ModelContainer) async {
+        await Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
+            do {
+                let movies = try context.fetch(FetchDescriptor<Movie>(
+                    predicate: #Predicate { $0.watchProgress != 0 || $0.isWatched || $0.lastWatchedDate != nil }
+                ))
+                for (index, movie) in movies.enumerated() {
+                    movie.watchProgress = 0
+                    movie.isWatched = false
+                    movie.lastWatchedDate = nil
+                    if (index + 1).isMultiple(of: clearBatchSize) { try context.save() }
+                }
+                try context.save()
 
-            let episodes = try context.fetch(FetchDescriptor<Episode>(
-                predicate: #Predicate { $0.watchProgress != 0 || $0.isWatched || $0.lastWatchedDate != nil }
-            ))
-            for episode in episodes {
-                episode.watchProgress = 0
-                episode.isWatched = false
-                episode.lastWatchedDate = nil
-            }
+                let episodes = try context.fetch(FetchDescriptor<Episode>(
+                    predicate: #Predicate { $0.watchProgress != 0 || $0.isWatched || $0.lastWatchedDate != nil }
+                ))
+                for (index, episode) in episodes.enumerated() {
+                    episode.watchProgress = 0
+                    episode.isWatched = false
+                    episode.lastWatchedDate = nil
+                    if (index + 1).isMultiple(of: clearBatchSize) { try context.save() }
+                }
+                try context.save()
 
-            let series = try context.fetch(FetchDescriptor<Series>(
-                predicate: #Predicate { $0.lastWatchedDate != nil }
-            ))
-            for show in series {
-                show.lastWatchedDate = nil
-            }
+                let series = try context.fetch(FetchDescriptor<Series>(
+                    predicate: #Predicate { $0.lastWatchedDate != nil }
+                ))
+                for show in series {
+                    show.lastWatchedDate = nil
+                }
 
-            let channels = try context.fetch(FetchDescriptor<LiveStream>(
-                predicate: #Predicate { $0.lastWatchedDate != nil }
-            ))
-            for channel in channels {
-                channel.lastWatchedDate = nil
-            }
+                let channels = try context.fetch(FetchDescriptor<LiveStream>(
+                    predicate: #Predicate { $0.lastWatchedDate != nil }
+                ))
+                for channel in channels {
+                    channel.lastWatchedDate = nil
+                }
 
-            try context.save()
-        } catch {
-            logger.error("Failed to clear watch history: \(error.localizedDescription)")
-        }
+                try context.save()
+            } catch {
+                logger.error("Failed to clear watch history: \(error.localizedDescription)")
+            }
+        }.value
     }
 
     #if DEBUG
@@ -186,31 +215,35 @@ enum StorageManager {
         /// resolved `tmdbId` links and each title's `indexedAt` stamp — so the
         /// next indexing pass rebuilds everything from scratch. Used to exercise
         /// the indexer during development.
-        static func clearIndex(in context: ModelContext) {
-            clearMetadataEnrichment(in: context)
-            do {
-                let movies = try context.fetch(FetchDescriptor<Movie>(
-                    predicate: #Predicate { $0.indexedAt != nil || $0.embeddingData != nil || $0.tmdbId != nil }
-                ))
-                for movie in movies {
-                    movie.tmdbId = nil
-                    movie.embeddingData = nil
-                    movie.indexedAt = nil
-                }
+        static func clearIndex(container: ModelContainer) async {
+            await clearMetadataEnrichment(container: container)
+            await Task.detached(priority: .userInitiated) {
+                let context = ModelContext(container)
+                context.autosaveEnabled = false
+                do {
+                    let movies = try context.fetch(FetchDescriptor<Movie>(
+                        predicate: #Predicate { $0.indexedAt != nil || $0.embeddingData != nil || $0.tmdbId != nil }
+                    ))
+                    for movie in movies {
+                        movie.tmdbId = nil
+                        movie.embeddingData = nil
+                        movie.indexedAt = nil
+                    }
 
-                let series = try context.fetch(FetchDescriptor<Series>(
-                    predicate: #Predicate { $0.indexedAt != nil || $0.embeddingData != nil || $0.tmdbId != nil }
-                ))
-                for show in series {
-                    show.tmdbId = nil
-                    show.embeddingData = nil
-                    show.indexedAt = nil
-                }
+                    let series = try context.fetch(FetchDescriptor<Series>(
+                        predicate: #Predicate { $0.indexedAt != nil || $0.embeddingData != nil || $0.tmdbId != nil }
+                    ))
+                    for show in series {
+                        show.tmdbId = nil
+                        show.embeddingData = nil
+                        show.indexedAt = nil
+                    }
 
-                try context.save()
-            } catch {
-                logger.error("Failed to clear index: \(error.localizedDescription)")
-            }
+                    try context.save()
+                } catch {
+                    logger.error("Failed to clear index: \(error.localizedDescription)")
+                }
+            }.value
         }
     #endif
 

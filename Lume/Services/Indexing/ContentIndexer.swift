@@ -37,9 +37,24 @@ actor ContentIndexer {
     private let assetRetryPause: Duration = .seconds(15)
     private let assetRetryMaxPause: Duration = .seconds(300)
 
-    init(modelContainer: ModelContainer, tmdbClient: TMDBClient = .shared) {
+    init(modelContainer: ModelContainer, tmdbClient: TMDBClient? = nil) {
         self.modelContainer = modelContainer
-        self.tmdbClient = tmdbClient
+        self.tmdbClient = tmdbClient ?? TMDBClient(session: Self.makeIndexingSession())
+    }
+
+    /// Session for the indexer's TMDB traffic: skips expensive (cellular /
+    /// hotspot) and constrained (Low Data Mode) networks. A full-library pass
+    /// issues one request per unindexed title over a long stretch, and nobody
+    /// is waiting on it — so it shouldn't burn metered data or hold the radio.
+    /// On a cellular-only connection requests fail immediately (no
+    /// `waitsForConnectivity`), the run throws, and the next kick retries —
+    /// the same recovery path as any transient network failure. User-initiated
+    /// detail-screen enrichment stays on `.shared`, unconstrained.
+    private static func makeIndexingSession() -> URLSession {
+        let config = URLSessionConfiguration.default
+        config.allowsExpensiveNetworkAccess = false
+        config.allowsConstrainedNetworkAccess = false
+        return URLSession(configuration: config)
     }
 
     // MARK: - Run loop
