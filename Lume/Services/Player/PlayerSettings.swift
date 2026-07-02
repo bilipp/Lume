@@ -212,7 +212,9 @@ enum PlayerSettings {
     /// Storage keys and defaults for the KSPlayer engine, mapped 1:1 onto
     /// `KSOptions` fields. Defaults match `KSOptions`' own defaults except where
     /// the app deliberately diverged (asynchronous decompression on, so the
-    /// hardware path actually engages — see the KSPlayer hardware-decode gate).
+    /// hardware path actually engages — see the KSPlayer hardware-decode gate;
+    /// subtitle auto-select off, so playback doesn't start with subtitles
+    /// showing on every open).
     enum KSPlayer {
         static let hardwareDecodeKey = "player.ks.hardwareDecode"
         static let asyncDecompressionKey = "player.ks.asyncDecompression"
@@ -226,6 +228,7 @@ enum PlayerSettings {
         static let noBufferKey = "player.ks.noBuffer"
         static let codecLowDelayKey = "player.ks.codecLowDelay"
         static let autoPipKey = "player.ks.autoPip"
+        static let autoSelectSubtitleKey = "player.ks.autoSelectSubtitle"
         static let liveBufferKey = "player.ks.liveBuffer"
         static let vodBufferKey = "player.ks.vodBuffer"
         static let maxBufferKey = "player.ks.maxBuffer"
@@ -243,6 +246,7 @@ enum PlayerSettings {
         static let noBufferDefault = false
         static let codecLowDelayDefault = false
         static let autoPipDefault = true
+        static let autoSelectSubtitleDefault = false
         /// Minimum forward buffer for live streams, in seconds.
         static let liveBufferDefault = 4
         /// Minimum forward buffer for on-demand streams, in seconds.
@@ -257,7 +261,8 @@ enum PlayerSettings {
                 hardwareDecodeKey, asyncDecompressionKey, secondOpenKey, accurateSeekKey,
                 loopPlayKey, systemProxyKey, autoDeinterlaceKey, autoRotateKey,
                 adaptiveKey, noBufferKey, codecLowDelayKey, autoPipKey,
-                liveBufferKey, vodBufferKey, maxBufferKey, primaryEngineKey
+                autoSelectSubtitleKey, liveBufferKey, vodBufferKey, maxBufferKey,
+                primaryEngineKey
             ]
         }
 

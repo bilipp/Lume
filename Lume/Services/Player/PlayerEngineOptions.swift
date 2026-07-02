@@ -225,6 +225,10 @@ struct KSPlayerOptions {
     var noBuffer: Bool
     var codecLowDelay: Bool
     var autoPip: Bool
+    /// Whether KSPlayer picks the first embedded subtitle track on open.
+    /// Deliberately off by default — the subtitle overlay renders whatever is
+    /// selected, so auto-select would show subtitles on every playback start.
+    var autoSelectSubtitle: Bool
     var primaryEngine: KSPrimaryEngine
     /// Forward-buffer durations, in seconds.
     var liveBuffer: Int
@@ -245,6 +249,7 @@ struct KSPlayerOptions {
             noBuffer: defaults.bool(PlayerSettings.KSPlayer.noBufferKey, default: PlayerSettings.KSPlayer.noBufferDefault),
             codecLowDelay: defaults.bool(PlayerSettings.KSPlayer.codecLowDelayKey, default: PlayerSettings.KSPlayer.codecLowDelayDefault),
             autoPip: defaults.bool(PlayerSettings.KSPlayer.autoPipKey, default: PlayerSettings.KSPlayer.autoPipDefault),
+            autoSelectSubtitle: defaults.bool(PlayerSettings.KSPlayer.autoSelectSubtitleKey, default: PlayerSettings.KSPlayer.autoSelectSubtitleDefault),
             primaryEngine: KSPrimaryEngine(rawValue: defaults.string(forKey: PlayerSettings.KSPlayer.primaryEngineKey) ?? "") ?? .defaultValue,
             liveBuffer: defaults.integer(PlayerSettings.KSPlayer.liveBufferKey, default: PlayerSettings.KSPlayer.liveBufferDefault),
             vodBuffer: defaults.integer(PlayerSettings.KSPlayer.vodBufferKey, default: PlayerSettings.KSPlayer.vodBufferDefault),

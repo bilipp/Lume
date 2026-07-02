@@ -52,6 +52,7 @@ extension KSPlayerEngineView {
         options.nobuffer = settings.noBuffer
         options.codecLowDelay = settings.codecLowDelay
         options.canStartPictureInPictureAutomaticallyFromInline = settings.autoPip
+        options.autoSelectEmbedSubtitle = settings.autoSelectSubtitle
         options.maxBufferDuration = Double(settings.maxBuffer)
         options.preferredForwardBufferDuration = Double(media.isLive ? settings.liveBuffer : settings.vodBuffer)
         if !media.isLive, media.startTime > 1 {

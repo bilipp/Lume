@@ -115,6 +115,7 @@ import SwiftUI
         @AppStorage(PlayerSettings.KSPlayer.noBufferKey) private var noBuffer = PlayerSettings.KSPlayer.noBufferDefault
         @AppStorage(PlayerSettings.KSPlayer.codecLowDelayKey) private var codecLowDelay = PlayerSettings.KSPlayer.codecLowDelayDefault
         @AppStorage(PlayerSettings.KSPlayer.autoPipKey) private var autoPip = PlayerSettings.KSPlayer.autoPipDefault
+        @AppStorage(PlayerSettings.KSPlayer.autoSelectSubtitleKey) private var autoSelectSubtitle = PlayerSettings.KSPlayer.autoSelectSubtitleDefault
         @AppStorage(PlayerSettings.KSPlayer.liveBufferKey) private var liveBuffer = PlayerSettings.KSPlayer.liveBufferDefault
         @AppStorage(PlayerSettings.KSPlayer.vodBufferKey) private var vodBuffer = PlayerSettings.KSPlayer.vodBufferDefault
         @AppStorage(PlayerSettings.KSPlayer.maxBufferKey) private var maxBuffer = PlayerSettings.KSPlayer.maxBufferDefault
@@ -136,6 +137,7 @@ import SwiftUI
                 Toggle("Accurate Seek", isOn: $accurateSeek)
                 Toggle("Fast Open", isOn: $secondOpen)
                 Toggle("Loop Playback", isOn: $loopPlay)
+                Toggle("Auto-Select Subtitles", isOn: $autoSelectSubtitle)
                 Toggle("Low Latency (No Buffer)", isOn: $noBuffer)
                 Toggle("Use System HTTP Proxy", isOn: $systemProxy)
                 Toggle("Automatic Picture in Picture", isOn: $autoPip)
@@ -316,6 +318,7 @@ import SwiftUI
         @AppStorage(PlayerSettings.KSPlayer.noBufferKey) private var noBuffer = PlayerSettings.KSPlayer.noBufferDefault
         @AppStorage(PlayerSettings.KSPlayer.codecLowDelayKey) private var codecLowDelay = PlayerSettings.KSPlayer.codecLowDelayDefault
         @AppStorage(PlayerSettings.KSPlayer.autoPipKey) private var autoPip = PlayerSettings.KSPlayer.autoPipDefault
+        @AppStorage(PlayerSettings.KSPlayer.autoSelectSubtitleKey) private var autoSelectSubtitle = PlayerSettings.KSPlayer.autoSelectSubtitleDefault
         @AppStorage(PlayerSettings.KSPlayer.liveBufferKey) private var liveBuffer = PlayerSettings.KSPlayer.liveBufferDefault
         @AppStorage(PlayerSettings.KSPlayer.vodBufferKey) private var vodBuffer = PlayerSettings.KSPlayer.vodBufferDefault
         @AppStorage(PlayerSettings.KSPlayer.maxBufferKey) private var maxBuffer = PlayerSettings.KSPlayer.maxBufferDefault
@@ -343,6 +346,7 @@ import SwiftUI
                     TVOptionToggleRow(title: "Accurate Seek", isOn: $accurateSeek)
                     TVOptionToggleRow(title: "Fast Open", isOn: $secondOpen)
                     TVOptionToggleRow(title: "Loop Playback", isOn: $loopPlay)
+                    TVOptionToggleRow(title: "Auto-Select Subtitles", isOn: $autoSelectSubtitle)
                     TVOptionToggleRow(title: "Automatic Picture in Picture", isOn: $autoPip)
                     TVOptionToggleRow(title: "Use System HTTP Proxy", isOn: $systemProxy)
                 }
