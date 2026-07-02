@@ -28,6 +28,23 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
         kind == .live
     }
 
+    /// A copy of this stream that resumes at `position` seconds. Same identity,
+    /// so it's the same title for progress/NextUp — used when handing the stream
+    /// to a different engine mid-playback (e.g. switching to AVPlayer to route
+    /// full-screen video over AirPlay). See `FullScreenPlayerView`.
+    func resuming(at position: TimeInterval) -> PlayableMedia {
+        PlayableMedia(
+            id: id,
+            url: url,
+            title: title,
+            subtitle: subtitle,
+            posterURL: posterURL,
+            kind: kind,
+            startTime: position,
+            contentRef: contentRef
+        )
+    }
+
     /// Returns a copy with the playback URL replaced. Used by
     /// `StalkerStreamResolver` to swap a deferred `lumestalker://` placeholder for
     /// the real, freshly resolved stream URL while keeping the same identity.

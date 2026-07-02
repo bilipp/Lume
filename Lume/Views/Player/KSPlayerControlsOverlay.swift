@@ -96,9 +96,11 @@ import SwiftUI
                 .accessibilityLabel("Close player")
                 .keyboardShortcut(.escape, modifiers: [])
 
+                pipButton
+
                 Spacer()
 
-                pipButton
+                AirPlayRouteButton()
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)

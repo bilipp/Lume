@@ -113,6 +113,13 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
 
     override init() {
         player.automaticallyWaitsToMinimizeStalling = true
+        // Hand video to an AirPlay receiver natively when one is picked — the
+        // other two engines render into their own layers and can't do this, so
+        // AVPlayer is the engine that delivers full-screen AirPlay video (#103).
+        player.allowsExternalPlayback = true
+        #if os(iOS)
+            player.usesExternalPlaybackWhileExternalScreenIsActive = true
+        #endif
         super.init()
     }
 
