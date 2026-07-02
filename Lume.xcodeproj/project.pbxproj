@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = C66C81682FC5A59D0048468D /* KSPlayer */; };
 		C6FF000A2FC5A59D00484601 /* VLCKitSPM in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKitSPM */; };
+		C89740B71101B965C46F49EE /* GoogleCast.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7EDCDE70D16B0D851E5AD6A3 /* GoogleCast.xcframework */; platformFilter = ios; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		FC7AC2139ACF6F702B734CE3 /* GoogleCast.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EDCDE70D16B0D851E5AD6A3 /* GoogleCast.xcframework */; platformFilter = ios; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,7 +30,22 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		C6D808EC383EADDD47C86DC6 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				C89740B71101B965C46F49EE /* GoogleCast.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		7EDCDE70D16B0D851E5AD6A3 /* GoogleCast.xcframework */ = {isa = PBXFileReference; includeInIndex = 1; name = GoogleCast.xcframework; path = Vendor/GoogleCast/GoogleCast.xcframework; sourceTree = "<group>"; };
 		C6339AC72FE20238008DDD93 /* Lume.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Lume.storekit; sourceTree = "<group>"; };
 		C67C02C02F880F2200842DBA /* Lume.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lume.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C67C02D12F880F2400842DBA /* LumeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -56,11 +73,15 @@
 		};
 		C67C02D42F880F2400842DBA /* LumeTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = LumeTests;
 			sourceTree = "<group>";
 		};
 		C67C02DE2F880F2400842DBA /* LumeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = LumeUITests;
 			sourceTree = "<group>";
 		};
@@ -73,6 +94,7 @@
 			files = (
 				C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */,
 				C6FF000A2FC5A59D00484601 /* VLCKitSPM in Frameworks */,
+				FC7AC2139ACF6F702B734CE3 /* GoogleCast.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -93,6 +115,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A6330AAB68E7244B5835B391 /* Vendor */ = {
+			isa = PBXGroup;
+			children = (
+				7EDCDE70D16B0D851E5AD6A3 /* GoogleCast.xcframework */,
+			);
+			name = Vendor;
+			sourceTree = "<group>";
+		};
 		C67C02B72F880F2200842DBA = {
 			isa = PBXGroup;
 			children = (
@@ -101,6 +131,7 @@
 				C67C02D42F880F2400842DBA /* LumeTests */,
 				C67C02DE2F880F2400842DBA /* LumeUITests */,
 				C67C02C12F880F2200842DBA /* Products */,
+				A6330AAB68E7244B5835B391 /* Vendor */,
 			);
 			sourceTree = "<group>";
 		};
@@ -125,6 +156,7 @@
 				C67C02BC2F880F2200842DBA /* Sources */,
 				C67C02BD2F880F2200842DBA /* Frameworks */,
 				C67C02BE2F880F2200842DBA /* Resources */,
+				C6D808EC383EADDD47C86DC6 /* Embed Frameworks */,
 				C6FEED020000000000000002 /* Inject .env secrets */,
 			);
 			buildRules = (
@@ -160,8 +192,6 @@
 				C67C02D42F880F2400842DBA /* LumeTests */,
 			);
 			name = LumeTests;
-			packageProductDependencies = (
-			);
 			productName = LumeTests;
 			productReference = C67C02D12F880F2400842DBA /* LumeTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -183,8 +213,6 @@
 				C67C02DE2F880F2400842DBA /* LumeUITests */,
 			);
 			name = LumeUITests;
-			packageProductDependencies = (
-			);
 			productName = LumeUITests;
 			productReference = C67C02DB2F880F2400842DBA /* LumeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -364,6 +392,10 @@
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/GoogleCast",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -382,6 +414,10 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.2.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -414,6 +450,10 @@
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/GoogleCast",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -432,6 +472,10 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.2.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -737,6 +781,10 @@
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Vendor/GoogleCast",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -755,6 +803,10 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.2.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

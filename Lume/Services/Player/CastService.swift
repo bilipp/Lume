@@ -2,6 +2,10 @@ import AVFoundation
 import Foundation
 import OSLog
 
+#if os(iOS) && canImport(GoogleCast)
+    import GoogleCast
+#endif
+
 /// Coordinates "casting" — sending playback to an external device — for the
 /// player overlay, independent of which playback engine is active.
 ///
@@ -60,6 +64,20 @@ final class CastService {
     /// `nil` when none is AirPlay. Pure, so it can be exercised in tests.
     static func activeAirPlayName(in outputs: [RouteOutput]) -> String? {
         outputs.first(where: \.isAirPlay)?.name
+    }
+
+    /// Configure the Google Cast SDK and register the Chromecast provider against
+    /// the `castProvider` seam. Call once at app launch. This is a no-op unless
+    /// the `GoogleCast` product is linked (the SDK is not bundled — see
+    /// `Docs/Chromecast.md`), so it is safe to call unconditionally.
+    func configureGoogleCast() {
+        #if os(iOS) && canImport(GoogleCast)
+            let criteria = GCKDiscoveryCriteria(applicationID: kGCKDefaultMediaReceiverApplicationID)
+            let options = GCKCastOptions(discoveryCriteria: criteria)
+            GCKCastContext.setSharedInstanceWith(options)
+            castProvider = GoogleCastProvider()
+            Logger.player.log("Chromecast: Cast context configured")
+        #endif
     }
 
     private func refreshAirPlayRoute() {

@@ -45,6 +45,16 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<!-- Chromecast (Google Cast SDK) device discovery — see Docs/Chromecast.md. -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Lume uses Bluetooth to discover nearby Chromecast devices.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_googlecast._tcp</string>
+		<string>_CC1AD845._googlecast._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Lume uses the local network to find and stream to Chromecast devices.</string>
 	<key>OMDBAPIKey</key>
 	<string></string>
 	<key>TMDBAccessToken</key>
