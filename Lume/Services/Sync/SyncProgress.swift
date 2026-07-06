@@ -53,6 +53,9 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         // sync skips the movie/series content walk (loaded on demand); only a
         // full-catalog download walks everything.
         case .stalker: full ? xtreamSteps : stalkerDynamicSteps
+        // Stremio maps onto the same catalog kinds as Xtream (auth, categories,
+        // movies, series, live), so it walks the same progress steps.
+        case .stremio: xtreamSteps
         }
     }
 

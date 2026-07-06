@@ -135,7 +135,9 @@ extension PlayableMedia {
         case .stalker:
             guard let cmd = episode.directSource, let placeholder = StalkerLink.placeholder(type: .vod, cmd: cmd) else { return nil }
             url = placeholder
-        case .m3u:
+        case .m3u, .stremio:
+            // m3u stores the episode's direct URL; Stremio stores a
+            // `lumestremio://` placeholder the player resolves at playback time.
             guard let resolved = episode.directSource.flatMap(URL.init(string:)) else { return nil }
             url = resolved
         case .xtream:

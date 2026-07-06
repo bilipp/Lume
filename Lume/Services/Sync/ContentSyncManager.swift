@@ -140,6 +140,8 @@ actor ContentSyncManager {
             try await performM3USync(playlist: playlist, playlistId: playlistId, progress: progress)
         case .stalker:
             try await performStalkerSync(playlist: playlist, playlistId: playlistId, progress: progress, full: full)
+        case .stremio:
+            try await performStremioSync(playlist: playlist, playlistId: playlistId, progress: progress, full: full)
         }
 
         let doneContext = ModelContext(modelContainer)
@@ -388,6 +390,8 @@ actor ContentSyncManager {
             try await fetchXtreamEpisodes(seriesId: seriesId, seriesElementId: seriesElementId, playlist: playlist)
         case .stalker:
             try await fetchStalkerEpisodes(seriesId: seriesId, seriesElementId: seriesElementId, playlist: playlist)
+        case .stremio:
+            try await fetchStremioEpisodes(seriesElementId: seriesElementId, playlist: playlist)
         case .m3u:
             // m3u episodes are imported alongside the rest of the catalog during
             // sync, so there is nothing to fetch lazily here.

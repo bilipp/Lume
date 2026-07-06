@@ -61,15 +61,16 @@ struct FullScreenPlayerView: View {
     /// the viewer picks another episode from the in-player episode rail (tvOS).
     @State private var activeMedia: PlayableMedia
 
-    /// The Stalker-resolved stand-in for `activeMedia`. Stalker streams arrive as
-    /// a `lumestalker://` placeholder whose real URL is fetched via `create_link`
-    /// at playback time; this holds the resolved copy once it lands. `nil` while
-    /// resolution is in flight (the loading indicator shows). Engines that play a
-    /// directly usable URL (Xtream / m3u) bypass this entirely — see `displayMedia`.
+    /// The resolved stand-in for `activeMedia`. Stalker and Stremio streams
+    /// arrive as a `lumestalker://` / `lumestremio://` placeholder whose real
+    /// URL is fetched at playback time; this holds the resolved copy once it
+    /// lands. `nil` while resolution is in flight (the loading indicator
+    /// shows). Engines that play a directly usable URL (Xtream / m3u) bypass
+    /// this entirely — see `displayMedia`.
     @State private var resolvedMedia: PlayableMedia?
 
-    /// Set when Stalker `create_link` resolution fails, so the host shows the
-    /// failure overlay instead of an endless spinner.
+    /// Set when stream resolution fails, so the host shows the failure overlay
+    /// instead of an endless spinner.
     @State private var resolveError: String?
 
     /// The episode queued to play after `activeMedia`, resolved whenever the
@@ -218,8 +219,9 @@ struct FullScreenPlayerView: View {
             #endif
         }
         .task(id: activeMedia.id) {
-            // Resolve a deferred Stalker placeholder into a real (short-lived)
-            // stream URL before the engine loads it. No-op for Xtream / m3u.
+            // Resolve a deferred Stalker/Stremio placeholder into a real
+            // (short-lived) stream URL before the engine loads it. No-op for
+            // Xtream / m3u.
             await resolveActiveMedia()
         }
         .task(id: activeMedia.id) {
@@ -302,11 +304,11 @@ struct FullScreenPlayerView: View {
 
     /// The media to hand the engine. For a directly playable stream (Xtream /
     /// m3u) this is `activeMedia` itself, so playback starts with no extra step.
-    /// For a Stalker placeholder it is the resolved copy, gated on its identity
-    /// matching the active stream so a stale resolution from the previous stream
-    /// never reaches the engine during a channel/episode switch.
+    /// For a deferred Stalker/Stremio placeholder it is the resolved copy, gated
+    /// on its identity matching the active stream so a stale resolution from the
+    /// previous stream never reaches the engine during a channel/episode switch.
     private var displayMedia: PlayableMedia? {
-        guard StalkerLink.isPlaceholder(activeMedia.url) else { return activeMedia }
+        guard DeferredStreamLink.isPlaceholder(activeMedia.url) else { return activeMedia }
         guard let resolvedMedia, resolvedMedia.id == activeMedia.id else { return nil }
         return resolvedMedia
     }
@@ -316,11 +318,11 @@ struct FullScreenPlayerView: View {
         if let media = displayMedia {
             engineView(for: media)
         } else if resolveError != nil {
-            // Stalker `create_link` failed — surface the failure with a retry
+            // Stream resolution failed — surface the failure with a retry
             // rather than spinning forever.
             PlayerErrorIndicator(title: activeMedia.title, onRetry: retryResolve, onClose: closePlayer)
         } else {
-            // Resolving the Stalker stream URL before the engine can load it.
+            // Resolving the stream URL before the engine can load it.
             PlayerLoadingIndicator(title: activeMedia.title)
         }
     }
@@ -387,20 +389,20 @@ struct FullScreenPlayerView: View {
         }
     }
 
-    /// Resolves the active Stalker placeholder into a playable URL. A no-op for
-    /// directly playable streams. Re-runs whenever the active stream changes
-    /// (open, channel surf, next episode), so each switch resolves a fresh,
-    /// short-lived URL.
+    /// Resolves the active Stalker/Stremio placeholder into a playable URL. A
+    /// no-op for directly playable streams. Re-runs whenever the active stream
+    /// changes (open, channel surf, next episode), so each switch resolves a
+    /// fresh, short-lived URL.
     private func resolveActiveMedia() async {
-        guard StalkerLink.isPlaceholder(activeMedia.url) else { return }
+        guard DeferredStreamLink.isPlaceholder(activeMedia.url) else { return }
         resolvedMedia = nil
         resolveError = nil
         do {
-            resolvedMedia = try await StalkerStreamResolver.resolve(activeMedia, container: modelContext.container)
+            resolvedMedia = try await DeferredStreamLink.resolve(activeMedia, container: modelContext.container)
         } catch {
             resolveError = error.localizedDescription
             let detail = (error as? StalkerError)?.logDescription ?? LogRedaction.describe(error)
-            Logger.player.error("Stalker stream resolution failed: \(detail, privacy: .public)")
+            Logger.player.error("Stream resolution failed: \(detail, privacy: .public)")
         }
     }
 
