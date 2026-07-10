@@ -81,6 +81,20 @@ nonisolated struct StremioManifest: Decodable {
     func supportsResource(_ name: String) -> Bool {
         resources.contains { $0.name == name }
     }
+
+    /// Whether the addon declares it can serve streams for the given content
+    /// type and meta-id prefix. A bare-string `"stream"` resource carries no
+    /// scoping of its own, so the manifest-level `types`/`idPrefixes` fill in;
+    /// an addon that scopes neither is taken at its word and matches anything.
+    func supportsStreams(forType type: String, idPrefix: String) -> Bool {
+        resources.contains { resource in
+            guard resource.name == "stream" else { return false }
+            let resourceTypes = resource.types ?? types
+            guard resourceTypes.isEmpty || resourceTypes.contains(type) else { return false }
+            let prefixes = resource.idPrefixes ?? idPrefixes ?? []
+            return prefixes.isEmpty || prefixes.contains(idPrefix)
+        }
+    }
 }
 
 /// One entry of a manifest's `resources` array — either a bare string
@@ -253,9 +267,10 @@ nonisolated struct StremioStream: Decodable {
     let name: String?
     let title: String?
     let streamDescription: String?
+    let behaviorHints: StremioStreamBehaviorHints?
 
     enum CodingKeys: String, CodingKey {
-        case url, ytId, infoHash, externalUrl, name, title
+        case url, ytId, infoHash, externalUrl, name, title, behaviorHints
         case streamDescription = "description"
     }
 
@@ -267,6 +282,36 @@ nonisolated struct StremioStream: Decodable {
               scheme == "http" || scheme == "https"
         else { return nil }
         return resolved
+    }
+}
+
+/// A stream's `behaviorHints`. `bingeGroup` ties together streams of the same
+/// source/quality across a series so auto-advance can stay on the release the
+/// viewer picked; `filename` and `videoSize` describe the underlying file.
+nonisolated struct StremioStreamBehaviorHints: Decodable {
+    let bingeGroup: String?
+    let filename: String?
+    /// File size in bytes; spec'd as a number but guarded against the string
+    /// drift every other numeric field in the protocol exhibits.
+    let videoSize: Int64?
+    let notWebReady: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case bingeGroup, filename, videoSize, notWebReady
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        bingeGroup = try? container.decodeIfPresent(String.self, forKey: .bingeGroup)
+        filename = try? container.decodeIfPresent(String.self, forKey: .filename)
+        if let bytes = try? container.decodeIfPresent(Int64.self, forKey: .videoSize) {
+            videoSize = bytes
+        } else if let raw = container.stremioString(.videoSize), let bytes = Int64(raw) {
+            videoSize = bytes
+        } else {
+            videoSize = nil
+        }
+        notWebReady = try? container.decodeIfPresent(Bool.self, forKey: .notWebReady)
     }
 }
 

@@ -35,6 +35,8 @@ struct SettingsView: View {
     var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
     @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
     var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+    @AppStorage(PlayerSettings.Playback.stremioStreamPickerKey)
+    var stremioStreamPicker = PlayerSettings.Playback.stremioStreamPickerDefault
     @AppStorage(SearchSettings.searchAllPlaylistsKey)
     private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     #if !os(tvOS)
@@ -296,6 +298,7 @@ struct SettingsView: View {
                     .disabled(!premium.isPremium)
                 Toggle("Show Skip Intro Button", isOn: $showSkipIntroButton)
                     .disabled(!premium.isPremium)
+                Toggle("Choose Stremio Stream", isOn: $stremioStreamPicker)
                 if !premium.isPremium {
                     Button {
                         presentPaywall(.playbackControls)
@@ -306,7 +309,7 @@ struct SettingsView: View {
             } header: {
                 Text("Playback")
             } footer: {
-                Text("Automatically start the next episode when one finishes, and show a button near the end to skip ahead.")
+                Text("Automatically start the next episode when one finishes, and show a button near the end to skip ahead. When a Stremio addon offers several streams, ask which one to play.")
             }
         }
 

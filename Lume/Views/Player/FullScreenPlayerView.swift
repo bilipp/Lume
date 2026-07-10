@@ -73,6 +73,17 @@ struct FullScreenPlayerView: View {
     /// instead of an endless spinner.
     @State private var resolveError: String?
 
+    /// The stream candidates a Stremio addon returned for `activeMedia`, when
+    /// the viewer has to choose between them. Non-`nil` only while the source
+    /// picker is up; picking (or an auto-pick, see `resolveActiveMedia`)
+    /// clears it and fills `resolvedMedia`.
+    @State private var streamOptions: [StremioStreamOption]?
+
+    /// The `bingeGroup` of the stream the viewer last picked, so episode hops
+    /// within this player session stay on the same source/quality instead of
+    /// re-asking on every auto-advance.
+    @State private var selectedBingeGroup: String?
+
     /// The episode queued to play after `activeMedia`, resolved whenever the
     /// active stream changes. Drives both the in-player Next Episode button and
     /// auto-advance (see `PlayerNextUpOverlay`); `nil` for movies, live channels
@@ -194,8 +205,8 @@ struct FullScreenPlayerView: View {
             // auto-hiding controls overlay — showing a second one here means
             // the user sees duplicate X buttons whenever the controls are
             // visible. Only render our custom close for engines that don't
-            // draw their own controls.
-            if !engine.rendersOwnControls {
+            // draw their own controls. The stream picker also brings its own.
+            if !engine.rendersOwnControls, streamOptions == nil {
                 closeButton
                     .padding(.top, 4)
                     .padding(.leading, 4)
@@ -317,6 +328,15 @@ struct FullScreenPlayerView: View {
     private var playerView: some View {
         if let media = displayMedia {
             engineView(for: media)
+        } else if let streamOptions {
+            // The addon offered several streams — let the viewer pick before
+            // the engine loads.
+            StremioStreamPickerView(
+                title: activeMedia.title,
+                options: streamOptions,
+                onSelect: selectStreamOption,
+                onClose: closePlayer
+            )
         } else if resolveError != nil {
             // Stream resolution failed — surface the failure with a retry
             // rather than spinning forever.
@@ -397,13 +417,41 @@ struct FullScreenPlayerView: View {
         guard DeferredStreamLink.isPlaceholder(activeMedia.url) else { return }
         resolvedMedia = nil
         resolveError = nil
+        streamOptions = nil
         do {
-            resolvedMedia = try await DeferredStreamLink.resolve(activeMedia, container: modelContext.container)
+            if StremioLink.isPlaceholder(activeMedia.url), !activeMedia.isLive {
+                // Stremio VOD: fetch every candidate so the viewer can choose
+                // between qualities/sources. Live channels stay on the
+                // first-playable path — a picker would break channel surfing.
+                let options = try await StremioStreamResolver.streamOptions(
+                    for: activeMedia, container: modelContext.container
+                )
+                guard !options.isEmpty else { throw StremioError.noStreamURL }
+                if let auto = StremioStreamResolver.autoPick(
+                    from: options,
+                    matching: selectedBingeGroup,
+                    askEnabled: PlayerSettings.Playback.stremioStreamPicker
+                ) {
+                    selectStreamOption(auto)
+                } else {
+                    streamOptions = options
+                }
+            } else {
+                resolvedMedia = try await DeferredStreamLink.resolve(activeMedia, container: modelContext.container)
+            }
         } catch {
             resolveError = error.localizedDescription
             let detail = (error as? StalkerError)?.logDescription ?? LogRedaction.describe(error)
             Logger.player.error("Stream resolution failed: \(detail, privacy: .public)")
         }
+    }
+
+    /// Starts playback with the chosen Stremio stream, remembering its binge
+    /// group so subsequent episodes auto-continue on the same source.
+    private func selectStreamOption(_ option: StremioStreamOption) {
+        selectedBingeGroup = option.bingeGroup
+        streamOptions = nil
+        resolvedMedia = activeMedia.replacingURL(option.url)
     }
 
     private func retryResolve() {
@@ -458,40 +506,8 @@ struct FullScreenPlayerView: View {
         #endif
     }
 
-    private func configureAudioSessionForPlayback() {
-        // tvOS needs this as much as iOS: LumeEngine renders PCM through
-        // AVSampleBufferAudioRenderer and sizes its downmix to the session's
-        // *negotiated* output channels — without an active .playback session
-        // the route stays at its default and multichannel audio has no path.
-        // (KSPlayer/VLC configure their own session; LumeEngine by design
-        // does not touch global audio state, so it is the app's job.)
-        #if os(iOS) || os(tvOS)
-            let session = AVAudioSession.sharedInstance()
-            try? session.setCategory(.playback, mode: .moviePlayback, options: [])
-            // Ask for the route's full width (HDMI LPCM surround); harmless
-            // when the route is stereo — the session clamps and LumeEngine
-            // downmixes to whatever was actually granted.
-            let maxChannels = session.maximumOutputNumberOfChannels
-            if maxChannels > 2 {
-                try? session.setPreferredOutputNumberOfChannels(maxChannels)
-            }
-            try? session.setActive(true, options: [])
-            let route = session.currentRoute.outputs
-                .map { "\($0.portType.rawValue)(\($0.channels?.count ?? 0)ch)" }
-                .joined(separator: "+")
-            Logger.player.info("""
-            Audio session active: route=\(route, privacy: .public) \
-            outputChannels=\(session.outputNumberOfChannels) \
-            maxChannels=\(maxChannels) sampleRate=\(session.sampleRate)
-            """)
-        #endif
-    }
-
-    private func releaseAudioSession() {
-        #if os(iOS) || os(tvOS)
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
-    }
+    // configureAudioSessionForPlayback() / releaseAudioSession() live in
+    // FullScreenPlayerView+AudioSession.swift.
 
     #if os(macOS)
         private func enterMacFullScreen() {

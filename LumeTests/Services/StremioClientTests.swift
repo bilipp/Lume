@@ -119,6 +119,51 @@ struct StremioDTODecodingTests {
         #expect(manifest.catalogs.isEmpty)
     }
 
+    @Test func `stream support respects the resource's type and id-prefix scoping`() throws {
+        // AIOStreams-style: an object stream resource scoped to types + prefixes.
+        let scoped: StremioManifest = try decode("""
+        {
+            "id": "com.example.aio", "name": "AIO", "types": ["movie", "series", "anime"],
+            "resources": [
+                { "name": "catalog", "types": ["movie", "series"], "idPrefixes": ["tt"] },
+                { "name": "stream", "types": ["movie", "series"], "idPrefixes": ["tt", "kitsu"] }
+            ]
+        }
+        """)
+        #expect(scoped.supportsStreams(forType: "movie", idPrefix: "tt"))
+        #expect(scoped.supportsStreams(forType: "series", idPrefix: "kitsu"))
+        #expect(!scoped.supportsStreams(forType: "tv", idPrefix: "tt"))
+        #expect(!scoped.supportsStreams(forType: "movie", idPrefix: "yt"))
+    }
+
+    @Test func `bare stream resource falls back to manifest-level scoping`() throws {
+        let bare: StremioManifest = try decode("""
+        {
+            "id": "com.example.bare", "name": "Bare", "types": ["movie"],
+            "resources": ["stream"], "idPrefixes": ["tt"]
+        }
+        """)
+        #expect(bare.supportsStreams(forType: "movie", idPrefix: "tt"))
+        #expect(!bare.supportsStreams(forType: "series", idPrefix: "tt"))
+
+        // No scoping anywhere: the addon is taken at its word.
+        let open: StremioManifest = try decode("""
+        { "id": "com.example.open", "name": "Open", "resources": ["stream"] }
+        """)
+        #expect(open.supportsStreams(forType: "movie", idPrefix: "tt"))
+    }
+
+    @Test func `catalog-only addons declare no stream support`() throws {
+        // Cinemeta-style: catalog + meta only.
+        let cinemeta: StremioManifest = try decode("""
+        {
+            "id": "com.linvo.cinemeta", "name": "Cinemeta", "types": ["movie", "series"],
+            "resources": ["catalog", "meta", "addon_catalog"]
+        }
+        """)
+        #expect(!cinemeta.supportsStreams(forType: "movie", idPrefix: "tt"))
+    }
+
     @Test func `catalog with a required extra is not browsable`() throws {
         let catalog: StremioCatalog = try decode("""
         {
@@ -207,7 +252,37 @@ struct StremioDTODecodingTests {
         let playable = response.streams.compactMap(\.playableURL)
         #expect(playable.count == 1)
         #expect(playable.first?.absoluteString == "https://cdn.example.com/movie.mp4")
-        #expect(StremioStreamResolver.bestStreamURL(from: response.streams)?.absoluteString == "https://cdn.example.com/movie.mp4")
+    }
+
+    @Test func `stream decodes behaviorHints`() throws {
+        let stream: StremioStream = try decode("""
+        {
+            "url": "https://cdn.example.com/movie.mkv",
+            "name": "[TB] TorBox 2160p",
+            "description": "BluRay REMUX | 62.3 GB",
+            "behaviorHints": {
+                "bingeGroup": "addon|2160p|REMUX",
+                "filename": "Movie.2160p.mkv",
+                "videoSize": 62254402955,
+                "notWebReady": true
+            }
+        }
+        """)
+        #expect(stream.behaviorHints?.bingeGroup == "addon|2160p|REMUX")
+        #expect(stream.behaviorHints?.filename == "Movie.2160p.mkv")
+        #expect(stream.behaviorHints?.videoSize == 62_254_402_955)
+        #expect(stream.behaviorHints?.notWebReady == true)
+    }
+
+    @Test func `behaviorHints tolerate a string videoSize and junk fields`() throws {
+        let stream: StremioStream = try decode("""
+        {
+            "url": "https://cdn.example.com/movie.mkv",
+            "behaviorHints": { "videoSize": "12345", "bingeGroup": 7 }
+        }
+        """)
+        #expect(stream.behaviorHints?.videoSize == 12345)
+        #expect(stream.behaviorHints?.bingeGroup == nil)
     }
 
     @Test func `subtitles decode`() throws {
@@ -215,5 +290,96 @@ struct StremioDTODecodingTests {
         { "subtitles": [{ "id": "s1", "url": "https://subs.example/en.srt", "lang": "eng" }] }
         """)
         #expect(response.subtitles.first?.lang == "eng")
+    }
+}
+
+// MARK: - Catalog paging
+
+struct StremioCatalogWalkerTests {
+    /// Builds metas `first..<first+count` with ids "id<N>".
+    private func metas(from first: Int, count: Int) throws -> [StremioMeta] {
+        let json = (first ..< first + count)
+            .map { #"{ "id": "id\#($0)", "type": "movie", "name": "M\#($0)" }"# }
+            .joined(separator: ",")
+        return try JSONDecoder().decode([StremioMeta].self, from: Data("[\(json)]".utf8))
+    }
+
+    @Test func `keeps paging past a page shorter than 100`() async throws {
+        // AIOStreams serves 99-item pages; a fixed-page-size heuristic would
+        // stop after one.
+        let pages = try [metas(from: 0, count: 99), metas(from: 99, count: 99), metas(from: 198, count: 40)]
+        var requestedSkips: [Int] = []
+        let items = await ContentSyncManager.walkStremioCatalog(maxItems: 500) { skip in
+            requestedSkips.append(skip)
+            let index = requestedSkips.count - 1
+            return index < pages.count ? pages[index] : []
+        }
+        #expect(items.count == 238)
+        #expect(requestedSkips == [0, 99, 198, 238])
+    }
+
+    @Test func `stops after one extra request when the addon ignores skip`() async throws {
+        let page = try metas(from: 0, count: 99)
+        var requests = 0
+        let items = await ContentSyncManager.walkStremioCatalog(maxItems: 500) { _ in
+            requests += 1
+            return page
+        }
+        #expect(items.count == 99)
+        #expect(requests == 2)
+    }
+
+    @Test func `caps at maxItems`() async throws {
+        let all = try metas(from: 0, count: 300)
+        let items = await ContentSyncManager.walkStremioCatalog(maxItems: 150) { skip in
+            Array(all.dropFirst(skip).prefix(100))
+        }
+        #expect(items.count == 150)
+    }
+
+    @Test func `treats a failing page as the end of the catalog`() async throws {
+        let first = try metas(from: 0, count: 100)
+        let items = await ContentSyncManager.walkStremioCatalog(maxItems: 500) { skip in
+            skip == 0 ? first : nil
+        }
+        #expect(items.count == 100)
+    }
+}
+
+// MARK: - Stream auto-pick
+
+struct StremioAutoPickTests {
+    private func options(bingeGroups: [String?]) throws -> [StremioStreamOption] {
+        try bingeGroups.enumerated().map { index, group in
+            let hints = group.map { #", "behaviorHints": { "bingeGroup": "\#($0)" }"# } ?? ""
+            let stream = try JSONDecoder().decode(
+                StremioStream.self,
+                from: Data(#"{ "url": "https://cdn.example.com/\#(index).mkv", "name": "S\#(index)" \#(hints) }"#.utf8)
+            )
+            let url = try #require(stream.playableURL)
+            return StremioStreamOption(id: index, url: url, stream: stream)
+        }
+    }
+
+    @Test func `a lone stream plays without asking`() throws {
+        let lone = try options(bingeGroups: [nil])
+        #expect(StremioStreamResolver.autoPick(from: lone, matching: nil, askEnabled: true) == lone.first)
+    }
+
+    @Test func `disabled picker takes the addon's first stream`() throws {
+        let many = try options(bingeGroups: ["a", "b"])
+        #expect(StremioStreamResolver.autoPick(from: many, matching: nil, askEnabled: false) == many.first)
+    }
+
+    @Test func `binge group continuation skips the picker`() throws {
+        let many = try options(bingeGroups: ["a", "b", "b"])
+        let pick = StremioStreamResolver.autoPick(from: many, matching: "b", askEnabled: true)
+        #expect(pick?.id == 1)
+    }
+
+    @Test func `several streams without a match ask the viewer`() throws {
+        let many = try options(bingeGroups: ["a", "b"])
+        #expect(StremioStreamResolver.autoPick(from: many, matching: "c", askEnabled: true) == nil)
+        #expect(StremioStreamResolver.autoPick(from: many, matching: nil, askEnabled: true) == nil)
     }
 }

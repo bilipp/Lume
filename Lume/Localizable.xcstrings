@@ -3637,54 +3637,54 @@
         }
       }
     },
-    "Automatically start the next episode when one finishes, and show a button near the end to skip ahead." : {
+    "Automatically start the next episode when one finishes, and show a button near the end to skip ahead. When a Stremio addon offers several streams, ask which one to play." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Startet die nächste Folge automatisch, sobald eine endet, und zeigt gegen Ende eine Schaltfläche zum Vorspringen an."
+            "value" : "Startet die nächste Folge automatisch, sobald eine endet, und zeigt gegen Ende eine Schaltfläche zum Vorspringen an. Bietet ein Stremio-Addon mehrere Streams an, wird gefragt, welcher abgespielt werden soll."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inicia automáticamente el siguiente episodio cuando termina uno y muestra un botón cerca del final para avanzar."
+            "value" : "Inicia automáticamente el siguiente episodio cuando termina uno y muestra un botón cerca del final para avanzar. Cuando un addon de Stremio ofrece varios streams, pregunta cuál reproducir."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lance automatiquement l’épisode suivant à la fin du précédent et affiche un bouton vers la fin pour passer à la suite."
+            "value" : "Lance automatiquement l’épisode suivant à la fin du précédent et affiche un bouton vers la fin pour passer à la suite. Lorsqu’un addon Stremio propose plusieurs flux, demande lequel lire."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Avvia automaticamente l'episodio successivo al termine di quello in corso e mostra un pulsante verso la fine per saltare avanti."
+            "value" : "Avvia automaticamente l'episodio successivo al termine di quello in corso e mostra un pulsante verso la fine per saltare avanti. Quando un addon Stremio offre più stream, chiede quale riprodurre."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エピソードが終わると自動的に次のエピソードを再生し、終わり近くにスキップ用のボタンを表示します。"
+            "value" : "エピソードが終わると自動的に次のエピソードを再生し、終わり近くにスキップ用のボタンを表示します。Stremioアドオンが複数のストリームを提供する場合は、どれを再生するか確認します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "에피소드가 끝나면 자동으로 다음 에피소드를 재생하고, 끝부분에 건너뛰기 버튼을 표시합니다."
+            "value" : "에피소드가 끝나면 자동으로 다음 에피소드를 재생하고, 끝부분에 건너뛰기 버튼을 표시합니다. Stremio 애드온이 여러 스트림을 제공하면 재생할 스트림을 묻습니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Iniciar automaticamente o próximo episódio quando um terminar e mostrar um botão perto do fim para avançar."
+            "value" : "Iniciar automaticamente o próximo episódio quando um terminar e mostrar um botão perto do fim para avançar. Quando um addon do Stremio oferece vários streams, pergunta qual reproduzir."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一集播放结束时自动开始下一集，并在接近结尾时显示跳过按钮。"
+            "value" : "一集播放结束时自动开始下一集，并在接近结尾时显示跳过按钮。当 Stremio 插件提供多个流时，询问要播放哪一个。"
           }
         }
       }
@@ -5312,6 +5312,58 @@
         }
       }
     },
+    "Choose a Source" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelle auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige una fuente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une source"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli una fonte"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소스 선택"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher uma fonte"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择来源"
+          }
+        }
+      }
+    },
     "Choose Local File…" : {
       "comment" : "A button that allows the user to choose a local file.",
       "isCommentAutoGenerated" : true,
@@ -5362,6 +5414,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择本地文件…"
+          }
+        }
+      }
+    },
+    "Choose Stremio Stream" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio-Stream auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir stream de Stremio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir le flux Stremio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli stream Stremio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremioストリームを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio 스트림 선택"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher stream do Stremio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择 Stremio 流"
           }
         }
       }
@@ -28521,6 +28625,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已用存储"
+          }
+        }
+      }
+    },
+    "Stream %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flux %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ストリーム %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스트림 %lld"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "流 %lld"
           }
         }
       }

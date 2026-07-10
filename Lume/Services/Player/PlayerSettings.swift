@@ -128,10 +128,14 @@ enum PlayerSettings {
         /// Surface a "Skip Intro" / "Skip Recap" button while the playhead sits
         /// inside an intro or recap window known to IntroDB (TV episodes only).
         static let showSkipIntroButtonKey = "player.showSkipIntroButton"
+        /// When a Stremio addon offers several streams for a title, show the
+        /// source picker instead of auto-playing the addon's first pick.
+        static let stremioStreamPickerKey = "player.stremioStreamPicker"
 
         static let autoPlayNextDefault = true
         static let showNextEpisodeButtonDefault = true
         static let showSkipIntroButtonDefault = true
+        static let stremioStreamPickerDefault = true
 
         /// Whether the skip-intro affordance is enabled, read off `UserDefaults`
         /// directly (so the player host needn't hold an `@AppStorage` that would
@@ -140,6 +144,14 @@ enum PlayerSettings {
         static var showSkipIntroButton: Bool {
             UserDefaults.standard.object(forKey: showSkipIntroButtonKey) as? Bool
                 ?? showSkipIntroButtonDefault
+        }
+
+        /// Whether Stremio playback asks which stream to play when the addon
+        /// returns more than one candidate. Read off `UserDefaults` directly
+        /// for the same re-render reason as `showSkipIntroButton`.
+        static var stremioStreamPicker: Bool {
+            UserDefaults.standard.object(forKey: stremioStreamPickerKey) as? Bool
+                ?? stremioStreamPickerDefault
         }
     }
 

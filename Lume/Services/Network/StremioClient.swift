@@ -13,6 +13,17 @@ import Foundation
 import OSLog
 
 class StremioClient {
+    /// Stremio's canonical metadata addon, pre-installed in the official app.
+    /// Used as the meta fallback for IMDb-keyed titles when the user's addon
+    /// only serves catalogs and streams (AIOStreams, Torrentio, …), and as the
+    /// companion catalog source that fills a stream-capable addon's browse
+    /// experience the way it fills the Stremio app's Discover.
+    nonisolated static let cinemetaManifestURL = "https://v3-cinemeta.strem.io/manifest.json"
+
+    /// Cinemeta's addon id, so the companion-catalog pass can recognize a
+    /// playlist that already *is* Cinemeta.
+    nonisolated static let cinemetaAddonId = "com.linvo.cinemeta"
+
     nonisolated struct Configuration {
         /// The full, normalized manifest URL (ending in `/manifest.json`).
         let manifestURL: String

@@ -42,6 +42,7 @@ import SwiftUI
                         .disabled(!premium.isPremium)
                     TVOptionToggleRow(title: "Show Skip Intro Button", isOn: $showSkipIntroButton)
                         .disabled(!premium.isPremium)
+                    TVOptionToggleRow(title: "Choose Stremio Stream", isOn: $stremioStreamPicker)
                     if !premium.isPremium {
                         Button {
                             presentPaywall(.playbackControls)
