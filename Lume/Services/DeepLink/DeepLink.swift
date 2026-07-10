@@ -3,7 +3,10 @@
 //  Lume
 //
 //  Custom URL-scheme deep links. `lume://movie/{tmdbId}` and
-//  `lume://series/{tmdbId}` open a title's detail screen directly.
+//  `lume://series/{tmdbId}` open a title's detail screen directly;
+//  `lume://play/{movie|episode|live}/{catalogId}` and
+//  `lume://open/series/{catalogId}` are emitted by the widgets / Top Shelf
+//  (built in `WidgetDeepLink`) and launch playback or a detail screen.
 //
 
 import Foundation
@@ -14,23 +17,48 @@ import Foundation
 nonisolated enum DeepLink: Equatable {
     case movie(tmdbId: Int)
     case series(tmdbId: Int)
+    case playMovie(id: String)
+    case playEpisode(id: String)
+    case playLive(id: String)
+    case openSeries(id: String)
 
     /// The app's registered URL scheme (see `CFBundleURLTypes` in Info.plist).
     static let scheme = "lume"
 
-    /// Parses `lume://movie/{tmdbId}` and `lume://series/{tmdbId}`. Returns nil
-    /// for any other scheme, an unknown kind, or a non-numeric id.
+    /// Parses every supported `lume://` form. Returns nil for any other scheme,
+    /// an unknown kind, or a malformed id.
     init?(url: URL) {
         guard url.scheme?.lowercased() == Self.scheme else { return nil }
         // For `lume://movie/123` the kind is the host and the id is the first
-        // path component; `pathComponents` includes the leading "/".
-        guard let idComponent = url.pathComponents.first(where: { $0 != "/" }),
-              let tmdbId = Int(idComponent)
-        else { return nil }
+        // path component; `pathComponents` includes the leading "/" and returns
+        // components percent-decoded (widget links encode their catalog ids).
+        let components = url.pathComponents.filter { $0 != "/" }
         switch url.host()?.lowercased() {
-        case "movie": self = .movie(tmdbId: tmdbId)
-        case "series": self = .series(tmdbId: tmdbId)
-        default: return nil
+        case "movie":
+            guard let tmdbId = components.first.flatMap(Int.init) else { return nil }
+            self = .movie(tmdbId: tmdbId)
+        case "series":
+            guard let tmdbId = components.first.flatMap(Int.init) else { return nil }
+            self = .series(tmdbId: tmdbId)
+        case "play":
+            guard let link = Self.play(components) else { return nil }
+            self = link
+        case "open":
+            guard components.count == 2, components[0].lowercased() == "series" else { return nil }
+            self = .openSeries(id: components[1])
+        default:
+            return nil
+        }
+    }
+
+    /// `play/{movie|episode|live}/{catalogId}` — built by `WidgetDeepLink.play`.
+    private static func play(_ components: [String]) -> DeepLink? {
+        guard components.count == 2 else { return nil }
+        return switch components[0].lowercased() {
+        case "movie": .playMovie(id: components[1])
+        case "episode": .playEpisode(id: components[1])
+        case "live": .playLive(id: components[1])
+        default: nil
         }
     }
 }
