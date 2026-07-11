@@ -14,7 +14,7 @@ struct FullScreenPlayerView: View {
     let media: PlayableMedia
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.modelContext) var modelContext
     @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
         @Environment(\.dismissWindow) private var dismissWindow
@@ -29,7 +29,7 @@ struct FullScreenPlayerView: View {
     /// Advanced when an engine fails to start a stream, falling the player back
     /// to the next engine in the list. Reset to the primary engine whenever the
     /// active stream changes.
-    @State private var engineAttempt = 0
+    @State var engineAttempt = 0
 
     /// Observes the active AirPlay route. Full-screen AirPlay *video* is only
     /// possible through `AVPlayer` (KSPlayer/VLCKit render into their own layers,
@@ -59,7 +59,7 @@ struct FullScreenPlayerView: View {
 
     /// The stream currently playing. Starts as `media` but can be swapped when
     /// the viewer picks another episode from the in-player episode rail (tvOS).
-    @State private var activeMedia: PlayableMedia
+    @State var activeMedia: PlayableMedia
 
     /// The resolved stand-in for `activeMedia`. Stalker and Stremio streams
     /// arrive as a `lumestalker://` / `lumestremio://` placeholder whose real
@@ -67,22 +67,28 @@ struct FullScreenPlayerView: View {
     /// lands. `nil` while resolution is in flight (the loading indicator
     /// shows). Engines that play a directly usable URL (Xtream / m3u) bypass
     /// this entirely — see `displayMedia`.
-    @State private var resolvedMedia: PlayableMedia?
+    @State var resolvedMedia: PlayableMedia?
 
     /// Set when stream resolution fails, so the host shows the failure overlay
     /// instead of an endless spinner.
-    @State private var resolveError: String?
+    @State var resolveError: String?
 
     /// The stream candidates a Stremio addon returned for `activeMedia`, when
     /// the viewer has to choose between them. Non-`nil` only while the source
     /// picker is up; picking (or an auto-pick, see `resolveActiveMedia`)
     /// clears it and fills `resolvedMedia`.
-    @State private var streamOptions: [StremioStreamOption]?
+    @State var streamOptions: [StremioStreamOption]?
 
     /// The `bingeGroup` of the stream the viewer last picked, so episode hops
     /// within this player session stay on the same source/quality instead of
     /// re-asking on every auto-advance.
-    @State private var selectedBingeGroup: String?
+    @State var selectedBingeGroup: String?
+
+    /// In-flight fetch of the active stream's external subtitle tracks from
+    /// every subtitle-capable Stremio source (see `StremioSubtitleResolver`).
+    /// Runs alongside stream resolution; its result is attached to the
+    /// resolved media when a stream is picked. Stremio VOD only.
+    @State var subtitleFetch: Task<[ExternalSubtitle], Never>?
 
     /// The episode queued to play after `activeMedia`, resolved whenever the
     /// active stream changes. Drives both the in-player Next Episode button and
@@ -407,56 +413,6 @@ struct FullScreenPlayerView: View {
             )
             .id(engineAttempt)
         }
-    }
-
-    /// Resolves the active Stalker/Stremio placeholder into a playable URL. A
-    /// no-op for directly playable streams. Re-runs whenever the active stream
-    /// changes (open, channel surf, next episode), so each switch resolves a
-    /// fresh, short-lived URL.
-    private func resolveActiveMedia() async {
-        guard DeferredStreamLink.isPlaceholder(activeMedia.url) else { return }
-        resolvedMedia = nil
-        resolveError = nil
-        streamOptions = nil
-        do {
-            if StremioLink.isPlaceholder(activeMedia.url), !activeMedia.isLive {
-                // Stremio VOD: fetch every candidate so the viewer can choose
-                // between qualities/sources. Live channels stay on the
-                // first-playable path — a picker would break channel surfing.
-                let options = try await StremioStreamResolver.streamOptions(
-                    for: activeMedia, container: modelContext.container
-                )
-                guard !options.isEmpty else { throw StremioError.noStreamURL }
-                if let auto = StremioStreamResolver.autoPick(
-                    from: options,
-                    matching: selectedBingeGroup,
-                    askEnabled: PlayerSettings.Playback.stremioStreamPicker
-                ) {
-                    selectStreamOption(auto)
-                } else {
-                    streamOptions = options
-                }
-            } else {
-                resolvedMedia = try await DeferredStreamLink.resolve(activeMedia, container: modelContext.container)
-            }
-        } catch {
-            resolveError = error.localizedDescription
-            let detail = (error as? StalkerError)?.logDescription ?? LogRedaction.describe(error)
-            Logger.player.error("Stream resolution failed: \(detail, privacy: .public)")
-        }
-    }
-
-    /// Starts playback with the chosen Stremio stream, remembering its binge
-    /// group so subsequent episodes auto-continue on the same source.
-    private func selectStreamOption(_ option: StremioStreamOption) {
-        selectedBingeGroup = option.bingeGroup
-        streamOptions = nil
-        resolvedMedia = activeMedia.replacingURL(option.url)
-    }
-
-    private func retryResolve() {
-        engineAttempt = 0
-        Task { await resolveActiveMedia() }
     }
 
     /// Persist the outgoing stream's progress, then swap in a new one. The

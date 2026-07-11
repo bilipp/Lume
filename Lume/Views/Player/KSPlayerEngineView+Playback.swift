@@ -109,6 +109,11 @@ extension KSPlayerEngineView {
         case .readyToPlay:
             hasSeenReadyToPlay = true
             reconnector.reset()
+            // Attached here rather than at view setup: assigning the layer's
+            // URL wipes `subtitleModel.subtitleInfos` on an async main hop, so
+            // tracks added earlier would be lost. Every (re)open passes through
+            // `.readyToPlay`, and `addSubtitle` dedupes by id.
+            attachExternalSubtitles()
         case .bufferFinished:
             // Guard: KSPlayerLayer.play() immediately sets state = .bufferFinished
             // if the previous session's loadState is still .playable (it isn't reset
@@ -134,6 +139,23 @@ extension KSPlayerEngineView {
             }
         default:
             break
+        }
+    }
+
+    /// Offers the media's external subtitle tracks (fetched from Stremio
+    /// subtitle addons at resolution time) in the engine's subtitle menu
+    /// alongside the stream's embedded tracks. Tracks of the same language get
+    /// ordinal suffixes so the menu rows stay distinguishable.
+    private func attachExternalSubtitles() {
+        guard let subtitles = media.externalSubtitles, !subtitles.isEmpty else { return }
+        var perLanguage: [String: Int] = [:]
+        for subtitle in subtitles {
+            let ordinal = perLanguage[subtitle.language, default: 0] + 1
+            perLanguage[subtitle.language] = ordinal
+            let name = ordinal > 1 ? "\(subtitle.displayName) \(ordinal)" : subtitle.displayName
+            coordinator.subtitleModel.addSubtitle(
+                info: URLSubtitleInfo(subtitleID: subtitle.id, name: name, url: subtitle.url)
+            )
         }
     }
 

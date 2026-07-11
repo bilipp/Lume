@@ -143,12 +143,14 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
 
         let vlcMedia = VLCMedia(url: media.url)
         applyMediaOptions(to: vlcMedia, isLive: media.isLive)
+        applyRequestHeaders(to: vlcMedia, from: media)
         mediaPlayer.media = vlcMedia
         let deinterlaceOn = options.deinterlace
         // swiftlint:disable:next line_length
         Logger.player.log("configure: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
         applyDeinterlace()
+        attachExternalSubtitles(from: media)
         isPlaying = true
         startStatsLogging()
     }
@@ -205,12 +207,14 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
 
         let vlcMedia = VLCMedia(url: media.url)
         applyMediaOptions(to: vlcMedia, isLive: media.isLive)
+        applyRequestHeaders(to: vlcMedia, from: media)
         mediaPlayer.media = vlcMedia
         let deinterlaceOn = options.deinterlace
         // swiftlint:disable:next line_length
         Logger.player.log("reload: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
         applyDeinterlace()
+        attachExternalSubtitles(from: media)
         isPlaying = true
         startStatsLogging()
     }
@@ -220,7 +224,6 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// React to a player state change for reconnect purposes: clear the budget
     /// once playback is healthy again, and schedule a backoff reconnect when
     /// the stream drops.
-    ///
     private func handleRetry(for state: VLCMediaPlayerState) {
         switch state {
         case .opening, .playing:

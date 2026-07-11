@@ -383,3 +383,130 @@ struct StremioAutoPickTests {
         #expect(StremioStreamResolver.autoPick(from: many, matching: nil, askEnabled: true) == nil)
     }
 }
+
+// MARK: - Proxy headers
+
+struct StremioProxyHeaderTests {
+    private func decode<T: Decodable>(_ json: String) throws -> T {
+        try JSONDecoder().decode(T.self, from: Data(json.utf8))
+    }
+
+    @Test func `stream decodes proxyHeaders request headers`() throws {
+        let stream: StremioStream = try decode("""
+        {
+            "url": "https://proxy.example.com/movie.mkv",
+            "behaviorHints": {
+                "notWebReady": true,
+                "proxyHeaders": {
+                    "request": { "User-Agent": "Lume", "Authorization": "Bearer token" },
+                    "response": { "Content-Type": "video/mp4" }
+                }
+            }
+        }
+        """)
+        #expect(stream.requestHeaders == ["User-Agent": "Lume", "Authorization": "Bearer token"])
+    }
+
+    @Test func `missing or empty proxyHeaders collapse to nil`() throws {
+        let plain: StremioStream = try decode(#"{ "url": "https://cdn.example.com/movie.mkv" }"#)
+        #expect(plain.requestHeaders == nil)
+
+        let empty: StremioStream = try decode("""
+        { "url": "https://cdn.example.com/movie.mkv", "behaviorHints": { "proxyHeaders": { "request": {} } } }
+        """)
+        #expect(empty.requestHeaders == nil)
+    }
+
+    @Test func `junk proxyHeaders don't fail the stream`() throws {
+        let junk: StremioStream = try decode("""
+        { "url": "https://cdn.example.com/movie.mkv", "behaviorHints": { "proxyHeaders": "nope" } }
+        """)
+        #expect(junk.requestHeaders == nil)
+        #expect(junk.playableURL != nil)
+    }
+}
+
+// MARK: - Resource support scoping
+
+struct StremioResourceSupportTests {
+    private func decode<T: Decodable>(_ json: String) throws -> T {
+        try JSONDecoder().decode(T.self, from: Data(json.utf8))
+    }
+
+    @Test func `subtitle support respects resource scoping`() throws {
+        let manifest: StremioManifest = try decode("""
+        {
+            "id": "org.stremio.opensubtitlesv3", "name": "OpenSubtitles v3",
+            "types": ["movie", "series"],
+            "resources": ["subtitles"], "idPrefixes": ["tt"]
+        }
+        """)
+        #expect(manifest.supports(resource: "subtitles", type: "movie", idPrefix: "tt"))
+        #expect(manifest.supports(resource: "subtitles", type: "series", idPrefix: "tt"))
+        #expect(!manifest.supports(resource: "subtitles", type: "movie", idPrefix: "kitsu"))
+        #expect(!manifest.supports(resource: "stream", type: "movie", idPrefix: "tt"))
+    }
+
+    @Test func `id prefixes derive from the meta id`() {
+        #expect(StremioStreamResolver.idPrefix(of: "tt0898266") == "tt")
+        #expect(StremioStreamResolver.idPrefix(of: "tt0898266:9:17") == "tt")
+        #expect(StremioStreamResolver.idPrefix(of: "kitsu:7442") == "kitsu")
+        #expect(StremioStreamResolver.idPrefix(of: "kitsu:7442:1") == "kitsu")
+    }
+}
+
+// MARK: - Mixed-type catalog bucketing
+
+struct StremioBucketTests {
+    @Test func `items route to the bucket their own type names`() {
+        #expect(ContentSyncManager.StremioBucket(metaType: "movie") == .movie)
+        #expect(ContentSyncManager.StremioBucket(metaType: "series") == .series)
+        #expect(ContentSyncManager.StremioBucket(metaType: "tv") == .live)
+        #expect(ContentSyncManager.StremioBucket(metaType: "channel") == .live)
+    }
+
+    @Test func `unknown item types default to the movie bucket`() {
+        // Such items play straight off their meta id; the series path would
+        // demand an episode list they may not have.
+        #expect(ContentSyncManager.StremioBucket(metaType: "events") == .movie)
+        #expect(ContentSyncManager.StremioBucket(metaType: "") == .movie)
+    }
+}
+
+// MARK: - Subtitle merging
+
+struct StremioSubtitleMergeTests {
+    private func subtitle(_ id: String, url: String, lang: String) -> StremioSubtitle {
+        StremioSubtitle(id: id, url: url, lang: lang)
+    }
+
+    @Test func `merges sources in order and dedupes by URL`() {
+        let merged = StremioSubtitleResolver.merge([
+            [subtitle("a1", url: "https://subs.example/en-1.srt", lang: "eng")],
+            [
+                subtitle("b1", url: "https://subs.example/en-1.srt", lang: "eng"),
+                subtitle("b2", url: "https://subs.example/de-1.srt", lang: "ger")
+            ]
+        ])
+        #expect(merged.map(\.url.absoluteString) == [
+            "https://subs.example/en-1.srt",
+            "https://subs.example/de-1.srt"
+        ])
+        #expect(merged.first?.language == "eng")
+    }
+
+    @Test func `caps tracks per language`() {
+        let flood = (0 ..< 10).map { subtitle("s\($0)", url: "https://subs.example/en-\($0).srt", lang: "eng") }
+        let merged = StremioSubtitleResolver.merge([flood])
+        #expect(merged.count == StremioSubtitleResolver.maxTracksPerLanguage)
+    }
+
+    @Test func `skips non-http and malformed URLs`() {
+        let merged = StremioSubtitleResolver.merge([[
+            subtitle("f", url: "ftp://subs.example/en.srt", lang: "eng"),
+            subtitle("ok", url: "https://subs.example/en.srt", lang: "eng")
+        ]])
+        #expect(merged.count == 1)
+        #expect(merged.first?.url.absoluteString == "https://subs.example/en.srt")
+    }
+}

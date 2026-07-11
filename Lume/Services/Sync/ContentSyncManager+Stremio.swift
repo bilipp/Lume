@@ -31,7 +31,7 @@ extension ContentSyncManager {
     /// A positive `Int` stream id for a Stremio meta id. Stremio ids are
     /// strings (`"tt1254207"`, `"kitsu:1234"`), so they're hashed the same way
     /// m3u identities are — deterministic across re-syncs.
-    private static func streamId(for stremioId: String) -> Int {
+    private static func stremioStreamId(for stremioId: String) -> Int {
         M3UIdentity.numericId(for: stremioId)
     }
 
@@ -45,11 +45,14 @@ extension ContentSyncManager {
     /// One catalog to sync, paired with the client that serves it — the
     /// playlist's own addon, or the Cinemeta companion. `categoryApiId` is
     /// prefixed for companion catalogs so they can't collide with an addon
-    /// catalog of the same type/id.
+    /// catalog of the same type/id. `prefetched` carries the items of a
+    /// non-standard-type catalog that was fetched up front to route its items
+    /// by their own type (see the mixed-type pass in `performStremioSync`).
     nonisolated struct StremioCatalogSource {
         let client: StremioClient
         let catalog: StremioCatalog
         let categoryApiId: String
+        var prefetched: [StremioMeta]?
     }
 
     private static func catalogSources(
@@ -59,6 +62,31 @@ extension ContentSyncManager {
     ) -> [StremioCatalogSource] {
         catalogs.map {
             StremioCatalogSource(client: client, catalog: $0, categoryApiId: apiIdPrefix + categoryApiId(for: $0))
+        }
+    }
+
+    /// The catalog types the sync pipeline maps onto its three buckets
+    /// directly. Anything else ("anime" on Anime Kitsu and friends) goes
+    /// through the mixed-type pass.
+    private static let standardCatalogTypes: Set<String> = ["movie", "series", "tv", "channel"]
+
+    /// Which bucket a single catalog item belongs in, by its own declared
+    /// type. Unknown item types default to the movie bucket: such items play
+    /// straight off their meta id (the deferred placeholder keeps the original
+    /// type string for the stream request), whereas the series path would
+    /// demand an episode list they may not have.
+    nonisolated enum StremioBucket {
+        case movie, series, live
+
+        init(metaType: String) {
+            switch metaType {
+            case "series":
+                self = .series
+            case "tv", "channel":
+                self = .live
+            default:
+                self = .movie
+            }
         }
     }
 
@@ -76,7 +104,34 @@ extension ContentSyncManager {
         let browsable = manifest.catalogs.filter(\.isBrowsable)
         var movieSources = Self.catalogSources(client: client, catalogs: browsable.filter { $0.type == "movie" })
         var seriesSources = Self.catalogSources(client: client, catalogs: browsable.filter { $0.type == "series" })
-        let liveSources = Self.catalogSources(client: client, catalogs: browsable.filter { $0.type == "tv" || $0.type == "channel" })
+        var liveSources = Self.catalogSources(client: client, catalogs: browsable.filter { $0.type == "tv" || $0.type == "channel" })
+
+        // Catalogs of a non-standard type — Anime Kitsu's "anime" is the big
+        // one — hold items that self-describe as movie or series. Fetch each
+        // such catalog once up front and route its items to the buckets their
+        // own type names; the prefetched items ride on the source so the item
+        // pass below doesn't fetch them again.
+        let mixed = Self.catalogSources(
+            client: client,
+            catalogs: browsable.filter { !Self.standardCatalogTypes.contains($0.type) }
+        )
+        for source in mixed {
+            let metas = try await fetchCatalogItems(source: source)
+            let split = Dictionary(grouping: metas) { StremioBucket(metaType: $0.type) }
+            var copy = source
+            if let movies = split[.movie], !movies.isEmpty {
+                copy.prefetched = movies
+                movieSources.append(copy)
+            }
+            if let series = split[.series], !series.isEmpty {
+                copy.prefetched = series
+                seriesSources.append(copy)
+            }
+            if let live = split[.live], !live.isEmpty {
+                copy.prefetched = live
+                liveSources.append(copy)
+            }
+        }
 
         let companion = await cinemetaCompanionSources(for: manifest)
         movieSources += companion.movies
@@ -144,8 +199,11 @@ extension ContentSyncManager {
     /// Walks a catalog's pages until it ends or the per-catalog cap is hit.
     /// A failing page is treated as the end of the catalog rather than a sync
     /// failure — per the protocol, an erroring addon just has no (more) results.
+    /// Sources carrying prefetched items (mixed-type catalogs, fetched once and
+    /// split) return those without touching the network again.
     private func fetchCatalogItems(source: StremioCatalogSource) async throws -> [StremioMeta] {
-        try await Self.walkStremioCatalog(maxItems: Self.maxItemsPerCatalog) { skip in
+        if let prefetched = source.prefetched { return prefetched }
+        return try await Self.walkStremioCatalog(maxItems: Self.maxItemsPerCatalog) { skip in
             try Task.checkCancellation()
             return try? await source.client.getCatalog(type: source.catalog.type, id: source.catalog.id, skip: skip).metas
         }
@@ -252,7 +310,7 @@ extension ContentSyncManager {
     ) -> Int {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
-        let ids = metas.map { "\(playlistId.uuidString)-movie-\(Self.streamId(for: $0.id))" }
+        let ids = metas.map { "\(playlistId.uuidString)-movie-\(Self.stremioStreamId(for: $0.id))" }
         var existing: [String: Movie] = [:]
         let fetched = (try? context.fetch(
             FetchDescriptor<Movie>(predicate: #Predicate { ids.contains($0.id) })
@@ -263,7 +321,7 @@ extension ContentSyncManager {
 
         var imported = 0
         for meta in metas {
-            let streamId = Self.streamId(for: meta.id)
+            let streamId = Self.stremioStreamId(for: meta.id)
             let movieId = "\(playlistId.uuidString)-movie-\(streamId)"
             // An item can appear in several catalogs; the first one wins so it
             // isn't re-assigned (and re-counted) per catalog.
@@ -334,7 +392,7 @@ extension ContentSyncManager {
     ) -> Int {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
-        let ids = metas.map { "\(playlistId.uuidString)-series-\(Self.streamId(for: $0.id))" }
+        let ids = metas.map { "\(playlistId.uuidString)-series-\(Self.stremioStreamId(for: $0.id))" }
         var existing: [String: Series] = [:]
         let fetched = (try? context.fetch(
             FetchDescriptor<Series>(predicate: #Predicate { ids.contains($0.id) })
@@ -345,7 +403,7 @@ extension ContentSyncManager {
 
         var imported = 0
         for meta in metas {
-            let seriesId = Self.streamId(for: meta.id)
+            let seriesId = Self.stremioStreamId(for: meta.id)
             let id = "\(playlistId.uuidString)-series-\(seriesId)"
             guard seenIds.insert(id).inserted else { continue }
 
@@ -371,66 +429,6 @@ extension ContentSyncManager {
         }
         try? context.save()
         return imported
-    }
-
-    /// Fetches a Stremio series' episodes on demand (the series detail screen
-    /// calls this through `fetchEpisodes`). The series' full meta carries the
-    /// episode list; each episode stores a placeholder link resolved at
-    /// playback time. Episodes that haven't aired yet are skipped — they have
-    /// no streams to resolve.
-    ///
-    /// Stream-focused addons (AIOStreams, Torrentio) serve catalogs and
-    /// streams but no `meta` resource — in the Stremio app, Cinemeta fills
-    /// that gap for IMDb-keyed titles. Mirror that: when the addon can't
-    /// produce the meta and the id is IMDb-shaped, ask Cinemeta instead.
-    func fetchStremioEpisodes(seriesElementId: String, playlist: Playlist) async throws -> [ParsedEpisode] {
-        let context = ModelContext(modelContainer)
-        guard let stremioId = try context.fetch(
-            FetchDescriptor<Series>(predicate: #Predicate { $0.id == seriesElementId })
-        ).first?.stremioId else { return [] }
-
-        let client = StremioClient(configuration: StremioClient.Configuration(playlist: playlist))
-        let meta: StremioMeta
-        do {
-            meta = try await client.getMeta(type: "series", id: stremioId).meta
-        } catch where stremioId.hasPrefix("tt") {
-            let cinemeta = StremioClient(
-                configuration: StremioClient.Configuration(manifestURL: StremioClient.cinemetaManifestURL)
-            )
-            meta = try await cinemeta.getMeta(type: "series", id: stremioId).meta
-        }
-
-        let now = Date()
-        // Addons send `released` with and without fractional seconds; ISO8601
-        // parsing is strict about the difference, so try both.
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let plain = ISO8601DateFormatter()
-
-        var result: [ParsedEpisode] = []
-        for (index, video) in (meta.videos ?? []).enumerated() {
-            if let released = video.released,
-               let releaseDate = fractional.date(from: released) ?? plain.date(from: released),
-               releaseDate > now
-            { continue }
-            guard let placeholder = StremioLink.placeholder(type: "series", id: video.id) else { continue }
-            result.append(ParsedEpisode(
-                id: "\(seriesElementId)-episode-\(video.id)",
-                episodeId: video.id,
-                title: video.title ?? "",
-                containerExtension: "mp4",
-                seasonNum: video.season ?? 1,
-                episodeNum: video.episode ?? index + 1,
-                added: nil,
-                directSource: placeholder.absoluteString,
-                durationSecs: nil,
-                movieImage: video.thumbnail,
-                rating: nil,
-                airDate: video.released,
-                plot: video.overview
-            ))
-        }
-        return result
     }
 
     // MARK: - Live channels (tv / channel)
@@ -472,7 +470,7 @@ extension ContentSyncManager {
     ) -> Int {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
-        let ids = metas.map { "\(playlistId.uuidString)-live-\(Self.streamId(for: $0.id))" }
+        let ids = metas.map { "\(playlistId.uuidString)-live-\(Self.stremioStreamId(for: $0.id))" }
         var existing: [String: LiveStream] = [:]
         let fetched = (try? context.fetch(
             FetchDescriptor<LiveStream>(predicate: #Predicate { ids.contains($0.id) })
@@ -483,7 +481,7 @@ extension ContentSyncManager {
 
         var imported = 0
         for (index, meta) in metas.enumerated() {
-            let streamId = Self.streamId(for: meta.id)
+            let streamId = Self.stremioStreamId(for: meta.id)
             let id = "\(playlistId.uuidString)-live-\(streamId)"
             guard seenIds.insert(id).inserted else { continue }
 

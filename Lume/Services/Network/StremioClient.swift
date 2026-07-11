@@ -24,6 +24,12 @@ class StremioClient {
     /// playlist that already *is* Cinemeta.
     nonisolated static let cinemetaAddonId = "com.linvo.cinemeta"
 
+    /// The OpenSubtitles v3 community addon, pre-installed in the official
+    /// app. Queried as the companion subtitle source for IMDb-keyed titles the
+    /// same way Cinemeta fills in catalogs and metas (see
+    /// `StremioSubtitleResolver`).
+    nonisolated static let openSubtitlesManifestURL = "https://opensubtitles-v3.strem.io/manifest.json"
+
     nonisolated struct Configuration {
         /// The full, normalized manifest URL (ending in `/manifest.json`).
         let manifestURL: String

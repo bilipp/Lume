@@ -23,6 +23,37 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     let kind: Kind
     let startTime: TimeInterval
     let contentRef: ContentRef
+    /// HTTP headers the source requires on the media request (Stremio streams
+    /// carrying `behaviorHints.proxyHeaders`). Engines that can pass request
+    /// headers apply them; `nil` for every other source.
+    let httpHeaders: [String: String]?
+    /// External subtitle tracks fetched from subtitle-capable Stremio addons at
+    /// resolution time, for engines to offer alongside the embedded tracks.
+    let externalSubtitles: [ExternalSubtitle]?
+
+    init(
+        id: String,
+        url: URL,
+        title: String,
+        subtitle: String?,
+        posterURL: URL?,
+        kind: Kind,
+        startTime: TimeInterval,
+        contentRef: ContentRef,
+        httpHeaders: [String: String]? = nil,
+        externalSubtitles: [ExternalSubtitle]? = nil
+    ) {
+        self.id = id
+        self.url = url
+        self.title = title
+        self.subtitle = subtitle
+        self.posterURL = posterURL
+        self.kind = kind
+        self.startTime = startTime
+        self.contentRef = contentRef
+        self.httpHeaders = httpHeaders
+        self.externalSubtitles = externalSubtitles
+    }
 
     var isLive: Bool {
         kind == .live
@@ -41,15 +72,23 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             posterURL: posterURL,
             kind: kind,
             startTime: position,
-            contentRef: contentRef
+            contentRef: contentRef,
+            httpHeaders: httpHeaders,
+            externalSubtitles: externalSubtitles
         )
     }
 
-    /// Returns a copy with the playback URL replaced. Used by
-    /// `StalkerStreamResolver` to swap a deferred `lumestalker://` placeholder for
-    /// the real, freshly resolved stream URL while keeping the same identity.
-    /// `nonisolated` so the resolver can call it off the main actor.
-    nonisolated func replacingURL(_ newURL: URL) -> PlayableMedia {
+    /// Returns a copy with the playback URL replaced — and, for Stremio
+    /// streams, the request headers and external subtitles the resolution
+    /// produced. Used by the resolvers to swap a deferred `lumestalker://` /
+    /// `lumestremio://` placeholder for the real, freshly resolved stream URL
+    /// while keeping the same identity. `nonisolated` so the resolvers can call
+    /// it off the main actor.
+    nonisolated func replacingURL(
+        _ newURL: URL,
+        httpHeaders: [String: String]? = nil,
+        externalSubtitles: [ExternalSubtitle]? = nil
+    ) -> PlayableMedia {
         PlayableMedia(
             id: id,
             url: newURL,
@@ -58,8 +97,30 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             posterURL: posterURL,
             kind: kind,
             startTime: startTime,
-            contentRef: contentRef
+            contentRef: contentRef,
+            httpHeaders: httpHeaders,
+            externalSubtitles: externalSubtitles
         )
+    }
+}
+
+/// One external subtitle track offered by a subtitle-capable source (today:
+/// Stremio subtitle addons, see `StremioSubtitleResolver`). Value type so it
+/// can ride on `PlayableMedia` into any engine.
+nonisolated struct ExternalSubtitle: Hashable, Codable, Identifiable {
+    let id: String
+    let url: URL
+    /// The track's language as the source sent it — an ISO 639 code most of
+    /// the time, but addons also ship bare names and site-specific codes.
+    let language: String
+
+    /// Menu label: the localized language name when `language` is a real ISO
+    /// code, the raw value otherwise.
+    var displayName: String {
+        if let name = Locale.current.localizedString(forLanguageCode: language) {
+            return name.capitalized(with: .current)
+        }
+        return language
     }
 }
 

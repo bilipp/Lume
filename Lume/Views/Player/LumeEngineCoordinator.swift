@@ -274,6 +274,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         configuration.stallThreshold = Double(options.stallThreshold)
         configuration.demuxer.enableReconnect = options.httpReconnect
         configuration.demuxer.ioTimeout = options.ioTimeout
+        // Headers the source requires on the media request (Stremio
+        // `proxyHeaders`); the demuxer passes them to FFmpeg's http layer.
+        if let headers = media.httpHeaders, !headers.isEmpty {
+            configuration.demuxer.httpHeaders = headers
+        }
         // The open timeout stays tied to the engine-fallback budget rather than
         // a user option, so the fallback chain keeps its timing guarantees.
         configuration.demuxer.openTimeout = startupTimeout

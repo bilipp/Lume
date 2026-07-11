@@ -82,18 +82,25 @@ nonisolated struct StremioManifest: Decodable {
         resources.contains { $0.name == name }
     }
 
-    /// Whether the addon declares it can serve streams for the given content
-    /// type and meta-id prefix. A bare-string `"stream"` resource carries no
-    /// scoping of its own, so the manifest-level `types`/`idPrefixes` fill in;
-    /// an addon that scopes neither is taken at its word and matches anything.
-    func supportsStreams(forType type: String, idPrefix: String) -> Bool {
+    /// Whether the addon declares it can serve the named resource for the
+    /// given content type and meta-id prefix. A bare-string resource entry
+    /// carries no scoping of its own, so the manifest-level
+    /// `types`/`idPrefixes` fill in; an addon that scopes neither is taken at
+    /// its word and matches anything.
+    func supports(resource name: String, type: String, idPrefix: String) -> Bool {
         resources.contains { resource in
-            guard resource.name == "stream" else { return false }
+            guard resource.name == name else { return false }
             let resourceTypes = resource.types ?? types
             guard resourceTypes.isEmpty || resourceTypes.contains(type) else { return false }
             let prefixes = resource.idPrefixes ?? idPrefixes ?? []
             return prefixes.isEmpty || prefixes.contains(idPrefix)
         }
+    }
+
+    /// Whether the addon declares it can serve streams for the given content
+    /// type and meta-id prefix.
+    func supportsStreams(forType type: String, idPrefix: String) -> Bool {
+        supports(resource: "stream", type: type, idPrefix: idPrefix)
     }
 }
 
@@ -283,6 +290,14 @@ nonisolated struct StremioStream: Decodable {
         else { return nil }
         return resolved
     }
+
+    /// HTTP headers the addon requires on the media request, from
+    /// `behaviorHints.proxyHeaders` (MediaFusion's media proxy, header-guarded
+    /// live-TV addons). An empty set collapses to `nil`.
+    var requestHeaders: [String: String]? {
+        guard let headers = behaviorHints?.proxyHeaders?.request, !headers.isEmpty else { return nil }
+        return headers
+    }
 }
 
 /// A stream's `behaviorHints`. `bingeGroup` ties together streams of the same
@@ -295,9 +310,10 @@ nonisolated struct StremioStreamBehaviorHints: Decodable {
     /// drift every other numeric field in the protocol exhibits.
     let videoSize: Int64?
     let notWebReady: Bool?
+    let proxyHeaders: StremioProxyHeaders?
 
     enum CodingKeys: String, CodingKey {
-        case bingeGroup, filename, videoSize, notWebReady
+        case bingeGroup, filename, videoSize, notWebReady, proxyHeaders
     }
 
     init(from decoder: any Decoder) throws {
@@ -312,6 +328,25 @@ nonisolated struct StremioStreamBehaviorHints: Decodable {
             videoSize = nil
         }
         notWebReady = try? container.decodeIfPresent(Bool.self, forKey: .notWebReady)
+        proxyHeaders = try? container.decodeIfPresent(StremioProxyHeaders.self, forKey: .proxyHeaders)
+    }
+}
+
+/// A stream's `proxyHeaders` behavior hint — HTTP headers the addon needs on
+/// the media request (`request`) for the stream to play. Response headers are
+/// ignored: they exist for browser-based clients, native demuxers can't act on
+/// them.
+nonisolated struct StremioProxyHeaders: Decodable {
+    let request: [String: String]?
+
+    enum CodingKeys: String, CodingKey {
+        case request
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        request = (try? container.decodeIfPresent([String: StremioString].self, forKey: .request))?
+            .compactMapValues(\.value)
     }
 }
 
