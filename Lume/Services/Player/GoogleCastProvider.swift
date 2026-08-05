@@ -26,8 +26,20 @@ import OSLog
         /// class is not `@Observable`).
         var onCastingChanged: ((Bool) -> Void)?
 
+        /// Reports a stream the receiver wouldn't play. Two things can go wrong
+        /// and both land here: the `loadMedia` request itself is rejected (bad
+        /// MIME type, unreachable URL), or it is accepted and the receiver then
+        /// errors out while starting (CORS refusal on an HLS manifest, a codec
+        /// it can't decode). Neither surfaces without asking, which is why
+        /// this class keeps both a request delegate and a media-status listener.
+        var onFailure: ((CastFailure) -> Void)?
+
         private(set) var isCasting = false {
-            didSet { if isCasting != oldValue { onCastingChanged?(isCasting) } }
+            didSet {
+                if isCasting != oldValue {
+                    onCastingChanged?(isCasting)
+                }
+            }
         }
 
         var connectedDeviceName: String? {
@@ -43,6 +55,16 @@ import OSLog
         /// playing (the host re-invokes it on every "may have changed" edge).
         private var loadedURL: URL?
 
+        /// The in-flight `loadMedia` request. Held so its delegate callbacks
+        /// arrive — `GCKRequest.delegate` is weak and the request is otherwise
+        /// unowned once `loadMedia` returns.
+        private var loadRequest: GCKRequest?
+
+        /// Guards against reporting the same stream's failure twice: a rejected
+        /// load and the receiver's idle-with-error status can both fire for one
+        /// attempt, and the host would otherwise be told twice.
+        private var failureReportedForURL: URL?
+
         private var sessionManager: GCKSessionManager {
             GCKCastContext.sharedInstance().sessionManager
         }
@@ -56,11 +78,12 @@ import OSLog
             sessionManager.add(self)
         }
 
-        deinit {
-            // `GCKCastContext` is a shared singleton; drop our listener so a
-            // re-created provider doesn't double-handle session callbacks.
-            GCKCastContext.sharedInstance().sessionManager.remove(self)
-        }
+        // No `deinit` unregistration: `deinit` is nonisolated, and detaching a
+        // main-actor-isolated conformance from there is an error under the Swift 6
+        // language mode. It would also be dead code — `CastService.shared` holds
+        // this provider for the life of the process, so it is never deallocated.
+        // If that ever changes, add an explicit `@MainActor` teardown the owner
+        // calls before releasing it.
 
         // MARK: - CastProvider
 
@@ -121,6 +144,15 @@ import OSLog
         // MARK: - Loading
 
         private func load(_ media: PlayableMedia, at position: TimeInterval, on client: GCKRemoteMediaClient) {
+            // Defence in depth: the host gates on this too, but a provider that
+            // silently ships a `file://` download to a TV is the exact failure
+            // this whole path exists to remove.
+            let verdict = CastCompatibility.evaluate(media.url)
+            guard case let .castable(contentType) = verdict else {
+                report(.init(url: media.url, detail: "rejected before load: \(verdict)"))
+                return
+            }
+
             let metadata = GCKMediaMetadata(metadataType: media.isLive ? .generic : .movie)
             metadata.setString(media.title, forKey: kGCKMetadataKeyTitle)
             if let subtitle = media.subtitle, !subtitle.isEmpty {
@@ -132,27 +164,63 @@ import OSLog
 
             let infoBuilder = GCKMediaInformationBuilder(contentURL: media.url)
             infoBuilder.streamType = media.isLive ? .live : .buffered
-            infoBuilder.contentType = Self.contentType(for: media.url)
+            // Left unset for an unrecognised container so the receiver sniffs it
+            // rather than trusting a guess (see `CastCompatibility`).
+            if let contentType {
+                infoBuilder.contentType = contentType
+            }
             infoBuilder.metadata = metadata
 
             let requestBuilder = GCKMediaLoadRequestDataBuilder()
             requestBuilder.mediaInformation = infoBuilder.build()
             requestBuilder.startTime = media.isLive ? kGCKInvalidTimeInterval : position
 
-            client.loadMedia(with: requestBuilder.build())
             loadedURL = media.url
-            Logger.player.log("Chromecast: loading media live=\(media.isLive, privacy: .public)")
+            failureReportedForURL = nil
+            let request = client.loadMedia(with: requestBuilder.build())
+            request.delegate = self
+            loadRequest = request
+            Logger.player.log("Chromecast: loading media live=\(media.isLive, privacy: .public) type=\(contentType ?? "sniff", privacy: .public)")
         }
 
-        /// Best-effort MIME type from the URL extension; HLS is the common IPTV
-        /// case, so default to it when the container is unknown.
-        private static func contentType(for url: URL) -> String {
-            switch url.pathExtension.lowercased() {
-            case "mp4", "m4v": "video/mp4"
-            case "mkv": "video/x-matroska"
-            case "ts": "video/mp2t"
-            default: "application/x-mpegurl"
-            }
+        /// Pass a failure up once per attempt.
+        private func report(_ failure: CastFailure) {
+            guard failureReportedForURL != failure.url else { return }
+            failureReportedForURL = failure.url
+            Logger.player.error("Chromecast: \(failure.detail, privacy: .public)")
+            onFailure?(failure)
+        }
+    }
+
+    // MARK: - GCKRequestDelegate
+
+    extension GoogleCastProvider: GCKRequestDelegate {
+        func request(_: GCKRequest, didFailWithError error: GCKError) {
+            guard let url = loadedURL else { return }
+            report(.init(url: url, detail: "load request failed: \(error.localizedDescription)"))
+        }
+
+        func request(_: GCKRequest, didAbortWith abortReason: GCKRequestAbortReason) {
+            // A replaced request is normal (the viewer switched titles mid-cast);
+            // only a cancellation with nothing to show for it is worth reporting.
+            guard abortReason != .replaced, let url = loadedURL else { return }
+            report(.init(url: url, detail: "load request aborted: \(abortReason.rawValue)"))
+        }
+    }
+
+    // MARK: - GCKRemoteMediaClientListener
+
+    extension GoogleCastProvider: GCKRemoteMediaClientListener {
+        func remoteMediaClient(_: GCKRemoteMediaClient, didUpdate mediaStatus: GCKMediaStatus?) {
+            // The receiver accepts the load, tries to start, and gives up — this
+            // is where a CORS refusal on an HLS manifest or an undecodable codec
+            // lands. `.finished` is a normal end of stream, not a failure.
+            guard let mediaStatus,
+                  mediaStatus.playerState == .idle,
+                  mediaStatus.idleReason == .error,
+                  let url = loadedURL
+            else { return }
+            report(.init(url: url, detail: "receiver went idle with an error"))
         }
     }
 
@@ -161,6 +229,10 @@ import OSLog
     extension GoogleCastProvider: GCKSessionManagerListener {
         func sessionManager(_: GCKSessionManager, didStart session: GCKCastSession) {
             loadedURL = nil
+            failureReportedForURL = nil
+            // Per-session client, so the status listener has to be re-attached
+            // every time rather than once at init.
+            session.remoteMediaClient?.add(self)
             isCasting = true
             Logger.player.log("Chromecast: session started")
             if let pending = pendingMedia, let client = session.remoteMediaClient {
@@ -169,13 +241,17 @@ import OSLog
             }
         }
 
-        func sessionManager(_: GCKSessionManager, didResumeCastSession _: GCKCastSession) {
+        func sessionManager(_: GCKSessionManager, didResumeCastSession session: GCKCastSession) {
+            session.remoteMediaClient?.add(self)
             isCasting = true
         }
 
-        func sessionManager(_: GCKSessionManager, didEnd _: GCKCastSession, withError error: Error?) {
+        func sessionManager(_: GCKSessionManager, didEnd session: GCKCastSession, withError error: Error?) {
+            session.remoteMediaClient?.remove(self)
             loadedURL = nil
             pendingMedia = nil
+            loadRequest = nil
+            failureReportedForURL = nil
             isCasting = false
             if let error {
                 Logger.player.error("Chromecast: session ended with error: \(error.localizedDescription, privacy: .public)")
@@ -187,6 +263,8 @@ import OSLog
             // auto-load onto some later, unrelated session.
             loadedURL = nil
             pendingMedia = nil
+            loadRequest = nil
+            failureReportedForURL = nil
             isCasting = false
             Logger.player.error("Chromecast: session failed to start: \(error.localizedDescription, privacy: .public)")
         }

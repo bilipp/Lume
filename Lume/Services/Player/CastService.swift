@@ -55,6 +55,19 @@ final class CastService {
     /// this flips true.
     private(set) var isProviderCasting = false
 
+    /// The receiver's most recent refusal to play a stream, mirrored from the
+    /// provider. `FullScreenPlayerView` watches this to drop back to local
+    /// playback and tell the viewer why — see `CastFailure` and
+    /// `CastCompatibility`, which catches statically what this catches at
+    /// runtime (CORS on adaptive streams, unplayable codecs).
+    private(set) var castFailure: CastFailure?
+
+    /// Forget the last failure so a retry — a different title, a different
+    /// receiver — starts clean. Called by the host once it has acted on it.
+    func clearCastFailure() {
+        castFailure = nil
+    }
+
     /// True when the Google Cast SDK is linked into this build (iOS only).
     /// Lets tests assert the provider seam without re-deriving the platform
     /// gate themselves.
@@ -106,6 +119,14 @@ final class CastService {
             let provider = GoogleCastProvider()
             provider.onCastingChanged = { [weak self] casting in
                 self?.isProviderCasting = casting
+                // A new session gets a clean slate: the previous receiver's
+                // refusal says nothing about this one's abilities.
+                if casting {
+                    self?.castFailure = nil
+                }
+            }
+            provider.onFailure = { [weak self] failure in
+                self?.castFailure = failure
             }
             castProvider = provider
             Logger.player.log("Chromecast: Cast context configured")
@@ -160,6 +181,11 @@ protocol CastProvider: AnyObject {
     /// Reports `isCasting` flips so `CastService` can mirror them into its
     /// observable `isProviderCasting`. Set by `CastService` at registration.
     var onCastingChanged: ((Bool) -> Void)? { get set }
+
+    /// Reports that the receiver refused or errored out on the stream it was
+    /// asked to play, so the host can resume locally instead of leaving a poster
+    /// and a dead scrubber on screen. Set by `CastService` at registration.
+    var onFailure: ((CastFailure) -> Void)? { get set }
 
     /// Begin casting the given media to the selected receiver, seeking the
     /// receiver to `position` seconds so playback resumes where it left off.

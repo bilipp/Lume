@@ -4,9 +4,9 @@ import SwiftUI
 // Button`'s glass-circle styling but is backed by the Google Cast SDK's
 // `GCKUICastButton`, which handles device discovery and session start/stop.
 //
-// The Google Cast SDK is an iOS-only third-party dependency that is **not
-// bundled** here (see `Docs/Chromecast.md`). Until it is linked — and on every
-// non-iOS platform — this renders nothing, so the overlays can place it
+// The Google Cast SDK is an iOS-only third-party dependency (bundled at
+// `Vendor/GoogleCast` — see `Docs/Chromecast.md`). On every non-iOS platform,
+// where it isn't linked, this renders nothing, so the overlays can place it
 // unconditionally next to the AirPlay button.
 
 #if os(iOS) && canImport(GoogleCast)
