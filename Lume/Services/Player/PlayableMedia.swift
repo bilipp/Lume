@@ -162,7 +162,10 @@ extension PlayableMedia {
             guard let cmd = stream.directURL, let placeholder = StalkerLink.placeholder(type: .itv, cmd: cmd) else { return nil }
             url = placeholder
         } else {
-            let directURL = stream.directURL.flatMap(URL.init(string:))
+            // An m3u channel plays at the URL the playlist listed; the chosen
+            // container rewrites it only when the provider used one of the two
+            // interchangeable live endpoints. Xtream URLs are built with it.
+            let directURL = stream.directURL.flatMap(URL.init(string:)).map(playlist.streamFormat.applied(to:))
             guard let resolved = directURL ?? client.buildLiveStreamURL(for: stream, playlist: playlist) else { return nil }
             url = resolved
         }

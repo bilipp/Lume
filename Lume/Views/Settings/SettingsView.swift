@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     /// Not `private`: read by the SettingsView+Profiles extension (separate file).
     @Environment(ProfileManager.self) var profileManager: ProfileManager?
+    @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @Query var playlists: [Playlist]
     /// Not `private`: read by the SettingsView+Playlists extension (separate file).
@@ -36,6 +37,13 @@ struct SettingsView: View {
     var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
     @AppStorage(SearchSettings.searchAllPlaylistsKey)
     private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
+    #if !os(tvOS)
+        /// The app-wide appearance override (System / Dark / Light), applied at
+        /// the scene root in `LumeApp`. Not offered on tvOS — the TV UI is
+        /// designed dark and a per-app light mode makes no sense there.
+        @AppStorage(AppAppearance.storageKey)
+        private var appearanceRaw = AppAppearance.defaultValue.rawValue
+    #endif
     /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
     @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     #if !os(tvOS)
@@ -101,6 +109,7 @@ struct SettingsView: View {
                     playlistsSection
                     librarySection
                     layoutSection
+                    appearanceSection
                     searchSection
                     autoSyncSection
                     epgSection
@@ -232,6 +241,21 @@ struct SettingsView: View {
             }
         }
 
+        private var appearanceSection: some View {
+            Section {
+                Picker("Appearance", selection: $appearanceRaw) {
+                    ForEach(AppAppearance.allCases) { appearance in
+                        Text(appearance.title).tag(appearance.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text("Follow the device appearance, or keep Lume always in Dark or Light Mode.")
+            }
+        }
+
         private var searchSection: some View {
             Section {
                 Toggle("Search All Playlists", isOn: $searchAllPlaylists)
@@ -326,6 +350,7 @@ struct SettingsView: View {
 
                 NavigationLink("VLCKit Options") { VLCEngineSettingsScreen() }
                 NavigationLink("KSPlayer Options") { KSEngineSettingsScreen() }
+                NavigationLink("Lume Engine Options") { LumeEngineSettingsScreen() }
 
                 Picker("External Player", selection: $externalPlayerRaw) {
                     Text("Off").tag("")
@@ -354,9 +379,23 @@ struct SettingsView: View {
         }
 
         private func deletePlaylists(offsets: IndexSet) {
-            withAnimation {
-                for index in offsets {
-                    PlaylistDeletion.delete(playlists[index], in: modelContext)
+            // Route through the sync engine so the deletion also clears the
+            // CloudKit mirror and shadow baseline — deleting on the view
+            // context alone leaves a surviving mirror that resurrects the last
+            // playlist (#136). Previews have no coordinator; local-only
+            // deletion is fine there.
+            if let cloudSync {
+                let ids = offsets.map { playlists[$0].id }
+                Task {
+                    for id in ids {
+                        await cloudSync.deletePlaylist(id: id)
+                    }
+                }
+            } else {
+                withAnimation {
+                    for index in offsets {
+                        PlaylistDeletion.delete(playlists[index], in: modelContext)
+                    }
                 }
             }
         }

@@ -172,6 +172,126 @@ enum KSMaxBufferPreset {
     }
 }
 
+// MARK: - Lume Engine choices
+
+/// Buffer-target presets (milliseconds of decoded media held before playback
+/// starts or resumes) offered for the Lume Engine's live and on-demand streams.
+enum LumeBufferPreset {
+    static let values = [500, 1000, 2000, 3000, 5000, 8000]
+
+    static func label(_ milliseconds: Int) -> String {
+        "\(milliseconds) ms"
+    }
+}
+
+/// Decoded-video channel capacities, in frames. Each slot retains a full
+/// decoded pixel buffer (a 4K frame is ~12 MB), so the presets stay small.
+enum LumeVideoQueuePreset {
+    static let values = [4, 8, 12, 16, 24]
+
+    static func label(_ frames: Int) -> String {
+        String(localized: "\(frames) frames")
+    }
+}
+
+/// Decoded-audio channel capacities, in frames. Audio frames are tiny compared
+/// to video, so deeper queues are cheap and smooth out bursty demux timing on
+/// high-channel-count (e.g. Atmos) streams.
+enum LumeAudioQueuePreset {
+    static let values = [24, 48, 96, 192]
+
+    static func label(_ frames: Int) -> String {
+        String(localized: "\(frames) frames")
+    }
+}
+
+/// Stall-watchdog thresholds (seconds without playhead progress before the
+/// engine reports a stall and Lume's retry controller reconnects).
+enum LumeStallThresholdPreset {
+    static let values = [4, 8, 15, 30]
+
+    static func label(_ seconds: Int) -> String {
+        "\(seconds) s"
+    }
+}
+
+/// Blocking network-I/O timeout applied to reads mid-stream. `.off` leaves the
+/// engine's interrupt-based open timeout as the only bound.
+enum LumeIOTimeout: Int, CaseIterable, Identifiable {
+    case off = 0
+    case fiveSeconds = 5
+    case tenSeconds = 10
+    case fifteenSeconds = 15
+    case thirtySeconds = 30
+    case sixtySeconds = 60
+
+    static let defaultValue: LumeIOTimeout = .fifteenSeconds
+
+    var id: Int {
+        rawValue
+    }
+
+    /// The value handed to `DemuxerOptions.ioTimeout` (microseconds), or `nil`
+    /// to disable the read timeout.
+    var optionValue: Int64? {
+        self == .off ? nil : Int64(rawValue) * 1_000_000
+    }
+
+    var label: String {
+        self == .off ? String(localized: "Off") : "\(rawValue) s"
+    }
+}
+
+/// How many bytes FFmpeg reads to identify streams before playback (`probesize`).
+/// `.auto` keeps FFmpeg's default; larger values find late-appearing tracks in
+/// messy muxes at the cost of a slower start.
+enum LumeProbeSize: Int, CaseIterable, Identifiable {
+    case auto = 0
+    case oneMB = 1
+    case twoMB = 2
+    case fiveMB = 5
+    case tenMB = 10
+    case twentyMB = 20
+
+    var id: Int {
+        rawValue
+    }
+
+    /// The value handed to `DemuxerOptions.probeSize` (bytes), or `nil` to keep
+    /// FFmpeg's default.
+    var optionValue: Int64? {
+        self == .auto ? nil : Int64(rawValue) * 1_048_576
+    }
+
+    var label: String {
+        self == .auto ? String(localized: "Default") : "\(rawValue) MB"
+    }
+}
+
+/// How long FFmpeg analyses the stream to determine formats (`analyzeduration`).
+/// `.auto` keeps FFmpeg's default.
+enum LumeAnalyzeDuration: Int, CaseIterable, Identifiable {
+    case auto = 0
+    case oneSecond = 1
+    case twoSeconds = 2
+    case fiveSeconds = 5
+    case tenSeconds = 10
+
+    var id: Int {
+        rawValue
+    }
+
+    /// The value handed to `DemuxerOptions.maxAnalyzeDuration` (microseconds),
+    /// or `nil` to keep FFmpeg's default.
+    var optionValue: Int64? {
+        self == .auto ? nil : Int64(rawValue) * 1_000_000
+    }
+
+    var label: String {
+        self == .auto ? String(localized: "Default") : "\(rawValue) s"
+    }
+}
+
 // MARK: - Snapshots
 
 /// A point-in-time read of every VLCKit option, taken when the coordinator
@@ -254,6 +374,44 @@ struct KSPlayerOptions {
             liveBuffer: defaults.integer(PlayerSettings.KSPlayer.liveBufferKey, default: PlayerSettings.KSPlayer.liveBufferDefault),
             vodBuffer: defaults.integer(PlayerSettings.KSPlayer.vodBufferKey, default: PlayerSettings.KSPlayer.vodBufferDefault),
             maxBuffer: defaults.integer(PlayerSettings.KSPlayer.maxBufferKey, default: PlayerSettings.KSPlayer.maxBufferDefault)
+        )
+    }
+}
+
+/// A point-in-time read of every Lume Engine option, taken when the coordinator
+/// builds its `PlayerConfiguration`.
+struct LumeEngineOptions {
+    var hardwareDecode: Bool
+    var httpReconnect: Bool
+    /// Buffer targets before starting/resuming playback, in milliseconds.
+    var liveBuffer: Int
+    var vodBuffer: Int
+    /// Decoded frame-channel capacities, in frames.
+    var videoQueueDepth: Int
+    var audioQueueDepth: Int
+    /// Stall-watchdog threshold, in seconds.
+    var stallThreshold: Int
+    /// `nil` when the user chose the automatic/off choice, in which case the
+    /// engine keeps its own default (or, for the timeout, no read timeout).
+    var ioTimeout: Int64?
+    var probeSize: Int64?
+    var analyzeDuration: Int64?
+
+    static func load(from defaults: UserDefaults = .standard) -> LumeEngineOptions {
+        let ioTimeout = LumeIOTimeout(rawValue: defaults.integer(PlayerSettings.Lume.ioTimeoutKey, default: LumeIOTimeout.defaultValue.rawValue)) ?? .defaultValue
+        let probeSize = LumeProbeSize(rawValue: defaults.integer(PlayerSettings.Lume.probeSizeKey, default: LumeProbeSize.auto.rawValue)) ?? .auto
+        let analyzeDuration = LumeAnalyzeDuration(rawValue: defaults.integer(PlayerSettings.Lume.analyzeDurationKey, default: LumeAnalyzeDuration.auto.rawValue)) ?? .auto
+        return LumeEngineOptions(
+            hardwareDecode: defaults.bool(PlayerSettings.Lume.hardwareDecodeKey, default: PlayerSettings.Lume.hardwareDecodeDefault),
+            httpReconnect: defaults.bool(PlayerSettings.Lume.httpReconnectKey, default: PlayerSettings.Lume.httpReconnectDefault),
+            liveBuffer: defaults.integer(PlayerSettings.Lume.liveBufferKey, default: PlayerSettings.Lume.liveBufferDefault),
+            vodBuffer: defaults.integer(PlayerSettings.Lume.vodBufferKey, default: PlayerSettings.Lume.vodBufferDefault),
+            videoQueueDepth: defaults.integer(PlayerSettings.Lume.videoQueueDepthKey, default: PlayerSettings.Lume.videoQueueDepthDefault),
+            audioQueueDepth: defaults.integer(PlayerSettings.Lume.audioQueueDepthKey, default: PlayerSettings.Lume.audioQueueDepthDefault),
+            stallThreshold: defaults.integer(PlayerSettings.Lume.stallThresholdKey, default: PlayerSettings.Lume.stallThresholdDefault),
+            ioTimeout: ioTimeout.optionValue,
+            probeSize: probeSize.optionValue,
+            analyzeDuration: analyzeDuration.optionValue
         )
     }
 }

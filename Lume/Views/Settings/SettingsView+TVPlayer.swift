@@ -99,6 +99,7 @@ import SwiftUI
                     VStack(spacing: 2) {
                         tvEngineOptionsRow(.vlcKit)
                         tvEngineOptionsRow(.ksPlayer)
+                        tvEngineOptionsRow(.lumeEngine)
                     }
                 }
             }

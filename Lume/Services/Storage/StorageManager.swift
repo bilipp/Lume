@@ -209,6 +209,39 @@ enum StorageManager {
         }.value
     }
 
+    /// Clears the active profile's Recently Watched *live channels* for a single
+    /// playlist by nulling `lastWatchedDate` on every matching `LiveStream`. Live
+    /// has no resumable progress or `isWatched`, so the timestamp is the only
+    /// watch state to reset — favorites and the channels themselves are left
+    /// alone.
+    ///
+    /// Runs on a private background context, like `clearWatchHistory`, so its
+    /// saves merge back into the main context and the Recently Watched section
+    /// updates as soon as they land. A live channel's `lastWatchedDate` is
+    /// deliberately device-local — it's never projected to the CloudKit mirror
+    /// (see `liveEntries()`) — so this is a purely local reset, matching the
+    /// per-channel "remove from recently watched". Scoped in-memory by the
+    /// playlist id prefix — the same approach the virtual collections use, since
+    /// SwiftData can't parameterise a predicate on it.
+    static func clearRecentlyWatchedChannels(playlistPrefix: String, container: ModelContainer) async {
+        await Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
+            do {
+                let channels = try context.fetch(FetchDescriptor<LiveStream>(
+                    predicate: #Predicate { $0.lastWatchedDate != nil }
+                )).filter { $0.id.hasPrefix(playlistPrefix) }
+                for (index, channel) in channels.enumerated() {
+                    channel.lastWatchedDate = nil
+                    if (index + 1).isMultiple(of: clearBatchSize) { try context.save() }
+                }
+                try context.save()
+            } catch {
+                logger.error("Failed to clear recently watched channels: \(error.localizedDescription)")
+            }
+        }.value
+    }
+
     #if DEBUG
         /// DEBUG-only: wipes the on-device search index end to end — the TMDB/MDBList
         /// enrichment (via `clearMetadataEnrichment`), the embedding vectors, the

@@ -48,6 +48,13 @@ extension KSPlayerEngineView {
     /// the value is already correct (avoids redundant SwiftUI diffs).
     private func setBuffering(_ buffering: Bool) {
         guard isBuffering != buffering else { return }
+        // QoE only counts *mid-stream* stalls; a spinner before the first frame
+        // is join time, and `PlaybackQoE` discards these until it has one.
+        if buffering {
+            PlaybackQoE.shared.noteStallBegan()
+        } else {
+            PlaybackQoE.shared.noteStallEnded()
+        }
         withAnimation(.easeInOut(duration: 0.25)) { isBuffering = buffering }
     }
 
@@ -78,6 +85,7 @@ extension KSPlayerEngineView {
     func markPlaybackStarted() {
         guard !hasStartedPlayback, hasSeenReadyToPlay else { return }
         hasStartedPlayback = true
+        PlaybackQoE.shared.noteFirstFrame()
         cancelStartupWatchdog()
     }
 
@@ -230,6 +238,9 @@ extension KSPlayerEngineView {
     /// first frame (`markPlaybackStarted`) disarms it.
     func startStartupWatchdog() {
         startupWatchdog?.cancel()
+        // Every startup attempt goes through here — open, channel swap, retry —
+        // which makes it the one place join time can be started from.
+        PlaybackQoE.shared.beginStartup(engine: .ksPlayer, isLive: media.isLive)
         // With a fallback engine available, wait only the shorter fallback
         // timeout before declaring the stream dead, so a silently-hanging engine
         // hands off to the next one promptly instead of stalling on a black
@@ -259,6 +270,9 @@ extension KSPlayerEngineView {
         guard !loadFailed else { return }
         cancelStartupWatchdog()
         reconnector.cancel()
+        if !hasStartedPlayback {
+            PlaybackQoE.shared.noteStartupFailure()
+        }
         if !hasStartedPlayback, reportsStartupFailure {
             onPlaybackFailed?()
             return

@@ -270,6 +270,7 @@ struct KSPlayerEngineView: View {
                 reconnector.cancel()
                 cancelStartupWatchdog()
                 cancelStallWatchdog()
+                PlaybackQoE.shared.endSession()
                 coordinator.resetPlayer()
             }
             .onChange(of: engine.isPlaying) { _, _ in
@@ -454,6 +455,7 @@ struct KSPlayerEngineView: View {
                 reconnector.cancel()
                 cancelStartupWatchdog()
                 cancelStallWatchdog()
+                PlaybackQoE.shared.endSession()
                 coordinator.resetPlayer()
             }
             .onTapGesture {

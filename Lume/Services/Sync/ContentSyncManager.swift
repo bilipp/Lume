@@ -116,6 +116,11 @@ actor ContentSyncManager {
     }
 
     private func performSync(playlistId: UUID, progress: SyncProgress?, full: Bool) async throws {
+        // Whole-sync interval: the umbrella every phase below nests under, so a
+        // trace (or `XCTOSSignpostMetric`) shows both the total and the split.
+        let interval = Perf.begin(.playlistSync)
+        defer { Perf.end(interval) }
+
         let statusContext = ModelContext(modelContainer)
         statusContext.autosaveEnabled = false
         guard let playlist = try statusContext.fetch(
@@ -206,6 +211,9 @@ actor ContentSyncManager {
     }
 
     private func syncCategories(_ dtos: [XtreamCategory], type: CategoryType, playlistId: UUID) throws {
+        let interval = Perf.begin(.syncCategories)
+        defer { Perf.end(interval) }
+
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
 
@@ -254,6 +262,9 @@ actor ContentSyncManager {
     /// no SwiftData relationship — so each insert avoids the inverse-array
     /// updates that previously slowed sync as categories grew.
     func syncMovies(for playlist: Playlist, playlistId: UUID, progress: SyncProgress? = nil) async throws {
+        let interval = Perf.begin(.syncMovies)
+        defer { Perf.end(interval) }
+
         await progress?.start(.movies)
         let movieDTOs = try await xtreamClient.getVODStreams(playlist: playlist)
         let totalCount = movieDTOs.count
@@ -307,6 +318,9 @@ actor ContentSyncManager {
 
     /// Syncs series in memory-bounded batches.
     func syncSeries(for playlist: Playlist, playlistId: UUID, progress: SyncProgress? = nil) async throws {
+        let interval = Perf.begin(.syncSeries)
+        defer { Perf.end(interval) }
+
         await progress?.start(.series)
         let seriesDTOs = try await xtreamClient.getSeries(playlist: playlist)
         let totalCount = seriesDTOs.count
@@ -434,6 +448,9 @@ actor ContentSyncManager {
 
     /// Syncs live streams in memory-bounded batches.
     func syncLiveStreams(for playlist: Playlist, playlistId: UUID, progress: SyncProgress? = nil) async throws {
+        let interval = Perf.begin(.syncLiveStreams)
+        defer { Perf.end(interval) }
+
         await progress?.start(.liveStreams)
         let streamDTOs = try await xtreamClient.getLiveStreams(playlist: playlist)
         let totalCount = streamDTOs.count

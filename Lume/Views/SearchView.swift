@@ -125,7 +125,7 @@ struct SearchView: View {
                     await updateResults()
                 }
         }
-        #if os(iOS)
+        #if os(iOS) || os(tvOS)
         .fullScreenCover(item: $playingMedia) { media in
             FullScreenPlayerView(media: media)
         }
@@ -151,14 +151,13 @@ struct SearchView: View {
 
     // MARK: - Searching
 
-    /// Runs the search against SwiftData using bounded, predicate-based fetches.
-    ///
-    /// Filtering happens in SQLite (via `localizedStandardContains`) — but even a
-    /// bounded `LIKE '%q%'` scan can't use an index, so on a large library it has
-    /// real cost. The fetch runs on a background context (returning only the
-    /// matched rows' identifiers, which are `Sendable`); the view context then
-    /// hydrates just those rows by id. Combined with the debounce above, typing
-    /// never blocks the main thread no matter how large the library is.
+    /// Runs the search. Locally synced content (all Xtream/m3u content and
+    /// Stalker live channels) is matched with bounded, predicate-based fetches
+    /// on a background context — even a bounded `LIKE '%q%'` scan can't use an
+    /// index, so the fetch returns only `Sendable` identifiers that the view
+    /// context hydrates by id, and the debounce keeps typing off the main
+    /// thread. A Stalker portal's movies/series aren't synced, so they come
+    /// from the portal's dedicated search API instead (see `searchStalker`).
     private func updateResults() async {
         let query = debouncedSearchText
         guard !query.isEmpty else {
@@ -166,51 +165,116 @@ struct SearchView: View {
             return
         }
 
-        // Unless the user has opted into cross-playlist search, scope results to
-        // the active playlist. Every category id is prefixed with its playlist's
-        // UUID (see Category.id), and that UUID appears nowhere else, so matching
-        // it within categoryId limits results to the active playlist's content.
-        let playlistID = activePlaylist?.id.uuidString ?? ""
-        let restrictToPlaylist = !searchAllPlaylists && activePlaylist != nil
+        let playlist = activePlaylist
         let filter = selectedFilter
-        let limit = resultLimit
-        let container = modelContext.container
+        let wantMovies = filter == .all || filter == .movies
+        let wantSeries = filter == .all || filter == .series
+        let wantLive = filter == .all || filter == .liveTV
 
-        let request = SearchRequest(
-            query: query,
-            playlistID: playlistID,
-            restrictToPlaylist: restrictToPlaylist,
-            wantMovies: filter == .all || filter == .movies,
-            wantSeries: filter == .all || filter == .series,
-            wantLive: filter == .all || filter == .liveTV,
-            limit: limit
-        )
-        let hits = await Task.detached(priority: .userInitiated) {
-            SearchFetcher.fetch(container: container, request: request)
-        }.value
-
+        // A Stalker portal's movies/series aren't synced locally, so they can
+        // only be found through the portal's own search API. Live TV (which
+        // *is* synced) and every other source type use the local predicate
+        // search. Cross-playlist search still runs the local pass too, so other
+        // playlists' synced content is included.
+        let usePortalForVODSeries = playlist?.sourceType == .stalker && !searchAllPlaylists
+        let portal = await portalSearch(query: query, playlist: playlist, wantMovies: wantMovies, wantSeries: wantSeries)
         guard !Task.isCancelled else { return }
 
-        // Hydrate the matched rows in the view context (a cheap by-identifier
-        // lookup) and drop any in a restricted category for the active profile.
-        var matches: [SearchResult] = []
-        for id in hits.movies {
-            if let movie = modelContext.model(for: id) as? Movie, !restriction.hides(categoryID: movie.categoryId) {
-                matches.append(.movie(movie))
-            }
-        }
-        for id in hits.series {
-            if let series = modelContext.model(for: id) as? Series, !restriction.hides(categoryID: series.categoryId) {
-                matches.append(.series(series))
-            }
-        }
-        for id in hits.streams {
-            if let stream = modelContext.model(for: id) as? LiveStream, !restriction.hides(categoryID: stream.categoryId) {
-                matches.append(.liveStream(stream))
-            }
-        }
+        let localHits = await localSearch(
+            query: query, playlist: playlist,
+            wantMovies: wantMovies && !usePortalForVODSeries,
+            wantSeries: wantSeries && !usePortalForVODSeries,
+            wantLive: wantLive
+        )
+        guard !Task.isCancelled else { return }
 
-        results = matches
+        results = assembleResults(portal: portal, localHits: localHits)
+    }
+
+    /// Portal search hits (element ids) for a Stalker active playlist; empty
+    /// otherwise.
+    private func portalSearch(
+        query: String, playlist: Playlist?, wantMovies: Bool, wantSeries: Bool
+    ) async -> (movies: [String], series: [String]) {
+        guard let playlist, playlist.sourceType == .stalker, wantMovies || wantSeries else { return ([], []) }
+        let manager = ContentSyncManager(modelContainer: modelContext.container)
+        return await manager.searchStalker(
+            query: query, playlist: playlist,
+            includeMovies: wantMovies, includeSeries: wantSeries, limit: resultLimit
+        )
+    }
+
+    /// Bounded local predicate search, run off the main thread.
+    private func localSearch(
+        query: String, playlist: Playlist?, wantMovies: Bool, wantSeries: Bool, wantLive: Bool
+    ) async -> SearchHits {
+        // Scope to the active playlist unless cross-playlist search is on. Every
+        // category id is prefixed with its playlist's UUID (see Category.id),
+        // which appears nowhere else, so matching it within categoryId limits
+        // results to that playlist.
+        let request = SearchRequest(
+            query: query,
+            playlistID: playlist?.id.uuidString ?? "",
+            restrictToPlaylist: !searchAllPlaylists && playlist != nil,
+            wantMovies: wantMovies,
+            wantSeries: wantSeries,
+            wantLive: wantLive,
+            limit: resultLimit
+        )
+        let container = modelContext.container
+        return await Task.detached(priority: .userInitiated) {
+            SearchFetcher.fetch(container: container, request: request)
+        }.value
+    }
+
+    /// Portal hits first (relevance order), then the local pass. Hydrates rows
+    /// in the view context, drops any the active profile restricts, and dedupes
+    /// so an already-imported title isn't listed twice.
+    private func assembleResults(
+        portal: (movies: [String], series: [String]), localHits: SearchHits
+    ) -> [SearchResult] {
+        var matches: [SearchResult] = []
+        var seen = Set<String>()
+        func add(_ result: SearchResult, categoryID: String?) {
+            guard !restriction.hides(categoryID: categoryID), seen.insert(result.id).inserted else { return }
+            matches.append(result)
+        }
+        for movie in hydrateMovies(ids: portal.movies) {
+            add(.movie(movie), categoryID: movie.categoryId)
+        }
+        for series in hydrateSeries(ids: portal.series) {
+            add(.series(series), categoryID: series.categoryId)
+        }
+        for id in localHits.movies {
+            if let movie = modelContext.model(for: id) as? Movie { add(.movie(movie), categoryID: movie.categoryId) }
+        }
+        for id in localHits.series {
+            if let series = modelContext.model(for: id) as? Series { add(.series(series), categoryID: series.categoryId) }
+        }
+        for id in localHits.streams {
+            if let stream = modelContext.model(for: id) as? LiveStream { add(.liveStream(stream), categoryID: stream.categoryId) }
+        }
+        return matches
+    }
+
+    /// Fetches `Movie` rows for the given ids in one query, returned in id order.
+    private func hydrateMovies(ids: [String]) -> [Movie] {
+        guard !ids.isEmpty else { return [] }
+        let fetched = (try? modelContext.fetch(
+            FetchDescriptor<Movie>(predicate: #Predicate { ids.contains($0.id) })
+        )) ?? []
+        let byId = Dictionary(fetched.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return ids.compactMap { byId[$0] }
+    }
+
+    /// Fetches `Series` rows for the given ids in one query, returned in id order.
+    private func hydrateSeries(ids: [String]) -> [Series] {
+        guard !ids.isEmpty else { return [] }
+        let fetched = (try? modelContext.fetch(
+            FetchDescriptor<Series>(predicate: #Predicate { ids.contains($0.id) })
+        )) ?? []
+        let byId = Dictionary(fetched.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return ids.compactMap { byId[$0] }
     }
 }
 

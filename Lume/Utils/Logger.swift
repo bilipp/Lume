@@ -10,4 +10,7 @@ nonisolated extension Logger {
     static let indexing = Logger(subsystem: subsystem, category: "Indexing")
     static let premium = Logger(subsystem: subsystem, category: "Premium")
     static let memory = Logger(subsystem: subsystem, category: "Memory")
+    /// Shares its category with `Perf`'s signposts, so one filter shows both the
+    /// phase boundaries and the messages explaining them.
+    static let performance = Logger(subsystem: subsystem, category: "Performance")
 }

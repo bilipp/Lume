@@ -29,7 +29,24 @@ nonisolated enum PlaylistDeletion {
     /// explicitly, and the now-orphaned EPG listings for the playlist's channels
     /// are pruned.
     static func delete(_ playlist: Playlist, in context: ModelContext) {
-        let prefix = playlist.id.uuidString
+        let playlistID = playlist.id
+
+        // Drop the playlist's auto-created EPG source so it isn't re-synced.
+        EPGSourceReconciler.remove(playlistID: playlistID, in: context)
+        context.delete(playlist)
+
+        removeOrphanedContent(playlistID: playlistID, in: context)
+
+        Logger.sync.info("Deleted playlist \(playlistID.uuidString) and its orphaned catalog content")
+    }
+
+    /// The bulk half of a playlist deletion: every catalog item the playlist
+    /// brought in, matched by its playlist-scoped id prefix. Split from
+    /// `delete(_:in:)` so `CloudSyncEngine.deletePlaylist` can save the removal
+    /// of the `Playlist` row itself first (the UI's `@Query`s drop it promptly)
+    /// before this — potentially long — cleanup runs.
+    static func removeOrphanedContent(playlistID: UUID, in context: ModelContext) {
+        let prefix = playlistID.uuidString
 
         // Scope each fetch to the playlist in SQLite via the playlist-prefixed
         // id instead of hydrating the whole catalog into memory just to filter
@@ -71,11 +88,6 @@ nonisolated enum PlaylistDeletion {
             context.delete(stream)
         }
 
-        // Drop the playlist's auto-created EPG source so it isn't re-synced.
-        EPGSourceReconciler.remove(playlistID: playlist.id, in: context)
-
-        context.delete(playlist)
-
         // Prune the guide listings for channels no surviving playlist carries.
         // Scoped by `channelId` (now indexed) so this seeks the orphaned rows
         // instead of hydrating the entire — potentially huge — guide table.
@@ -88,7 +100,5 @@ nonisolated enum PlaylistDeletion {
                 context.delete(listing)
             }
         }
-
-        Logger.sync.info("Deleted playlist \(prefix) and its orphaned catalog content")
     }
 }

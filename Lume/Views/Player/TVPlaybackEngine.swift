@@ -13,7 +13,7 @@
 
     import Combine
     import Foundation
-    import VLCKitSPM
+    import VLCKit
 
     /// The playback surface the tvOS overlay reads and commands. Marked
     /// `@MainActor` because the overlay (a SwiftUI `View`) only ever touches it

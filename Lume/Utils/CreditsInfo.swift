@@ -45,7 +45,7 @@ nonisolated enum CreditsInfo {
     static let libraries: [Library] = [
         Library(name: "KSPlayer", license: "GPL v3", urlString: "https://github.com/kingslay/KSPlayer"),
         Library(name: "FFmpegKit", license: "GPL v3 / LGPL v3", urlString: "https://github.com/kingslay/FFmpegKit"),
-        Library(name: "VLCKit", license: "LGPL v2.1", urlString: "https://github.com/virtualox/vlckit-spm")
+        Library(name: "VLCKit", license: "LGPL v2.1", urlString: "https://code.videolan.org/videolan/VLCKit")
     ]
 
     // MARK: - Contributors

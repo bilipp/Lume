@@ -21,3 +21,5 @@ lefthook-local.yml
 
 # Claude Code skills (local-only)
 .claude/skills/
+
+.xcodebuildmcp/

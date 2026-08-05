@@ -11,6 +11,10 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 <a href="https://apps.apple.com/us/app/lume-iptv-player/id6779551584">
   <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1700000000" alt="Download Lume on the App Store" height="48">
 </a>
+&nbsp;&nbsp;
+<a href="https://discord.gg/DMnQfr69Ug">
+  <img src="https://img.shields.io/badge/Join_the_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Lume Discord" height="48">
+</a>
 
 <br><br>
 
@@ -20,7 +24,6 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)](https://developer.apple.com/xcode/swiftui/)
 [![SwiftData](https://img.shields.io/badge/Persistence-SwiftData-30B0C7)](https://developer.apple.com/documentation/swiftdata)
 [![Issues](https://img.shields.io/github/issues/bilipp/Lume?color=F9EE00&labelColor=1f1f2e)](https://github.com/bilipp/Lume/issues)
-[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white&labelColor=1f1f2e)](https://discord.gg/DMnQfr69Ug)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue?labelColor=1f1f2e)](LICENSE)
 
 </div>
@@ -30,6 +33,7 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 ## Table of contents
 
 - [Overview](#overview)
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [Supported platforms](#supported-platforms)
 - [Playback engines](#playback-engines)
@@ -39,6 +43,7 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 - [Configuration](#configuration)
 - [Testing](#testing)
 - [Roadmap](#roadmap)
+- [Community](#community)
 - [Contributing](#contributing)
 - [Anti-piracy](#anti-piracy)
 - [License](#license)
@@ -50,8 +55,9 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 **Lume** is a native IPTV client for the Apple ecosystem. It connects to your own
 **Xtream Codes** provider or imports **M3U/M3U8** playlists, indexes the full catalog
 locally with **SwiftData** for instant, offline-capable browsing, and plays everything
-through a choice of three playback engines — from VLC's universal codec support to
-Apple's native AVPlayer.
+through a choice of four playback engines — from VLC's universal codec support to
+Apple's native AVPlayer, plus [our own FFmpeg 8 engine](https://github.com/bilipp/LumeEngine)
+in beta.
 
 It is built entirely in **SwiftUI** with a single, platform-adaptive codebase that
 runs on iPhone, iPad, Mac, Apple TV, and Apple Vision Pro. Content is enriched with
@@ -62,6 +68,51 @@ Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to **
 > of its own. You bring your own Xtream Codes credentials or M3U playlist from a
 > provider you are entitled to use. We do not condone piracy — please read the
 > [**Anti-Piracy Policy**](ANTI_PIRACY.md).
+
+---
+
+## Screenshots
+
+<div align="center">
+
+<img src="Assets/Screenshots/tvOS/1-home.jpeg" alt="Lume on Apple TV — immersive home screen with hero carousel and trending rail" width="880">
+
+**Apple TV** — immersive full-screen home with a crossfading TMDB hero and fold-based scroll snapping
+
+<br>
+
+<img src="Assets/Screenshots/tvOS/4-movie-hero.jpeg" alt="Lume movie detail on Apple TV with logo artwork, ratings and cast" width="880">
+
+**Apple TV** — movie detail with TMDB backdrop, logo treatment, ratings, and metadata
+
+<br>
+
+<img src="Assets/Screenshots/macOS/01-home.png" alt="Lume on macOS showing the home dashboard in a window" width="880">
+
+**Mac** — the same catalog in a resizable window, with profile switching in the toolbar
+
+<br>
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/1-home.jpeg" alt="Home dashboard on iPhone" width="250"></td>
+    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/7-movies-overview.jpeg" alt="Movies browsing on iPhone" width="250"></td>
+    <td align="center" width="33%"><img src="Assets/Screenshots/iOS/4-live-epg.jpeg" alt="Live TV program guide on iPhone" width="250"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Home</sub></td>
+    <td align="center"><sub>Movies</sub></td>
+    <td align="center"><sub>Live TV guide</sub></td>
+  </tr>
+</table>
+
+**iPhone & iPad** — a hero carousel, poster rails, and a scrollable EPG timeline, all
+adapted per size class
+
+<sub>More shots — including iPad, the players, and the tvOS guide — live in
+[`Assets/Screenshots/`](Assets/Screenshots).</sub>
+
+</div>
 
 ---
 
@@ -140,7 +191,7 @@ dedicated focus-driven interface and top-shelf branding on tvOS.
 
 ## Playback engines
 
-Lume ships with three interchangeable engines, ordered into a **priority list** in
+Lume ships with four interchangeable engines, ordered into a **priority list** in
 **Settings**. Playback starts with your preferred engine and **automatically falls
 back** to the next one whenever an engine can't play a stream, so a codec or stream
 one engine chokes on is retried with another before any error is shown. The default
@@ -152,6 +203,14 @@ available on the platform).
 | **VLCKit** | VLCKit 4 (libVLC) | Maximum compatibility | Virtually any format/codec, hardware-accelerated 4K HDR, Picture in Picture, broadest IPTV support |
 | **KSPlayer** | FFmpeg (FFmpegKit) | Wide IPTV support | Handles most formats common in IPTV streams; configurable decoder (FFmpeg / VideoToolbox) |
 | **AVPlayer** | AVFoundation | HLS & MP4 | Native Apple player with **custom unified overlay** matching the other engines |
+| **Lume Engine** *(beta)* | [LumeEngine](https://github.com/bilipp/LumeEngine) (FFmpeg 8) | Long-running IPTV streams | Our own engine, built from scratch for stability on live streams: Apple-owned A/V sync, supervised pipelines, MPEG-TS wraparound handled at the demux boundary |
+
+**Lume Engine** is opt-in: it sits at the *end* of the priority list until you move it
+up in **Settings**, so it is never silently promoted while it is in beta. It is
+developed in the open in its own repository —
+[**bilipp/LumeEngine**](https://github.com/bilipp/LumeEngine) — where the
+[design document](https://github.com/bilipp/LumeEngine/blob/main/PLAN.md) explains the
+failure modes it is built to make structurally impossible.
 
 Prefer a third-party app? Lume can hand streams off to an **external player** —
 **Infuse** or **VLC** — via their deep-link APIs, selectable in **Settings**.
@@ -196,7 +255,7 @@ Lume follows a clean, layered SwiftUI architecture:
 
 - **UI** — SwiftUI, adaptive across iOS / macOS / tvOS / visionOS
 - **Persistence** — SwiftData (8 model types, local catalog index)
-- **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer
+- **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer · LumeEngine (FFmpeg 8, beta)
 - **Networking** — `URLSession` with typed endpoints, retry/backoff, and error classification
 - **Integrations** — TMDB (metadata), MDBList (ratings), Trakt (device OAuth + scrobbling)
 - **Localization** — 9 languages via String Catalogs (English, German, French, Spanish, Italian, Portuguese, Japanese, Korean, Simplified Chinese)
@@ -207,7 +266,8 @@ Lume follows a clean, layered SwiftUI architecture:
 |---|---|
 | [KSPlayer](https://github.com/kingslay/KSPlayer) | FFmpeg-based playback engine |
 | [FFmpegKit](https://github.com/kingslay/FFmpegKit.git) | Media decoding backend for KSPlayer |
-| [vlckit-spm](https://github.com/virtualox/vlckit-spm) | VLCKit 4 playback engine |
+| [VLCKit](https://code.videolan.org/videolan/VLCKit) | VLCKit 4 playback engine |
+| [LumeEngine](https://github.com/bilipp/LumeEngine) | Lume's own FFmpeg 8 engine (beta) — referenced as a local package, see [Build & run](#build--run) |
 
 ---
 
@@ -256,8 +316,17 @@ The easiest way to use Lume is to [**download it from the App Store**](https://a
 ### Build & run
 
 ```bash
+# Lume expects LumeEngine as a sibling directory — clone both:
 git clone https://github.com/bilipp/Lume.git
-cd Lume
+git clone https://github.com/bilipp/LumeEngine.git
+
+# Build LumeEngine's FFmpeg xcframework once (~10-20 min, see its README)
+cd LumeEngine
+curl -sLo build/ffmpeg-8.1.2.tar.xz https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz
+build/scripts/build-ffmpeg.sh macos-arm64      # + ios-arm64 / tvos-arm64 for device builds
+build/scripts/make-xcframework.sh
+
+cd ../Lume
 open Lume.xcodeproj
 ```
 
@@ -265,7 +334,14 @@ Select the **Lume** scheme and a target destination (iPhone, Mac, Apple TV, or V
 Pro), then build and run (`⌘R`). On first launch, sign in with your Xtream credentials
 or import an M3U playlist, and Lume will sync your catalog.
 
-> Dependencies are resolved automatically by Swift Package Manager on first build.
+> Remote dependencies (KSPlayer, FFmpegKit, VLCKit) are resolved automatically by Swift
+> Package Manager on first build.
+>
+> **[LumeEngine](https://github.com/bilipp/LumeEngine) is different**: the project
+> references it as a *local* package at `../LumeEngine`, so it must be cloned next to
+> `Lume/` and its FFmpeg xcframework must be built before the project will resolve. Build
+> the slices for the platforms you target — one `macos-arm64` slice is enough for a Mac
+> build, `ios-arm64` / `tvos-arm64` for device builds.
 
 **Code signing.** The project ships with the maintainer's Development Team
 (`DEVELOPMENT_TEAM`) and bundle identifier (`com.bilipp.lume`). Simulator builds run as
@@ -357,10 +433,37 @@ Planned features and enhancements are tracked as
 
 ---
 
+## Community
+
+<div align="center">
+
+<a href="https://discord.gg/DMnQfr69Ug">
+  <img src="https://img.shields.io/badge/Join_the_Lume_Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Lume Discord" height="44">
+</a>
+
+### [discord.gg/DMnQfr69Ug](https://discord.gg/DMnQfr69Ug)
+
+</div>
+
+The Discord is the fastest way to get help and the best place to follow where Lume is
+going:
+
+- 🛟 **Support** — playlist, EPG, and playback troubleshooting with people running the
+  same providers and devices
+- 🐞 **Bug reports** — quick triage before (or alongside) a [GitHub issue](https://github.com/bilipp/Lume/issues)
+- 🗺️ **Feature requests** — help shape what gets built next
+- 🚀 **Releases** — every new version announced as it ships, plus beta feedback
+- 💬 **Just hanging out** — talk to the maintainer and other users directly
+
+One rule: **no piracy talk** — no requests for, or sharing of, streams, playlists, or
+credentials. See the [**Anti-Piracy Policy**](ANTI_PIRACY.md).
+
+---
+
 ## Contributing
 
-> 💬 Have a question, want to share feedback, or just hang out? Join the community on
-> **[Discord](https://discord.gg/DMnQfr69Ug)**.
+> 💬 Question or feedback? The **[Discord](https://discord.gg/DMnQfr69Ug)** is usually
+> faster than an issue — see [Community](#community).
 
 Contributions are welcome! The short version:
 
@@ -419,4 +522,6 @@ PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 <div align="center">
 <br>
 <sub>Built with SwiftUI for iPhone, iPad, Mac, Apple TV & Vision Pro.</sub>
+<br>
+<sub>Questions, ideas, or bugs? <a href="https://discord.gg/DMnQfr69Ug"><b>Join us on Discord</b></a>.</sub>
 </div>

@@ -4,6 +4,7 @@ import SwiftUI
 struct PlaylistDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
     @Bindable var playlist: Playlist
 
     /// tvOS: called to leave this detail when it is shown inline in the Settings
@@ -12,26 +13,29 @@ struct PlaylistDetailView: View {
     /// pops it.
     var onClose: (() -> Void)?
 
-    @State private var isEditing = false
-    @State private var editName = ""
-    @State private var editServerURL = ""
-    @State private var editUsername = ""
-    @State private var editPassword = ""
-    @State private var editEPGURL = ""
-    @State private var editMacAddress = ""
-    @State private var showDeleteConfirmation = false
-    @State private var showSync = false
+    @State var isEditing = false
+    @State var editName = ""
+    @State var editServerURL = ""
+    @State var editUsername = ""
+    @State var editPassword = ""
+    @State var editEPGURL = ""
+    @State var editMacAddress = ""
+    @State var showDeleteConfirmation = false
+    @State var showSync = false
+    /// Presents the full-catalog download (Stalker only). Kept separate from
+    /// `showSync` so the two sheets carry different `full` flags.
+    @State var showFullSync = false
 
-    private var isM3U: Bool {
+    var isM3U: Bool {
         playlist.sourceType == .m3u
     }
 
-    private var isStalker: Bool {
+    var isStalker: Bool {
         playlist.sourceType == .stalker
     }
 
     /// The localized section heading for the connection fields.
-    private var connectionSectionTitle: LocalizedStringKey {
+    var connectionSectionTitle: LocalizedStringKey {
         switch playlist.sourceType {
         case .xtream: "Server"
         case .m3u: "M3U Playlist"
@@ -74,6 +78,10 @@ struct PlaylistDetailView: View {
                     }
                 }
 
+                if playlist.supportsStreamFormatChoice {
+                    streamFormatSection
+                }
+
                 syncSection
 
                 Section {
@@ -111,6 +119,9 @@ struct PlaylistDetailView: View {
                 }
                 .sheet(isPresented: $showSync) {
                     SyncProgressView(playlist: playlist)
+                }
+                .sheet(isPresented: $showFullSync) {
+                    SyncProgressView(playlist: playlist, full: true)
                 }
         }
     #endif
@@ -201,10 +212,26 @@ struct PlaylistDetailView: View {
             }
         }
 
+        // MARK: - Stream Format Section
+
+        private var streamFormatSection: some View {
+            Section {
+                Picker("Live Stream Format", selection: $playlist.streamFormat) {
+                    ForEach(PlaylistStreamFormat.allCases) { format in
+                        Text(verbatim: format.displayName).tag(format)
+                    }
+                }
+            } header: {
+                Text("Playback")
+            } footer: {
+                Text(streamFormatFooter)
+            }
+        }
+
         // MARK: - Sync Section
 
         private var syncSection: some View {
-            Section("Sync") {
+            Section {
                 Toggle("Sync Enabled", isOn: $playlist.syncEnabled)
 
                 if playlist.syncStatus == .syncing {
@@ -231,184 +258,53 @@ struct PlaylistDetailView: View {
                     showSync = true
                 }
                 .disabled(playlist.syncStatus == .syncing)
+
+                if isStalker {
+                    Button("Download Full Catalog") {
+                        showFullSync = true
+                    }
+                    .disabled(playlist.syncStatus == .syncing)
+                }
+            } header: {
+                Text("Sync")
+            } footer: {
+                if isStalker {
+                    // The portal serves ~14 items per request with no bulk
+                    // endpoint, so a default sync only loads the newest titles;
+                    // the full catalog is opt-in because it can take a while.
+                    Text("""
+                    Movies and series load as you browse — nothing is prefetched. \
+                    Download the full catalog to make everything available offline and \
+                    searchable at once; this can take a while on large portals.
+                    """)
+                }
             }
         }
     #endif
 
+    /// Explains the stream-format choice. m3u playlists carry their own URLs, so
+    /// the wording there is about rewriting them rather than picking a default.
+    var streamFormatFooter: LocalizedStringKey {
+        isM3U
+            ? "Automatic plays channels at the URL the playlist lists. Choose HLS or MPEG-TS to request that container instead; channels served through another kind of URL are unaffected."
+            : "Automatic requests live channels as HLS. Choose MPEG-TS if channels stutter, refuse to start, or drop out — servers often serve one container more reliably than the other."
+    }
+
     /// Field label for the primary URL, shared across the iOS/macOS and tvOS
     /// layouts — its wording depends on the playlist's source type.
-    private var serverURLFieldTitle: LocalizedStringKey {
+    var serverURLFieldTitle: LocalizedStringKey {
         switch playlist.sourceType {
         case .xtream: "Server URL"
         case .m3u: "Playlist URL"
         case .stalker: "Portal URL"
         }
     }
+}
 
-    // MARK: - tvOS layout
+// MARK: - Actions
 
-    #if os(tvOS)
-        /// Rendered *inline* inside the Settings detail pane (next to the sidebar),
-        /// not pushed full-screen. A push hides the TabView's header tab bar and
-        /// strands focus once the content scrolls — keeping it in the pane means
-        /// the sidebar and tab bar stay one "Left"/"Up" away at all times. The
-        /// enclosing pane supplies the ScrollView, background, and width framing.
-        private var tvBody: some View {
-            VStack(alignment: .leading, spacing: 32) {
-                Text(playlist.name)
-                    .font(.system(size: 34, weight: .bold))
-                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-
-                tvServerSection
-                tvAccountSection
-                tvSyncSection
-                tvActionsSection
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .alert("Delete Playlist", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) { deletePlaylist() }
-            } message: {
-                Text("All synced content for this playlist will also be removed.")
-            }
-            .fullScreenCover(isPresented: $showSync) {
-                SyncProgressView(playlist: playlist)
-            }
-        }
-
-        private var tvServerSection: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel(connectionSectionTitle)
-
-                if isEditing {
-                    VStack(spacing: 18) {
-                        TVSettingsField(title: "Name", placeholder: "Name", text: $editName, contentType: .name)
-                        TVSettingsField(title: serverURLFieldTitle, placeholder: serverURLFieldTitle, text: $editServerURL, contentType: .URL)
-                        if isM3U {
-                            TVSettingsField(title: "EPG URL (optional)", placeholder: "EPG URL", text: $editEPGURL, contentType: .URL)
-                        } else if isStalker {
-                            TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $editMacAddress, contentType: nil)
-                            TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
-                            TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        } else {
-                            TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
-                            TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        }
-                    }
-                } else {
-                    VStack(spacing: 2) {
-                        TVSettingsValueRow("Name", value: playlist.name)
-                        TVSettingsValueRow(isStalker ? "Portal URL" : "URL") {
-                            Text(playlist.serverURL)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                        if isM3U {
-                            TVSettingsValueRow("EPG URL") {
-                                Text(playlist.epgURL ?? String(localized: "None"))
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                        } else if isStalker {
-                            TVSettingsValueRow("MAC Address", value: playlist.macAddress ?? "")
-                            if !playlist.username.isEmpty {
-                                TVSettingsValueRow("Username", value: playlist.username)
-                            }
-                        } else {
-                            TVSettingsValueRow("Username", value: playlist.username)
-                            TVSettingsValueRow("Password") { Text("••••••••") }
-                        }
-                        TVSettingsValueRow("Added") { Text(playlist.addedAt, style: .date) }
-                    }
-                }
-            }
-        }
-
-        @ViewBuilder
-        private var tvAccountSection: some View {
-            if let status = playlist.userStatus {
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Account")
-
-                    VStack(spacing: 2) {
-                        TVSettingsValueRow("Status", value: status)
-                        if let expDate = playlist.expDate {
-                            TVSettingsValueRow("Expires") {
-                                Text(formattedExpiry(expDate))
-                                    .foregroundStyle(isExpired(expDate) ? .red : .secondary)
-                            }
-                        }
-                        if let maxConn = playlist.maxConnections {
-                            TVSettingsValueRow("Max Connections", value: maxConn)
-                        }
-                        if let activeConn = playlist.activeConnections {
-                            TVSettingsValueRow("Active Connections", value: activeConn)
-                        }
-                    }
-                }
-            }
-        }
-
-        private var tvSyncSection: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel("Sync")
-
-                VStack(spacing: 2) {
-                    Button {
-                        playlist.syncEnabled.toggle()
-                    } label: {
-                        HStack(spacing: 16) {
-                            Text("Sync Enabled")
-                            Spacer(minLength: 0)
-                            Text(playlist.syncEnabled ? "On" : "Off")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(TVSettingsRowButtonStyle())
-
-                    if playlist.syncStatus == .syncing {
-                        TVSettingsValueRow("Status") {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                Text("Syncing")
-                            }
-                        }
-                    }
-
-                    if let lastSync = playlist.lastSyncDate {
-                        TVSettingsValueRow("Last Synced") {
-                            Text(lastSync, style: .relative)
-                        }
-                    }
-
-                    Button("Sync Now") { showSync = true }
-                        .buttonStyle(TVSettingsRowButtonStyle())
-                        .disabled(playlist.syncStatus == .syncing)
-                }
-            }
-        }
-
-        private var tvActionsSection: some View {
-            VStack(spacing: 2) {
-                if isEditing {
-                    Button("Done") { saveChanges() }
-                        .buttonStyle(TVSettingsRowButtonStyle())
-                    Button("Cancel") { cancelEditing() }
-                        .buttonStyle(TVSettingsRowButtonStyle())
-                } else {
-                    Button("Edit Playlist") { startEditing() }
-                        .buttonStyle(TVSettingsRowButtonStyle())
-                    Button("Delete Playlist") { showDeleteConfirmation = true }
-                        .buttonStyle(TVSettingsRowButtonStyle(isDestructive: true))
-                }
-            }
-            .padding(.top, 12)
-        }
-    #endif
-
-    // MARK: - Actions
-
-    private func startEditing() {
+extension PlaylistDetailView {
+    func startEditing() {
         editName = playlist.name
         editServerURL = playlist.serverURL
         editUsername = playlist.username
@@ -418,11 +314,11 @@ struct PlaylistDetailView: View {
         withAnimation { isEditing = true }
     }
 
-    private func cancelEditing() {
+    func cancelEditing() {
         withAnimation { isEditing = false }
     }
 
-    private func saveChanges() {
+    func saveChanges() {
         playlist.name = editName.trimmingCharacters(in: .whitespacesAndNewlines)
         playlist.serverURL = editServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if isM3U {
@@ -443,8 +339,17 @@ struct PlaylistDetailView: View {
         withAnimation { isEditing = false }
     }
 
-    private func deletePlaylist() {
-        PlaylistDeletion.delete(playlist, in: modelContext)
+    func deletePlaylist() {
+        // Route through the sync engine so the deletion also clears the
+        // CloudKit mirror and shadow baseline — deleting on the view context
+        // alone leaves a surviving mirror that resurrects the last playlist
+        // (#136). Previews have no coordinator; local-only deletion is fine.
+        if let cloudSync {
+            let id = playlist.id
+            Task { await cloudSync.deletePlaylist(id: id) }
+        } else {
+            PlaylistDeletion.delete(playlist, in: modelContext)
+        }
         #if os(tvOS)
             onClose?()
         #else
@@ -455,7 +360,7 @@ struct PlaylistDetailView: View {
 
 // MARK: - Helpers
 
-private extension PlaylistDetailView {
+extension PlaylistDetailView {
     func formattedExpiry(_ raw: String) -> String {
         if let timestamp = TimeInterval(raw) {
             let date = Date(timeIntervalSince1970: timestamp)

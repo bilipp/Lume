@@ -1,6 +1,6 @@
 import SwiftData
 import SwiftUI
-import VLCKitSPM
+import VLCKit
 
 /// Native iOS-style controls overlay for the VLCKit engine.
 ///

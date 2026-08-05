@@ -9,6 +9,9 @@ import SwiftUI
 
 struct SeriesCardView: View {
     let series: Series
+    /// Set by the category / genre grids so the card sizes to its cell rather
+    /// than the fixed rail width — see `View.posterArtworkFrame(fillsWidth:)`.
+    var fillsWidth: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: PosterCardMetrics.titleSpacing) {
@@ -37,7 +40,7 @@ struct SeriesCardView: View {
                     EmptyView()
                 }
             }
-            .frame(width: PosterCardMetrics.posterWidth, height: PosterCardMetrics.posterHeight)
+            .posterArtworkFrame(fillsWidth: fillsWidth)
             .clipShape(RoundedRectangle(cornerRadius: PosterCardMetrics.cornerRadius))
             // A shadow applied after clipShape forces an offscreen render pass per
             // card every frame. On tvOS the focus style already supplies depth and
@@ -50,7 +53,7 @@ struct SeriesCardView: View {
             Text(series.name)
                 .font(PosterCardMetrics.titleFont)
                 .lineLimit(2)
-                .frame(width: PosterCardMetrics.posterWidth, alignment: .leading)
+                .posterTitleFrame(fillsWidth: fillsWidth)
         }
     }
 }

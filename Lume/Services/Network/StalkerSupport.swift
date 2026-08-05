@@ -98,6 +98,27 @@ nonisolated enum StalkerLink {
         return (type, cmd)
     }
 
+    /// Query parameters embedded in a direct-URL `cmd`, re-exposed as top-level
+    /// `create_link` parameters. Xtream-UI-style Stalker emulations hand out
+    /// channel cmds that are full stream URLs
+    /// (`ffmpeg http://host/play/live.php?mac=…&stream=933136&extension=ts&play_token=…`)
+    /// and their `create_link` never parses the percent-encoded `cmd` it
+    /// receives — it reads `stream` / `extension` from the request's own query
+    /// string and answers with an empty `stream=` (an unplayable URL) when
+    /// they're missing. Forwarding the embedded parameters satisfies those
+    /// portals, while genuine Ministra portals resolve the full `cmd` and
+    /// ignore the extras. `mac` and `play_token` stay out — the portal derives
+    /// the MAC from the session and mints a fresh token; the stored one is
+    /// stale by playback time.
+    static func forwardedQueryItems(from cmd: String) -> [URLQueryItem] {
+        guard let url = resolvedURL(from: cmd),
+              url.scheme == "http" || url.scheme == "https",
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        else { return [] }
+        let excluded: Set = ["mac", "play_token", "token", "type", "action", "cmd", "JsHttpRequest"]
+        return items.filter { !excluded.contains($0.name) }
+    }
+
     /// Extracts a playable URL from a `create_link` `cmd` response. Portals
     /// commonly prefix the URL with an engine token (`ffmpeg `, `auto `) and may
     /// append params, so we take the first `http(s)` token rather than trusting
@@ -145,6 +166,34 @@ enum StalkerError: LocalizedError {
             "Received an invalid response from the portal."
         case let .serverError(code):
             "Portal error (HTTP \(code))."
+        }
+    }
+
+    /// Credential-free summary for diagnostic logs. Interpolated with
+    /// `privacy: .public` so user-exported logs stay actionable — which means
+    /// it must never contain a URL: Stalker portal links carry the MAC
+    /// address and short-lived tokens, and underlying `NSError` descriptions
+    /// can embed the failing URL.
+    var logDescription: String {
+        switch self {
+        case .invalidURL:
+            return "invalid portal URL"
+        case .handshakeFailed:
+            return "portal handshake failed"
+        case .authenticationFailed:
+            return "portal rejected the MAC address"
+        case .noStreamURL:
+            return "no playable stream in portal response"
+        case let .networkError(error):
+            let nsError = error as NSError
+            return "network error (\(nsError.domain) \(nsError.code))"
+        case let .decodingError(error):
+            let nsError = error as NSError
+            return "undecodable portal response (\(nsError.domain) \(nsError.code))"
+        case .invalidResponse:
+            return "non-HTTP response"
+        case let .serverError(code):
+            return "HTTP \(code)"
         }
     }
 

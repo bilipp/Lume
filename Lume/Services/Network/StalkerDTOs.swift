@@ -178,6 +178,10 @@ nonisolated struct StalkerVODItem: Decodable {
     let rating: String?
     let genreId: String?
     let categoryId: String?
+    /// When the portal added this title (`"YYYY-MM-DD HH:MM:SS"`, lexically
+    /// sortable). The default sync fetches newest-first and orders the
+    /// Recently Added rail by it.
+    let added: String?
     /// Episode numbers available for a series item (`series` field). Empty for
     /// plain VOD.
     let seriesNumbers: [Int]
@@ -193,11 +197,12 @@ nonisolated struct StalkerVODItem: Decodable {
         rating = container.stalkerString(.rating)
         genreId = container.stalkerString(.genreId)
         categoryId = container.stalkerString(.categoryId)
+        added = container.stalkerString(.added)
         seriesNumbers = (try? container.decodeIfPresent([Int].self, forKey: .seriesNumbers)) ?? []
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, cmd, year, description, rating
+        case id, name, cmd, year, description, rating, added
         case screenshot = "screenshot_uri"
         case genreId = "tv_genre_id"
         case categoryId = "category_id"

@@ -1,5 +1,5 @@
 {
-  "originHash" : "bade9719a9b0c1445f99405486308b257f81527e3a0d31a7adc9ed5bbc45ee9f",
+  "originHash" : "5cfdcc961e4ce7fa06d2fdf7e9f06f8f245e4b6b29ddd5b3aa15a3e7deb2c2b9",
   "pins" : [
     {
       "identity" : "ffmpegkit",
@@ -20,12 +20,12 @@
       }
     },
     {
-      "identity" : "vlckit-spm",
+      "identity" : "vlckit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/virtualox/vlckit-spm",
+      "location" : "https://code.videolan.org/videolan/VLCKit.git",
       "state" : {
-        "revision" : "1d19105c52515a1d52813923d88515947cdeb3d8",
-        "version" : "4.0.0-alpha.19"
+        "revision" : "5d3535a664e7815765a5cee40d9b22527d7299cc",
+        "version" : "4.0.0-a22"
       }
     }
   ],

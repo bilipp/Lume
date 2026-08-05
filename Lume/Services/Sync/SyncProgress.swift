@@ -38,13 +38,21 @@ enum SyncStep: Int, CaseIterable, Identifiable {
     /// The steps an m3u sync walks through, in order.
     static let m3uSteps: [SyncStep] = [.playlistDownload, .playlistImport]
 
-    static func steps(for sourceType: PlaylistSourceType) -> [SyncStep] {
+    /// A default Stalker sync fetches only the category lists and live
+    /// channels; movie/series *content* is loaded per-category on demand, so
+    /// those steps are omitted. A full-catalog download uses `xtreamSteps`.
+    static let stalkerDynamicSteps: [SyncStep] = [
+        .authenticating, .movieCategories, .seriesCategories, .liveCategories, .liveStreams
+    ]
+
+    static func steps(for sourceType: PlaylistSourceType, full: Bool = false) -> [SyncStep] {
         switch sourceType {
         case .xtream: xtreamSteps
         case .m3u: m3uSteps
-        // Stalker maps onto the same catalog kinds as Xtream (auth, categories,
-        // movies, series, live), so it walks the same progress steps.
-        case .stalker: xtreamSteps
+        // Stalker maps onto the same catalog kinds as Xtream, but its default
+        // sync skips the movie/series content walk (loaded on demand); only a
+        // full-catalog download walks everything.
+        case .stalker: full ? xtreamSteps : stalkerDynamicSteps
         }
     }
 

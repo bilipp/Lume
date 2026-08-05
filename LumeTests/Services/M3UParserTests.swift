@@ -255,16 +255,20 @@ struct M3UClientValidationTests {
         #expect(!M3UClient.looksLikeEnigma2Bouquet(Data()))
     }
 
-    @Test func `rewrites xtream bouquet type to m3u_plus`() {
+    @Test func `rewrites xtream type to m3u_plus`() {
         let base = "http://host/get.php?username=u&password=p&output=ts"
         #expect(M3UClient.normalizedPlaylistURL(base + "&type=gigablue")
             == base + "&type=m3u_plus")
         #expect(M3UClient.normalizedPlaylistURL(base + "&type=dreambox")
             == base + "&type=m3u_plus")
-        // Already-valid types and non-get.php URLs pass through untouched.
+        // Plain `m3u` is upgraded to `m3u_plus`: both parse, but `m3u_plus` is a
+        // superset that carries tvg-logo / tvg-id / group-title (plain `m3u`
+        // drops them, so artwork and categories would be missing).
+        #expect(M3UClient.normalizedPlaylistURL(base + "&type=m3u")
+            == base + "&type=m3u_plus")
+        // Already-`m3u_plus` and non-get.php URLs pass through untouched.
         let valid = base + "&type=m3u_plus"
         #expect(M3UClient.normalizedPlaylistURL(valid) == valid)
-        #expect(M3UClient.normalizedPlaylistURL(base + "&type=m3u") == base + "&type=m3u")
         let plain = "http://host/playlist.m3u?type=gigablue"
         #expect(M3UClient.normalizedPlaylistURL(plain) == plain)
         #expect(M3UClient.normalizedPlaylistURL("not a url") == "not a url")

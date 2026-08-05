@@ -130,4 +130,30 @@ enum AutoSync {
             && !alreadyStarted
             && frequency.isDue(lastSyncDate: lastSyncDate, now: now)
     }
+
+    /// Whether a background EPG refresh must stand aside for this playlist:
+    /// its content sync is either running right now or due to start.
+    ///
+    /// Both downloads hit the same provider account, and Xtream panels
+    /// commonly cap an account at one concurrent connection — a guide
+    /// download racing the catalog sync gets one of the two rejected (and can
+    /// leave the account briefly blocked, failing the sync's next requests
+    /// too). Deferring costs nothing: the post-sync hook re-kicks the refresh
+    /// as soon as the content sync queue drains.
+    static func blocksEPGRefresh(
+        syncEnabled: Bool,
+        status: SyncStatus,
+        lastSyncDate: Date?,
+        frequency: SyncFrequency,
+        now: Date = Date()
+    ) -> Bool {
+        status == .syncing || shouldSync(
+            syncEnabled: syncEnabled,
+            status: status,
+            lastSyncDate: lastSyncDate,
+            frequency: frequency,
+            alreadyStarted: false,
+            now: now
+        )
+    }
 }

@@ -228,12 +228,19 @@ extension ContentSyncManager {
         // Local imported files are parsed in place; only downloads are temp
         // files we own and must clean up.
         let isRemote = !(URL(string: serverURL)?.isFileURL ?? false)
+        let downloadInterval = Perf.begin(.m3uDownload)
         let fileURL = try await client.downloadPlaylist(from: serverURL)
+        Perf.end(downloadInterval)
         defer { if isRemote { try? FileManager.default.removeItem(at: fileURL) } }
         await progress?.complete(.playlistDownload)
 
         await progress?.start(.playlistImport)
+        // Download and import are separate intervals on purpose: profiling a
+        // 600k-entry playlist showed the SwiftData import — not the download —
+        // owning the multi-minute wait, and one combined number hid that.
+        let importInterval = Perf.begin(.m3uImport)
         let summary = try importM3UFile(fileURL, playlistId: playlistId, progress: progress)
+        Perf.end(importInterval)
         Logger.database.info(
             "m3u import finished: \(summary.liveCount) live, \(summary.movieCount) movies, \(summary.episodeCount) episodes"
         )

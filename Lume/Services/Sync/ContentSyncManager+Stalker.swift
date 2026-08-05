@@ -20,13 +20,24 @@ extension ContentSyncManager {
     /// A positive `Int` stream id for a Stalker element. Stalker ids are numeric
     /// strings (`"123"`); fall back to a stable hash for the rare non-numeric id
     /// so element ids stay constant across re-syncs.
-    private static func streamId(for stalkerId: String) -> Int {
+    /// Not `private`: the on-demand/search extension lives in a separate file.
+    static func streamId(for stalkerId: String) -> Int {
         if let int = Int(stalkerId), int > 0 { return int }
         return M3UIdentity.numericId(for: stalkerId)
     }
 
-    /// The Stalker pipeline: authenticate, then pull categories and content.
-    func performStalkerSync(playlist: Playlist, playlistId: UUID, progress: SyncProgress?, full _: Bool = false) async throws {
+    /// The Stalker pipeline: authenticate, then pull categories and live
+    /// channels. VOD/series *content* is intentionally not synced here.
+    ///
+    /// The portal serves ordered lists at a fixed ~14 items per page with no
+    /// bulk endpoint, so a large catalog (100k+ titles) is thousands of
+    /// requests. Rather than prefetch, the default sync (`full == false`)
+    /// fetches only the category lists; movie/series content loads per-category
+    /// on demand when opened (`importStalkerCategory`) and search goes through
+    /// the portal's search API (`searchStalker`). `full == true` — the
+    /// "Download Full Catalog" action — walks the entire VOD/series catalog for
+    /// users who want it all local.
+    func performStalkerSync(playlist: Playlist, playlistId: UUID, progress: SyncProgress?, full: Bool = false) async throws {
         let client = StalkerClient(configuration: StalkerClient.Configuration(playlist: playlist))
 
         await progress?.start(.authenticating)
@@ -54,10 +65,15 @@ extension ContentSyncManager {
         await progress?.update(detail: "\(genres.count) categories")
         await progress?.complete(.liveCategories)
 
-        try await syncStalkerMovies(client: client, categories: vodCategories, playlistId: playlistId, progress: progress)
-        try await Task.sleep(for: .seconds(1))
-        try await syncStalkerSeries(client: client, categories: seriesCategories, playlistId: playlistId, progress: progress)
-        try await Task.sleep(for: .seconds(1))
+        // VOD and series content is loaded per-category on demand (see
+        // `importStalkerCategory`), so a default sync fetches no movie/series
+        // items — only the "Download Full Catalog" action (`full`) walks them.
+        if full {
+            try await syncStalkerMovies(client: client, categories: vodCategories, playlistId: playlistId, progress: progress)
+            try await Task.sleep(for: .seconds(1))
+            try await syncStalkerSeries(client: client, categories: seriesCategories, playlistId: playlistId, progress: progress)
+            try await Task.sleep(for: .seconds(1))
+        }
         try await syncStalkerChannels(client: client, playlistId: playlistId, progress: progress)
 
         markStalkerPlaylistUpdated(playlistId)
@@ -93,6 +109,75 @@ extension ContentSyncManager {
         }
     }
 
+    // MARK: - Catalog walk (vod / series)
+
+    /// Walks a portal's entire `vod` or `series` catalog and upserts it in
+    /// fixed-size batches (mirroring `syncStalkerChannels` and the Xtream/m3u
+    /// pipelines — one save, and one main-context merge, per batch rather than
+    /// per category). Returns the imported count, every element id seen, and
+    /// whether the walk reached the end of the catalog. Used only by the
+    /// "Download Full Catalog" action; the default sync loads content
+    /// per-category on demand (`importStalkerCategory`).
+    ///
+    /// Ministra portals expose a `*` "All" pseudo-category whose items each
+    /// carry their real `category_id`, so one walk over it covers every
+    /// category in ceil(total / page-size) requests. Walking category by
+    /// category instead re-pages the same catalog once per category — tens of
+    /// thousands of sequential requests on large portals. The per-category
+    /// walk remains only as the fallback for portals without `*`.
+    private func syncStalkerCatalog(
+        client: StalkerClient,
+        type: String,
+        categories: [StalkerCategory],
+        progress: SyncProgress?,
+        upsert: ([(item: StalkerVODItem, categoryId: String)], inout Set<String>) -> Int
+    ) async throws -> (imported: Int, seenIds: Set<String>, complete: Bool) {
+        var seenIds = Set<String>()
+        var imported = 0
+        let batchSize = 2000
+        var pending: [(item: StalkerVODItem, categoryId: String)] = []
+        var walkedFullCatalog = true
+
+        if categories.contains(where: { $0.id == "*" }) {
+            let walk = await (try? client.getAllOrderedItems(type: type, categoryId: "*", maxItems: .max) { count, total in
+                let target = total ?? count
+                await progress?.update(
+                    detail: "\(count) of \(target)",
+                    fraction: target > 0 ? Double(count) / Double(target) : 0
+                )
+            })
+            walkedFullCatalog = walk?.complete ?? false
+            pending = (walk?.items ?? []).map { (item: $0, categoryId: $0.categoryId ?? "*") }
+        } else {
+            for category in categories where !category.id.isEmpty {
+                try Task.checkCancellation()
+                let walk = await (try? client.getAllOrderedItems(type: type, categoryId: category.id))
+                if walk?.complete != true { walkedFullCatalog = false }
+                let items = walk?.items ?? []
+                guard !items.isEmpty else { continue }
+
+                pending.append(contentsOf: items.map { (item: $0, categoryId: category.id) })
+                while pending.count >= batchSize {
+                    let batch = Array(pending.prefix(batchSize))
+                    pending.removeFirst(batchSize)
+                    autoreleasepool {
+                        imported += upsert(batch, &seenIds)
+                    }
+                }
+                await progress?.update(detail: "\(imported + pending.count) items")
+            }
+        }
+        while !pending.isEmpty {
+            try Task.checkCancellation()
+            let batch = Array(pending.prefix(batchSize))
+            pending.removeFirst(batch.count)
+            autoreleasepool {
+                imported += upsert(batch, &seenIds)
+            }
+        }
+        return (imported, seenIds, walkedFullCatalog)
+    }
+
     // MARK: - Movies (vod)
 
     private func syncStalkerMovies(
@@ -103,54 +188,35 @@ extension ContentSyncManager {
     ) async throws {
         await progress?.start(.movies)
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.vod.rawValue)-"
-        var seenIds = Set<String>()
-        var imported = 0
-
-        // Accumulate items across categories and save in fixed-size batches
-        // (mirroring `syncStalkerChannels` and the Xtream/m3u pipelines).
-        // Saving once per category produced one main-context merge — and the
-        // browse-view `@Query` re-evaluation it triggers — per category, which
-        // adds up on portals with many small categories.
-        let batchSize = 2000
-        var pending: [(item: StalkerVODItem, categoryId: String)] = []
-
-        for category in categories where !category.id.isEmpty {
-            try Task.checkCancellation()
-            let items = await (try? client.getAllOrderedItems(type: "vod", categoryId: category.id)) ?? []
-            guard !items.isEmpty else { continue }
-
-            pending.append(contentsOf: items.map { (item: $0, categoryId: category.id) })
-            while pending.count >= batchSize {
-                let batch = Array(pending.prefix(batchSize))
-                pending.removeFirst(batchSize)
-                autoreleasepool {
-                    imported += upsertStalkerMovies(
-                        batch, playlistPrefix: playlistPrefix,
-                        playlistId: playlistId, seenIds: &seenIds
-                    )
-                }
-            }
-            await progress?.update(detail: "\(imported + pending.count) items")
-        }
-        if !pending.isEmpty {
-            autoreleasepool {
-                imported += upsertStalkerMovies(
-                    pending, playlistPrefix: playlistPrefix,
-                    playlistId: playlistId, seenIds: &seenIds
-                )
-            }
+        let result = try await syncStalkerCatalog(
+            client: client, type: "vod", categories: categories, progress: progress
+        ) { batch, seenIds in
+            upsertStalkerMovies(
+                batch, playlistPrefix: playlistPrefix,
+                playlistId: playlistId, seenIds: &seenIds
+            )
         }
 
-        if !seenIds.isEmpty {
-            pruneStaleMovies(playlistId: playlistId, seenIds: seenIds)
+        // Prune only after the walk reached the catalog's end; a truncated
+        // walk (mid-walk page failure) has a partial `seenIds`, and pruning
+        // against it would delete titles still on the portal.
+        if result.complete, !result.seenIds.isEmpty {
+            pruneStaleMovies(playlistId: playlistId, seenIds: result.seenIds)
         }
+        // A completed full walk pulled every category's content, so none needs
+        // an on-demand fetch when opened.
+        if result.complete {
+            markAllStalkerCategoriesImported(type: .vod, playlistId: playlistId)
+        }
+        let imported = result.imported
         Logger.database.info("Stalker: synced \(imported) movies")
         await progress?.complete(.movies)
     }
 
     /// Upserts one batch of VOD items (each carrying its category) on a fresh
     /// context and returns how many were imported.
-    private func upsertStalkerMovies(
+    /// Not `private`: reused by the on-demand/search extension.
+    func upsertStalkerMovies(
         _ items: [(item: StalkerVODItem, categoryId: String)],
         playlistPrefix: String,
         playlistId: UUID,
@@ -189,6 +255,7 @@ extension ContentSyncManager {
             movie.plot = item.description
             movie.releaseDate = item.year
             movie.rating = Double(item.rating ?? "") ?? movie.rating
+            movie.added = item.added ?? movie.added
             movie.categoryId = playlistPrefix + categoryId
             movie.directURL = cmd
             imported += 1
@@ -207,52 +274,32 @@ extension ContentSyncManager {
     ) async throws {
         await progress?.start(.series)
         let playlistPrefix = "\(playlistId.uuidString)-\(CategoryType.series.rawValue)-"
-        var seenIds = Set<String>()
-        var imported = 0
-
-        // Same cross-category batching as `syncStalkerMovies`, for the same
-        // reason: one save (and main-context merge) per fixed-size batch
-        // instead of one per category.
-        let batchSize = 2000
-        var pending: [(item: StalkerVODItem, categoryId: String)] = []
-
-        for category in categories where !category.id.isEmpty {
-            try Task.checkCancellation()
-            let items = await (try? client.getAllOrderedItems(type: "series", categoryId: category.id)) ?? []
-            guard !items.isEmpty else { continue }
-
-            pending.append(contentsOf: items.map { (item: $0, categoryId: category.id) })
-            while pending.count >= batchSize {
-                let batch = Array(pending.prefix(batchSize))
-                pending.removeFirst(batchSize)
-                autoreleasepool {
-                    imported += upsertStalkerSeries(
-                        batch, playlistPrefix: playlistPrefix,
-                        playlistId: playlistId, seenIds: &seenIds
-                    )
-                }
-            }
-            await progress?.update(detail: "\(imported + pending.count) items")
-        }
-        if !pending.isEmpty {
-            autoreleasepool {
-                imported += upsertStalkerSeries(
-                    pending, playlistPrefix: playlistPrefix,
-                    playlistId: playlistId, seenIds: &seenIds
-                )
-            }
+        let result = try await syncStalkerCatalog(
+            client: client, type: "series", categories: categories, progress: progress
+        ) { batch, seenIds in
+            upsertStalkerSeries(
+                batch, playlistPrefix: playlistPrefix,
+                playlistId: playlistId, seenIds: &seenIds
+            )
         }
 
-        if !seenIds.isEmpty {
-            pruneStaleSeries(playlistId: playlistId, seenIds: seenIds)
+        // Prune only after the walk reached the catalog's end — see
+        // `syncStalkerMovies`.
+        if result.complete, !result.seenIds.isEmpty {
+            pruneStaleSeries(playlistId: playlistId, seenIds: result.seenIds)
         }
+        if result.complete {
+            markAllStalkerCategoriesImported(type: .series, playlistId: playlistId)
+        }
+        let imported = result.imported
         Logger.database.info("Stalker: synced \(imported) series")
         await progress?.complete(.series)
     }
 
     /// Upserts one batch of series items (each carrying its category) on a
     /// fresh context and returns how many were imported.
-    private func upsertStalkerSeries(
+    /// Not `private`: reused by the on-demand/search extension.
+    func upsertStalkerSeries(
         _ items: [(item: StalkerVODItem, categoryId: String)],
         playlistPrefix: String,
         playlistId: UUID,
@@ -290,6 +337,9 @@ extension ContentSyncManager {
             series.cover = item.screenshot
             series.plot = item.description
             series.releaseDate = item.year
+            // The Recently Added series rail orders by `lastModified`; the
+            // portal's `added` timestamp is the closest equivalent.
+            series.lastModified = item.added ?? series.lastModified
             series.categoryId = playlistPrefix + categoryId
             imported += 1
         }
@@ -310,7 +360,7 @@ extension ContentSyncManager {
             categoryId: "*",
             movieId: String(seriesId),
             maxItems: 2000
-        )
+        ).items
         var result: [ParsedEpisode] = []
         for (index, item) in items.enumerated() {
             guard let cmd = item.cmd else { continue }

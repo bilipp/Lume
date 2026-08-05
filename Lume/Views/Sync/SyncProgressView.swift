@@ -23,6 +23,11 @@ struct SyncProgressView: View {
     /// shows a Done button when finished.
     let autoStart: Bool
 
+    /// Pulls the entire VOD/series catalog rather than the default recent
+    /// slice. Only meaningful for Stalker portals (the "Download full catalog"
+    /// action); other source types always sync fully and ignore it.
+    let full: Bool
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -31,10 +36,11 @@ struct SyncProgressView: View {
     @State private var syncError: String?
     @State private var syncTask: Task<Void, Never>?
 
-    init(playlist: Playlist, autoStart: Bool = false) {
+    init(playlist: Playlist, autoStart: Bool = false, full: Bool = false) {
         self.playlist = playlist
         self.autoStart = autoStart
-        _progress = State(initialValue: SyncProgress(steps: SyncStep.steps(for: playlist.sourceType)))
+        self.full = full
+        _progress = State(initialValue: SyncProgress(steps: SyncStep.steps(for: playlist.sourceType, full: full)))
         // Start already in the syncing state for auto-sync so the "Ready" screen
         // (with its Start button) never flashes before `.task` kicks off.
         _phase = State(initialValue: autoStart ? .syncing : .ready)
@@ -87,14 +93,14 @@ struct SyncProgressView: View {
 
     private func startSync() {
         // Fresh progress for each attempt so a retry starts clean.
-        progress = SyncProgress(steps: SyncStep.steps(for: playlist.sourceType))
+        progress = SyncProgress(steps: SyncStep.steps(for: playlist.sourceType, full: full))
         syncError = nil
         phase = .syncing
 
         syncTask = Task {
             do {
                 let syncManager = ContentSyncManager(modelContainer: modelContext.container)
-                try await syncManager.syncPlaylist(playlist, progress: progress, full: true)
+                try await syncManager.syncPlaylist(playlist, progress: progress, full: full)
                 await MainActor.run {
                     // Newly synced titles need indexing; the launch-time pass
                     // may already be finished, so kick a fresh one — but hold it
@@ -104,7 +110,10 @@ struct SyncProgressView: View {
                     ContentIndexingService.shared.kick(after: .seconds(3))
                     // Refresh the guide so a freshly synced playlist's channels
                     // get EPG data without waiting for the next scheduled run.
-                    EPGSyncService.shared.syncNow()
+                    // Gated: defers while another queued playlist sync is due,
+                    // so the guide download never races a content sync for the
+                    // provider's connection allowance.
+                    EPGSyncService.shared.syncAfterContentSync()
                     phase = .finished
                     // Auto-sync gets out of the way as soon as it succeeds so the
                     // user can start browsing; the manual flow waits for Done.

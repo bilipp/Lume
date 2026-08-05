@@ -42,6 +42,20 @@ struct ModelTests {
         #expect(live.typeRaw == "series")
     }
 
+    @Test func `category stalker content staleness follows the TTL`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x.com", username: "u", password: "p")
+        let category = Lume.Category(apiId: "1", name: "Movies", parentId: 0, type: .vod, playlist: playlist)
+
+        // Never imported counts as stale (the first-open import path).
+        #expect(category.stalkerContentStale)
+
+        category.contentImportedAt = Date()
+        #expect(!category.stalkerContentStale)
+
+        category.contentImportedAt = Date(timeIntervalSinceNow: -Lume.Category.stalkerContentTTL - 60)
+        #expect(category.stalkerContentStale)
+    }
+
     @Test func `category upsert via unique attribute`() throws {
         let container = try makeTestContainer()
         let playlist = Playlist(name: "P", serverURL: "http://x.com", username: "u", password: "p")

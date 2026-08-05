@@ -37,6 +37,9 @@ enum ChannelEPGLoader {
     ) -> [String: ChannelEPG] {
         guard !channelIds.isEmpty else { return [:] }
 
+        let interval = Perf.begin(.channelEPGLoad)
+        defer { Perf.end(interval) }
+
         let context = ModelContext(container)
         // Only currently-airing or upcoming listings matter for now/next; the
         // `end > now` bound (plus the channel-id scope) keeps this to a small,
@@ -95,6 +98,9 @@ enum EPGGuideLoader {
         windowEnd: Date
     ) -> [String: [EPGWindowListing]] {
         guard !channelIds.isEmpty else { return [:] }
+
+        let interval = Perf.begin(.guideWindowLoad)
+        defer { Perf.end(interval) }
 
         let context = ModelContext(container)
         // Channel-id scope is index-served; the time bounds trim it to the

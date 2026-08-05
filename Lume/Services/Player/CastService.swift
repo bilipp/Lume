@@ -27,7 +27,10 @@ import OSLog
 /// macOS has no `AVAudioSession`, so route observation — and with it the
 /// engine handoff — doesn't exist there: `isAirPlayActive` stays `false` and
 /// AirPlay is available only on the AVPlayer engine, whose overlay binds the
-/// route picker to its player directly (see `AirPlayRouteButton`).
+/// route picker to its player directly (see `AirPlayRouteButton`). tvOS is
+/// likewise excluded: the Apple TV is itself the AirPlay destination, so its
+/// route always looks "external" and the handoff would wrongly pin every
+/// stream to AVPlayer, ignoring the user's engine priority.
 @MainActor
 @Observable
 final class CastService {
@@ -110,7 +113,12 @@ final class CastService {
     }
 
     private func refreshAirPlayRoute() {
-        #if os(iOS) || os(tvOS) || os(visionOS)
+        // tvOS is the AirPlay *destination*, not a device casting elsewhere: its
+        // audio route reports an external/AirPlay-style output almost always,
+        // which would spuriously force the AVPlayer engine (see the override in
+        // FullScreenPlayerView) and ignore the user's engine priority. So route
+        // observation — and the engine handoff — is iOS/visionOS only.
+        #if os(iOS) || os(visionOS)
             let outputs = AVAudioSession.sharedInstance().currentRoute.outputs.map {
                 RouteOutput(isAirPlay: $0.portType == .airPlay, name: $0.portName)
             }
@@ -123,7 +131,7 @@ final class CastService {
     }
 
     private func observeRouteChanges() {
-        #if os(iOS) || os(tvOS) || os(visionOS)
+        #if os(iOS) || os(visionOS)
             routeObserver = NotificationCenter.default.addObserver(
                 forName: AVAudioSession.routeChangeNotification,
                 object: nil,

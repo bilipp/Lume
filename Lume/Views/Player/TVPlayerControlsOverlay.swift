@@ -17,7 +17,7 @@
 
     import SwiftData
     import SwiftUI
-    import VLCKitSPM
+    import VLCKit
 
     struct TVPlayerControlsOverlay<Engine: TVPlaybackEngine>: View {
         @ObservedObject var coordinator: Engine

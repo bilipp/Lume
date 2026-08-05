@@ -267,22 +267,43 @@ struct PaywallView: View {
         }
     }
 
+    /// Derived from StoreKit rather than the product ID, so the renewal wording can
+    /// only ever say "billed monthly" about something the App Store will actually
+    /// bill monthly.
     private func planCaption(for product: Product) -> String? {
-        switch product.id {
-        case PremiumManager.Plan.lifetime.rawValue: String(localized: "One-time purchase")
-        case PremiumManager.Plan.monthly.rawValue: String(localized: "Billed monthly, cancel anytime")
-        default: nil
+        guard let period = product.subscription?.subscriptionPeriod else {
+            return String(localized: "One-time purchase")
         }
+        switch (period.unit, period.value) {
+        case (.month, 1): return String(localized: "Billed monthly, cancel anytime")
+        case (.year, 1): return String(localized: "Billed yearly, cancel anytime")
+        default: return String(localized: "Cancel anytime")
+        }
+    }
+
+    /// True when an auto-renewable product is on sale — the only case in which the
+    /// subscription terms in the footer apply.
+    private var offersSubscription: Bool {
+        premium.products.contains { $0.subscription != nil }
     }
 
     #if !os(tvOS)
         private var legalFooter: some View {
             VStack(spacing: 8) {
-                // swiftlint:disable:next line_length
-                Text("Payment is charged to your Apple Account. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period. Manage or cancel in your Apple Account settings.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                // Describe only what is actually on sale. Printing the auto-renewal
+                // terms next to a one-time purchase is what made buyers go looking for
+                // a cancel button in the App Store that could not exist — so the
+                // renewal sentence is gated on a renewable product being loaded, and
+                // while nothing is loaded we state no terms at all.
+                if !premium.products.isEmpty {
+                    Text(offersSubscription
+                        // swiftlint:disable:next line_length
+                        ? "Payment is charged to your Apple Account. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period. Manage or cancel in your Apple Account settings."
+                        : "Payment is charged to your Apple Account. This is a one-time purchase — nothing renews and there is nothing to cancel.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
                 HStack(spacing: 16) {
                     Button("Terms of Use") { openURL(Self.termsURL) }
                     Button("Privacy Policy") { openURL(Self.privacyURL) }

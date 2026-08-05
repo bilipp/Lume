@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 import OSLog
-import VLCKitSPM
+import VLCKit
 
 #if canImport(UIKit)
     import UIKit
@@ -81,7 +81,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
 
     var statsTimer: Timer?
     var lastStats: VLCMedia.Stats?
-    private var lastStateName: String?
+    /// Internal so `logStateChange()` can live in the +Diagnostics file, which
+    /// exists to keep this one under the project's 600-line cap.
+    var lastStateName: String?
     private var bufferingStartedAt: Date?
 
     /// Drives bounded backoff reconnects when the stream drops (see
@@ -135,6 +137,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         retry.reset()
         hasStartedPlayback = false
         didReportFailure = false
+        PlaybackQoE.shared.beginStartup(engine: .vlcKit, isLive: media.isLive)
         startStartupWatchdog()
         mediaPlayer.delegate = self
 
@@ -172,7 +175,8 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         if let synchro = options.clockSynchro { media.addOption(":clock-synchro=\(synchro)") }
     }
 
-    private func applyDeinterlace() {
+    /// Internal so `logStateChange()` (in +Diagnostics) can re-assert it.
+    func applyDeinterlace() {
         if options.deinterlace {
             mediaPlayer.setDeinterlace(.on, withFilter: options.deinterlaceMode)
         } else {
@@ -196,6 +200,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         retry.reset()
         hasStartedPlayback = false
         didReportFailure = false
+        PlaybackQoE.shared.beginStartup(engine: .vlcKit, isLive: media.isLive)
         startStartupWatchdog()
 
         let vlcMedia = VLCMedia(url: media.url)
@@ -218,11 +223,12 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     ///
     private func handleRetry(for state: VLCMediaPlayerState) {
         switch state {
-        case .opening, .buffering, .playing:
+        case .opening, .playing:
             isReloading = false
             if state == .playing {
                 retry.reset()
                 hasStartedPlayback = true
+                PlaybackQoE.shared.noteFirstFrame()
                 cancelStartupWatchdog()
             }
         case .error:
@@ -270,6 +276,9 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     private func reportFailure() {
         guard !didReportFailure else { return }
         didReportFailure = true
+        if !hasStartedPlayback {
+            PlaybackQoE.shared.noteStartupFailure()
+        }
         cancelStartupWatchdog()
         retry.cancel()
         Logger.player.error("playback failure reported")
@@ -373,6 +382,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         stopStatsLogging()
         retry.cancel()
         cancelStartupWatchdog()
+        PlaybackQoE.shared.endSession()
         Logger.player.log("tearDown")
         mediaPlayer.delegate = nil
         if mediaPlayer.isPlaying { mediaPlayer.stop() }
@@ -466,32 +476,27 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
         }
     }
 
-    /// Log player state transitions, and measure how long each buffering
-    /// episode lasts — frequent or long rebuffers are the clearest fingerprint
-    /// of a struggling live stream.
-    private func logStateChange() {
-        let state = mediaPlayer.state
-        let name = VLCMediaPlayerStateToString(state)
-        guard name != lastStateName else { return }
-        lastStateName = name
-
-        if state == .buffering {
-            bufferingStartedAt = Date()
-            Logger.player.log("state → \(name, privacy: .public)")
-        } else if let started = bufferingStartedAt {
-            let elapsed = Date().timeIntervalSince(started)
-            bufferingStartedAt = nil
-            Logger.player.log("state → \(name, privacy: .public) (rebuffered \(elapsed, format: .fixed(precision: 2), privacy: .public)s)")
-        } else {
-            Logger.player.log("state → \(name, privacy: .public)")
-        }
-
-        // Re-assert deinterlace once a vout exists: the runtime setting doesn't
-        // survive the output being (re)created, e.g. across a stream reload.
-        if state == .playing { applyDeinterlace() }
-
-        if state == .error {
-            Logger.player.error("player entered error state")
+    /// Measure how long each buffering episode lasts — frequent or long
+    /// rebuffers are the clearest fingerprint of a struggling live stream.
+    /// VLCKit 4 reports buffering as a progress signal rather than a state:
+    /// progress climbs to 1.0 when buffering completes.
+    func mediaPlayerBufferingChanged(_ progress: Float) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if progress >= 1.0 {
+                PlaybackQoE.shared.noteStallEnded()
+                if let started = bufferingStartedAt {
+                    let elapsed = Date().timeIntervalSince(started)
+                    bufferingStartedAt = nil
+                    Logger.player.log("buffering complete (rebuffered \(elapsed, format: .fixed(precision: 2), privacy: .public)s)")
+                }
+            } else if bufferingStartedAt == nil {
+                // Mid-stream only; `PlaybackQoE` ignores stalls before the first
+                // frame, which are join time rather than rebuffering.
+                PlaybackQoE.shared.noteStallBegan()
+                bufferingStartedAt = Date()
+                Logger.player.log("buffering started")
+            }
         }
     }
 

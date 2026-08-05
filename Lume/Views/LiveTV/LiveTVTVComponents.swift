@@ -27,6 +27,8 @@
         /// How many channels are currently rendered. Grows by a page as the list
         /// nears its end so a large category loads lazily instead of all at once.
         @State private var visibleCount = LiveChannelQuery.pageSize
+        /// Drives the "Clear Recently Watched" confirmation alert.
+        @State private var confirmingClear = false
 
         init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
             self.scope = scope
@@ -52,6 +54,9 @@
                         )
                         .padding(.top, 80)
                     } else {
+                        if scope == .recentlyWatched {
+                            clearButton
+                        }
                         ForEach(visible) { stream in
                             TVChannelRow(
                                 stream: stream,
@@ -77,6 +82,27 @@
             .task(id: "\(channels.count)-\(visible.count)-\(epgSync.isSyncing)") {
                 await loadEPG(for: visible)
             }
+            .alert("Clear Recently Watched", isPresented: $confirmingClear) {
+                Button("Clear", role: .destructive) { clearRecentlyWatched() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This clears the list of channels you've recently watched. Your favorites and the channels themselves aren't affected.")
+            }
+        }
+
+        /// A full-width focusable "Clear" pill pinned above the Recently Watched
+        /// rows. Full-width so the focus engine reliably catches a "down" move
+        /// into it from the category rail and out of it into the first channel.
+        private var clearButton: some View {
+            Button(role: .destructive) {
+                confirmingClear = true
+            } label: {
+                Label("Clear Recently Watched", systemImage: "trash")
+                    .font(.system(size: 28, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+            }
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.02))
         }
 
         private func loadEPG(for channels: [LiveStream]) async {
@@ -97,6 +123,14 @@
         private func removeFromRecentlyWatched(_ stream: LiveStream) {
             stream.lastWatchedDate = nil
             try? modelContext.save()
+        }
+
+        /// Empties the whole Recently Watched list for the active playlist. The
+        /// section drops away on its own once the last timestamp clears (its
+        /// parent gates it on `hasRecents`).
+        private func clearRecentlyWatched() {
+            let container = modelContext.container
+            Task { await StorageManager.clearRecentlyWatchedChannels(playlistPrefix: playlistPrefix, container: container) }
         }
     }
 

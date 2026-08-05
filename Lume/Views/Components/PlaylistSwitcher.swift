@@ -53,15 +53,36 @@ struct PlaylistSwitcher: View {
                     }
                 }
             } label: {
-                HStack {
+                HStack(spacing: 4) {
                     Text(effectiveName)
                         .font(.headline)
+                        // A long playlist name must never grow this label
+                        // unbounded: the navigation bar answers an over-wide
+                        // trailing item by collapsing *every* trailing item into
+                        // a "..." overflow menu, which used to take the sync and
+                        // settings buttons off screen with it (issue: settings
+                        // unreachable with a long playlist name). Cap the width
+                        // and truncate — the full name is still spelled out in
+                        // the menu below and read out by VoiceOver.
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                     Image(systemName: "chevron.down")
                         .font(.caption)
                 }
+                .frame(maxWidth: Self.maxLabelWidth, alignment: .leading)
             }
+            .accessibilityLabel("Playlist: \(effectiveName)")
         }
     }
+
+    // Width ceiling for the label in the toolbar. Deliberately a fixed value
+    // rather than a `@ScaledMetric` one: growing it with Dynamic Type would
+    // re-create the overflow this cap exists to prevent.
+    #if os(macOS)
+        private static let maxLabelWidth: CGFloat = 260
+    #else
+        private static let maxLabelWidth: CGFloat = 150
+    #endif
 
     /// Switches the global selection to `playlist`, surfacing the re-render as a
     /// blocking overlay when a switch model is available.

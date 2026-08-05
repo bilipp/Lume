@@ -8,54 +8,6 @@
 import Foundation
 import OSLog
 
-enum XtreamError: LocalizedError {
-    case invalidURL
-    case authenticationFailed
-    case networkError(Error)
-    case decodingError(Error)
-    case invalidResponse
-    case serverError(Int)
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidURL:
-            "The server URL is invalid."
-        case .authenticationFailed:
-            "Authentication failed. The provider rejected the request (this can also happen when the account's connection limit is reached)."
-        case let .networkError(error):
-            "Network error: \(error.localizedDescription)"
-        case let .decodingError(error):
-            "Failed to read the server response: \(error.localizedDescription)"
-        case .invalidResponse:
-            "Received an invalid response from the server."
-        case let .serverError(code):
-            "Server error (HTTP \(code))."
-        }
-    }
-
-    /// Whether the failure is likely transient and worth retrying.
-    /// Note: `authenticationFailed` (HTTP 401/403) is *not* retriable by
-    /// default — for login it means bad credentials. During an
-    /// already-authenticated sync it's usually the provider's connection /
-    /// rate limit, so those call sites opt in via `retryAuthFailure`.
-    var isRetriable: Bool {
-        switch self {
-        case .networkError:
-            // Timeouts, connection reset (RST), lost connection — transient.
-            true
-        case let .serverError(code):
-            code >= 500
-        case .invalidURL, .authenticationFailed, .decodingError, .invalidResponse:
-            false
-        }
-    }
-
-    var isAuthFailure: Bool {
-        if case .authenticationFailed = self { return true }
-        return false
-    }
-}
-
 // MARK: - XtreamClient
 
 class XtreamClient: APIClient {
@@ -151,12 +103,15 @@ class XtreamClient: APIClient {
 
     /// Performs a request with retry-and-backoff for transient failures.
     ///
+    /// - Parameter action: constant API-action label (e.g. `get_live_streams`)
+    ///   included in failure logs so diagnostics can pinpoint the endpoint.
+    ///   Must never carry request parameters — logged as `privacy: .public`.
     /// - Parameter retryAuthFailure: when `true`, HTTP 401/403 is also treated
     ///   as transient. Sync/content calls set this because, after `getInfo`
     ///   has already proven the credentials, a 401/403 is almost always the
     ///   provider's connection/rate limit rather than bad credentials. Login
     ///   (`getInfo`) leaves it `false` so wrong credentials fail fast.
-    private func request<T: Decodable>(_ url: URL, retryAuthFailure: Bool = true) async throws -> T {
+    private func request<T: Decodable>(_ url: URL, action: String, retryAuthFailure: Bool = true) async throws -> T {
         var attempt = 0
         while true {
             attempt += 1
@@ -164,13 +119,18 @@ class XtreamClient: APIClient {
                 return try await performRequest(url)
             } catch let error as XtreamError {
                 let retriable = error.isRetriable || (retryAuthFailure && error.isAuthFailure)
-                guard retriable, attempt < Self.maxAttempts else { throw error }
+                guard retriable, attempt < Self.maxAttempts else {
+                    Logger.network.error(
+                        "Xtream \(action, privacy: .public) request failed permanently (\(error.logDescription, privacy: .public)) after \(attempt) attempt(s)"
+                    )
+                    throw error
+                }
 
                 // Exponential backoff: 2s, then 4s. Gives the provider time to
                 // release the connection slot / clear the rate-limit window.
                 let delay = pow(2.0, Double(attempt))
                 Logger.network.warning(
-                    "Xtream request failed (\(error.localizedDescription)); retry \(attempt)/\(Self.maxAttempts - 1) in \(delay)s"
+                    "Xtream \(action, privacy: .public) request failed (\(error.logDescription, privacy: .public)); retry \(attempt)/\(Self.maxAttempts - 1) in \(delay)s"
                 )
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
@@ -222,7 +182,7 @@ class XtreamClient: APIClient {
         }
 
         // Login: a 401/403 means bad credentials, so don't retry it.
-        return try await request(url, retryAuthFailure: false)
+        return try await request(url, action: "auth", retryAuthFailure: false)
     }
 
     /// 2. Get Live Categories
@@ -237,7 +197,8 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        return try await request(url)
+        let list: XtreamList<XtreamCategory> = try await request(url, action: "get_live_categories")
+        return list.items
     }
 
     /// 3. Get Live Streams
@@ -255,7 +216,8 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        return try await request(url)
+        let list: XtreamList<XtreamLiveStream> = try await request(url, action: "get_live_streams")
+        return list.items
     }
 
     /// 4. Get VOD Categories
@@ -270,7 +232,8 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        return try await request(url)
+        let list: XtreamList<XtreamCategory> = try await request(url, action: "get_vod_categories")
+        return list.items
     }
 
     /// 5. Get VOD Streams
@@ -288,7 +251,8 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        return try await request(url)
+        let list: XtreamList<XtreamVODStream> = try await request(url, action: "get_vod_streams")
+        return list.items
     }
 
     /// 6. Get VOD Info
@@ -304,7 +268,7 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        return try await request(url)
+        return try await request(url, action: "get_vod_info")
     }
 
     /// 7. Get Series Categories
@@ -319,7 +283,8 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        return try await request(url)
+        let list: XtreamList<XtreamCategory> = try await request(url, action: "get_series_categories")
+        return list.items
     }
 
     /// 8. Get Series
@@ -337,7 +302,8 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        return try await request(url)
+        let list: XtreamList<XtreamSeries> = try await request(url, action: "get_series")
+        return list.items
     }
 
     /// 9. Get Series Info
@@ -353,7 +319,7 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        return try await request(url)
+        return try await request(url, action: "get_series_info")
     }
 
     /// 10. Get Short EPG
@@ -372,17 +338,13 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        struct ShortEPGResponse: Decodable {
-            let epgListings: [XtreamShortEPG]
-        }
-
         do {
-            let response: ShortEPGResponse = try await request(url)
-            return response.epgListings
+            let response: ShortEPGResponse = try await request(url, action: "get_short_epg")
+            return response.epgListings.items
         } catch {
             // Try array fallback if not wrapped
-            if let arrayResponse: [XtreamShortEPG] = try? await request(url) {
-                return arrayResponse
+            if let arrayResponse: XtreamList<XtreamShortEPG> = try? await request(url, action: "get_short_epg") {
+                return arrayResponse.items
             }
             throw error
         }
@@ -438,9 +400,18 @@ class XtreamClient: APIClient {
         return URL(string: "\(playlist.serverURL)/series/\(playlist.username)/\(playlist.password)/\(episode.episodeId).\(ext)")
     }
 
-    /// Builds a playback URL for a live stream
-    func buildLiveStreamURL(for stream: LiveStream, playlist: Playlist, format: StreamFormat = .m3u8) -> URL? {
-        URL(string: "\(playlist.serverURL)/live/\(playlist.username)/\(playlist.password)/\(stream.streamId).\(format.rawValue)")
+    /// Builds a playback URL for a live stream. `format` overrides the
+    /// playlist's own container preference; when omitted the playlist decides,
+    /// falling back to HLS.
+    func buildLiveStreamURL(for stream: LiveStream, playlist: Playlist, format: StreamFormat? = nil) -> URL? {
+        let ext = Self.resolvedFormat(format, playlist: playlist).rawValue
+        return URL(string: "\(playlist.serverURL)/live/\(playlist.username)/\(playlist.password)/\(stream.streamId).\(ext)")
+    }
+
+    /// HLS is the fallback because it is what every Xtream URL Lume ever built
+    /// used before the container became configurable.
+    private nonisolated static func resolvedFormat(_ requested: StreamFormat?, playlist: Playlist) -> StreamFormat {
+        requested ?? playlist.streamFormat.xtreamFormat ?? .m3u8
     }
 
     /// `Y-m-d:H-i` is the start format Xtream Codes panels expect in a timeshift
@@ -466,11 +437,12 @@ class XtreamClient: APIClient {
         playlist: Playlist,
         start: Date,
         durationMinutes: Int,
-        format: StreamFormat = .m3u8
+        format: StreamFormat? = nil
     ) -> URL? {
         guard durationMinutes > 0 else { return nil }
+        let ext = Self.resolvedFormat(format, playlist: playlist).rawValue
         let startString = Self.timeshiftStartFormatter.string(from: start)
-        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(format.rawValue)")
+        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(ext)")
     }
 }
 
@@ -567,6 +539,15 @@ final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
 }
 
 // MARK: - Supporting Types
+
+/// Wrapper some panels put around `get_short_epg` listings.
+private struct ShortEPGResponse: Decodable {
+    let epgListings: XtreamList<XtreamShortEPG>
+
+    enum CodingKeys: String, CodingKey {
+        case epgListings = "epg_listings"
+    }
+}
 
 enum StreamFormat: String {
     case m3u8

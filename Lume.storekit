@@ -28,6 +28,21 @@
       "productID" : "com.bilipp.lume.premium.lifetime",
       "referenceName" : "Lume Pro Lifetime",
       "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : true,
+      "internalID" : "5003",
+      "localizations" : [
+        {
+          "description" : "Retired. Kept here only so the grandfathered entitlement path stays testable.",
+          "displayName" : "Lume Pro (Retired Monthly)",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.bilipp.lume.premium.monthly",
+      "referenceName" : "Lume Pro Retired Monthly",
+      "type" : "NonConsumable"
     }
   ],
   "settings" : {
@@ -81,11 +96,11 @@
   },
   "subscriptionGroups" : [
     {
-      "id" : "21111111",
+      "id" : "22272764",
       "localizations" : [
 
       ],
-      "name" : "Premium",
+      "name" : "Lume Pro",
       "subscriptions" : [
         {
           "adHocOffers" : [
@@ -104,7 +119,7 @@
 
           ],
           "displayPrice" : "0.99",
-          "familyShareable" : false,
+          "familyShareable" : true,
           "groupNumber" : 1,
           "internalID" : "5002",
           "introductoryOffers" : [
@@ -117,10 +132,10 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.bilipp.lume.premium.monthly",
+          "productID" : "com.bilipp.lume.pro.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Lume Pro Monthly",
-          "subscriptionGroupID" : "21111111",
+          "referenceName" : "Lume Pro Monthly Subscription",
+          "subscriptionGroupID" : "22272764",
           "type" : "RecurringSubscription",
           "winbackOffers" : [
 

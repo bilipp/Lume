@@ -59,6 +59,15 @@ final class Category {
     var customOrder: Int?
     var customIcon: String?
     var lastRefreshed: Date?
+    /// When this category's full content was last imported from the portal on
+    /// demand. Stalker playlists don't sync their whole catalog (the portal
+    /// serves ~14 items per request); a default sync only seeds the newest
+    /// titles, so a category is otherwise near-empty until opened. `nil` means
+    /// never imported — opening the category blocks on a first fetch; once the
+    /// stamp outlives `stalkerContentTTL`, opening it revalidates in the
+    /// background instead. Unused by Xtream/m3u, whose categories are fully
+    /// synced up front.
+    var contentImportedAt: Date?
 
     init(apiId: String, name: String, parentId: Int, typeRaw: String, playlist: Playlist? = nil) {
         id = "\(playlist?.id.uuidString ?? "unknown")-\(typeRaw)-\(apiId)"
@@ -78,5 +87,18 @@ extension Category {
 
     convenience init(apiId: String, name: String, parentId: Int, type: CategoryType, playlist: Playlist? = nil) {
         self.init(apiId: apiId, name: name, parentId: parentId, typeRaw: type.rawValue, playlist: playlist)
+    }
+
+    /// How long an on-demand Stalker category import stays fresh. Past this,
+    /// opening the category revalidates it against the portal in the background
+    /// (see `MovieCategoryView` / `SeriesCategoryView`) so provider-added titles
+    /// surface without a manual refresh — the only refresh path tvOS has.
+    static let stalkerContentTTL: TimeInterval = 24 * 60 * 60
+
+    /// Whether the last on-demand import is old enough to revalidate. `true`
+    /// when the category was never imported at all.
+    var stalkerContentStale: Bool {
+        guard let contentImportedAt else { return true }
+        return Date().timeIntervalSince(contentImportedAt) > Self.stalkerContentTTL
     }
 }

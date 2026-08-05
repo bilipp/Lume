@@ -268,4 +268,133 @@ struct DTODecodingEdgeCaseTests {
         #expect(server.timestampNow == 1_700_000_000)
         #expect(server.timeNow == "2024-01-01 00:00:00")
     }
+
+    @Test func `auth response decodes numeric fields sent as numbers`() throws {
+        // Real panels routinely send ports / dates / counters as numbers where
+        // others send strings — the auth response must accept both.
+        let json = Data("""
+        {
+            "user_info": {
+                "username": "test",
+                "exp_date": 1770000000,
+                "is_trial": 0,
+                "active_cons": 1,
+                "max_connections": 2
+            },
+            "server_info": {
+                "url": "example.com",
+                "port": 8080,
+                "https_port": 443,
+                "timestamp_now": "1700000000"
+            }
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(XtreamAuthResponse.self, from: json)
+        #expect(response.userInfo.expDate == "1770000000")
+        #expect(response.userInfo.isTrial == "0")
+        #expect(response.userInfo.activeCons == "1")
+        #expect(response.userInfo.maxConnections == "2")
+        #expect(response.serverInfo.port == "8080")
+        #expect(response.serverInfo.httpsPort == "443")
+        #expect(response.serverInfo.timestampNow == 1_700_000_000)
+    }
+
+    // MARK: - XtreamCategory coercion
+
+    @Test func `category decodes int id and string parent id`() throws {
+        let json = Data("""
+        {"category_id": 42, "category_name": "Movies", "parent_id": "7"}
+        """.utf8)
+        let category = try JSONDecoder().decode(XtreamCategory.self, from: json)
+        #expect(category.categoryId == "42")
+        #expect(category.categoryName == "Movies")
+        #expect(category.parentId == 7)
+    }
+
+    @Test func `category without id fails alone but is dropped from a list`() throws {
+        let missingId = Data("""
+        {"category_name": "Orphan"}
+        """.utf8)
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(XtreamCategory.self, from: missingId)
+        }
+
+        let json = Data("""
+        [
+            {"category_id": "1", "category_name": "Keep"},
+            {"category_name": "Drop"},
+            {"category_id": 2, "category_name": "Keep too"}
+        ]
+        """.utf8)
+        let list = try JSONDecoder().decode(XtreamList<XtreamCategory>.self, from: json)
+        #expect(list.items.map(\.categoryId) == ["1", "2"])
+    }
+
+    // MARK: - XtreamList payload shapes
+
+    @Test func `list decodes index-keyed object payload`() throws {
+        let json = Data("""
+        {
+            "10": {"category_id": "b", "category_name": "Second"},
+            "2": {"category_id": "a", "category_name": "First"}
+        }
+        """.utf8)
+        let list = try JSONDecoder().decode(XtreamList<XtreamCategory>.self, from: json)
+        #expect(list.items.map(\.categoryId) == ["a", "b"])
+    }
+
+    @Test func `list decodes empty array`() throws {
+        let list = try JSONDecoder().decode(XtreamList<XtreamCategory>.self, from: Data("[]".utf8))
+        #expect(list.items.isEmpty)
+    }
+
+    @Test func `list with only undecodable entries throws instead of returning empty`() {
+        // An {"error": …} body must not sync as "zero items" — that would let
+        // the prune pass wipe the catalog.
+        let json = Data("""
+        {"error": "account expired"}
+        """.utf8)
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(XtreamList<XtreamCategory>.self, from: json)
+        }
+    }
+
+    // MARK: - XtreamSeriesInfoResponse episode payload shapes
+
+    @Test func `series info decodes flat episode array`() throws {
+        let json = Data("""
+        {
+            "info": {"name": "Show", "rating": 8},
+            "episodes": [
+                {"id": "1", "episode_num": 1, "season": 2},
+                {"id": "2", "episode_num": 2, "season": 2}
+            ]
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(XtreamSeriesInfoResponse.self, from: json)
+        #expect(response.info?.rating == "8")
+        #expect(response.episodes?["2"]?.map(\.id) == ["1", "2"])
+    }
+
+    @Test func `series info decodes array of season arrays`() throws {
+        let json = Data("""
+        {
+            "episodes": [
+                [{"id": "1", "season": 1}],
+                [{"id": "2", "season": 2}, {"id": "3", "season": 2}]
+            ]
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(XtreamSeriesInfoResponse.self, from: json)
+        #expect(response.episodes?["1"]?.map(\.id) == ["1"])
+        #expect(response.episodes?["2"]?.map(\.id) == ["2", "3"])
+    }
+
+    @Test func `series info tolerates empty episodes array`() throws {
+        let json = Data("""
+        {"info": {"name": "Show"}, "episodes": []}
+        """.utf8)
+        let response = try JSONDecoder().decode(XtreamSeriesInfoResponse.self, from: json)
+        #expect(response.episodes?.isEmpty != false)
+    }
 }

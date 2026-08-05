@@ -401,6 +401,9 @@ private extension HomeView {
         // loading placeholder) in place; the task re-fires once `isSyncBusy` clears.
         guard !isSyncBusy else { return }
 
+        let interval = Perf.begin(.homeRecommendations)
+        defer { Perf.end(interval) }
+
         let engine = RecommendationEngine(modelContainer: modelContext.container)
         let scored = await engine.recommendations()
         var items: [HomeMediaItem] = []

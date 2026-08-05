@@ -30,6 +30,8 @@ extension HomeView {
             return
         }
         trendingState = .loading
+        let interval = Perf.begin(.homeTrendingLoad)
+        defer { Perf.end(interval) }
         do {
             async let movieTitles = client.trending(.movie)
             async let tvTitles = client.trending(.tvShow)

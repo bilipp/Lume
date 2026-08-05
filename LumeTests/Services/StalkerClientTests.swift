@@ -88,7 +88,8 @@ struct StalkerDTODecodingTests {
     @Test func `paginated VOD list reads totals from string fields`() throws {
         let json = """
         {"js":{"total_items":"40","max_page_items":"14","data":[
-          {"id":"100","name":"A Movie","cmd":"/media/100.mpg","screenshot_uri":"a.jpg","year":"2021"}
+          {"id":"100","name":"A Movie","cmd":"/media/100.mpg","screenshot_uri":"a.jpg","year":"2021",
+           "added":"2026-07-10 12:00:00","category_id":"9"}
         ]}}
         """
         let env = try decode(StalkerEnvelope<StalkerPage<StalkerVODItem>>.self, json)
@@ -96,6 +97,10 @@ struct StalkerDTODecodingTests {
         #expect(env.js.maxPageItems == 14)
         #expect(env.js.data.first?.name == "A Movie")
         #expect(env.js.data.first?.cmd == "/media/100.mpg")
+        // `added` (Recently Added ordering) and `category_id` (single-pass `*`
+        // walk category assignment) must decode.
+        #expect(env.js.data.first?.added == "2026-07-10 12:00:00")
+        #expect(env.js.data.first?.categoryId == "9")
     }
 
     @Test func `create_link decodes the resolved cmd`() throws {

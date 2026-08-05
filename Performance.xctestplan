@@ -1,0 +1,27 @@
+{
+  "configurations" : [
+    {
+      "id" : "DE0B10B0-F6B3-4DEF-BDAA-82C7D3DFDBF5",
+      "name" : "Benchmark",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "testExecutionOrdering" : "alphabetical",
+    "testTimeoutsEnabled" : false
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:Lume.xcodeproj",
+        "identifier" : "C6BE110000000000000000A6",
+        "name" : "LumePerformanceTests"
+      }
+    }
+  ],
+  "version" : 1
+}

@@ -162,6 +162,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         isBuffering = true
         hasStartedPlayback = false
         didReportFailure = false
+        PlaybackQoE.shared.beginStartup(engine: .avPlayer, isLive: media.isLive)
         startStartupWatchdog()
 
         let asset = AVURLAsset(url: media.url)
@@ -203,6 +204,9 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
     private func reportFailure() {
         guard !didReportFailure else { return }
         didReportFailure = true
+        if !hasStartedPlayback {
+            PlaybackQoE.shared.noteStartupFailure()
+        }
         cancelStartupWatchdog()
         Logger.player.error("AVPlayer playback failure reported")
         onPlaybackFailure?()
@@ -220,6 +224,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         teardownItemObservers()
         trackLoadTask?.cancel()
         cancelStartupWatchdog()
+        PlaybackQoE.shared.endSession()
         pipController?.stopPictureInPicture()
         pipController = nil
         player.pause()
@@ -391,8 +396,14 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
                 guard let self else { return }
                 isPlaying = player.timeControlStatus != .paused
                 isBuffering = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                if isBuffering {
+                    PlaybackQoE.shared.noteStallBegan()
+                } else {
+                    PlaybackQoE.shared.noteStallEnded()
+                }
                 if player.timeControlStatus == .playing {
                     hasStartedPlayback = true
+                    PlaybackQoE.shared.noteFirstFrame()
                     cancelStartupWatchdog()
                 }
             }

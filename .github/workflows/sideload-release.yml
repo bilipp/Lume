@@ -12,6 +12,9 @@ on:
       tag:
         description: Existing release tag to (re)build sideload assets for (e.g. v1.2.0)
         required: true
+      engine_ref:
+        description: LumeEngine ref to build against (defaults to the pinned version)
+        required: false
 
 # The build jobs attach assets to the release, which requires write access to
 # repo contents. The default GITHUB_TOKEN is read-only when the repo's default
@@ -24,6 +27,15 @@ permissions:
 # event this is the published tag; on manual dispatch it's the input.
 env:
   RELEASE_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+  # LumeEngine (the beta 4th playback engine) is referenced by the project as a
+  # *local* SPM package at ../LumeEngine, so the sibling repo has to exist on the
+  # runner or `xcodebuild archive` dies at "Could not resolve package
+  # dependencies" before compiling anything.
+  #
+  # Pinned rather than tracking the engine's main: app↔engine commits are paired
+  # by hand, so a drifting engine would break this archive with no change on
+  # Lume's side. Bump this when a release needs newer engine code.
+  ENGINE_REF: ${{ github.event.inputs.engine_ref || 'v0.1.3' }}
 
 jobs:
   build:
@@ -47,11 +59,33 @@ jobs:
             destination: generic/platform=macOS
             format: zip
 
+    # Every `run` step works inside the app checkout (see the sibling-layout note
+    # on the checkout steps). Packaging steps use absolute $RUNNER_TEMP paths and
+    # are unaffected.
+    defaults:
+      run:
+        working-directory: Lume
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # Lume and LumeEngine are checked out as *siblings* rather than the app
+      # sitting at the workspace root, because the project references the engine
+      # by relative path (../LumeEngine) and actions/checkout refuses any `path`
+      # outside $GITHUB_WORKSPACE. Both therefore live one level down inside it.
+      - name: Checkout Lume
+        uses: actions/checkout@v5
         with:
           ref: ${{ env.RELEASE_TAG }}
+          path: Lume
+
+      # No FFmpeg build needed: with BinaryDependencies/ absent (it's gitignored,
+      # so a fresh clone never has it) the engine's Package.swift falls back to a
+      # checksum-pinned FFmpeg.xcframework downloaded from a GitHub release.
+      - name: Checkout LumeEngine
+        uses: actions/checkout@v5
+        with:
+          repository: bilipp/LumeEngine
+          ref: ${{ env.ENGINE_REF }}
+          path: LumeEngine
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -71,14 +105,14 @@ jobs:
         env:
           # Key names MUST match what Scripts/inject-env.sh reads (read_env …).
           TMDB_ACCESS_TOKEN: ${{ secrets.TMDB_ACCESS_TOKEN }}
-          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+          MDBLIST_API_KEY: ${{ secrets.MDBLIST_API_KEY }}
           INTRO_DB_API_KEY: ${{ secrets.INTRO_DB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
         run: |
           {
             [ -n "$TMDB_ACCESS_TOKEN" ]   && echo "TMDB_ACCESS_TOKEN=$TMDB_ACCESS_TOKEN"
-            [ -n "$OMDB_API_KEY" ]        && echo "OMDB_API_KEY=$OMDB_API_KEY"
+            [ -n "$MDBLIST_API_KEY" ]     && echo "MDBLIST_API_KEY=$MDBLIST_API_KEY"
             [ -n "$INTRO_DB_API_KEY" ]    && echo "INTRO_DB_API_KEY=$INTRO_DB_API_KEY"
             [ -n "$TRAKT_CLIENT_ID" ]     && echo "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID"
             [ -n "$TRAKT_CLIENT_SECRET" ] && echo "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET"

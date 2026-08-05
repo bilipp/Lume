@@ -176,6 +176,13 @@ struct LumeApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    /// The user's appearance override (issue #135), applied at the scene root
+    /// as a window-level style override so every screen (and sheets presented
+    /// from it) restyles immediately — see `AppearanceSettings.swift` for why
+    /// `.preferredColorScheme` can't do this. The players stay unaffected —
+    /// they force dark themselves.
+    @AppStorage(AppAppearance.storageKey) private var appearanceRaw = AppAppearance.defaultValue.rawValue
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -186,6 +193,14 @@ struct LumeApp: App {
                 .environment(playlistSwitch)
                 .environment(parentalControls)
                 .task {
+                    // Subscribe to MetricKit before anything else: payloads for a
+                    // previous run are delivered shortly after launch, and one
+                    // missed registration loses a day of field data. Compiles out
+                    // on tvOS, where MetricKit doesn't exist.
+                    #if canImport(MetricKit) && !os(tvOS)
+                        AppPerformanceMetrics.shared.start()
+                    #endif
+
                     // Give DownloadManager access to the model container so it
                     // can persist download state from its delegate callbacks.
                     #if !os(tvOS)
@@ -227,8 +242,10 @@ struct LumeApp: App {
                     ContentIndexingService.shared.configure(container: catalogContainer)
                     ContentIndexingService.shared.kick()
 
-                    // Refresh the TV guide on its own schedule, independent of
-                    // the content sync. No-ops when no guide is due yet.
+                    // Refresh the TV guide on its own schedule. No-ops when no
+                    // guide is due yet, and stands aside when a playlist sync
+                    // is running or about to start — the post-sync hook kicks
+                    // the refresh instead once the sync queue drains.
                     EPGSyncService.shared.configure(container: catalogContainer)
                     EPGSyncService.shared.syncIfDue()
                 }
@@ -246,6 +263,7 @@ struct LumeApp: App {
                         }
                     #endif
                 }
+                .appAppearance(AppAppearance.resolve(appearanceRaw))
         }
         .modelContainer(catalogContainer)
 

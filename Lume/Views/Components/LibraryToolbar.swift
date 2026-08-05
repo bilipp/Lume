@@ -22,19 +22,27 @@ struct LibraryToolbarModifier: ViewModifier {
                     SortMenu(categorySortRaw: $categorySortRaw, contentSortRaw: $contentSortRaw)
                 }
 
+                // One ToolbarItem each, deliberately not an HStack in a single
+                // item: when the bar runs out of room it moves surplus items
+                // into a "..." overflow menu, and an item whose content is a
+                // stack of buttons has no menu representation — it was dropped
+                // outright, leaving no way to reach Settings at all. Separate
+                // items degrade into menu rows instead. The titles also give the
+                // menu rows (and VoiceOver) real names rather than the symbols'
+                // defaults.
                 ToolbarItem(placement: .automatic) {
-                    HStack {
-                        Button {
-                            showingSync = true
-                        } label: {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                        }
+                    Button {
+                        showingSync = true
+                    } label: {
+                        Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                }
 
-                        Button {
-                            showingSettings = true
-                        } label: {
-                            Image(systemName: "gear")
-                        }
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gear")
                     }
                 }
             }

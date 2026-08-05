@@ -29,6 +29,11 @@ nonisolated struct DebugLogExporter {
         var osVersion: String
         var deviceModel: String
         var engineSummary: String
+        /// Per-engine playback QoE lines (join time, rebuffering, failures).
+        /// Pre-rendered because `PlaybackQoE` is MainActor-isolated.
+        var playbackQoE: [String] = []
+        /// The newest MetricKit payload summary, when one has been delivered.
+        var fieldMetrics: [String] = []
     }
 
     /// Oldest entries to include when the session start is unknown or very old.
@@ -44,6 +49,7 @@ nonisolated struct DebugLogExporter {
     /// Reads the unified log off the main actor.
     func makeReport(now: Date = Date()) async throws -> String {
         var lines = header(now: now)
+        lines.append(contentsOf: performanceSection())
         let entries = try collectEntries(now: now)
         lines.append("")
         lines.append("--- Log entries (\(entries.count)) ---")
@@ -83,7 +89,11 @@ nonisolated struct DebugLogExporter {
             .compactMap { $0 as? OSLogEntryLog }
             .map { entry in
                 let time = Self.entryStamp.string(from: entry.date)
-                return "\(time)  [\(entry.category)] \(Self.label(for: entry.level))  \(entry.composedMessage)"
+                // Last line of defense: even if a future call site accidentally
+                // interpolates a URL with `privacy: .public`, it must not reach
+                // a shared report — stream URLs carry playlist credentials.
+                let message = LogRedaction.scrubURLs(in: entry.composedMessage)
+                return "\(time)  [\(entry.category)] \(Self.label(for: entry.level))  \(message)"
             }
     }
 
@@ -110,6 +120,56 @@ nonisolated struct DebugLogExporter {
         ]
     }
 
+    // MARK: - Performance section
+
+    /// Playback QoE and field metrics, when there is anything to report. These
+    /// numbers turn "streams are slow to start" into an actual measurement, so
+    /// they belong in the report a user sends rather than in a localized screen.
+    func performanceSection() -> [String] {
+        var lines: [String] = []
+        if !metadata.playbackQoE.isEmpty {
+            lines.append("")
+            lines.append("--- Playback quality of experience ---")
+            lines.append(contentsOf: metadata.playbackQoE)
+        }
+        if !metadata.fieldMetrics.isEmpty {
+            lines.append("")
+            lines.append("--- Latest MetricKit payload ---")
+            lines.append(contentsOf: metadata.fieldMetrics)
+        }
+        return lines
+    }
+
+    /// Renders one line per engine that has seen a playback attempt.
+    static func qoeLines(_ summary: PlaybackQoESummary) -> [String] {
+        guard summary.totalSessions > 0 else { return [] }
+        var lines: [String] = []
+        for kind in PlayerEngineKind.allCases {
+            guard let stats = summary.engines[kind.rawValue], stats.sessions > 0 else { continue }
+            var parts = [
+                "sessions=\(stats.sessions)",
+                "firstFrames=\(stats.firstFrames)",
+                "meanJoin=\(String(format: "%.2f", stats.meanJoinTime))s",
+                "worstJoin=\(String(format: "%.2f", stats.joinTimeWorst))s",
+                "rebuffers=\(stats.rebuffers)"
+            ]
+            if let ratio = stats.rebufferRatio {
+                parts.append("rebufferRatio=\(String(format: "%.4f", ratio))")
+            }
+            if stats.startupFailures > 0 {
+                parts.append("startupFailures=\(stats.startupFailures)")
+            }
+            if stats.exitsBeforeVideoStart > 0 {
+                parts.append("exitsBeforeVideoStart=\(stats.exitsBeforeVideoStart)")
+            }
+            lines.append("\(kind.displayName): \(parts.joined(separator: " "))")
+        }
+        if summary.engineFallbacks > 0 {
+            lines.append("Engine fallbacks: \(summary.engineFallbacks)")
+        }
+        return lines
+    }
+
     // MARK: - Metadata
 
     /// Gather app / device context. Runs on the main actor because it reads the
@@ -123,13 +183,21 @@ nonisolated struct DebugLogExporter {
             .map(\.displayName)
             .joined(separator: " › ")
 
+        #if canImport(MetricKit) && !os(tvOS)
+            let fieldMetrics = AppPerformanceMetrics.shared.latestSummary
+        #else
+            let fieldMetrics: [String] = []
+        #endif
+
         return Metadata(
             appVersion: SupportInfo.appVersion,
             buildNumber: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—",
             platform: platformName,
             osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
             deviceModel: deviceModel,
-            engineSummary: engineSummary
+            engineSummary: engineSummary,
+            playbackQoE: qoeLines(PlaybackQoE.shared.summary),
+            fieldMetrics: fieldMetrics
         )
     }
 

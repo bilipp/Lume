@@ -509,6 +509,8 @@ struct ChannelsList: View {
     /// How many channels are currently rendered. Grows by a page as the list
     /// nears its end so a large category loads lazily instead of all at once.
     @State private var visibleCount = LiveChannelQuery.pageSize
+    /// Drives the "Clear Recently Watched" confirmation alert.
+    @State private var confirmingClear = false
 
     init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
         self.scope = scope
@@ -529,44 +531,81 @@ struct ChannelsList: View {
         try? modelContext.save()
     }
 
+    /// Empties the whole Recently Watched list for the active playlist. The
+    /// section drops away on its own once the last timestamp clears (its parent
+    /// gates it on `hasRecents`).
+    private func clearRecentlyWatched() {
+        let container = modelContext.container
+        Task { await StorageManager.clearRecentlyWatchedChannels(playlistPrefix: playlistPrefix, container: container) }
+    }
+
+    /// A trailing "Clear" button shown above the Recently Watched list. Stays
+    /// out of the scroll view so it's always reachable no matter how far the
+    /// list is scrolled.
+    private var clearHeader: some View {
+        HStack {
+            Spacer()
+            Button(role: .destructive) {
+                confirmingClear = true
+            } label: {
+                Label("Clear", systemImage: "trash")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
     var body: some View {
         let channels = scopedStreams
         let visible = Array(channels.prefix(visibleCount))
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                if channels.isEmpty {
-                    ContentUnavailableView(
-                        "No Channels",
-                        systemImage: "antenna.radiowaves.left.and.right",
-                        description: Text("This category has no channels")
-                    )
-                } else {
-                    ForEach(visible) { stream in
-                        Button {
-                            onPlay(stream)
-                        } label: {
-                            LiveStreamCardView(stream: stream, epg: epgByChannel[stream.epgChannelId ?? ""])
-                                .padding(.horizontal)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .recentlyWatchedRemoveMenu(scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil)
-                        .onAppear {
-                            if stream.id == visible.last?.id, visibleCount < channels.count {
-                                visibleCount = min(visibleCount + LiveChannelQuery.pageSize, channels.count)
+        VStack(spacing: 0) {
+            if scope == .recentlyWatched, !channels.isEmpty {
+                clearHeader
+            }
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if channels.isEmpty {
+                        ContentUnavailableView(
+                            "No Channels",
+                            systemImage: "antenna.radiowaves.left.and.right",
+                            description: Text("This category has no channels")
+                        )
+                    } else {
+                        ForEach(visible) { stream in
+                            Button {
+                                onPlay(stream)
+                            } label: {
+                                LiveStreamCardView(stream: stream, epg: epgByChannel[stream.epgChannelId ?? ""])
+                                    .padding(.horizontal)
+                                    .contentShape(Rectangle())
                             }
-                        }
+                            .buttonStyle(.plain)
+                            .recentlyWatchedRemoveMenu(scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil)
+                            .onAppear {
+                                if stream.id == visible.last?.id, visibleCount < channels.count {
+                                    visibleCount = min(visibleCount + LiveChannelQuery.pageSize, channels.count)
+                                }
+                            }
 
-                        Divider()
-                            .padding(.leading, 88)
+                            Divider()
+                                .padding(.leading, 88)
+                        }
                     }
                 }
             }
+            // Reload when the visible window or channel set changes, or a guide
+            // import settles — EPG is resolved only for the channels on screen.
+            .task(id: "\(channels.count)-\(visible.count)-\(epgSync.isSyncing)") {
+                await loadEPG(for: visible)
+            }
         }
-        // Reload when the visible window or channel set changes, or a guide
-        // import settles — EPG is resolved only for the channels on screen.
-        .task(id: "\(channels.count)-\(visible.count)-\(epgSync.isSyncing)") {
-            await loadEPG(for: visible)
+        .alert("Clear Recently Watched", isPresented: $confirmingClear) {
+            Button("Clear", role: .destructive) { clearRecentlyWatched() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This clears the list of channels you've recently watched. Your favorites and the channels themselves aren't affected.")
         }
     }
 

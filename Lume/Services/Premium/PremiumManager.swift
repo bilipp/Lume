@@ -21,20 +21,51 @@ import StoreKit
 final class PremiumManager {
     static let shared = PremiumManager()
 
-    /// The two ways to unlock Premium on the App Store. The lifetime option is a
-    /// non-consumable; the monthly option is an auto-renewable subscription.
+    /// Every product that can grant Premium — the two currently on sale plus one
+    /// retired product we still honour.
     enum Plan: String, CaseIterable {
-        case monthly = "com.bilipp.lume.premium.monthly"
+        /// Auto-renewable monthly subscription (App Store Connect group "Lume Pro").
+        case monthly = "com.bilipp.lume.pro.monthly"
+        /// One-time non-consumable unlock.
         case lifetime = "com.bilipp.lume.premium.lifetime"
+        /// Retired. This shipped as a *non-consumable* that App Store Connect could
+        /// never renew or cancel, while the paywall advertised it as a monthly
+        /// subscription — so it never appeared under App Store ▸ Subscriptions and
+        /// buyers were understandably confused. It is off sale; the handful of people
+        /// who bought it paid once and keep Pro permanently, which is why it still
+        /// entitles below. Replaced by `monthly`.
+        case retiredMonthly = "com.bilipp.lume.premium.monthly"
+
+        /// The plans the paywall offers, cheapest first.
+        static let purchasable: [Plan] = [.monthly, .lifetime]
+
+        /// Whether owning this plan means there is something to manage or cancel in
+        /// the App Store. Only true auto-renewables appear there.
+        var isRenewable: Bool {
+            self == .monthly
+        }
     }
 
-    /// App Store Connect subscription group for the monthly plan.
-    static let subscriptionGroupID = "21111111"
+    /// Renewal detail for the auto-renewable plan, so Settings can tell a subscriber
+    /// what they are paying for and when it renews — and so they always have a route
+    /// to cancel.
+    nonisolated struct SubscriptionStatus: Equatable {
+        /// False once the user has cancelled; the subscription then runs to `renewsAt`.
+        var willAutoRenew: Bool
+        /// End of the paid period: the next charge date, or the cut-off if cancelled.
+        var renewsAt: Date?
+        /// The App Store failed to charge and is retrying — the user needs to fix
+        /// their payment method.
+        var isInBillingRetry: Bool
+    }
 
-    /// Loaded `Product`s, ascending by price (monthly first, lifetime second).
+    /// Loaded `Product`s for the purchasable plans, ascending by price (monthly
+    /// first, lifetime second).
     private(set) var products: [Product] = []
-    /// Product IDs the user currently owns (active subscription or lifetime).
+    /// Product IDs the user currently owns (active subscription or a one-time unlock).
     private(set) var purchasedProductIDs: Set<String> = []
+    /// Renewal detail when Premium comes from the subscription, else nil.
+    private(set) var subscriptionStatus: SubscriptionStatus?
     /// True while a purchase or restore is in flight, for button spinners.
     private(set) var isWorking = false
 
@@ -98,11 +129,18 @@ final class PremiumManager {
         purchasedProductIDs.contains(plan.rawValue)
     }
 
+    /// True when the user holds an auto-renewable subscription, i.e. there is
+    /// something for them to manage or cancel in the App Store. Drives the
+    /// "Manage Subscription" row in Settings.
+    var hasManageableSubscription: Bool {
+        Plan.allCases.contains { $0.isRenewable && owns($0) }
+    }
+
     // MARK: - StoreKit
 
     func loadProducts() async {
         do {
-            let ids = Plan.allCases.map(\.rawValue)
+            let ids = Plan.purchasable.map(\.rawValue)
             let loaded = try await Product.products(for: ids)
             products = loaded.sorted { $0.price < $1.price }
             if products.count != ids.count {
@@ -161,6 +199,30 @@ final class PremiumManager {
             }
         }
         purchasedProductIDs = owned
+        subscriptionStatus = owned.contains(Plan.monthly.rawValue) ? await loadSubscriptionStatus() : nil
+    }
+
+    /// Renewal detail for the monthly plan. Requires the product to be loaded, so a
+    /// launch where `Product.products(for:)` failed simply yields nil and Settings
+    /// falls back to the plain "Monthly subscription" line.
+    private func loadSubscriptionStatus() async -> SubscriptionStatus? {
+        guard let info = product(for: .monthly)?.subscription else { return nil }
+        do {
+            for status in try await info.status {
+                guard case let .verified(renewal) = status.renewalInfo,
+                      case let .verified(transaction) = status.transaction,
+                      transaction.productID == Plan.monthly.rawValue
+                else { continue }
+                return SubscriptionStatus(
+                    willAutoRenew: renewal.willAutoRenew,
+                    renewsAt: transaction.expirationDate,
+                    isInBillingRetry: status.state == .inBillingRetryPeriod
+                )
+            }
+        } catch {
+            Logger.premium.error("Failed to read subscription status: \(error.localizedDescription, privacy: .public)")
+        }
+        return nil
     }
 
     private func handle(_ result: VerificationResult<Transaction>) async {
