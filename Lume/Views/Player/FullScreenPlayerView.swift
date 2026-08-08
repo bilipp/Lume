@@ -45,6 +45,19 @@ struct FullScreenPlayerView: View {
     /// audio still on the receiver, instead of a dead "stream offline" error.
     @State private var airPlayVideoUnsupported: String?
 
+    /// Id of a stream the Chromecast receiver can't play — either refused up
+    /// front by `CastCompatibility` (a `file://` download, an MKV) or reported
+    /// failed by the receiver itself (a CORS-less HLS manifest, an undecodable
+    /// codec). Once set, the cast stand-in is dropped for that stream and the
+    /// local engine plays it on the device, the same shape as the AirPlay
+    /// fallback above. Keyed by media id so moving to another title retries.
+    @State private var castUnsupported: String?
+
+    /// Drives the "can't cast this one" notice. Set alongside `castUnsupported`
+    /// so the drop back to local playback isn't silent — the whole point of this
+    /// path is that a receiver failing was previously invisible.
+    @State private var castNoticeVisible = false
+
     /// The only high-frequency playback state. An `@Observable` the host owns
     /// but never reads in its own body, so playback ticks invalidate just the
     /// scrubber/time labels rather than re-rendering the whole player tree. See
@@ -193,12 +206,22 @@ struct FullScreenPlayerView: View {
             // auto-hiding controls overlay — showing a second one here means
             // the user sees duplicate X buttons whenever the controls are
             // visible. Only render our custom close for engines that don't
-            // draw their own controls.
-            if !engine.rendersOwnControls {
+            // draw their own controls — and while Chromecasting, where the
+            // engine (and its overlay) is unmounted and `ChromecastPlaybackView`
+            // deliberately carries no close of its own: this one persists
+            // progress on the way out.
+            if !engine.rendersOwnControls || isCastingActive {
                 closeButton
                     .padding(.top, 4)
                     .padding(.leading, 4)
             }
+
+            castNotice
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .animation(.easeInOut(duration: 0.25), value: castNoticeVisible)
+                // Informational only, and it sits over the engine's top bar for
+                // five seconds — never let it swallow a tap meant for a control.
+                .allowsHitTesting(false)
         }
         #if os(iOS)
         .statusBarHidden(true)
@@ -213,6 +236,10 @@ struct FullScreenPlayerView: View {
             // main context and hitch KSPlayer's render loop.
             ContentIndexingService.shared.isPlaybackActive = true
             configureAudioSessionForPlayback()
+            // A Chromecast session can outlive the player (connect, close,
+            // open another title) — if one is already active, cast this
+            // stream instead of playing it locally.
+            loadOntoReceiver()
             #if os(macOS)
                 enterMacFullScreen()
             #endif
@@ -262,7 +289,9 @@ struct FullScreenPlayerView: View {
         .onChange(of: scenePhase) { _, phase in
             // Leaving the foreground is a safe moment to flush; covers the user
             // backgrounding the app mid-playback without closing the player.
-            if phase != .active { persistProgressDetached(force: true) }
+            if phase != .active {
+                persistProgressDetached(force: true)
+            }
             #if os(tvOS)
                 // tvOS has no background playback for any engine, so a stream
                 // left running behind the Home screen just keeps buffering and
@@ -271,7 +300,9 @@ struct FullScreenPlayerView: View {
                 // down via `onDisappear`. `.inactive` is a transient transition
                 // (a system overlay, the screensaver arming) where the app is
                 // still foreground, so only act on a real `.background` move.
-                if phase == .background { closePlayer() }
+                if phase == .background {
+                    closePlayer()
+                }
             #endif
         }
         .onChange(of: castService.isAirPlayActive) { _, isActive in
@@ -291,6 +322,44 @@ struct FullScreenPlayerView: View {
             // AVPlayer there's no swap to bridge.
             guard engineSwaps, priorityEngine != .avPlayer, !activeMedia.isLive, clock.current > 1 else { return }
             resumeActiveMedia(at: clock.current)
+        }
+        .onChange(of: castService.isProviderCasting) { _, casting in
+            if casting {
+                // A Chromecast session connected — hand it the stream being
+                // watched. The engine view unmounts (see `playerView`), which
+                // is a safe boundary to flush the local progress at.
+                persistProgressDetached(force: true)
+                loadOntoReceiver()
+            } else {
+                // The session is gone; a future cast (possibly to a different,
+                // more capable receiver) should retry this stream.
+                castUnsupported = nil
+                if !activeMedia.isLive, clock.current > 1 {
+                    // The receiver's last position is in the clock
+                    // (`ChromecastPlaybackView` polls it there), so rebase the
+                    // stream and let the local engine pick up where the TV
+                    // stopped.
+                    resumeActiveMedia(at: clock.current)
+                }
+            }
+        }
+        .onChange(of: castService.castFailure) { _, failure in
+            guard let failure else { return }
+            handleCastFailure(failure)
+        }
+        .task(id: castNoticeVisible) {
+            // Auto-dismiss the notice. Cancels itself on teardown, so no timer
+            // outlives the player.
+            guard castNoticeVisible else { return }
+            try? await Task.sleep(for: .seconds(5))
+            castNoticeVisible = false
+        }
+        .onChange(of: displayMedia?.url) { _, _ in
+            // While casting, follow the stream onto the receiver whenever what's
+            // playable changes: a Stalker resolve landing after the session
+            // connected (the placeholder had nothing castable), or the viewer
+            // switching episode/channel mid-cast.
+            loadOntoReceiver()
         }
         .onDisappear {
             // Capture the clock synchronously, then flush off the main thread.
@@ -314,7 +383,19 @@ struct FullScreenPlayerView: View {
     @ViewBuilder
     private var playerView: some View {
         if let media = displayMedia {
-            engineView(for: media)
+            // While a Chromecast session is active the receiver is the video
+            // surface: mounting a local engine too would decode the stream a
+            // second time for pixels nobody sees (and fight the receiver over
+            // the transport). The cast stand-in drives the receiver instead.
+            #if os(iOS)
+                if isCastingActive {
+                    ChromecastPlaybackView(media: media, clock: clock)
+                } else {
+                    engineView(for: media)
+                }
+            #else
+                engineView(for: media)
+            #endif
         } else if resolveError != nil {
             // Stalker `create_link` failed — surface the failure with a retry
             // rather than spinning forever.
@@ -529,7 +610,9 @@ struct FullScreenPlayerView: View {
     /// race the read; clears the buffer entry once the write lands.
     private func persistProgressDetached(force: Bool) {
         guard let writer = progressWriter else { return }
-        if activeMedia.isLive, !force { return }
+        if activeMedia.isLive, !force {
+            return
+        }
         let ref = activeMedia.contentRef
         let now = clock.current
         let total = clock.duration
@@ -538,7 +621,9 @@ struct FullScreenPlayerView: View {
                 ref: ref, progress: now, duration: total, force: force
             )
             WatchProgressBuffer.remove(ref: ref)
-            if let completion { syncTraktWatched(ref: completion.ref) }
+            if let completion {
+                syncTraktWatched(ref: completion.ref)
+            }
         }
     }
 
@@ -575,4 +660,97 @@ struct FullScreenPlayerView: View {
         contentRef: .live("preview")
     ))
     .preferredColorScheme(.dark)
+}
+
+// MARK: - Casting
+
+//
+// The host side of Chromecast: deciding whether the receiver is standing in
+// for the local engine, handing it the stream, and dropping back to local
+// playback when it won't play one. An extension rather than more struct body,
+// which `type_body_length` caps — same file, so `private` state stays private.
+
+extension FullScreenPlayerView {
+    /// Whether the receiver is standing in for the local engine right now: a
+    /// session is connected *and* it hasn't already proven it can't play this
+    /// particular stream. When it has, the session stays connected (the viewer
+    /// may pick something castable next) but this stream plays on the device.
+    private var isCastingActive: Bool {
+        castService.isProviderCasting && castUnsupported != activeMedia.id
+    }
+
+    /// Cast the current stream onto the connected Chromecast receiver, resuming
+    /// at the position being watched. Safe to call from every "session or media
+    /// may have changed" edge: it no-ops without an active session or castable
+    /// media, and the provider ignores re-loads of the URL already playing.
+    private func loadOntoReceiver() {
+        guard castService.isProviderCasting, let media = displayMedia else { return }
+        // Refuse what a receiver demonstrably can't fetch or demux before
+        // unmounting the local engine for it, rather than showing a poster over
+        // a stream that will never start. What can't be judged from the URL
+        // (CORS, codecs) still fails at runtime into `handleCastFailure`.
+        let verdict = CastCompatibility.evaluate(media.url)
+        guard case .castable = verdict else {
+            Logger.player.log("Chromecast: not castable (\(String(describing: verdict), privacy: .public)); keeping playback local")
+            markCastUnsupported()
+            return
+        }
+        // The running clock is the position being watched; before the first
+        // tick (session started from the poster screen) fall back to the
+        // stream's resume point.
+        let position = clock.current > 1 ? clock.current : media.startTime
+        castService.castProvider?.beginSession(
+            for: media,
+            startingAt: media.isLive ? 0 : position
+        )
+    }
+
+    /// The receiver won't play the current stream. Drop the cast stand-in for
+    /// this title so the local engine takes over where the cast left off, and
+    /// say so — the failure is otherwise indistinguishable from a slow start.
+    /// The session itself is left connected: the next title may well cast fine.
+    private func markCastUnsupported() {
+        guard castUnsupported != activeMedia.id else { return }
+        castUnsupported = activeMedia.id
+        castNoticeVisible = true
+        if !activeMedia.isLive, clock.current > 1 {
+            resumeActiveMedia(at: clock.current)
+        }
+    }
+
+    /// A refusal reported by the provider. Ignored when it names a stream the
+    /// viewer has already moved off — the same staleness guard `displayMedia`
+    /// applies to Stalker resolutions.
+    private func handleCastFailure(_ failure: CastFailure) {
+        castService.clearCastFailure()
+        guard failure.url == displayMedia?.url else { return }
+        // Local copy: `Logger` interpolation is an autoclosure, and a `self`
+        // reference inside one trips the SwiftFormat/os_log interaction.
+        let engineName = priorityEngine.rawValue
+        Logger.player.log("Chromecast: receiver refused the stream; resuming locally on \(engineName, privacy: .public)")
+        markCastUnsupported()
+    }
+
+    /// Transient explanation for the drop back to local playback. Sits below the
+    /// close button so it clears it, and carries no dismiss of its own — it is
+    /// information, not a decision.
+    @ViewBuilder
+    private var castNotice: some View {
+        if castNoticeVisible {
+            Label {
+                Text("Can’t cast this stream — playing it on this device")
+            } icon: {
+                Image(systemName: "tv.slash")
+            }
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .glassEffectCompat(.regular, in: Capsule())
+            .padding(.top, 60)
+            .padding(.horizontal, 24)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .accessibilityAddTraits(.isStaticText)
+        }
+    }
 }

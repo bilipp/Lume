@@ -1,0 +1,136 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Lume"
+          }
+        }
+      }
+    },
+    "NSBluetoothAlwaysUsageDescription" : {
+      "comment" : "Privacy - Bluetooth Always Usage Description",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume nutzt Bluetooth, um Chromecast-Geräte in der Nähe zu erkennen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume uses Bluetooth to discover nearby Chromecast devices."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume usa Bluetooth para detectar dispositivos Chromecast cercanos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume utilise le Bluetooth pour détecter les appareils Chromecast à proximité."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume usa il Bluetooth per rilevare i dispositivi Chromecast nelle vicinanze."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LumeはBluetoothを使用して近くのChromecastデバイスを検出します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume은 Bluetooth를 사용하여 주변 Chromecast 기기를 검색합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Lume usa Bluetooth para detectar dispositivos Chromecast próximos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 使用蓝牙发现附近的 Chromecast 设备。"
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy - Local Network Usage Description",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume nutzt das lokale Netzwerk, um Chromecast-Geräte zu finden und Inhalte an sie zu streamen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume uses the local network to find and stream to Chromecast devices."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume usa la red local para encontrar dispositivos Chromecast y transmitir contenido a ellos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume utilise le réseau local pour trouver des appareils Chromecast et y diffuser du contenu."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume usa la rete locale per trovare i dispositivi Chromecast e trasmettere contenuti in streaming."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lumeはローカルネットワークを使用してChromecastデバイスを検出し、ストリーミングします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume은 로컬 네트워크를 사용하여 Chromecast 기기를 찾고 스트리밍합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Lume usa a rede local para encontrar dispositivos Chromecast e transmitir para eles."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 使用本地网络查找 Chromecast 设备并向其串流。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -32,8 +32,10 @@ struct CastServiceTests {
         #expect(CastService.activeAirPlayName(in: outputs) == "Apple TV")
     }
 
-    @Test func `shared service starts without a cast provider`() {
-        // The Chromecast seam is empty until the Google Cast SDK is integrated.
-        #expect(CastService.shared.castProvider == nil)
+    @Test func `cast provider seam matches the linked Cast SDK`() {
+        // These tests run hosted in Lume.app, whose launch registers the
+        // Chromecast provider when the (iOS-only) Google Cast SDK is linked;
+        // on every other platform the seam stays empty.
+        #expect((CastService.shared.castProvider != nil) == CastService.isGoogleCastAvailable)
     }
 }

@@ -574,7 +574,6 @@
 
     /// Full-screen placeholder shown while TMDB enrichment is fetched on first
     /// visit, mirroring the loading gate the iOS / macOS detail screens use.
-    /// Tuned for the 10-foot UI with a large spinner and title.
     struct TVDetailLoadingView: View {
         let title: String
 

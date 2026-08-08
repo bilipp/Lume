@@ -81,6 +81,7 @@ import SwiftUI
                 Spacer()
 
                 AirPlayRouteButton(player: coordinator.player)
+                ChromecastButton()
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)

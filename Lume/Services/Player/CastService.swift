@@ -2,6 +2,10 @@ import AVFoundation
 import Foundation
 import OSLog
 
+#if os(iOS) && canImport(GoogleCast)
+    import GoogleCast
+#endif
+
 /// Coordinates "casting" — sending playback to an external device — for the
 /// player overlay, independent of which playback engine is active.
 ///
@@ -40,9 +44,40 @@ final class CastService {
     /// Display name of the active AirPlay route, when the system reports one.
     private(set) var airPlayRouteName: String?
 
-    /// A registered casting provider (e.g. a future Chromecast backend). `nil`
-    /// until the Google Cast SDK is integrated — see `CastProvider` and #103.
+    /// The registered casting provider (Chromecast, via the bundled Google Cast
+    /// SDK on iOS). `nil` on the platforms the SDK doesn't support — see
+    /// `CastProvider`, `configureGoogleCast()` and #103.
     var castProvider: (any CastProvider)?
+
+    /// Whether the registered provider has an active cast session. Mirrored
+    /// from the provider (which is not `@Observable`) so SwiftUI can react —
+    /// `FullScreenPlayerView` loads the current stream onto the receiver when
+    /// this flips true.
+    private(set) var isProviderCasting = false
+
+    /// The receiver's most recent refusal to play a stream, mirrored from the
+    /// provider. `FullScreenPlayerView` watches this to drop back to local
+    /// playback and tell the viewer why — see `CastFailure` and
+    /// `CastCompatibility`, which catches statically what this catches at
+    /// runtime (CORS on adaptive streams, unplayable codecs).
+    private(set) var castFailure: CastFailure?
+
+    /// Forget the last failure so a retry — a different title, a different
+    /// receiver — starts clean. Called by the host once it has acted on it.
+    func clearCastFailure() {
+        castFailure = nil
+    }
+
+    /// True when the Google Cast SDK is linked into this build (iOS only).
+    /// Lets tests assert the provider seam without re-deriving the platform
+    /// gate themselves.
+    nonisolated static var isGoogleCastAvailable: Bool {
+        #if os(iOS) && canImport(GoogleCast)
+            true
+        #else
+            false
+        #endif
+    }
 
     /// Touched from the nonisolated `deinit`; `removeObserver` is thread-safe.
     private nonisolated(unsafe) var routeObserver: (any NSObjectProtocol)?
@@ -70,6 +105,32 @@ final class CastService {
     /// `nil` when none is AirPlay. Pure, so it can be exercised in tests.
     static func activeAirPlayName(in outputs: [RouteOutput]) -> String? {
         outputs.first(where: \.isAirPlay)?.name
+    }
+
+    /// Configure the Google Cast SDK and register the Chromecast provider against
+    /// the `castProvider` seam. Call once at app launch. This is a no-op on the
+    /// platforms where the (iOS-only) Cast SDK isn't linked — see
+    /// `Docs/Chromecast.md` — so it is safe to call unconditionally.
+    func configureGoogleCast() {
+        #if os(iOS) && canImport(GoogleCast)
+            let criteria = GCKDiscoveryCriteria(applicationID: kGCKDefaultMediaReceiverApplicationID)
+            let options = GCKCastOptions(discoveryCriteria: criteria)
+            GCKCastContext.setSharedInstanceWith(options)
+            let provider = GoogleCastProvider()
+            provider.onCastingChanged = { [weak self] casting in
+                self?.isProviderCasting = casting
+                // A new session gets a clean slate: the previous receiver's
+                // refusal says nothing about this one's abilities.
+                if casting {
+                    self?.castFailure = nil
+                }
+            }
+            provider.onFailure = { [weak self] failure in
+                self?.castFailure = failure
+            }
+            castProvider = provider
+            Logger.player.log("Chromecast: Cast context configured")
+        #endif
     }
 
     private func refreshAirPlayRoute() {
@@ -104,10 +165,11 @@ final class CastService {
 }
 
 /// A casting backend abstraction. AirPlay is handled natively by AVFoundation
-/// and needs no provider; this seam exists for a future Google Cast
-/// (Chromecast) integration — see #103. A provider discovers receivers, starts
-/// and ends a session for a given `PlayableMedia`, and mirrors transport state
-/// back to the overlay so watch-progress / NextUp tracking can follow the cast.
+/// and needs no provider; this seam is where the Google Cast (Chromecast)
+/// backend plugs in — see #103. A provider discovers receivers, starts
+/// and ends a session for a given `PlayableMedia`, and exposes the receiver's
+/// transport so the casting UI can drive it and watch-progress / NextUp
+/// tracking can follow the cast (see `ChromecastPlaybackView`).
 @MainActor
 protocol CastProvider: AnyObject {
     /// Human-readable name of the connected receiver, when connected.
@@ -116,10 +178,44 @@ protocol CastProvider: AnyObject {
     /// Whether a cast session is currently active.
     var isCasting: Bool { get }
 
+    /// Reports `isCasting` flips so `CastService` can mirror them into its
+    /// observable `isProviderCasting`. Set by `CastService` at registration.
+    var onCastingChanged: ((Bool) -> Void)? { get set }
+
+    /// Reports that the receiver refused or errored out on the stream it was
+    /// asked to play, so the host can resume locally instead of leaving a poster
+    /// and a dead scrubber on screen. Set by `CastService` at registration.
+    var onFailure: ((CastFailure) -> Void)? { get set }
+
     /// Begin casting the given media to the selected receiver, seeking the
     /// receiver to `position` seconds so playback resumes where it left off.
+    /// Loading the same URL again is a no-op, so callers can invoke this from
+    /// every "media or session may have changed" edge without restarting the
+    /// receiver's stream.
     func beginSession(for media: PlayableMedia, startingAt position: TimeInterval)
 
     /// End the current cast session.
     func endSession()
+
+    /// The receiver's playhead in seconds, interpolated between status updates.
+    /// `0` while nothing is loaded. Polled by the casting UI — the Cast SDK
+    /// pushes media status only on change, not per tick.
+    var approximatePosition: TimeInterval { get }
+
+    /// The loaded stream's duration in seconds, or `0` when unknown (live, or
+    /// nothing loaded yet).
+    var streamDuration: TimeInterval { get }
+
+    /// Whether the receiver is currently playing (as opposed to paused, idle,
+    /// or still loading).
+    var isReceiverPlaying: Bool { get }
+
+    /// Resume playback on the receiver.
+    func play()
+
+    /// Pause playback on the receiver.
+    func pause()
+
+    /// Seek the receiver to an absolute position in seconds.
+    func seek(to seconds: TimeInterval)
 }

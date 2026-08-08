@@ -42,6 +42,9 @@ struct LumeApp: App {
         let profiles = ProfileManager(catalogContainer: catalog, cloudContainer: cloud, coordinator: coordinator)
         _profileManager = State(initialValue: profiles)
         _parentalControls = State(initialValue: ParentalControls(profileManager: profiles))
+        // Registers the Chromecast provider when the Google Cast SDK is linked;
+        // a no-op otherwise (see Docs/Chromecast.md). AirPlay needs no setup.
+        CastService.shared.configureGoogleCast()
     }
 
     /// Builds **two separate containers** (the foreground-freeze fix):
