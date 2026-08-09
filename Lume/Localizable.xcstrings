@@ -2427,6 +2427,58 @@
         }
       }
     },
+    "Addon URL" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Addon-URL"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL del addon"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL de l’addon"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL dell’addon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アドオンURL"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "애드온 URL"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL do addon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "插件 URL"
+          }
+        }
+      }
+    },
     "AirPlay" : {
       "localizations" : {
         "de" : {
@@ -3794,54 +3846,54 @@
         }
       }
     },
-    "Automatically start the next episode when one finishes, and show a button near the end to skip ahead." : {
+    "Automatically start the next episode when one finishes, and show a button near the end to skip ahead. When a Stremio addon offers several streams, ask which one to play." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Startet die nächste Folge automatisch, sobald eine endet, und zeigt gegen Ende eine Schaltfläche zum Vorspringen an."
+            "value" : "Startet die nächste Folge automatisch, sobald eine endet, und zeigt gegen Ende eine Schaltfläche zum Vorspringen an. Bietet ein Stremio-Addon mehrere Streams an, wird gefragt, welcher abgespielt werden soll."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inicia automáticamente el siguiente episodio cuando termina uno y muestra un botón cerca del final para avanzar."
+            "value" : "Inicia automáticamente el siguiente episodio cuando termina uno y muestra un botón cerca del final para avanzar. Cuando un addon de Stremio ofrece varios streams, pregunta cuál reproducir."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lance automatiquement l’épisode suivant à la fin du précédent et affiche un bouton vers la fin pour passer à la suite."
+            "value" : "Lance automatiquement l’épisode suivant à la fin du précédent et affiche un bouton vers la fin pour passer à la suite. Lorsqu’un addon Stremio propose plusieurs flux, demande lequel lire."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Avvia automaticamente l'episodio successivo al termine di quello in corso e mostra un pulsante verso la fine per saltare avanti."
+            "value" : "Avvia automaticamente l'episodio successivo al termine di quello in corso e mostra un pulsante verso la fine per saltare avanti. Quando un addon Stremio offre più stream, chiede quale riprodurre."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エピソードが終わると自動的に次のエピソードを再生し、終わり近くにスキップ用のボタンを表示します。"
+            "value" : "エピソードが終わると自動的に次のエピソードを再生し、終わり近くにスキップ用のボタンを表示します。Stremioアドオンが複数のストリームを提供する場合は、どれを再生するか確認します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "에피소드가 끝나면 자동으로 다음 에피소드를 재생하고, 끝부분에 건너뛰기 버튼을 표시합니다."
+            "value" : "에피소드가 끝나면 자동으로 다음 에피소드를 재생하고, 끝부분에 건너뛰기 버튼을 표시합니다. Stremio 애드온이 여러 스트림을 제공하면 재생할 스트림을 묻습니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Iniciar automaticamente o próximo episódio quando um terminar e mostrar um botão perto do fim para avançar."
+            "value" : "Iniciar automaticamente o próximo episódio quando um terminar e mostrar um botão perto do fim para avançar. Quando um addon do Stremio oferece vários streams, pergunta qual reproduzir."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一集播放结束时自动开始下一集，并在接近结尾时显示跳过按钮。"
+            "value" : "一集播放结束时自动开始下一集，并在接近结尾时显示跳过按钮。当 Stremio 插件提供多个流时，询问要播放哪一个。"
           }
         }
       }
@@ -5469,6 +5521,58 @@
         }
       }
     },
+    "Choose a Source" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelle auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige una fuente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une source"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli una fonte"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소스 선택"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher uma fonte"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择来源"
+          }
+        }
+      }
+    },
     "Choose Local File…" : {
       "comment" : "A button that allows the user to choose a local file.",
       "isCommentAutoGenerated" : true,
@@ -5519,6 +5623,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择本地文件…"
+          }
+        }
+      }
+    },
+    "Choose Stremio Stream" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio-Stream auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir stream de Stremio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir le flux Stremio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli stream Stremio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremioストリームを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio 스트림 선택"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher stream do Stremio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择 Stremio 流"
           }
         }
       }
@@ -9096,6 +9252,110 @@
         }
       }
     },
+    "e.g. https://v3-cinemeta.strem.io/manifest.json" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "z. B. https://v3-cinemeta.strem.io/manifest.json"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "p. ej. https://v3-cinemeta.strem.io/manifest.json"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ex. https://v3-cinemeta.strem.io/manifest.json"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "es. https://v3-cinemeta.strem.io/manifest.json"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例: https://v3-cinemeta.strem.io/manifest.json"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예: https://v3-cinemeta.strem.io/manifest.json"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ex.: https://v3-cinemeta.strem.io/manifest.json"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如 https://v3-cinemeta.strem.io/manifest.json"
+          }
+        }
+      }
+    },
+    "e.g. My Addon" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "z. B. Mein Addon"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "p. ej. Mi addon"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ex. Mon addon"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "es. Il mio addon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例: マイアドオン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예: 내 애드온"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ex.: Meu addon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如 我的插件"
+          }
+        }
+      }
+    },
     "e.g. My IPTV" : {
       "localizations" : {
         "de" : {
@@ -10138,6 +10398,110 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入PIN码"
+          }
+        }
+      }
+    },
+    "Enter the addon's manifest URL or a stremio:// install link. The addon's catalogs appear alongside your other playlists; the name is taken from the addon when left empty." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib die Manifest-URL des Addons oder einen stremio://-Installationslink ein. Die Kataloge des Addons erscheinen neben deinen anderen Playlists; der Name wird vom Addon übernommen, wenn er leer bleibt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce la URL del manifiesto del addon o un enlace de instalación stremio://. Los catálogos del addon aparecen junto a tus otras listas; el nombre se toma del addon si se deja vacío."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez l’URL du manifeste de l’addon ou un lien d’installation stremio://. Les catalogues de l’addon apparaissent aux côtés de vos autres playlists ; le nom est repris de l’addon s’il est laissé vide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci l’URL del manifest dell’addon o un link di installazione stremio://. I cataloghi dell’addon compaiono accanto alle altre playlist; il nome viene ripreso dall’addon se lasciato vuoto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アドオンのマニフェストURLまたはstremio://インストールリンクを入力してください。アドオンのカタログは他のプレイリストと並んで表示されます。名前を空にするとアドオンから取得されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "애드온의 매니페스트 URL 또는 stremio:// 설치 링크를 입력하세요. 애드온의 카탈로그는 다른 재생목록과 함께 표시되며, 이름을 비워 두면 애드온에서 가져옵니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insira a URL do manifesto do addon ou um link de instalação stremio://. Os catálogos do addon aparecem junto às suas outras playlists; o nome é obtido do addon quando deixado vazio."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入插件的清单 URL 或 stremio:// 安装链接。插件的目录会与您的其他播放列表一起显示；名称留空时将从插件获取。"
+          }
+        }
+      }
+    },
+    "Enter the addon's manifest URL. The name is taken from the addon when left empty." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib die Manifest-URL des Addons ein. Der Name wird vom Addon übernommen, wenn er leer bleibt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce la URL del manifiesto del addon. El nombre se toma del addon si se deja vacío."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez l’URL du manifeste de l’addon. Le nom est repris de l’addon s’il est laissé vide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci l’URL del manifest dell’addon. Il nome viene ripreso dall’addon se lasciato vuoto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アドオンのマニフェストURLを入力してください。名前を空にするとアドオンから取得されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "애드온의 매니페스트 URL을 입력하세요. 이름을 비워 두면 애드온에서 가져옵니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insira a URL do manifesto do addon. O nome é obtido do addon quando deixado vazio."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入插件的清单 URL。名称留空时将从插件获取。"
           }
         }
       }
@@ -29464,6 +29828,58 @@
         }
       }
     },
+    "Stream %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flux %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ストリーム %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스트림 %lld"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "流 %lld"
+          }
+        }
+      }
+    },
     "Streams open in the selected app instead of Lume's player. Downloads always play in Lume, and the built-in player is used when the app is not installed." : {
       "localizations" : {
         "de" : {
@@ -29512,6 +29928,110 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "流会在所选App中打开，而非Lume的播放器。下载内容始终在Lume中播放，未安装该App时则使用内置播放器。"
+          }
+        }
+      }
+    },
+    "Stremio" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio"
+          }
+        }
+      }
+    },
+    "Stremio Addon" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio-Addon"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Addon de Stremio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Addon Stremio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Addon Stremio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremioアドオン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio 애드온"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Addon Stremio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stremio 插件"
           }
         }
       }

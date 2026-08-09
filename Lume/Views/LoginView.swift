@@ -21,24 +21,31 @@ struct LoginView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
+    /// Form state is internal (not private) because the per-source form
+    /// sections live in a separate file (LoginView+Sections.swift) to keep this
+    /// one within the lint size caps.
     @State private var sourceType: PlaylistSourceType = .xtream
 
-    @State private var name = ""
-    @State private var serverURL = ""
-    @State private var username = ""
-    @State private var password = ""
+    @State var name = ""
+    @State var serverURL = ""
+    @State var username = ""
+    @State var password = ""
 
     // m3u fields
-    @State private var m3uURL = ""
-    @State private var epgURL = ""
+    @State var m3uURL = ""
+    @State var epgURL = ""
     #if !os(tvOS)
-        @State private var showFileImporter = false
+        @State var showFileImporter = false
     #endif
 
     // Stalker portal fields. The MAC defaults to a freshly generated MAG-style
     // address so a user without a provider-issued MAC still gets a valid one.
-    @State private var portalURL = ""
-    @State private var macAddress = StalkerMAC.generate()
+    @State var portalURL = ""
+    @State var macAddress = StalkerMAC.generate()
+
+    /// Stremio addon field: the addon's manifest.json URL (or a stremio://
+    /// install link, normalized on submit).
+    @State var stremioURL = ""
 
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -54,6 +61,8 @@ struct LoginView: View {
         case .stalker:
             !portalURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && StalkerMAC.isValid(macAddress.trimmingCharacters(in: .whitespacesAndNewlines))
+        case .stremio:
+            !stremioURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 
@@ -74,6 +83,7 @@ struct LoginView: View {
                             Text("Xtream").tag(PlaylistSourceType.xtream)
                             Text("M3U").tag(PlaylistSourceType.m3u)
                             Text("Stalker").tag(PlaylistSourceType.stalker)
+                            Text("Stremio").tag(PlaylistSourceType.stremio)
                         }
                         .pickerStyle(.segmented)
                     }
@@ -82,6 +92,7 @@ struct LoginView: View {
                     case .xtream: xtreamSection
                     case .m3u: m3uSection
                     case .stalker: stalkerSection
+                    case .stremio: stremioSection
                     }
 
                     if let errorMessage {
@@ -134,107 +145,6 @@ struct LoginView: View {
             }
         }
 
-        private var xtreamSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com:8080", text: $serverURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                TextField("Username", text: $username)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.username)
-
-                SecureField("Password", text: $password)
-                    .textContentType(.password)
-            } header: {
-                Text("Server Connection")
-            } footer: {
-                Text("Your credentials are stored locally on this device.")
-            }
-        }
-
-        private var m3uSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com/playlist.m3u", text: $m3uURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                Button("Choose Local File…") { showFileImporter = true }
-
-                TextField("EPG URL (optional)", text: $epgURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-            } header: {
-                Text("M3U Playlist")
-            } footer: {
-                Text("Enter the playlist URL or choose a local m3u/m3u8 file. The EPG URL is read from the playlist when left empty.")
-            }
-        }
-
-        private var stalkerSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com:8080/c/", text: $portalURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                HStack {
-                    TextField("MAC Address", text: $macAddress)
-                    #if os(iOS)
-                        .textInputAutocapitalization(.characters)
-                    #endif
-                        .autocorrectionDisabled()
-                    Button {
-                        macAddress = StalkerMAC.generate()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Generate a new MAC address")
-                }
-
-                TextField("Username (optional)", text: $username)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.username)
-
-                SecureField("Password (optional)", text: $password)
-                    .textContentType(.password)
-            } header: {
-                Text("Stalker Portal")
-            } footer: {
-                Text("Enter the portal URL and the MAC address your provider authorized. Most portals need only the portal URL and MAC.")
-            }
-        }
     #endif
 
     #if os(tvOS)
@@ -243,6 +153,7 @@ struct LoginView: View {
             case .xtream: "Your credentials are stored locally on this device."
             case .m3u: "The EPG URL is read from the playlist when left empty."
             case .stalker: "Enter the portal URL and the MAC address your provider authorized."
+            case .stremio: "Enter the addon's manifest URL. The name is taken from the addon when left empty."
             }
         }
 
@@ -262,6 +173,7 @@ struct LoginView: View {
                         Text("Xtream").tag(PlaylistSourceType.xtream)
                         Text("M3U").tag(PlaylistSourceType.m3u)
                         Text("Stalker").tag(PlaylistSourceType.stalker)
+                        Text("Stremio").tag(PlaylistSourceType.stremio)
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -281,6 +193,8 @@ struct LoginView: View {
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $macAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $username, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $password, isSecure: true, contentType: .password)
+                        case .stremio:
+                            TVSettingsField(title: "Addon URL", placeholder: "e.g. https://v3-cinemeta.strem.io/manifest.json", text: $stremioURL, contentType: .URL)
                         }
                     }
 
@@ -334,6 +248,7 @@ struct LoginView: View {
         case .xtream: loginXtream()
         case .m3u: addM3UPlaylist()
         case .stalker: addStalkerPlaylist()
+        case .stremio: addStremioPlaylist()
         }
     }
 
@@ -424,6 +339,37 @@ struct LoginView: View {
                     let profile = try await client.authenticate()
                     playlist.userStatus = profile.status
                     playlist.expDate = profile.expDate
+                    insertAndFinish(playlist)
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+                isLoading = false
+            }
+        }
+    }
+
+    private func addStremioPlaylist() {
+        isLoading = true
+        errorMessage = nil
+
+        let manifestURL = StremioManifestURL.normalized(stremioURL)
+
+        Task {
+            let playlist = Playlist(
+                name: trimmedName.isEmpty ? "Stremio" : trimmedName,
+                stremioManifestURL: manifestURL
+            )
+
+            let client = StremioClient(configuration: StremioClient.Configuration(playlist: playlist))
+            do {
+                try await withConnectionTimeout {
+                    // Loading the manifest doubles as the connection test — and
+                    // supplies the addon's own name when the user left it empty.
+                    let manifest = try await client.getManifest()
+                    if trimmedName.isEmpty, !manifest.name.isEmpty {
+                        playlist.name = manifest.name
+                    }
+                    playlist.serverVersion = manifest.version
                     insertAndFinish(playlist)
                 }
             } catch {

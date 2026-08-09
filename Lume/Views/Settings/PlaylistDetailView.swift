@@ -34,12 +34,17 @@ struct PlaylistDetailView: View {
         playlist.sourceType == .stalker
     }
 
+    var isStremio: Bool {
+        playlist.sourceType == .stremio
+    }
+
     /// The localized section heading for the connection fields.
     var connectionSectionTitle: LocalizedStringKey {
         switch playlist.sourceType {
         case .xtream: "Server"
         case .m3u: "M3U Playlist"
         case .stalker: "Stalker Portal"
+        case .stremio: "Stremio Addon"
         }
     }
 
@@ -151,7 +156,7 @@ struct PlaylistDetailView: View {
                     if !playlist.username.isEmpty {
                         LabeledContent("Username", value: playlist.username)
                     }
-                } else {
+                } else if !isStremio {
                     LabeledContent("Username", value: playlist.username)
                     LabeledContent("Password") {
                         Text("••••••••")
@@ -199,7 +204,7 @@ struct PlaylistDetailView: View {
                         .textContentType(.username)
                     SecureField("Password (optional)", text: $editPassword)
                         .textContentType(.password)
-                } else {
+                } else if !isStremio {
                     TextField("Username", text: $editUsername)
                     #if os(iOS)
                         .textInputAutocapitalization(.never)
@@ -297,6 +302,7 @@ struct PlaylistDetailView: View {
         case .xtream: "Server URL"
         case .m3u: "Playlist URL"
         case .stalker: "Portal URL"
+        case .stremio: "Addon URL"
         }
     }
 }
@@ -328,6 +334,8 @@ extension PlaylistDetailView {
             playlist.macAddress = editMacAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword
+        } else if isStremio {
+            playlist.serverURL = StremioManifestURL.normalized(playlist.serverURL)
         } else {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword

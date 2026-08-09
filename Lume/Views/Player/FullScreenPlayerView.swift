@@ -14,7 +14,7 @@ struct FullScreenPlayerView: View {
     let media: PlayableMedia
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.modelContext) var modelContext
     @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
         @Environment(\.dismissWindow) private var dismissWindow
@@ -29,7 +29,7 @@ struct FullScreenPlayerView: View {
     /// Advanced when an engine fails to start a stream, falling the player back
     /// to the next engine in the list. Reset to the primary engine whenever the
     /// active stream changes.
-    @State private var engineAttempt = 0
+    @State var engineAttempt = 0
 
     /// Observes the active AirPlay route. Full-screen AirPlay *video* is only
     /// possible through `AVPlayer` (KSPlayer/VLCKit render into their own layers,
@@ -59,18 +59,36 @@ struct FullScreenPlayerView: View {
 
     /// The stream currently playing. Starts as `media` but can be swapped when
     /// the viewer picks another episode from the in-player episode rail (tvOS).
-    @State private var activeMedia: PlayableMedia
+    @State var activeMedia: PlayableMedia
 
-    /// The Stalker-resolved stand-in for `activeMedia`. Stalker streams arrive as
-    /// a `lumestalker://` placeholder whose real URL is fetched via `create_link`
-    /// at playback time; this holds the resolved copy once it lands. `nil` while
-    /// resolution is in flight (the loading indicator shows). Engines that play a
-    /// directly usable URL (Xtream / m3u) bypass this entirely — see `displayMedia`.
-    @State private var resolvedMedia: PlayableMedia?
+    /// The resolved stand-in for `activeMedia`. Stalker and Stremio streams
+    /// arrive as a `lumestalker://` / `lumestremio://` placeholder whose real
+    /// URL is fetched at playback time; this holds the resolved copy once it
+    /// lands. `nil` while resolution is in flight (the loading indicator
+    /// shows). Engines that play a directly usable URL (Xtream / m3u) bypass
+    /// this entirely — see `displayMedia`.
+    @State var resolvedMedia: PlayableMedia?
 
-    /// Set when Stalker `create_link` resolution fails, so the host shows the
-    /// failure overlay instead of an endless spinner.
-    @State private var resolveError: String?
+    /// Set when stream resolution fails, so the host shows the failure overlay
+    /// instead of an endless spinner.
+    @State var resolveError: String?
+
+    /// The stream candidates a Stremio addon returned for `activeMedia`, when
+    /// the viewer has to choose between them. Non-`nil` only while the source
+    /// picker is up; picking (or an auto-pick, see `resolveActiveMedia`)
+    /// clears it and fills `resolvedMedia`.
+    @State var streamOptions: [StremioStreamOption]?
+
+    /// The `bingeGroup` of the stream the viewer last picked, so episode hops
+    /// within this player session stay on the same source/quality instead of
+    /// re-asking on every auto-advance.
+    @State var selectedBingeGroup: String?
+
+    /// In-flight fetch of the active stream's external subtitle tracks from
+    /// every subtitle-capable Stremio source (see `StremioSubtitleResolver`).
+    /// Runs alongside stream resolution; its result is attached to the
+    /// resolved media when a stream is picked. Stremio VOD only.
+    @State var subtitleFetch: Task<[ExternalSubtitle], Never>?
 
     /// The episode queued to play after `activeMedia`, resolved whenever the
     /// active stream changes. Drives both the in-player Next Episode button and
@@ -193,8 +211,8 @@ struct FullScreenPlayerView: View {
             // auto-hiding controls overlay — showing a second one here means
             // the user sees duplicate X buttons whenever the controls are
             // visible. Only render our custom close for engines that don't
-            // draw their own controls.
-            if !engine.rendersOwnControls {
+            // draw their own controls. The stream picker also brings its own.
+            if !engine.rendersOwnControls, streamOptions == nil {
                 closeButton
                     .padding(.top, 4)
                     .padding(.leading, 4)
@@ -218,8 +236,9 @@ struct FullScreenPlayerView: View {
             #endif
         }
         .task(id: activeMedia.id) {
-            // Resolve a deferred Stalker placeholder into a real (short-lived)
-            // stream URL before the engine loads it. No-op for Xtream / m3u.
+            // Resolve a deferred Stalker/Stremio placeholder into a real
+            // (short-lived) stream URL before the engine loads it. No-op for
+            // Xtream / m3u.
             await resolveActiveMedia()
         }
         .task(id: activeMedia.id) {
@@ -302,11 +321,11 @@ struct FullScreenPlayerView: View {
 
     /// The media to hand the engine. For a directly playable stream (Xtream /
     /// m3u) this is `activeMedia` itself, so playback starts with no extra step.
-    /// For a Stalker placeholder it is the resolved copy, gated on its identity
-    /// matching the active stream so a stale resolution from the previous stream
-    /// never reaches the engine during a channel/episode switch.
+    /// For a deferred Stalker/Stremio placeholder it is the resolved copy, gated
+    /// on its identity matching the active stream so a stale resolution from the
+    /// previous stream never reaches the engine during a channel/episode switch.
     private var displayMedia: PlayableMedia? {
-        guard StalkerLink.isPlaceholder(activeMedia.url) else { return activeMedia }
+        guard DeferredStreamLink.isPlaceholder(activeMedia.url) else { return activeMedia }
         guard let resolvedMedia, resolvedMedia.id == activeMedia.id else { return nil }
         return resolvedMedia
     }
@@ -315,12 +334,21 @@ struct FullScreenPlayerView: View {
     private var playerView: some View {
         if let media = displayMedia {
             engineView(for: media)
+        } else if let streamOptions {
+            // The addon offered several streams — let the viewer pick before
+            // the engine loads.
+            StremioStreamPickerView(
+                title: activeMedia.title,
+                options: streamOptions,
+                onSelect: selectStreamOption,
+                onClose: closePlayer
+            )
         } else if resolveError != nil {
-            // Stalker `create_link` failed — surface the failure with a retry
+            // Stream resolution failed — surface the failure with a retry
             // rather than spinning forever.
             PlayerErrorIndicator(title: activeMedia.title, onRetry: retryResolve, onClose: closePlayer)
         } else {
-            // Resolving the Stalker stream URL before the engine can load it.
+            // Resolving the stream URL before the engine can load it.
             PlayerLoadingIndicator(title: activeMedia.title)
         }
     }
@@ -387,28 +415,6 @@ struct FullScreenPlayerView: View {
         }
     }
 
-    /// Resolves the active Stalker placeholder into a playable URL. A no-op for
-    /// directly playable streams. Re-runs whenever the active stream changes
-    /// (open, channel surf, next episode), so each switch resolves a fresh,
-    /// short-lived URL.
-    private func resolveActiveMedia() async {
-        guard StalkerLink.isPlaceholder(activeMedia.url) else { return }
-        resolvedMedia = nil
-        resolveError = nil
-        do {
-            resolvedMedia = try await StalkerStreamResolver.resolve(activeMedia, container: modelContext.container)
-        } catch {
-            resolveError = error.localizedDescription
-            let detail = (error as? StalkerError)?.logDescription ?? LogRedaction.describe(error)
-            Logger.player.error("Stalker stream resolution failed: \(detail, privacy: .public)")
-        }
-    }
-
-    private func retryResolve() {
-        engineAttempt = 0
-        Task { await resolveActiveMedia() }
-    }
-
     /// Persist the outgoing stream's progress, then swap in a new one. The
     /// engine reconfigures its player when `activeMedia` changes.
     private func switchMedia(to newMedia: PlayableMedia) {
@@ -456,40 +462,8 @@ struct FullScreenPlayerView: View {
         #endif
     }
 
-    private func configureAudioSessionForPlayback() {
-        // tvOS needs this as much as iOS: LumeEngine renders PCM through
-        // AVSampleBufferAudioRenderer and sizes its downmix to the session's
-        // *negotiated* output channels — without an active .playback session
-        // the route stays at its default and multichannel audio has no path.
-        // (KSPlayer/VLC configure their own session; LumeEngine by design
-        // does not touch global audio state, so it is the app's job.)
-        #if os(iOS) || os(tvOS)
-            let session = AVAudioSession.sharedInstance()
-            try? session.setCategory(.playback, mode: .moviePlayback, options: [])
-            // Ask for the route's full width (HDMI LPCM surround); harmless
-            // when the route is stereo — the session clamps and LumeEngine
-            // downmixes to whatever was actually granted.
-            let maxChannels = session.maximumOutputNumberOfChannels
-            if maxChannels > 2 {
-                try? session.setPreferredOutputNumberOfChannels(maxChannels)
-            }
-            try? session.setActive(true, options: [])
-            let route = session.currentRoute.outputs
-                .map { "\($0.portType.rawValue)(\($0.channels?.count ?? 0)ch)" }
-                .joined(separator: "+")
-            Logger.player.info("""
-            Audio session active: route=\(route, privacy: .public) \
-            outputChannels=\(session.outputNumberOfChannels) \
-            maxChannels=\(maxChannels) sampleRate=\(session.sampleRate)
-            """)
-        #endif
-    }
-
-    private func releaseAudioSession() {
-        #if os(iOS) || os(tvOS)
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
-    }
+    // configureAudioSessionForPlayback() / releaseAudioSession() live in
+    // FullScreenPlayerView+AudioSession.swift.
 
     #if os(macOS)
         private func enterMacFullScreen() {

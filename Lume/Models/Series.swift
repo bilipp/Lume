@@ -85,6 +85,12 @@ final class Series {
     var categoryId: String?
     @Relationship(deleteRule: .cascade) var episodes: [Episode] = []
 
+    /// The Stremio meta id (e.g. `tt0898266`) for series that come from a
+    /// Stremio addon. `seriesId` is a derived hash for those sources, so the
+    /// original id must be kept to request the episode list and streams.
+    /// `nil` for Xtream / m3u / Stalker sources.
+    var stremioId: String?
+
     var isFavorite: Bool = false
     /// A user-defined order for the unified Favorites collection, spanning movies,
     /// series and live channels. `nil` means "follow the default order"; once the

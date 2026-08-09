@@ -23,6 +23,37 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     let kind: Kind
     let startTime: TimeInterval
     let contentRef: ContentRef
+    /// HTTP headers the source requires on the media request (Stremio streams
+    /// carrying `behaviorHints.proxyHeaders`). Engines that can pass request
+    /// headers apply them; `nil` for every other source.
+    let httpHeaders: [String: String]?
+    /// External subtitle tracks fetched from subtitle-capable Stremio addons at
+    /// resolution time, for engines to offer alongside the embedded tracks.
+    let externalSubtitles: [ExternalSubtitle]?
+
+    init(
+        id: String,
+        url: URL,
+        title: String,
+        subtitle: String?,
+        posterURL: URL?,
+        kind: Kind,
+        startTime: TimeInterval,
+        contentRef: ContentRef,
+        httpHeaders: [String: String]? = nil,
+        externalSubtitles: [ExternalSubtitle]? = nil
+    ) {
+        self.id = id
+        self.url = url
+        self.title = title
+        self.subtitle = subtitle
+        self.posterURL = posterURL
+        self.kind = kind
+        self.startTime = startTime
+        self.contentRef = contentRef
+        self.httpHeaders = httpHeaders
+        self.externalSubtitles = externalSubtitles
+    }
 
     var isLive: Bool {
         kind == .live
@@ -41,15 +72,23 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             posterURL: posterURL,
             kind: kind,
             startTime: position,
-            contentRef: contentRef
+            contentRef: contentRef,
+            httpHeaders: httpHeaders,
+            externalSubtitles: externalSubtitles
         )
     }
 
-    /// Returns a copy with the playback URL replaced. Used by
-    /// `StalkerStreamResolver` to swap a deferred `lumestalker://` placeholder for
-    /// the real, freshly resolved stream URL while keeping the same identity.
-    /// `nonisolated` so the resolver can call it off the main actor.
-    nonisolated func replacingURL(_ newURL: URL) -> PlayableMedia {
+    /// Returns a copy with the playback URL replaced — and, for Stremio
+    /// streams, the request headers and external subtitles the resolution
+    /// produced. Used by the resolvers to swap a deferred `lumestalker://` /
+    /// `lumestremio://` placeholder for the real, freshly resolved stream URL
+    /// while keeping the same identity. `nonisolated` so the resolvers can call
+    /// it off the main actor.
+    nonisolated func replacingURL(
+        _ newURL: URL,
+        httpHeaders: [String: String]? = nil,
+        externalSubtitles: [ExternalSubtitle]? = nil
+    ) -> PlayableMedia {
         PlayableMedia(
             id: id,
             url: newURL,
@@ -58,8 +97,45 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             posterURL: posterURL,
             kind: kind,
             startTime: startTime,
-            contentRef: contentRef
+            contentRef: contentRef,
+            httpHeaders: httpHeaders,
+            externalSubtitles: externalSubtitles
         )
+    }
+}
+
+/// One subtitle track that isn't embedded in the stream. Two sources produce
+/// these: a Stremio subtitle addon offers a list up front at stream-resolution
+/// time (see `StremioSubtitleResolver`), and the OpenSubtitles search sheet
+/// hands back a single downloaded file mid-playback (see `SubtitleSearchView`).
+/// One value type for both, so `PlayableMedia` can carry addon tracks into any
+/// engine and `ExternalSubtitleLoading` can take either kind.
+nonisolated struct ExternalSubtitle: Hashable, Codable, Identifiable {
+    let id: String
+    /// Where the engine reads the track from: a remote URL for an addon track,
+    /// a file URL for one downloaded from OpenSubtitles.
+    let url: URL
+    /// What the track is called in the player's subtitle menu.
+    let label: String
+    /// The track's language as the source sent it — an ISO 639 code most of
+    /// the time, but addons also ship bare names and site-specific codes. Only
+    /// used to group same-language tracks in the menu; `nil` when the source
+    /// didn't say.
+    let language: String?
+
+    init(id: String, url: URL, label: String, language: String? = nil) {
+        self.id = id
+        self.url = url
+        self.label = label
+        self.language = language
+    }
+
+    /// A track from a Stremio subtitle addon, which identifies it by language
+    /// alone: the label is the localized language name when `language` is a
+    /// real ISO code, the raw value otherwise.
+    static func addonTrack(id: String, url: URL, language: String) -> ExternalSubtitle {
+        let localized = Locale.current.localizedString(forLanguageCode: language)?.capitalized(with: .current)
+        return ExternalSubtitle(id: id, url: url, label: localized ?? language, language: language)
     }
 }
 
@@ -135,7 +211,9 @@ extension PlayableMedia {
         case .stalker:
             guard let cmd = episode.directSource, let placeholder = StalkerLink.placeholder(type: .vod, cmd: cmd) else { return nil }
             url = placeholder
-        case .m3u:
+        case .m3u, .stremio:
+            // m3u stores the episode's direct URL; Stremio stores a
+            // `lumestremio://` placeholder the player resolves at playback time.
             guard let resolved = episode.directSource.flatMap(URL.init(string:)) else { return nil }
             url = resolved
         case .xtream:

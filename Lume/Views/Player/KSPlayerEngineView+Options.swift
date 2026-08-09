@@ -58,6 +58,12 @@ extension KSPlayerEngineView {
         if !media.isLive, media.startTime > 1 {
             options.startPlayTime = media.startTime
         }
+        // Headers the source requires on the media request (Stremio
+        // `proxyHeaders`). `appendHeader` feeds both backends: FFmpeg's
+        // `headers` option and KSAVPlayer's AVURLAsset header field.
+        if let headers = media.httpHeaders, !headers.isEmpty {
+            options.appendHeader(headers)
+        }
         #if os(macOS)
             options.automaticWindowResize = false
         #endif

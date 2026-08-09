@@ -79,10 +79,13 @@ enum ExternalPlayback {
     /// Opens `media` in the preferred external player. Returns `true` when the
     /// hand-off happened; on `false` the caller starts the built-in player so
     /// playback never dead-ends. Local downloads always return `false` — other
-    /// apps cannot read files inside Lume's sandbox.
+    /// apps cannot read files inside Lume's sandbox — and so do deferred
+    /// Stalker/Stremio placeholders, whose real URL only the built-in player
+    /// can resolve.
     static func open(_ media: PlayableMedia) -> Bool {
         guard let player = preferred,
               !media.url.isFileURL,
+              !DeferredStreamLink.isPlaceholder(media.url),
               let deepLink = player.deepLink(for: media.url) else { return false }
         #if os(macOS)
             guard NSWorkspace.shared.urlForApplication(toOpen: deepLink) != nil else { return false }

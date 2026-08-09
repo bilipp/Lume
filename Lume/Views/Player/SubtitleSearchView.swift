@@ -115,8 +115,9 @@ struct SubtitleSearchView: View {
                 let fileURL = try await service.download(subtitle)
                 onPick(ExternalSubtitle(
                     id: subtitle.id,
+                    url: fileURL,
                     label: "\(subtitle.languageName) · OpenSubtitles",
-                    fileURL: fileURL
+                    language: subtitle.languageCode
                 ))
                 dismiss()
             } catch let error as OpenSubtitlesError {

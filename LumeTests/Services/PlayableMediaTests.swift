@@ -236,3 +236,57 @@ struct PlayableMediaTests {
         #expect(set.count == 3)
     }
 }
+
+// MARK: - External subtitles
+
+/// `ExternalSubtitle` is the one value type both subtitle sources produce — a
+/// Stremio addon track and an OpenSubtitles download — so the engines can take
+/// either through `ExternalSubtitleLoading`.
+struct ExternalSubtitleTests {
+    @Test func `an addon track labels itself with the localized language name`() throws {
+        let track = try ExternalSubtitle.addonTrack(
+            id: "s1", url: #require(URL(string: "https://subs.example/en.srt")), language: "en"
+        )
+        #expect(track.language == "en")
+        // Locale-dependent, so assert the fallback didn't fire rather than a
+        // literal: "English" under en, "Englisch" under de.
+        #expect(track.label != "en")
+        #expect(!track.label.isEmpty)
+    }
+
+    @Test func `an addon track falls back to the raw language when it isn't an ISO code`() throws {
+        let track = try ExternalSubtitle.addonTrack(
+            id: "s2", url: #require(URL(string: "https://subs.example/x.srt")), language: "Brazilian"
+        )
+        #expect(track.label == "Brazilian")
+    }
+
+    /// A downloaded file carries its own label and a file URL — the same shape
+    /// the engines read, so no per-source branching is needed at load time.
+    @Test func `a downloaded track keeps the label its source gave it`() {
+        let track = ExternalSubtitle(
+            id: "42", url: URL(fileURLWithPath: "/tmp/42.en.srt"),
+            label: "English · OpenSubtitles", language: "en"
+        )
+        #expect(track.label == "English · OpenSubtitles")
+        #expect(track.url.isFileURL)
+    }
+
+    /// Addon tracks ride on `PlayableMedia`, which crosses a `Window` value as
+    /// JSON — so they have to survive the round trip.
+    @Test func `external subtitles survive a playable media round trip`() throws {
+        let media = try PlayableMedia(
+            id: "movie-1", url: #require(URL(string: "https://cdn.example/a.mkv")),
+            title: "A", subtitle: nil, posterURL: nil, kind: .vod, startTime: 0,
+            contentRef: .movie("m-1"),
+            externalSubtitles: [
+                .addonTrack(id: "s1", url: #require(URL(string: "https://subs.example/en.srt")), language: "en")
+            ]
+        )
+        let decoded = try JSONDecoder().decode(
+            PlayableMedia.self, from: JSONEncoder().encode(media)
+        )
+        #expect(decoded.externalSubtitles?.count == 1)
+        #expect(decoded.externalSubtitles?.first == media.externalSubtitles?.first)
+    }
+}

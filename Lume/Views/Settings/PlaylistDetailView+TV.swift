@@ -58,7 +58,7 @@ import SwiftUI
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $editMacAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        } else {
+                        } else if !isStremio {
                             TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
                         }
@@ -82,7 +82,7 @@ import SwiftUI
                             if !playlist.username.isEmpty {
                                 TVSettingsValueRow("Username", value: playlist.username)
                             }
-                        } else {
+                        } else if !isStremio {
                             TVSettingsValueRow("Username", value: playlist.username)
                             TVSettingsValueRow("Password") { Text("••••••••") }
                         }

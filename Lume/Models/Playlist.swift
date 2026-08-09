@@ -73,12 +73,21 @@ final class Playlist {
         sourceTypeRaw = PlaylistSourceType.stalker.rawValue
         self.macAddress = macAddress
     }
+
+    /// Creates a Stremio addon source. The addon's `manifest.json` URL goes in
+    /// `serverURL`; addons are public HTTP services with no credentials (any
+    /// user configuration is baked into the manifest URL itself).
+    convenience init(name: String, stremioManifestURL: String) {
+        self.init(name: name, serverURL: stremioManifestURL, username: "", password: "")
+        sourceTypeRaw = PlaylistSourceType.stremio.rawValue
+    }
 }
 
 enum PlaylistSourceType: String, Codable {
     case xtream
     case m3u
     case stalker
+    case stremio
 }
 
 /// The container a playlist's live streams are requested in.
@@ -168,15 +177,23 @@ extension Playlist {
 
     /// Whether the stream container can be chosen for this playlist. Stalker
     /// portals hand out a fully-formed stream URL per session through
-    /// `create_link`, so there is nothing for us to pick.
+    /// `create_link`, and Stremio addons resolve a stream on demand at playback
+    /// time, so in neither case is there anything for us to pick.
     var supportsStreamFormatChoice: Bool {
-        sourceType != .stalker
+        switch sourceType {
+        case .xtream, .m3u: true
+        case .stalker, .stremio: false
+        }
     }
 
     /// Whether content from this playlist can be downloaded for offline playback.
-    /// Stalker portals hand out short-lived, per-session stream URLs, so there is
-    /// no stable URL to persist for offline use.
+    /// Stalker portals hand out short-lived, per-session stream URLs, and
+    /// Stremio streams are resolved on demand at playback time, so neither has
+    /// a stable URL to persist for offline use.
     var supportsDownloads: Bool {
-        sourceType != .stalker
+        switch sourceType {
+        case .xtream, .m3u: true
+        case .stalker, .stremio: false
+        }
     }
 }
