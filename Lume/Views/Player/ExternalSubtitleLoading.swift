@@ -2,8 +2,9 @@
 //  ExternalSubtitleLoading.swift
 //  Lume
 //
-//  The engine-agnostic surface for side-loading a subtitle file that isn't
-//  embedded in the stream — what the OpenSubtitles search sheet hands back.
+//  The engine-agnostic surface for side-loading a subtitle track that isn't
+//  embedded in the stream — a file the OpenSubtitles search sheet hands back,
+//  or a track a Stremio subtitle addon offered alongside the stream.
 //
 //  Each engine gets there differently (KSPlayer takes a `SubtitleInfo`, VLCKit
 //  a "playback slave", LumeEngine an FFmpeg sidecar demux), so the conformances
@@ -19,13 +20,8 @@ import Foundation
 import KSPlayer
 import VLCKit
 
-/// A subtitle file on disk, ready to hand to an engine.
-nonisolated struct ExternalSubtitle: Equatable, Identifiable {
-    let id: String
-    /// What the track is called in the player's subtitle menu.
-    let label: String
-    let fileURL: URL
-}
+// `ExternalSubtitle`, the value both sources produce, lives next to
+// `PlayableMedia` — addon tracks ride on the media itself.
 
 @MainActor
 protocol ExternalSubtitleLoading: AnyObject {
@@ -47,7 +43,7 @@ extension ExternalSubtitleLoading {
 
 extension KSVideoPlayer.Coordinator: ExternalSubtitleLoading {
     func loadExternalSubtitle(_ subtitle: ExternalSubtitle) {
-        let info = URLSubtitleInfo(subtitleID: subtitle.id, name: subtitle.label, url: subtitle.fileURL)
+        let info = URLSubtitleInfo(subtitleID: subtitle.id, name: subtitle.label, url: subtitle.url)
         subtitleModel.addSubtitle(info: info)
         subtitleModel.selectedSubtitleInfo = info
     }
@@ -59,7 +55,7 @@ extension VLCPlayerCoordinator: ExternalSubtitleLoading {
     func loadExternalSubtitle(_ subtitle: ExternalSubtitle) {
         // `enforce: true` selects the new track immediately; VLC appends it to
         // `textTracks`, which the overlays re-read on the next render.
-        mediaPlayer.addPlaybackSlave(subtitle.fileURL, type: .subtitle, enforce: true)
+        mediaPlayer.addPlaybackSlave(subtitle.url, type: .subtitle, enforce: true)
         objectWillChange.send()
     }
 }

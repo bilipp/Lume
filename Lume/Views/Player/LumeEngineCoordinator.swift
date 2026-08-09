@@ -89,17 +89,21 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     private var startupTask: Task<Void, Never>?
     private var reportedFailure = false
     private var selectedSubtitleID: String?
-    /// The sidecar subtitle file loaded from the OpenSubtitles search, if any.
-    /// Kept so the track survives a switch to an embedded track and back — the
-    /// engine's sidecar loader is a one-shot parse, so re-selecting means
-    /// re-reading the file.
-    private var externalSubtitle: ExternalSubtitle?
+    /// Sidecar subtitle tracks on offer in the menu: the ones a Stremio
+    /// subtitle addon supplied alongside the stream, plus anything picked from
+    /// the OpenSubtitles search this session. Kept so a track survives a switch
+    /// to an embedded track and back — the engine's sidecar loader is a
+    /// one-shot parse, so re-selecting means re-reading the file.
+    private var externalSubtitles: [ExternalSubtitle] = []
 
     // MARK: Lifecycle
 
     func configure(media: PlayableMedia) {
         tearDown()
         currentMedia = media
+        // Addon-supplied tracks are on offer from the first frame; they load
+        // only when the viewer picks one, so nothing is parsed up front.
+        externalSubtitles = media.externalSubtitles ?? []
         reportedFailure = false
         // After `tearDown` (which closes any previous session) so a reload counts
         // as its own startup attempt rather than extending the last one.
@@ -203,7 +207,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         subtitleCues.update(nil)
         // The sidecar lane belongs to the session that just went away; a fresh
         // session starts with no cues, so the menu must not keep advertising it.
-        externalSubtitle = nil
+        externalSubtitles = []
         selectedSubtitleID = nil
         isPipActive = false
     }
@@ -254,7 +258,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     func selectTextTrack(id: String?) {
         selectedSubtitleID = id
-        if let external = externalSubtitle, id == Self.externalTrackID {
+        if let external = externalSubtitles.first(where: { Self.trackID(for: $0) == id }) {
             loadExternalSubtitleFile(external)
             return
         }
@@ -388,13 +392,10 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 isSelected: selectedSubtitleID == id
             )
         }
-        if let external = externalSubtitle {
-            options.append(PlayerTrackOption(
-                id: Self.externalTrackID,
-                label: external.label,
-                isSelected: selectedSubtitleID == Self.externalTrackID
-            ))
-        }
+        options.append(contentsOf: externalSubtitles.map { external in
+            let id = Self.trackID(for: external)
+            return PlayerTrackOption(id: id, label: external.label, isSelected: selectedSubtitleID == id)
+        })
         textTrackOptions = options
     }
 
@@ -435,15 +436,18 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 // MARK: - External subtitles
 
 extension LumeEngineCoordinator: ExternalSubtitleLoading {
-    /// Id for the sidecar track in the overlay's subtitle menu. Prefixed so it
+    /// Id for a sidecar track in the overlay's subtitle menu. Prefixed so it
     /// can never collide with an embedded track's stream index.
-    static var externalTrackID: String {
-        "external"
+    static func trackID(for subtitle: ExternalSubtitle) -> String {
+        "external:\(subtitle.id)"
     }
 
     func loadExternalSubtitle(_ subtitle: ExternalSubtitle) {
-        externalSubtitle = subtitle
-        selectedSubtitleID = Self.externalTrackID
+        // A track searched for mid-playback joins whatever the addon offered.
+        if !externalSubtitles.contains(subtitle) {
+            externalSubtitles.append(subtitle)
+        }
+        selectedSubtitleID = Self.trackID(for: subtitle)
         loadExternalSubtitleFile(subtitle)
     }
 
@@ -456,10 +460,10 @@ extension LumeEngineCoordinator: ExternalSubtitleLoading {
         let session = session
         Task {
             do {
-                try await session?.loadExternalSubtitles(url: subtitle.fileURL.absoluteString)
+                try await session?.loadExternalSubtitles(url: subtitle.url.absoluteString)
             } catch {
                 Logger.player.error("LumeEngine could not load external subtitles: \(LogRedaction.describe(error), privacy: .public)")
-                self.externalSubtitle = nil
+                self.externalSubtitles.removeAll { $0 == subtitle }
                 self.selectedSubtitleID = nil
                 if let info = self.mediaInfo { self.publishTracks(info: info) }
             }

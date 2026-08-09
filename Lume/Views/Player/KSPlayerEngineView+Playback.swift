@@ -150,9 +150,10 @@ extension KSPlayerEngineView {
         guard let subtitles = media.externalSubtitles, !subtitles.isEmpty else { return }
         var perLanguage: [String: Int] = [:]
         for subtitle in subtitles {
-            let ordinal = perLanguage[subtitle.language, default: 0] + 1
-            perLanguage[subtitle.language] = ordinal
-            let name = ordinal > 1 ? "\(subtitle.displayName) \(ordinal)" : subtitle.displayName
+            let group = subtitle.language ?? subtitle.label
+            let ordinal = perLanguage[group, default: 0] + 1
+            perLanguage[group] = ordinal
+            let name = ordinal > 1 ? "\(subtitle.label) \(ordinal)" : subtitle.label
             coordinator.subtitleModel.addSubtitle(
                 info: URLSubtitleInfo(subtitleID: subtitle.id, name: name, url: subtitle.url)
             )

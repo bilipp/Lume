@@ -310,7 +310,7 @@ nonisolated enum StremioSubtitleResolver {
             let count = perLanguage[subtitle.lang, default: 0]
             guard count < maxTracksPerLanguage else { continue }
             perLanguage[subtitle.lang] = count + 1
-            result.append(ExternalSubtitle(id: subtitle.url, url: url, language: subtitle.lang))
+            result.append(.addonTrack(id: subtitle.url, url: url, language: subtitle.lang))
         }
         return result
     }

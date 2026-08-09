@@ -104,23 +104,38 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     }
 }
 
-/// One external subtitle track offered by a subtitle-capable source (today:
-/// Stremio subtitle addons, see `StremioSubtitleResolver`). Value type so it
-/// can ride on `PlayableMedia` into any engine.
+/// One subtitle track that isn't embedded in the stream. Two sources produce
+/// these: a Stremio subtitle addon offers a list up front at stream-resolution
+/// time (see `StremioSubtitleResolver`), and the OpenSubtitles search sheet
+/// hands back a single downloaded file mid-playback (see `SubtitleSearchView`).
+/// One value type for both, so `PlayableMedia` can carry addon tracks into any
+/// engine and `ExternalSubtitleLoading` can take either kind.
 nonisolated struct ExternalSubtitle: Hashable, Codable, Identifiable {
     let id: String
+    /// Where the engine reads the track from: a remote URL for an addon track,
+    /// a file URL for one downloaded from OpenSubtitles.
     let url: URL
+    /// What the track is called in the player's subtitle menu.
+    let label: String
     /// The track's language as the source sent it — an ISO 639 code most of
-    /// the time, but addons also ship bare names and site-specific codes.
-    let language: String
+    /// the time, but addons also ship bare names and site-specific codes. Only
+    /// used to group same-language tracks in the menu; `nil` when the source
+    /// didn't say.
+    let language: String?
 
-    /// Menu label: the localized language name when `language` is a real ISO
-    /// code, the raw value otherwise.
-    var displayName: String {
-        if let name = Locale.current.localizedString(forLanguageCode: language) {
-            return name.capitalized(with: .current)
-        }
-        return language
+    init(id: String, url: URL, label: String, language: String? = nil) {
+        self.id = id
+        self.url = url
+        self.label = label
+        self.language = language
+    }
+
+    /// A track from a Stremio subtitle addon, which identifies it by language
+    /// alone: the label is the localized language name when `language` is a
+    /// real ISO code, the raw value otherwise.
+    static func addonTrack(id: String, url: URL, language: String) -> ExternalSubtitle {
+        let localized = Locale.current.localizedString(forLanguageCode: language)?.capitalized(with: .current)
+        return ExternalSubtitle(id: id, url: url, label: localized ?? language, language: language)
     }
 }
 

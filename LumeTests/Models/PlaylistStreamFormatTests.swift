@@ -56,6 +56,15 @@ struct PlaylistStreamFormatTests {
         #expect(makePlaylist().supportsStreamFormatChoice)
     }
 
+    @Test func `stremio addons cannot choose a container`() {
+        let stremio = Playlist(name: "Addon", stremioManifestURL: "https://addon.example/manifest.json")
+        #expect(!stremio.supportsStreamFormatChoice)
+    }
+
+    @Test func `m3u playlists can choose a container`() {
+        #expect(Playlist(name: "M3U", m3uURL: "http://example.com/list.m3u").supportsStreamFormatChoice)
+    }
+
     // MARK: - Xtream live URLs
 
     @Test func `automatic keeps the historical HLS live URL`() {

@@ -177,9 +177,13 @@ extension Playlist {
 
     /// Whether the stream container can be chosen for this playlist. Stalker
     /// portals hand out a fully-formed stream URL per session through
-    /// `create_link`, so there is nothing for us to pick.
+    /// `create_link`, and Stremio addons resolve a stream on demand at playback
+    /// time, so in neither case is there anything for us to pick.
     var supportsStreamFormatChoice: Bool {
-        sourceType != .stalker
+        switch sourceType {
+        case .xtream, .m3u: true
+        case .stalker, .stremio: false
+        }
     }
 
     /// Whether content from this playlist can be downloaded for offline playback.
