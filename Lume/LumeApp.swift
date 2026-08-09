@@ -222,6 +222,11 @@ struct LumeApp: App {
                     // from launch.
                     await TraktService.shared.restore()
 
+                    // Restore the OpenSubtitles session (a keychain read, no
+                    // network) so the in-player subtitle search can download
+                    // without sending the viewer to Settings first.
+                    OpenSubtitlesService.shared.restore()
+
                     // Resolve the active profile and claim any pre-profiles
                     // content state before the first sync, so the catalog the
                     // reconciler reads is already scoped to a profile.

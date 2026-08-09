@@ -112,6 +112,19 @@
             objectWillChange.send()
         }
 
+        // MARK: - External subtitles
+
+        /// Only while a coordinator is attached — without one there is no
+        /// `SubtitleModel` to add the track to.
+        var supportsExternalSubtitles: Bool {
+            coordinator != nil
+        }
+
+        func loadExternalSubtitle(_ subtitle: ExternalSubtitle) {
+            coordinator?.loadExternalSubtitle(subtitle)
+            objectWillChange.send()
+        }
+
         // MARK: - Codec naming
 
         private static func codecName(for track: some MediaPlayerTrack) -> String? {

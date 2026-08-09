@@ -12,6 +12,7 @@ struct SettingsView: View {
     /// Not `private`: read by the SettingsView+Playlists extension (separate file).
     @State var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
+    @State private var openSubtitles = OpenSubtitlesService.shared
     /// Premium entitlement + paywall presentation. Not `private`: read by the
     /// SettingsView+Playlists / +TVComponents extensions (separate files).
     @State var premium = PremiumManager.shared
@@ -283,10 +284,26 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                if openSubtitles.isConfigured {
+                    NavigationLink {
+                        OpenSubtitlesIntegrationView()
+                    } label: {
+                        HStack {
+                            Label("OpenSubtitles", systemImage: "captions.bubble")
+                            Spacer()
+                            if let username = openSubtitles.username {
+                                Text(username)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
             } header: {
                 Text("Integrations")
             } footer: {
-                Text("Sync watched movies and episodes, and show your Trakt watchlist on Home.")
+                Text("Sync watched movies and episodes, show your Trakt watchlist on Home, and download subtitles for anything that ships without them.")
             }
         }
 
@@ -468,9 +485,11 @@ struct SettingsView: View {
         }
 
         /// The sidebar categories. Integrations is hidden unless the build has
-        /// Trakt credentials configured.
+        /// credentials for at least one of them.
         private var availableCategories: [SettingsCategory] {
-            SettingsCategory.allCases.filter { $0 != .integrations || trakt.isConfigured }
+            SettingsCategory.allCases.filter {
+                $0 != .integrations || trakt.isConfigured || openSubtitles.isConfigured
+            }
         }
 
         /// Content Management brings its own scroll/background, so it replaces the
@@ -525,7 +544,14 @@ struct SettingsView: View {
         }
 
         private var tvIntegrationsDetail: some View {
-            TVTraktIntegrationView()
+            VStack(alignment: .leading, spacing: 36) {
+                if trakt.isConfigured {
+                    TVTraktIntegrationView()
+                }
+                if openSubtitles.isConfigured {
+                    TVOpenSubtitlesIntegrationView()
+                }
+            }
         }
 
         private var tvSearchDetail: some View {

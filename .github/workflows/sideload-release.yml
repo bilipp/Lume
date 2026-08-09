@@ -35,7 +35,7 @@ env:
   # Pinned rather than tracking the engine's main: app↔engine commits are paired
   # by hand, so a drifting engine would break this archive with no change on
   # Lume's side. Bump this when a release needs newer engine code.
-  ENGINE_REF: ${{ github.event.inputs.engine_ref || 'v0.1.3' }}
+  ENGINE_REF: ${{ github.event.inputs.engine_ref || 'v0.1.4' }}
 
 jobs:
   build:
@@ -107,15 +107,17 @@ jobs:
           TMDB_ACCESS_TOKEN: ${{ secrets.TMDB_ACCESS_TOKEN }}
           MDBLIST_API_KEY: ${{ secrets.MDBLIST_API_KEY }}
           INTRO_DB_API_KEY: ${{ secrets.INTRO_DB_API_KEY }}
+          OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
         run: |
           {
-            [ -n "$TMDB_ACCESS_TOKEN" ]   && echo "TMDB_ACCESS_TOKEN=$TMDB_ACCESS_TOKEN"
-            [ -n "$MDBLIST_API_KEY" ]     && echo "MDBLIST_API_KEY=$MDBLIST_API_KEY"
-            [ -n "$INTRO_DB_API_KEY" ]    && echo "INTRO_DB_API_KEY=$INTRO_DB_API_KEY"
-            [ -n "$TRAKT_CLIENT_ID" ]     && echo "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID"
-            [ -n "$TRAKT_CLIENT_SECRET" ] && echo "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET"
+            [ -n "$TMDB_ACCESS_TOKEN" ]     && echo "TMDB_ACCESS_TOKEN=$TMDB_ACCESS_TOKEN"
+            [ -n "$MDBLIST_API_KEY" ]       && echo "MDBLIST_API_KEY=$MDBLIST_API_KEY"
+            [ -n "$INTRO_DB_API_KEY" ]      && echo "INTRO_DB_API_KEY=$INTRO_DB_API_KEY"
+            [ -n "$OPENSUBTITLES_API_KEY" ] && echo "OPENSUBTITLES_API_KEY=$OPENSUBTITLES_API_KEY"
+            [ -n "$TRAKT_CLIENT_ID" ]       && echo "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID"
+            [ -n "$TRAKT_CLIENT_SECRET" ]   && echo "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET"
           } > .env || true
 
       # ── Archive (unsigned) ───────────────────────────────────────────────────

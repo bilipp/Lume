@@ -90,6 +90,10 @@ struct KSPlayerEngineView: View {
     /// disarmed). See `handleState`.
     @State var stallWatchdog: Task<Void, Never>?
     @State private var isControlsVisible = true
+    /// Presents the OpenSubtitles browser. Held here rather than in the controls
+    /// overlay: the overlay is removed when the controls auto-hide, which would
+    /// take a sheet anchored there down with it mid-search.
+    @State var isSearchingSubtitles = false
     @State var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
     /// PiP state and its observer task are `internal` (not `private`) so the
@@ -220,7 +224,8 @@ struct KSPlayerEngineView: View {
                         onResetHideTimer: { resetHideTimer() },
                         onSelectMedia: { onSelectMedia?($0) },
                         onPanelOpenChange: { setPanelOpen($0) },
-                        onSwitchChannel: { switchLiveChannel($0) }
+                        onSwitchChannel: { switchLiveChannel($0) },
+                        onSearchSubtitles: subtitleSearchAction
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 }
@@ -259,6 +264,7 @@ struct KSPlayerEngineView: View {
                     .transition(.opacity)
                 }
             }
+            .subtitleSearch(isPresented: $isSearchingSubtitles, media: media, onPick: applyExternalSubtitle)
             .preferredColorScheme(.dark)
             .onAppear {
                 engine.attach(coordinator: coordinator)
@@ -442,6 +448,7 @@ struct KSPlayerEngineView: View {
                     .transition(.opacity)
                 }
             }
+            .subtitleSearch(isPresented: $isSearchingSubtitles, media: media, onPick: applyExternalSubtitle)
             .preferredColorScheme(.dark)
             .onAppear {
                 scheduleHide()
@@ -503,7 +510,8 @@ struct KSPlayerEngineView: View {
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
-                onScheduleHide: { scheduleHide() }
+                onScheduleHide: { scheduleHide() },
+                onSearchSubtitles: subtitleSearchAction
             )
         }
 

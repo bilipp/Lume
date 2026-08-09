@@ -33,6 +33,9 @@ import SwiftUI
         var onTogglePlay: () -> Void
         var onResetHideTimer: () -> Void
         var onScheduleHide: () -> Void
+        /// Raises the OpenSubtitles browser. `nil` when the search isn't
+        /// available for this stream, which also drops the menu entry.
+        var onSearchSubtitles: (() -> Void)?
 
         @Environment(\.modelContext) private var modelContext
         /// Mirrors the backing model's favorite flag; refreshed when the media
@@ -207,7 +210,7 @@ import SwiftUI
 
         private var secondaryControls: some View {
             let hasAudio = coordinator.audioTrackOptions.count > 1
-            let hasText = !coordinator.textTrackOptions.isEmpty
+            let hasText = !coordinator.textTrackOptions.isEmpty || onSearchSubtitles != nil
             let hasRate = !media.isLive
 
             return HStack(spacing: 4) {
@@ -248,6 +251,15 @@ import SwiftUI
                         onResetHideTimer()
                     } label: {
                         checkmarkLabel(track.label, checked: track.isSelected)
+                    }
+                }
+                if let onSearchSubtitles {
+                    Divider()
+                    Button {
+                        onSearchSubtitles()
+                        onResetHideTimer()
+                    } label: {
+                        Label("Search Online…", systemImage: "magnifyingglass")
                     }
                 }
             } label: {

@@ -89,6 +89,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     private var startupTask: Task<Void, Never>?
     private var reportedFailure = false
     private var selectedSubtitleID: String?
+    /// The sidecar subtitle file loaded from the OpenSubtitles search, if any.
+    /// Kept so the track survives a switch to an embedded track and back — the
+    /// engine's sidecar loader is a one-shot parse, so re-selecting means
+    /// re-reading the file.
+    private var externalSubtitle: ExternalSubtitle?
 
     // MARK: Lifecycle
 
@@ -196,6 +201,10 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         isBuffering = false
         hasStartedPlayback = false
         subtitleCues.update(nil)
+        // The sidecar lane belongs to the session that just went away; a fresh
+        // session starts with no cues, so the menu must not keep advertising it.
+        externalSubtitle = nil
+        selectedSubtitleID = nil
         isPipActive = false
     }
 
@@ -245,6 +254,10 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     func selectTextTrack(id: String?) {
         selectedSubtitleID = id
+        if let external = externalSubtitle, id == Self.externalTrackID {
+            loadExternalSubtitleFile(external)
+            return
+        }
         let session = session
         let index = id.flatMap(Int32.init)
         Task { await session?.selectSubtitleTrack(index) }
@@ -367,7 +380,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 isSelected: selectedAudioID.map { $0 == id } ?? fallbackSelected
             )
         }
-        textTrackOptions = info.subtitleTracks.enumerated().map { position, track in
+        var options = info.subtitleTracks.enumerated().map { position, track in
             let id = String(track.index)
             return PlayerTrackOption(
                 id: id,
@@ -375,6 +388,14 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 isSelected: selectedSubtitleID == id
             )
         }
+        if let external = externalSubtitle {
+            options.append(PlayerTrackOption(
+                id: Self.externalTrackID,
+                label: external.label,
+                isSelected: selectedSubtitleID == Self.externalTrackID
+            ))
+        }
+        textTrackOptions = options
     }
 
     private func publishVideoInfo(info: MediaInfo) {
@@ -408,6 +429,41 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         let now = session.renderer.currentTime
         guard let info = mediaInfo, now != .min else { return 0 }
         return max(0, MediaTime.seconds(now - info.startTime))
+    }
+}
+
+// MARK: - External subtitles
+
+extension LumeEngineCoordinator: ExternalSubtitleLoading {
+    /// Id for the sidecar track in the overlay's subtitle menu. Prefixed so it
+    /// can never collide with an embedded track's stream index.
+    static var externalTrackID: String {
+        "external"
+    }
+
+    func loadExternalSubtitle(_ subtitle: ExternalSubtitle) {
+        externalSubtitle = subtitle
+        selectedSubtitleID = Self.externalTrackID
+        loadExternalSubtitleFile(subtitle)
+    }
+
+    /// Hands the file to the engine, which parses it in full and replaces
+    /// whatever subtitle lane was active. On failure the track is dropped from
+    /// the menu rather than left selected but silent.
+    private func loadExternalSubtitleFile(_ subtitle: ExternalSubtitle) {
+        subtitleCues.update(nil)
+        if let info = mediaInfo { publishTracks(info: info) }
+        let session = session
+        Task {
+            do {
+                try await session?.loadExternalSubtitles(url: subtitle.fileURL.absoluteString)
+            } catch {
+                Logger.player.error("LumeEngine could not load external subtitles: \(LogRedaction.describe(error), privacy: .public)")
+                self.externalSubtitle = nil
+                self.selectedSubtitleID = nil
+                if let info = self.mediaInfo { self.publishTracks(info: info) }
+            }
+        }
     }
 }
 

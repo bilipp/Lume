@@ -52,6 +52,10 @@ struct LumeEngineEngineView: View {
     /// Drives bounded backoff reconnects when the stream drops mid-playback.
     @State private var reconnector = PlaybackRetryController()
     @State private var isControlsVisible = true
+    /// Presents the OpenSubtitles browser. Held here rather than in the controls
+    /// overlay: the overlay is removed when the controls auto-hide, which would
+    /// take a sheet anchored there down with it mid-search.
+    @State private var isSearchingSubtitles = false
     /// Set once the stream is given up on (initial-load failure with no fallback
     /// left, or the reconnect budget spent). Swaps the player for the
     /// `PlayerErrorIndicator` (Try Again / Back).
@@ -160,6 +164,9 @@ struct LumeEngineEngineView: View {
                 )
                 .transition(.opacity)
             }
+        }
+        .subtitleSearch(isPresented: $isSearchingSubtitles, media: media) { subtitle in
+            coordinator.loadExternalSubtitle(subtitle)
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -311,7 +318,8 @@ struct LumeEngineEngineView: View {
                 onResetHideTimer: { resetHideTimer() },
                 onSelectMedia: { onSelectMedia?($0) },
                 onPanelOpenChange: { setPanelOpen($0) },
-                onSwitchChannel: { switchLiveChannel($0) }
+                onSwitchChannel: { switchLiveChannel($0) },
+                onSearchSubtitles: subtitleSearchAction
             )
         #else
             LumeEngineControlsOverlay(
@@ -324,9 +332,19 @@ struct LumeEngineEngineView: View {
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
-                onScheduleHide: { scheduleHide() }
+                onScheduleHide: { scheduleHide() },
+                onSearchSubtitles: subtitleSearchAction
             )
         #endif
+    }
+
+    /// Raises the OpenSubtitles browser, or `nil` when this stream can't use it
+    /// (a live channel, no API key in the build, or an engine that can't
+    /// side-load a subtitle file).
+    private var subtitleSearchAction: (() -> Void)? {
+        guard OpenSubtitlesService.supportsSearch(for: media),
+              coordinator.supportsExternalSubtitles else { return nil }
+        return { isSearchingSubtitles = true }
     }
 
     // MARK: - Actions

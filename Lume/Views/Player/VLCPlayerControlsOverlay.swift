@@ -21,6 +21,9 @@ struct VLCPlayerControlsOverlay: View {
     var onTogglePlay: () -> Void
     var onResetHideTimer: () -> Void
     var onScheduleHide: () -> Void
+    /// Raises the OpenSubtitles browser. `nil` when the search isn't available
+    /// for this stream, which also drops the menu entry.
+    var onSearchSubtitles: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     /// Mirrors the backing model's favorite flag; refreshed when the media
@@ -197,7 +200,7 @@ struct VLCPlayerControlsOverlay: View {
 
     private var secondaryControls: some View {
         let hasAudio = coordinator.audioTracks.count > 1
-        let hasText = !coordinator.textTracks.isEmpty
+        let hasText = !coordinator.textTracks.isEmpty || onSearchSubtitles != nil
         let hasRate = !media.isLive
 
         return HStack(spacing: 4) {
@@ -238,6 +241,15 @@ struct VLCPlayerControlsOverlay: View {
                     onResetHideTimer()
                 } label: {
                     checkmarkLabel(track.trackName, checked: track.isSelectedExclusively)
+                }
+            }
+            if let onSearchSubtitles {
+                Divider()
+                Button {
+                    onSearchSubtitles()
+                    onResetHideTimer()
+                } label: {
+                    Label("Search Online…", systemImage: "magnifyingglass")
                 }
             }
         } label: {
