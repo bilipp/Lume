@@ -417,15 +417,16 @@ class XtreamClient: APIClient {
     }
 
     /// `Y-m-d:H-i` is the start format Xtream Codes panels expect in a timeshift
-    /// path. Formatted in the device's local timezone — the panel interprets the
-    /// value as wall-clock time, and EPG `start` dates are absolute instants, so
-    /// this keeps the requested moment aligned with what the guide showed.
-    private nonisolated static let timeshiftStartFormatter: DateFormatter = {
+    /// path. The value is wall-clock time in the timezone advertised by the
+    /// account. Fall back to the device timezone for older panels that omit it,
+    /// preserving Lume's historical behaviour for those providers.
+    private nonisolated static func timeshiftStartString(for start: Date, playlist: Playlist) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd:HH-mm"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
+        formatter.timeZone = playlist.serverTimezone.flatMap(TimeZone.init(identifier:)) ?? .current
+        return formatter.string(from: start)
+    }
 
     /// Builds a catch-up / timeshift URL for a past programme on a live stream.
     ///
@@ -446,7 +447,7 @@ class XtreamClient: APIClient {
         // resource even when normal live playback defaults to HLS. Respect an
         // explicit playlist/argument choice, but prefer TS when it is unknown.
         let ext = Self.resolvedFormat(format, playlist: playlist, fallback: .tsStream).rawValue
-        let startString = Self.timeshiftStartFormatter.string(from: start)
+        let startString = Self.timeshiftStartString(for: start, playlist: playlist)
         return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(ext)")
     }
 }
