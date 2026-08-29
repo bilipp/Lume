@@ -66,7 +66,7 @@ struct SearchView: View {
                                 switch result {
                                 case let .movie(movie):
                                     NavigationLink(value: movie) {
-                                        SearchResultRow(result: result)
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
                                             .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
                                     }
                                     .mediaFavoriteMenu(
@@ -75,7 +75,7 @@ struct SearchView: View {
                                     )
                                 case let .series(series):
                                     NavigationLink(value: series) {
-                                        SearchResultRow(result: result)
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
                                             .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
                                     }
                                     .mediaFavoriteMenu(
@@ -86,7 +86,7 @@ struct SearchView: View {
                                     Button {
                                         playChannel(stream)
                                     } label: {
-                                        SearchResultRow(result: result)
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
                                     }
                                     .buttonStyle(.plain)
                                     .liveChannelMenu(
@@ -150,8 +150,23 @@ struct SearchView: View {
         playlists.active(for: selectedPlaylistID)
     }
 
+    /// The owning playlist's name, for rows that could have come from any of
+    /// them. Only while searching across several playlists: with one playlist
+    /// in play it's the same badge on every row, and the point of it is telling
+    /// two identically-named rows from different providers apart.
+    private func playlistName(for result: SearchResult) -> String? {
+        guard searchAllPlaylists, playlists.count > 1 else { return nil }
+        return playlists.owner(ofContentID: result.contentID)?.name
+    }
+
     private func playChannel(_ stream: LiveStream) {
-        guard let playlist = activePlaylist,
+        // Cross-playlist search surfaces channels the active playlist can't
+        // stream: a live URL is built from its playlist's server, credentials
+        // and portal, so playing a foreign channel with the active playlist
+        // asks the wrong provider for it. Stream ids are per-provider integers,
+        // so that doesn't reliably fail — it can quietly play whichever channel
+        // holds the same id over there.
+        guard let playlist = playlists.owner(ofContentID: stream.id) ?? activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
@@ -347,6 +362,17 @@ enum SearchResult: Identifiable, Hashable {
         }
     }
 
+    /// The catalog row's own id, which carries the owning playlist's UUID as a
+    /// prefix. `id` above namespaces by kind so a movie and a channel can't
+    /// collide in the list; this one is what `owner(ofContentID:)` reads.
+    var contentID: String {
+        switch self {
+        case let .movie(movie): movie.id
+        case let .series(series): series.id
+        case let .liveStream(stream): stream.id
+        }
+    }
+
     static func == (lhs: SearchResult, rhs: SearchResult) -> Bool {
         lhs.id == rhs.id
     }
@@ -360,6 +386,8 @@ enum SearchResult: Identifiable, Hashable {
 
 struct SearchResultRow: View {
     let result: SearchResult
+    /// Which playlist this row came from, or `nil` to leave the badge off.
+    var playlistName: String?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -399,12 +427,24 @@ struct SearchResultRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 4) {
-                    Image(systemName: categoryIcon)
-                    Text(LocalizedStringKey(categoryName))
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: categoryIcon)
+                        Text(LocalizedStringKey(categoryName))
+                    }
+                    .foregroundStyle(.blue)
+                    // Only present while searching across playlists, where the
+                    // category alone doesn't say which provider a row is from.
+                    if let playlistName {
+                        HStack(spacing: 4) {
+                            Image(systemName: "rectangle.stack")
+                            Text(playlistName)
+                        }
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    }
                 }
                 .font(.caption2)
-                .foregroundStyle(.blue)
             }
 
             Spacer()
