@@ -12,6 +12,13 @@ import SwiftData
 import Testing
 
 struct M3USyncTests {
+    /// Swift Testing runs this before every test in the suite. The m3u digest is
+    /// device-local `UserDefaults` state that outlives a test, so each case
+    /// starts from a clean slate rather than inheriting a sibling's fingerprint.
+    init() {
+        clearM3UDigests()
+    }
+
     // MARK: - Fixtures
 
     private func writeTempFile(_ content: String, ext: String) throws -> URL {
@@ -120,7 +127,14 @@ struct M3USyncTests {
             try context.save()
         }
 
+        // Force the second sync down the real import path. The file is
+        // byte-identical, so the digest skip would otherwise return before
+        // `importM3UFile` and this test would assert nothing about the upsert —
+        // which is the thing it exists to pin. The skip has its own coverage in
+        // `M3UDigestSkipTests`.
+        M3UDigestStore.remove(playlistId: playlist.id)
         try await manager.syncPlaylist(playlist)
+        defer { M3UDigestStore.remove(playlistId: playlist.id) }
 
         let context = ModelContext(container)
         #expect(try context.fetchCount(FetchDescriptor<LiveStream>()) == 3)
@@ -133,6 +147,45 @@ struct M3USyncTests {
         #expect(stream.isFavorite, "Re-sync must not wipe favorites")
         let category = try #require(try context.fetch(FetchDescriptor<Lume.Category>()).first { $0.name == "News" })
         #expect(category.isHidden, "Re-sync must not wipe hidden state")
+    }
+
+    @Test func `a byte-identical re-import writes no catalog rows`() async throws {
+        let container = try makeTestContainer()
+        let fileURL = try writeTempFile(mixedPlaylist, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let playlist = try makePlaylist(container: container, fileURL: fileURL)
+
+        let manager = ContentSyncManager(modelContainer: container)
+        let recorder = CatalogWriteRecorder()
+        try await manager.syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let store = try #require(
+            try context.fetch(FetchDescriptor<LiveStream>()).first?.persistentModelID.storeIdentifier
+        )
+        // Also proves the recorder sees this store at all, so the assertion
+        // below can't pass by observing nothing.
+        #expect(recorder.catalogWrites(inStore: store) > 0, "The first import must write the catalog")
+
+        recorder.reset()
+        // Clear the fingerprint so the re-import actually runs. Without this the
+        // digest skip returns before `importM3UFile` and the write count would
+        // be zero because nothing executed, not because the dirty check held —
+        // the assertion below would pass vacuously. `M3UDigestSkipTests` covers
+        // the skip itself.
+        M3UDigestStore.remove(playlistId: playlist.id)
+        try await manager.syncPlaylist(playlist)
+        defer { M3UDigestStore.remove(playlistId: playlist.id) }
+
+        #expect(
+            recorder.catalogWrites(inStore: store) == 0,
+            "A byte-identical re-import must leave every batch context clean, so no save runs"
+        )
+        #expect(try context.fetchCount(FetchDescriptor<LiveStream>()) == 3)
+        #expect(try context.fetchCount(FetchDescriptor<Movie>()) == 2)
+        #expect(try context.fetchCount(FetchDescriptor<Series>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<Episode>()) == 3)
+        #expect(try context.fetchCount(FetchDescriptor<Lume.Category>()) == 6)
     }
 
     /// A reduced version of `mixedPlaylist`: Sport One (live), The Godfather
@@ -173,20 +226,49 @@ struct M3USyncTests {
         let context = ModelContext(container)
         #expect(try context.fetchCount(FetchDescriptor<LiveStream>()) == 2)
         #expect(try context.fetchCount(FetchDescriptor<Movie>()) == 1)
-        #expect(try context.fetchCount(FetchDescriptor<Series>()) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Episode>()) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Lume.Category>()) == 3) // News, General, VOD | Action
+
+        // The series section vanished entirely, which is also what a download
+        // cut before it looks like — the sanity gate holds those rows back for a
+        // bounded number of syncs rather than deleting them on the strength of a
+        // file that may simply be short.
+        #expect(try context.fetchCount(FetchDescriptor<Series>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<Episode>()) == 3)
+        // News, General, VOD | Action, and the held-back Series | Crime.
+        #expect(try context.fetchCount(FetchDescriptor<Lume.Category>()) == 4)
 
         #expect(try context.fetch(FetchDescriptor<LiveStream>()).contains { $0.name == "Sport One" } == false)
         #expect(try context.fetch(FetchDescriptor<Movie>()).contains { $0.name == "The Godfather" } == false)
         let categoryNames = try Set(context.fetch(FetchDescriptor<Lume.Category>()).map(\.name))
         #expect(!categoryNames.contains("Sports"))
-        #expect(!categoryNames.contains("Series | Crime"))
 
         // The surviving favorited movie is untouched.
         let dieHard = try #require(try context.fetch(FetchDescriptor<Movie>()).first)
         #expect(dieHard.name == "Die Hard")
         #expect(dieHard.isFavorite, "Pruning must not disturb surviving rows")
+    }
+
+    @Test func `a section the provider dropped entirely is swept once the gate relents`() async throws {
+        let container = try makeTestContainer()
+        let fileURL = try writeTempFile(mixedPlaylist, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let playlist = try makePlaylist(container: container, fileURL: fileURL)
+
+        let manager = ContentSyncManager(modelContainer: container)
+        try await manager.syncPlaylist(playlist)
+
+        // A truncated download does not repeat; a provider that really dropped
+        // its series section sends the same short file every sync, so the gate's
+        // bounded tolerance has to converge or the rows strand forever.
+        try reducedPlaylist.write(to: fileURL, atomically: true, encoding: .utf8)
+        for _ in 0 ..< 3 {
+            try await manager.syncPlaylist(playlist)
+        }
+
+        let context = ModelContext(container)
+        #expect(try context.fetchCount(FetchDescriptor<Series>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Episode>()) == 0)
+        let categoryNames = try Set(context.fetch(FetchDescriptor<Lume.Category>()).map(\.name))
+        #expect(!categoryNames.contains("Series | Crime"))
     }
 
     @Test func `an empty fetch does not prune existing content`() async throws {
@@ -257,6 +339,72 @@ struct M3USyncTests {
         #expect(listings.first?.channelId == "news.1")
     }
 
+    // MARK: - Cancellation
+
+    /// Cancelling a running sync has to stop the import *and* skip the sweeps:
+    /// the seen-ids only cover the part of the file that was read, so sweeping
+    /// on them would delete the rest of the catalog — and the iCloud reconcile
+    /// that follows every completed sync would push those deletes to every
+    /// device. What was already committed stays; the playlist goes back to idle
+    /// so the next attempt is a plain retry.
+    @Test func `cancelling mid-import stops the pipeline and prunes nothing`() async throws {
+        let entryCount = 40000
+        var content = "#EXTM3U\n"
+        content.reserveCapacity(4_000_000)
+        for index in 0 ..< entryCount {
+            content += "#EXTINF:-1 tvg-id=\"chan.\(index)\" group-title=\"Group \(index % 10)\",Channel \(index)\n"
+            content += "http://example.com/live/\(index).ts\n"
+        }
+
+        let container = try makeTestContainer()
+        let fileURL = try writeTempFile(content, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let playlist = try makePlaylist(container: container, fileURL: fileURL)
+        let playlistId = playlist.id
+
+        // Rows this playlist file does not contain, so a sweep would delete
+        // them: their survival is the evidence that no sweep ran.
+        let staleCount = 20
+        do {
+            let context = ModelContext(container)
+            for index in 0 ..< staleCount {
+                context.insert(LiveStream(
+                    id: "\(playlistId.uuidString)-live-stale\(index)",
+                    streamId: 900_000 + index,
+                    name: "Dropped \(index)"
+                ))
+            }
+            try context.save()
+        }
+
+        let manager = ContentSyncManager(modelContainer: container)
+        let sync = Task { try await manager.syncPlaylist(playlist) }
+
+        // Cancel once the first batch has committed, so the cancel lands with
+        // the file only partly imported.
+        var committed = staleCount
+        let deadline = ContinuousClock.now + .seconds(60)
+        while committed <= staleCount, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(2))
+            committed = try ModelContext(container).fetchCount(FetchDescriptor<LiveStream>())
+        }
+        sync.cancel()
+        #expect(committed > staleCount, "no batch committed before the cancel, so the run proves nothing")
+
+        // Surfaced as a cancellation, not buried as SyncError.databaseError.
+        await #expect(throws: CancellationError.self) { try await sync.value }
+
+        let context = ModelContext(container)
+        let live = try context.fetchCount(FetchDescriptor<LiveStream>())
+        #expect(live < entryCount + staleCount, "the import kept importing past the cancellation")
+        #expect(live > staleCount, "the batches already committed must survive a cancellation")
+        let survivors = try context.fetch(FetchDescriptor<LiveStream>()).count { $0.name.hasPrefix("Dropped ") }
+        #expect(survivors == staleCount, "a cancelled import must not sweep")
+
+        let reloaded = try #require(try context.fetch(FetchDescriptor<Playlist>()).first)
+        #expect(reloaded.syncStatus == .idle, "an aborted sync leaves the playlist retryable, not in .error")
+    }
+
     // MARK: - Scale
 
     /// The user-facing requirement: playlists with a huge number of entries
@@ -293,5 +441,123 @@ struct M3USyncTests {
 
         let seconds = elapsed.components.seconds
         #expect(seconds < 120, "100k-entry sync took \(seconds)s — expected < 120s")
+    }
+
+    /// The 100k test above is live and movie rows only, but ~86% of a real
+    /// provider file is episodes, and that path does strictly more per entry:
+    /// a regex match to classify, a `Series` upsert, and an `Episode` hanging
+    /// off it. A regression there would not move the numbers above at all.
+    ///
+    /// Show names carry the provider's shape ("Show Name (2012) S01 E05") and
+    /// the per-show episode counts are deliberately uneven with a long tail —
+    /// the real file's median show is 12 episodes and its largest is 2,799,
+    /// so a fixture of uniform shows would miss how the per-series work scales.
+    @Test func `syncs an episode-heavy playlist in bounded time`() async throws {
+        // Most shows run one or two seasons; a few carry hundreds.
+        let commonCounts = [3, 6, 8, 10, 12, 12, 13, 16, 20, 26]
+        func episodeCount(forShow index: Int) -> Int {
+            if index % 499 == 0 { return 600 }
+            if index % 97 == 0 { return 180 }
+            return commonCounts[index % commonCounts.count]
+        }
+
+        let showCount = 3000
+        var content = "#EXTM3U\n"
+        content.reserveCapacity(8_000_000)
+        var episodeTotal = 0
+        for show in 0 ..< showCount {
+            let showName = "Show \(show) (20\(10 + show % 15))"
+            let group = "Series | Genre \(show % 40)"
+            for episode in 0 ..< episodeCount(forShow: show) {
+                let season = 1 + episode / 24
+                let number = 1 + episode % 24
+                let token = String(format: "S%02d E%02d", season, number)
+                content += "#EXTINF:-1 group-title=\"\(group)\","
+                content += "\(showName) \(token)\n"
+                content += "http://example.com/series/u/p/\(show)-\(episode).mkv\n"
+                episodeTotal += 1
+            }
+        }
+
+        let container = try makeTestContainer()
+        let fileURL = try writeTempFile(content, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let playlist = try makePlaylist(container: container, fileURL: fileURL)
+
+        let manager = ContentSyncManager(modelContainer: container)
+        let start = ContinuousClock.now
+        try await manager.syncPlaylist(playlist)
+        let elapsed = ContinuousClock.now - start
+
+        let context = ModelContext(container)
+        #expect(try context.fetchCount(FetchDescriptor<Episode>()) == episodeTotal)
+        #expect(try context.fetchCount(FetchDescriptor<Series>()) == showCount)
+        #expect(try context.fetchCount(FetchDescriptor<LiveStream>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Movie>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Lume.Category>()) == 40)
+
+        let seconds = elapsed.components.seconds
+        #expect(seconds < 120, "\(episodeTotal)-episode sync took \(seconds)s — expected < 120s")
+    }
+}
+
+/// Counts the catalog rows the `ModelContext` saves in one store touch.
+///
+/// The dirty check's payoff is the `save()` `importBatch` never runs, and a row
+/// carries no timestamp to observe that by, so the save notification is the only
+/// evidence. `Playlist` is excluded: its sync status and `lastSyncDate` are
+/// rewritten by every sync by design. Suites run in parallel against their own
+/// in-memory stores, hence the store filter.
+private final class CatalogWriteRecorder: @unchecked Sendable {
+    private static let catalogEntities: Set<String> = [
+        "LiveStream", "Movie", "Series", "Episode", "Category"
+    ]
+
+    private let lock = NSLock()
+    private var written: [PersistentIdentifier] = []
+    private var observer: (any NSObjectProtocol)?
+
+    init() {
+        observer = NotificationCenter.default.addObserver(
+            forName: ModelContext.didSave,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            self?.record(notification)
+        }
+    }
+
+    deinit {
+        if let observer {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    func reset() {
+        lock.lock()
+        written.removeAll()
+        lock.unlock()
+    }
+
+    func catalogWrites(inStore store: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return written.count(where: { $0.storeIdentifier == store && Self.catalogEntities.contains($0.entityName) })
+    }
+
+    /// Saves post from whichever thread committed them, so the buffer is locked.
+    private func record(_ notification: Notification) {
+        let keys: [ModelContext.NotificationKey] = [
+            .insertedIdentifiers, .updatedIdentifiers, .deletedIdentifiers
+        ]
+        let touched = keys.flatMap { key -> [PersistentIdentifier] in
+            let value = notification.userInfo?[key.rawValue]
+            if let identifiers = value as? Set<PersistentIdentifier> { return Array(identifiers) }
+            return value as? [PersistentIdentifier] ?? []
+        }
+        guard !touched.isEmpty else { return }
+        lock.lock()
+        written.append(contentsOf: touched)
+        lock.unlock()
     }
 }

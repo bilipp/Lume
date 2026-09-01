@@ -41,12 +41,20 @@ nonisolated enum PlaylistDeletion {
     }
 
     /// The bulk half of a playlist deletion: every catalog item the playlist
-    /// brought in, matched by its playlist-scoped id prefix. Split from
+    /// brought in, matched by its playlist-scoped id prefix, plus the
+    /// device-local sync bookkeeping keyed by its UUID. Split from
     /// `delete(_:in:)` so `CloudSyncEngine.deletePlaylist` can save the removal
     /// of the `Playlist` row itself first (the UI's `@Query`s drop it promptly)
     /// before this — potentially long — cleanup runs.
     static func removeOrphanedContent(playlistID: UUID, in context: ModelContext) {
         let prefix = playlistID.uuidString
+
+        // The prune gate's skip counters and the m3u file fingerprint live in
+        // UserDefaults, outside every cascade, so nothing else ever collects
+        // them: they would leak for the lifetime of the install on each deleted
+        // playlist.
+        SweepSkipDefaults.removeAll(playlistId: playlistID)
+        M3UDigestStore.remove(playlistId: playlistID)
 
         // Scope each fetch to the playlist in SQLite via the playlist-prefixed
         // id instead of hydrating the whole catalog into memory just to filter

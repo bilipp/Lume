@@ -50,7 +50,7 @@ final class ParsingBenchmarks: XCTestCase {
             var count = 0
             var urlBytes = 0
             do {
-                count = try M3UParser.parse(fileURL: fixture, batchSize: 2000) { batch in
+                count = try M3UParser.parse(fileURL: fixture, batchSize: 2000) { batch, _ in
                     // Touch every entry so the optimizer can't discard the parse.
                     for entry in batch {
                         urlBytes += entry.url.utf8.count
@@ -83,28 +83,59 @@ final class ParsingBenchmarks: XCTestCase {
 
     /// Classification is the other per-entry cost of an m3u import — it decides
     /// live vs movie vs episode for every single line.
-    func testM3UClassification() {
-        let names = [
-            "Channel 12 HD",
-            "Movie Title 2019 (2019)",
-            "Show Name S03E11",
-            "Some Show 1x04 Pilot"
-        ]
-        let entries = (0 ..< 4000).map { index in
-            M3UEntry(
-                name: names[index % names.count],
-                url: "https://example.invalid/stream/\(index).ts",
-                tvgId: index.isMultiple(of: 2) ? "ch\(index)" : nil,
-                logo: nil,
-                group: "Group \(index % 100)",
-                type: nil
-            )
+    ///
+    /// Measured over provider-shaped entries rather than synthetic ones: 86% of
+    /// a real export carries a season/episode token, so this is the benchmark
+    /// that actually exercises `M3UClassifier`'s ICU matching. The four-name,
+    /// `/stream/`-URL version this replaced classified a mix that does not occur
+    /// in provider files, so it could not gate that work at all.
+    ///
+    /// The parse happens outside `measure` — this is the classifier in
+    /// isolation, the way `testM3UExtInfAttributeScan` isolates attribute
+    /// scanning.
+    func testM3UClassification() throws {
+        let entryCount = 60000
+        let fixture = try PerfFixtures.writeM3UProviderShape(
+            entryCount: entryCount, showCount: 1400, to: scratch
+        )
+        assertFixtureIsSubstantial(fixture, minimumBytes: 12_000_000)
+
+        var entries: [M3UEntry] = []
+        entries.reserveCapacity(entryCount)
+        try M3UParser.parse(fileURL: fixture, batchSize: 4000) { batch, _ in
+            entries.append(contentsOf: batch)
         }
 
-        measure(metrics: [XCTClockMetric()]) {
-            for entry in entries {
-                _ = M3UClassifier.classify(entry)
+        let expectedLive = entryCount * PerfFixtures.providerLiveShare / 100
+        let expectedMovies = entryCount * PerfFixtures.providerMovieShare / 100
+        let expectedEpisodes = entryCount - expectedLive - expectedMovies
+
+        // Fixture fidelity, checked once and outside `measure`: a generator that
+        // stopped emitting episode-shaped names would make this benchmark look
+        // several times faster instead of failing.
+        var live = 0
+        var movies = 0
+        var episodes = 0
+        for entry in entries {
+            switch M3UClassifier.classify(entry) {
+            case .live: live += 1
+            case .movie: movies += 1
+            case .episode: episodes += 1
             }
+        }
+        XCTAssertEqual(entries.count, entryCount)
+        XCTAssertEqual(live, expectedLive)
+        XCTAssertEqual(movies, expectedMovies)
+        XCTAssertEqual(episodes, expectedEpisodes)
+
+        // Assertion outside the inner loop: a per-entry XCTAssert would dominate
+        // the number being measured.
+        measure(metrics: [XCTClockMetric()]) {
+            var vod = 0
+            for entry in entries where M3UClassifier.classify(entry) != .live {
+                vod += 1
+            }
+            XCTAssertEqual(vod, expectedMovies + expectedEpisodes)
         }
     }
 

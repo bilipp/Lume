@@ -7,8 +7,38 @@
 //  megabytes, so nothing is ever held in memory as one blob.
 //
 
+import CryptoKit
 import Foundation
 import OSLog
+
+/// The Xtream account behind an m3u `get.php` URL, when one can be read out of
+/// it. Purely a hint: it is offered to the user as "this provider can also be
+/// added as an Xtream login", never acted on automatically.
+///
+/// Nothing here may grow into a conversion. The two pipelines disagree on
+/// content identity — m3u derives a stream's id by hashing its URL
+/// (`M3UIdentity.hash64`), Xtream uses the provider's own stream ids — so
+/// rewriting a playlist's source type in place would give every row a new id.
+/// Favourites, watch positions, the CloudKit `UserContentState` records keyed by
+/// those ids, and all TMDB enrichment would be orphaned, and the next sweep
+/// would delete the rows they pointed at. A user who wants Xtream adds a second
+/// playlist and removes the m3u one.
+nonisolated struct XtreamCredentialsHint {
+    /// Scheme, host and (when non-default) port only — the form an Xtream login
+    /// expects. No path, no query: the query is what carries the credentials.
+    let baseURL: String
+    let username: String
+    let password: String
+}
+
+/// A playlist file ready to parse, plus a content fingerprint the sync uses to
+/// recognise a byte-identical re-download and skip the import entirely.
+nonisolated struct M3UPlaylistFile {
+    let url: URL
+    /// Lowercase hex SHA-256 over the file's bytes, or `nil` when the file could
+    /// not be read. `nil` never matches, so an unreadable file always imports.
+    let digest: String?
+}
 
 nonisolated enum M3UError: LocalizedError {
     case invalidURL
@@ -88,10 +118,13 @@ nonisolated class M3UClient {
 
     // MARK: - Download
 
-    /// Fetches the playlist behind `urlString` and returns a local file URL to
-    /// parse from. Remote playlists download to a temp file; `file://` URLs
-    /// (imported local files) are returned as-is.
-    func downloadPlaylist(from urlString: String) async throws -> URL {
+    /// Fetches the playlist behind `urlString` and returns a local file to parse
+    /// from, fingerprinted. Remote playlists download to a temp file; `file://`
+    /// URLs (imported local files) are returned as-is.
+    ///
+    /// Only playlists are hashed, not EPG guides: the fingerprint exists to skip
+    /// the m3u import, and hashing every guide download would buy nothing.
+    func downloadPlaylist(from urlString: String) async throws -> M3UPlaylistFile {
         guard let url = URL(string: Self.normalizedPlaylistURL(urlString)) else {
             throw M3UError.invalidURL
         }
@@ -100,11 +133,40 @@ nonisolated class M3UClient {
             guard FileManager.default.fileExists(atPath: url.path) else {
                 throw M3UError.fileNotFound
             }
-            return url
+            return M3UPlaylistFile(url: url, digest: Self.sha256Hex(ofFileAt: url))
         }
 
-        return try await download(url, suffix: ".m3u")
+        let downloaded = try await download(url, suffix: ".m3u")
+        return M3UPlaylistFile(url: downloaded, digest: Self.sha256Hex(ofFileAt: downloaded))
     }
+
+    /// Streams a file through SHA-256 a megabyte at a time. Never loads the
+    /// whole file: a provider playlist is half a gigabyte, and the download
+    /// already landed it on disk. Reading it back costs ~0.28 s at that size,
+    /// against the minutes an import of the same bytes would take.
+    static func sha256Hex(ofFileAt url: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+
+        var hasher = SHA256()
+        var reachedEnd = false
+        // Each chunk is released inside the pool: this runs inside the sync
+        // actor's uninterrupted synchronous stretch, where the enclosing pool
+        // never drains, and 520 undrained megabyte buffers is the whole file
+        // back in memory.
+        while !reachedEnd {
+            autoreleasepool {
+                guard let chunk = try? handle.read(upToCount: hashChunkSize), !chunk.isEmpty else {
+                    reachedEnd = true
+                    return
+                }
+                hasher.update(data: chunk)
+            }
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static let hashChunkSize = 1 << 20
 
     /// Downloads an XMLTV guide to a temp file for streaming parse. Gzipped
     /// guides (`guide.xml.gz` — the common way public EPGs are hosted) are
@@ -273,5 +335,35 @@ nonisolated class M3UClient {
         items[index].value = "m3u_plus"
         components.queryItems = items
         return components.string ?? urlString
+    }
+
+    /// Reads the Xtream account out of an m3u URL that is really an Xtream
+    /// `get.php` endpoint, or returns `nil` when it is an ordinary playlist URL.
+    ///
+    /// Same URL shape `normalizedPlaylistURL(_:)` already handles: a `get.php`
+    /// path carrying `username` and `password` query items. Both must be present
+    /// and non-empty — a `get.php` link without them is not an account we could
+    /// offer to add.
+    ///
+    /// Advisory only; see `XtreamCredentialsHint` for why this must never drive
+    /// an automatic conversion. Callers that log around this must pass the URL
+    /// through `LogRedaction.scrubURLs` — these URLs carry the credentials as
+    /// query items.
+    static func xtreamCredentials(in urlString: String) -> XtreamCredentialsHint? {
+        guard let components = URLComponents(string: urlString),
+              components.path.hasSuffix("get.php"),
+              let scheme = components.scheme,
+              let host = components.host, !host.isEmpty,
+              let items = components.queryItems,
+              let username = items.first(where: { $0.name == "username" })?.value, !username.isEmpty,
+              let password = items.first(where: { $0.name == "password" })?.value, !password.isEmpty
+        else { return nil }
+
+        var base = URLComponents()
+        base.scheme = scheme
+        base.host = host
+        base.port = components.port
+        guard let baseURL = base.string else { return nil }
+        return XtreamCredentialsHint(baseURL: baseURL, username: username, password: password)
     }
 }

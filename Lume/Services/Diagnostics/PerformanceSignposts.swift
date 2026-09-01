@@ -74,6 +74,24 @@ nonisolated extension PerfSignpost {
     static let m3uDownload = PerfSignpost("M3UDownload")
     static let m3uImport = PerfSignpost("M3UImport")
 
+    // M3U import sub-phases. Nested inside the M3UImport interval above, which
+    // stays as the outer boundary so existing traces and benchmark baselines
+    // keep resolving.
+    /// Emitted once per *gap between batches*, not once per import: parsing and
+    /// importing interleave, so a provider file produces ~860 short intervals
+    /// whose union is the scan time. A trace or `XCTOSSignpostMetric` expecting
+    /// one interval per import will not find one — sum them instead.
+    static let m3uParse = PerfSignpost("M3UParse")
+    static let m3uClassify = PerfSignpost("M3UClassify")
+    static let m3uUpsertLive = PerfSignpost("M3UUpsertLive")
+    static let m3uUpsertMovies = PerfSignpost("M3UUpsertMovies")
+    static let m3uUpsertEpisodes = PerfSignpost("M3UUpsertEpisodes")
+    static let m3uPruneLive = PerfSignpost("M3UPruneLive")
+    static let m3uPruneMovies = PerfSignpost("M3UPruneMovies")
+    static let m3uPruneEpisodes = PerfSignpost("M3UPruneEpisodes")
+    static let m3uPruneSeries = PerfSignpost("M3UPruneSeries")
+    static let m3uPruneCategories = PerfSignpost("M3UPruneCategories")
+
     // EPG
     static let epgSourceSync = PerfSignpost("EPGSourceSync")
     static let epgIngest = PerfSignpost("EPGIngest")
