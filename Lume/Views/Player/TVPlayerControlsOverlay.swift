@@ -60,6 +60,9 @@
         @State var seriesPlaylist: Playlist?
         @State var recentChannels: [LiveStream] = []
         @State var recentNowTitles: [String: String] = [:]
+        /// Programme-level context for the caption (the owning playlist),
+        /// resolved once per stream off the main actor and held as a value.
+        @State var streamInfoPlaylistName: String?
 
         // Scrubbing (VOD only). The progress bar is focusable; selecting it
         // pauses playback and enters a scrub mode where left/right step the
@@ -116,6 +119,7 @@
                 if isScrubbing { cancelScrub() } else { closePanel() }
             }
             .task(id: media.id) { resolveContent() }
+            .task(id: media.id) { await resolveStreamInfo() }
             .onAppear {
                 // Every time the controls reappear this is a fresh subtree;
                 // `defaultFocus` alone is unreliable here, so place focus on the
@@ -186,6 +190,7 @@
                                 .font(.system(size: 26, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.85))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .frame(maxWidth: 900, alignment: .leading)
                         }
                         Text(media.title)

@@ -54,16 +54,51 @@
             }
         }
 
+        /// Resolves the owning playlist off the main actor, once per stream.
+        /// The player's other SwiftData reads run on the view context; this one
+        /// must not, because it runs while the stream is starting. The tvOS
+        /// caption names no category, and resolves its own
+        /// EPG, so only the playlist is fetched here.
+        func resolveStreamInfo() async {
+            streamInfoPlaylistName = nil
+            streamInfoPlaylistName = await PlayerStreamInfo.playlistNameDetached(
+                for: media.contentRef,
+                container: modelContext.container
+            )
+        }
+
         // MARK: Captions
 
+        /// The shared, platform-neutral caption derivation, so the tvOS chrome
+        /// and the iOS / macOS / visionOS caption can never drift. tvOS resolves
+        /// its own `EPGListing`s, so they are mapped into the snapshot's value
+        /// form here; `engine` is `nil` because the tvOS caption names none.
+        var infoSnapshot: PlayerInfoSnapshot {
+            PlayerInfoSnapshot(
+                media: media,
+                details: StreamInfoDetails(
+                    playlistName: streamInfoPlaylistName,
+                    categoryName: nil,
+                    epg: ChannelEPG(
+                        current: epgNow.map(EPGSlot.init),
+                        next: epgNext.map(EPGSlot.init)
+                    )
+                ),
+                videoInfo: coordinator.videoInfo,
+                engine: nil,
+                detailLevel: PlayerSettings.StreamInfo.detailLevel
+            )
+        }
+
+        /// tvOS keeps its own layout, so it takes the snapshot's programme half
+        /// rather than the full `captionParts`, whose technical tail it renders
+        /// separately and right-aligned as `techCaption`.
         var topCaption: String? {
-            if media.isLive { return epgNow?.title }
-            if isSeries { return media.subtitle }
-            return nil
+            infoSnapshot.programmeCaption
         }
 
         var techCaption: String {
-            coordinator.videoInfo?.captionParts.joined(separator: "  ·  ") ?? ""
+            infoSnapshot.techCaption
         }
 
         // MARK: Scrubbing (VOD)
@@ -260,10 +295,7 @@
         var infoBadges: [String] {
             var badges: [String] = []
             if let rating = contentRatingBadge, !rating.isEmpty { badges.append(rating) }
-            if let info = coordinator.videoInfo {
-                if !info.qualityTag.isEmpty { badges.append(info.qualityTag) }
-                if let codec = info.codec, !codec.isEmpty { badges.append(codec.uppercased()) }
-            }
+            badges.append(contentsOf: infoSnapshot.infoBadges)
             return badges
         }
 

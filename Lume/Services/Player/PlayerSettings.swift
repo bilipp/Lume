@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-enum PlayerEngineKind: String, CaseIterable, Identifiable {
+nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
     case vlcKit
     case ksPlayer
     case avPlayer
@@ -54,6 +54,33 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
         #else
             return .avPlayer
         #endif
+    }
+}
+
+/// How much the in-player stream-information caption spells out. A two-level
+/// preset rather than per-element toggles: Simple carries programme context
+/// (playlist, category, EPG), Advanced adds the technical
+/// readout (quality, codec, frame rate, engine).
+nonisolated enum StreamInfoDetailLevel: String, CaseIterable, Identifiable {
+    case simple
+    case advanced
+
+    var id: String {
+        rawValue
+    }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .simple: "Simple"
+        case .advanced: "Advanced"
+        }
+    }
+
+    var footer: LocalizedStringResource {
+        switch self {
+        case .simple: "Shows the playlist, category, and what's on now."
+        case .advanced: "Adds the technical readout: quality, codec, frame rate, and playback engine."
+        }
     }
 }
 
@@ -153,6 +180,45 @@ enum PlayerSettings {
         /// directly for the same reason as `showSkipIntroButton`.
         static var showNextEpisodeButton: Bool {
             UserDefaults.standard.bool(showNextEpisodeButtonKey, default: showNextEpisodeButtonDefault)
+        }
+    }
+
+    // MARK: - Stream information
+
+    /// The in-player stream-information caption. Opt-in off tvOS, where it rides
+    /// the controls overlay; on tvOS the caption is part of the always-on player
+    /// chrome and `enabled` is never consulted.
+    enum StreamInfo {
+        static let enabledKey = "player.streamInfo.enabled"
+        static let detailLevelKey = "player.streamInfo.detailLevel"
+
+        static let enabledDefault = false
+
+        /// Advanced on tvOS so the existing technical caption (`4K · H264 ·
+        /// 24 fps`) keeps rendering exactly as it does today; Simple elsewhere,
+        /// where the caption is new and shares space with the transport controls.
+        static var detailLevelDefault: StreamInfoDetailLevel {
+            #if os(tvOS)
+                .advanced
+            #else
+                .simple
+            #endif
+        }
+
+        /// Whether the caption is shown, read off `UserDefaults` directly (so the
+        /// player host needn't hold an `@AppStorage` that would re-render the
+        /// whole player tree when toggled).
+        static var isEnabled: Bool {
+            UserDefaults.standard.bool(enabledKey, default: enabledDefault)
+        }
+
+        /// How much the caption spells out, read off `UserDefaults` directly for
+        /// the same reason as `isEnabled`.
+        static var detailLevel: StreamInfoDetailLevel {
+            guard let raw = UserDefaults.standard.string(forKey: detailLevelKey) else {
+                return detailLevelDefault
+            }
+            return StreamInfoDetailLevel(rawValue: raw) ?? detailLevelDefault
         }
     }
 
