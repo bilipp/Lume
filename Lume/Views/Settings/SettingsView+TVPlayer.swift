@@ -57,6 +57,8 @@ import SwiftUI
                     }
                 }
 
+                tvStreamInfoSection
+
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Engine Priority")
 

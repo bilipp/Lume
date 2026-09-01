@@ -38,6 +38,13 @@ struct SettingsView: View {
     var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
     @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
     var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+    // Stream-information caption preferences (SettingsView+StreamInfo, separate file).
+    #if !os(tvOS)
+        @AppStorage(PlayerSettings.StreamInfo.enabledKey)
+        var streamInfoEnabled = PlayerSettings.StreamInfo.enabledDefault
+    #endif
+    @AppStorage(PlayerSettings.StreamInfo.detailLevelKey)
+    var streamInfoDetailLevelRaw = PlayerSettings.StreamInfo.detailLevelDefault.rawValue
     @AppStorage(SearchSettings.searchAllPlaylistsKey)
     private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     #if !os(tvOS)
@@ -124,6 +131,7 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
+                    streamInfoSection
                     externalPlayerSection
                     storageSection
                     supportSection
@@ -405,18 +413,6 @@ struct SettingsView: View {
             } footer: {
                 // swiftlint:disable:next line_length
                 Text("Streams open in the selected external app instead of Lume's player, when it is installed. Some apps — Infuse among them — play movies and series but no live channels, so you can limit the hand-off to one or the other.")
-            }
-        }
-
-        private var storageSection: some View {
-            Section {
-                NavigationLink {
-                    StorageManagementView()
-                } label: {
-                    Label("Storage & Cache", systemImage: "internaldrive")
-                }
-            } header: {
-                Text("Storage")
             }
         }
 
