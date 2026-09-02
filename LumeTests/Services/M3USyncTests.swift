@@ -23,9 +23,11 @@ struct M3USyncTests {
 
     private let mixedPlaylist = """
     #EXTM3U url-tvg="http://example.com/embedded-guide.xml"
-    #EXTINF:-1 tvg-id="news.1" tvg-logo="http://example.com/news1.png" group-title="News",News One
+    #EXTINF:-1 tvg-id="news.1" tvg-logo="http://example.com/news1.png" catchup="flussonic" \
+    catchup-days="7" catchup-source="http://example.com/live/news1.ts?utc={utc}&lutc={now}" \
+    group-title="News",News One
     http://example.com/live/news1.ts
-    #EXTINF:-1 tvg-id="sport.1" group-title="Sports",Sport One
+    #EXTINF:-1 tvg-id="sport.1" catchup="fs" group-title="Sports",Sport One
     http://example.com/live/sport1.m3u8
     #EXTINF:-1 group-title="General",Ungrouped Extras
     http://example.com/live/extra
@@ -71,8 +73,21 @@ struct M3USyncTests {
         #expect(newsOne.epgChannelId == "news.1")
         #expect(newsOne.streamIcon == "http://example.com/news1.png")
         #expect(newsOne.categoryId == "\(playlistId.uuidString)-live-News")
+        #expect(newsOne.tvArchive == 1)
+        #expect(newsOne.tvArchiveDuration == 7)
+        #expect(newsOne.catchupType == .flussonic)
+        // Stored verbatim: the placeholders are expanded at play time, so a
+        // template baked in here would carry a stale `now` forever.
+        #expect(newsOne.catchupSource == "http://example.com/live/news1.ts?utc={utc}&lutc={now}")
+        let sportOne = try #require(streams.first { $0.name == "Sport One" })
+        #expect(sportOne.tvArchive == 1)
+        #expect(sportOne.catchupType == .flussonic, "`fs` is the Flussonic alias")
+        #expect(sportOne.tvArchiveDuration == 0, "no declared depth stays 0 rather than an invented day count")
         let ungrouped = try #require(streams.first { $0.name == "Ungrouped Extras" })
         #expect(ungrouped.categoryId == "\(playlistId.uuidString)-live-General")
+        #expect(ungrouped.tvArchive == 0)
+        #expect(ungrouped.catchupTypeRaw == nil)
+        #expect(ungrouped.catchupSource == nil)
 
         let movies = try context.fetch(FetchDescriptor<Movie>())
         #expect(movies.count == 2)
@@ -131,8 +146,90 @@ struct M3USyncTests {
 
         let stream = try #require(try context.fetch(FetchDescriptor<LiveStream>()).first { $0.name == "News One" })
         #expect(stream.isFavorite, "Re-sync must not wipe favorites")
+        #expect(stream.tvArchive == 1)
+        #expect(stream.tvArchiveDuration == 7)
         let category = try #require(try context.fetch(FetchDescriptor<Lume.Category>()).first { $0.name == "News" })
         #expect(category.isHidden, "Re-sync must not wipe hidden state")
+    }
+
+    /// `mixedPlaylist`'s two archive channels with every catch-up attribute
+    /// stripped, on the same URLs — so a re-sync updates those rows instead of
+    /// pruning and re-inserting them.
+    private let archivelessPlaylist = """
+    #EXTM3U
+    #EXTINF:-1 tvg-id="news.1" group-title="News",News One
+    http://example.com/live/news1.ts
+    #EXTINF:-1 tvg-id="sport.1" group-title="Sports",Sport One
+    http://example.com/live/sport1.m3u8
+    """
+
+    @Test func `re-sync clears catch-up the provider stops advertising`() async throws {
+        let container = try makeTestContainer()
+        let fileURL = try writeTempFile(mixedPlaylist, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let playlist = try makePlaylist(container: container, fileURL: fileURL)
+
+        let manager = ContentSyncManager(modelContainer: container)
+        try await manager.syncPlaylist(playlist)
+
+        do {
+            let context = ModelContext(container)
+            let stream = try #require(try context.fetch(FetchDescriptor<LiveStream>()).first { $0.name == "News One" })
+            #expect(stream.tvArchive == 1)
+            stream.isFavorite = true
+            try context.save()
+        }
+
+        try archivelessPlaylist.write(to: fileURL, atomically: true, encoding: .utf8)
+        try await manager.syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let stream = try #require(try context.fetch(FetchDescriptor<LiveStream>()).first { $0.name == "News One" })
+        #expect(stream.isFavorite, "The favorite proves this is the same row, not a re-insert")
+        #expect(stream.tvArchive == 0)
+        #expect(stream.tvArchiveDuration == 0)
+        #expect(stream.catchupTypeRaw == nil)
+        #expect(stream.catchupSource == nil)
+    }
+
+    /// Channels that declare an archive we cannot build a URL for, next to one
+    /// we can.
+    private let unbuildablePlaylist = """
+    #EXTM3U
+    #EXTINF:-1 catchup="quantum" catchup-days="5" group-title="News",Unknown Scheme
+    http://example.com/live/unknown.ts
+    #EXTINF:-1 catchup="default" catchup-days="5" group-title="News",No Source
+    http://example.com/live/nosource.ts
+    #EXTINF:-1 catchup="shift" catchup-source="http://example.com/live/shift.ts?utc={utc}&dur={duration}" group-title="News",Shift Source
+    http://example.com/live/shift.ts
+    """
+
+    @Test func `an archive we cannot build a URL for is never badged`() async throws {
+        let container = try makeTestContainer()
+        let fileURL = try writeTempFile(unbuildablePlaylist, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let playlist = try makePlaylist(container: container, fileURL: fileURL)
+
+        let manager = ContentSyncManager(modelContainer: container)
+        try await manager.syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let streams = try context.fetch(FetchDescriptor<LiveStream>())
+
+        let unknown = try #require(streams.first { $0.name == "Unknown Scheme" })
+        #expect(unknown.tvArchive == 0, "An unrecognised dialect must not light up a dead affordance")
+        #expect(unknown.tvArchiveDuration == 0)
+        #expect(unknown.catchupTypeRaw == nil)
+
+        let noSource = try #require(streams.first { $0.name == "No Source" })
+        #expect(noSource.tvArchive == 0, "`default` without a catchup-source has nothing to expand")
+        #expect(noSource.tvArchiveDuration == 0, "The declared day count is dropped with the unbuildable scheme")
+        #expect(noSource.catchupTypeRaw == nil)
+
+        let shift = try #require(streams.first { $0.name == "Shift Source" })
+        #expect(shift.tvArchive == 1)
+        #expect(shift.catchupType == .shift)
+        #expect(shift.catchupSource == "http://example.com/live/shift.ts?utc={utc}&dur={duration}")
     }
 
     /// A reduced version of `mixedPlaylist`: Sport One (live), The Godfather

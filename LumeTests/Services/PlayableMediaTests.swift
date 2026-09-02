@@ -7,6 +7,14 @@ struct PlayableMediaTests {
         Playlist(name: "Test", serverURL: "http://example.com:8080", username: "user", password: "pass")
     }
 
+    private func makeM3UPlaylist() -> Playlist {
+        Playlist(name: "M3U", m3uURL: "http://example.com/get.php?username=test&password=test")
+    }
+
+    private func makeStalkerPlaylist() -> Playlist {
+        Playlist(name: "Portal", portalURL: "http://example.com/c/", macAddress: "00:1A:79:00:00:01")
+    }
+
     // MARK: - from(movie:playlist:client:)
 
     @Test func `from movie creates media`() throws {
@@ -134,10 +142,59 @@ struct PlayableMediaTests {
         #expect(media == nil)
     }
 
-    @Test func `catchup returns nil for m3u direct stream`() {
-        let playlist = makePlaylist()
+    @Test func `catchup returns nil for m3u channel without catchup attributes`() {
+        let playlist = makeM3UPlaylist()
         let stream = LiveStream(id: "l-5", streamId: 302, name: "M3U", tvArchive: 1, tvArchiveDuration: 7)
         stream.directURL = "http://example.com/live/stream.m3u8"
+        let media = PlayableMedia.catchup(
+            stream: stream, playlist: playlist, programTitle: "x",
+            start: Date(), end: Date().addingTimeInterval(3600)
+        )
+        #expect(media == nil)
+    }
+
+    @Test func `catchup builds media for m3u flussonic channel`() throws {
+        let playlist = makeM3UPlaylist()
+        let stream = LiveStream(id: "l-5b", streamId: 303, name: "Flussonic",
+                                tvArchive: 1, tvArchiveDuration: 0,
+                                catchupTypeRaw: "fs")
+        stream.directURL = "http://example.com/ch/video.m3u8"
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let media = try #require(PlayableMedia.catchup(
+            stream: stream, playlist: playlist, programTitle: "Evening News",
+            start: start, end: start.addingTimeInterval(3600)
+        ))
+        #expect(media.url.absoluteString == "http://example.com/ch/video-1700000000-3600.m3u8")
+        #expect(media.id == "catchup-l-5b-1700000000")
+        #expect(media.kind == .vod)
+        #expect(media.startTime == 0)
+        #expect(media.contentRef == .live("l-5b"))
+        #expect(media.channelScope == nil)
+    }
+
+    @Test func `catchup ignores the playlist stream format rewrite`() throws {
+        let playlist = makeM3UPlaylist()
+        playlist.streamFormat = .mpegTS
+        let stream = LiveStream(id: "l-5c", streamId: 304, name: "Flussonic",
+                                tvArchive: 1, tvArchiveDuration: 3,
+                                catchupTypeRaw: "flussonic")
+        stream.directURL = "http://example.com/ch/index.m3u8"
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let media = try #require(PlayableMedia.catchup(
+            stream: stream, playlist: playlist, programTitle: "x",
+            start: start, end: start.addingTimeInterval(1800)
+        ))
+        #expect(media.url.absoluteString == "http://example.com/ch/index-1700000000-1800.m3u8")
+    }
+
+    @Test func `catchup returns nil for stalker channel`() {
+        let playlist = makeStalkerPlaylist()
+        let stream = LiveStream(id: "l-5d", streamId: 305, name: "Portal",
+                                tvArchive: 1, tvArchiveDuration: 7,
+                                catchupTypeRaw: "flussonic")
+        stream.directURL = "ffmpeg http://localhost/ch/video.m3u8"
         let media = PlayableMedia.catchup(
             stream: stream, playlist: playlist, programTitle: "x",
             start: Date(), end: Date().addingTimeInterval(3600)
@@ -163,12 +220,46 @@ struct PlayableMediaTests {
         #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: start, now: now))
     }
 
-    @Test func `catchup availability treats zero duration as one day`() {
+    @Test func `xtream zero duration keeps the one day window`() {
         let stream = LiveStream(id: "l-8", streamId: 305, name: "Archive",
                                 tvArchive: 1, tvArchiveDuration: 0)
         let now = Date(timeIntervalSince1970: 1_700_000_000)
+        #expect(PlayableMedia.archiveWindowDays(for: stream) == 1)
         #expect(PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-3600), now: now))
         #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-2 * 86400), now: now))
+    }
+
+    @Test func `m3u zero duration opens the unknown depth window`() {
+        let stream = LiveStream(id: "l-8b", streamId: 310, name: "Archive",
+                                tvArchive: 1, tvArchiveDuration: 0,
+                                catchupTypeRaw: "flussonic")
+        stream.directURL = "http://example.com/ch/video.m3u8"
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let inside = -TimeInterval(PlayableMedia.unknownArchiveDays) * 86400 + 3600
+        let outside = -TimeInterval(PlayableMedia.unknownArchiveDays) * 86400 - 3600
+        #expect(PlayableMedia.archiveWindowDays(for: stream) == PlayableMedia.unknownArchiveDays)
+        #expect(PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-2 * 86400), now: now))
+        #expect(PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(inside), now: now))
+        #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(outside), now: now))
+    }
+
+    @Test func `xtream declared duration keeps its own window`() {
+        let stream = LiveStream(id: "l-8c", streamId: 311, name: "Archive",
+                                tvArchive: 1, tvArchiveDuration: 14)
+        #expect(PlayableMedia.archiveWindowDays(for: stream) == 14)
+    }
+
+    @Test func `a deep archive is clamped for the guide but not for playback`() {
+        let stream = LiveStream(id: "l-8d", streamId: 312, name: "Deep Archive",
+                                tvArchive: 1, tvArchiveDuration: 30)
+        #expect(PlayableMedia.archiveWindowDays(for: stream) == 30)
+        #expect(PlayableMedia.guideArchiveWindowDays(for: stream) == PlayableMedia.maxGuideArchiveDays)
+    }
+
+    @Test func `a fortnight archive survives the guide clamp unnarrowed`() {
+        let stream = LiveStream(id: "l-8e", streamId: 313, name: "Archive",
+                                tvArchive: 1, tvArchiveDuration: 14)
+        #expect(PlayableMedia.guideArchiveWindowDays(for: stream) == 14)
     }
 
     @Test func `catchup availability rejects channels without archive`() {
@@ -177,12 +268,40 @@ struct PlayableMediaTests {
         #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-3600), now: now))
     }
 
-    @Test func `catchup availability rejects m3u direct streams`() {
+    @Test func `catchup availability rejects m3u channels without catchup attributes`() {
         let stream = LiveStream(id: "l-10", streamId: 307, name: "M3U",
                                 tvArchive: 1, tvArchiveDuration: 7)
         stream.directURL = "http://example.com/live/stream.m3u8"
         let now = Date()
         #expect(!PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-3600), now: now))
+    }
+
+    @Test func `catchup availability accepts m3u channels with catchup attributes`() {
+        let stream = LiveStream(id: "l-10b", streamId: 308, name: "M3U Archive",
+                                tvArchive: 1, tvArchiveDuration: 7,
+                                catchupTypeRaw: "flussonic")
+        stream.directURL = "http://example.com/ch/video.m3u8"
+        let now = Date()
+        #expect(PlayableMedia.isCatchupAvailable(stream: stream, start: now.addingTimeInterval(-3600), now: now))
+    }
+
+    @Test func `catchup capability rejects stalker channels`() {
+        // What the Stalker importer actually writes: no `tvArchive`, no
+        // `catchupTypeRaw`, and a `create_link` command in `directURL`.
+        let stream = LiveStream(id: "l-10d", streamId: 312, name: "Portal")
+        stream.directURL = "ffmpeg http://localhost/ch/video.m3u8"
+        #expect(!PlayableMedia.isCatchupCapable(stream: stream))
+    }
+
+    @Test func `catchup capability trusts the imported decision without rebuilding a url`() {
+        // `tvArchive == 1` is only ever written for a source the importer could
+        // build, so the render path must not re-derive it from the URL.
+        let stream = LiveStream(id: "l-10e", streamId: 313, name: "M3U Archive",
+                                tvArchive: 1, tvArchiveDuration: 7,
+                                catchupTypeRaw: "default",
+                                catchupSource: "plugin://foo/{utc}")
+        stream.directURL = "http://example.com/live/stream.m3u8"
+        #expect(PlayableMedia.isCatchupCapable(stream: stream))
     }
 
     // MARK: - Codable

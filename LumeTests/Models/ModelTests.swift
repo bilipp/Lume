@@ -358,6 +358,9 @@ struct ModelTests {
         #expect(stream.isFavorite == false)
         #expect(stream.tvArchive == 0)
         #expect(stream.tvArchiveDuration == 0)
+        #expect(stream.catchupTypeRaw == nil)
+        #expect(stream.catchupSource == nil)
+        #expect(stream.catchupType == nil)
     }
 
     @Test func `live stream full init`() {
@@ -373,7 +376,9 @@ struct ModelTests {
             tvArchiveDuration: 7,
             isAdult: 0,
             num: 1,
-            categoryId: "cat-1"
+            categoryId: "cat-1",
+            catchupTypeRaw: "flussonic",
+            catchupSource: "http://example.com/ch/archive-{utc}-{duration}.m3u8"
         )
         #expect(stream.streamIcon == "http://example.com/icon.png")
         #expect(stream.epgChannelId == "BBC1")
@@ -383,6 +388,48 @@ struct ModelTests {
         #expect(stream.tvArchiveDuration == 7)
         #expect(stream.categoryId == "cat-1")
         #expect(stream.customOrder == nil)
+        #expect(stream.catchupTypeRaw == "flussonic")
+        #expect(stream.catchupType == .flussonic)
+        #expect(stream.catchupSource == "http://example.com/ch/archive-{utc}-{duration}.m3u8")
+    }
+
+    @Test func `live stream catchup type accessor round-trips`() {
+        let stream = LiveStream(id: "l-catchup", streamId: 9, name: "Archive Channel")
+        stream.catchupType = .flussonic
+        #expect(stream.catchupTypeRaw == "flussonic")
+        #expect(stream.catchupType == .flussonic)
+        stream.catchupType = nil
+        #expect(stream.catchupTypeRaw == nil)
+        #expect(stream.catchupType == nil)
+    }
+
+    @Test func `catchup type parses canonical spellings`() {
+        #expect(CatchupType.parse("default") == .default)
+        #expect(CatchupType.parse("append") == .append)
+        #expect(CatchupType.parse("flussonic") == .flussonic)
+        #expect(CatchupType.parse("xc") == .xc)
+        #expect(CatchupType.parse("shift") == .shift)
+    }
+
+    @Test func `catchup type parses aliases and enable flags`() {
+        #expect(CatchupType.parse("fs") == .flussonic)
+        #expect(CatchupType.parse("FS") == .flussonic)
+        #expect(CatchupType.parse("flussonic_hls") == .flussonic)
+        #expect(CatchupType.parse("Flussonic-HLS") == .flussonic)
+        #expect(CatchupType.parse("xtream") == .xc)
+        #expect(CatchupType.parse("timeshift") == .shift)
+        #expect(CatchupType.parse("1") == .default)
+        #expect(CatchupType.parse("true") == .default)
+        #expect(CatchupType.parse(" append ") == .append)
+    }
+
+    @Test func `catchup type rejects unknown and empty values`() {
+        #expect(CatchupType.parse(nil) == nil)
+        #expect(CatchupType.parse("") == nil)
+        #expect(CatchupType.parse("   ") == nil)
+        #expect(CatchupType.parse("0") == nil)
+        #expect(CatchupType.parse("false") == nil)
+        #expect(CatchupType.parse("sometrandomscheme") == nil)
     }
 
     @Test func `live stream favorite`() {

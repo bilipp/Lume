@@ -61,6 +61,85 @@ Sizes are a compromise between representativeness and a suite that finishes in a
 few minutes. When chasing a specific regression, raise `entryCount` locally —
 don't commit the raise, or every future baseline shifts.
 
+### The m3u fixture shape changed with the catch-up feature (issue #203)
+
+The catch-up branch moved the parser **and** the fixture in the same change, so
+`testM3UParse120kEntries` numbers do not compare across it without care.
+
+What changed in the fixture: `PerfFixtures.writeM3U` now appends
+`catchupAttributes(index:)` to every live entry — a `switch index % 12` whose
+cases 0–5 emit an attribute block and whose default emits nothing, so roughly
+half the live entries carry catch-up attributes and the other half exercise the
+lookup-misses. It is keyed off `index` rather than the LCG on purpose: the draw
+sequence, and therefore the live/movie/series mix, is byte-identical to before.
+`reserveCapacity` went `entryCount * 180` → `* 200` to keep generation
+realloc-free.
+
+Measured at 120k entries: **20,364,387 B (169 B/entry) before,
+21,557,041 B (179 B/entry) after** — 5.9% more input. `assertFixtureIsSubstantial`'s
+floor moved 5 MB → 18 MB in the same change; the point of the raise is that the
+old 5 MB floor was so far below the real size that a generator dropping an entire
+attribute block would still have passed it. Note the old-shape fixture is
+*20.4 MB*, i.e. still above the new 18 MB floor — the floor does not encode the
+new shape, it just stopped being useless.
+
+#### De-confounding the reported 25% regression
+
+The fresh-eyes review measured m3u parse of 120k entries going 0.851 s →
+1.067–1.421 s and attributed it to the extra per-`#EXTINF` dictionary lookups.
+Because code and input moved together, that attribution could not stand as
+measured. The experiment below moved them one at a time, in one process, in one
+run, under the Benchmark configuration on an iPhone 17 Pro simulator.
+
+Method: a throwaway `LegacyM3UParserExperiment.swift` in this target carried
+verbatim copies of the pre-branch parser (commit `76044b6`), of the branch's
+parser *as the review saw it* (before finding 7 added the display-name boundary
+to `parseAttributes`), and of the shipping parser, plus an old-shape
+`writeM3U`. Six cells, `XCTClockMetric`, five iterations each, five back-to-back
+runs on an otherwise idle machine; medians below.
+
+| Cell | Parser | Module | Fixture | Median |
+|---|---|---|---|---|
+| A | shipping | Lume | old shape | **0.954 s** |
+| B | pre-branch (76044b6) | test | old shape | **1.466 s** |
+| C | shipping | Lume | new shape | **0.883 s** |
+| D | as-reviewed | test | new shape | 1.434 s |
+| E | as-reviewed | test | old shape | 1.342 s |
+| F | shipping (verbatim copy) | test | old shape | 1.233 s |
+
+The *module* column is load-bearing and was the trap in the first pass. A
+verbatim copy of the shipping parser compiled into the test target (F) runs
+**29% slower than the identical source called across the module boundary into
+Lume (A)** — 1.233 s vs 0.954 s. Every legacy/as-reviewed cell pays that
+handicap and cells A and C do not, so a raw A-vs-B comparison overstates the
+shipping parser by roughly that much. F is the control that makes the
+same-module rows comparable to each other.
+
+What the cells say:
+
+- **Code, isolated (F vs B, same module, same input): the shipping parser is
+  15.9% *faster* than the pre-branch one.** Finding 7's fix stops attribute
+  scanning at the comma that starts the display name, so `parseAttributes` no
+  longer walks the name of every line — which more than pays for the six extra
+  dictionary lookups the feature added.
+- **Fixture shape, isolated (A vs C): no cost.** 0.954 s on the old shape vs
+  0.883 s on the new one; 5.9% more bytes did not make the parse slower, and
+  the direction is inside the run-to-run spread either way.
+- **Where the review's number came from (D and E):** only the as-reviewed
+  parser reproduces it. D is 1.434 s in the test module; divided by the 1.29
+  module handicap that is ~1.11 s in Lume-module terms, squarely inside the
+  review's 1.067–1.421 s band. Its old-shape twin E is 1.342 s, so the fixture
+  contributed ~7% of that and the attribute scan the rest.
+
+Caveat, so nobody over-reads the table: the pre-branch parser could only be
+measured as a test-module copy — swapping it into `Lume/` does not compile,
+because `ContentSyncManager+M3U` and `ParsingBenchmarks` read the new
+`M3UEntry` catch-up fields. Cross-module rows are therefore comparable to each
+other, not to A and C. B is also the noisiest cell in the set (1.30–1.62 s
+across runs); F and E are stable to a few percent.
+
+Verdict: the 25% is not a real regression in the shipping parser — it was the pre-finding-7 attribute scan, which no longer exists; on identical input in identical module placement the current parser is 15.9% faster than the pre-branch one (F 1.233 s vs B 1.466 s), the new fixture shape costs nothing measurable (A 0.954 s vs C 0.883 s), and there is nothing here to optimize.
+
 ## Stores are on disk, not in memory
 
 `PerfStore.makeOnDiskContainer()` creates a real store file per iteration. An

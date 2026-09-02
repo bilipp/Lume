@@ -211,8 +211,8 @@
                                 .foregroundStyle(secondaryColor)
                         }
 
-                        if stream.tvArchive > 0 {
-                            Label("Catchup: \(stream.tvArchiveDuration)d", systemImage: "clock.arrow.circlepath")
+                        if PlayableMedia.isCatchupCapable(stream: stream) {
+                            CatchupBadge(days: PlayableMedia.archiveBadgeDays(for: stream), spacing: 6)
                                 .font(.system(size: 22))
                                 .foregroundStyle(Color.blue)
                         }

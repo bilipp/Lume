@@ -134,6 +134,103 @@ struct EPGGridBuilderTests {
         #expect(cells[0].isGap)
     }
 
+    // MARK: - rows(streams:cellsByChannel:timeline:)
+
+    @MainActor
+    private static func row(for stream: LiveStream) -> EPGChannelRow? {
+        EPGGridBuilder.rows(streams: [stream], cellsByChannel: [:], timeline: timeline).first
+    }
+
+    /// The row snapshot and the player's own check must answer identically for
+    /// the same channel and instant — a divergence is a clock icon whose tap
+    /// does nothing.
+    @MainActor
+    private static func expectAgreement(
+        _ row: EPGChannelRow,
+        _ stream: LiveStream,
+        start: Date,
+        now: Date,
+        replayable: Bool,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        #expect(row.isReplayable(start: start, now: now) == replayable, sourceLocation: sourceLocation)
+        #expect(
+            row.isReplayable(start: start, now: now)
+                == PlayableMedia.isCatchupAvailable(stream: stream, start: start, now: now),
+            sourceLocation: sourceLocation
+        )
+    }
+
+    @MainActor
+    @Test func `an xtream archive channel is replayable inside its window`() throws {
+        let stream = LiveStream(id: "row-xtream", streamId: 1, name: "Archive",
+                                tvArchive: 1, tvArchiveDuration: 7)
+        let row = try #require(Self.row(for: stream))
+        let now = Self.windowStart
+
+        #expect(row.catchupCapable)
+        #expect(row.archiveDays == 7)
+        Self.expectAgreement(row, stream, start: now.addingTimeInterval(-3 * 86400), now: now, replayable: true)
+        Self.expectAgreement(row, stream, start: now.addingTimeInterval(-8 * 86400), now: now, replayable: false)
+    }
+
+    @MainActor
+    @Test func `an m3u channel with catchup attributes is replayable`() throws {
+        let stream = LiveStream(id: "row-m3u", streamId: 2, name: "Flussonic",
+                                tvArchive: 1, tvArchiveDuration: 3,
+                                catchupTypeRaw: "flussonic")
+        stream.directURL = "http://example.com/ch/video.m3u8"
+        let row = try #require(Self.row(for: stream))
+        let now = Self.windowStart
+
+        #expect(row.catchupCapable)
+        #expect(row.archiveDays == 3)
+        Self.expectAgreement(row, stream, start: now.addingTimeInterval(-86400), now: now, replayable: true)
+        Self.expectAgreement(row, stream, start: now.addingTimeInterval(-4 * 86400), now: now, replayable: false)
+    }
+
+    @MainActor
+    @Test func `a deep archive row uses the guide's clamped window`() throws {
+        let stream = LiveStream(id: "row-deep", streamId: 4, name: "Deep",
+                                tvArchive: 1, tvArchiveDuration: 30,
+                                catchupTypeRaw: "flussonic")
+        stream.directURL = "http://example.com/ch/video.m3u8"
+        let row = try #require(Self.row(for: stream))
+
+        #expect(row.catchupCapable)
+        #expect(row.archiveDays == PlayableMedia.guideArchiveWindowDays(for: stream))
+        #expect(row.archiveDays == PlayableMedia.maxGuideArchiveDays)
+    }
+
+    @MainActor
+    @Test func `an m3u channel without catchup attributes is not replayable`() throws {
+        let stream = LiveStream(id: "row-m3u-bare", streamId: 3, name: "Plain",
+                                tvArchive: 1, tvArchiveDuration: 7)
+        stream.directURL = "http://example.com/ch/video.m3u8"
+        let row = try #require(Self.row(for: stream))
+        let now = Self.windowStart
+
+        #expect(!row.catchupCapable)
+        Self.expectAgreement(row, stream, start: now.addingTimeInterval(-3600), now: now, replayable: false)
+    }
+
+    @MainActor
+    @Test func `a channel of unknown archive depth uses the guessed window`() throws {
+        let stream = LiveStream(id: "row-unknown", streamId: 4, name: "Depthless",
+                                tvArchive: 1, tvArchiveDuration: 0,
+                                catchupTypeRaw: "fs")
+        stream.directURL = "http://example.com/ch/video.m3u8"
+        let row = try #require(Self.row(for: stream))
+        let now = Self.windowStart
+        let unknown = TimeInterval(PlayableMedia.unknownArchiveDays) * 86400
+
+        #expect(row.catchupCapable)
+        #expect(row.archiveDays == PlayableMedia.unknownArchiveDays)
+        Self.expectAgreement(row, stream, start: now.addingTimeInterval(-2 * 86400), now: now, replayable: true)
+        Self.expectAgreement(row, stream, start: now.addingTimeInterval(-unknown + 3600), now: now, replayable: true)
+        Self.expectAgreement(row, stream, start: now.addingTimeInterval(-unknown - 3600), now: now, replayable: false)
+    }
+
     @Test func `cell ids stay unique so the grid can identify them`() {
         let cells = Self.cells([
             Self.listing("a", "First", startMinutes: 0, endMinutes: 30),

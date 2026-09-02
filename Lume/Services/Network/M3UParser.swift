@@ -32,6 +32,15 @@ nonisolated struct M3UEntry {
     /// when present. Some providers serve live and on-demand through identical
     /// URLs and only this attribute distinguishes them.
     var type: String?
+    /// Raw catch-up dialect (`catchup-type` / `catchup`), kept verbatim —
+    /// `CatchupType.parse` folds in the wild spellings.
+    var catchupTypeRaw: String?
+    /// Archive depth in days, when the channel declares one. `nil` means the
+    /// channel declares catch-up without a depth.
+    var catchupDays: Int?
+    /// `catchup-source` template, kept verbatim: it carries `{utc}`-style
+    /// placeholders that must be expanded at play time, never at import time.
+    var catchupSource: String?
 }
 
 // MARK: - Parser
@@ -146,7 +155,17 @@ nonisolated enum M3UParser {
                 // Plain (non-extended) m3u: a bare URL with no metadata.
                 guard looksLikeURL(line) else { return nil }
                 let fallbackName = URL(string: line)?.deletingPathExtension().lastPathComponent ?? line
-                return M3UEntry(name: fallbackName, url: line, tvgId: nil, logo: nil, group: pendingGroup, type: nil)
+                return M3UEntry(
+                    name: fallbackName,
+                    url: line,
+                    tvgId: nil,
+                    logo: nil,
+                    group: pendingGroup,
+                    type: nil,
+                    catchupTypeRaw: nil,
+                    catchupDays: nil,
+                    catchupSource: nil
+                )
             }
 
             let name = info.name.isEmpty ? (info.tvgName ?? line) : info.name
@@ -156,7 +175,10 @@ nonisolated enum M3UParser {
                 tvgId: info.tvgId,
                 logo: info.logo,
                 group: info.group ?? pendingGroup,
-                type: info.type
+                type: info.type,
+                catchupTypeRaw: info.catchupTypeRaw,
+                catchupDays: info.catchupDays,
+                catchupSource: info.catchupSource
             )
         }
 
@@ -174,28 +196,34 @@ nonisolated enum M3UParser {
         var logo: String?
         var group: String?
         var type: String?
+        var catchupTypeRaw: String?
+        var catchupDays: Int?
+        var catchupSource: String?
     }
 
     /// Parses `#EXTINF:-1 tvg-id="..." tvg-logo="..." group-title="...",Name`.
     ///
-    /// Attribute values may contain commas, so the display name is whatever
-    /// follows the first comma *after* the last quoted attribute value.
+    /// Attribute values may contain commas, so the display name starts at the
+    /// first comma reached *outside* a quoted value — where the attribute scan
+    /// stops.
     static func parseExtInf(_ line: String) -> ExtInf {
         let body = String(line.dropFirst("#EXTINF:".count))
 
-        let attributes = parseAttributes(body)
+        let (attributes, stop) = scanAttributes(body)
 
-        // Name: after the first comma past the end of the last quoted value.
+        // Name: after the comma the attribute scan stopped on.
         var name = ""
-        let searchStart: String.Index = if let lastQuote = body.lastIndex(of: "\"") {
-            body.index(after: lastQuote)
-        } else {
-            body.startIndex
-        }
-        if let comma = body[searchStart...].firstIndex(of: ",") {
+        if let comma = body[stop...].firstIndex(of: ",") {
             name = String(body[body.index(after: comma)...])
                 .trimmingCharacters(in: .whitespaces)
         }
+
+        // `tvg-rec` is an enable flag, not a dialect: only its truthy spellings
+        // stand in for a missing `catchup`/`catchup-type`, and such a flag
+        // carries no day count.
+        let rec = nonEmpty(attributes["tvg-rec"])
+        let recIsFlag = rec.map(CatchupType.isEnableFlag) ?? false
+        let recDays = recIsFlag ? nil : rec.flatMap { Int($0) }
 
         return ExtInf(
             name: name,
@@ -203,7 +231,12 @@ nonisolated enum M3UParser {
             tvgName: nonEmpty(attributes["tvg-name"]),
             logo: nonEmpty(attributes["tvg-logo"]),
             group: nonEmpty(attributes["group-title"]),
-            type: nonEmpty(attributes["type"])
+            type: nonEmpty(attributes["type"]),
+            catchupTypeRaw: nonEmpty(attributes["catchup-type"]) ?? nonEmpty(attributes["catchup"]) ?? (recIsFlag ? rec : nil),
+            catchupDays: positive(attributes["catchup-days"].flatMap { Int($0) })
+                ?? positive(attributes["timeshift"].flatMap { Int($0) })
+                ?? positive(recDays),
+            catchupSource: nonEmpty(attributes["catchup-source"])
         )
     }
 
@@ -212,20 +245,31 @@ nonisolated enum M3UParser {
         return M3UHeader(epgURL: nonEmpty(attributes["url-tvg"]) ?? nonEmpty(attributes["x-tvg-url"]))
     }
 
-    /// Extracts `key="value"` pairs (the only attribute form the IPTV dialect
-    /// uses in practice). A single manual scan — no regex — because this runs
-    /// once per line on playlists with hundreds of thousands of lines.
+    /// Extracts `key="value"` pairs plus the bare `key=value` form providers
+    /// emit for numeric attributes (`catchup-days=1`, `timeshift=2`). A single
+    /// manual scan — no regex — because this runs once per line on playlists
+    /// with hundreds of thousands of lines.
+    ///
+    /// Scanning stops at the first comma reached outside a quoted value: on an
+    /// `#EXTINF` line that comma starts the display name, and a name like
+    /// `Sky F1=HD` must not contribute an attribute. Commas inside a quoted
+    /// value are consumed with the value, so this is the same boundary
+    /// `parseExtInf` uses to find the name.
     static func parseAttributes(_ text: String) -> [String: String] {
+        scanAttributes(text).attributes
+    }
+
+    /// `parseAttributes` plus the index the scan stopped on, so `parseExtInf`
+    /// does not have to locate the display-name comma a second time.
+    private static func scanAttributes(_ text: String) -> (attributes: [String: String], stop: String.Index) {
         var result: [String: String] = [:]
         var index = text.startIndex
 
         while index < text.endIndex {
-            guard let equals = text[index...].firstIndex(of: "=") else { break }
+            guard let equals = nextEquals(in: text, from: index) else { break }
             let valueStart = text.index(after: equals)
-            guard valueStart < text.endIndex, text[valueStart] == "\"" else {
-                index = valueStart
-                continue
-            }
+            guard valueStart < text.endIndex else { break }
+
             // Key: identifier characters immediately before '='.
             var keyStart = equals
             while keyStart > index {
@@ -236,18 +280,49 @@ nonisolated enum M3UParser {
             }
             let key = String(text[keyStart ..< equals])
 
-            let quoteStart = text.index(after: valueStart)
-            guard let quoteEnd = text[quoteStart...].firstIndex(of: "\"") else { break }
-            if !key.isEmpty {
-                result[key] = String(text[quoteStart ..< quoteEnd])
+            if text[valueStart] == "\"" {
+                let quoteStart = text.index(after: valueStart)
+                guard let quoteEnd = text[quoteStart...].firstIndex(of: "\"") else { break }
+                if !key.isEmpty {
+                    result[key] = String(text[quoteStart ..< quoteEnd])
+                }
+                index = text.index(after: quoteEnd)
+            } else {
+                // An unquoted value ends at the next space or at the comma that
+                // starts the display name; a value carrying either must be quoted.
+                var valueEnd = valueStart
+                while valueEnd < text.endIndex, !text[valueEnd].isWhitespace, text[valueEnd] != "," {
+                    valueEnd = text.index(after: valueEnd)
+                }
+                if !key.isEmpty, valueStart < valueEnd {
+                    result[key] = String(text[valueStart ..< valueEnd])
+                }
+                index = valueEnd
             }
-            index = text.index(after: quoteEnd)
         }
-        return result
+        return (result, index)
+    }
+
+    /// Index of the next `=` at or after `start`, or `nil` once the scan hits a
+    /// comma — the display-name boundary — or the end of the text.
+    private static func nextEquals(in text: String, from start: String.Index) -> String.Index? {
+        var cursor = start
+        while cursor < text.endIndex {
+            let char = text[cursor]
+            if char == "," { return nil }
+            if char == "=" { return cursor }
+            cursor = text.index(after: cursor)
+        }
+        return nil
     }
 
     private static func nonEmpty(_ value: String?) -> String? {
         guard let value, !value.isEmpty else { return nil }
+        return value
+    }
+
+    private static func positive(_ value: Int?) -> Int? {
+        guard let value, value > 0 else { return nil }
         return value
     }
 }
