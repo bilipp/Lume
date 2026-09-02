@@ -44,7 +44,12 @@ final class ParsingBenchmarks: XCTestCase {
     /// memory failure even if it parsed faster.
     func testM3UParse120kEntries() throws {
         let fixture = try PerfFixtures.writeM3U(entryCount: 120_000, to: scratch)
-        assertFixtureIsSubstantial(fixture, minimumBytes: 5_000_000)
+        // Floor raised 5 MB → 18 MB with the catch-up attributes (issue #203):
+        // the fixture is ~21.5 MB at 120k entries, so the old 5 MB floor would
+        // have waved through a generator that dropped a whole attribute block.
+        // Re-tune it alongside any change to `entryCount` or to the share of
+        // live entries `PerfFixtures.catchupAttributes(index:)` decorates.
+        assertFixtureIsSubstantial(fixture, minimumBytes: 18_000_000)
 
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
             var count = 0
@@ -67,9 +72,14 @@ final class ParsingBenchmarks: XCTestCase {
     /// `#EXTINF` attribute scanning in isolation. It runs once per playlist line,
     /// so a constant-factor regression here multiplies by hundreds of thousands.
     func testM3UExtInfAttributeScan() {
+        // Carries the catch-up attributes too — `parseExtInf` now does six more
+        // dictionary lookups per line, and `catchup-days` is deliberately
+        // unquoted because that is the form real playlists emit.
         let line = "#EXTINF:-1 tvg-id=\"ch4711\" tvg-name=\"Channel 4711\" "
             + "tvg-logo=\"https://example.invalid/logo/4711.png\" "
-            + "group-title=\"Sports, News & More\" type=\"video\",Channel 4711 HD, Extra"
+            + "group-title=\"Sports, News & More\" catchup=\"flussonic\" catchup-days=7 "
+            + "catchup-source=\"?utc={utc}&lutc={now}\" "
+            + "type=\"video\",Channel 4711 HD, Extra"
 
         // Assertion outside the loop: per-iteration XCTAsserts would dominate.
         measure(metrics: [XCTClockMetric()]) {
@@ -97,7 +107,10 @@ final class ParsingBenchmarks: XCTestCase {
                 tvgId: index.isMultiple(of: 2) ? "ch\(index)" : nil,
                 logo: nil,
                 group: "Group \(index % 100)",
-                type: nil
+                type: nil,
+                catchupTypeRaw: index.isMultiple(of: 2) ? "flussonic" : nil,
+                catchupDays: index.isMultiple(of: 2) ? 7 : nil,
+                catchupSource: nil
             )
         }
 

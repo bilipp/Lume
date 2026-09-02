@@ -92,6 +92,27 @@ enum PerfFixtures {
         return directory
     }
 
+    /// The catch-up attribute block for a live entry, keyed off `index` rather
+    /// than the generator so adding it left the existing bucket sequence — and
+    /// therefore the live/movie/series mix — byte-identical.
+    ///
+    /// Half the live entries carry one, spread across the spellings real
+    /// providers emit: the `fs` alias, both `catchup` and `catchup-type`, a
+    /// quoted and an unquoted day count, the bare `tvg-rec` enable flag, and
+    /// both template dialects. `parseExtInf` does a dictionary lookup per key
+    /// whether or not the key is present, so the empty half is measured too.
+    private static func catchupAttributes(index: Int) -> String {
+        switch index % 12 {
+        case 0: " catchup=\"fs\""
+        case 1: " catchup=\"flussonic\" catchup-days=\"7\""
+        case 2: " catchup-type=\"flussonic\" catchup-days=3"
+        case 3: " tvg-rec=\"1\""
+        case 4: " catchup=\"append\" catchup-source=\"?utc={utc}&lutc={now}\""
+        case 5: " catchup=\"default\" catchup-source=\"https://example.invalid/timeshift/user/pass/{utc}/{duration}/\(index).m3u8\""
+        default: ""
+        }
+    }
+
     /// Writes an extended-m3u playlist with `entryCount` entries, mixing live
     /// channels, movies and episode-shaped names in roughly the proportions a
     /// provider export has — so `M3UClassifier` does representative work.
@@ -100,15 +121,18 @@ enum PerfFixtures {
         var generator = SeededGenerator()
         let url = directory.appendingPathComponent("playlist.m3u")
         var text = "#EXTM3U url-tvg=\"https://example.invalid/guide.xml.gz\"\n"
-        text.reserveCapacity(entryCount * 180)
+        // ~180 B/entry measured after the catch-up attributes landed (~170
+        // before); the headroom keeps a 120k-entry generation realloc-free.
+        text.reserveCapacity(entryCount * 200)
 
         for index in 0 ..< entryCount {
             let bucket = Int.random(in: 0 ..< 100, using: &generator)
             let group = "Group \(index % 400)"
             if bucket < 45 {
                 text += "#EXTINF:-1 tvg-id=\"ch\(index)\" tvg-name=\"Channel \(index)\" "
-                text += "tvg-logo=\"https://example.invalid/logo/\(index).png\" group-title=\"\(group)\","
-                text += "Channel \(index) HD\n"
+                text += "tvg-logo=\"https://example.invalid/logo/\(index).png\" group-title=\"\(group)\""
+                text += catchupAttributes(index: index)
+                text += ",Channel \(index) HD\n"
                 text += "https://example.invalid/live/user/pass/\(index).ts\n"
             } else if bucket < 80 {
                 text += "#EXTINF:-1 tvg-id=\"\" tvg-logo=\"https://example.invalid/poster/\(index).jpg\" "

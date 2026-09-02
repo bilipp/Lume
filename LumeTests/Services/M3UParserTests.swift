@@ -112,6 +112,131 @@ struct M3UParserTests {
         #expect(entries.first?.name == "Named via tvg")
     }
 
+    @Test func `reads the catch-up spellings providers ship`() throws {
+        let playlist = """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="a" catchup="fs",Chan A
+        http://example.com/a/video.m3u8
+        #EXTINF:-1 tvg-id="b" catchup="flussonic" catchup-days="7",Chan B
+        http://example.com/b/video.m3u8
+        #EXTINF:-1 tvg-id="c" catchup-type="flussonic" timeshift="3",Chan C
+        http://example.com/c/video.m3u8
+        #EXTINF:-1 tvg-id="d" tvg-rec="1" catchup-days="6" catchup-type="flussonic",Chan D
+        http://example.com/d/video.m3u8
+        #EXTINF:-1 tvg-id="e" tvg-rec="1",Chan E
+        http://example.com/e/video.m3u8
+        #EXTINF:-1 tvg-id="f",Chan F
+        http://example.com/f/video.m3u8
+        """
+        let entries = try parseAll(playlist).entries
+        #expect(entries.count == 6)
+
+        #expect(entries[0].catchupTypeRaw == "fs")
+        #expect(entries[0].catchupDays == nil)
+        #expect(CatchupType.parse(entries[0].catchupTypeRaw) == .flussonic)
+
+        #expect(entries[1].catchupTypeRaw == "flussonic")
+        #expect(entries[1].catchupDays == 7)
+
+        #expect(entries[2].catchupTypeRaw == "flussonic")
+        #expect(entries[2].catchupDays == 3)
+
+        #expect(entries[3].name == "Chan D")
+        #expect(entries[3].catchupTypeRaw == "flussonic")
+        #expect(entries[3].catchupDays == 6)
+
+        // A bare enable flag declares catch-up but no depth.
+        #expect(CatchupType.parse(entries[4].catchupTypeRaw) == .default)
+        #expect(entries[4].catchupDays == nil)
+
+        #expect(entries[5].catchupTypeRaw == nil)
+        #expect(entries[5].catchupDays == nil)
+        #expect(entries[5].catchupSource == nil)
+    }
+
+    @Test func `catch-up type prefers catchup-type over catchup`() throws {
+        let playlist = """
+        #EXTM3U
+        #EXTINF:-1 catchup="append" catchup-type="shift",Chan
+        http://example.com/x.ts
+        """
+        let entries = try parseAll(playlist).entries
+        #expect(entries.first?.catchupTypeRaw == "shift")
+    }
+
+    @Test func `unquoted attribute values are read`() throws {
+        let playlist = """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="a" catchup=flussonic catchup-days=1,Chan A
+        http://example.com/a/video.m3u8
+        #EXTINF:-1 catchup=shift timeshift=2,Chan B
+        http://example.com/b/video.m3u8
+        """
+        let entries = try parseAll(playlist).entries
+        #expect(entries[0].catchupTypeRaw == "flussonic")
+        #expect(entries[0].catchupDays == 1)
+        #expect(entries[0].name == "Chan A")
+        #expect(entries[1].catchupTypeRaw == "shift")
+        #expect(entries[1].catchupDays == 2)
+        #expect(entries[1].name == "Chan B")
+    }
+
+    @Test func `an equals sign in the display name is not an attribute`() throws {
+        let playlist = """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="a",Sky F1=HD
+        http://example.com/a.ts
+        #EXTINF:-1,Sky F1=HD
+        http://example.com/b.ts
+        """
+        let entries = try parseAll(playlist).entries
+        #expect(entries[0].name == "Sky F1=HD")
+        #expect(entries[0].tvgId == "a")
+        #expect(M3UParser.parseAttributes("-1 tvg-id=\"a\",Sky F1=HD")["F1"] == nil)
+        #expect(entries[1].name == "Sky F1=HD")
+        #expect(M3UParser.parseAttributes("-1,Sky F1=HD").isEmpty)
+    }
+
+    @Test func `real unquoted attributes survive an equals sign in the name`() throws {
+        let playlist = """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="a" catchup=shift catchup-days=3,Sky F1=HD
+        http://example.com/a.ts
+        """
+        let entries = try parseAll(playlist).entries
+        let entry = try #require(entries.first)
+        #expect(entry.name == "Sky F1=HD")
+        #expect(entry.catchupTypeRaw == "shift")
+        #expect(entry.catchupDays == 3)
+    }
+
+    @Test func `catch-up source keeps its query template verbatim`() throws {
+        let source = "http://example.com/live/1.ts?utc={utc}&lutc={lutc}&d={duration},extra"
+        let playlist = """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="a" catchup="default" catchup-source="\(source)" catchup-days="5",Chan A
+        http://example.com/live/1.ts
+        """
+        let entries = try parseAll(playlist).entries
+        let entry = try #require(entries.first)
+        #expect(entry.catchupSource == source)
+        #expect(entry.catchupTypeRaw == "default")
+        #expect(entry.catchupDays == 5)
+        #expect(entry.name == "Chan A")
+    }
+
+    @Test func `a space before the name comma still yields the display name`() throws {
+        let playlist = """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="a" catchup-days="1" ,Chan A
+        http://example.com/a.ts
+        """
+        let entries = try parseAll(playlist).entries
+        let entry = try #require(entries.first)
+        #expect(entry.name == "Chan A")
+        #expect(entry.catchupDays == 1)
+    }
+
     /// Exercises the chunked reader's carry logic: the file is much larger
     /// than one 512 KB read, so lines straddle chunk boundaries.
     @Test func `parses a large playlist across chunk boundaries`() throws {

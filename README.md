@@ -122,7 +122,7 @@ adapted per size class
 - Browse channels by category with logos and **EPG** data (now & next)
 - Full **program guide** with a scrollable timeline
 - **Custom EPG sources**: add external XMLTV feeds, refresh the guide on its own schedule, and sync manually — managed separately from playlist content
-- Catchup / time-shift support
+- **Catchup / time-shift** on both **Xtream Codes** (`tv_archive`) and **M3U/M3U8** playlists — M3U channels are picked up from their `catchup` / `catchup-type` attributes, covering the `flussonic` (and `flussonic-hls` / `fs`), `append`, `default` / `shift` (`catchup-source` template expansion), and `xc` schemes
 - **Multi-View**: watch up to four channels at once in a 2 / 3 / 2×2 grid, with the audio on whichever tile you pick — channels can come from different playlists, so a provider limited to one concurrent connection is no obstacle
 - Channel zapping with recently-watched history
 - **In-player channel browser** on tvOS (left-press overlay with category/channel grid)
