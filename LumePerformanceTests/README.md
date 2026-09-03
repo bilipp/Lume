@@ -25,7 +25,7 @@ Release would change what ships. Debug, Release and Sideload are untouched.
 
 | Layer | Where | What it catches |
 |---|---|---|
-| Microbenchmarks | `ParsingBenchmarks`, `PersistenceBenchmarks`, `EPGQueryBenchmarks` | Parser / import / query regressions |
+| Microbenchmarks | `ParsingBenchmarks`, `PersistenceBenchmarks`, `M3UPersistenceBenchmarks`, `EPGQueryBenchmarks` | Parser / import / query regressions |
 | Signpost metrics | `SignpostBenchmarks` | A named production phase getting slower |
 | Field telemetry | `AppPerformanceMetrics` (MetricKit) in the app | What users actually experience |
 | Player QoE | `PlaybackQoE` in the app | Join time, rebuffering, startup failures |
@@ -172,6 +172,196 @@ is flat at 274 MB on all three. A rewrite that had only moved wall clock would
 not have fixed the jetsam hazard on an Apple TV, which is why the benchmark
 measures memory alongside clock.
 
+### The m3u pipeline writes an order of magnitude more rows
+
+The same account, fetched as an m3u file instead of over the Xtream API: 520 MB
+and 1,719,199 entries — 56,858 live, 178,231 movies and 1,484,110 episodes across
+~47.4k series — against 135 MB and 282,288 rows. The difference is not the
+provider; it is the shape. Xtream sends 47,568 series *shells* and Lume fetches
+episodes per series on demand, while an m3u file names every episode inline and
+the import materialises all of them.
+
+The per-series distribution is what any fixture has to reproduce: 1,544 distinct
+group titles, a median show of 12 episodes, p99 279, and a largest show of 2,799.
+A fixture of uniformly sized shows measures neither the tail nor the per-series
+work that the tail is made of.
+
+`M3UPersistenceBenchmarks` is the store side of that: `testImportFullM3UCatalog`,
+`testReimportFullM3UCatalogUnchanged` and `testPruneFullEpisodeCatalogWithNoDeletions`,
+at one tenth of the file's row counts with the kind mix (3% live / 11% movie /
+86% episode) preserved. A tenth, because 1.72M rows per iteration is tens of
+minutes; the mix, because episodes are the kind the sync spends its time on and
+were previously not benchmarked at all. It is a separate file from
+`PersistenceBenchmarks` only because that one is already at SwiftLint's file and
+type-body limits.
+
+The same caveat applies as to the Xtream re-import rows above, and harder. The
+`insertLiveStreams` / `insertMovies` / `insertEpisodes` helpers in
+`M3UPersistenceBenchmarks` are hand-written copies of `importLive` /
+`importMovies` / `importEpisodes` — they cannot call them, since those are driven
+by a streaming parse of a downloaded file — and their four field appliers are
+copies of `applyM3ULiveStreamFields` / `applyM3UMovieFields` /
+`applyM3USeriesFields` / `applyM3UEpisodeFields` in
+`Lume/Services/Sync/ContentSyncManager+M3UFields.swift`, down to `num` being
+assigned only on insert and the per-series hoist of the group title. **Edit them
+in lockstep.** A field added to a production applier and not here leaves the
+benchmark measuring a write the app no longer performs; a guard dropped there and
+not here leaves it measuring a dirty check the app no longer has. What pins the
+production path is `M3UFieldApplicationTests` and
+`M3USeriesFieldApplicationTests`, not this benchmark.
+
+First run, iPhone 17 Pro simulator, Benchmark configuration — one machine, one
+sitting, so these are comparable to each other and to nothing else:
+
+| Benchmark | Clock | Peak RSS |
+|---|---|---|
+| `testImportFullM3UCatalog` (cold, ~177k rows) | 27.02 s | 248 MB |
+| `testReimportFullM3UCatalogUnchanged` | **5.21 s** | 242 MB |
+| `testPruneFullEpisodeCatalogWithNoDeletions` | 0.75 s | 243 MB |
+
+The re-import is ~5x cheaper than the cold pass, which is the dirty check and the
+`hasChanges` gate doing on the m3u path what they already do on the Xtream one.
+
+The prune test drives the production `pruneStaleM3UEpisodes` directly rather than
+the guarded `pruneEpisodes` wrapper, so it measures the sweep and not the
+coverage gate in front of it — and does not write a skip counter into
+`UserDefaults` as a side effect. Its seen-set is the `Set<UInt64>` of
+`M3UIdentity.hash64` the import actually builds; the id set it replaced cost
++337 MB resident, held live across the whole import and all four sweeps.
+
+Neither benchmark is where an episode regression gets caught in a normal test
+run, though. That is `M3USyncTests`, in `LumeTests`: alongside the 100k
+live-and-movie playlist it now syncs an episode-only playlist of ~3,000 shows
+with uneven per-show counts end to end through the real `ContentSyncManager`,
+under the same bounded-time assertion. The old scale test had zero episodes in
+it, so the path that is 86% of a real file was the one path with no scale
+coverage at all.
+
+### The m3u import's other half is not SwiftData
+
+On the Xtream side `save()` is ~90% of the import. The m3u side has a second half
+that is pure CPU and resident memory, and it was bigger than anything SwiftData
+was doing per row. All three numbers are against the real 520 MB / 1,719,199-entry
+file:
+
+| Cost | Before | After |
+|---|---|---|
+| Season/episode regex, per import | ~75 s | ~21x cheaper |
+| The four seen-id registries, resident | +337 MB | ~19–33 MB |
+| `M3UParser.parse` peak RSS | 502 MB | 10 MB |
+
+**The regex was compiled 1,719,199 times, and then again 1,484,110 times.**
+`M3UClassifier.episodeInfo` declared its pattern as a literal inside the function
+and matched with `name.range(of:options: .regularExpression)`, which builds an ICU
+matcher per call — ~40 s over the file. Then
+`ContentSyncManager.cleanEpisodeTitle` ran the *identical* pattern a second time
+over every one of the ~1.48M names `classify` had just matched, only to derive the
+episode title: another ~35 s. Roughly 75 s of CPU burned before a single row is
+written. The fix is a hoisted `NSRegularExpression` built once, plus threading the
+match range out of `episodeInfo` so the title comes from the match that already
+happened. Same ICU engine, same pattern, same first-match semantics — a
+differential over all 1,719,199 real names found **0** mismatches. Do not
+"improve" it into a hand-rolled UTF-8 scanner: ICU's `\b` is Unicode-aware where
+an ASCII scanner's is not, and provider names in this file are dense with
+superscript decoration (`ᵁᴴᴰ ³⁸⁴⁰ᴾ`). `cleanEpisodeTitle` itself is unchanged —
+Xtream and Stalker still call it.
+
+**The seen-id registries were 337 MB of `String`.** The four `Set<String>` in
+`M3UImportState` are built during the import and read by the sweeps, so they were
+held live across the whole run *and* all four sweeps; `seenEpisodeIds` alone was
+~292 MB, because a 78-character id is past Swift's 15-byte small-string form and
+so is a separate heap allocation per entry. They are now `Set<UInt64>` of
+`M3UIdentity.hash64` (FNV-1a 64, deterministic across launches — never `Hasher`,
+whose seed changes per process), and each set is released the moment its own sweep
+returns. At 1.48M keys the collision probability is ~6e-8 and the direction is
+benign: a collision makes the sweep *keep* a stale row, never delete a live one.
+
+**The parser's chunk loop had no `autoreleasepool`.** `String(bytes:encoding:)`,
+`trimmingCharacters` and `Data.subdata`/`split` all autorelease per line, and
+`importM3UFile` is one uninterrupted synchronous stretch inside an actor job with
+no suspension point, so the enclosing pool never drained until the whole file was
+done: 502 MB peak RSS against 10 MB with a pool around the loop body.
+`ParsingBenchmarks.testM3UParse120kEntries` cannot see this — 120k entries is only
+~35 MB, well under where it hurts — which is why the number above is from the real
+file and not from the suite.
+
+Attribution for all of this comes from the sub-phase signposts added alongside it
+(`M3UParse`, `M3UClassify`, `M3UUpsertLive`/`Movies`/`Episodes`, and one per
+sweep), nested inside the existing `M3UImport` boundary so older traces and
+baselines still resolve. Before them the m3u import was a single opaque number and
+none of the above could have been ranked.
+
+### `num` is insert-only, and that is what makes the dirty check pay
+
+Xtream's `num` is a value the provider sends. m3u has no such field, so `num` is
+the entry's **position in the file** — which means the obvious implementation
+(assign it every sync, like every other field) hands the dirty check nothing:
+one line inserted near the top of a 1.7M-entry file shifts every position after
+it, so every row downstream is genuinely modified and the whole tail is rewritten.
+The lever would benchmark beautifully on a byte-identical file and deliver
+approximately zero against a provider that ever reorders.
+
+So `num` is assigned **only on insert**, and only from a counter seeded one past
+the highest `num` the playlist already stores (`seedInsertOrder`, three
+`fetchLimit: 1` reads per import — `num` has no `#Index`, so each is a
+filter-then-sort, which is tens of milliseconds against an import measured in
+minutes and not worth an index every write would pay for). Two things about that
+are easy to get wrong:
+
+- Seeding matters as much as the insert-only rule. Handing an insert the raw file
+  position instead *collides* — a channel prepended to the file takes `num` 0
+  while the row that already holds `num` 0 keeps it, and `SortOption.playlist`
+  breaks the tie arbitrarily. Uniqueness is pinned by tests in
+  `M3UFieldApplicationTests`.
+- The accepted cost is that new content sorts at the **end** rather than at its
+  file position, so "Playlist order" drifts from the provider's file over a
+  playlist's life. That is deliberate, not a bug to fix back. On a first import
+  the seed is 0 and the result is exactly the file order.
+
+### Dead levers, m3u edition
+
+The Xtream dead levers above all still apply — the m3u path uses the same store,
+the same batch shape and the same sweep. These are the ones specific to m3u.
+Recorded so nobody re-derives them:
+
+| Lever | Result |
+|---|---|
+| Reorder `M3UClassifier.classify` to test URL shape before `episodeInfo` | Wrong **and** slower |
+| Fetch the `type=m3u` URL variant instead of `m3u_plus` | Loses metadata the app needs |
+| Anything at the HTTP layer | The server offers no hook (see below) |
+
+The reorder is the tempting one, because `episodeInfo` runs a regex on every
+entry and the URL test is a substring scan. It is wrong twice over: the
+`/series/` branch returns `.movie`, so ~1.48M episodes would import as movies —
+and it measured *slightly slower* anyway. Leave `classify`'s test order alone.
+
+`M3UClient.normalizedPlaylistURL` rewrites `type=m3u` to `m3u_plus` deliberately:
+the plain variant drops `tvg-logo`, `tvg-id` and `group-title`, which are
+artwork, EPG matching and categories respectively. A smaller file that imports
+into a worse catalog is not a saving.
+
+### Eager `Episode` materialisation is deferred, not decided
+
+The m3u import writes all ~1.48M `Episode` rows up front. Xtream does not: it
+stores 47,568 series shells and fetches a series' episodes on demand. Converting
+m3u to the same lazy shape is the single largest remaining lever and it is
+**deliberately not part of this work**.
+
+What is not known: every `Episode.series` assignment faults the `Series.episodes`
+inverse, ~1.48M times, and nobody has isolated that cost. It could dominate
+everything measured above. It is also the shape behind closed issue #45's
+`PersistentIdentifier … remapped to a temporary identifier` fatal error, so the
+question is not only "how slow" but "how safe". The `M3UUpsertEpisodes` signpost
+is what will answer it, on a device, against the real file — the benchmarks here
+run at a tenth scale, where a tenth of an unknown is still an unknown.
+
+What makes it a separate decision rather than an optimisation: Continue Watching,
+Up Next, `NextEpisodeResolver`, offline episode browsing, episode search,
+Downloads and Trakt's `applyPending` all read local `Episode` rows, and existing
+m3u users have CloudKit watch progress keyed by episode id. Going lazy is a data
+migration with a user-visible blast radius, not a change to an import loop.
+Measure first.
+
 ### The provider gives you nothing to cache against
 
 nginx/1.24.0, HTTP/1.1, `max_connections: 1`:
@@ -184,6 +374,46 @@ nginx/1.24.0, HTTP/1.1, `max_connections: 1`:
   optimised around cheap *writes* rather than a cheap fetch.
 - One connection means the three content fetches are serialized whether or not
   the code chooses to serialize them.
+
+The m3u endpoint on the same host is worse, and it is where the whole 520 MB
+arrives in one response. Probed directly:
+
+- **No compression**, despite `Accept-Encoding: gzip, deflate, br`.
+- **No `ETag`, no `Last-Modified`.** Nothing to make a conditional GET out of.
+- **No `Content-Length`** — it is `Transfer-Encoding: chunked`, so a connection
+  cut mid-file is indistinguishable from a complete short playlist. That is why
+  the m3u sweeps now run behind the same coverage gate as the Xtream ones: a
+  truncated download used to pass the old `totalImported > 0` check and sweep
+  away everything the cut had removed.
+- **No `Accept-Ranges`** — a `Range` request is answered `200` with the whole
+  file, so resume is not available either.
+- **37 s to first byte**, then 2m04s wall for the full download on a fast Mac.
+
+**The download is irreducible.** Every HTTP-layer idea is dead against this
+server; do not spend another afternoon on one. The only lever that works is
+above the protocol: hash the downloaded file (SHA-256 over 520 MB costs 0.28 s)
+and skip the import and the sweeps when the digest matches the last successful
+import's. The digest is device-local in `UserDefaults`, never on a `@Model` and
+never mirrored to `SyncedPlaylist` — one device's successful import must not
+suppress another device's first one.
+
+That lever is only worth anything if the provider actually returns stable bytes,
+so it was checked rather than assumed: two full downloads **30 minutes apart**
+came back byte-identical — same 520,540,228 bytes, same SHA-256
+(`75622b6b399d9268…`). That also confirms the export is not shuffled per
+request, which is the premise the insert-only `num` depends on. Note the limit
+of the measurement: 30 minutes is not 24 hours, so it says the response is
+deterministic, **not** that this catalog is stable across a day. If the digest
+never matches in the field, that is the assumption that broke.
+
+Worth knowing when reading any m3u number here: this provider's *same account*
+exposes an Xtream API that returns the equivalent catalog in ~135 MB and 282,288
+rows, against 520 MB and 1,719,199. The pipelines have different content
+identity — m3u hashes the stream URL, Xtream uses provider stream ids — so
+switching is not a conversion anyone can do silently without orphaning every
+favourite, watch position and enrichment. The app therefore only *hints*: when an
+entered m3u URL is an Xtream `get.php` endpoint carrying credentials, the
+add-playlist screen says so and leaves the choice to the user.
 
 ## Baselines
 

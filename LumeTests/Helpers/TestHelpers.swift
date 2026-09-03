@@ -105,3 +105,19 @@ struct StringCatalog {
         return resolved
     }
 }
+
+/// Clears every `sync.m3uDigest.*` key from the test host's defaults.
+///
+/// The m3u skip-if-unchanged fingerprint is device-local `UserDefaults` state,
+/// so a suite that drives `syncPlaylist` leaves one key behind per playlist it
+/// creates. The ids are fresh UUIDs, so a leftover can never make a *later*
+/// test skip — but they accumulate in the host for the life of the simulator,
+/// and a suite that wants the real import path has to start from a known-clean
+/// slate. Call it from a suite's `init()`, which Swift Testing runs before
+/// every test in the suite.
+func clearM3UDigests() {
+    let defaults = UserDefaults.standard
+    for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("sync.m3uDigest.") {
+        defaults.removeObject(forKey: key)
+    }
+}

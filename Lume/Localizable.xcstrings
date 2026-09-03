@@ -35161,6 +35161,58 @@
         }
       }
     },
+    "This is an Xtream provider link. It works as an m3u playlist, or add the provider as an Xtream login instead — Xtream syncs far less data for the same catalog." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das ist ein Xtream-Anbieterlink. Er funktioniert als M3U-Playlist, oder füge den Anbieter stattdessen als Xtream-Login hinzu – Xtream synchronisiert für denselben Katalog deutlich weniger Daten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este es un enlace de proveedor Xtream. Funciona como playlist m3u, o añade el proveedor como inicio de sesión Xtream: Xtream sincroniza muchos menos datos para el mismo catálogo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ceci est un lien de fournisseur Xtream. Il fonctionne comme playlist m3u, ou ajoutez plutôt le fournisseur en tant que connexion Xtream — Xtream synchronise beaucoup moins de données pour le même catalogue."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo è un link di un provider Xtream. Funziona come playlist m3u, oppure aggiungi il provider come accesso Xtream — Xtream sincronizza molti meno dati a parità di catalogo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これは Xtream プロバイダのリンクです。m3u プレイリストとしても使えますが、プロバイダを Xtream ログインとして追加することもできます。同じカタログでも Xtream の方が同期するデータ量がはるかに少なくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 링크는 Xtream 제공업체 링크입니다. m3u 재생목록으로도 작동하지만, 제공업체를 Xtream 로그인으로 추가할 수도 있습니다. 같은 카탈로그라도 Xtream이 훨씬 적은 데이터를 동기화합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este é um link de provedor Xtream. Funciona como playlist m3u, ou adicione o provedor como login Xtream — o Xtream sincroniza muito menos dados para o mesmo catálogo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是一个 Xtream 服务商链接。它可以作为 m3u 播放列表使用，也可以改为将该服务商添加为 Xtream 登录——同样的内容库，Xtream 同步的数据量要少得多。"
+          }
+        }
+      }
+    },
     "This may take a few minutes…" : {
       "localizations" : {
         "de" : {
