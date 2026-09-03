@@ -139,3 +139,29 @@ nonisolated func searchLiveStreamPredicate(scope: SearchScope) -> Predicate<Live
             && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
     }
 }
+
+// MARK: - Interleaving
+
+/// Spends `limit` by taking one element from each list in turn, preserving each
+/// list's own order and dropping repeats. Used for hits from several Stalker
+/// portals: each returns its own relevance ranking, and concatenating them
+/// would bury a second portal's best match under everything the first had to
+/// say. Lists shorter than the rest simply drop out of the rotation.
+nonisolated func interleaved<Element: Hashable>(_ lists: [[Element]], limit: Int) -> [Element] {
+    guard lists.count > 1 else { return Array((lists.first ?? []).prefix(limit)) }
+    var merged: [Element] = []
+    var seen = Set<Element>()
+    var index = 0
+    while merged.count < limit {
+        var advanced = false
+        for list in lists where index < list.count {
+            advanced = true
+            guard seen.insert(list[index]).inserted else { continue }
+            merged.append(list[index])
+            if merged.count == limit { break }
+        }
+        guard advanced, merged.count < limit else { break }
+        index += 1
+    }
+    return merged
+}

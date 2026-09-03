@@ -184,12 +184,13 @@ struct SearchView: View {
         let wantLive = filter == .all || filter == .liveTV
 
         // A Stalker portal's movies/series aren't synced locally, so they can
-        // only be found through the portal's own search API. Live TV (which
+        // only be found through the portal's own search API — asked of every
+        // Stalker playlist in scope, not just the active one. Live TV (which
         // *is* synced) and every other source type use the local predicate
         // search. Cross-playlist search still runs the local pass too, so other
         // playlists' synced content is included.
         let usePortalForVODSeries = playlist?.sourceType == .stalker && !searchAllPlaylists
-        let portal = await portalSearch(query: query, playlist: playlist, wantMovies: wantMovies, wantSeries: wantSeries)
+        let portal = await portalSearch(query: query, wantMovies: wantMovies, wantSeries: wantSeries)
         guard !Task.isCancelled else { return }
 
         let localHits = await localSearch(
@@ -203,17 +204,43 @@ struct SearchView: View {
         results = assembleResults(portal: portal, localHits: localHits)
     }
 
-    /// Portal search hits (element ids) for a Stalker active playlist; empty
-    /// otherwise.
+    /// Portal search hits (element ids) from every Stalker playlist in scope.
+    /// A Stalker catalog's movies and series are never synced into the store,
+    /// so the portal's own search API is the only way to reach them — which
+    /// left a non-active Stalker playlist invisible to search whatever
+    /// "Search All Playlists" was set to, since the local pass has nothing of
+    /// its VOD to find.
     private func portalSearch(
-        query: String, playlist: Playlist?, wantMovies: Bool, wantSeries: Bool
+        query: String, wantMovies: Bool, wantSeries: Bool
     ) async -> (movies: [String], series: [String]) {
-        guard let playlist, playlist.sourceType == .stalker, wantMovies || wantSeries else { return ([], []) }
+        let targets = portalPlaylists
+        guard !targets.isEmpty, wantMovies || wantSeries else { return ([], []) }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        return await manager.searchStalker(
-            query: query, playlist: playlist,
-            includeMovies: wantMovies, includeSeries: wantSeries, limit: resultLimit
-        )
+        var movies: [[String]] = []
+        var series: [[String]] = []
+        // One portal at a time: these are separate providers, each with its own
+        // connection allowance, and a Stalker middleware is quick to refuse a
+        // second session. The debounce means only a settled query gets here,
+        // and cancellation stops the walk before the next portal is asked.
+        for playlist in targets {
+            guard !Task.isCancelled else { break }
+            let hits = await manager.searchStalker(
+                query: query, playlist: playlist,
+                includeMovies: wantMovies, includeSeries: wantSeries, limit: resultLimit
+            )
+            movies.append(hits.movies)
+            series.append(hits.series)
+        }
+        // Each portal ranks its own hits, so rotate rather than concatenate.
+        return (interleaved(movies, limit: resultLimit), interleaved(series, limit: resultLimit))
+    }
+
+    /// The Stalker playlists this search asks directly: all of them while
+    /// searching across playlists, otherwise the active one if it happens to
+    /// be a portal.
+    private var portalPlaylists: [Playlist] {
+        let candidates = searchAllPlaylists ? playlists : [activePlaylist].compactMap { $0 }
+        return candidates.filter { $0.sourceType == .stalker }
     }
 
     /// Bounded local predicate search, run off the main thread.
