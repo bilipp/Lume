@@ -201,6 +201,9 @@ struct SettingsView: View {
                                         .lineLimit(1)
                                         .truncationMode(.middle)
                                 }
+
+                                Spacer(minLength: 0)
+                                PlaylistSyncAccessory(state: playlist.syncState)
                             }
                             .padding(.vertical, 1)
                         }

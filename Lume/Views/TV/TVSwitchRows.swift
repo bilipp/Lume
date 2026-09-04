@@ -32,6 +32,7 @@
                             .truncationMode(.middle)
                     }
                     Spacer(minLength: 0)
+                    PlaylistSyncAccessory(state: playlist.syncState, size: 26)
                     if isActive {
                         TVSwitchRowCheckmark()
                     }

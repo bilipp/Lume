@@ -6,6 +6,24 @@ struct PlaylistDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
     @Bindable var playlist: Playlist
+    /// Held here rather than read inside `playlist.syncState` so changing the
+    /// frequency in Settings re-renders the Status row (it decides `.overdue`).
+    @AppStorage(SyncFrequency.storageKey)
+    private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
+
+    /// This playlist's sync condition, shared by the Status row and the
+    /// `Last Synced` line below it so the two can never disagree.
+    ///
+    /// Not `private`: the tvOS pane in PlaylistDetailView+TV (separate file)
+    /// renders the same two rows from it.
+    var syncState: PlaylistSyncState {
+        PlaylistSyncState.resolve(
+            syncEnabled: playlist.syncEnabled,
+            status: playlist.syncStatus,
+            lastSyncDate: playlist.lastSyncDate,
+            frequency: SyncFrequency.resolve(syncFrequencyRaw)
+        )
+    }
 
     /// tvOS: called to leave this detail when it is shown inline in the Settings
     /// detail pane (e.g. after deleting the playlist, whose object then becomes
@@ -234,20 +252,21 @@ struct PlaylistDetailView: View {
             Section {
                 Toggle("Sync Enabled", isOn: $playlist.syncEnabled)
 
-                if playlist.syncStatus == .syncing {
-                    HStack {
-                        Text("Status")
-                        Spacer()
-                        HStack(spacing: 6) {
+                // Unconditional: "never synced" and "last sync failed" are the
+                // two states most worth reading here, and both used to render
+                // as no row at all.
+                LabeledContent("Status") {
+                    HStack(spacing: 6) {
+                        if syncState == .syncing {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("Syncing")
-                                .foregroundStyle(.secondary)
                         }
+                        Text(syncState.statusLabel)
+                            .foregroundStyle(syncState.tint)
                     }
                 }
 
-                if let lastSync = playlist.lastSyncDate {
+                if let lastSync = syncState.lastSyncDate {
                     LabeledContent("Last Synced") {
                         Text(lastSync, style: .relative)
                             .foregroundStyle(.secondary)
