@@ -149,6 +149,11 @@ enum PlayerSettings {
     /// `ExternalPlayerScope.default`.
     static let externalPlayerScopeKey = "player.externalPlayerScope"
 
+    /// Raw value of the `LiveSurfMode` up and down on the remote follow while a
+    /// live channel is playing. Unset (or unrecognised) means the channel
+    /// rocker; see `LiveSurfMode.default`.
+    static let liveSurfModeKey = "player.liveSurfMode"
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default

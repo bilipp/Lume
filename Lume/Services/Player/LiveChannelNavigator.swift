@@ -11,12 +11,108 @@
 import Foundation
 import SwiftData
 
+// Two channel-resolution helpers take six parameters: the media, the ordering
+// its list is in, the profile's restriction and the context are each needed to
+// resolve a single channel, and bundling them would only hide the inputs.
+// swiftlint:disable function_parameter_count
+
+/// How an up or down press on the remote maps onto the live channel list while
+/// a channel is playing. Both modes walk the same list — whichever the channel
+/// was launched from, in the sort the viewer had active — so this only decides
+/// which way each press moves along it.
+///
+/// Note what neither mode does: read channel numbers. `channelUpDown` lines up
+/// with the lineup's numbering only while the list is in playlist order, which
+/// is why the alternative exists at all — under a name sort, or in Favorites,
+/// "next channel" is just the row below and up reads as inverted.
+enum LiveSurfMode: String, CaseIterable, Identifiable {
+    /// Up moves to the next channel in the list, down to the previous — a TV
+    /// remote's channel rocker.
+    case channelUpDown = "channel"
+    /// Up moves to the row above in the channel list, down to the row below —
+    /// the way every other up/down handler in the app moves.
+    case listOrder = "list"
+
+    /// The channel rocker, which is how in-player surfing has always behaved.
+    static let `default` = LiveSurfMode.channelUpDown
+
+    var id: String {
+        rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .channelUpDown: String(localized: "Channel Up/Down")
+        case .listOrder: String(localized: "List Order")
+        }
+    }
+
+    /// The stored preference, falling back to the rocker for anything the
+    /// picker didn't write — including the unset default. Read off
+    /// `UserDefaults` directly, like `PlayerSettings.Playback`'s accessors: the
+    /// player hosts want this at the moment of a key press, and an `@AppStorage`
+    /// would re-render the whole player tree whenever it changed.
+    static var preferred: LiveSurfMode {
+        resolve(UserDefaults.standard.string(forKey: PlayerSettings.liveSurfModeKey))
+    }
+
+    /// The mode `raw` names, or the default when it names none. Split out from
+    /// `preferred` for the settings picker, which holds the raw value in
+    /// `@AppStorage` and needs the same fallback to label the row.
+    static func resolve(_ raw: String?) -> LiveSurfMode {
+        guard let raw, let mode = LiveSurfMode(rawValue: raw) else { return .default }
+        return mode
+    }
+}
+
 enum LiveChannelNavigator {
     /// The playlist that owns a live stream. Stream `id`s are prefixed with the
     /// owning playlist's UUID at sync time (see `ContentSyncManager`).
     static func playlist(for stream: LiveStream, in context: ModelContext) -> Playlist? {
         let playlists = (try? context.fetch(FetchDescriptor<Playlist>())) ?? []
         return playlists.first { stream.id.hasPrefix($0.id.uuidString) } ?? playlists.first
+    }
+
+    /// Which way the viewer asked to surf. The remote presses a direction, not
+    /// an index, so this is what the player hands over: turning it into an
+    /// offset is this file's job, next to the ordering that offset indexes
+    /// into. Four engine hosts each used to do that arithmetic themselves,
+    /// which is why the direction is resolved in one place now.
+    enum SurfDirection {
+        // `up` is two characters: the cases are named for the keys, mirroring
+        // the `MoveCommandDirection` the hosts translate from.
+        // swiftlint:disable identifier_name
+        /// The remote's up press.
+        case up
+        /// The remote's down press.
+        case down
+        // swiftlint:enable identifier_name
+
+        /// The list offset this press means under `mode`. The two modes are
+        /// mirror images — the list is walked either way, only the sign
+        /// differs — which is exactly why the choice belongs to the viewer
+        /// rather than to whichever host handled the press.
+        fileprivate func offset(in mode: LiveSurfMode) -> Int {
+            switch (mode, self) {
+            case (.channelUpDown, .up), (.listOrder, .down): 1
+            case (.channelUpDown, .down), (.listOrder, .up): -1
+            }
+        }
+    }
+
+    /// The channel one press of `direction` away, within the list `media` was
+    /// launched from, mapped onto that list by `mode` — see `LiveSurfMode`.
+    /// See `adjacentMedia(for:offset:sort:restriction:in:)` for how the list
+    /// itself is resolved.
+    static func adjacentMedia(
+        for media: PlayableMedia,
+        surfing direction: SurfDirection,
+        mode: LiveSurfMode,
+        sort: ContentSortOption,
+        restriction: ContentRestriction,
+        in context: ModelContext
+    ) -> PlayableMedia? {
+        adjacentMedia(for: media, offset: direction.offset(in: mode), sort: sort, restriction: restriction, in: context)
     }
 
     /// The playable channel `offset` positions away from `media` within the list
@@ -124,3 +220,5 @@ enum LiveChannelNavigator {
         return LiveChannelQuery.scoped(fetched, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
     }
 }
+
+// swiftlint:enable function_parameter_count

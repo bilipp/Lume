@@ -365,9 +365,9 @@ struct LumeEngineEngineView: View {
 
     #if os(tvOS)
         /// Change the live channel from the Siri Remote. Up/Down surf to the
-        /// adjacent channel (a TV remote's channel rocker); Right recalls the
-        /// channel watched just before this one. Falls back to summoning the
-        /// controls when there's nothing to jump to.
+        /// adjacent channel, the way the viewer's `LiveSurfMode` maps the
+        /// press; Right recalls the channel watched just before this one.
+        /// Falls back to summoning the controls when there's nothing to jump to.
         private func switchLiveChannel(_ direction: MoveCommandDirection) {
             guard media.isLive else { return }
             let target: PlayableMedia?
@@ -375,7 +375,9 @@ struct LumeEngineEngineView: View {
             case .up, .down:
                 let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
                 target = LiveChannelNavigator.adjacentMedia(
-                    for: media, offset: direction == .up ? 1 : -1, sort: sort, restriction: restriction, in: modelContext
+                    for: media, surfing: direction == .up ? .up : .down,
+                    mode: .preferred,
+                    sort: sort, restriction: restriction, in: modelContext
                 )
             case .right:
                 target = LiveChannelHistory.recallMedia(

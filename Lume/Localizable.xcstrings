@@ -5892,6 +5892,58 @@
         }
       }
     },
+    "Channel Up/Down" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanal auf/ab"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal arriba/abajo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaîne suivante/précédente"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canale su/giù"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャンネル送り"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채널 업/다운"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal acima/abaixo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "频道上下"
+          }
+        }
+      }
+    },
     "Channels" : {
       "localizations" : {
         "de" : {
@@ -16942,6 +16994,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "列表"
+          }
+        }
+      }
+    },
+    "List Order" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listenreihenfolge"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orden de la lista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordre de la liste"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordine dell'elenco"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リストの並び順"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "목록 순서"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordem da lista"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表顺序"
           }
         }
       }
@@ -36459,6 +36563,110 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消限制%@"
+          }
+        }
+      }
+    },
+    "Up & Down" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoch & Runter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arriba y abajo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haut et bas"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su e giù"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下ボタン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위/아래"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cima e baixo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下键"
+          }
+        }
+      }
+    },
+    "Up and down move to the next and previous channel, like a TV remote. List Order moves the way the channel list reads on screen instead — up goes to the row above." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoch und Runter wechseln zum nächsten und vorherigen Kanal, wie bei einer TV-Fernbedienung. Listenreihenfolge folgt stattdessen der Kanalliste auf dem Bildschirm – Hoch springt zur Zeile darüber."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arriba y abajo cambian al canal siguiente y al anterior, como en un mando de TV. Orden de la lista sigue en cambio la lista de canales tal como se ve en pantalla: arriba va a la fila de encima."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haut et bas passent à la chaîne suivante et à la précédente, comme sur une télécommande. Ordre de la liste suit plutôt la liste des chaînes telle qu'elle s'affiche à l'écran : haut va à la ligne du dessus."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su e giù passano al canale successivo e a quello precedente, come con un telecomando. Ordine dell'elenco segue invece l'elenco dei canali così come appare sullo schermo: su va alla riga sopra."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下でテレビのリモコンのように次と前のチャンネルに切り替えます。「リストの並び順」では画面に表示されているチャンネルリストの順に移動し、上が一つ上の行になります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위/아래로 TV 리모컨처럼 다음 채널과 이전 채널로 이동합니다. 목록 순서를 선택하면 화면에 보이는 채널 목록을 따라 이동하며, 위는 바로 위 행으로 갑니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cima e baixo mudam para o canal seguinte e o anterior, como em um controle remoto de TV. Ordem da lista segue a lista de canais como ela aparece na tela — cima vai para a linha acima."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下键像电视遥控器一样切换到下一个和上一个频道。选择“列表顺序”则按屏幕上频道列表的顺序移动——上键前往上一行。"
           }
         }
       }

@@ -68,6 +68,27 @@ import SwiftUI
                     }
                 }
 
+                // Viewer-facing too, so it belongs up here with Languages
+                // rather than among the engine sections — and it is
+                // engine-independent: all four hosts route their up/down
+                // presses through LiveChannelNavigator.
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Live TV")
+
+                    TVOptionCycleRow(
+                        title: "Up & Down",
+                        valueLabel: LiveSurfMode.resolve(liveSurfModeRaw).displayName
+                    ) {
+                        liveSurfModeRaw = nextLiveSurfModeRaw(after: liveSurfModeRaw)
+                    }
+
+                    Text("Up and down move to the next and previous channel, like a TV remote. List Order moves the way the channel list reads on screen instead — up goes to the row above.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Engine Priority")
 

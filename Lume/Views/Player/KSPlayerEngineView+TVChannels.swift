@@ -43,10 +43,10 @@
         }
 
         /// Change the live channel from the Siri Remote: up/down surf to the
-        /// adjacent channel (a TV remote's channel rocker), while right recalls
-        /// the channel watched just before this one (the remote's "last"
-        /// button). Falls back to summoning the controls when there's nothing
-        /// to jump to.
+        /// adjacent channel, the way the viewer's `LiveSurfMode` maps the
+        /// press, while right recalls the channel watched just before this one
+        /// (the remote's "last" button). Falls back to summoning the controls
+        /// when there's nothing to jump to.
         func switchLiveChannel(_ direction: MoveCommandDirection) {
             guard media.isLive else { return }
             let target: PlayableMedia?
@@ -54,7 +54,9 @@
             case .up, .down:
                 let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
                 target = LiveChannelNavigator.adjacentMedia(
-                    for: media, offset: direction == .up ? 1 : -1, sort: sort, restriction: restriction, in: modelContext
+                    for: media, surfing: direction == .up ? .up : .down,
+                    mode: .preferred,
+                    sort: sort, restriction: restriction, in: modelContext
                 )
             case .right:
                 target = LiveChannelHistory.recallMedia(
