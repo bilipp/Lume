@@ -209,6 +209,11 @@ struct MultiViewScreen: View {
                 // The tiles' QoE reports would be nonsense against a summary that
                 // models one stream at a time.
                 PlaybackQoE.shared.isSuspended = true
+                // Reported from here rather than the presentation sites: on macOS
+                // the grid is its own window with the browse root still visible,
+                // so an armed rating sheet would otherwise animate in over four
+                // running streams.
+                AppStoreReviewPrompt.shared.notePlayerAppeared()
                 // Background indexing merges periodic saves into the main context,
                 // which hitches every running decoder — more so with four of them.
                 ContentIndexingService.shared.isPlaybackActive = true
@@ -269,6 +274,7 @@ struct MultiViewScreen: View {
                 releaseAudioSession()
                 ContentIndexingService.shared.isPlaybackActive = false
                 PlaybackQoE.shared.isSuspended = false
+                AppStoreReviewPrompt.shared.notePlayerDisappeared()
             }
         #if os(tvOS)
             // Only reached when the picker isn't presented — its own cover handles
