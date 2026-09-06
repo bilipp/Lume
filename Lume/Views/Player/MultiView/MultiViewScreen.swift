@@ -502,16 +502,10 @@ struct MultiViewScreen: View {
     /// asking for an HDMI surround layout for a muted 2×2 grid would negotiate a
     /// wider route than anything here can fill.
     private func configureAudioSession() {
-        #if os(iOS) || os(tvOS)
-            let session = AVAudioSession.sharedInstance()
-            try? session.setCategory(.playback, mode: .moviePlayback, options: [])
-            try? session.setActive(true, options: [])
-        #endif
+        PlaybackAudioRoute.activateStereo()
     }
 
     private func releaseAudioSession() {
-        #if os(iOS) || os(tvOS)
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
+        PlaybackAudioRoute.release()
     }
 }

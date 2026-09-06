@@ -161,6 +161,15 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 self.selectedSubtitleID = await session.selectedSubtitleTrackIndex.map { String($0) }
                 self.publishTracks(info: info)
                 self.publishVideoInfo(info: info)
+                // Dolby/format readout at stream open. The pipeline-health
+                // heartbeat below carries the same tokens, but its first tick
+                // lands ~30 s in — and never at all on a short clip or a
+                // stream that fails early — which is too late to triage a
+                // "Lume downmixed my Atmos" report. Reads the engine's own
+                // diagnostics so selected-track resolution is not duplicated
+                // here. See issue #207.
+                let openDiagnostics = await session.diagnostics
+                Logger.player.info("LumeEngine stream open \(openDiagnostics.description, privacy: .public)")
                 if !self.isEmbedded {
                     self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
                 }
@@ -340,6 +349,13 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             // on AVFoundation.
             configuration.autoEnableForcedSubtitlesForForeignAudio = true
         }
+        // Resolved here, not in a SwiftUI `.task`: the engine picks its audio
+        // output width when it builds the lane, and a session opens exactly one
+        // URL with no rebuild-in-place, so a width read before the app widened
+        // the route is the width for the whole stream. `activateForPlayback()`
+        // is idempotent, so this and the player view's own call cannot race —
+        // whichever runs first negotiates, the other reuses the result.
+        configuration.maxOutputChannels = PlaybackAudioRoute.activateForPlayback()
         configuration.demuxer.enableReconnect = options.httpReconnect
         configuration.demuxer.ioTimeout = options.ioTimeout
         // The open timeout stays tied to the engine-fallback budget rather than

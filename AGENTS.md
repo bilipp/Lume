@@ -159,9 +159,22 @@ Two separate `ModelContainer`s:
 - App-side wiring only lives here (`Lume/Views/Player/LumeEngine*.swift`); demux/decode/render/sync bugs are engine-side. Decide which side a bug belongs to *before* editing.
 - Declared last in `PlayerEngineKind` so it appends to the end of existing priority lists — opt-in, never silently promoted while KSPlayer is the default.
 - The engine never retries on its own schedule: reconnect/backoff, engine fallback, and overlays stay Lume's job. If a fix would add retry policy to the engine, it belongs here instead.
+- The engine's audio output width is **host-stated**: `PlayerConfiguration.maxOutputChannels` must carry the *negotiated* width (`AVAudioSession.outputNumberOfChannels` after activation), never `maximumOutputNumberOfChannels` — over-shooting fails `AVSampleBufferAudioRenderer` outright (silence, wedged pipeline), which is worse than a downmix. macOS has no `AVAudioSession` and the engine falls back to a flat 2 there, so `PlaybackAudioRoute` queries CoreAudio for the default output device's own channel count instead. It owns the session and the arithmetic, and `LumeEngineCoordinator.makeConfiguration` resolves the value itself precisely so no SwiftUI `.task` / `.onAppear` ordering can race it: a session opens exactly one URL with no rebuild-in-place, so a width resolved too early is the width for the whole stream.
 
 ### Localization
 String Catalogs (9 languages: en, de, es, fr, it, ja, ko, pt, zh-Hans; the App Store listing mirrors them — see `ship-release`'s `references/store-metadata.json`). Run `xcstringstool sync` and include the tvOS stringsdata. Normalize `.xcstrings` with `Scripts/normalize-xcstrings.swift` (pre-commit hook) to avoid format churn.
+
+### Dolby branding — technical labels only
+Never put the Dolby word marks ("Dolby Vision", "Dolby Atmos", "Dolby Digital")
+in user-facing UI, String Catalogs or App Store copy. Use technical labels
+instead — `HDR10`, `HLG`, `DV P8.1`, `E-AC-3 JOC`, `TrueHD`, `5.1`, `7.1`.
+Dolby licenses its marks, and Lume has no agreement; the marks are also the
+most visible exposure because store metadata is public. Internal API names
+(`TrackInfo.DolbyVision`) and diagnostic log tokens (`dv=P8.1/L6`,
+`objectAudio=yes`) are fine — the rule is about what a user or reviewer sees.
+Decided 2026-09-05 while scoping issue #207; see that issue for the wider
+licensing picture (bundled FFmpeg decodes E-AC-3/TrueHD ourselves rather than
+through Apple's licensed frameworks, which is a separate, pre-existing matter).
 
 ### Pre-commit hooks (lefthook)
 SwiftFormat + SwiftLint run as errors. Notable: `String(decoding:)` is banned; `redundantStaticSelf` crashes on `for x in (try? …) ?? []` — avoid that pattern.

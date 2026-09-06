@@ -80,11 +80,8 @@ nonisolated struct DebugLogExporter {
         }
         let start = startDate(now: now)
         let position = store.position(date: start)
-        let predicate = Bundle.main.bundleIdentifier.map {
-            NSPredicate(format: "subsystem == %@", $0)
-        }
 
-        let entries = try store.getEntries(at: position, matching: predicate)
+        let entries = try store.getEntries(at: position, matching: Self.entryPredicate())
         return entries.compactMap { entry -> String? in
             switch entry {
             case let log as OSLogEntryLog:
@@ -93,19 +90,60 @@ nonisolated struct DebugLogExporter {
                 // interpolates a URL with `privacy: .public`, it must not reach
                 // a shared report — stream URLs carry playlist credentials.
                 let message = LogRedaction.scrubURLs(in: log.composedMessage)
-                return "\(time)  [\(log.category)] \(Self.label(for: log.level))  \(message)"
+                let label = Self.categoryLabel(subsystem: log.subsystem, category: log.category)
+                return "\(time)  [\(label)] \(Self.label(for: log.level))  \(message)"
             case let signpost as OSLogEntrySignpost:
                 // MetricKit is compiled out on tvOS, so on Apple TV the `Perf`
                 // intervals are the only phase timing a field report can carry.
                 let time = Self.entryStamp.string(from: signpost.date)
                 let message = LogRedaction.scrubURLs(in: signpost.composedMessage)
-                let head = "\(time)  [\(signpost.category)] \(Self.signpostLabel(for: signpost.signpostType))  \(signpost.signpostName) #\(signpost.signpostIdentifier)"
+                let label = Self.categoryLabel(subsystem: signpost.subsystem, category: signpost.category)
+                let head = "\(time)  [\(label)] \(Self.signpostLabel(for: signpost.signpostType))  \(signpost.signpostName) #\(signpost.signpostIdentifier)"
                 return message.isEmpty ? head : "\(head)  \(message)"
             default:
                 return nil
             }
         }
     }
+
+    /// The app's own subsystem plus LumeEngine's once-per-stream readouts.
+    ///
+    /// LumeEngine logs into its own subsystem, so without this the `stream-open`,
+    /// `video-color` and `audio-width` lines — the only record of what colour
+    /// signalling and audio width a session actually resolved — are filtered out
+    /// of a report the user sends.
+    ///
+    /// `engine.lume/ffmpeg` is deliberately excluded: it is the raw FFmpeg log
+    /// bridge at `AV_LOG_WARNING`, which some streams hit per frame, so a 24 h
+    /// lookback would bury the report in decoder chatter. Everything the engine
+    /// states once per stream is on `diagnostics`.
+    static func entryPredicate() -> NSPredicate {
+        let engine = NSPredicate(
+            format: "subsystem == %@ AND category == %@",
+            Self.engineSubsystem,
+            Self.engineDiagnosticsCategory
+        )
+        guard let app = Bundle.main.bundleIdentifier else { return engine }
+        return NSCompoundPredicate(orPredicateWithSubpredicates: [
+            NSPredicate(format: "subsystem == %@", app),
+            engine
+        ])
+    }
+
+    /// Bracketed label for an entry. Foreign subsystems are qualified so an
+    /// engine line can't be misread as an app category of the same name.
+    static func categoryLabel(
+        subsystem: String,
+        category: String,
+        appSubsystem: String? = Bundle.main.bundleIdentifier
+    ) -> String {
+        let name = category.isEmpty ? "—" : category
+        guard !subsystem.isEmpty, subsystem != appSubsystem else { return name }
+        return "\(subsystem)/\(name)"
+    }
+
+    static let engineSubsystem = "engine.lume"
+    static let engineDiagnosticsCategory = "diagnostics"
 
     /// The debugging session start, floored to `maxLookback` so an ancient
     /// session (logging left on for days) doesn't drag in an unbounded history.
