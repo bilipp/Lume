@@ -46,9 +46,17 @@ struct LibraryToolbarModifier: ViewModifier {
                     }
                 }
             }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
-            }
+            .sheet(
+                isPresented: $showingSettings,
+                // Settings is a sheet on this toolbar, invisible to the browse
+                // root that fires the rating prompt — so it reports itself, the
+                // way the paywall and the players do.
+                onDismiss: { AppStoreReviewPrompt.shared.noteBlockingSheetDismissed() },
+                content: {
+                    SettingsView()
+                        .onAppear { AppStoreReviewPrompt.shared.noteBlockingSheetAppeared() }
+                }
+            )
             .sheet(isPresented: $showingSync) {
                 if let playlist = activePlaylist {
                     SyncProgressView(playlist: playlist)

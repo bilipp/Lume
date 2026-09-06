@@ -207,6 +207,13 @@ struct LumeApp: App {
                         AppPerformanceMetrics.shared.start()
                     #endif
 
+                    // Count this launch for the review policy's second route
+                    // (launches + days since install) — the only route a Live TV
+                    // only user can ever satisfy, since the >=90% completion
+                    // crossing is VOD-only. A cheap synchronous `UserDefaults`
+                    // write, and idempotent per process on the callee's side.
+                    AppStoreReviewPrompt.shared.noteAppLaunched()
+
                     // Give DownloadManager access to the model container so it
                     // can persist download state from its delegate callbacks.
                     #if !os(tvOS)
@@ -299,6 +306,10 @@ struct LumeApp: App {
             .modelContainer(catalogContainer)
             .environment(TraktService.shared)
             .environment(PremiumManager.shared)
+            // The player is its own window on macOS, so it does not inherit
+            // the main scene's environment — without this the review prompt
+            // would read every macOS session as "no child watching".
+            .environment(profileManager)
             .windowStyle(.hiddenTitleBar)
             .windowResizability(.contentMinSize)
 
