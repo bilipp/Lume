@@ -33,10 +33,10 @@ struct StreamInfoSettingsDefaultsTests {
         #expect(PlayerSettings.StreamInfo.detailLevelKey == "player.streamInfo.detailLevel")
     }
 
-    /// Opt-in everywhere off tvOS; tvOS never consults this key at all, because
+    /// On everywhere off tvOS; tvOS never consults this key at all, because
     /// its caption is always-on chrome.
-    @Test func `caption is off by default`() {
-        #expect(PlayerSettings.StreamInfo.enabledDefault == false)
+    @Test func `caption is on by default`() {
+        #expect(PlayerSettings.StreamInfo.enabledDefault == true)
     }
 
     @Test func `detail level default matches the platform`() {
@@ -58,8 +58,12 @@ struct StreamInfoSettingsDefaultsTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = PlayerSettings.StreamInfo.enabledKey
-        #expect(defaults.bool(key, default: PlayerSettings.StreamInfo.enabledDefault) == false)
+        // Absent: the default stands.
+        #expect(defaults.bool(key, default: PlayerSettings.StreamInfo.enabledDefault))
 
+        // Stored: the viewer's choice wins over the default, in both directions.
+        defaults.set(false, forKey: key)
+        #expect(defaults.bool(key, default: PlayerSettings.StreamInfo.enabledDefault) == false)
         defaults.set(true, forKey: key)
         #expect(defaults.bool(key, default: PlayerSettings.StreamInfo.enabledDefault))
     }

@@ -214,14 +214,18 @@ enum PlayerSettings {
 
     // MARK: - Stream information
 
-    /// The in-player stream-information caption. Opt-in off tvOS, where it rides
-    /// the controls overlay; on tvOS the caption is part of the always-on player
-    /// chrome and `enabled` is never consulted.
+    /// The in-player stream-information caption. On by default off tvOS, where
+    /// it rides the controls overlay and so is only visible while they are; on
+    /// tvOS the caption is part of the always-on player chrome and `enabled` is
+    /// never consulted.
     enum StreamInfo {
         static let enabledKey = "player.streamInfo.enabled"
         static let detailLevelKey = "player.streamInfo.detailLevel"
 
-        static let enabledDefault = false
+        /// On: the caption only appears with the controls, which are already a
+        /// deliberate tap away, so it costs nothing to a viewer who never wants
+        /// it and needs no discovery from one who does. tvOS ignores this.
+        static let enabledDefault = true
 
         /// Advanced on tvOS so the existing technical caption (`4K · H264 ·
         /// 24 fps`) keeps rendering exactly as it does today; Simple elsewhere,
