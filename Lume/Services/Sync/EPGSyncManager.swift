@@ -8,6 +8,13 @@
 //  stream-parse each source's XMLTV file and insert only programmes whose
 //  channel a stream actually uses.
 //
+//  A channel is guided by exactly one source. Sources are walked oldest-first
+//  and each claims the channels it carries; later sources are then confined to
+//  the channels still unclaimed. Without that, two sources covering the same
+//  channel both survived — the listing id only collapses programmes whose start
+//  matches to the second — and the guide drew their schedules on top of each
+//  other.
+//
 //  Memory stays flat regardless of guide size: files live on disk, and only one
 //  batch of `ParsedProgramme` structs is held at a time.
 //
@@ -45,23 +52,39 @@ actor EPGSyncManager {
         clearListings()
 
         var anySucceeded = false
+        var unclaimedChannelIDs = knownChannelIDs
         for source in sources {
-            let didSync = await sync(sourceID: source.id, url: source.url, knownChannelIDs: knownChannelIDs)
-            anySucceeded = anySucceeded || didSync
+            let result = await sync(sourceID: source.id, url: source.url, knownChannelIDs: unclaimedChannelIDs)
+            unclaimedChannelIDs.subtract(result.claimedChannelIDs)
+            anySucceeded = anySucceeded || result.didSync
         }
         return anySucceeded
     }
 
     // MARK: - Per-source sync
 
-    private func sync(sourceID: UUID, url: String, knownChannelIDs: Set<String>) async -> Bool {
+    /// What one source contributed: whether it synced at all, and which channels
+    /// it now owns for the rest of this refresh.
+    private struct SourceResult {
+        let didSync: Bool
+        let claimedChannelIDs: Set<String>
+    }
+
+    private func sync(sourceID: UUID, url: String, knownChannelIDs: Set<String>) async -> SourceResult {
         let interval = Perf.begin(.epgSourceSync)
         defer { Perf.end(interval) }
 
         markStatus(sourceID, .syncing)
         guard !url.isEmpty else {
             markStatus(sourceID, .error)
-            return false
+            return SourceResult(didSync: false, claimedChannelIDs: [])
+        }
+        guard !knownChannelIDs.isEmpty else {
+            // Every channel this source could guide is already covered by an
+            // earlier one; downloading it would only produce overlaps.
+            Logger.database.info("EPG source \(sourceID, privacy: .public) skipped, all channels already guided")
+            markSynced(sourceID)
+            return SourceResult(didSync: true, claimedChannelIDs: [])
         }
         do {
             let isRemote = !(URL(string: url)?.isFileURL ?? false)
@@ -69,9 +92,9 @@ actor EPGSyncManager {
             defer { if isRemote { try? FileManager.default.removeItem(at: fileURL) } }
 
             let inserted = insertListings(from: fileURL, knownChannelIDs: knownChannelIDs)
-            Logger.database.info("EPG source \(sourceID) inserted \(inserted) listings")
+            Logger.database.info("EPG source \(sourceID) inserted \(inserted.count) listings for \(inserted.channelIDs.count) channels")
             markSynced(sourceID)
-            return true
+            return SourceResult(didSync: true, claimedChannelIDs: inserted.channelIDs)
         } catch {
             // Credential-free detail (never a URL) so it can be public in
             // user-exported diagnostic logs.
@@ -79,7 +102,7 @@ actor EPGSyncManager {
             let detail = (error as? M3UError)?.logDescription ?? "\(nsError.domain) \(nsError.code)"
             Logger.database.warning("EPG source \(sourceID, privacy: .public) sync failed: \(detail, privacy: .public)")
             markStatus(sourceID, .error)
-            return false
+            return SourceResult(didSync: false, claimedChannelIDs: [])
         }
     }
 
@@ -135,17 +158,24 @@ actor EPGSyncManager {
     /// bounded.
     private static let saveThreshold = 10000
 
+    /// What an XMLTV file contributed: how many listings were inserted, and the
+    /// channels they landed on.
+    private struct InsertResult {
+        var count = 0
+        var channelIDs: Set<String> = []
+    }
+
     /// Stream-parses an XMLTV file and inserts every programme on a known
-    /// channel. Returns the number of listings inserted.
+    /// channel.
     ///
     /// Parsing streams in 2000-programme batches to keep `ParsedProgramme`
     /// memory flat, but inserts accumulate on a single context and save only
     /// every `saveThreshold` listings to minimise main-context merges.
-    private func insertListings(from fileURL: URL, knownChannelIDs: Set<String>) -> Int {
+    private func insertListings(from fileURL: URL, knownChannelIDs: Set<String>) -> InsertResult {
         let interval = Perf.begin(.epgIngest)
         defer { Perf.end(interval) }
 
-        var insertedCount = 0
+        var result = InsertResult()
         var pendingInserts = 0
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
@@ -162,7 +192,8 @@ actor EPGSyncManager {
                         start: programme.start,
                         end: programme.end
                     ))
-                    insertedCount += 1
+                    result.count += 1
+                    result.channelIDs.insert(programme.channelId)
                     pendingInserts += 1
                 }
                 if pendingInserts >= Self.saveThreshold {
@@ -175,7 +206,7 @@ actor EPGSyncManager {
         if pendingInserts > 0 {
             try? context.save()
         }
-        return insertedCount
+        return result
     }
 
     // MARK: - Status bookkeeping

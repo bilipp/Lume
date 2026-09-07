@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// Resolution / frame-rate / codec snapshot for the current video track.
 ///
@@ -11,7 +12,9 @@ import Foundation
 /// Engine-agnostic and unguarded by platform: the shared tvOS overlay
 /// (`TVPlayerControlsOverlay`) and the AVPlayer iOS / macOS overlay both consume
 /// it, and the AVPlayer coordinator produces it on every platform.
-struct PlayerTrackOption: Identifiable, Hashable {
+/// `nonisolated` because the language matcher reads these off the main actor
+/// (KSPlayer's `wantedAudio` override, VLCKit's delegate thread).
+nonisolated struct PlayerTrackOption: Identifiable, Hashable {
     /// Opaque, engine-defined identifier handed back to `select…Track(id:)`.
     let id: String
     let label: String
@@ -81,5 +84,40 @@ nonisolated struct PlayerVideoInfo: Equatable {
         let rounded = (fps * 100).rounded() / 100
         let places = rounded.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
         return rounded.formatted(.number.precision(.fractionLength(places)))
+    }
+}
+
+/// A track-menu entry: the title, with a leading checkmark when it is the
+/// selected one. Shared by every engine overlay's subtitle / audio / rate menu.
+@ViewBuilder
+func playerCheckmarkLabel(_ title: LocalizedStringKey, checked: Bool) -> some View {
+    if checked {
+        Label(title, systemImage: "checkmark")
+    } else {
+        Text(title)
+    }
+}
+
+/// Engine-supplied track names and rate numbers must never reach a
+/// localization lookup — this overload is the verbatim one.
+@ViewBuilder
+func playerCheckmarkLabel(verbatim title: String, checked: Bool) -> some View {
+    if checked {
+        Label { Text(verbatim: title) } icon: { Image(systemName: "checkmark") }
+    } else {
+        Text(verbatim: title)
+    }
+}
+
+extension View {
+    /// VoiceOver label and value for a track menu: the enabled track's own
+    /// name, or the menu's own no-selection wording.
+    func trackMenuAccessibility(
+        _ label: LocalizedStringKey,
+        selected: String?,
+        fallback: LocalizedStringKey
+    ) -> some View {
+        accessibilityLabel(label)
+            .accessibilityValue(selected.flatMap { $0.isEmpty ? nil : Text(verbatim: $0) } ?? Text(fallback))
     }
 }

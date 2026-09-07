@@ -2644,6 +2644,58 @@
         }
       }
     },
+    "Add Language" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprache hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir idioma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une langue"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi lingua"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語を追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어 추가"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar idioma"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加语言"
+          }
+        }
+      }
+    },
     "Add Playlist" : {
       "localizations" : {
         "de" : {
@@ -4003,6 +4055,58 @@
         }
       }
     },
+    "Audio Languages" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audiosprachen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idiomas de audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Langues audio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lingue audio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声言語"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 언어"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idiomas de áudio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频语言"
+          }
+        }
+      }
+    },
     "Audio Queue Depth" : {
       "localizations" : {
         "de" : {
@@ -4051,6 +4155,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音频队列深度"
+          }
+        }
+      }
+    },
+    "Audio Track" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tonspur"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pista de audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piste audio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traccia audio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声トラック"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 트랙"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faixa de áudio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音轨"
           }
         }
       }
@@ -7360,6 +7516,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "颜色"
+          }
+        }
+      }
+    },
+    "Common Languages" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Häufige Sprachen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idiomas frecuentes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Langues courantes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lingue comuni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "よく使う言語"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자주 쓰는 언어"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idiomas comuns"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常用语言"
           }
         }
       }
@@ -18416,6 +18624,110 @@
         }
       }
     },
+    "Lume selects the first of these languages the stream offers as an audio track, most preferred at the top. When the audio that plays is in none of them and the stream carries a forced subtitle track, that track is turned on. Applied the next time playback starts." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume wählt die erste dieser Sprachen, die der Stream als Tonspur anbietet – die bevorzugte steht oben. Wenn der abgespielte Ton in keiner davon vorliegt und der Stream eine erzwungene Untertitelspur enthält, wird diese Spur aktiviert. Wird bei der nächsten Wiedergabe angewendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume selecciona el primero de estos idiomas que el stream ofrezca como pista de audio; el preferido va arriba. Si el audio que se reproduce no está en ninguno de ellos y el stream incluye una pista de subtítulos forzados, esa pista se activa. Se aplica la próxima vez que se inicie la reproducción."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume choisit la première de ces langues proposée par le flux comme piste audio, la préférée en haut. Si l'audio lu ne correspond à aucune d'elles et que le flux contient une piste de sous-titres forcés, cette piste est activée. Appliqué au prochain démarrage de la lecture."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume seleziona la prima di queste lingue offerta dallo stream come traccia audio; la preferita è in cima. Se l'audio riprodotto non è in nessuna di queste lingue e lo stream contiene una traccia di sottotitoli forzati, quella traccia viene attivata. Applicato al successivo avvio della riproduzione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume は、ストリームが音声トラックとして提供しているこれらの言語のうち最初のものを選択します。優先度の高いものを上に配置してください。再生される音声がいずれの言語でもなく、ストリームに強制字幕トラックがある場合は、そのトラックがオンになります。次回の再生開始時に適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume는 스트림이 오디오 트랙으로 제공하는 언어 중 목록의 첫 번째 언어를 선택합니다. 가장 선호하는 언어를 맨 위에 두세요. 재생되는 오디오가 이 언어 중 어느 것도 아니고 스트림에 강제 자막 트랙이 있으면 해당 트랙이 켜집니다. 다음 재생 시작 시 적용됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Lume seleciona o primeiro destes idiomas que o stream oferecer como faixa de áudio; o preferido fica no topo. Se o áudio reproduzido não estiver em nenhum deles e o stream tiver uma faixa de legendas forçadas, essa faixa é ativada. Aplicado na próxima vez que a reprodução começar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 会选择流以音轨形式提供的这些语言中的第一种，最优先的排在最上方。如果播放的音轨不属于其中任何一种语言，且流中包含强制字幕轨道，则会自动开启该轨道。将在下次播放开始时生效。"
+          }
+        }
+      }
+    },
+    "Lume selects the first of these languages the stream offers as an audio track. Drag to reorder. When the audio that plays is in none of them and the stream carries a forced subtitle track, that track is turned on. Applied the next time playback starts." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume wählt die erste dieser Sprachen, die der Stream als Tonspur anbietet. Zum Umsortieren ziehen. Wenn der abgespielte Ton in keiner davon vorliegt und der Stream eine erzwungene Untertitelspur enthält, wird diese Spur aktiviert. Wird bei der nächsten Wiedergabe angewendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume selecciona el primero de estos idiomas que el stream ofrezca como pista de audio. Arrastra para reordenar. Si el audio que se reproduce no está en ninguno de ellos y el stream incluye una pista de subtítulos forzados, esa pista se activa. Se aplica la próxima vez que se inicie la reproducción."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume choisit la première de ces langues proposée par le flux comme piste audio. Faites glisser pour réorganiser. Si l'audio lu ne correspond à aucune d'elles et que le flux contient une piste de sous-titres forcés, cette piste est activée. Appliqué au prochain démarrage de la lecture."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume seleziona la prima di queste lingue offerta dallo stream come traccia audio. Trascina per riordinare. Se l'audio riprodotto non è in nessuna di queste lingue e lo stream contiene una traccia di sottotitoli forzati, quella traccia viene attivata. Applicato al successivo avvio della riproduzione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume は、ストリームが音声トラックとして提供しているこれらの言語のうち最初のものを選択します。ドラッグして並べ替えられます。再生される音声がいずれの言語でもなく、ストリームに強制字幕トラックがある場合は、そのトラックがオンになります。次回の再生開始時に適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume는 스트림이 오디오 트랙으로 제공하는 언어 중 목록의 첫 번째 언어를 선택합니다. 드래그하여 순서를 바꾸세요. 재생되는 오디오가 이 언어 중 어느 것도 아니고 스트림에 강제 자막 트랙이 있으면 해당 트랙이 켜집니다. 다음 재생 시작 시 적용됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Lume seleciona o primeiro destes idiomas que o stream oferecer como faixa de áudio. Arraste para reordenar. Se o áudio reproduzido não estiver em nenhum deles e o stream tiver uma faixa de legendas forçadas, essa faixa é ativada. Aplicado na próxima vez que a reprodução começar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 会选择流以音轨形式提供的这些语言中的第一种。拖动可重新排序。如果播放的音轨不属于其中任何一种语言，且流中包含强制字幕轨道，则会自动开启该轨道。将在下次播放开始时生效。"
+          }
+        }
+      }
+    },
     "Lume's own FFmpeg 8 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture." : {
       "comment" : "Description of the Lume Engine, a custom FFmpeg 8 engine.",
       "isCommentAutoGenerated" : true,
@@ -21870,6 +22182,58 @@
         }
       }
     },
+    "No Languages Found" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Sprachen gefunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron idiomas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune langue trouvée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna lingua trovata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語が見つかりません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어를 찾을 수 없음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum idioma encontrado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到语言"
+          }
+        }
+      }
+    },
     "No Movies" : {
       "localizations" : {
         "de" : {
@@ -22231,6 +22595,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无播放列表。添加您的IPTV服务商即可开始流媒体播放。"
+          }
+        }
+      }
+    },
+    "No Preferred Languages" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine bevorzugten Sprachen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin idiomas preferidos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune langue préférée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna lingua preferita"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "優先言語なし"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선호 언어 없음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem idiomas preferidos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无首选语言"
           }
         }
       }
@@ -25491,6 +25907,58 @@
         }
       }
     },
+    "Preferred Order" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bevorzugte Reihenfolge"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orden de preferencia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordre de préférence"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordine di preferenza"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "優先順位"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선호 순서"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordem de preferência"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "优先顺序"
+          }
+        }
+      }
+    },
     "Premium" : {
       "localizations" : {
         "de" : {
@@ -27054,6 +27522,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除"
+          }
+        }
+      }
+    },
+    "Remove %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 제거"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除%@"
           }
         }
       }
@@ -29473,6 +29993,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在线搜索…"
+          }
+        }
+      }
+    },
+    "Search to find any other language." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suche nach jeder weiteren Sprache."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Busca para encontrar cualquier otro idioma."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effectuez une recherche pour trouver toute autre langue."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca per trovare qualsiasi altra lingua."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他の言語は検索して見つけてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 언어는 검색으로 찾으세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pesquise para encontrar qualquer outro idioma."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索可查找其他任何语言。"
           }
         }
       }
@@ -33134,6 +33706,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "字幕"
+          }
+        }
+      }
+    },
+    "Suggested" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorschläge"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sugeridos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggestions"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggerite"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おすすめ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sugeridos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推荐"
           }
         }
       }

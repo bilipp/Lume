@@ -471,6 +471,31 @@ struct LumeEngineOptions {
     }
 }
 
+// MARK: - Preferred track languages
+
+/// A point-in-time read of the engine-independent preferred audio languages,
+/// taken when a stream is configured (the preference is deliberately not
+/// re-read mid-session). An empty list means no preference, and every engine
+/// then leaves track selection exactly as the container asks for it.
+nonisolated struct PlayerLanguageOptions {
+    /// Bare `de`-style codes, normalized on load: `AVMediaSelectionGroup`'s
+    /// preferred-language filter and LumeEngine's `PlayerConfiguration` both
+    /// need real language identifiers rather than something to match on, and
+    /// `TrackLanguageMatcher` normalizes its own input anyway. Entries that
+    /// name no single language are dropped.
+    var preferredAudioLanguages: [String]
+
+    static func load(from defaults: UserDefaults = .standard) -> PlayerLanguageOptions {
+        let stored = PreferredLanguageList.decode(
+            defaults.string(forKey: PlayerSettings.Language.preferredAudioLanguagesKey)
+                ?? PlayerSettings.Language.preferredAudioLanguagesDefault
+        )
+        return PlayerLanguageOptions(
+            preferredAudioLanguages: PreferredLanguageList.normalized(stored.compactMap(TrackLanguageMatcher.normalize))
+        )
+    }
+}
+
 // MARK: - UserDefaults default-aware reads
 
 /// `@AppStorage` writes nothing until the user first changes a control, so a

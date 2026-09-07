@@ -156,7 +156,7 @@ struct OpenSubtitlesSignInSection: View {
 
         private var languageSummary: String {
             service.preferredLanguages
-                .map { Locale.current.localizedString(forIdentifier: $0) ?? $0.uppercased() }
+                .map { TrackLanguageMatcher.displayName(for: $0) }
                 .joined(separator: ", ")
         }
     }

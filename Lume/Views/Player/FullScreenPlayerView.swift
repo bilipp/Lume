@@ -1,4 +1,3 @@
-import AVFoundation
 import OSLog
 import SwiftData
 import SwiftUI
@@ -16,6 +15,16 @@ struct FullScreenPlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    /// Optional so previews (which don't inject it) don't crash.
+    @Environment(ProfileManager.self) private var profileManager: ProfileManager?
+    /// This player's own playback-health bracket. Per view, not per tracker:
+    /// macOS opens the player in its own window and iPadOS can run several
+    /// scenes, so two sessions can be in flight at once.
+    @State var healthToken: PlaybackHealthTracker.Token?
+    /// The in-flight progress write, so the review policy can wait for a
+    /// finished title to be counted before it judges the session that
+    /// finished it.
+    @State var pendingProgressWrite: Task<Void, Never>?
     #if os(macOS)
         @Environment(\.dismissWindow) private var dismissWindow
     #endif
@@ -206,6 +215,12 @@ struct FullScreenPlayerView: View {
         #endif
         .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.dark)
+        // Synchronous on purpose, and ahead of the `.task` below: the engine
+        // coordinators report `beginStartup` / `noteEngineFallback` from their
+        // own appearance, and an async baseline can land after them — which
+        // would bake a fault the viewer just lived through into the "before"
+        // snapshot and read the session as flawless.
+        .onAppear { beginReviewSession() }
         .task {
             // Seed the recall pair with the channel we opened on, so the very
             // first in-player recall has somewhere to jump back to.
@@ -311,6 +326,7 @@ struct FullScreenPlayerView: View {
             NowPlayingService.shared.endSession()
             releaseAudioSession()
             ContentIndexingService.shared.isPlaybackActive = false
+            endReviewSession(isChildWatching: profileManager?.activeProfileIsChild ?? false)
         }
     }
 
@@ -470,41 +486,6 @@ struct FullScreenPlayerView: View {
         #endif
     }
 
-    private func configureAudioSessionForPlayback() {
-        // tvOS needs this as much as iOS: LumeEngine renders PCM through
-        // AVSampleBufferAudioRenderer and sizes its downmix to the session's
-        // *negotiated* output channels — without an active .playback session
-        // the route stays at its default and multichannel audio has no path.
-        // (KSPlayer/VLC configure their own session; LumeEngine by design
-        // does not touch global audio state, so it is the app's job.)
-        #if os(iOS) || os(tvOS)
-            let session = AVAudioSession.sharedInstance()
-            try? session.setCategory(.playback, mode: .moviePlayback, options: [])
-            // Ask for the route's full width (HDMI LPCM surround); harmless
-            // when the route is stereo — the session clamps and LumeEngine
-            // downmixes to whatever was actually granted.
-            let maxChannels = session.maximumOutputNumberOfChannels
-            if maxChannels > 2 {
-                try? session.setPreferredOutputNumberOfChannels(maxChannels)
-            }
-            try? session.setActive(true, options: [])
-            let route = session.currentRoute.outputs
-                .map { "\($0.portType.rawValue)(\($0.channels?.count ?? 0)ch)" }
-                .joined(separator: "+")
-            Logger.player.info("""
-            Audio session active: route=\(route, privacy: .public) \
-            outputChannels=\(session.outputNumberOfChannels) \
-            maxChannels=\(maxChannels) sampleRate=\(session.sampleRate)
-            """)
-        #endif
-    }
-
-    private func releaseAudioSession() {
-        #if os(iOS) || os(tvOS)
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
-    }
-
     #if os(macOS)
         private func enterMacFullScreen() {
             // Wait for the window to mount before toggling fullscreen.
@@ -547,12 +528,19 @@ struct FullScreenPlayerView: View {
         let ref = activeMedia.contentRef
         let now = clock.current
         let total = clock.duration
-        Task { @MainActor in
+        // Held so `endReviewSession` can await it: `writer` is an actor, so the
+        // await below suspends, and without the handle the review policy would
+        // read `completedTitles` before this task increments it — the third
+        // finished title would then only arm the *next* session.
+        pendingProgressWrite = Task { @MainActor in
             let completion = await writer.record(
                 ref: ref, progress: now, duration: total, force: force
             )
             WatchProgressBuffer.remove(ref: ref)
-            if let completion { syncTraktWatched(ref: completion.ref) }
+            if let completion {
+                syncTraktWatched(ref: completion.ref)
+                AppStoreReviewPrompt.shared.noteCompletedTitle()
+            }
         }
     }
 

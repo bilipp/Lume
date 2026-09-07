@@ -241,14 +241,14 @@ import VLCKit
                     coordinator.selectTextTrack(nil)
                     onResetHideTimer()
                 } label: {
-                    checkmarkLabel("Off", checked: !hasSelection)
+                    playerCheckmarkLabel("Off", checked: !hasSelection)
                 }
                 ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
                     Button {
                         coordinator.selectTextTrack(track)
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.trackName, checked: track.isSelectedExclusively)
+                        playerCheckmarkLabel(verbatim: track.trackName, checked: track.isSelectedExclusively)
                     }
                 }
                 if let onSearchSubtitles {
@@ -264,6 +264,7 @@ import VLCKit
                 pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Subtitles", selected: tracks.first(where: \.isSelectedExclusively)?.trackName, fallback: "Off")
         }
 
         @ViewBuilder
@@ -275,13 +276,14 @@ import VLCKit
                         coordinator.selectAudioTrack(track)
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.trackName, checked: track.isSelectedExclusively)
+                        playerCheckmarkLabel(verbatim: track.trackName, checked: track.isSelectedExclusively)
                     }
                 }
             } label: {
                 pillGlyph("waveform")
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Audio Track", selected: tracks.first(where: \.isSelectedExclusively)?.trackName, fallback: "Default")
         }
 
         private var playbackRateMenu: some View {
@@ -291,7 +293,7 @@ import VLCKit
                         coordinator.playbackRate = rate
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                        playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
                     }
                 }
             } label: {
@@ -377,15 +379,6 @@ import VLCKit
         /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
         private func rateString(_ rate: Float) -> String {
             String(format: "%g×", rate)
-        }
-
-        @ViewBuilder
-        private func checkmarkLabel(_ title: String, checked: Bool) -> some View {
-            if checked {
-                Label(title, systemImage: "checkmark")
-            } else {
-                Text(title)
-            }
         }
 
         private func timeString(from time: TimeInterval) -> String {

@@ -117,10 +117,24 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
 
     // Cached media-selection groups so the overlay can map an opaque option id
     // back to the `AVMediaSelectionOption` to select.
-    private var audioGroup: AVMediaSelectionGroup?
-    private var legibleGroup: AVMediaSelectionGroup?
-    private var audioOptions: [AVMediaSelectionOption] = []
-    private var legibleOptions: [AVMediaSelectionOption] = []
+    // Not `private`: read by the AVPlayerCoordinator+Languages extension
+    // (separate file).
+    var audioGroup: AVMediaSelectionGroup?
+    var legibleGroup: AVMediaSelectionGroup?
+    var audioOptions: [AVMediaSelectionOption] = []
+    var legibleOptions: [AVMediaSelectionOption] = []
+
+    /// The viewer's ordered preferred track languages, snapshotted when a
+    /// stream starts. Deliberately not re-read mid-session: changing the
+    /// setting applies the next time playback starts. Not `private`: read by
+    /// the AVPlayerCoordinator+Languages extension (separate file).
+    var languageOptions = PlayerLanguageOptions(preferredAudioLanguages: [])
+    /// A manual pick in the audio or subtitle menu outranks the preference for
+    /// the rest of this stream. Kept across a same-URL rebuild (Try Again,
+    /// stall recovery) and cleared when the URL changes, so it can never leak
+    /// into the next channel or episode. Persisted nowhere. Not `private`:
+    /// read by the AVPlayerCoordinator+Languages extension (separate file).
+    var hasManualTrackSelection = false
 
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
@@ -181,6 +195,10 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         teardownItemObservers()
         trackLoadTask?.cancel()
 
+        if media.url != currentMedia?.url {
+            hasManualTrackSelection = false
+        }
+        languageOptions = PlayerLanguageOptions.load()
         currentMedia = media
         isLive = media.isLive
         startTime = media.startTime
@@ -323,6 +341,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
 
     func selectAudioTrack(id: String) {
         guard let audioGroup, let index = Int(id), audioOptions.indices.contains(index) else { return }
+        hasManualTrackSelection = true
         item?.select(audioOptions[index], in: audioGroup)
         refreshTrackSelection()
     }
@@ -330,6 +349,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
     /// `nil` disables subtitles ("Off").
     func selectTextTrack(id: String?) {
         guard let legibleGroup else { return }
+        hasManualTrackSelection = true
         if let id, let index = Int(id), legibleOptions.indices.contains(index) {
             item?.select(legibleOptions[index], in: legibleGroup)
         } else {
@@ -349,6 +369,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
                 legibleGroup = legible
                 audioOptions = audio?.options ?? []
                 legibleOptions = legible?.options ?? []
+                applyPreferredLanguages(to: item)
                 refreshTrackSelection()
             }
         }
@@ -380,6 +401,15 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         } else {
             textTrackOptions = []
         }
+    }
+
+    /// Raw BCP-47 tag for a selection option. `extendedLanguageTag` keeps the
+    /// region ("pt-BR"); `locale` is the fallback for options that only carry
+    /// one. Handed on un-normalized — `TrackLanguageMatcher` does that.
+    /// Not `private`: read by the AVPlayerCoordinator+Languages extension
+    /// (separate file).
+    nonisolated static func languageTag(of option: AVMediaSelectionOption) -> String? {
+        option.extendedLanguageTag ?? option.locale?.identifier
     }
 
     // MARK: - Content mode

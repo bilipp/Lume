@@ -82,21 +82,21 @@
             }
         }
 
+        /// Manual picks route through the coordinator's `select…Track(_:)`
+        /// entry points, which are what tell the preferred-language pass to
+        /// stand down for the rest of this stream.
         func selectAudioTrack(id: String) {
             guard let index = Int(id), mediaPlayer.audioTracks.indices.contains(index) else { return }
-            mediaPlayer.audioTracks[index].isSelectedExclusively = true
-            objectWillChange.send()
+            selectAudioTrack(mediaPlayer.audioTracks[index])
         }
 
         func selectTextTrack(id: String?) {
             guard let id else {
-                mediaPlayer.deselectAllTextTracks()
-                objectWillChange.send()
+                selectTextTrack(nil)
                 return
             }
             guard let index = Int(id), mediaPlayer.textTracks.indices.contains(index) else { return }
-            mediaPlayer.textTracks[index].isSelectedExclusively = true
-            objectWillChange.send()
+            selectTextTrack(mediaPlayer.textTracks[index])
         }
     }
 

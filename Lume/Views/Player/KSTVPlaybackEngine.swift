@@ -80,9 +80,10 @@
         }
 
         func selectAudioTrack(id: String) {
-            guard let player = coordinator?.playerLayer?.player,
-                  let track = player.tracks(mediaType: .audio).first(where: { String($0.trackID) == id }) else { return }
-            player.select(track: track)
+            guard let coordinator,
+                  let track = coordinator.playerLayer?.player
+                  .tracks(mediaType: .audio).first(where: { String($0.trackID) == id }) else { return }
+            coordinator.selectAudioTrack(track)
             objectWillChange.send()
         }
 

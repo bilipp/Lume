@@ -8,9 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = C66C81682FC5A59D0048468D /* KSPlayer */; };
-		C6AA310B2FDD00020000AB0B /* LumeWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; };
 		C6AA10042FDD00010000AA04 /* LumeEngine in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		C6AA310B2FDD00020000AB0B /* LumeWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKit */; };
 /* End PBXBuildFile section */
 
@@ -126,8 +126,8 @@
 		C6AA31022FDD00020000AB02 /* LumeWidgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				C6AA310F2FDD00020000AB0F /* Exceptions for "LumeWidgets" folder in "LumeWidgets" target */,
 				C6AA31102FDD00020000AB10 /* Exceptions for "LumeWidgets" folder in "Lume" target */,
+				C6AA310F2FDD00020000AB0F /* Exceptions for "LumeWidgets" folder in "LumeWidgets" target */,
 			);
 			path = LumeWidgets;
 			sourceTree = "<group>";
@@ -262,28 +262,6 @@
 			productReference = C67C02D12F880F2400842DBA /* LumeTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		C6AA31032FDD00020000AB03 /* LumeWidgets */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = C6AA31072FDD00020000AB07 /* Build configuration list for PBXNativeTarget "LumeWidgets" */;
-			buildPhases = (
-				C6AA31042FDD00020000AB04 /* Sources */,
-				C6AA31052FDD00020000AB05 /* Frameworks */,
-				C6AA31062FDD00020000AB06 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				C6AA31022FDD00020000AB02 /* LumeWidgets */,
-			);
-			name = LumeWidgets;
-			packageProductDependencies = (
-			);
-			productName = LumeWidgets;
-			productReference = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
 		C67C02DA2F880F2400842DBA /* LumeUITests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C67C02EC2F880F2400842DBA /* Build configuration list for PBXNativeTarget "LumeUITests" */;
@@ -306,6 +284,28 @@
 			productName = LumeUITests;
 			productReference = C67C02DB2F880F2400842DBA /* LumeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		C6AA31032FDD00020000AB03 /* LumeWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C6AA31072FDD00020000AB07 /* Build configuration list for PBXNativeTarget "LumeWidgets" */;
+			buildPhases = (
+				C6AA31042FDD00020000AB04 /* Sources */,
+				C6AA31052FDD00020000AB05 /* Frameworks */,
+				C6AA31062FDD00020000AB06 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C6AA31022FDD00020000AB02 /* LumeWidgets */,
+			);
+			name = LumeWidgets;
+			packageProductDependencies = (
+			);
+			productName = LumeWidgets;
+			productReference = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		C6BE110000000000000000A6 /* LumePerformanceTests */ = {
 			isa = PBXNativeTarget;
@@ -867,122 +867,6 @@
 			};
 			name = Release;
 		};
-		C6AA31082FDD00020000AB08 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
-				DEVELOPMENT_TEAM = CHG45F8MCL;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = LumeWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Lume;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks @executable_path/../../Frameworks";
-				MARKETING_VERSION = 1.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		C6AA31092FDD00020000AB09 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
-				DEVELOPMENT_TEAM = CHG45F8MCL;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = LumeWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Lume;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks @executable_path/../../Frameworks";
-				MARKETING_VERSION = 1.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		C6AA310A2FDD00020000AB0A /* Sideload */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
-				DEVELOPMENT_TEAM = CHG45F8MCL;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = LumeWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Lume;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks @executable_path/../../Frameworks";
-				MARKETING_VERSION = 1.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Sideload;
-		};
-		C6BE110000000000000000B5 /* Benchmark */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
-				DEVELOPMENT_TEAM = CHG45F8MCL;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = LumeWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Lume;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks @executable_path/../../Frameworks";
-				MARKETING_VERSION = 1.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Benchmark;
-		};
 		C67C02F12F880F2400842DBA /* Sideload */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1141,6 +1025,102 @@
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_TARGET_NAME = Lume;
 				XROS_DEPLOYMENT_TARGET = 2.0;
+			};
+			name = Sideload;
+		};
+		C6AA31082FDD00020000AB08 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 19;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C6AA31092FDD00020000AB09 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 19;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C6AA310A2FDD00020000AB0A /* Sideload */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 19;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Sideload;
 		};
@@ -1408,6 +1388,38 @@
 			};
 			name = Benchmark;
 		};
+		C6BE110000000000000000B5 /* Benchmark */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 19;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Benchmark;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1444,17 +1456,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C6AA31072FDD00020000AB07 /* Build configuration list for PBXNativeTarget "LumeWidgets" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				C6AA31082FDD00020000AB08 /* Debug */,
-				C6AA31092FDD00020000AB09 /* Release */,
-				C6AA310A2FDD00020000AB0A /* Sideload */,
-				C6BE110000000000000000B5 /* Benchmark */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		C67C02EC2F880F2400842DBA /* Build configuration list for PBXNativeTarget "LumeUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1462,6 +1463,17 @@
 				C67C02EE2F880F2400842DBA /* Release */,
 				C67C02F42F880F2400842DBA /* Sideload */,
 				C6BE110000000000000000B4 /* Benchmark */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C6AA31072FDD00020000AB07 /* Build configuration list for PBXNativeTarget "LumeWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C6AA31082FDD00020000AB08 /* Debug */,
+				C6AA31092FDD00020000AB09 /* Release */,
+				C6AA310A2FDD00020000AB0A /* Sideload */,
+				C6BE110000000000000000B5 /* Benchmark */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1500,7 +1512,7 @@
 			repositoryURL = "https://code.videolan.org/videolan/VLCKit.git";
 			requirement = {
 				kind = exactVersion;
-				version = "4.0.0-a23";
+				version = "4.0.0-a24";
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

@@ -24,9 +24,7 @@ import SwiftUI
         /// sync with the primary so other readers (and a downgrade) still resolve it.
         private func moveEngine(at index: Int, by offset: Int) {
             var list = enginePriority
-            let target = index + offset
-            guard list.indices.contains(index), list.indices.contains(target) else { return }
-            list.swapAt(index, target)
+            guard list.move(at: index, by: offset) else { return }
             let normalized = PlayerEnginePriority.normalized(list)
             enginePriorityRaw = PlayerEnginePriority.encode(normalized)
             engineRaw = normalized.first?.rawValue ?? PlayerEngineKind.defaultValue.rawValue
@@ -54,6 +52,19 @@ import SwiftUI
                             }
                         }
                         .buttonStyle(TVSettingsRowButtonStyle())
+                    }
+                }
+
+                // Second in the pane, right under Playback: this is a
+                // viewer-facing playback preference (and the one that otherwise
+                // costs a menu trip on every zap), where everything below —
+                // engine order, hand-off, per-engine options — is technical
+                // setup touched once.
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Languages")
+
+                    VStack(spacing: 2) {
+                        tvPreferredLanguageRow()
                     }
                 }
 
@@ -140,42 +151,222 @@ import SwiftUI
         /// One row of the tvOS engine-priority list: the engine name, a "Primary"
         /// tag on the top entry, and up / down controls that reorder the list.
         private func tvEnginePriorityRow(kind: PlayerEngineKind, index: Int) -> some View {
-            HStack(spacing: 16) {
-                Text(kind.displayName)
-                    .font(.system(size: TVSettingsMetrics.rowFontSize))
+            TVSettingsReorderRow(
+                name: kind.displayName,
+                index: index,
+                count: enginePriority.count,
+                onMove: { moveEngine(at: index, by: $0) },
+                leading: {
+                    Text(kind.displayName)
+                        .font(.system(size: TVSettingsMetrics.rowFontSize))
 
-                if index == 0 {
-                    Text("Primary")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    if index == 0 {
+                        Text("Primary")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    moveEngine(at: index, by: -1)
-                } label: {
-                    Image(systemName: "chevron.up")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-                .disabled(index == 0)
-                .accessibilityLabel("Move \(kind.displayName) up")
-
-                Button {
-                    moveEngine(at: index, by: 1)
-                } label: {
-                    Image(systemName: "chevron.down")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-                .disabled(index == enginePriority.count - 1)
-                .accessibilityLabel("Move \(kind.displayName) down")
-            }
-            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-            .padding(.vertical, TVSettingsMetrics.rowVPadding)
-            .background(
-                RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
             )
+        }
+
+        // MARK: - Preferred languages
+
+        /// The stored list, most-preferred first. Empty is the shipped default
+        /// and means "no preference".
+        private var preferredLanguageCodes: [String] {
+            PreferredLanguageList.decode(preferredAudioLanguagesRaw)
+        }
+
+        /// Deferred: the reorder and remove buttons run inside the focus
+        /// engine's animated context, and rewriting the list rebuilds the
+        /// `ForEach` under it. Mutating on the next turn lets the engine finish
+        /// the move it is already animating and keeps focus on the row.
+        private func setPreferredLanguageCodes(_ codes: [String]) {
+            let encoded = PreferredLanguageList.encode(codes)
+            Task { preferredAudioLanguagesRaw = encoded }
+        }
+
+        private func movePreferredLanguage(at index: Int, by offset: Int) {
+            var list = preferredLanguageCodes
+            guard list.move(at: index, by: offset) else { return }
+            setPreferredLanguageCodes(list)
+        }
+
+        private func removePreferredLanguage(at index: Int) {
+            var list = preferredLanguageCodes
+            guard list.indices.contains(index) else { return }
+            list.remove(at: index)
+            setPreferredLanguageCodes(list)
+        }
+
+        /// A drill-in row that replaces the player detail with the language
+        /// list in place, mirroring `tvEngineOptionsRow`.
+        private func tvPreferredLanguageRow() -> some View {
+            Button {
+                preferredLanguagePane = .list
+            } label: {
+                HStack(spacing: 16) {
+                    Text("Audio Languages")
+                    Spacer(minLength: 16)
+                    tvPreferredLanguageValue
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(TVSettingsRowButtonStyle())
+        }
+
+        /// The row's trailing summary. `.opacity` rather than `.secondary`: the
+        /// focused row's label turns black, which a secondary style washes out.
+        @ViewBuilder
+        private var tvPreferredLanguageValue: some View {
+            let codes = preferredLanguageCodes
+            Group {
+                if codes.isEmpty {
+                    Text("Automatic")
+                } else {
+                    Text(verbatim: codes.map { TrackLanguageMatcher.displayName(for: $0) }.joined(separator: ", "))
+                }
+            }
+            .font(.system(size: TVSettingsMetrics.secondaryFontSize))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .opacity(0.6)
+        }
+
+        /// The drilled-in pane for the language list: the ordered list itself,
+        /// or the add picker one level deeper.
+        @ViewBuilder
+        func tvPreferredLanguageDetail(_ pane: PreferredLanguagePane) -> some View {
+            switch pane {
+            case .list: tvPreferredLanguageOrderDetail()
+            case .add: tvAddPreferredLanguageDetail()
+            }
+        }
+
+        private func tvPreferredLanguageOrderDetail() -> some View {
+            let codes = preferredLanguageCodes
+            return VStack(alignment: .leading, spacing: 28) {
+                Text("Audio Languages")
+                    .font(.system(size: 34, weight: .bold))
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Preferred Order")
+
+                    if codes.isEmpty {
+                        Text("No Preferred Languages")
+                            .tvSettingsSecondaryText()
+                    } else {
+                        VStack(spacing: 2) {
+                            ForEach(Array(codes.enumerated()), id: \.element) { index, code in
+                                tvPreferredLanguageOrderRow(code: code, index: index, count: codes.count)
+                            }
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        preferredLanguagePane = .add
+                    } label: {
+                        HStack(spacing: 16) {
+                            Text("Add Language")
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(TVSettingsRowButtonStyle())
+
+                    Text(tvPreferredLanguageFooter)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+
+        private var tvPreferredLanguageFooter: LocalizedStringKey {
+            // swiftlint:disable:next line_length
+            "Lume selects the first of these languages the stream offers as an audio track, most preferred at the top. When the audio that plays is in none of them and the stream carries a forced subtitle track, that track is turned on. Applied the next time playback starts."
+        }
+
+        /// One row of the ordered list: the language's name, reorder controls
+        /// and a remove button.
+        private func tvPreferredLanguageOrderRow(
+            code: String,
+            index: Int,
+            count: Int
+        ) -> some View {
+            let name = TrackLanguageMatcher.displayName(for: code)
+            return TVSettingsReorderRow(
+                name: name,
+                index: index,
+                count: count,
+                onMove: { movePreferredLanguage(at: index, by: $0) },
+                onRemove: { removePreferredLanguage(at: index) },
+                leading: {
+                    Text(verbatim: name)
+                        .font(.system(size: TVSettingsMetrics.rowFontSize))
+                }
+            )
+        }
+
+        /// The add picker: the device's own languages first, then the curated
+        /// shortlist. Deliberately not the full ISO list — several hundred
+        /// focusable rows is a scroll and VoiceOver hazard on tvOS, and this
+        /// pane has no search field.
+        private func tvAddPreferredLanguageDetail() -> some View {
+            let addable = PreferredLanguageCatalog.addable(excluding: preferredLanguageCodes)
+
+            return VStack(alignment: .leading, spacing: 28) {
+                Text("Add Language")
+                    .font(.system(size: 34, weight: .bold))
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                if !addable.suggested.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TVSettingsSectionLabel("Suggested")
+                        VStack(spacing: 2) {
+                            ForEach(addable.suggested) { tvAddPreferredLanguageRow($0) }
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Common Languages")
+                    if addable.common.isEmpty {
+                        Text("No Languages Found")
+                            .tvSettingsSecondaryText()
+                    } else {
+                        VStack(spacing: 2) {
+                            ForEach(addable.common) { tvAddPreferredLanguageRow($0) }
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+
+        private func tvAddPreferredLanguageRow(_ language: PreferredLanguage) -> some View {
+            Button {
+                setPreferredLanguageCodes(preferredLanguageCodes + [language.code])
+                preferredLanguagePane = .list
+            } label: {
+                HStack(spacing: 16) {
+                    Text(verbatim: language.name)
+                    Spacer(minLength: 16)
+                    Text(verbatim: language.code.uppercased())
+                        .font(.system(size: TVSettingsMetrics.secondaryFontSize).monospaced())
+                        .opacity(0.6)
+                }
+            }
+            .buttonStyle(TVSettingsRowButtonStyle())
         }
     }
 

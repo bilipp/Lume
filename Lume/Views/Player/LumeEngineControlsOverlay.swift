@@ -219,9 +219,15 @@ import SwiftUI
             let hasRate = !media.isLive
 
             return HStack(spacing: 4) {
-                if hasText { subtitleMenu }
-                if hasAudio { audioTrackMenu }
-                if hasRate { playbackRateMenu }
+                if hasText {
+                    subtitleMenu
+                }
+                if hasAudio {
+                    audioTrackMenu
+                }
+                if hasRate {
+                    playbackRateMenu
+                }
                 favoriteButton
             }
             .padding(.horizontal, 4)
@@ -248,14 +254,14 @@ import SwiftUI
                     coordinator.selectTextTrack(id: nil)
                     onResetHideTimer()
                 } label: {
-                    checkmarkLabel("Off", checked: !hasSelection)
+                    playerCheckmarkLabel("Off", checked: !hasSelection)
                 }
                 ForEach(tracks) { track in
                     Button {
                         coordinator.selectTextTrack(id: track.id)
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.label, checked: track.isSelected)
+                        playerCheckmarkLabel(verbatim: track.label, checked: track.isSelected)
                     }
                 }
                 if let onSearchSubtitles {
@@ -271,6 +277,7 @@ import SwiftUI
                 pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Subtitles", selected: tracks.first(where: \.isSelected)?.label, fallback: "Off")
         }
 
         @ViewBuilder
@@ -282,13 +289,14 @@ import SwiftUI
                         coordinator.selectAudioTrack(id: track.id)
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.label, checked: track.isSelected)
+                        playerCheckmarkLabel(verbatim: track.label, checked: track.isSelected)
                     }
                 }
             } label: {
                 pillGlyph("waveform")
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Audio Track", selected: tracks.first(where: \.isSelected)?.label, fallback: "Default")
         }
 
         private var playbackRateMenu: some View {
@@ -298,7 +306,7 @@ import SwiftUI
                         coordinator.playbackRate = rate
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                        playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
                     }
                 }
             } label: {
@@ -358,15 +366,6 @@ import SwiftUI
         /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
         private func rateString(_ rate: Float) -> String {
             String(format: "%g×", rate)
-        }
-
-        @ViewBuilder
-        private func checkmarkLabel(_ title: String, checked: Bool) -> some View {
-            if checked {
-                Label(title, systemImage: "checkmark")
-            } else {
-                Text(title)
-            }
         }
     }
 

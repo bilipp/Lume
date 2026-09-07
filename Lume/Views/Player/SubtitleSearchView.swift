@@ -75,11 +75,7 @@ struct SubtitleSearchView: View {
     }
 
     var languageSummary: String {
-        let names = service.preferredLanguages.map { code in
-            Locale.current.localizedString(forIdentifier: code)
-                ?? Locale.current.localizedString(forLanguageCode: code)
-                ?? code.uppercased()
-        }
+        let names = service.preferredLanguages.map { TrackLanguageMatcher.displayName(for: $0) }
         return names.isEmpty ? String(localized: "Any") : names.joined(separator: ", ")
     }
 

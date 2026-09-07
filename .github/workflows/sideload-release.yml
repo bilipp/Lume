@@ -35,7 +35,7 @@ env:
   # Pinned rather than tracking the engine's main: app↔engine commits are paired
   # by hand, so a drifting engine would break this archive with no change on
   # Lume's side. Bump this when a release needs newer engine code.
-  ENGINE_REF: ${{ github.event.inputs.engine_ref || 'v0.1.5' }}
+  ENGINE_REF: ${{ github.event.inputs.engine_ref || 'v0.1.6' }}
 
 jobs:
   build:

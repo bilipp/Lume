@@ -130,6 +130,35 @@ enum PlayerEnginePriority {
     }
 }
 
+/// The ordered list of language codes a viewer prefers for a track kind, most
+/// preferred first. Persisted as a comma-separated raw string under
+/// `PlayerSettings.Language`'s keys, because `@AppStorage` cannot bind
+/// `[String]`. An empty list means no preference at all: track selection is
+/// left exactly as the container asks for it.
+nonisolated enum PreferredLanguageList {
+    /// Parse the comma-separated raw value into language codes.
+    static func decode(_ raw: String) -> [String] {
+        normalized(raw.split(separator: ",").map(String.init))
+    }
+
+    static func encode(_ list: [String]) -> String {
+        normalized(list).joined(separator: ",")
+    }
+
+    /// Keep the given order, trimmed of whitespace, without empty tokens or
+    /// case-insensitive duplicates.
+    static func normalized(_ codes: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for code in codes {
+            let trimmed = code.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, seen.insert(trimmed.lowercased()).inserted else { continue }
+            result.append(trimmed)
+        }
+        return result
+    }
+}
+
 enum PlayerSettings {
     static let engineKey = "player.engine"
 
@@ -220,6 +249,23 @@ enum PlayerSettings {
             }
             return StreamInfoDetailLevel(rawValue: raw) ?? detailLevelDefault
         }
+    }
+
+    // MARK: - Preferred track languages
+
+    /// Engine-independent preferred audio track languages: an ordered list of
+    /// bare language codes (`de` matches a `de-AT` track), stored
+    /// comma-separated — see `PreferredLanguageList`.
+    ///
+    /// Defaults to EMPTY, which means no preference and behaviour identical
+    /// to before the setting existed. Nothing is seeded from
+    /// `Locale.preferredLanguages`.
+    nonisolated enum Language {
+        /// Ordered preferred audio languages.
+        static let preferredAudioLanguagesKey = "player.preferredAudioLanguages"
+
+        /// Empty: no preferred language.
+        static let preferredAudioLanguagesDefault = ""
     }
 
     /// Legacy top-level key for VLC's deinterlace toggle, kept stable so the

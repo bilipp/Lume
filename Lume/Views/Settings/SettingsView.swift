@@ -38,6 +38,9 @@ struct SettingsView: View {
     var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
     @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
     var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+    /// Comma-separated preferred languages, empty meaning no preference (see `PreferredLanguageList`). Not `private`: read by the SettingsView+Language extension (separate file).
+    @AppStorage(PlayerSettings.Language.preferredAudioLanguagesKey) var preferredAudioLanguagesRaw = PlayerSettings.Language.preferredAudioLanguagesDefault
+
     // Stream-information caption preferences (SettingsView+StreamInfo, separate file).
     #if !os(tvOS)
         @AppStorage(PlayerSettings.StreamInfo.enabledKey)
@@ -86,6 +89,17 @@ struct SettingsView: View {
         /// replacing the player detail in place (same reasoning as `selectedPlaylist`).
         /// Not `private`: read by the SettingsView+TVPlayer extension (separate file).
         @State var selectedEngineOptions: PlayerEngineKind?
+        /// Which preferred-language pane is drilled into within the Player
+        /// category — the ordered list, or its add picker one level deeper —
+        /// replacing the player detail in place (same reasoning as
+        /// `selectedEngineOptions`). Not `private`: read by the
+        /// SettingsView+TVPlayer extension (separate file).
+        @State var preferredLanguagePane: PreferredLanguagePane?
+
+        enum PreferredLanguagePane {
+            case list, add
+        }
+
         /// Home layout preferences, shown in the Home category. Not `private`: read
         /// by the SettingsView+TVHome extension (separate file). The iOS/macOS build
         /// has its own `HomeLayoutSettingsView`, so these live in the tvOS block.
@@ -361,58 +375,15 @@ struct SettingsView: View {
             }
         }
 
-        private var playerSection: some View {
+        private var storageSection: some View {
             Section {
                 NavigationLink {
-                    PlayerEnginePriorityView()
+                    StorageManagementView()
                 } label: {
-                    HStack {
-                        Text("Player Engines")
-                        Spacer()
-                        Text(enginePriority.map(\.displayName).joined(separator: " › "))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
+                    Label("Storage & Cache", systemImage: "internaldrive")
                 }
-
-                NavigationLink("VLCKit Options") { VLCEngineSettingsScreen() }
-                NavigationLink("KSPlayer Options") { KSEngineSettingsScreen() }
-                NavigationLink("Lume Engine Options") { LumeEngineSettingsScreen() }
             } header: {
-                Text("Player")
-            } footer: {
-                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played.")
-            }
-        }
-
-        /// Hand-off to a third-party player. Its own group — this bypasses the
-        /// engines above rather than configuring them — but headerless, so it
-        /// still reads as part of the Player block.
-        private var externalPlayerSection: some View {
-            Section {
-                Picker("External Player", selection: $externalPlayerRaw) {
-                    Text("Off").tag("")
-                    ForEach(ExternalPlayer.allCases) { player in
-                        Text(player.displayName).tag(player.rawValue)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                // Only meaningful once a player is selected — some players
-                // (Infuse, for one) handle VOD but not live streams.
-                if ExternalPlayer(rawValue: externalPlayerRaw) != nil {
-                    Picker("Use For", selection: $externalPlayerScopeRaw) {
-                        ForEach(ExternalPlayerScope.allCases) { scope in
-                            Text(scope.displayName).tag(scope.rawValue)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-            } footer: {
-                // swiftlint:disable:next line_length
-                Text("Streams open in the selected external app instead of Lume's player, when it is installed. Some apps — Infuse among them — play movies and series but no live channels, so you can limit the hand-off to one or the other.")
+                Text("Storage")
             }
         }
 
@@ -465,6 +436,7 @@ struct SettingsView: View {
                         // pane reverts to its top-level list.
                         selectedPlaylist = nil
                         selectedEngineOptions = nil
+                        preferredLanguagePane = nil
                     }
                 }
                 .fullScreenCover(isPresented: $showingAddPlaylist) {
@@ -546,6 +518,8 @@ struct SettingsView: View {
                     case .player:
                         if let selectedEngineOptions {
                             tvEngineOptionsDetail(for: selectedEngineOptions)
+                        } else if let preferredLanguagePane {
+                            tvPreferredLanguageDetail(preferredLanguagePane)
                         } else {
                             tvPlayerDetail
                         }
