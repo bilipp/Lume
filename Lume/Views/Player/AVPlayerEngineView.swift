@@ -407,7 +407,7 @@ struct AVPlayerEngineView: View {
 
     private func scheduleHide() {
         hideTask?.cancel()
-        guard coordinator.isPlaying, !isPanelOpen else { return }
+        guard coordinator.isPlaying, !isPanelOpen, !PlayerControlsAutoHide.isSuppressed else { return }
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
             guard !Task.isCancelled, coordinator.isPlaying else { return }

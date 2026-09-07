@@ -40,6 +40,14 @@ struct SettingsView: View {
     var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
     /// Comma-separated preferred languages, empty meaning no preference (see `PreferredLanguageList`). Not `private`: read by the SettingsView+Language extension (separate file).
     @AppStorage(PlayerSettings.Language.preferredAudioLanguagesKey) var preferredAudioLanguagesRaw = PlayerSettings.Language.preferredAudioLanguagesDefault
+
+    // Stream-information caption preferences (SettingsView+StreamInfo, separate file).
+    #if !os(tvOS)
+        @AppStorage(PlayerSettings.StreamInfo.enabledKey)
+        var streamInfoEnabled = PlayerSettings.StreamInfo.enabledDefault
+    #endif
+    @AppStorage(PlayerSettings.StreamInfo.detailLevelKey)
+    var streamInfoDetailLevelRaw = PlayerSettings.StreamInfo.detailLevelDefault.rawValue
     @AppStorage(SearchSettings.searchAllPlaylistsKey)
     private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     #if !os(tvOS)
@@ -137,6 +145,7 @@ struct SettingsView: View {
                     playbackSection
                     downloadsSection
                     playerSection
+                    streamInfoSection
                     externalPlayerSection
                     storageSection
                     supportSection

@@ -161,6 +161,11 @@ import SwiftUI
 
         private var titleBlock: some View {
             VStack(alignment: .leading, spacing: 2) {
+                StreamInfoCaption(
+                    media: media,
+                    videoInfo: coordinator.videoInfo,
+                    engine: .avPlayer
+                )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)
