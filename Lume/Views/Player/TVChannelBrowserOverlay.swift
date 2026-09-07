@@ -66,22 +66,7 @@
             case guide(String)
         }
 
-        /// A guide programme as plain values, so the trailing column doesn't hold
-        /// managed `EPGListing` objects across focus changes.
-        struct GuideEntry: Identifiable, Equatable {
-            let id: String
-            let title: String
-            let start: Date
-            let end: Date
-
-            func isLive(at now: Date) -> Bool {
-                start <= now && now < end
-            }
-
-            func isPast(at now: Date) -> Bool {
-                end <= now
-            }
-        }
+        typealias GuideEntry = TVPlayerContent.GuideEntry
 
         /// The focused channel's model, resolved from the loaded column — the
         /// source of truth for catch-up availability and building playback.
@@ -262,11 +247,9 @@
 
                 // Flag channels with an archive so the viewer knows the guide
                 // column offers replays before they move into it.
-                if channel.tvArchive > 0 {
-                    Image(systemName: "clock.arrow.circlepath")
+                if PlayableMedia.isCatchupCapable(stream: channel) {
+                    TVBrowserRowAccent { CatchupBadge(days: nil) }
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.blue)
-                        .accessibilityLabel("Catch-up available")
                 }
 
                 if isCurrent {
@@ -286,7 +269,7 @@
                     .padding(.vertical, 40)
             } else {
                 let now = Date()
-                let hasCatchup = (guideStream?.tvArchive ?? 0) > 0
+                let hasCatchup = guideStream.map { PlayableMedia.isCatchupCapable(stream: $0) } ?? false
                 ForEach(guideEntries) { entry in
                     Button {
                         selectGuide(entry)
@@ -324,9 +307,8 @@
                 Spacer(minLength: 0)
 
                 if isPast, hasCatchup {
-                    Image(systemName: "play.circle")
+                    TVBrowserRowAccent { Image(systemName: "play.circle") }
                         .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.blue)
                 } else if isLive {
                     Image(systemName: "dot.radiowaves.left.and.right")
                         .font(.system(size: 20, weight: .semibold))
@@ -377,7 +359,10 @@
             // Fill the guide column with the playing channel up front, so the
             // third column isn't blank before focus first settles on a channel.
             if let currentChannelID, channels.contains(where: { $0.id == currentChannelID }) {
-                loadGuide(channelID: currentChannelID)
+                guideLoadTask?.cancel()
+                guideLoadTask = Task { @MainActor in
+                    await loadGuide(channelID: currentChannelID)
+                }
             }
         }
 
@@ -418,26 +403,31 @@
             guideLoadTask = Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 150_000_000)
                 guard !Task.isCancelled else { return }
-                loadGuide(channelID: channelID)
+                await loadGuide(channelID: channelID)
             }
         }
 
         /// Fetch the focused channel's guide. Catch-up channels reach back over
         /// their archive window so aired programmes are replayable; others show
         /// only what's on now and next.
-        private func loadGuide(channelID: String) {
+        private func loadGuide(channelID: String) async {
             guideChannelID = channelID
             guard let stream = channels.first(where: { $0.id == channelID }) else {
                 guideEntries = []
                 return
             }
-            let archiveDays = stream.tvArchive > 0 ? max(1, stream.tvArchiveDuration) : 0
-            let listings = TVPlayerContent.guideListings(
-                channelId: stream.epgChannelId, archiveDays: archiveDays, in: modelContext
-            )
-            guideEntries = listings.map {
-                GuideEntry(id: $0.id, title: $0.title, start: $0.start, end: $0.end)
-            }
+            let archiveDays = PlayableMedia.isCatchupCapable(stream: stream)
+                ? PlayableMedia.guideArchiveWindowDays(for: stream)
+                : 0
+            let channelId = stream.epgChannelId
+            let container = modelContext.container
+            let entries = await Task.detached(priority: .userInitiated) {
+                TVPlayerContent.guideListings(
+                    channelId: channelId, archiveDays: archiveDays, container: container
+                )
+            }.value
+            guard !Task.isCancelled else { return }
+            guideEntries = entries
         }
 
         // MARK: - Focus
@@ -502,6 +492,19 @@
     }
 
     // MARK: - Row style
+
+    /// Tints the archive glyphs a browser row carries. `TVBrowserRowStyle`'s
+    /// focused row is a solid-white fill with black content, which would
+    /// swallow blue-on-white — the same rule `EPGChannelCell.catchupColor`
+    /// applies in the guide.
+    private struct TVBrowserRowAccent<Content: View>: View {
+        @ViewBuilder var content: Content
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            content.foregroundStyle(isFocused ? .black : .blue)
+        }
+    }
 
     /// A full-width list row for the browser columns: white glass highlight
     /// under focus (black content), a faint persistent fill for the selected

@@ -32,6 +32,15 @@ final class LiveStream {
     var customSid: String?
     var tvArchive: Int
     var tvArchiveDuration: Int
+    /// The catch-up dialect an m3u playlist declared for this channel
+    /// (`catchup="…"`), folded to its canonical spelling by the importer, which
+    /// writes it only for a dialect it can build a URL for. Optional and outside
+    /// `#Index` on purpose: the app ships without a `SchemaMigrationPlan`, so
+    /// every new column has to stay lightweight-migratable.
+    var catchupTypeRaw: String?
+    /// The verbatim `catchup-source` template. Expanded at play time, never at
+    /// import time — expanding on import would bake in a stale `now`.
+    var catchupSource: String?
     var isAdult: Int
     var num: Int
 
@@ -71,7 +80,9 @@ final class LiveStream {
         tvArchiveDuration: Int = 0,
         isAdult: Int = 0,
         num: Int = 0,
-        categoryId: String? = nil
+        categoryId: String? = nil,
+        catchupTypeRaw: String? = nil,
+        catchupSource: String? = nil
     ) {
         self.id = id
         self.streamId = streamId
@@ -85,5 +96,57 @@ final class LiveStream {
         self.isAdult = isAdult
         self.num = num
         self.categoryId = categoryId
+        self.catchupTypeRaw = catchupTypeRaw
+        self.catchupSource = catchupSource
     }
+}
+
+extension LiveStream {
+    /// The catch-up dialect declared for this channel, or `nil` when the
+    /// playlist declared none or one we cannot build a URL for.
+    var catchupType: CatchupType? {
+        get { CatchupType.parse(catchupTypeRaw) }
+        set { catchupTypeRaw = newValue?.rawValue }
+    }
+}
+
+/// The catch-up (archive) dialects an m3u playlist can declare through
+/// `catchup="…"`. Raw values are the canonical spellings; `parse` folds in the
+/// aliases seen in the wild.
+nonisolated enum CatchupType: String {
+    case `default`
+    case append
+    case flussonic
+    // swiftlint:disable:next identifier_name - `xc` is the spelling playlists ship.
+    case xc
+    case shift
+}
+
+nonisolated extension CatchupType {
+    /// Tolerant of the spellings playlists actually ship: `fs`, `flussonic-hls`,
+    /// `xtream`, and the bare enable-flags `1`/`true` used by `tvg-rec`. The
+    /// hls-flavoured Flussonic spellings fold into `flussonic`: the archive URL
+    /// is the same filename rewrite, and the container stays whatever the live
+    /// URL already carried.
+    static func parse(_ raw: String?) -> CatchupType? {
+        guard let raw else { return nil }
+        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else { return nil }
+        if let exact = CatchupType(rawValue: key) { return exact }
+        switch key {
+        case "fs", "flussonic-hls", "flussonic_hls", "flussonichls": return .flussonic
+        case "xtream", "xtreamcodes", "xtream-codes": return .xc
+        case "timeshift": return .shift
+        default: return isEnableFlag(key) ? .default : nil
+        }
+    }
+
+    /// The truthy spellings `tvg-rec` uses to declare an archive without naming
+    /// a dialect. Shared with `M3UParser` so the parser and the model can never
+    /// disagree on what counts as "on".
+    static func isEnableFlag(_ raw: String) -> Bool {
+        enableFlags.contains(raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
+    private static let enableFlags: Set<String> = ["1", "true", "yes"]
 }

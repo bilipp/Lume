@@ -92,13 +92,10 @@ struct LiveStreamCardView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if stream.tvArchive > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock.arrow.circlepath")
-                        Text("Catchup: \(stream.tvArchiveDuration)d")
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.blue)
+                if PlayableMedia.isCatchupCapable(stream: stream) {
+                    CatchupBadge(days: PlayableMedia.archiveBadgeDays(for: stream))
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
                 }
             }
 
@@ -162,4 +159,48 @@ struct LiveStreamCardView: View {
     stream.isFavorite = true
     return LiveStreamCardView(stream: stream)
         .padding()
+}
+
+#Preview("M3U Catch-up") {
+    let flussonic = LiveStream(
+        id: "preview-5",
+        streamId: 5,
+        name: "Sky News (m3u)",
+        tvArchive: 1,
+        tvArchiveDuration: 3,
+        catchupTypeRaw: CatchupType.flussonic.rawValue
+    )
+    flussonic.directURL = "http://example.com:8080/skynews/video.m3u8"
+
+    // Declared catch-up, depth unknown: the badge is glyph-only.
+    let unknownDepth = LiveStream(
+        id: "preview-6",
+        streamId: 6,
+        name: "Euronews (m3u)",
+        tvArchive: 1,
+        tvArchiveDuration: 0,
+        catchupTypeRaw: CatchupType.default.rawValue,
+        catchupSource: "http://example.com:8080/live/euronews.m3u8?utc={utc}"
+    )
+    unknownDepth.directURL = "http://example.com:8080/live/euronews.m3u8"
+
+    // An m3u channel flagged as having an archive but carrying no dialect —
+    // what a row left over from before the import learned `catchupTypeRaw`
+    // looks like. The capability gate reads the dialect, not the flag, so this
+    // gets no affordance at all.
+    let unbuildable = LiveStream(
+        id: "preview-7",
+        streamId: 7,
+        name: "Local News (m3u, no archive)",
+        tvArchive: 1,
+        tvArchiveDuration: 5
+    )
+    unbuildable.directURL = "http://example.com:8080/local/index.m3u8"
+
+    return VStack(alignment: .leading) {
+        LiveStreamCardView(stream: flussonic)
+        LiveStreamCardView(stream: unknownDepth)
+        LiveStreamCardView(stream: unbuildable)
+    }
+    .padding()
 }

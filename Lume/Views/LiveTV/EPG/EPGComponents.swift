@@ -154,10 +154,9 @@ struct EPGChannelCell: View {
             // Flag channels with an archive so the viewer knows the row
             // offers replays — same idiom as the player's channel overlay.
             if row.catchupCapable {
-                Image(systemName: "clock.arrow.circlepath")
+                CatchupBadge(days: nil)
                     .font(catchupFont)
                     .foregroundStyle(catchupColor)
-                    .accessibilityLabel(Text("Catch-up available"))
             }
         }
         .padding(.horizontal, 12)

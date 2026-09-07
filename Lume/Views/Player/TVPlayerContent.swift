@@ -112,22 +112,53 @@
             return (try? context.fetch(descriptor)) ?? []
         }
 
+        /// A guide programme as plain values, so the fetch can hand its result
+        /// across actors and the overlay never holds managed `EPGListing`
+        /// objects across focus changes.
+        nonisolated struct GuideEntry: Identifiable, Equatable {
+            let id: String
+            let title: String
+            let start: Date
+            let end: Date
+
+            func isLive(at now: Date) -> Bool {
+                start <= now && now < end
+            }
+
+            func isPast(at now: Date) -> Bool {
+                end <= now
+            }
+        }
+
         /// EPG listings for the in-player guide, oldest first. With
         /// `archiveDays > 0` (a catch-up channel) it reaches back that many days
         /// so already-aired programmes are available to replay; otherwise it
         /// returns only what's airing now and later. The `channelId + end` index
         /// keeps this to a small slice of the guide table.
-        static func guideListings(channelId: String?, archiveDays: Int, in context: ModelContext) -> [EPGListing] {
+        ///
+        /// Runs on its own `ModelContext` off the caller's actor: a catch-up
+        /// channel's window is up to two weeks wide and this fires per debounced
+        /// focus move while video is playing.
+        nonisolated static func guideListings(
+            channelId: String?,
+            archiveDays: Int,
+            container: ModelContainer
+        ) -> [GuideEntry] {
             guard let channelId, !channelId.isEmpty else { return [] }
             let now = Date()
             let earliest = archiveDays > 0
                 ? Calendar.current.date(byAdding: .day, value: -archiveDays, to: now) ?? now
                 : now
-            let descriptor = FetchDescriptor<EPGListing>(
+            var descriptor = FetchDescriptor<EPGListing>(
                 predicate: #Predicate { $0.channelId == channelId && $0.end > earliest },
                 sortBy: [SortDescriptor(\.start)]
             )
-            return (try? context.fetch(descriptor)) ?? []
+            descriptor.propertiesToFetch = [\.id, \.title, \.start, \.end]
+            let context = ModelContext(container)
+            let listings = (try? context.fetch(descriptor)) ?? []
+            return listings.map {
+                GuideEntry(id: $0.id, title: $0.title, start: $0.start, end: $0.end)
+            }
         }
     }
 

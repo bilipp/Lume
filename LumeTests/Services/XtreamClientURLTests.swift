@@ -112,7 +112,9 @@ struct XtreamClientURLTests {
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-3", streamId: 777, name: "Catchup Channel")
         let start = Date(timeIntervalSince1970: 1_700_000_000)
-        let url = try #require(client.buildCatchupURL(for: stream, playlist: playlist, start: start, durationMinutes: 90))
+        let url = try #require(client.buildCatchupURL(
+            for: stream, playlist: playlist, start: start, end: start.addingTimeInterval(90 * 60)
+        ))
         let string = url.absoluteString
         #expect(string.hasPrefix("http://example.com:8080/timeshift/testuser/testpass/90/"))
         #expect(string.hasSuffix("/777.ts"))
@@ -130,21 +132,27 @@ struct XtreamClientURLTests {
         newYorkPlaylist.serverTimezone = "America/New_York"
 
         let utcURL = try #require(client.buildCatchupURL(
-            for: stream, playlist: utcPlaylist, start: start, durationMinutes: 60
+            for: stream, playlist: utcPlaylist, start: start, end: start.addingTimeInterval(3600)
         ))
         let newYorkURL = try #require(client.buildCatchupURL(
-            for: stream, playlist: newYorkPlaylist, start: start, durationMinutes: 60
+            for: stream, playlist: newYorkPlaylist, start: start, end: start.addingTimeInterval(3600)
         ))
 
         #expect(utcURL.absoluteString.contains("/2023-11-14:22-13/"))
         #expect(newYorkURL.absoluteString.contains("/2023-11-14:17-13/"))
     }
 
-    @Test func `build catchup URL rejects non-positive duration`() {
+    /// Panels answer 400 on a zero-minute request, so a sub-minute window is
+    /// rounded up to one minute by the builder rather than sent as written.
+    @Test func `build catchup URL rounds a sub-minute window up to one minute`() throws {
         let client = makeClient()
         let playlist = makePlaylist()
         let stream = LiveStream(id: "l-5", streamId: 779, name: "Catchup Channel")
-        #expect(client.buildCatchupURL(for: stream, playlist: playlist, start: Date(), durationMinutes: 0) == nil)
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let url = try #require(client.buildCatchupURL(
+            for: stream, playlist: playlist, start: start, end: start.addingTimeInterval(20)
+        ))
+        #expect(url.absoluteString.hasPrefix("http://example.com:8080/timeshift/testuser/testpass/1/"))
     }
 
     // MARK: - Server URL trailing slash handling

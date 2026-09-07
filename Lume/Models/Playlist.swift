@@ -132,15 +132,27 @@ nonisolated enum PlaylistStreamFormat: String, CaseIterable, Identifiable, Codab
     /// alone rather than guessed at, so a mismatched setting can never break a
     /// channel that was playing before.
     func applied(to url: URL) -> URL {
-        guard let target = xtreamFormat?.rawValue,
+        guard let target = xtreamFormat,
               var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let dot = components.path.lastIndex(of: "."),
-              !components.path[dot...].contains("/")
+              let live = components.liveContainer,
+              live.format != target
         else { return url }
-        let current = components.path[components.path.index(after: dot)...].lowercased()
-        guard current == "m3u8" || current == "ts", current != target else { return url }
-        components.path = String(components.path[..<dot]) + "." + target
+        components.path = String(live.stem) + "." + target.rawValue
         return components.url ?? url
+    }
+}
+
+nonisolated extension URLComponents {
+    /// The interchangeable live container this URL's filename names, plus the
+    /// path up to the dot. `nil` for anything that is not a filename ending in
+    /// one of the two Xtream-style live extensions — a bare path, an `index.*`
+    /// segment manifest, a VOD file.
+    var liveContainer: (format: StreamFormat, stem: Substring)? {
+        guard let dot = path.lastIndex(of: "."),
+              !path[dot...].contains("/"),
+              let format = StreamFormat(rawValue: path[path.index(after: dot)...].lowercased())
+        else { return nil }
+        return (format, path[..<dot])
     }
 }
 
