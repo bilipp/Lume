@@ -38,5 +38,11 @@ final class DeepLinkRouter {
         /// `interactiveDismissDisabled`. The modal needs Menu for itself so a PIN
         /// pad nested over it can consume the press first.
         var isQuickSwitchPresented = false
+
+        /// Whether the "How Lume Works" guide is covering the app, re-opened
+        /// from Settings. A plain overlay for the same reason as the two above,
+        /// and one more: the guide claims Menu to leave *and* record itself as
+        /// seen, which a self-dismissing cover would never let it do.
+        var isOnboardingPresented = false
     #endif
 }

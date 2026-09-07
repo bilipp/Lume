@@ -140,6 +140,7 @@ struct SettingsView: View {
                     externalPlayerSection
                     storageSection
                     supportSection
+                    onboardingSection
                     aboutSection
                     #if DEBUG && !SIDE_LOAD
                         developerSection

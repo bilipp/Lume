@@ -31,9 +31,10 @@ final class CloudSyncStatus {
 
     /// Whether the launch-time iCloud sync has settled — the first CloudKit
     /// import finished, the account turned out unusable, or we gave up waiting.
-    /// A fresh install (empty local store) gates the add-playlist form on this,
-    /// so cloud playlists get a chance to arrive before the form is offered,
-    /// instead of it flashing up and then vanishing mid-typing. Set by
+    /// A fresh install (empty local store) gates the rest of the launch chain —
+    /// the "How Lume Works" guide, then the add-playlist form — on this, so
+    /// cloud playlists get a chance to arrive before credentials are asked for,
+    /// instead of the form flashing up and then vanishing mid-typing. Set by
     /// `CloudSyncCoordinator` (immediately when CloudKit is disabled).
     var hasCompletedInitialSync: Bool = false
 

@@ -157,8 +157,16 @@ struct MainTabView: View {
                     TVQuickSwitchOverlay(router: router, playlists: playlists)
                         .transition(.opacity)
                 }
+
+                if router.isOnboardingPresented {
+                    // Re-read from Settings; the first-launch pass runs from
+                    // ContentView, where MainTabView isn't mounted yet.
+                    TVOnboardingOverlay(onFinish: { router.isOnboardingPresented = false })
+                        .transition(.opacity)
+                }
             }
             .animation(.easeInOut(duration: 0.2), value: router.isQuickSwitchPresented)
+            .animation(.easeInOut(duration: 0.2), value: router.isOnboardingPresented)
         }
 
         private func tabView(selection: Binding<AppTab>) -> some View {
@@ -208,6 +216,7 @@ struct MainTabView: View {
         /// it would move focus and hand it back somewhere else.
         private var blockingOverlayOwnsScreen: Bool {
             router.isMultiViewPresented
+                || router.isOnboardingPresented
                 || activeSyncPlaylist != nil
                 || profileManager?.isSwitching == true
         }

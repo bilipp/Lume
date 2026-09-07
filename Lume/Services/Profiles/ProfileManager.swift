@@ -136,6 +136,13 @@ final class ProfileManager {
         }
     }
 
+    /// Whether the synced user state shows the app was really used before this
+    /// build — the onboarding guide's upgrade-suppression signal. Lives here
+    /// because the cloud container is private to this manager.
+    func hasPriorUsage() -> Bool {
+        OnboardingUsageProbe.hasPriorUsage(in: context)
+    }
+
     func profile(with id: UUID) -> UserProfile? {
         var descriptor = FetchDescriptor<UserProfile>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1

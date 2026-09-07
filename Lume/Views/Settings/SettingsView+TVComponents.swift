@@ -102,6 +102,8 @@ import SwiftUI
                     }
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                     .padding(.vertical, 8)
+
+                    TVOnboardingSettingsRow()
                 }
 
                 tvSupportSection
@@ -156,6 +158,33 @@ import SwiftUI
                 RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
                     .fill(Color.white.opacity(0.05))
             )
+        }
+    }
+
+    /// The "How Lume Works" re-open row in the About pane. A view of its own so
+    /// it can hold the router without adding a stored property to `SettingsView`,
+    /// and deliberately not a new `SettingsCategory`: another sidebar entry would
+    /// reorder focus around the `.defaultFocus(_, .premium)` landing.
+    ///
+    /// The guide itself is layered by `MainTabView.tvOverlays` — a tvOS
+    /// `fullScreenCover` self-dismisses on Menu, which the guide needs for
+    /// itself. Re-reading never touches `OnboardingSettings.seenVersionKey`.
+    private struct TVOnboardingSettingsRow: View {
+        @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
+
+        var body: some View {
+            Button {
+                // The press lands inside the focus engine's animated context.
+                Task { @MainActor in
+                    router?.isOnboardingPresented = true
+                }
+            } label: {
+                Text(
+                    "How Lume Works",
+                    comment: "Title of the first-launch guide and of the Settings row that re-opens it"
+                )
+            }
+            .buttonStyle(TVSettingsRowButtonStyle())
         }
     }
 

@@ -1597,6 +1597,59 @@
         }
       }
     },
+    "A quick tour of the app. It takes less than a minute." : {
+      "comment" : "Subtitle under the first-launch guide's title",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine kurze Tour durch die App. Dauert keine Minute."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un recorrido rápido por la app. Menos de un minuto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un tour rapide de l’app. Moins d’une minute."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un rapido tour dell'app. Meno di un minuto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの簡単なツアーです。1分もかかりません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱을 빠르게 둘러보세요. 1분이면 충분합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um tour rápido pelo app. Leva menos de um minuto."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速了解这款 app，用时不到一分钟。"
+          }
+        }
+      }
+    },
     "About" : {
       "localizations" : {
         "de" : {
@@ -5052,6 +5105,59 @@
         }
       }
     },
+    "Bring your own service" : {
+      "comment" : "Title of the first-launch guide page explaining that the viewer connects their own Xtream Codes or M3U account",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bring deinen eigenen Dienst mit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa tu propio servicio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilisez votre propre service"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa il tuo servizio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ご利用中のサービスを使う"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용 중인 서비스를 연결"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use o seu próprio serviço"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用自己的服务"
+          }
+        }
+      }
+    },
     "Browse by Genre" : {
       "localizations" : {
         "de" : {
@@ -7720,6 +7826,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "内容管理"
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "comment" : "Button that advances the first-launch guide to the next page",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weiter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continua"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "続ける"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계속"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
           }
         }
       }
@@ -13132,6 +13291,59 @@
         }
       }
     },
+    "Find any channel, movie or episode across every playlist you have added, as you type." : {
+      "comment" : "Body of the first-launch guide page describing search",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finde jeden Sender, Film und jede Folge in allen hinzugefügten Playlists – schon beim Tippen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encuentra cualquier canal, película o episodio en todas tus listas mientras escribes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trouvez une chaîne, un film ou un épisode dans toutes vos playlists, au fil de la frappe."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trova qualsiasi canale, film o episodio in tutte le playlist aggiunte, mentre digiti."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加したすべてのプレイリストから、チャンネル・映画・エピソードを入力しながら検索できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추가한 모든 재생목록에서 채널, 영화, 에피소드를 입력하는 즉시 찾아보세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encontre qualquer canal, filme ou episódio em todas as playlists adicionadas, enquanto você digita."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在已添加的所有播放列表中即时搜索频道、电影或剧集。"
+          }
+        }
+      }
+    },
     "Finding recommendations…" : {
       "localizations" : {
         "de" : {
@@ -13234,6 +13446,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "适应视频"
+          }
+        }
+      }
+    },
+    "Flip through channels with a full TV Guide, see what is on now, and jump straight back to the last thing you watched." : {
+      "comment" : "Body of the first-launch guide page describing the Live TV tab and the TV Guide",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blättere im vollen TV-Programm durch die Sender, sieh was gerade läuft, und kehre direkt zum zuletzt Gesehenen zurück."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorre los canales con una guía de TV completa, mira qué hay ahora y vuelve al instante a lo último que viste."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parcourez les chaînes avec un guide TV complet, voyez ce qui passe et revenez directement au dernier programme regardé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sfoglia i canali con una guida TV completa, scopri cosa c'è in onda e torna subito all'ultima cosa che hai guardato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充実した番組表でチャンネルを見渡し、今放送中の番組を確認して、最後に見たものにすぐ戻れます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전체 TV 편성표로 채널을 넘겨보고, 지금 방송 중인 프로그램을 확인하고, 마지막으로 본 채널로 바로 돌아가세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navegue pelos canais com um guia de TV completo, veja o que está no ar e volte direto ao que assistiu por último."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "借助完整的电视指南浏览频道，查看正在播出的节目，并一键回到上次观看的内容。"
           }
         }
       }
@@ -14647,6 +14912,59 @@
         }
       }
     },
+    "How Lume Works" : {
+      "comment" : "Title of the first-launch guide and of the Settings row that re-opens it",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So funktioniert Lume"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cómo funciona Lume"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment fonctionne Lume"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come funziona Lume"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lumeの使い方"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 사용 방법"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como o Lume funciona"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 使用指南"
+          }
+        }
+      }
+    },
     "HTTP Reconnect" : {
       "comment" : "A toggle that enables or disables HTTP reconnection.",
       "isCommentAutoGenerated" : true,
@@ -16001,6 +16319,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "IntroDB"
+          }
+        }
+      }
+    },
+    "It ships with no channels, streams, or content of its own — it gives what you already pay for a native home on every Apple device." : {
+      "comment" : "Body of the first-launch guide page stating that Lume supplies no content of its own",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume bringt keine Sender, Streams oder Inhalte mit – es gibt dem, wofür du bereits bezahlst, ein natives Zuhause auf jedem Apple-Gerät."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No incluye canales, transmisiones ni contenido propio: le da a lo que ya pagas un hogar nativo en todos tus dispositivos Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne fournit ni chaînes, ni flux, ni contenu : il offre à ce que vous payez déjà un écrin natif sur chaque appareil Apple."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non include canali, stream o contenuti propri: dà a ciò per cui paghi già una casa nativa su ogni dispositivo Apple."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャンネルやストリーム、コンテンツは一切含まれません。すでに契約しているサービスに、すべてのAppleデバイスでネイティブな居場所を用意します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채널이나 스트림, 콘텐츠는 일절 포함하지 않습니다. 이미 이용 중인 서비스에 모든 Apple 기기를 위한 네이티브 환경을 제공합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não inclui canais, transmissões nem conteúdo próprio — dá ao que você já assina um lar nativo em todos os dispositivos Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它不附带任何自有频道、流或内容，只为已订阅的服务提供一个在所有 Apple 设备上的原生归宿。"
           }
         }
       }
@@ -18040,6 +18411,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lume Engine 选项"
+          }
+        }
+      }
+    },
+    "Lume is a player" : {
+      "comment" : "Title of the first page of the first-launch guide, stating that Lume plays your own service and supplies no content itself",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume ist ein Player"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume es un reproductor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume est un lecteur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume è un player"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lumeはプレーヤーです"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume는 플레이어입니다"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Lume é um reprodutor"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 是一款播放器"
           }
         }
       }
@@ -20193,6 +20617,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电影和剧集"
+          }
+        }
+      }
+    },
+    "Movies and Series arrive sorted by category and enriched with artwork, cast, trailers and ratings. Your progress follows you across your devices." : {
+      "comment" : "Body of the first-launch guide page describing the Movies and Series tabs",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filme und Serien erscheinen nach Kategorie sortiert, mit Artwork, Besetzung, Trailern und Bewertungen. Dein Fortschritt folgt dir auf allen Geräten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Películas y series llegan ordenadas por categoría y enriquecidas con carátulas, reparto, tráileres y valoraciones. Tu progreso te acompaña en todos tus dispositivos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Films et séries arrivent classés par catégorie et enrichis d’affiches, de distribution, de bandes-annonces et de notes. Votre progression vous suit sur tous vos appareils."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Film e serie arrivano ordinati per categoria e arricchiti con copertine, cast, trailer e voti. I tuoi progressi ti seguono su tutti i dispositivi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "映画とシリーズはカテゴリ別に整理され、アートワーク、キャスト、予告編、評価が加わります。視聴の進行状況はすべてのデバイスで引き継がれます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영화와 시리즈가 카테고리별로 정리되고 아트워크, 출연진, 예고편, 평점이 더해집니다. 시청 진행 상황은 모든 기기에서 이어집니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmes e séries chegam organizados por categoria e enriquecidos com capas, elenco, trailers e avaliações. Seu progresso acompanha você em todos os dispositivos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电影和剧集按类别整理，并配有海报、演员、预告片和评分。观看进度会在你的所有设备之间同步。"
           }
         }
       }
@@ -25797,7 +26274,7 @@
       }
     },
     "Press Menu to close" : {
-      "comment" : "Hint at the bottom of the tvOS quick-switch modal telling the viewer which remote button closes it",
+      "comment" : "Hint at the bottom of a tvOS modal telling the viewer which remote button closes it — used by both the quick-switch overlay and the first-launch guide",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -25845,6 +26322,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按菜单键关闭"
+          }
+        }
+      }
+    },
+    "Press Play/Pause on the Home screen to change playlist or profile without losing your place." : {
+      "comment" : "Body of the tvOS-only first-launch guide page describing the Play/Pause quick-switch gesture",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drücke auf dem Startbildschirm Play/Pause, um Playlist oder Profil zu wechseln, ohne deinen Platz zu verlieren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pulsa Reproducir/Pausa en la pantalla de inicio para cambiar de lista o de perfil sin perder dónde estabas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appuyez sur Lecture/Pause depuis l’accueil pour changer de playlist ou de profil sans perdre votre place."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premi Play/Pausa nella schermata Home per cambiare playlist o profilo senza perdere il segno."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホーム画面で再生/一時停止を押すと、見ている場所を失わずにプレイリストやプロファイルを切り替えられます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "홈 화면에서 재생/일시정지를 누르면 보던 위치를 잃지 않고 재생목록이나 프로필을 바꿀 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pressione Reproduzir/Pausar na tela de início para trocar de playlist ou perfil sem perder o seu lugar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在主页上按下播放/暂停键，即可切换播放列表或个人资料，且不会丢失当前位置。"
           }
         }
       }
@@ -31346,6 +31876,59 @@
         }
       }
     },
+    "Sign in with your own Xtream Codes credentials or point Lume at an M3U playlist. The catalog is indexed on device, so browsing stays instant." : {
+      "comment" : "Body of the first-launch guide page explaining how to connect an existing IPTV account",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich mit deinen Xtream Codes-Zugangsdaten an oder gib Lume eine M3U-Playlist. Der Katalog wird auf dem Gerät indexiert, damit Stöbern sofort geht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia sesión con tus credenciales de Xtream Codes o indica a Lume una lista M3U. El catálogo se indexa en el dispositivo, así que navegar es instantáneo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous avec vos identifiants Xtream Codes ou indiquez à Lume une playlist M3U. Le catalogue est indexé sur l’appareil : la navigation reste instantanée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi con le tue credenziali Xtream Codes o indica a Lume una playlist M3U. Il catalogo viene indicizzato sul dispositivo, così la navigazione resta istantanea."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ご自身のXtream Codesの認証情報でサインインするか、M3Uプレイリストを指定します。カタログはデバイス上で索引化されるため、閲覧は常に軽快です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 보유한 Xtream Codes 자격 증명으로 로그인하거나 Lume에 M3U 재생목록을 지정하세요. 카탈로그는 기기에서 색인되므로 탐색이 언제나 즉각적입니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre com suas próprias credenciais Xtream Codes ou aponte o Lume para uma playlist M3U. O catálogo é indexado no dispositivo, então navegar é instantâneo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你自己的 Xtream Codes 凭据登录，或让 Lume 指向一个 M3U 播放列表。目录在设备上建立索引，浏览始终即时。"
+          }
+        }
+      }
+    },
     "Sign Out" : {
       "localizations" : {
         "de" : {
@@ -31446,6 +32029,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已登录"
+          }
+        }
+      }
+    },
+    "Skip" : {
+      "comment" : "Button that closes the first-launch guide without reading it",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überspringen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スキップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "건너뛰기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pular"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
           }
         }
       }
@@ -37878,6 +38514,59 @@
         }
       }
     },
+    "Watch up to four live channels side by side on the big screen." : {
+      "comment" : "Body of the tvOS-only first-launch guide page describing Multi-View",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sieh bis zu vier Live-Kanäle nebeneinander auf dem großen Bildschirm."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mira hasta cuatro canales en directo a la vez en la pantalla grande."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regardez jusqu’à quatre chaînes en direct côte à côte sur grand écran."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda fino a quattro canali in diretta affiancati sul grande schermo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大画面で最大4つのライブチャンネルを並べて視聴できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "큰 화면에서 라이브 채널을 최대 4개까지 나란히 시청하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assista a até quatro canais ao vivo lado a lado na tela grande."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在大屏幕上最多可并排观看四个直播频道。"
+          }
+        }
+      }
+    },
     "Watch, favorite, or rate titles and we'll suggest more here." : {
       "localizations" : {
         "de" : {
@@ -38765,6 +39454,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iCloud 存储空间已满。请释放空间或升级方案以恢复同步。"
+          }
+        }
+      }
+    },
+    "Your library, organized" : {
+      "comment" : "Title of the first-launch guide page describing the Movies and Series tabs",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Mediathek, sortiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu biblioteca, ordenada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre bibliothèque, organisée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La tua libreria, in ordine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理されたライブラリ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정돈된 라이브러리"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua biblioteca, organizada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "井然有序的媒体库"
           }
         }
       }

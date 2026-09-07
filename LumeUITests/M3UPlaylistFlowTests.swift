@@ -17,6 +17,24 @@ final class M3UPlaylistFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
+        // A fresh install opens on the "How Lume Works" guide (this test launches
+        // without `-ui-testing`, which is what suppresses it) — skip past it to
+        // reach the form. Matched by identifier so it survives localization.
+        //
+        // The guide sits behind the launch-time iCloud gate, whose own safety
+        // timeout is ~15 s, so a short fixed wait misses it on a cold run. Race
+        // the three possible landings instead of betting on one arriving first.
+        let skipGuide = app.buttons["onboarding.skip"]
+        let landingDeadline = Date().addingTimeInterval(45)
+        while Date() < landingDeadline {
+            if skipGuide.exists {
+                skipGuide.tap()
+                break
+            }
+            if app.tabBars.firstMatch.exists || app.textFields["e.g. My IPTV"].exists { break }
+            _ = XCTWaiter.wait(for: [XCTestExpectation(description: "launch settle")], timeout: 0.5)
+        }
+
         // Fresh install shows the login form as root; otherwise add via Settings.
         if app.tabBars.firstMatch.waitForExistence(timeout: 5) {
             app.buttons["gear"].tap()
