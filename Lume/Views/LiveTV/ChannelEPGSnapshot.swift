@@ -21,6 +21,12 @@ nonisolated struct EPGSlot: Equatable {
     let end: Date
 }
 
+nonisolated extension EPGSlot {
+    init(_ listing: EPGListing) {
+        self.init(title: listing.title, start: listing.start, end: listing.end)
+    }
+}
+
 /// The now/next programme pair shown on a single channel card.
 nonisolated struct ChannelEPG: Equatable {
     let current: EPGSlot?
@@ -61,8 +67,8 @@ enum ChannelEPGLoader {
             let current = items.first { $0.start <= now && now < $0.end }
             let next = items.first { $0.start > now }
             result[channelId] = ChannelEPG(
-                current: current.map { EPGSlot(title: $0.title, start: $0.start, end: $0.end) },
-                next: next.map { EPGSlot(title: $0.title, start: $0.start, end: $0.end) }
+                current: current.map(EPGSlot.init),
+                next: next.map(EPGSlot.init)
             )
         }
         return result

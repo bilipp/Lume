@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-enum PlayerEngineKind: String, CaseIterable, Identifiable {
+nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
     case vlcKit
     case ksPlayer
     case avPlayer
@@ -57,6 +57,33 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
     }
 }
 
+/// How much the in-player stream-information caption spells out. A two-level
+/// preset rather than per-element toggles: Simple carries programme context
+/// (playlist, EPG), Advanced adds the technical
+/// readout (quality, codec, frame rate, engine).
+nonisolated enum StreamInfoDetailLevel: String, CaseIterable, Identifiable {
+    case simple
+    case advanced
+
+    var id: String {
+        rawValue
+    }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .simple: "Simple"
+        case .advanced: "Advanced"
+        }
+    }
+
+    var footer: LocalizedStringResource {
+        switch self {
+        case .simple: "Shows the playlist and what's on now."
+        case .advanced: "Adds the technical readout: quality, codec, frame rate, and playback engine."
+        }
+    }
+}
+
 /// The ordered list of engines the player tries, from most to least preferred.
 /// Playback starts with the first engine and falls back to the next whenever an
 /// engine can't start a stream (see `FullScreenPlayerView`). Persisted as a
@@ -98,6 +125,35 @@ enum PlayerEnginePriority {
         }
         for kind in PlayerEngineKind.allCases where seen.insert(kind).inserted {
             result.append(kind)
+        }
+        return result
+    }
+}
+
+/// The ordered list of language codes a viewer prefers for a track kind, most
+/// preferred first. Persisted as a comma-separated raw string under
+/// `PlayerSettings.Language`'s keys, because `@AppStorage` cannot bind
+/// `[String]`. An empty list means no preference at all: track selection is
+/// left exactly as the container asks for it.
+nonisolated enum PreferredLanguageList {
+    /// Parse the comma-separated raw value into language codes.
+    static func decode(_ raw: String) -> [String] {
+        normalized(raw.split(separator: ",").map(String.init))
+    }
+
+    static func encode(_ list: [String]) -> String {
+        normalized(list).joined(separator: ",")
+    }
+
+    /// Keep the given order, trimmed of whitespace, without empty tokens or
+    /// case-insensitive duplicates.
+    static func normalized(_ codes: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for code in codes {
+            let trimmed = code.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, seen.insert(trimmed.lowercased()).inserted else { continue }
+            result.append(trimmed)
         }
         return result
     }
@@ -154,6 +210,66 @@ enum PlayerSettings {
         static var showNextEpisodeButton: Bool {
             UserDefaults.standard.bool(showNextEpisodeButtonKey, default: showNextEpisodeButtonDefault)
         }
+    }
+
+    // MARK: - Stream information
+
+    /// The in-player stream-information caption. On by default off tvOS, where
+    /// it rides the controls overlay and so is only visible while they are; on
+    /// tvOS the caption is part of the always-on player chrome and `enabled` is
+    /// never consulted.
+    enum StreamInfo {
+        static let enabledKey = "player.streamInfo.enabled"
+        static let detailLevelKey = "player.streamInfo.detailLevel"
+
+        /// On: the caption only appears with the controls, which are already a
+        /// deliberate tap away, so it costs nothing to a viewer who never wants
+        /// it and needs no discovery from one who does. tvOS ignores this.
+        static let enabledDefault = true
+
+        /// Advanced on tvOS so the existing technical caption (`4K · H264 ·
+        /// 24 fps`) keeps rendering exactly as it does today; Simple elsewhere,
+        /// where the caption is new and shares space with the transport controls.
+        static var detailLevelDefault: StreamInfoDetailLevel {
+            #if os(tvOS)
+                .advanced
+            #else
+                .simple
+            #endif
+        }
+
+        /// Whether the caption is shown, read off `UserDefaults` directly (so the
+        /// player host needn't hold an `@AppStorage` that would re-render the
+        /// whole player tree when toggled).
+        static var isEnabled: Bool {
+            UserDefaults.standard.bool(enabledKey, default: enabledDefault)
+        }
+
+        /// How much the caption spells out, read off `UserDefaults` directly for
+        /// the same reason as `isEnabled`.
+        static var detailLevel: StreamInfoDetailLevel {
+            guard let raw = UserDefaults.standard.string(forKey: detailLevelKey) else {
+                return detailLevelDefault
+            }
+            return StreamInfoDetailLevel(rawValue: raw) ?? detailLevelDefault
+        }
+    }
+
+    // MARK: - Preferred track languages
+
+    /// Engine-independent preferred audio track languages: an ordered list of
+    /// bare language codes (`de` matches a `de-AT` track), stored
+    /// comma-separated — see `PreferredLanguageList`.
+    ///
+    /// Defaults to EMPTY, which means no preference and behaviour identical
+    /// to before the setting existed. Nothing is seeded from
+    /// `Locale.preferredLanguages`.
+    nonisolated enum Language {
+        /// Ordered preferred audio languages.
+        static let preferredAudioLanguagesKey = "player.preferredAudioLanguages"
+
+        /// Empty: no preferred language.
+        static let preferredAudioLanguagesDefault = ""
     }
 
     /// Legacy top-level key for VLC's deinterlace toggle, kept stable so the

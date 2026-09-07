@@ -33,6 +33,12 @@ struct EPGMetrics {
     var headerHeight: CGFloat
     var blockCornerRadius: CGFloat
     var blockInset: CGFloat
+    /// How much of the programme already in progress stays visible when the
+    /// guide parks on "now": enough to show where the current show started —
+    /// and the tail of the one before it — rather than only what is still to
+    /// come. The 10-foot layout fits hours across the screen, so it needs a
+    /// wider lead-in than a phone to read as the same amount of context.
+    var nowLeadInMinutes: CGFloat
 
     static var current: EPGMetrics {
         #if os(tvOS)
@@ -43,7 +49,8 @@ struct EPGMetrics {
                 channelColumnWidth: 300,
                 headerHeight: 68,
                 blockCornerRadius: 16,
-                blockInset: 18
+                blockInset: 18,
+                nowLeadInMinutes: 30
             )
         #elseif os(macOS)
             EPGMetrics(
@@ -53,7 +60,8 @@ struct EPGMetrics {
                 channelColumnWidth: 210,
                 headerHeight: 36,
                 blockCornerRadius: 7,
-                blockInset: 10
+                blockInset: 10,
+                nowLeadInMinutes: 10
             )
         #else
             EPGMetrics(
@@ -63,7 +71,8 @@ struct EPGMetrics {
                 channelColumnWidth: 136,
                 headerHeight: 36,
                 blockCornerRadius: 9,
-                blockInset: 10
+                blockInset: 10,
+                nowLeadInMinutes: 10
             )
         #endif
     }
@@ -278,6 +287,21 @@ struct EPGProgramBlockView: View {
             .padding(.horizontal, metrics.blockInset)
             .padding(.vertical, metrics.blockInset * 0.55)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            // Keeps the text of a partially scrolled block readable instead of
+            // letting it ride off the leading edge with the block's own origin.
+            // Driven by `visualEffect` rather than the shared scroll offset: the
+            // closure re-runs on geometry change without invalidating the
+            // block's body, where observing the guide's per-frame offset would
+            // re-render every realized cell — the cost the grid is built around.
+            .visualEffect { [inset = metrics.blockInset] content, proxy in
+                content.offset(
+                    x: EPGStickyText.shift(
+                        blockMinX: proxy.frame(in: .scrollView).minX,
+                        blockWidth: proxy.size.width,
+                        inset: inset
+                    )
+                )
+            }
 
             if isLive {
                 liveProgressBar

@@ -128,3 +128,149 @@ struct PlayerEnginePriorityTests {
         #expect(resolved == [.ksPlayer, .vlcKit, .avPlayer, .lumeEngine])
     }
 }
+
+// MARK: - Preferred track languages
+
+struct PreferredLanguageStorageTests {
+    /// Both lists are device-local `UserDefaults`, so every case runs against
+    /// its own suite — `UserDefaults.standard` is shared with the rest of the
+    /// suite and races itself.
+    private func withSuite(_ body: (UserDefaults) throws -> Void) rethrows {
+        let name = "PreferredLanguageStorageTests-\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: name) }
+        guard let defaults = UserDefaults(suiteName: name) else { return }
+        try body(defaults)
+    }
+
+    @Test func `storage key`() {
+        #expect(PlayerSettings.Language.preferredAudioLanguagesKey == "player.preferredAudioLanguages")
+    }
+
+    @Test func `the list ships empty`() {
+        // The shipped default is "no preference at all": every engine then
+        // leaves track selection exactly as the container asks for it.
+        #expect(PlayerSettings.Language.preferredAudioLanguagesDefault == "")
+    }
+
+    @Test func `load yields an empty array for an untouched key`() {
+        withSuite { defaults in
+            let options = PlayerLanguageOptions.load(from: defaults)
+            #expect(options.preferredAudioLanguages.isEmpty)
+        }
+    }
+
+    @Test func `load reads the stored list in order`() {
+        withSuite { defaults in
+            defaults.set("de,en", forKey: PlayerSettings.Language.preferredAudioLanguagesKey)
+            let options = PlayerLanguageOptions.load(from: defaults)
+            #expect(options.preferredAudioLanguages == ["de", "en"])
+        }
+    }
+
+    @Test func `an empty stored string still means no preference`() {
+        withSuite { defaults in
+            defaults.set("", forKey: PlayerSettings.Language.preferredAudioLanguagesKey)
+            #expect(PlayerLanguageOptions.load(from: defaults).preferredAudioLanguages.isEmpty)
+        }
+    }
+}
+
+struct PreferredLanguageListTests {
+    @Test func `encode and decode round-trip`() {
+        let list = ["de", "en", "ja"]
+        #expect(PreferredLanguageList.encode(list) == "de,en,ja")
+        #expect(PreferredLanguageList.decode("de,en,ja") == list)
+    }
+
+    @Test func `an empty list encodes and decodes to nothing`() {
+        #expect(PreferredLanguageList.encode([]) == "")
+        #expect(PreferredLanguageList.decode("") == [])
+    }
+
+    @Test func `decode trims whitespace around each token`() {
+        #expect(PreferredLanguageList.decode(" de , en ,\tja ") == ["de", "en", "ja"])
+    }
+
+    @Test func `decode drops empty tokens`() {
+        #expect(PreferredLanguageList.decode(",de,,en,") == ["de", "en"])
+        #expect(PreferredLanguageList.decode("  ,  ") == [])
+    }
+
+    @Test func `normalized dedupes case-insensitively, keeping the first spelling`() {
+        #expect(PreferredLanguageList.normalized(["de", "DE", "De"]) == ["de"])
+        #expect(PreferredLanguageList.normalized(["EN", "de", "en"]) == ["EN", "de"])
+    }
+
+    @Test func `normalized preserves the given order`() {
+        #expect(PreferredLanguageList.normalized(["ja", "de", "en"]) == ["ja", "de", "en"])
+    }
+
+    @Test func `encode normalizes what it stores`() {
+        #expect(PreferredLanguageList.encode([" de ", "DE", "", "en"]) == "de,en")
+    }
+}
+
+/// The feature's user-facing literals. `String(localized:)` can't prove a key
+/// is in the catalog — an English key resolves to itself either way — so the
+/// catalog is read directly.
+struct PreferredLanguageStringsTests {
+    private static let expectedLanguages: Set<String> = ["de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
+
+    /// Keys the preferred-language feature added.
+    private static let addedKeys = [
+        "Audio Languages",
+        "Preferred Order",
+        "No Preferred Languages",
+        "Add Language",
+        "Common Languages",
+        "Suggested",
+        "No Languages Found",
+        "Search to find any other language.",
+        "Remove %@",
+        "Audio Track",
+        "Lume selects the first of these languages the stream offers as an audio track. Drag to reorder. "
+            + "When the audio that plays is in none of them and the stream carries a forced subtitle track, "
+            + "that track is turned on. Applied the next time playback starts.",
+        "Lume selects the first of these languages the stream offers as an audio track, most preferred at the top. "
+            + "When the audio that plays is in none of them and the stream carries a forced subtitle track, "
+            + "that track is turned on. Applied the next time playback starts."
+    ]
+
+    /// Keys the feature reuses deliberately rather than adding near-duplicates.
+    private static let reusedKeys = [
+        "Languages",
+        "Search languages",
+        "Automatic",
+        "Default",
+        "Subtitles",
+        "Off",
+        "Any",
+        "Move %@ up",
+        "Move %@ down"
+    ]
+
+    private static var allKeys: [String] {
+        addedKeys + reusedKeys
+    }
+
+    @Test func `literals resolve to a non empty string`() {
+        for key in Self.allKeys {
+            let resolved = String(localized: String.LocalizationValue(key))
+            #expect(!resolved.isEmpty, "\(key) resolved to an empty string")
+        }
+    }
+
+    @Test func `literals are translated in every locale`() throws {
+        let catalog = try StringCatalog.localizable()
+        for key in Self.allKeys {
+            let localizations = try #require(catalog.localizations(for: key), "\(key) is not in the catalog")
+            #expect(
+                Self.expectedLanguages.isSubset(of: Set(localizations.keys)),
+                "\(key) is missing locales: \(Self.expectedLanguages.subtracting(localizations.keys).sorted())"
+            )
+            for (language, value) in localizations {
+                #expect(!value.isEmpty, "\(key) is untranslated in \(language)")
+            }
+        }
+    }
+}

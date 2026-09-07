@@ -36,6 +36,9 @@ import SwiftUI
         /// Raises the OpenSubtitles browser. `nil` when the search isn't
         /// available for this stream, which also drops the menu entry.
         var onSearchSubtitles: (() -> Void)?
+        /// Video-track snapshot for the Advanced stream-info caption. `nil`
+        /// until the first frame reports usable dimensions.
+        var videoInfo: PlayerVideoInfo?
 
         @Environment(\.modelContext) private var modelContext
         /// Mirrors the backing model's favorite flag; refreshed when the media
@@ -185,6 +188,11 @@ import SwiftUI
 
         private var titleBlock: some View {
             VStack(alignment: .leading, spacing: 2) {
+                StreamInfoCaption(
+                    media: media,
+                    videoInfo: videoInfo,
+                    engine: .ksPlayer
+                )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)
@@ -216,9 +224,15 @@ import SwiftUI
 
         private var secondaryControls: some View {
             HStack(spacing: 4) {
-                if !subtitleTracks.isEmpty || onSearchSubtitles != nil { subtitleMenu }
-                if audioTracks.count > 1 { audioTrackMenu }
-                if !media.isLive { playbackRateMenu }
+                if !subtitleTracks.isEmpty || onSearchSubtitles != nil {
+                    subtitleMenu
+                }
+                if audioTracks.count > 1 {
+                    audioTrackMenu
+                }
+                if !media.isLive {
+                    playbackRateMenu
+                }
                 contentModeButton
                 favoriteButton
             }
@@ -245,14 +259,14 @@ import SwiftUI
                     coordinator.subtitleModel.selectedSubtitleInfo = nil
                     onResetHideTimer()
                 } label: {
-                    checkmarkLabel("Off", checked: !hasSelection)
+                    playerCheckmarkLabel("Off", checked: !hasSelection)
                 }
                 ForEach(subtitleTracks, id: \.subtitleID) { track in
                     Button {
                         coordinator.subtitleModel.selectedSubtitleInfo = track
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.name, checked: selectedSubtitle?.subtitleID == track.subtitleID)
+                        playerCheckmarkLabel(verbatim: track.name, checked: selectedSubtitle?.subtitleID == track.subtitleID)
                     }
                 }
                 if let onSearchSubtitles {
@@ -268,6 +282,7 @@ import SwiftUI
                 pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Subtitles", selected: selectedSubtitle?.name, fallback: "Off")
         }
 
         /// KSPlayer exposes the demuxed audio streams on the player itself —
@@ -285,17 +300,18 @@ import SwiftUI
             Menu {
                 ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
                     Button {
-                        coordinator.playerLayer?.player.select(track: track)
+                        coordinator.selectAudioTrack(track)
                         coordinator.objectWillChange.send()
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.name, checked: track.isEnabled)
+                        playerCheckmarkLabel(verbatim: track.name, checked: track.isEnabled)
                     }
                 }
             } label: {
                 pillGlyph("waveform")
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Audio Track", selected: tracks.first(where: \.isEnabled)?.name, fallback: "Default")
         }
 
         private var playbackRateMenu: some View {
@@ -305,7 +321,7 @@ import SwiftUI
                         coordinator.playbackRate = rate
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                        playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
                     }
                 }
             } label: {
@@ -380,15 +396,6 @@ import SwiftUI
         /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
         private func rateString(_ rate: Float) -> String {
             String(format: "%g×", rate)
-        }
-
-        @ViewBuilder
-        private func checkmarkLabel(_ title: String, checked: Bool) -> some View {
-            if checked {
-                Label(title, systemImage: "checkmark")
-            } else {
-                Text(title)
-            }
         }
     }
 

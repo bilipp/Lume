@@ -146,9 +146,7 @@ nonisolated struct OnlineSubtitle: Identifiable, Hashable {
     /// for OpenSubtitles' regional variants (`pt-br`, `zh-cn`) the system
     /// doesn't name.
     var languageName: String {
-        Locale.current.localizedString(forIdentifier: languageCode)
-            ?? Locale.current.localizedString(forLanguageCode: languageCode)
-            ?? languageCode.uppercased()
+        TrackLanguageMatcher.displayName(for: languageCode)
     }
 }
 
