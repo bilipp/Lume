@@ -17,12 +17,13 @@
 //  relies on.
 //
 //  SAFETY: a sweep against an empty/partial fetch would wipe the playlist's
-//  catalog, so the *caller* must gate the sweep on a healthy fetch (see the
-//  guards in syncMovies/…/importM3UFile) before handing a `seenIds` set here.
-//  The Xtream entry points below add a second gate: `XtreamList` drops the
-//  elements that fail to decode and only rethrows when *every* element fails,
-//  so a mostly-malformed payload arrives as a small non-empty array whose
-//  row count alone would wave the sweep through (see `sweepIsSafe`).
+//  catalog, so the `pruneStale*` sweeps are never called directly by a sync —
+//  the guarded entry points below are, and they add the coverage gate a row
+//  count alone cannot: `XtreamList` drops the elements that fail to decode and
+//  only rethrows when *every* element fails, and a truncated m3u download
+//  parses cleanly into a short but valid playlist. Either arrives as a small
+//  non-empty payload that would wave the sweep through (see `sweepIsSafe`).
+//  Stalker is the exception and calls `pruneStale*` itself.
 //  Pruning is confined to the local-only catalog store, so a delete never
 //  propagates to CloudKit; and user state (favorites, progress, watchlist)
 //  lives in `UserContentState` in the cloud mirror keyed by `contentId`, so it
@@ -81,12 +82,150 @@ extension ContentSyncManager {
 
     /// Deletes movies for `playlistId` whose id is absent from `seenIds`.
     func pruneStaleMovies(playlistId: UUID, seenIds: Set<String>) {
+        sweepMovies(playlistId: playlistId) { seenIds.contains($0) }
+    }
+
+    /// Deletes series for `playlistId` whose id is absent from `seenIds`. Each
+    /// removed series' episodes and cast cascade from the series — which is why
+    /// the sweep deletes row by row instead of `delete(model:where:)`, whose
+    /// bulk delete would leave those children (and the watch progress on them)
+    /// orphaned.
+    func pruneStaleSeries(playlistId: UUID, seenIds: Set<String>) {
+        sweepSeries(playlistId: playlistId) { seenIds.contains($0) }
+    }
+
+    /// Deletes live streams for `playlistId` whose id is absent from `seenIds`.
+    func pruneStaleLiveStreams(playlistId: UUID, seenIds: Set<String>) {
+        sweepLiveStreams(playlistId: playlistId) { seenIds.contains($0) }
+    }
+
+    /// Deletes episodes for `playlistId` whose id is absent from `seenIds`,
+    /// leaving their series in place. Used by the m3u pipeline, where episodes
+    /// are imported alongside the rest of the catalog; the Xtream pipeline pulls
+    /// episodes lazily per-series and so isn't swept here.
+    func pruneStaleEpisodes(playlistId: UUID, seenIds: Set<String>) {
+        sweepEpisodes(playlistId: playlistId) { seenIds.contains($0) }
+    }
+
+    // MARK: - m3u sweep entry points
+
+    // Same sweeps, membership tested against `M3UIdentity.hash64` of the id
+    // instead of the id itself. A provider m3u file carries ~1.5M episode ids of
+    // ~78 characters each — past Swift's inline small-string form, so every one
+    // is a separate heap allocation — and the sets stay live across the whole
+    // import and every sweep: ~337 MB resident against ~19-33 MB for the hashes.
+    //
+    // A 64-bit hash collides with probability ~6e-8 at 1.5M keys, and the
+    // direction is benign: a collision makes a stale row test as seen, so the
+    // sweep KEEPS it. It can never delete a row the file still carries.
+
+    func pruneStaleM3UMovies(playlistId: UUID, seenHashes: Set<UInt64>) {
+        sweepMovies(playlistId: playlistId) { seenHashes.contains(M3UIdentity.hash64($0)) }
+    }
+
+    func pruneStaleM3USeries(playlistId: UUID, seenHashes: Set<UInt64>) {
+        sweepSeries(playlistId: playlistId) { seenHashes.contains(M3UIdentity.hash64($0)) }
+    }
+
+    func pruneStaleM3ULiveStreams(playlistId: UUID, seenHashes: Set<UInt64>) {
+        sweepLiveStreams(playlistId: playlistId) { seenHashes.contains(M3UIdentity.hash64($0)) }
+    }
+
+    func pruneStaleM3UEpisodes(playlistId: UUID, seenHashes: Set<UInt64>) {
+        sweepEpisodes(playlistId: playlistId) { seenHashes.contains(M3UIdentity.hash64($0)) }
+    }
+
+    // MARK: - m3u guarded sweep entry points
+
+    // The m3u file is one uninterrupted `Transfer-Encoding: chunked` response
+    // with no `Content-Length`, so a connection cut mid-download leaves a
+    // *valid* short playlist: the parse succeeds, the import commits, and the
+    // rows the truncated tail never mentioned look dropped. Sweeping on that
+    // deletes them, and the iCloud reconcile that follows
+    // `.lumeContentSyncDidComplete` turns each delete into a push that destroys
+    // the matching `UserContentState` on every device. So the m3u sweeps take
+    // the same gate as the Xtream ones: a payload must cover at least a tenth
+    // of the rows already stored, tolerated `maximumConsecutiveSweepSkips`
+    // times before a shrink is believed.
+    //
+    // Deliberate behaviour change: a provider that genuinely drops a whole
+    // section now keeps those dead rows for up to two extra syncs.
+    //
+    // `importedCount` is the import's TOTAL row count, not the kind's — a
+    // live-only playlist imports zero movies and must still prune the movies it
+    // used to carry, while a zero total means the download or parse produced
+    // nothing at all.
+    //
+    // The coverage floor counts the seen set against the playlist-scoped stored
+    // rows, so it reads the same whether the set holds ids or their hashes.
+
+    func pruneLiveStreams(playlistId: UUID, seenHashes: Set<UInt64>, importedCount: Int) {
+        guard importedCount > 0 else { return }
+        let prefix = playlistId.uuidString
+        let scope = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        guard sweepIsAllowed(playlistId: playlistId, kind: "live", seenCount: seenHashes.count, storedMatching: scope) else {
+            return
+        }
+        pruneStaleM3ULiveStreams(playlistId: playlistId, seenHashes: seenHashes)
+    }
+
+    func pruneMovies(playlistId: UUID, seenHashes: Set<UInt64>, importedCount: Int) {
+        guard importedCount > 0 else { return }
+        let prefix = playlistId.uuidString
+        let scope = FetchDescriptor<Movie>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        guard sweepIsAllowed(playlistId: playlistId, kind: "movie", seenCount: seenHashes.count, storedMatching: scope) else {
+            return
+        }
+        pruneStaleM3UMovies(playlistId: playlistId, seenHashes: seenHashes)
+    }
+
+    func pruneEpisodes(playlistId: UUID, seenHashes: Set<UInt64>, importedCount: Int) {
+        guard importedCount > 0 else { return }
+        let prefix = playlistId.uuidString
+        let scope = FetchDescriptor<Episode>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        guard sweepIsAllowed(playlistId: playlistId, kind: "episode", seenCount: seenHashes.count, storedMatching: scope) else {
+            return
+        }
+        pruneStaleM3UEpisodes(playlistId: playlistId, seenHashes: seenHashes)
+    }
+
+    func pruneSeries(playlistId: UUID, seenHashes: Set<UInt64>, importedCount: Int) {
+        guard importedCount > 0 else { return }
+        let prefix = playlistId.uuidString
+        let scope = FetchDescriptor<Series>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        guard sweepIsAllowed(playlistId: playlistId, kind: "series", seenCount: seenHashes.count, storedMatching: scope) else {
+            return
+        }
+        pruneStaleM3USeries(playlistId: playlistId, seenHashes: seenHashes)
+    }
+
+    /// Guarded `pruneStaleCategories`. Scoped per type, and so is the skip
+    /// count: the three types are accumulated from one file but a truncation
+    /// starves them independently.
+    func pruneCategories(playlistId: UUID, type: CategoryType, seenApiIds: Set<String>, importedCount: Int) {
+        guard importedCount > 0 else { return }
+        let prefix = "\(playlistId.uuidString)-\(type.rawValue)-"
+        let scope = FetchDescriptor<Category>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        guard sweepIsAllowed(
+            playlistId: playlistId,
+            kind: "category.\(type.rawValue)",
+            seenCount: seenApiIds.count,
+            storedMatching: scope
+        ) else {
+            return
+        }
+        pruneStaleCategories(playlistId: playlistId, type: type, seenApiIds: seenApiIds)
+    }
+
+    // MARK: - Shared sweep bodies
+
+    private func sweepMovies(playlistId: UUID, isSeen: (String) -> Bool) {
         // Scope to the playlist via its UUID, which anchors every id this
         // playlist produced (see PlaylistDeletion). `starts(with:)` compiles to
         // a range seek on the unique `id` index; the substring match used before
         // was a LIKE-%…% scan that touched every row on each sync's sweep.
         let prefix = playlistId.uuidString
-        let removed = sweepPaged(after: prefix, seenIds: seenIds, idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
+        let removed = sweepPaged(after: prefix, isSeen: isSeen, idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id)]
@@ -98,14 +237,9 @@ extension ContentSyncManager {
         Logger.database.info("Pruned \(removed) stale movie(s) for playlist \(prefix)")
     }
 
-    /// Deletes series for `playlistId` whose id is absent from `seenIds`. Each
-    /// removed series' episodes and cast cascade from the series — which is why
-    /// the sweep deletes row by row instead of `delete(model:where:)`, whose
-    /// bulk delete would leave those children (and the watch progress on them)
-    /// orphaned.
-    func pruneStaleSeries(playlistId: UUID, seenIds: Set<String>) {
+    private func sweepSeries(playlistId: UUID, isSeen: (String) -> Bool) {
         let prefix = playlistId.uuidString
-        let removed = sweepPaged(after: prefix, seenIds: seenIds, idOf: { (show: Series) in show.id }, page: { cursor, limit in
+        let removed = sweepPaged(after: prefix, isSeen: isSeen, idOf: { (show: Series) in show.id }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id)]
@@ -117,10 +251,9 @@ extension ContentSyncManager {
         Logger.database.info("Pruned \(removed) stale series for playlist \(prefix)")
     }
 
-    /// Deletes live streams for `playlistId` whose id is absent from `seenIds`.
-    func pruneStaleLiveStreams(playlistId: UUID, seenIds: Set<String>) {
+    private func sweepLiveStreams(playlistId: UUID, isSeen: (String) -> Bool) {
         let prefix = playlistId.uuidString
-        let removed = sweepPaged(after: prefix, seenIds: seenIds, idOf: { (stream: LiveStream) in stream.id }, page: { cursor, limit in
+        let removed = sweepPaged(after: prefix, isSeen: isSeen, idOf: { (stream: LiveStream) in stream.id }, page: { cursor, limit in
             var descriptor = FetchDescriptor<LiveStream>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id)]
@@ -132,15 +265,11 @@ extension ContentSyncManager {
         Logger.database.info("Pruned \(removed) stale live stream(s) for playlist \(prefix)")
     }
 
-    /// Deletes episodes for `playlistId` whose id is absent from `seenIds`,
-    /// leaving their series in place. Used by the m3u pipeline, where episodes
-    /// are imported alongside the rest of the catalog; the Xtream pipeline pulls
-    /// episodes lazily per-series and so isn't swept here.
-    func pruneStaleEpisodes(playlistId: UUID, seenIds: Set<String>) {
+    private func sweepEpisodes(playlistId: UUID, isSeen: (String) -> Bool) {
         // Episode.id is "\(seriesId)-episode-…" and seriesId starts with the
         // playlist UUID, so the same prefix scope applies.
         let prefix = playlistId.uuidString
-        let removed = sweepPaged(after: prefix, seenIds: seenIds, idOf: { (episode: Episode) in episode.id }, page: { cursor, limit in
+        let removed = sweepPaged(after: prefix, isSeen: isSeen, idOf: { (episode: Episode) in episode.id }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Episode>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id)]
@@ -200,9 +329,13 @@ extension ContentSyncManager {
     /// sorts before every id in scope (the playlist prefix does: a prefix sorts
     /// before anything extending it). The cursor strictly increases each pass
     /// and a short page means the rows ran out, so the loop terminates.
+    ///
+    /// Membership is a closure rather than a `Set<String>` so a caller can hold
+    /// its seen ids in a cheaper form: the m3u pipeline keeps 64-bit hashes
+    /// instead of the ids themselves (see `pruneStaleM3U*`).
     private func sweepPaged<T: PersistentModel>(
         after: String,
-        seenIds: Set<String>,
+        isSeen: (String) -> Bool,
         idOf: (T) -> String,
         pageSize: Int = 2000,
         page: (_ cursor: String, _ limit: Int) -> FetchDescriptor<T>
@@ -222,7 +355,7 @@ extension ContentSyncManager {
                 fetched = rows.count
                 if let last = rows.last { cursor = idOf(last) }
 
-                for row in rows where !seenIds.contains(idOf(row)) {
+                for row in rows where !isSeen(idOf(row)) {
                     context.delete(row)
                     removed += 1
                 }
@@ -310,18 +443,48 @@ extension ContentSyncManager {
         return true
     }
 
-    private func sweepSkipKey(playlistId: UUID, kind: String) -> String {
-        "sync.sweepSkips.\(playlistId.uuidString).\(kind)"
-    }
-
     private func recordSweepSkip(playlistId: UUID, kind: String) -> Int {
-        let key = sweepSkipKey(playlistId: playlistId, kind: kind)
+        let key = SweepSkipDefaults.key(playlistId: playlistId, kind: kind)
         let next = UserDefaults.standard.integer(forKey: key) + 1
         UserDefaults.standard.set(next, forKey: key)
         return next
     }
 
     private func clearSweepSkips(playlistId: UUID, kind: String) {
-        UserDefaults.standard.removeObject(forKey: sweepSkipKey(playlistId: playlistId, kind: kind))
+        UserDefaults.standard.removeObject(forKey: SweepSkipDefaults.key(playlistId: playlistId, kind: kind))
+    }
+}
+
+/// Where `sweepIsAllowed` keeps its consecutive-skip counters.
+///
+/// Device-local by design: the counter describes what this device's downloads
+/// looked like, and mirroring it would let one device's bad payload suppress
+/// another's sweep. That makes them invisible to the playlist's own deletion
+/// cascade, so the layout is spelled out here for `PlaylistDeletion` to clear —
+/// otherwise every deleted playlist leaks a key per content kind.
+nonisolated enum SweepSkipDefaults {
+    static func key(playlistId: UUID, kind: String) -> String {
+        "\(keyPrefix(playlistId: playlistId))\(kind)"
+    }
+
+    /// Whether any sweep for this playlist is currently being held back. The m3u
+    /// digest skip reads it: a deferred sweep is unfinished work, and recording
+    /// the file as fully imported would strand those rows until the provider
+    /// changed the file.
+    static func hasAny(playlistId: UUID) -> Bool {
+        let prefix = keyPrefix(playlistId: playlistId)
+        return UserDefaults.standard.dictionaryRepresentation().keys.contains { $0.hasPrefix(prefix) }
+    }
+
+    static func removeAll(playlistId: UUID) {
+        let prefix = keyPrefix(playlistId: playlistId)
+        let defaults = UserDefaults.standard
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    private static func keyPrefix(playlistId: UUID) -> String {
+        "sync.sweepSkips.\(playlistId.uuidString)."
     }
 }

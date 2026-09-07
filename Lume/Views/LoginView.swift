@@ -57,6 +57,28 @@ struct LoginView: View {
         }
     }
 
+    /// True when the entered m3u URL is really an Xtream `get.php` endpoint.
+    /// The hint it drives is advisory only: nothing switches the source type or
+    /// rewrites the URL, because the two pipelines disagree on content identity
+    /// (see `XtreamCredentialsHint`).
+    private var showsXtreamHint: Bool {
+        sourceType == .m3u
+            && M3UClient.xtreamCredentials(in: m3uURL.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+    }
+
+    private static let xtreamHintMessage: LocalizedStringKey =
+        "This is an Xtream provider link. It works as an m3u playlist, or add the provider as an Xtream login instead — Xtream syncs far less data for the same catalog."
+
+    /// Non-interactive on purpose, so it needs no focus target on tvOS.
+    private var xtreamHintLabel: some View {
+        Label {
+            Text(Self.xtreamHintMessage)
+        } icon: {
+            Image(systemName: "info.circle.fill")
+        }
+        .foregroundStyle(.secondary)
+    }
+
     var body: some View {
         #if os(tvOS)
             tvBody
@@ -163,7 +185,7 @@ struct LoginView: View {
             }
         }
 
-        private var m3uSection: some View {
+        @ViewBuilder private var m3uSection: some View {
             Section {
                 TextField("e.g. My IPTV", text: $name)
                     .textContentType(.name)
@@ -189,6 +211,13 @@ struct LoginView: View {
                 Text("M3U Playlist")
             } footer: {
                 Text("Enter the playlist URL or choose a local m3u/m3u8 file. The EPG URL is read from the playlist when left empty.")
+            }
+
+            if showsXtreamHint {
+                Section {
+                    xtreamHintLabel
+                        .font(.callout)
+                }
             }
         }
 
@@ -288,6 +317,13 @@ struct LoginView: View {
                         .font(.system(size: TVSettingsMetrics.secondaryFontSize))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                    if showsXtreamHint {
+                        xtreamHintLabel
+                            .font(.system(size: TVSettingsMetrics.secondaryFontSize))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    }
 
                     if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.circle.fill")
