@@ -67,7 +67,6 @@ struct PlayerStreamInfoTests {
 
         let details = PlayerStreamInfo.resolve(for: .live("not-a-uuid-at-all-live-1"), container: container)
         #expect(details.playlistName == nil)
-        #expect(details.categoryName == nil)
         #expect(details.epg == nil)
     }
 
@@ -78,25 +77,20 @@ struct PlayerStreamInfoTests {
 
         let details = PlayerStreamInfo.resolve(for: .episode(id), container: container)
         #expect(details.playlistName == "Provider A")
-        #expect(details.categoryName == nil)
         #expect(details.epg == nil)
     }
 
     // MARK: - Live details
 
-    @Test func `live stream resolves category and now next EPG`() throws {
+    @Test func `live stream resolves now and next EPG`() throws {
         let fixture = try makeFixture()
         let (container, context, playlistA) = (fixture.container, fixture.context, fixture.playlistA)
-        let category = Lume.Category(apiId: "5", name: "Sports", parentId: 0, type: .live, playlist: playlistA)
-        context.insert(category)
         let id = "\(playlistA.id.uuidString)-live-101"
         context.insert(LiveStream(
             id: id,
             streamId: 101,
             name: "Channel One",
-            epgChannelId: "chan.one",
-            num: 12,
-            categoryId: category.id
+            epgChannelId: "chan.one"
         ))
         let now = Date()
         context.insert(EPGListing(
@@ -119,7 +113,6 @@ struct PlayerStreamInfoTests {
 
         let details = PlayerStreamInfo.resolve(for: .live(id), container: container)
         #expect(details.playlistName == "Provider A")
-        #expect(details.categoryName == "Sports")
         #expect(details.epg?.current?.title == "Match of the Day")
         #expect(details.epg?.next?.title == "Highlights")
     }
@@ -134,19 +127,17 @@ struct PlayerStreamInfoTests {
         #expect(details.epg == nil)
     }
 
-    // MARK: - Movie details
+    // MARK: - VOD details
 
-    @Test func `movie resolves its category`() throws {
+    @Test func `movie resolves the playlist and carries no EPG`() throws {
         let fixture = try makeFixture()
         let (container, context, playlistA) = (fixture.container, fixture.context, fixture.playlistA)
-        let category = Lume.Category(apiId: "9", name: "Drama", parentId: 0, type: .vod, playlist: playlistA)
-        context.insert(category)
         let id = "\(playlistA.id.uuidString)-movie-8"
-        context.insert(Movie(id: id, streamId: 8, name: "A Film", categoryId: category.id))
+        context.insert(Movie(id: id, streamId: 8, name: "A Film"))
         try context.save()
 
         let details = PlayerStreamInfo.resolve(for: .movie(id), container: container)
-        #expect(details.categoryName == "Drama")
+        #expect(details.playlistName == "Provider A")
         #expect(details.epg == nil)
     }
 }

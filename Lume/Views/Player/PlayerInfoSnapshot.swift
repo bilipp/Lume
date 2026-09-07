@@ -95,8 +95,7 @@ struct PlayerInfoSnapshot: Equatable {
     var captionParts: [String] {
         var parts = [
             topCaption,
-            details?.playlistName,
-            details?.categoryName
+            details?.playlistName
         ].compactMap(\.self).filter { !$0.isEmpty }
 
         guard detailLevel == .advanced else { return parts }
@@ -119,9 +118,6 @@ struct PlayerInfoSnapshot: Equatable {
         }
         if let playlistName = details?.playlistName, !playlistName.isEmpty {
             spoken.append(String(localized: "Playlist \(playlistName)"))
-        }
-        if let categoryName = details?.categoryName, !categoryName.isEmpty {
-            spoken.append(categoryName)
         }
         if detailLevel == .advanced {
             spoken.append(contentsOf: videoInfo?.spokenCaptionParts ?? [])

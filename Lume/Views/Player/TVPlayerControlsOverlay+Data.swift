@@ -78,7 +78,6 @@
                 media: media,
                 details: StreamInfoDetails(
                     playlistName: streamInfoPlaylistName,
-                    categoryName: nil,
                     epg: ChannelEPG(
                         current: epgNow.map(EPGSlot.init),
                         next: epgNext.map(EPGSlot.init)

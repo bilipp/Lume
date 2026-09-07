@@ -34,7 +34,6 @@ private let episodeMedia = makeMedia(contentRef: .episode("e-1"), kind: .vod, su
 
 private let fullDetails = StreamInfoDetails(
     playlistName: "Provider A",
-    categoryName: "Sports",
     epg: ChannelEPG(
         current: EPGSlot(title: "Match of the Day", start: .distantPast, end: .distantFuture),
         next: nil
@@ -60,7 +59,7 @@ struct PlayerInfoSnapshotTests {
             detailLevel: .simple
         )
 
-        #expect(snapshot.captionParts == ["Match of the Day", "Provider A", "Sports"])
+        #expect(snapshot.captionParts == ["Match of the Day", "Provider A"])
         #expect(snapshot.techCaption.isEmpty)
     }
 
@@ -75,7 +74,7 @@ struct PlayerInfoSnapshotTests {
         )
 
         #expect(snapshot.captionParts == [
-            "Match of the Day", "Provider A", "Sports", "4K", "HEVC", "24 fps", "KSPlayer"
+            "Match of the Day", "Provider A", "4K", "HEVC", "24 fps", "KSPlayer"
         ])
         #expect(snapshot.techCaption == "4K  ·  HEVC  ·  24 fps")
     }
@@ -102,7 +101,7 @@ struct PlayerInfoSnapshotTests {
             detailLevel: .advanced
         )
 
-        #expect(snapshot.captionParts == ["Match of the Day", "Provider A", "Sports"])
+        #expect(snapshot.captionParts == ["Match of the Day", "Provider A"])
     }
 
     // MARK: - Collapsing
@@ -112,7 +111,6 @@ struct PlayerInfoSnapshotTests {
             media: movieMedia,
             details: StreamInfoDetails(
                 playlistName: "Provider A",
-                categoryName: nil,
                 epg: nil
             ),
             videoInfo: avPlayerVideoInfo,
@@ -137,7 +135,6 @@ struct PlayerInfoSnapshotTests {
             media: liveMedia,
             details: StreamInfoDetails(
                 playlistName: "Provider A",
-                categoryName: "Sports",
                 epg: nil
             ),
             videoInfo: nil,
@@ -146,11 +143,11 @@ struct PlayerInfoSnapshotTests {
         )
 
         let parts = snapshot.captionParts
-        #expect(parts == ["Provider A", "Sports"])
+        #expect(parts == ["Provider A"])
         #expect(!parts.contains { $0.isEmpty })
 
         let joined = parts.joined(separator: captionSeparator)
-        #expect(joined == "Provider A  ·  Sports")
+        #expect(joined == "Provider A")
         #expect(!joined.hasPrefix(" "))
         #expect(!joined.hasPrefix("·"))
     }
