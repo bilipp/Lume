@@ -7,8 +7,11 @@
 //
 //  Like XMLTVParser, it never holds the whole file in memory: the file is read
 //  in fixed-size chunks, split into lines, and parsed entries are handed to the
-//  caller in batches — so a multi-hundred-megabyte provider export parses with
-//  flat memory.
+//  caller in batches. Chunking alone is not enough — the per-line temporaries
+//  are autoreleased, and the sync actor's import job offers no suspension point
+//  for the enclosing pool to drain at, so the chunk loop drains its own pool per
+//  iteration. That is what makes a multi-hundred-megabyte provider export parse
+//  with flat memory.
 //
 
 import Foundation
@@ -41,17 +44,46 @@ nonisolated enum M3UParser {
     /// enough to keep memory flat.
     private static let chunkSize = 512 * 1024
 
+    /// Reads just the `#EXTM3U` header, without parsing the entries behind it.
+    ///
+    /// The header is the file's first non-empty line, so one chunk always
+    /// carries it. This exists for the skip-if-unchanged path: a playlist whose
+    /// bytes are unchanged still has to surrender its `url-tvg` to a user who
+    /// has since cleared their guide URL, and re-parsing half a gigabyte of
+    /// entries to reach line one would give the whole skip back.
+    ///
+    /// Returns `nil` for a file that is unreadable or carries no header line.
+    static func readHeader(fileURL: URL) -> M3UHeader? {
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return nil }
+        defer { try? handle.close() }
+        guard let chunk = (try? handle.read(upToCount: chunkSize)) ?? nil else { return nil }
+
+        for lineData in chunk.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true) {
+            let raw = String(bytes: lineData, encoding: .utf8)
+                ?? String(bytes: lineData, encoding: .isoLatin1)
+            guard let line = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty else { continue }
+            guard line.hasPrefix("#EXTM3U") else { return nil }
+            return parseHeader(line)
+        }
+        return nil
+    }
+
     /// Parses an m3u file from disk, calling `onBatch` for every `batchSize`
     /// entries (and once more with the remainder). Returns the total entry count.
     ///
     /// `onHeader` fires at most once, as soon as the `#EXTM3U` line is seen —
     /// before any batch — so callers can pick up the embedded EPG URL.
+    ///
+    /// `onBatch`'s second argument is how many bytes of the file have been
+    /// consumed at that point. A streaming parse doesn't know the entry count
+    /// until it ends, so bytes-over-file-size is the only progress fraction a
+    /// caller can report honestly while the import is running.
     @discardableResult
     static func parse(
         fileURL: URL,
         batchSize: Int = 2000,
         onHeader: ((M3UHeader) -> Void)? = nil,
-        onBatch: ([M3UEntry]) -> Void
+        onBatch: ([M3UEntry], _ bytesConsumed: Int) -> Void
     ) throws -> Int {
         let handle = try FileHandle(forReadingFrom: fileURL)
         defer { try? handle.close() }
@@ -63,49 +95,64 @@ nonisolated enum M3UParser {
 
         var carry = Data()
         var reachedEOF = false
+        // Bytes of the file already handed to the line loop, excluding the
+        // block currently being walked.
+        var consumedBase = 0
         while !reachedEOF {
-            let chunk = (try? handle.read(upToCount: chunkSize)) ?? nil
-            if let chunk, !chunk.isEmpty {
-                carry.append(chunk)
-            } else {
-                reachedEOF = true
-            }
+            // The pool is per chunk, not per file: `subdata`, `String(bytes:)`
+            // and `trimmingCharacters` autorelease once per line, and the only
+            // caller runs the whole parse as one uninterrupted synchronous
+            // stretch inside an actor job, so no enclosing pool ever drains.
+            // Without this, a 520 MB playlist peaks at ~502 MB resident.
+            autoreleasepool {
+                let chunk = (try? handle.read(upToCount: chunkSize)) ?? nil
+                if let chunk, !chunk.isEmpty {
+                    carry.append(chunk)
+                } else {
+                    reachedEOF = true
+                }
 
-            // Split everything up to the last newline into lines; the tail
-            // (a partial line) stays in `carry` for the next chunk. At EOF the
-            // whole remainder is one final line.
-            let processable: Data
-            if reachedEOF {
-                processable = carry
-                carry = Data()
-            } else if let lastNewline = carry.lastIndex(of: UInt8(ascii: "\n")) {
-                processable = carry.subdata(in: carry.startIndex ..< lastNewline)
-                carry = carry.subdata(in: carry.index(after: lastNewline) ..< carry.endIndex)
-            } else {
-                continue
-            }
+                // Split everything up to the last newline into lines; the tail
+                // (a partial line) stays in `carry` for the next chunk. At EOF the
+                // whole remainder is one final line.
+                let processable: Data
+                if reachedEOF {
+                    processable = carry
+                    carry = Data()
+                } else if let lastNewline = carry.lastIndex(of: UInt8(ascii: "\n")) {
+                    processable = carry.subdata(in: carry.startIndex ..< lastNewline)
+                    carry = carry.subdata(in: carry.index(after: lastNewline) ..< carry.endIndex)
+                } else {
+                    // No complete line buffered yet: leaving the pool body is
+                    // this loop's `continue`.
+                    return
+                }
 
-            for lineData in processable.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true) {
-                // Latin-1 fallback: it never fails, so a stray non-UTF-8 line
-                // (older provider exports) degrades to mojibake instead of
-                // dropping the entry.
-                let raw = String(bytes: lineData, encoding: .utf8)
-                    ?? String(bytes: lineData, encoding: .isoLatin1)
-                guard let line = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty else { continue }
+                let blockStart = processable.startIndex
+                defer { consumedBase += processable.count + 1 }
 
-                if let entry = state.consume(line: line, onHeader: onHeader) {
-                    batch.append(entry)
-                    totalCount += 1
-                    if batch.count >= batchSize {
-                        onBatch(batch)
-                        batch.removeAll(keepingCapacity: true)
+                for lineData in processable.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true) {
+                    // Latin-1 fallback: it never fails, so a stray non-UTF-8 line
+                    // (older provider exports) degrades to mojibake instead of
+                    // dropping the entry.
+                    let raw = String(bytes: lineData, encoding: .utf8)
+                        ?? String(bytes: lineData, encoding: .isoLatin1)
+                    guard let line = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty else { continue }
+
+                    if let entry = state.consume(line: line, onHeader: onHeader) {
+                        batch.append(entry)
+                        totalCount += 1
+                        if batch.count >= batchSize {
+                            onBatch(batch, consumedBase + (lineData.endIndex - blockStart))
+                            batch.removeAll(keepingCapacity: true)
+                        }
                     }
                 }
             }
         }
 
         if !batch.isEmpty {
-            onBatch(batch)
+            onBatch(batch, consumedBase)
         }
         return totalCount
     }

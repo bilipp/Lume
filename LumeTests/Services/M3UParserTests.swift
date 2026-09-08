@@ -23,7 +23,9 @@ private func parseAll(_ content: String, batchSize: Int = 2000) throws -> (entri
     defer { try? FileManager.default.removeItem(at: url) }
     var entries: [M3UEntry] = []
     var header: M3UHeader?
-    try M3UParser.parse(fileURL: url, batchSize: batchSize) { header = $0 } onBatch: { entries.append(contentsOf: $0) }
+    try M3UParser.parse(fileURL: url, batchSize: batchSize) { header = $0 } onBatch: { batch, _ in
+        entries.append(contentsOf: batch)
+    }
     return (entries, header)
 }
 
@@ -127,7 +129,7 @@ struct M3UParserTests {
         var total = 0
         var firstEntry: M3UEntry?
         var lastEntry: M3UEntry?
-        let returned = try M3UParser.parse(fileURL: url, batchSize: 2000) { batch in
+        let returned = try M3UParser.parse(fileURL: url, batchSize: 2000) { batch, _ in
             if firstEntry == nil { firstEntry = batch.first }
             lastEntry = batch.last
             total += batch.count
@@ -138,6 +140,32 @@ struct M3UParserTests {
         #expect(firstEntry?.name == "Channel 0")
         #expect(lastEntry?.name == "Channel \(count - 1)")
         #expect(lastEntry?.url == "http://example.com/live/\(count - 1).ts")
+    }
+
+    /// The byte offset handed to `onBatch` is what the importer turns into a
+    /// progress fraction, so it has to grow monotonically and stay inside the
+    /// file it is measured against.
+    @Test func `reports bytes consumed with every batch`() throws {
+        var content = "#EXTM3U\n"
+        let count = 12000
+        for index in 0 ..< count {
+            content += "#EXTINF:-1 group-title=\"Group \(index % 25)\",Channel \(index)\n"
+            content += "http://example.com/live/\(index).ts\n"
+        }
+        let url = try writeTempPlaylist(content)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let fileSize = try #require((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize)
+
+        var offsets: [Int] = []
+        try M3UParser.parse(fileURL: url, batchSize: 2000) { _, bytesConsumed in
+            offsets.append(bytesConsumed)
+        }
+
+        #expect(offsets.count == count / 2000)
+        #expect(offsets.first ?? 0 > 0)
+        #expect(offsets == offsets.sorted())
+        #expect((offsets.last ?? 0) <= fileSize + 1)
+        #expect(Double(offsets.last ?? 0) / Double(fileSize) > 0.9)
     }
 }
 
@@ -212,6 +240,30 @@ struct M3UClassifierTests {
         #expect(M3UClassifier.classify(entry(name: "Some Special", url: "http://example.com/series/u/p/7.mp4")) == .movie)
     }
 
+    @Test func `episode titles match the shared cleaner`() {
+        // The import path takes the episode title from the classifier's own
+        // token match instead of re-running the pattern via
+        // `cleanEpisodeTitle`; the two must stay byte-identical.
+        let names = [
+            "Dark S02E05",
+            "Breaking Bad S05E16 Felina",
+            "The Wire - S01 E03 - The Buys",
+            "Dark 2x05",
+            "S01E01 Pilot",
+            "Breaking Bad - S05E16",
+            "Show: S01E02: Episode Name",
+            "Serie S01E01 Pokémon"
+        ]
+        for name in names {
+            #expect(M3UClassifier.episodeInfo(in: name)?.title == ContentSyncManager.cleanEpisodeTitle(name))
+        }
+
+        // Shapes that are not episodes at all have no title to compare.
+        #expect(M3UClassifier.episodeInfo(in: "Foo TV 640x480") == nil)
+        #expect(M3UClassifier.episodeInfo(in: "Bar 640x480") == nil)
+        #expect(M3UClassifier.episodeInfo(in: "Some Special") == nil)
+    }
+
     @Test func `pathExtension ignores query and fragment`() {
         #expect(M3UClassifier.pathExtension(of: "http://e.com/a/b.mp4?t=1.x#f") == "mp4")
         #expect(M3UClassifier.pathExtension(of: "http://e.com/a/b") == nil)
@@ -272,5 +324,37 @@ struct M3UClientValidationTests {
         let plain = "http://host/playlist.m3u?type=gigablue"
         #expect(M3UClient.normalizedPlaylistURL(plain) == plain)
         #expect(M3UClient.normalizedPlaylistURL("not a url") == "not a url")
+    }
+
+    @Test func `reads the xtream account out of a get.php url`() {
+        let hint = M3UClient.xtreamCredentials(
+            in: "http://host:8080/get.php?username=alice&password=s3cret&type=m3u_plus&output=ts"
+        )
+        #expect(hint?.baseURL == "http://host:8080")
+        #expect(hint?.username == "alice")
+        #expect(hint?.password == "s3cret")
+        // The default port is not spelled out, and a nested path still counts.
+        #expect(M3UClient.xtreamCredentials(in: "https://host/panel/get.php?username=a&password=b")?
+            .baseURL == "https://host")
+    }
+
+    @Test func `a get.php url without credentials is not an xtream hint`() {
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?type=m3u_plus") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?username=alice") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?password=s3cret") == nil)
+        // Present but empty is not an account we could offer to add.
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?username=&password=s3cret") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?username=alice&password=") == nil)
+    }
+
+    @Test func `a plain m3u file url is not an xtream hint`() {
+        #expect(M3UClient.xtreamCredentials(in: "http://host/playlist.m3u?username=a&password=b") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "file:///tmp/playlist.m3u") == nil)
+    }
+
+    @Test func `a non get.php http url is not an xtream hint`() {
+        #expect(M3UClient.xtreamCredentials(in: "http://host/player_api.php?username=a&password=b") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "http://host/") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "not a url") == nil)
     }
 }

@@ -51,7 +51,7 @@ struct KSPlayerEngineView: View {
     /// Non-private so the playback/reconnect logic in `KSPlayerEngineView+Playback`
     /// (and the dead-stream handling there) can reach it.
     @State var reconnector = PlaybackRetryController()
-    @State private var isPlaying = false
+    @State var isPlaying = false
     /// Initial-load gate. The engine sits in `.preparing` / `.buffering` for
     /// ~10–20s before the first frame (`.bufferFinished`); showing the normal
     /// controls — with their Play button — during that window made viewers think
@@ -90,13 +90,13 @@ struct KSPlayerEngineView: View {
     /// (so the reconnector never engages, and the startup watchdog is already
     /// disarmed). See `handleState`.
     @State var stallWatchdog: Task<Void, Never>?
-    @State private var isControlsVisible = true
+    @State var isControlsVisible = true
     /// Presents the OpenSubtitles browser. Held here rather than in the controls
     /// overlay: the overlay is removed when the controls auto-hide, which would
     /// take a sheet anchored there down with it mid-search.
     @State var isSearchingSubtitles = false
     @State var isSeeking = false
-    @State private var seekPosition: TimeInterval = 0
+    @State var seekPosition: TimeInterval = 0
     /// PiP state and its observer task are `internal` (not `private`) so the
     /// PiP observation in `KSPlayerEngineView+Playback.swift` can drive them.
     @State var isPipActive = false
@@ -130,6 +130,11 @@ struct KSPlayerEngineView: View {
         /// profile must not be able to rock up/down, or recall the last channel,
         /// into a category a parent locked or the user hid.
         @Environment(\.contentRestriction) var restriction
+    #endif
+
+    #if !os(tvOS)
+        /// Video-track snapshot for the stream-info caption — see `+StreamInfo`.
+        @State var videoInfo: PlayerVideoInfo?
     #endif
 
     @Environment(\.dismiss) private var dismiss
@@ -194,8 +199,12 @@ struct KSPlayerEngineView: View {
                         // frame" warnings.
                         DispatchQueue.main.async {
                             if !isSeeking {
-                                if current.isFinite { clock.current = current }
-                                if total.isFinite, total > 0 { clock.duration = total }
+                                if current.isFinite {
+                                    clock.current = current
+                                }
+                                if total.isFinite, total > 0 {
+                                    clock.duration = total
+                                }
                             }
                             notePlaybackProgress(current)
                             noteClockDrift()
@@ -204,7 +213,9 @@ struct KSPlayerEngineView: View {
                             // per-tick play callback until it first lands, so
                             // steady playback doesn't re-read tracks/codec each
                             // tick.
-                            if engine.videoInfo == nil { engine.refreshVideoInfo() }
+                            if engine.videoInfo == nil {
+                                engine.refreshVideoInfo()
+                            }
                         }
                     }
                     .ignoresSafeArea()
@@ -284,7 +295,9 @@ struct KSPlayerEngineView: View {
                 // The Home button backgrounds the app without calling
                 // onDisappear, so pause here to stop audio when the player
                 // loses focus.
-                if phase != .active { coordinator.playerLayer?.pause() }
+                if phase != .active {
+                    coordinator.playerLayer?.pause()
+                }
             }
             .onChange(of: media) { _, _ in
                 // The host swapped the stream (KSPlayer reloads its URL
@@ -306,7 +319,9 @@ struct KSPlayerEngineView: View {
             .onChange(of: isControlsVisible) { _, visible in
                 // Hand focus to the tap-catcher once the controls vanish so the
                 // remote can bring them back.
-                if !visible { Task { @MainActor in catcherFocused = true } }
+                if !visible {
+                    Task { @MainActor in catcherFocused = true }
+                }
             }
             // Handle Menu/back at the player root so it reliably overrides the
             // cover's default dismiss-on-Menu.
@@ -393,17 +408,23 @@ struct KSPlayerEngineView: View {
                         DispatchQueue.main.async {
                             isPlaying = (state == .bufferFinished)
                             updateLoadingState(state)
+                            refreshVideoInfo()
                             handleState(state)
                         }
                     }
                     .onPlay { current, total in
                         DispatchQueue.main.async {
                             if !isSeeking {
-                                if current.isFinite { clock.current = current }
-                                if total.isFinite, total > 0 { clock.duration = total }
+                                if current.isFinite {
+                                    clock.current = current
+                                }
+                                if total.isFinite, total > 0 {
+                                    clock.duration = total
+                                }
                             }
                             notePlaybackProgress(current)
                             noteClockDrift()
+                            chaseVideoInfo()
                         }
                     }
                     .ignoresSafeArea()
@@ -456,6 +477,7 @@ struct KSPlayerEngineView: View {
                 NowPlayingService.shared.detachTransport(owner: coordinator)
                 coordinator.resetPlayer()
             }
+            .onChange(of: media.id) { _, _ in resetVideoInfo() }
             .onTapGesture {
                 toggleControls()
             }
@@ -488,33 +510,6 @@ struct KSPlayerEngineView: View {
             #endif
         }
 
-        private var controlsOverlay: some View {
-            KSPlayerControlsOverlay(
-                coordinator: coordinator,
-                media: media,
-                isPlaying: $isPlaying,
-                isSeeking: $isSeeking,
-                seekPosition: $seekPosition,
-                clock: clock,
-                isPipActive: $isPipActive,
-                hideTask: $hideTask,
-                onClose: { closePlayer() },
-                onTogglePlay: { togglePlay() },
-                onResetHideTimer: { resetHideTimer() },
-                onScheduleHide: { scheduleHide() },
-                onSearchSubtitles: subtitleSearchAction
-            )
-        }
-
-        private func toggleControls() {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isControlsVisible.toggle()
-            }
-            if isControlsVisible {
-                scheduleHide()
-            }
-        }
-
     #endif
 
     // MARK: - Actions (shared)
@@ -531,7 +526,7 @@ struct KSPlayerEngineView: View {
         ), owner: coordinator)
     }
 
-    private func togglePlay() {
+    func togglePlay() {
         let playing: Bool
         #if os(tvOS)
             playing = engine.isPlaying
@@ -551,19 +546,19 @@ struct KSPlayerEngineView: View {
         resetHideTimer()
     }
 
-    private func resetHideTimer() {
+    func resetHideTimer() {
         hideTask?.cancel()
         if isControlsVisible {
             scheduleHide()
         }
     }
 
-    private func scheduleHide() {
+    func scheduleHide() {
         hideTask?.cancel()
         #if os(tvOS)
             guard engine.isPlaying, !isPanelOpen else { return }
         #else
-            guard isPlaying else { return }
+            guard isPlaying, !PlayerControlsAutoHide.isSuppressed else { return }
         #endif
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
@@ -578,7 +573,7 @@ struct KSPlayerEngineView: View {
         }
     }
 
-    private func closePlayer() {
+    func closePlayer() {
         #if os(macOS)
             if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) {
                 window.toggleFullScreen(nil)

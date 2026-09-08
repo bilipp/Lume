@@ -152,6 +152,55 @@ struct ContentSyncPruneTests {
         #expect(try check.fetch(FetchDescriptor<Episode>()).first?.series?.id == keptId)
     }
 
+    // MARK: - m3u hashed sweep
+
+    @Test func `the hashed sweep keeps exactly the rows the m3u import saw`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        let total = pageSize * 2 + 500
+        try insertMovies(0 ..< total, playlistId: playlistId, container: container)
+
+        let seenIds = Set((0 ..< total).filter { $0 % 3 != 0 }.map { movieId($0, playlistId: playlistId) })
+        let seenHashes = Set(seenIds.map { M3UIdentity.hash64($0) })
+
+        let manager = ContentSyncManager(modelContainer: container)
+        await manager.pruneStaleM3UMovies(playlistId: playlistId, seenHashes: seenHashes)
+
+        #expect(try storedMovieIds(container) == seenIds)
+    }
+
+    @Test func `the hashed sweep spares episodes and series their import saw`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        for index in 0 ..< (pageSize + 100) {
+            let show = Series(id: "\(playlistId.uuidString)-series-\(index)", seriesId: index, name: "Show \(index)")
+            context.insert(show)
+            let episode = Episode(
+                id: "\(playlistId.uuidString)-series-\(index)-episode-1",
+                episodeId: "1",
+                title: "Pilot",
+                containerExtension: "mkv",
+                seasonNum: 1,
+                episodeNum: 1,
+                series: show
+            )
+            context.insert(episode)
+        }
+        try context.save()
+
+        let keptSeriesId = "\(playlistId.uuidString)-series-7"
+        let keptEpisodeId = "\(keptSeriesId)-episode-1"
+        let manager = ContentSyncManager(modelContainer: container)
+        await manager.pruneStaleM3UEpisodes(playlistId: playlistId, seenHashes: [M3UIdentity.hash64(keptEpisodeId)])
+        await manager.pruneStaleM3USeries(playlistId: playlistId, seenHashes: [M3UIdentity.hash64(keptSeriesId)])
+
+        let check = ModelContext(container)
+        #expect(try check.fetch(FetchDescriptor<Series>()).map(\.id) == [keptSeriesId])
+        #expect(try check.fetch(FetchDescriptor<Episode>()).map(\.id) == [keptEpisodeId])
+    }
+
     // MARK: - Xtream payload sanity gate
 
     @Test func `a payload covering too little of the catalog is not swept`() async throws {
@@ -266,5 +315,144 @@ struct ContentSyncPruneTests {
         await manager.pruneMovies(playlistId: playlistId, seenIds: [], fetchedCount: 0)
 
         #expect(try storedMovieIds(container).count == 100)
+    }
+}
+
+/// The sanity gate the m3u sweeps take before they delete anything. Its own
+/// suite so `ContentSyncPruneTests` stays inside SwiftLint's type-body limit.
+struct ContentSyncM3UPruneGateTests {
+    private let pageSize = 2000
+
+    // MARK: - Fixtures
+
+    private func insertMovies(_ range: Range<Int>, playlistId: UUID, container: ModelContainer) throws {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        for index in range {
+            context.insert(Movie(id: movieId(index, playlistId: playlistId), streamId: index, name: "Movie \(index)"))
+        }
+        try context.save()
+    }
+
+    private func movieId(_ index: Int, playlistId: UUID) -> String {
+        "\(playlistId.uuidString)-movie-\(index)"
+    }
+
+    private func storedMovieCount(_ container: ModelContainer) throws -> Int {
+        try ModelContext(container).fetchCount(FetchDescriptor<Movie>())
+    }
+
+    private func insertEpisodes(_ range: Range<Int>, playlistId: UUID, container: ModelContainer) throws {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        for index in range {
+            context.insert(Episode(
+                id: episodeId(index, playlistId: playlistId),
+                episodeId: "\(index)",
+                title: "Episode \(index)",
+                containerExtension: "mkv",
+                seasonNum: 1,
+                episodeNum: index
+            ))
+        }
+        try context.save()
+    }
+
+    private func episodeId(_ index: Int, playlistId: UUID) -> String {
+        "\(playlistId.uuidString)-series-1-episode-\(index)"
+    }
+
+    // MARK: - m3u payload sanity gate
+
+    // The m3u file arrives `Transfer-Encoding: chunked` with no length to check
+    // it against, so a cut connection yields a valid short playlist that imports
+    // cleanly — and every row its missing tail would have named looks dropped.
+
+    @Test func `a truncated m3u import does not sweep the rows it never reached`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        try insertMovies(0 ..< pageSize, playlistId: playlistId, container: container)
+
+        let seen = Set((0 ..< 100).map { M3UIdentity.hash64(movieId($0, playlistId: playlistId)) })
+        let manager = ContentSyncManager(modelContainer: container)
+        await manager.pruneMovies(playlistId: playlistId, seenHashes: seen, importedCount: 100)
+
+        #expect(try storedMovieCount(container) == pageSize)
+    }
+
+    @Test func `an m3u import covering enough of the catalog still prunes`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        try insertMovies(0 ..< pageSize, playlistId: playlistId, container: container)
+
+        let seen = Set((0 ..< 500).map { M3UIdentity.hash64(movieId($0, playlistId: playlistId)) })
+        let manager = ContentSyncManager(modelContainer: container)
+        await manager.pruneMovies(playlistId: playlistId, seenHashes: seen, importedCount: 500)
+
+        #expect(try storedMovieCount(container) == 500)
+    }
+
+    @Test func `an m3u import that produced nothing is never swept`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        try insertMovies(0 ..< 100, playlistId: playlistId, container: container)
+
+        let manager = ContentSyncManager(modelContainer: container)
+        await manager.pruneMovies(playlistId: playlistId, seenHashes: [], importedCount: 0)
+
+        #expect(try storedMovieCount(container) == 100)
+    }
+
+    @Test func `an m3u section that really shrank is swept once the skips run out`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        try insertMovies(0 ..< pageSize, playlistId: playlistId, container: container)
+
+        // A provider that genuinely dropped the section repeats the thin payload
+        // every sync, so the bounded tolerance converges instead of stranding
+        // the rows — the same escape hatch the Xtream gate has.
+        let seen = Set((0 ..< 100).map { M3UIdentity.hash64(movieId($0, playlistId: playlistId)) })
+        let manager = ContentSyncManager(modelContainer: container)
+
+        for _ in 0 ..< 2 {
+            await manager.pruneMovies(playlistId: playlistId, seenHashes: seen, importedCount: 100)
+            #expect(try storedMovieCount(container) == pageSize)
+        }
+
+        await manager.pruneMovies(playlistId: playlistId, seenHashes: seen, importedCount: 100)
+        #expect(try storedMovieCount(container) == 100)
+    }
+
+    @Test func `a truncated import does not sweep episodes either`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        try insertEpisodes(0 ..< pageSize, playlistId: playlistId, container: container)
+
+        let seen = Set((0 ..< 50).map { M3UIdentity.hash64(episodeId($0, playlistId: playlistId)) })
+        let manager = ContentSyncManager(modelContainer: container)
+        await manager.pruneEpisodes(playlistId: playlistId, seenHashes: seen, importedCount: 50)
+
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<Episode>()) == pageSize)
+    }
+
+    @Test func `a truncated import does not sweep categories either`() async throws {
+        let container = try makeTestContainer()
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let playlist = Playlist(name: "Provider", m3uURL: "http://example.com/get.php")
+        context.insert(playlist)
+        for index in 0 ..< 200 {
+            context.insert(
+                Lume.Category(apiId: "\(index)", name: "Group \(index)", parentId: 0, type: .vod, playlist: playlist)
+            )
+        }
+        try context.save()
+
+        let manager = ContentSyncManager(modelContainer: container)
+        await manager.pruneCategories(
+            playlistId: playlist.id, type: .vod, seenApiIds: ["0", "1", "2"], importedCount: 100
+        )
+
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<Lume.Category>()) == 200)
     }
 }

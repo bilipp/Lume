@@ -64,6 +64,20 @@ struct MainTabView: View {
         CommandLine.arguments.contains("-ui-testing")
     }
 
+    /// Whether the browse UI is covered, or the user is somewhere a rating
+    /// sheet has no business appearing — the sync cover, the downloads sheet, or
+    /// a playlist / profile switch. Players, paywalls and Settings are not
+    /// listed: every one of them reports itself, and `appStoreReviewPrompt`
+    /// already holds the fire while any is on screen. Settings has to, because
+    /// on every platform that shows the prompt it is a sheet on the library
+    /// toolbar rather than a tab, and so invisible to this root.
+    private var hasBlockingPresentation: Bool {
+        activeSyncPlaylist != nil
+            || showsDownloads
+            || playlistSwitch?.isSwitching == true
+            || profileManager?.isSwitching == true
+    }
+
     /// Hides categories (and their content) from every browse, Home and Search
     /// surface: the ones hidden in Content Management always, the restricted
     /// ones while a child profile is active.
@@ -127,6 +141,10 @@ struct MainTabView: View {
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
             .downloadsSheet(isPresented: $showsDownloads)
             .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
+            // The one fire point for the rating sheet. Here rather than at the
+            // eleven player presentation sites: this view is the browse root,
+            // so reaching it *is* the "player gone, nothing over it" condition.
+            .appStoreReviewPrompt(isBlocked: hasBlockingPresentation)
         #if os(tvOS)
             .overlay { tvOverlays }
         #endif

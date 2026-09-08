@@ -36,6 +36,9 @@ import SwiftUI
         /// Raises the OpenSubtitles browser. `nil` when the search isn't
         /// available for this stream, which also drops the menu entry.
         var onSearchSubtitles: (() -> Void)?
+        /// Video-track snapshot for the Advanced stream-info caption. `nil`
+        /// until the first frame reports usable dimensions.
+        var videoInfo: PlayerVideoInfo?
 
         @Environment(\.modelContext) private var modelContext
         /// Mirrors the backing model's favorite flag; refreshed when the media
@@ -185,6 +188,11 @@ import SwiftUI
 
         private var titleBlock: some View {
             VStack(alignment: .leading, spacing: 2) {
+                StreamInfoCaption(
+                    media: media,
+                    videoInfo: videoInfo,
+                    engine: .ksPlayer
+                )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)

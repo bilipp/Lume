@@ -90,6 +90,9 @@ final class SignpostBenchmarks: XCTestCase {
             .xtreamFetchLiveStreams, .xtreamDecodeLiveStreams, .upsertLiveStreams, .pruneLiveStreams,
             .xtreamPhaseSpacing,
             .m3uDownload, .m3uImport,
+            .m3uParse, .m3uClassify,
+            .m3uUpsertLive, .m3uUpsertMovies, .m3uUpsertEpisodes,
+            .m3uPruneLive, .m3uPruneMovies, .m3uPruneEpisodes, .m3uPruneSeries, .m3uPruneCategories,
             .epgSourceSync, .epgIngest, .channelEPGLoad, .guideWindowLoad,
             .homeTrendingLoad, .homeRecommendations,
             .playerStartup, .playerRebuffer, .playerEngineFallback, .playerStartupFailure
