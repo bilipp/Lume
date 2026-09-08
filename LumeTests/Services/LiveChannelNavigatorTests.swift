@@ -3,7 +3,8 @@
 //  LumeTests
 //
 //  Covers in-player live channel resolution — the next/previous channel surfing
-//  the tvOS player performs on up/down (`LiveChannelNavigator.adjacentMedia`).
+//  the tvOS player performs on up/down (`LiveChannelNavigator.adjacentMedia`),
+//  including which way a press maps onto the list under each `LiveSurfMode`.
 //
 
 import Foundation
@@ -80,6 +81,53 @@ struct LiveChannelNavigatorTests {
         StreamSpec(num: 2, name: "Bravo", category: "cat-a"),
         StreamSpec(num: 3, name: "Charlie", category: "cat-a")
     ]
+
+    // MARK: - Remote direction
+
+    /// Surfing one press in `direction` under `mode`, from Bravo, the middle of
+    /// `threeChannels`. Wraps the argument list the four engine hosts pass so a
+    /// direction test reads as the press it stands for.
+    private func surf(
+        _ direction: LiveChannelNavigator.SurfDirection,
+        _ mode: LiveSurfMode,
+        from media: PlayableMedia,
+        in context: ModelContext
+    ) -> PlayableMedia? {
+        LiveChannelNavigator.adjacentMedia(
+            for: media, surfing: direction, mode: mode,
+            sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+    }
+
+    @Test func `channel up-down maps up to the next channel`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        #expect(surf(.up, .channelUpDown, from: bravo, in: context)?.contentRef == liveRef(102, playlist)) // Charlie
+        #expect(surf(.down, .channelUpDown, from: bravo, in: context)?.contentRef == liveRef(100, playlist)) // Alpha
+    }
+
+    @Test func `list order maps up to the row above`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        #expect(surf(.up, .listOrder, from: bravo, in: context)?.contentRef == liveRef(100, playlist)) // Alpha
+        #expect(surf(.down, .listOrder, from: bravo, in: context)?.contentRef == liveRef(102, playlist)) // Charlie
+    }
+
+    @Test(arguments: LiveSurfMode.allCases)
+    func `surfing up then down returns to where it started`(mode: LiveSurfMode) throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        let stepped = try #require(surf(.up, mode, from: bravo, in: context))
+        #expect(surf(.down, mode, from: stepped, in: context)?.contentRef == bravo.contentRef)
+    }
+
+    @Test func `an unset preference surfs the way it always has`() {
+        #expect(LiveSurfMode.resolve(nil) == .channelUpDown)
+        #expect(LiveSurfMode.resolve("not a mode") == .channelUpDown)
+    }
 
     // MARK: - Next / previous
 
