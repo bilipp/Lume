@@ -72,16 +72,16 @@ struct SortOptionTests {
     @Test func `movie sort newest first`() {
         let movies = makeUnsortedMovies()
         let sorted = movies.sorted(using: ContentSortOption.newest.movieDescriptors)
-        #expect(sorted[0].added == "200")
-        #expect(sorted[1].added == "100")
-        #expect(sorted[2].added == "50")
+        #expect(sorted[0].added == "1700000200")
+        #expect(sorted[1].added == "1700000100")
+        #expect(sorted[2].added == "1700000050")
     }
 
     @Test func `movie sort oldest first`() {
         let movies = makeUnsortedMovies()
         let sorted = movies.sorted(using: ContentSortOption.oldest.movieDescriptors)
-        #expect(sorted[0].added == "50")
-        #expect(sorted[2].added == "200")
+        #expect(sorted[0].added == "1700000050")
+        #expect(sorted[2].added == "1700000200")
     }
 
     // MARK: - ContentSortOption - Series Descriptors
@@ -103,15 +103,15 @@ struct SortOptionTests {
     @Test func `series sort newest first`() {
         let series = makeUnsortedSeries()
         let sorted = series.sorted(using: ContentSortOption.newest.seriesDescriptors)
-        #expect(sorted[0].lastModified == "300")
-        #expect(sorted[1].lastModified == "200")
+        #expect(sorted[0].lastModified == "1700000300")
+        #expect(sorted[1].lastModified == "1700000200")
     }
 
     @Test func `series sort oldest first`() {
         let series = makeUnsortedSeries()
         let sorted = series.sorted(using: ContentSortOption.oldest.seriesDescriptors)
-        #expect(sorted[0].lastModified == "100")
-        #expect(sorted[1].lastModified == "200")
+        #expect(sorted[0].lastModified == "1700000100")
+        #expect(sorted[1].lastModified == "1700000200")
     }
 
     @Test func `live stream sort name ascending`() {
@@ -131,15 +131,15 @@ struct SortOptionTests {
     @Test func `live stream sort newest first`() {
         let streams = makeUnsortedStreams()
         let sorted = streams.sorted(using: ContentSortOption.newest.liveStreamDescriptors)
-        #expect(sorted[0].added == "200")
-        #expect(sorted[1].added == "100")
+        #expect(sorted[0].added == "1700000200")
+        #expect(sorted[1].added == "1700000100")
     }
 
     @Test func `live stream sort oldest first`() {
         let streams = makeUnsortedStreams()
         let sorted = streams.sorted(using: ContentSortOption.oldest.liveStreamDescriptors)
-        #expect(sorted[0].added == "100")
-        #expect(sorted[1].added == "200")
+        #expect(sorted[0].added == "1700000100")
+        #expect(sorted[1].added == "1700000200")
     }
 
     // MARK: - ContentSortOption - LiveStream Descriptors
@@ -206,25 +206,31 @@ struct SortOptionTests {
 
     private func makeUnsortedMovies() -> [Movie] {
         [
-            Movie(id: "m-1", streamId: 1, name: "Gamma", added: "50", num: 2),
-            Movie(id: "m-2", streamId: 2, name: "Alpha", added: "100", num: 1),
-            Movie(id: "m-3", streamId: 3, name: "Beta", added: "200", num: 3)
+            // Ten-digit Unix seconds, exactly as Xtream ships them — every one
+            // of the 200,110 `added` values in a real provider catalog is that
+            // width. The sort descriptors use `comparator: .lexical` so SQLite
+            // can serve them from the `added` index, and lexical order matches
+            // numeric order only while the widths agree, so the fixture has to
+            // be realistic for the test to mean anything.
+            Movie(id: "m-1", streamId: 1, name: "Gamma", added: "1700000050", num: 2),
+            Movie(id: "m-2", streamId: 2, name: "Alpha", added: "1700000100", num: 1),
+            Movie(id: "m-3", streamId: 3, name: "Beta", added: "1700000200", num: 3)
         ]
     }
 
     private func makeUnsortedSeries() -> [Series] {
         [
-            Series(id: "s-1", seriesId: 2, name: "Beta Series", lastModified: "200", num: 2),
-            Series(id: "s-2", seriesId: 1, name: "Alpha Series", lastModified: "100", num: 1),
-            Series(id: "s-3", seriesId: 3, name: "Second", lastModified: "300", num: 1),
-            Series(id: "s-4", seriesId: 4, name: "First", lastModified: "200", num: 0)
+            Series(id: "s-1", seriesId: 2, name: "Beta Series", lastModified: "1700000200", num: 2),
+            Series(id: "s-2", seriesId: 1, name: "Alpha Series", lastModified: "1700000100", num: 1),
+            Series(id: "s-3", seriesId: 3, name: "Second", lastModified: "1700000300", num: 1),
+            Series(id: "s-4", seriesId: 4, name: "First", lastModified: "1700000200", num: 0)
         ]
     }
 
     private func makeUnsortedStreams() -> [LiveStream] {
         [
-            LiveStream(id: "l-1", streamId: 2, name: "A Channel", added: "100", num: 2),
-            LiveStream(id: "l-2", streamId: 1, name: "Z Channel", added: "200", num: 1)
+            LiveStream(id: "l-1", streamId: 2, name: "A Channel", added: "1700000100", num: 2),
+            LiveStream(id: "l-2", streamId: 1, name: "Z Channel", added: "1700000200", num: 1)
         ]
     }
 }

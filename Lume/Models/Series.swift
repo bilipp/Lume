@@ -15,6 +15,13 @@ final class Series {
     // catalog on a large library.
     // `indexedAt` backs the content indexer's pending/progress scans, run once
     // per chunk for a whole indexing pass.
+    // `lastModified` is the sort key for the "Recently Added" rail, which asks
+    // for a handful of rows off the top of a descending sort. Unindexed that
+    // plans as a full scan plus "USE TEMP B-TREE FOR ORDER BY" — the whole table
+    // sorted to hand back 20 rows. As with `Movie.added`, the index only pays
+    // off while the ordering stays a binary comparison: a `SortDescriptor` on a
+    // String key path defaults to `.localizedStandard`, which emits
+    // `COLLATE NSCollateFinderlike` and no b-tree can serve that.
     #Index<Series>(
         [\.tmdbId],
         [\.isFavorite],
@@ -23,7 +30,8 @@ final class Series {
         [\.recommendationVoteRaw],
         [\.categoryId],
         [\.genre],
-        [\.indexedAt]
+        [\.indexedAt],
+        [\.lastModified]
     )
 
     @Attribute(.unique) var id: String

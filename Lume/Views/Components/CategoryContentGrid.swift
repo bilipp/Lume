@@ -72,15 +72,16 @@ struct CategoryContentGrid<Item: Identifiable & Hashable & WatchlistFavoritable,
                 .padding()
             }
         }
+        .browseActivity()
         // tvOS surfaces sorting through the tab bar's library controls instead of a
         // toolbar, mirroring the main browse views.
         #if !os(tvOS)
-        .navigationTitle(title)
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                ContentSortMenu(sortRaw: $sortRaw)
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    ContentSortMenu(sortRaw: $sortRaw)
+                }
             }
-        }
         #endif
     }
 }

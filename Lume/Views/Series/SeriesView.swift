@@ -88,6 +88,7 @@ struct SeriesView: View {
                         }
                         .padding(.vertical)
                     }
+                    .browseActivity()
                     .task(id: playlistPrefix) {
                         genres = await GenreDerivation.seriesGenres(in: modelContext.container, playlistPrefix: playlistPrefix, restriction: restriction)
                     }

@@ -8,10 +8,14 @@
 //  category — so they're driven by their own predicates rather than a
 //  `categoryId`, mirroring the Home screen's rows.
 //
-//  Each row scopes its @Query results to the active playlist in-memory (the same
-//  approach the rest of the app uses, since SwiftData can't parameterise a
-//  @Query on a playlist-prefixed id), then caps to a preview length. Rows render
-//  nothing when empty so a fresh library degrades gracefully.
+//  Each surface scopes its @Query to the active playlist inside the predicate:
+//  ids are playlist-prefixed, so `id.starts(with:)` is a prefix match SQLite
+//  answers itself. Scoping in memory instead meant every row hydrated every
+//  playlist's matches and then threw most of them away, on every catalog write
+//  — 0.85 ms for a fresh library, 59 ms once 3,035 movies carried a watch date.
+//  Only the viewer's hidden categories are filtered in Swift, since that state
+//  lives in the environment rather than the store. Rows render nothing when
+//  empty so a fresh library degrades gracefully.
 //
 
 import SwiftData
@@ -51,12 +55,20 @@ struct LibraryCollection: Hashable {
 /// How many items each preview row shows before "Show All".
 private let collectionPreviewLimit = 20
 
-/// Upper bound on the "Recently Added" fetch. Recently Watched and Favorites
-/// match small subsets, but every title carries an `added` timestamp, so that
-/// predicate matches the whole library — an unbounded fetch would hydrate the
-/// entire catalog on every change and stutter badly during sync. We only ever
-/// surface the newest slice, so the query is capped (then scoped in-memory to
-/// the active playlist, like the rest of the app).
+/// Upper bound on a preview row's fetch. A row renders `collectionPreviewLimit`
+/// items and only needs to know whether one more exists, but the hidden-category
+/// filter runs in memory *after* the fetch, so this keeps a wide margin over the
+/// preview length rather than the tight `limit + 1` a single-category row can
+/// use — a viewer with many hidden categories must not end up with a short row
+/// or a missing "Show All". Unbounded, Recently Watched and Favorites re-fetched
+/// every matching row in the store on every catalog write.
+private let collectionRowFetchLimit = 200
+
+/// Upper bound on the "Recently Added" fetch, preview row and "Show All" grid
+/// alike. Recently Watched and Favorites match small subsets, but every title
+/// carries an `added` timestamp, so that predicate matches the playlist whole —
+/// an unbounded fetch would hydrate the entire catalog on every change and
+/// stutter badly during sync. We only ever surface the newest slice.
 private let recentlyAddedFetchLimit = 200
 
 // MARK: - Shared preview row
@@ -131,7 +143,6 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable & WatchlistFav
 /// nothing when the active playlist has no matching movies.
 struct MovieCollectionRow: View {
     let kind: LibraryCollection.Kind
-    let playlistPrefix: String
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
@@ -139,17 +150,16 @@ struct MovieCollectionRow: View {
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
-        self.playlistPrefix = playlistPrefix
         self.animationNamespace = animationNamespace
-        _movies = Query(MovieCollectionQuery.descriptor(for: kind))
+        _movies = Query(MovieCollectionQuery.rowDescriptor(for: kind, playlistPrefix: playlistPrefix))
     }
 
-    private var scoped: [Movie] {
-        movies.filter { $0.id.hasPrefix(playlistPrefix) }.excludingRestricted(restriction)
+    private var visible: [Movie] {
+        movies.excludingRestricted(restriction)
     }
 
     var body: some View {
-        let matches = scoped
+        let matches = visible
         let items = Array(matches.prefix(collectionPreviewLimit))
         if !items.isEmpty {
             CollectionPreviewRow(
@@ -171,20 +181,18 @@ struct MovieCollectionRow: View {
 /// The full grid behind a Movies collection's "Show All".
 struct MovieCollectionView: View {
     let kind: LibraryCollection.Kind
-    let playlistPrefix: String
     var animationNamespace: Namespace.ID?
     @Environment(\.contentRestriction) private var restriction
     @Query private var movies: [Movie]
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
-        self.playlistPrefix = playlistPrefix
         self.animationNamespace = animationNamespace
-        _movies = Query(MovieCollectionQuery.descriptor(for: kind))
+        _movies = Query(MovieCollectionQuery.gridDescriptor(for: kind, playlistPrefix: playlistPrefix))
     }
 
-    private var scoped: [Movie] {
-        movies.filter { $0.id.hasPrefix(playlistPrefix) }.excludingRestricted(restriction)
+    private var visible: [Movie] {
+        movies.excludingRestricted(restriction)
     }
 
     var body: some View {
@@ -195,7 +203,7 @@ struct MovieCollectionView: View {
         }
         CategoryContentGrid(
             title: kind.localizedTitleString,
-            items: scoped,
+            items: visible,
             animationNamespace: animationNamespace,
             emptyTitle: kind.title,
             emptyIcon: kind.emptyIcon,
@@ -208,26 +216,46 @@ struct MovieCollectionView: View {
 }
 
 private enum MovieCollectionQuery {
-    static func descriptor(for kind: LibraryCollection.Kind) -> FetchDescriptor<Movie> {
-        var descriptor = switch kind {
+    /// The fetch behind a preview row — always bounded, see
+    /// `collectionRowFetchLimit`.
+    static func rowDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Movie> {
+        var descriptor = base(for: kind, playlistPrefix: playlistPrefix)
+        descriptor.fetchLimit = collectionRowFetchLimit
+        return descriptor
+    }
+
+    /// The fetch behind "Show All". Recently Watched and Favorites stay
+    /// unbounded — the grid is the surface that legitimately shows everything —
+    /// while Recently Added keeps the cap its whole-playlist predicate needs.
+    static func gridDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Movie> {
+        var descriptor = base(for: kind, playlistPrefix: playlistPrefix)
+        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
+        return descriptor
+    }
+
+    private static func base(for kind: LibraryCollection.Kind, playlistPrefix prefix: String) -> FetchDescriptor<Movie> {
+        switch kind {
         case .recentlyWatched:
             FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.lastWatchedDate != nil },
+                predicate: #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) },
                 sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
             )
         case .favorites:
             FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.isFavorite },
+                predicate: #Predicate { $0.isFavorite && $0.id.starts(with: prefix) },
                 sortBy: [SortDescriptor(\.name)]
             )
         case .recentlyAdded:
+            // `comparator: .lexical`, not the `.localizedStandard` default:
+            // `added` is a Unix timestamp string, and the localized comparator
+            // emits `COLLATE NSCollateFinderlike`, which the `#Index` on
+            // `Movie.added` cannot serve. 222.4 ms → 92.6 ms on a 179k-title
+            // catalog, and that one query was 46% of a cold launch's SQL.
             FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.added != nil },
-                sortBy: [SortDescriptor(\.added, order: .reverse), SortDescriptor(\.num)]
+                predicate: #Predicate { $0.added != nil && $0.id.starts(with: prefix) },
+                sortBy: [SortDescriptor(\.added, comparator: .lexical, order: .reverse), SortDescriptor(\.num)]
             )
         }
-        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
-        return descriptor
     }
 }
 
@@ -237,7 +265,6 @@ private enum MovieCollectionQuery {
 /// nothing when the active playlist has no matching series.
 struct SeriesCollectionRow: View {
     let kind: LibraryCollection.Kind
-    let playlistPrefix: String
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
@@ -245,17 +272,16 @@ struct SeriesCollectionRow: View {
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
-        self.playlistPrefix = playlistPrefix
         self.animationNamespace = animationNamespace
-        _series = Query(SeriesCollectionQuery.descriptor(for: kind))
+        _series = Query(SeriesCollectionQuery.rowDescriptor(for: kind, playlistPrefix: playlistPrefix))
     }
 
-    private var scoped: [Series] {
-        series.filter { $0.id.hasPrefix(playlistPrefix) }.excludingRestricted(restriction)
+    private var visible: [Series] {
+        series.excludingRestricted(restriction)
     }
 
     var body: some View {
-        let matches = scoped
+        let matches = visible
         let items = Array(matches.prefix(collectionPreviewLimit))
         if !items.isEmpty {
             CollectionPreviewRow(
@@ -277,20 +303,18 @@ struct SeriesCollectionRow: View {
 /// The full grid behind a Series collection's "Show All".
 struct SeriesCollectionView: View {
     let kind: LibraryCollection.Kind
-    let playlistPrefix: String
     var animationNamespace: Namespace.ID?
     @Environment(\.contentRestriction) private var restriction
     @Query private var series: [Series]
 
     init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
-        self.playlistPrefix = playlistPrefix
         self.animationNamespace = animationNamespace
-        _series = Query(SeriesCollectionQuery.descriptor(for: kind))
+        _series = Query(SeriesCollectionQuery.gridDescriptor(for: kind, playlistPrefix: playlistPrefix))
     }
 
-    private var scoped: [Series] {
-        series.filter { $0.id.hasPrefix(playlistPrefix) }.excludingRestricted(restriction)
+    private var visible: [Series] {
+        series.excludingRestricted(restriction)
     }
 
     var body: some View {
@@ -301,7 +325,7 @@ struct SeriesCollectionView: View {
         }
         CategoryContentGrid(
             title: kind.localizedTitleString,
-            items: scoped,
+            items: visible,
             animationNamespace: animationNamespace,
             emptyTitle: kind.title,
             emptyIcon: kind.emptyIcon,
@@ -314,26 +338,42 @@ struct SeriesCollectionView: View {
 }
 
 private enum SeriesCollectionQuery {
-    static func descriptor(for kind: LibraryCollection.Kind) -> FetchDescriptor<Series> {
-        var descriptor = switch kind {
+    /// The fetch behind a preview row — always bounded, see
+    /// `collectionRowFetchLimit`.
+    static func rowDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Series> {
+        var descriptor = base(for: kind, playlistPrefix: playlistPrefix)
+        descriptor.fetchLimit = collectionRowFetchLimit
+        return descriptor
+    }
+
+    /// The fetch behind "Show All"; see `MovieCollectionQuery.gridDescriptor`.
+    static func gridDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Series> {
+        var descriptor = base(for: kind, playlistPrefix: playlistPrefix)
+        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
+        return descriptor
+    }
+
+    private static func base(for kind: LibraryCollection.Kind, playlistPrefix prefix: String) -> FetchDescriptor<Series> {
+        switch kind {
         case .recentlyWatched:
             FetchDescriptor<Series>(
-                predicate: #Predicate { $0.lastWatchedDate != nil },
+                predicate: #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) },
                 sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
             )
         case .favorites:
             FetchDescriptor<Series>(
-                predicate: #Predicate { $0.isFavorite },
+                predicate: #Predicate { $0.isFavorite && $0.id.starts(with: prefix) },
                 sortBy: [SortDescriptor(\.name)]
             )
         case .recentlyAdded:
+            // `comparator: .lexical` for the same reason as the movie side:
+            // `lastModified` is a Unix timestamp string, and the default
+            // localized comparator forfeits the `#Index` to NSCollateFinderlike.
             FetchDescriptor<Series>(
-                predicate: #Predicate { $0.lastModified != nil },
-                sortBy: [SortDescriptor(\.lastModified, order: .reverse), SortDescriptor(\.num)]
+                predicate: #Predicate { $0.lastModified != nil && $0.id.starts(with: prefix) },
+                sortBy: [SortDescriptor(\.lastModified, comparator: .lexical, order: .reverse), SortDescriptor(\.num)]
             )
         }
-        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
-        return descriptor
     }
 }
 

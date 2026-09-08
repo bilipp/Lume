@@ -17,6 +17,13 @@ final class Movie {
     // `indexedAt` backs the content indexer's pending/progress scans (run once
     // per chunk for a whole indexing pass) and `downloadStatusRaw` the Downloads
     // screen's live `@Query`, which re-evaluates during catalog syncs.
+    // `added` is the sort key for the "Recently Added" rail, which asks for a
+    // handful of rows off the top of a descending sort. Unindexed that plans as
+    // "SCAN ZMOVIE + USE TEMP B-TREE FOR ORDER BY" — the whole table sorted to
+    // hand back 20 rows, 222 ms per run on a 179k-title catalog. The index only
+    // pays off while the ordering stays a binary comparison: a `SortDescriptor`
+    // on a String key path defaults to `.localizedStandard`, which emits
+    // `COLLATE NSCollateFinderlike` and no b-tree can serve that.
     #Index<Movie>(
         [\.tmdbId],
         [\.isFavorite],
@@ -28,7 +35,8 @@ final class Movie {
         [\.categoryId],
         [\.genre],
         [\.indexedAt],
-        [\.downloadStatusRaw]
+        [\.downloadStatusRaw],
+        [\.added]
     )
 
     @Attribute(.unique) var id: String

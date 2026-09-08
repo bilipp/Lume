@@ -221,11 +221,11 @@ struct SearchView: View {
         query: String, playlist: Playlist?, wantMovies: Bool, wantSeries: Bool, wantLive: Bool
     ) async -> SearchHits {
         // Scope to the active playlist unless cross-playlist search is on. Every
-        // category id is prefixed with its playlist's UUID (see Category.id),
-        // which appears nowhere else, so matching it within categoryId limits
-        // results to that playlist. Hidden/restricted categories are excluded in
-        // the fetch rather than afterwards, so `resultLimit` isn't spent on rows
-        // the viewer will never see.
+        // catalog row's id carries its playlist's UUID as a prefix (see
+        // `SearchScope.playlistIDPrefix`), so a prefix test on the indexed `id`
+        // limits results to that playlist. Hidden/restricted categories are
+        // excluded in the fetch rather than afterwards, so `resultLimit` isn't
+        // spent on rows the viewer will never see.
         let request = SearchRequest(
             query: query,
             playlistID: playlist?.id.uuidString ?? "",
@@ -237,9 +237,21 @@ struct SearchView: View {
             limit: resultLimit
         )
         let container = modelContext.container
-        return await Task.detached(priority: .userInitiated) {
+        // `Task.detached` starts an unstructured task, which does not inherit
+        // this one's cancellation: every keystroke that settled into a query
+        // used to leave its scans running to the end, so on a large catalog the
+        // superseded work piled up behind the query the viewer is waiting for.
+        // Forwarding the cancellation lets `SearchFetcher` bail between its
+        // three scans; the partial hits it returns are dropped by
+        // `updateResults`, which is the task being cancelled.
+        let fetch = Task.detached(priority: .userInitiated) {
             SearchFetcher.fetch(container: container, request: request)
-        }.value
+        }
+        return await withTaskCancellationHandler {
+            await fetch.value
+        } onCancel: {
+            fetch.cancel()
+        }
     }
 
     /// Portal hits first (relevance order), then the local pass. Hydrates rows
@@ -260,16 +272,35 @@ struct SearchView: View {
         for series in hydrateSeries(ids: portal.series) {
             add(.series(series), categoryID: series.categoryId)
         }
-        for id in localHits.movies {
-            if let movie = modelContext.model(for: id) as? Movie { add(.movie(movie), categoryID: movie.categoryId) }
+        // The local fetches deliberately run without an ORDER BY so SQLite can
+        // stop at the per-type limit instead of sorting every match first (see
+        // `SearchFetcher.fetch`). The per-type, name-ascending order the list
+        // has always shown is restored here, over at most `resultLimit`
+        // hydrated rows per type. `localizedStandardCompare` is what
+        // `SortDescriptor(\.name)` used, so the ordering is unchanged.
+        for movie in hydrateSortedByName(localHits.movies, name: \Movie.name) {
+            add(.movie(movie), categoryID: movie.categoryId)
         }
-        for id in localHits.series {
-            if let series = modelContext.model(for: id) as? Series { add(.series(series), categoryID: series.categoryId) }
+        for series in hydrateSortedByName(localHits.series, name: \Series.name) {
+            add(.series(series), categoryID: series.categoryId)
         }
-        for id in localHits.streams {
-            if let stream = modelContext.model(for: id) as? LiveStream { add(.liveStream(stream), categoryID: stream.categoryId) }
+        for stream in hydrateSortedByName(localHits.streams, name: \LiveStream.name) {
+            add(.liveStream(stream), categoryID: stream.categoryId)
         }
         return matches
+    }
+
+    /// Hydrates rows the background fetch matched, in name order. The fetch
+    /// itself no longer sorts (a `sortBy:` would make SQLite sort every match
+    /// before applying the limit), so this is where the list's per-type
+    /// alphabetical order comes from — over at most `resultLimit` rows.
+    /// `localizedStandardCompare` is the comparator `SortDescriptor(\.name)`
+    /// defaulted to, so the resulting order is the same one the list showed.
+    private func hydrateSortedByName<Model: PersistentModel>(
+        _ ids: [PersistentIdentifier], name: KeyPath<Model, String>
+    ) -> [Model] {
+        ids.compactMap { modelContext.model(for: $0) as? Model }
+            .sorted { $0[keyPath: name].localizedStandardCompare($1[keyPath: name]) == .orderedAscending }
     }
 
     /// Fetches `Movie` rows for the given ids in one query, returned in id order.

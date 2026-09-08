@@ -36,6 +36,24 @@ nonisolated struct ChannelEPG: Equatable {
 /// Builds the now/next lookup for a set of channels in one indexed fetch, off
 /// the main thread, returning only `Sendable` value snapshots.
 enum ChannelEPGLoader {
+    /// How far ahead a now/next lookup reads. A card shows what is on air and
+    /// what follows it, so the fetch only has to reach the start of that second
+    /// programme — but the old open-ended `end > now` returned every *future*
+    /// listing of every channel on screen, and the guide holds weeks of them
+    /// (218,081 rows on the measured playlist). A screenful of 50 channels meant
+    /// tens of thousands of rows materialized and grouped to pick two apiece.
+    ///
+    /// Twelve hours is deliberately generous — still ~3% of a two-week guide,
+    /// but wide enough for the long overnight blocks some providers ship, where
+    /// "next" is the morning show hours away.
+    nonisolated static let horizon: TimeInterval = 12 * 3600
+
+    /// How long a resolved snapshot may be extended before it is resolved again
+    /// from scratch. Callers that grow a channel list page by page reuse the
+    /// pairs they already hold (see `ChannelsList`), and this bounds how far
+    /// behind the guide the oldest of those pairs can fall.
+    nonisolated static let snapshotLifetime: TimeInterval = 60
+
     nonisolated static func load(
         container: ModelContainer,
         channelIds: [String],
@@ -47,13 +65,21 @@ enum ChannelEPGLoader {
         defer { Perf.end(interval) }
 
         let context = ModelContext(container)
-        // Only currently-airing or upcoming listings matter for now/next; the
-        // `end > now` bound (plus the channel-id scope) keeps this to a small,
-        // index-served slice of the guide rather than the whole table.
-        let descriptor = FetchDescriptor<EPGListing>(
-            predicate: #Predicate { channelIds.contains($0.channelId) && $0.end > now },
+        let horizonEnd = now.addingTimeInterval(horizon)
+        // Only currently-airing or imminent listings matter for now/next. The
+        // upper bound on `start` is the half the `[channelId, start]` index can
+        // seek against, and it is what keeps the result to a few rows per
+        // channel; `end > now` then drops the finished ones inside the window.
+        var descriptor = FetchDescriptor<EPGListing>(
+            predicate: #Predicate {
+                channelIds.contains($0.channelId) && $0.end > now && $0.start < horizonEnd
+            },
             sortBy: [SortDescriptor(\.channelId), SortDescriptor(\.start)]
         )
+        // The four fields a `ChannelEPG` is built from. `listingDescription` is
+        // the widest column in the table and nothing here reads it, so a partial
+        // fetch keeps it out of the rows entirely.
+        descriptor.propertiesToFetch = [\.channelId, \.title, \.start, \.end]
         guard let listings = try? context.fetch(descriptor) else { return [:] }
 
         var grouped: [String: [EPGListing]] = [:]

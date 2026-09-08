@@ -39,6 +39,9 @@ struct HomeView: View {
     @State var trendingMovies: [HomeMediaItem] = []
     @State var trendingSeries: [HomeMediaItem] = []
     @State var watchlist: [HomeMediaItem] = []
+    /// Resume fractions for partially-watched series, keyed by series id and
+    /// resolved off the main thread — see `SeriesResumeLoader`.
+    @State private var seriesResume: [String: Double] = [:]
     @AppStorage(RecommendationSettings.enabledKey) private var recommendationsEnabled = RecommendationSettings.enabledDefault
     /// The user's chosen Home row order (Settings › Layout › Home). Falls back to
     /// the declaration order of `HomeSection` until they reorder.
@@ -168,6 +171,7 @@ struct HomeView: View {
                             }
                             .padding(.bottom)
                         }
+                        .browseActivity()
                         .scrollIndicators(.hidden)
                         // Only let content run under the nav bar when the hero
                         // backdrop is there to fill it; otherwise the first row
@@ -221,6 +225,9 @@ struct HomeView: View {
                 .task(id: recommendationsKey) {
                     await loadRecommendations()
                 }
+                .task(id: seriesResumeKey) {
+                    await loadSeriesResume()
+                }
             #if os(iOS) || os(tvOS)
                 .fullScreenCover(item: $playingMedia) { media in
                     FullScreenPlayerView(media: media)
@@ -255,6 +262,7 @@ struct HomeView: View {
             case .forYou:
                 ForYouRow(
                     items: recommendations,
+                    seriesResume: seriesResume,
                     isLoading: !recommendationsLoaded,
                     onPlayLive: playChannel,
                     onVote: vote,
@@ -291,6 +299,7 @@ struct HomeView: View {
             HomeRow(
                 title: title,
                 items: items,
+                seriesResume: seriesResume,
                 onPlayLive: playChannel,
                 onRemove: onRemove,
                 onStartMultiView: startMultiView,
@@ -310,6 +319,15 @@ struct HomeView: View {
 
     var watchlistKey: String {
         "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)-\(restriction.visibilityToken)"
+    }
+
+    /// Identity of the series resume lookup. Resuming or finishing an episode
+    /// stamps its series' `lastWatchedDate` (`WatchProgressWriter`), which is
+    /// exactly what the Recently Watched query orders by — so the newest stamp
+    /// moves whenever a resume bar would.
+    private var seriesResumeKey: String {
+        let newest = watchedSeries.first?.lastWatchedDate?.timeIntervalSince1970 ?? 0
+        return "resume-\(watchedSeries.count)-\(newest)-\(selectedPlaylistID)"
     }
 
     // MARK: - Playlist scoping
@@ -386,6 +404,19 @@ struct HomeView: View {
         case let .live(stream): stream.lastWatchedDate = nil
         }
         try? modelContext.save()
+    }
+
+    // MARK: - Series resume
+
+    /// Resolves the resume bar for every partially-watched series in one indexed
+    /// fetch, off the main thread. The rails then read a plain dictionary rather
+    /// than each card faulting its series' whole `episodes` relationship from
+    /// `body` — the same hoist the Live TV list does for now/next EPG.
+    private func loadSeriesResume() async {
+        let container = modelContext.container
+        seriesResume = await Task.detached(priority: .userInitiated) {
+            SeriesResumeLoader.load(container: container)
+        }.value
     }
 
     // MARK: - Playback

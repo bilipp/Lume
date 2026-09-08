@@ -83,6 +83,12 @@ struct LumeApp: App {
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none
         )
+        // Create any index the models declare that this store predates. SwiftData
+        // applies `#Index` only when it creates the file, and no version bump or
+        // migration stage makes it revisit that — see `CatalogIndexBackfill`,
+        // which was written after both were measured against a real store. Runs
+        // before the container opens the file, on its own connection.
+        CatalogIndexBackfill.run(storeURL: catalogConfiguration.url)
         func buildCatalog() throws -> ModelContainer {
             try ModelContainer(for: catalogSchema, configurations: catalogConfiguration)
         }

@@ -23,7 +23,8 @@ final class ContentIndexingService {
         /// Downloading/loading the embedding model.
         case preparing
         case indexing
-        /// A playlist sync or playback is active; indexing resumes on its own.
+        /// A playlist sync, playback, an iCloud import or the user browsing is
+        /// holding indexing off; it resumes on its own.
         case waiting
         case upToDate
         /// The embedding model cannot be loaded on this device.
@@ -47,6 +48,42 @@ final class ContentIndexingService {
     /// and faulting a catalog object during that window throws an uncatchable
     /// `no such table` `NSException`.
     var isCloudSyncActive = false
+
+    /// When a browse surface last reported activity. The indexer pauses while
+    /// this is recent, for the same reason it pauses for playback: the one
+    /// `context.save()` that ends every chunk forces a main-context merge that
+    /// re-runs every `@Query` in every mounted tab. On a 284k-row playlist that
+    /// is ~4,500 whole-app query storms spread through ordinary use — measured,
+    /// a single launch re-ran each of Home's six `@Query` properties 20-25
+    /// times, and one "Add to Favorites" tap landed in a window holding 23,991
+    /// fetches. Nobody is waiting on the index; the person scrolling is.
+    ///
+    /// Deliberately `@ObservationIgnored`: a stamp taken on every scroll that
+    /// invalidated the views reading it would cost more than the indexer does.
+    @ObservationIgnored private var lastUserInteraction: Date?
+
+    /// How long a stamp keeps counting as "the user is here". Long enough to
+    /// bridge the gaps between taps while paging through a catalog, short
+    /// enough that a screen left open doesn't stall indexing for good.
+    private static let browsingQuietWindow: TimeInterval = 8
+
+    /// True while the user was interacting within the last
+    /// `browsingQuietWindow` seconds. Self-clearing by construction: callers
+    /// stamp and forget, so no view can leave indexing switched off by failing
+    /// to unset a flag on the way out — the failure mode that a paired
+    /// set/unset (like `isPlaybackActive`) has to be careful about.
+    var isUserBrowsing: Bool {
+        guard let lastUserInteraction else { return false }
+        return Date.now.timeIntervalSince(lastUserInteraction) < Self.browsingQuietWindow
+    }
+
+    /// Called by browse surfaces to hold indexing off for the next few seconds.
+    /// One line at the call site with nothing to balance, and it costs a single
+    /// `Date` write — cheap enough to sit on an `.onAppear`, a tab change or a
+    /// scroll/selection change.
+    func noteUserInteraction() {
+        lastUserInteraction = .now
+    }
 
     private var container: ModelContainer?
     private var task: Task<Void, Never>?
