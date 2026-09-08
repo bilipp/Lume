@@ -181,6 +181,24 @@ enum PlayerSettings {
     /// rocker; see `LiveSurfMode.default`.
     static let liveSurfModeKey = "player.liveSurfMode"
 
+    /// Whether swipes across the Siri Remote's touch surface drive the player's
+    /// directional actions — channel surfing, the channel browser, the last
+    /// channel, and summoning the controls. On by default, which is how the
+    /// player has always behaved and how tvOS reads everywhere else; off leaves
+    /// those actions to a click on the remote's direction buttons, for viewers
+    /// who change channel by brushing the surface. tvOS only — see
+    /// `RemoteDirectionGate` for how the two are told apart.
+    static let tvRemoteSwipesKey = "player.tvRemoteSwipes"
+
+    static let tvRemoteSwipesDefault = true
+
+    /// Whether swipe input is honoured, read off `UserDefaults` directly (so the
+    /// player host needn't hold an `@AppStorage` that would re-render the whole
+    /// player tree when toggled).
+    static var tvRemoteSwipesEnabled: Bool {
+        UserDefaults.standard.bool(tvRemoteSwipesKey, default: tvRemoteSwipesDefault)
+    }
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default

@@ -236,7 +236,7 @@ struct AVPlayerEngineView: View {
             // Yield focus to the failure overlay's buttons when a stream dies.
             .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
-            .onMoveCommand { direction in
+            .tvRemoteMoveCommand { direction in
                 // Left opens the channel browser; up/down surf adjacent
                 // channels; right recalls the last channel watched.
                 if media.isLive, direction == .left {
