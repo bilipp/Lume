@@ -262,7 +262,8 @@ struct VLCPlayerEngineView: View {
             // remote. The catcher only takes focus while controls are
             // hidden, so the control buttons stay reachable otherwise.
             // A focusable Button reliably catches the Siri remote's Select
-            // (center) press; `onMoveCommand` covers swipes/clicks. Disabled
+            // (center) press; `tvRemoteMoveCommand` covers the directions,
+            // swipes among them unless the viewer turned those off. Disabled
             // while the controls are up so the overlay's buttons own focus.
             Button(action: showControls) {
                 Color.clear.contentShape(Rectangle())
@@ -271,7 +272,7 @@ struct VLCPlayerEngineView: View {
             // Yield focus to the failure overlay's buttons when a stream dies.
             .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
-            .onMoveCommand { direction in
+            .tvRemoteMoveCommand { direction in
                 // While watching live TV with the controls hidden, left opens
                 // the channel browser, up/down surf adjacent channels — the
                 // classic channel rocker — and right recalls the last channel

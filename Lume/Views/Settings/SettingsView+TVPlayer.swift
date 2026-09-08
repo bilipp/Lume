@@ -89,6 +89,22 @@ import SwiftUI
                         .padding(.top, 6)
                 }
 
+                // Its own section rather than a row under Live TV: it governs
+                // every direction the player reads, VOD scrubbing included,
+                // and it is about the remote rather than about channels.
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Siri Remote")
+
+                    TVOptionToggleRow(title: "Swipe Gestures", isOn: $tvRemoteSwipes)
+
+                    // swiftlint:disable:next line_length
+                    Text("Swipes across the remote's touch surface control the player: up and down change channels, left opens the channel browser and right returns to the last channel. Turn this off to leave those to a click on the remote's direction buttons, so a brush across the surface changes nothing.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
                 tvStreamInfoSection
 
                 VStack(alignment: .leading, spacing: 8) {

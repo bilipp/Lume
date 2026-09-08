@@ -100,7 +100,7 @@
                 .padding(.bottom, 56)
             }
             .defaultFocus($focus, .transport)
-            .onMoveCommand { direction in
+            .tvRemoteMoveCommand { direction in
                 // While scrubbing, left/right step the playhead; vertical moves
                 // are swallowed so focus can't escape the bar.
                 if isScrubbing {

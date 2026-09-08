@@ -344,7 +344,7 @@ struct KSPlayerEngineView: View {
             // Yield focus to the failure overlay's buttons when a stream dies.
             .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
-            .onMoveCommand { direction in
+            .tvRemoteMoveCommand { direction in
                 // Watching live TV with the controls hidden, left opens the
                 // channel browser, up/down surf adjacent channels and right
                 // recalls the last channel watched. Any other move summons

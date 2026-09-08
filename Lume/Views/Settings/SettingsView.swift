@@ -34,6 +34,10 @@ struct SettingsView: View {
     var externalPlayerScopeRaw: String = ExternalPlayerScope.default.rawValue
     @AppStorage(PlayerSettings.liveSurfModeKey)
     var liveSurfModeRaw: String = LiveSurfMode.default.rawValue
+    #if os(tvOS)
+        @AppStorage(PlayerSettings.tvRemoteSwipesKey)
+        var tvRemoteSwipes = PlayerSettings.tvRemoteSwipesDefault
+    #endif
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
     @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
