@@ -2437,6 +2437,59 @@
         }
       }
     },
+    "Add as Xtream Login" : {
+      "comment" : "A button that adds the provider behind an Xtream get.php m3u link as an Xtream playlist.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Xtream-Login hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir como inicio de sesión Xtream"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter comme connexion Xtream"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi come accesso Xtream"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xtream ログインとして追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xtream 로그인으로 추가"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar como login Xtream"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加为 Xtream 登录"
+          }
+        }
+      }
+    },
     "Add Channel" : {
       "localizations" : {
         "de" : {

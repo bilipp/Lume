@@ -22,7 +22,9 @@ import OSLog
 /// Favourites, watch positions, the CloudKit `UserContentState` records keyed by
 /// those ids, and all TMDB enrichment would be orphaned, and the next sweep
 /// would delete the rows they pointed at. A user who wants Xtream adds a second
-/// playlist and removes the m3u one.
+/// playlist and removes the m3u one — which is all the add sheet's "Add as
+/// Xtream Login" button does: it creates a fresh Xtream playlist from these
+/// credentials, it does not rewrite one.
 nonisolated struct XtreamCredentialsHint {
     /// Scheme, host and (when non-default) port only — the form an Xtream login
     /// expects. No path, no query: the query is what carries the credentials.
