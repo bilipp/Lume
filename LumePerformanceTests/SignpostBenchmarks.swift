@@ -29,7 +29,6 @@ final class SignpostBenchmarks: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
         store = try PerfStore.makeOnDiskContainer()
-        seedGuide()
     }
 
     override func tearDownWithError() throws {
@@ -43,6 +42,7 @@ final class SignpostBenchmarks: XCTestCase {
     /// Times the `ChannelEPGLoad` interval emitted from inside
     /// `ChannelEPGLoader.load` — production instrumentation, measured by name.
     func testChannelEPGLoadSignpost() {
+        seedGuide()
         let channelIds = (0 ..< channelCount).map { "ch\($0)" }
         let now = epoch.addingTimeInterval(Double(slotsPerChannel) * 1800 / 2)
         let metric = XCTOSSignpostMetric(
@@ -60,6 +60,7 @@ final class SignpostBenchmarks: XCTestCase {
 
     /// Same for the guide grid's window fetch.
     func testGuideWindowLoadSignpost() {
+        seedGuide()
         let channelIds = (0 ..< channelCount).map { "ch\($0)" }
         let windowEnd = epoch.addingTimeInterval(Double(slotsPerChannel) * 1800)
         let metric = XCTOSSignpostMetric(
@@ -78,6 +79,57 @@ final class SignpostBenchmarks: XCTestCase {
         }
     }
 
+    /// The m3u import's phase signposts plus the shared post-sync history
+    /// purge, driven by a real `syncPlaylist` over a deliberately tiny
+    /// provider-shaped playlist.
+    ///
+    /// A tripwire, not a throughput number: `M3UColdImportBenchmarks` owns the
+    /// timing at provider scale, and re-running a 600k import per phase would
+    /// cost hours. What this catches is a renamed or dropped signpost, which
+    /// otherwise turns that suite's per-phase split into silence rather than a
+    /// failure — `XCTOSSignpostMetric` fails with "no samples" when its name
+    /// stops being emitted.
+    func testM3UImportSignposts() throws {
+        let scratch = try PerfFixtures.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let fixtureURL = try PerfFixtures.writeM3UProviderShape(
+            entryCount: 400, showCount: 10, to: scratch
+        )
+
+        let metrics = M3UColdImportBenchmarks.m3uSignposts.map(M3UColdImportBenchmarks.signpostMetric)
+        let options = XCTMeasureOptions()
+        options.iterationCount = 3
+        measure(metrics: metrics, options: options) {
+            // A fresh store per iteration, as `M3UColdImportBenchmarks` does:
+            // importing into a store that still holds the previous passes'
+            // catalog would make each iteration warmer than the last.
+            guard let iterationStore = try? PerfStore.makeOnDiskContainer() else {
+                XCTFail("could not create the on-disk store")
+                return
+            }
+            defer { PerfStore.destroy(directory: iterationStore.directory) }
+            // The device-local skip state is cleared with the playlist: a
+            // stored digest makes `m3uImportIsRedundant` short-circuit the
+            // import, and the second pass would emit nothing.
+            guard let playlistId = try? seedM3UPlaylist(
+                fileURL: fixtureURL, container: iterationStore.container
+            ) else {
+                XCTFail("could not seed the playlist row")
+                return
+            }
+            defer { clearM3UDeviceLocalState(playlistId: playlistId) }
+            let outcome = syncPlaylistSynchronously(
+                manager: ContentSyncManager(modelContainer: iterationStore.container),
+                playlistId: playlistId,
+                container: iterationStore.container,
+                timeout: 120
+            )
+            if let error = outcome.error {
+                XCTFail("m3u sync failed: \(error)")
+            }
+        }
+    }
+
     // MARK: - Instrumentation integrity
 
     /// Two milestones sharing a name would silently merge into one metric, so a
@@ -93,6 +145,7 @@ final class SignpostBenchmarks: XCTestCase {
             .m3uParse, .m3uClassify,
             .m3uUpsertLive, .m3uUpsertMovies, .m3uUpsertEpisodes,
             .m3uPruneLive, .m3uPruneMovies, .m3uPruneEpisodes, .m3uPruneSeries, .m3uPruneCategories,
+            .catalogPurgeHistory,
             .epgSourceSync, .epgIngest, .channelEPGLoad, .guideWindowLoad,
             .homeTrendingLoad, .homeRecommendations,
             .playerStartup, .playerRebuffer, .playerEngineFallback, .playerStartupFailure

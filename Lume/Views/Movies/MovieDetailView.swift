@@ -303,7 +303,7 @@ struct MovieDetailView: View {
     }
 
     private func resolveSimilar() {
-        let ids = movie.similarTMDBIds
+        let ids = movie.similarTitleIds
         guard !ids.isEmpty else { similar = []; return }
 
         // Scope to the same playlist this movie belongs to.

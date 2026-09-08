@@ -490,7 +490,7 @@ struct SeriesDetailView: View {
 
 private extension SeriesDetailView {
     func resolveSimilar() {
-        let ids = series.similarTMDBIds
+        let ids = series.similarTitleIds
         guard !ids.isEmpty else { similar = []; return }
 
         let playlistPrefix = series.id.components(separatedBy: "-series-").first

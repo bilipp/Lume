@@ -103,41 +103,21 @@ extension PerfFixtures {
         to writer: M3UFixtureWriter,
         using generator: inout SeededGenerator
     ) {
-        var shows: [(name: String, group: String, logo: String)] = []
-        shows.reserveCapacity(max(showCount, 1))
-        for index in 0 ..< max(showCount, 1) {
-            shows.append(showDescriptor(index: index, using: &generator))
-        }
-        var seasonCursor = [Int](repeating: 1, count: shows.count)
-        var episodesDone = 0
+        let shows = providerShowDescriptors(count: max(showCount, 1), using: &generator)
+        var walk = ProviderEpisodeWalk(episodeCount: episodeCount, showCount: shows.count)
         var moviesDone = 0
-        var showIndex = 0
-        var streamId = 200_000
 
-        while episodesDone < episodeCount {
-            let show = shows[showIndex]
-            let wanted = min(episodesForOneShow(using: &generator), episodeCount - episodesDone)
-            var season = seasonCursor[showIndex]
-            var number = 1
-            for _ in 0 ..< wanted {
-                streamId += 1
+        while let block = walk.nextBlock(using: &generator) {
+            for episode in block {
+                let show = shows[episode.show]
                 writer.emit(
-                    name: "\(show.name) \(seasonEpisodeToken(season, number))",
+                    name: "\(show.name) \(seasonEpisodeToken(episode.season, episode.number))",
                     logo: show.logo,
                     group: show.group,
-                    url: "https://example.invalid/series/92mc7c964u/n835i3j9a6/\(streamId).mkv"
+                    url: providerEpisodeURL(streamId: episode.streamId)
                 )
-                number += 1
-                if number > 30 {
-                    season += 1
-                    number = 1
-                }
             }
-            seasonCursor[showIndex] = season + 1
-            episodesDone += wanted
-            showIndex = (showIndex + 1) % shows.count
-
-            let due = movieCount * episodesDone / max(episodeCount, 1)
+            let due = movieCount * walk.episodesDone / max(episodeCount, 1)
             while moviesDone < due {
                 writeProviderMovie(index: moviesDone, to: writer, using: &generator)
                 moviesDone += 1
@@ -147,6 +127,26 @@ extension PerfFixtures {
             writeProviderMovie(index: moviesDone, to: writer, using: &generator)
             moviesDone += 1
         }
+    }
+
+    /// The show identities a provider-shaped catalog is built from. Drawn once
+    /// per fixture: drawing a name again would give the same show a different
+    /// title on its second block and inflate the distinct-series count past
+    /// `count`.
+    static func providerShowDescriptors(
+        count: Int,
+        using generator: inout SeededGenerator
+    ) -> [(name: String, group: String, logo: String)] {
+        var shows: [(name: String, group: String, logo: String)] = []
+        shows.reserveCapacity(max(count, 1))
+        for index in 0 ..< max(count, 1) {
+            shows.append(showDescriptor(index: index, using: &generator))
+        }
+        return shows
+    }
+
+    static func providerEpisodeURL(streamId: Int) -> String {
+        "https://example.invalid/series/92mc7c964u/n835i3j9a6/\(streamId).mkv"
     }
 
     private static func writeProviderMovie(
@@ -166,9 +166,7 @@ extension PerfFixtures {
         )
     }
 
-    /// A show's fixed identity. Precomputed rather than re-derived per pass:
-    /// drawing the name again would give the same show a different title on its
-    /// second block and inflate the distinct-series count past `showCount`.
+    /// A show's fixed identity, drawn from the vocabulary pools below.
     private static func showDescriptor(
         index: Int,
         using generator: inout SeededGenerator
@@ -205,7 +203,7 @@ extension PerfFixtures {
         (150, 27 ... 60), (70, 61 ... 140), (20, 141 ... 279), (10, 280 ... 2799)
     ]
 
-    private static func episodesForOneShow(using generator: inout SeededGenerator) -> Int {
+    fileprivate static func episodesForOneShow(using generator: inout SeededGenerator) -> Int {
         var roll = Int.random(in: 0 ..< 1000, using: &generator)
         for bucket in episodeCountBuckets {
             if roll < bucket.share {
@@ -214,6 +212,62 @@ extension PerfFixtures {
             roll -= bucket.share
         }
         return 12
+    }
+}
+
+// MARK: - Episode walk
+
+/// One episode as a provider export orders them.
+struct ProviderEpisode {
+    let show: Int
+    let season: Int
+    let number: Int
+    let streamId: Int
+}
+
+/// The show/season/block walk both provider-shaped fixtures are built from: a
+/// show emits one contiguous block, the cursor moves on, and a show reached
+/// again later continues at the next season.
+///
+/// Handed out a block at a time rather than as a finished array because the m3u
+/// fixture interleaves movie entries between blocks off the *same* generator —
+/// precomputing every block first would reorder its draws and change the bytes
+/// a seed produces. `M3UEpisodePlan` consumes the identical walk, so the two
+/// benchmarks cannot drift into measuring differently-shaped catalogs.
+struct ProviderEpisodeWalk {
+    private let episodeCount: Int
+    private var seasonCursor: [Int]
+    private var showIndex = 0
+    private var streamId = 200_000
+    private(set) var episodesDone = 0
+
+    init(episodeCount: Int, showCount: Int) {
+        self.episodeCount = episodeCount
+        seasonCursor = [Int](repeating: 1, count: max(showCount, 1))
+    }
+
+    /// The next show's contiguous block, or `nil` once the catalog is complete.
+    mutating func nextBlock(using generator: inout SeededGenerator) -> [ProviderEpisode]? {
+        guard episodesDone < episodeCount else { return nil }
+
+        let wanted = min(PerfFixtures.episodesForOneShow(using: &generator), episodeCount - episodesDone)
+        var block: [ProviderEpisode] = []
+        block.reserveCapacity(wanted)
+        var season = seasonCursor[showIndex]
+        var number = 1
+        for _ in 0 ..< wanted {
+            streamId += 1
+            block.append(ProviderEpisode(show: showIndex, season: season, number: number, streamId: streamId))
+            number += 1
+            if number > 30 {
+                season += 1
+                number = 1
+            }
+        }
+        seasonCursor[showIndex] = season + 1
+        episodesDone += wanted
+        showIndex = (showIndex + 1) % seasonCursor.count
+        return block
     }
 }
 

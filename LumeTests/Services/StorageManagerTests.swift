@@ -70,7 +70,7 @@ struct StorageManagerTests {
         #expect(refetched.tagline == nil)
         #expect(refetched.contentRating == nil)
         #expect(refetched.tmdbEnrichedAt == nil)
-        #expect(refetched.similarTMDBIds.isEmpty)
+        #expect(refetched.similarTMDBIds == nil)
         #expect(refetched.trailers.isEmpty)
         #expect(refetched.imdbId == nil)
         #expect(refetched.externalRatings.isEmpty)
@@ -81,5 +81,33 @@ struct StorageManagerTests {
 
         let remainingCast = try verifyContext.fetch(FetchDescriptor<CastMember>())
         #expect(remainingCast.isEmpty)
+    }
+
+    /// Series enrichment is cleared by its own overload. `similarTMDBIds` is
+    /// optional on both models, and nil — not [] — is the cleared state, so a
+    /// row that has been reset costs nothing to store.
+    @Test func `clearMetadataEnrichment resets a series too`() async throws {
+        let container = try makeTestContainer()
+        let context = container.mainContext
+
+        let show = Series(id: "s1", seriesId: 1, name: "Keep Me Too")
+        show.tagline = "A tagline"
+        show.tmdbEnrichedAt = Date(timeIntervalSince1970: 1)
+        show.similarTMDBIds = [4, 5, 6]
+        show.isFavorite = true
+        context.insert(show)
+        try context.save()
+
+        await StorageManager.clearMetadataEnrichment(container: container)
+
+        let verifyContext = ModelContext(container)
+        let refetched = try #require(
+            try verifyContext.fetch(FetchDescriptor<Series>(predicate: #Predicate { $0.id == "s1" })).first
+        )
+        #expect(refetched.name == "Keep Me Too")
+        #expect(refetched.isFavorite == true)
+        #expect(refetched.tagline == nil)
+        #expect(refetched.tmdbEnrichedAt == nil)
+        #expect(refetched.similarTMDBIds == nil)
     }
 }

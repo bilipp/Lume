@@ -125,7 +125,7 @@ struct LumeApp: App {
             SyncedParentalPIN.self, SyncedCategoryRestriction.self
         ])
         let cloudConfiguration = ModelConfiguration(
-            "CloudUserData",
+            ContentSyncManager.cloudMirrorConfigurationName,
             schema: cloudSchema,
             cloudKitDatabase: cloudKitDatabase
         )

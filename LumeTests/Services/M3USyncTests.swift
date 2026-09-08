@@ -341,6 +341,37 @@ struct M3USyncTests {
 
     // MARK: - Cancellation
 
+    /// Rows the playlist file being imported does not contain, so a completed
+    /// import would sweep every one of them: their survival is the evidence
+    /// that no sweep ran. One of each kind, because all five sweeps have to
+    /// stay unrun.
+    private func seedRowsNoSweepMayDelete(in container: ModelContainer, playlistId: UUID, liveCount: Int) throws {
+        let context = ModelContext(container)
+        for index in 0 ..< liveCount {
+            context.insert(LiveStream(
+                id: "\(playlistId.uuidString)-live-stale\(index)",
+                streamId: 900_000 + index,
+                name: "Dropped \(index)"
+            ))
+        }
+        context.insert(Movie(id: "\(playlistId.uuidString)-vod-stale", streamId: 900_100, name: "Dropped Movie"))
+        let staleSeries = Series(
+            id: "\(playlistId.uuidString)-series-stale", seriesId: 900_200, name: "Dropped Series"
+        )
+        context.insert(staleSeries)
+        let staleEpisode = Episode(
+            id: "\(playlistId.uuidString)-series-stale-episode-1", episodeId: "stale",
+            title: "Dropped Episode", containerExtension: "mkv", seasonNum: 1, episodeNum: 1
+        )
+        context.insert(staleEpisode)
+        staleEpisode.series = staleSeries
+        let stored = try #require(try context.fetch(FetchDescriptor<Playlist>()).first)
+        context.insert(
+            Lume.Category(apiId: "Dropped Group", name: "Dropped Group", parentId: 0, type: .vod, playlist: stored)
+        )
+        try context.save()
+    }
+
     /// Cancelling a running sync has to stop the import *and* skip the sweeps:
     /// the seen-ids only cover the part of the file that was read, so sweeping
     /// on them would delete the rest of the catalog — and the iCloud reconcile
@@ -362,20 +393,8 @@ struct M3USyncTests {
         let playlist = try makePlaylist(container: container, fileURL: fileURL)
         let playlistId = playlist.id
 
-        // Rows this playlist file does not contain, so a sweep would delete
-        // them: their survival is the evidence that no sweep ran.
         let staleCount = 20
-        do {
-            let context = ModelContext(container)
-            for index in 0 ..< staleCount {
-                context.insert(LiveStream(
-                    id: "\(playlistId.uuidString)-live-stale\(index)",
-                    streamId: 900_000 + index,
-                    name: "Dropped \(index)"
-                ))
-            }
-            try context.save()
-        }
+        try seedRowsNoSweepMayDelete(in: container, playlistId: playlistId, liveCount: staleCount)
 
         let manager = ContentSyncManager(modelContainer: container)
         let sync = Task { try await manager.syncPlaylist(playlist) }
@@ -400,6 +419,14 @@ struct M3USyncTests {
         #expect(live > staleCount, "the batches already committed must survive a cancellation")
         let survivors = try context.fetch(FetchDescriptor<LiveStream>()).count { $0.name.hasPrefix("Dropped ") }
         #expect(survivors == staleCount, "a cancelled import must not sweep")
+        #expect(try context.fetchCount(FetchDescriptor<Movie>()) == 1, "a cancelled import must not sweep movies")
+        #expect(try context.fetchCount(FetchDescriptor<Series>()) == 1, "a cancelled import must not sweep series")
+        #expect(try context.fetchCount(FetchDescriptor<Episode>()) == 1, "a cancelled import must not sweep episodes")
+        let categories = try context.fetch(FetchDescriptor<Lume.Category>())
+        #expect(
+            categories.contains { $0.apiId == "Dropped Group" },
+            "a cancelled import must not sweep categories"
+        )
 
         let reloaded = try #require(try context.fetch(FetchDescriptor<Playlist>()).first)
         #expect(reloaded.syncStatus == .idle, "an aborted sync leaves the playlist retryable, not in .error")

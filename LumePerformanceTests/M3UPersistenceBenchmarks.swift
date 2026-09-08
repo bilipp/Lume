@@ -290,7 +290,10 @@ final class M3UPersistenceBenchmarks: XCTestCase {
             let show = series(
                 id: parentIds[offset], index: parentIndices[offset], shows: &shows, context: context
             )
-            if applied.insert(parentIds[offset]).inserted {
+            // The `|| cover == nil` half is `importEpisodes`'s rule verbatim: a
+            // show whose first entry carried no artwork keeps consulting later
+            // ones.
+            if applied.insert(parentIds[offset]).inserted || show.cover == nil {
                 applySeriesFixture(index: parentIndices[offset], playlistId: playlistId, to: show)
             }
 
@@ -305,10 +308,14 @@ final class M3UPersistenceBenchmarks: XCTestCase {
                     title: "",
                     containerExtension: "mkv",
                     seasonNum: index % 60 / 20 + 1,
-                    episodeNum: index % 20 + 1,
-                    series: show
+                    episodeNum: index % 20 + 1
                 )
                 context.insert(episode)
+                // Assigned after `insert`, as `importEpisodes` does: passing
+                // `series:` to the initializer makes `insert` migrate the
+                // instance out of the transient backing store, which measured
+                // 5x the clock and 7x the peak footprint.
+                episode.series = show
                 existing[id] = episode
             }
             applyEpisodeFixture(index: index, to: episode)

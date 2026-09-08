@@ -154,6 +154,9 @@ actor ContentSyncManager {
             try await performStalkerSync(playlist: playlist, playlistId: playlistId, progress: progress, full: full)
         }
 
+        // Every source writes the same unread history rows (see the method).
+        purgeCatalogHistory()
+
         let doneContext = ModelContext(modelContainer)
         doneContext.autosaveEnabled = false
         if let dpl = try doneContext.fetch(

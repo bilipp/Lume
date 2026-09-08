@@ -47,21 +47,47 @@ final class ParsingBenchmarks: XCTestCase {
         assertFixtureIsSubstantial(fixture, minimumBytes: 5_000_000)
 
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
-            var count = 0
-            var urlBytes = 0
+            let outcome = parseSynchronously(fileURL: fixture, batchSize: 2000)
+            if let error = outcome.error {
+                XCTFail("m3u parse threw: \(error)")
+            }
+            XCTAssertEqual(outcome.count, 120_000)
+            XCTAssertGreaterThan(outcome.urlBytes, 0)
+        }
+    }
+
+    /// Carries the parse's results back across the `Task.detached` hand-off;
+    /// `var`s captured by a concurrently-executing closure cannot. Read only
+    /// after the expectation has been fulfilled.
+    private final class ParseOutcome: @unchecked Sendable {
+        var count = 0
+        var urlBytes = 0
+        var error: Error?
+    }
+
+    /// `parseStreaming` is the driver the import runs and it is async, while
+    /// `measure`'s block is not — so the parse is driven from a task and waited
+    /// on by spinning the run loop, exactly as `syncPlaylistSynchronously` does.
+    private func parseSynchronously(fileURL: URL, batchSize: Int) -> ParseOutcome {
+        let outcome = ParseOutcome()
+        let finished = expectation(description: "m3u parse")
+        Task.detached {
             do {
-                count = try M3UParser.parse(fileURL: fixture, batchSize: 2000) { batch, _ in
+                outcome.count = try await M3UParser.parseStreaming(
+                    fileURL: fileURL, batchSize: batchSize
+                ) { batch, _ in
                     // Touch every entry so the optimizer can't discard the parse.
                     for entry in batch {
-                        urlBytes += entry.url.utf8.count
+                        outcome.urlBytes += entry.url.utf8.count
                     }
                 }
             } catch {
-                XCTFail("m3u parse threw: \(error)")
+                outcome.error = error
             }
-            XCTAssertEqual(count, 120_000)
-            XCTAssertGreaterThan(urlBytes, 0)
+            finished.fulfill()
         }
+        wait(for: [finished], timeout: 600)
+        return outcome
     }
 
     /// `#EXTINF` attribute scanning in isolation. It runs once per playlist line,
@@ -93,7 +119,7 @@ final class ParsingBenchmarks: XCTestCase {
     /// The parse happens outside `measure` — this is the classifier in
     /// isolation, the way `testM3UExtInfAttributeScan` isolates attribute
     /// scanning.
-    func testM3UClassification() throws {
+    func testM3UClassification() async throws {
         let entryCount = 60000
         let fixture = try PerfFixtures.writeM3UProviderShape(
             entryCount: entryCount, showCount: 1400, to: scratch
@@ -102,7 +128,7 @@ final class ParsingBenchmarks: XCTestCase {
 
         var entries: [M3UEntry] = []
         entries.reserveCapacity(entryCount)
-        try M3UParser.parse(fileURL: fixture, batchSize: 4000) { batch, _ in
+        try await M3UParser.parseStreaming(fileURL: fixture, batchSize: 4000) { batch, _ in
             entries.append(contentsOf: batch)
         }
 

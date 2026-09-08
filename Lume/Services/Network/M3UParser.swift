@@ -77,84 +77,125 @@ nonisolated enum M3UParser {
     /// `onBatch`'s second argument is how many bytes of the file have been
     /// consumed at that point. A streaming parse doesn't know the entry count
     /// until it ends, so bytes-over-file-size is the only progress fraction a
-    /// caller can report honestly while the import is running.
+    /// caller can report honestly while the import is running. It may suspend:
+    /// the m3u import's producer hands each batch to a bounded channel and parks
+    /// there whenever the writer falls behind.
+    ///
+    /// The hand-off happens *outside* the per-chunk `autoreleasepool` — an
+    /// `await` may not cross one — so a chunk's completed batches are collected
+    /// first and delivered after the pool drains. A 512 KB chunk holds well
+    /// under two provider-shaped batches, so that collection is bounded. The
+    /// pool itself is per chunk, not per file: `subdata`, `String(bytes:)` and
+    /// `trimmingCharacters` autorelease once per line, and without it a 520 MB
+    /// playlist peaks at ~502 MB resident.
     @discardableResult
-    static func parse(
+    static func parseStreaming(
         fileURL: URL,
         batchSize: Int = 2000,
         onHeader: ((M3UHeader) -> Void)? = nil,
-        onBatch: ([M3UEntry], _ bytesConsumed: Int) -> Void
-    ) throws -> Int {
+        onBatch: ([M3UEntry], _ bytesConsumed: Int) async throws -> Void
+    ) async throws -> Int {
         let handle = try FileHandle(forReadingFrom: fileURL)
         defer { try? handle.close() }
 
-        var state = ParseState()
-        var batch: [M3UEntry] = []
-        batch.reserveCapacity(batchSize)
-        var totalCount = 0
+        var reader = ChunkedEntryReader(handle: handle, batchSize: batchSize)
+        while !reader.isFinished {
+            let ready = autoreleasepool { reader.readChunk(onHeader: onHeader) }
+            for batch in ready {
+                try await onBatch(batch.entries, batch.bytesConsumed)
+            }
+        }
+        if let final = reader.finalBatch() {
+            try await onBatch(final.entries, final.bytesConsumed)
+        }
+        return reader.totalCount
+    }
 
-        var carry = Data()
-        var reachedEOF = false
-        // Bytes of the file already handed to the line loop, excluding the
-        // block currently being walked.
-        var consumedBase = 0
-        while !reachedEOF {
-            // The pool is per chunk, not per file: `subdata`, `String(bytes:)`
-            // and `trimmingCharacters` autorelease once per line, and the only
-            // caller runs the whole parse as one uninterrupted synchronous
-            // stretch inside an actor job, so no enclosing pool ever drains.
-            // Without this, a 520 MB playlist peaks at ~502 MB resident.
-            autoreleasepool {
-                let chunk = (try? handle.read(upToCount: chunkSize)) ?? nil
-                if let chunk, !chunk.isEmpty {
-                    carry.append(chunk)
-                } else {
-                    reachedEOF = true
-                }
+    // MARK: - Chunk loop
 
-                // Split everything up to the last newline into lines; the tail
-                // (a partial line) stays in `carry` for the next chunk. At EOF the
-                // whole remainder is one final line.
-                let processable: Data
-                if reachedEOF {
-                    processable = carry
-                    carry = Data()
-                } else if let lastNewline = carry.lastIndex(of: UInt8(ascii: "\n")) {
-                    processable = carry.subdata(in: carry.startIndex ..< lastNewline)
-                    carry = carry.subdata(in: carry.index(after: lastNewline) ..< carry.endIndex)
-                } else {
-                    // No complete line buffered yet: leaving the pool body is
-                    // this loop's `continue`.
-                    return
-                }
+    /// One completed batch on its way out of `ChunkedEntryReader`.
+    private typealias ReadyBatch = (entries: [M3UEntry], bytesConsumed: Int)
 
-                let blockStart = processable.startIndex
-                defer { consumedBase += processable.count + 1 }
+    /// The chunk loop behind `parseStreaming`: reads the file in fixed-size
+    /// blocks, splits complete lines out of the carry buffer and accumulates
+    /// entries until a batch fills.
+    private nonisolated struct ChunkedEntryReader {
+        private let handle: FileHandle
+        private let batchSize: Int
+        private var state = ParseState()
+        private var batch: [M3UEntry] = []
+        private var carry = Data()
+        /// Bytes of the file already handed to the line loop, excluding the
+        /// block currently being walked.
+        private var consumedBase = 0
+        private(set) var isFinished = false
+        private(set) var totalCount = 0
 
-                for lineData in processable.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true) {
-                    // Latin-1 fallback: it never fails, so a stray non-UTF-8 line
-                    // (older provider exports) degrades to mojibake instead of
-                    // dropping the entry.
-                    let raw = String(bytes: lineData, encoding: .utf8)
-                        ?? String(bytes: lineData, encoding: .isoLatin1)
-                    guard let line = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty else { continue }
+        init(handle: FileHandle, batchSize: Int) {
+            self.handle = handle
+            self.batchSize = batchSize
+            batch.reserveCapacity(batchSize)
+        }
 
-                    if let entry = state.consume(line: line, onHeader: onHeader) {
-                        batch.append(entry)
-                        totalCount += 1
-                        if batch.count >= batchSize {
-                            onBatch(batch, consumedBase + (lineData.endIndex - blockStart))
-                            batch.removeAll(keepingCapacity: true)
-                        }
+        /// Reads the next chunk and returns whatever batches it completed —
+        /// usually none or one.
+        mutating func readChunk(onHeader: ((M3UHeader) -> Void)?) -> [ReadyBatch] {
+            let chunk = (try? handle.read(upToCount: M3UParser.chunkSize)) ?? nil
+            if let chunk, !chunk.isEmpty {
+                carry.append(chunk)
+            } else {
+                isFinished = true
+            }
+
+            // Split everything up to the last newline into lines; the tail
+            // (a partial line) stays in `carry` for the next chunk. At EOF the
+            // whole remainder is one final line.
+            let processable: Data
+            if isFinished {
+                processable = carry
+                carry = Data()
+            } else if let lastNewline = carry.lastIndex(of: UInt8(ascii: "\n")) {
+                processable = carry.subdata(in: carry.startIndex ..< lastNewline)
+                carry = carry.subdata(in: carry.index(after: lastNewline) ..< carry.endIndex)
+            } else {
+                // No complete line buffered yet.
+                return []
+            }
+
+            let blockStart = processable.startIndex
+            defer { consumedBase += processable.count + 1 }
+
+            var ready: [ReadyBatch] = []
+            for lineData in processable.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true) {
+                // Latin-1 fallback: it never fails, so a stray non-UTF-8 line
+                // (older provider exports) degrades to mojibake instead of
+                // dropping the entry.
+                let raw = String(bytes: lineData, encoding: .utf8)
+                    ?? String(bytes: lineData, encoding: .isoLatin1)
+                guard let line = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty else { continue }
+
+                if let entry = state.consume(line: line, onHeader: onHeader) {
+                    batch.append(entry)
+                    totalCount += 1
+                    if batch.count >= batchSize {
+                        ready.append((batch, consumedBase + (lineData.endIndex - blockStart)))
+                        // Handing the array out shares its buffer, so
+                        // `removeAll(keepingCapacity:)` would have to copy;
+                        // a fresh right-sized one instead of re-growing 0→2,000.
+                        batch = []
+                        batch.reserveCapacity(batchSize)
                     }
                 }
             }
+            return ready
         }
 
-        if !batch.isEmpty {
-            onBatch(batch, consumedBase)
+        /// The trailing partial batch, once the file is exhausted.
+        mutating func finalBatch() -> ReadyBatch? {
+            guard !batch.isEmpty else { return nil }
+            defer { batch = [] }
+            return (batch, consumedBase)
         }
-        return totalCount
     }
 
     // MARK: - Line state machine

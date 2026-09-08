@@ -92,6 +92,13 @@ nonisolated extension PerfSignpost {
     static let m3uPruneSeries = PerfSignpost("M3UPruneSeries")
     static let m3uPruneCategories = PerfSignpost("M3UPruneCategories")
 
+    /// The post-sync persistent-history purge. Its own phase because it is the
+    /// only part of a catalog sync that does work the user gets nothing from —
+    /// it exists purely to give back what SwiftData wrote behind the writes.
+    /// Sits outside `.m3uImport`: every source path emits it, so it is not an
+    /// m3u sub-phase.
+    static let catalogPurgeHistory = PerfSignpost("CatalogPurgeHistory")
+
     // EPG
     static let epgSourceSync = PerfSignpost("EPGSourceSync")
     static let epgIngest = PerfSignpost("EPGIngest")
