@@ -188,19 +188,24 @@ nonisolated enum M3UIdentity {
     static func numericId(for string: String) -> Int {
         Int(bitPattern: UInt(truncatingIfNeeded: hash64(string)) & 0x7FFF_FFFF_FFFF_FFFF)
     }
+
+    // The composed row ids. `LumePerformanceTests` builds these to seed the
+    // stores it then times the shipped upsert against — a benchmark composing
+    // the shape by hand would silently measure inserts once this changed.
+
+    static func seriesId(playlistId: UUID, name: String) -> String {
+        "\(playlistId.uuidString)-series-\(key(for: name))"
+    }
+
+    static func episodeId(seriesId: String, url: String) -> String {
+        "\(seriesId)-episode-\(key(for: url))"
+    }
 }
 
 // MARK: - Sync pipeline
 
 extension ContentSyncManager {
     private static let uncategorizedGroup = "Uncategorized"
-
-    /// How many batches pass between progress publishes and between log lines.
-    /// A provider file runs ~860 batches, and every publish hops onto
-    /// SyncProgress's MainActor isolation; the final count is reported once the
-    /// import returns, so throttling here only coarsens the intermediate steps.
-    private static let progressBatchInterval = 5
-    private static let logBatchInterval = 50
 
     /// The m3u pipeline: download → classify/import → EPG.
     func performM3USync(playlist: Playlist, playlistId: UUID, progress: SyncProgress?) async throws {
@@ -235,8 +240,8 @@ extension ContentSyncManager {
         // owning the multi-minute wait, and one combined number hid that.
         // `Perf.measure` again, for the same reason: a cancelled import throws,
         // and that is now a routine path rather than an edge case.
-        let summary = try Perf.measure(.m3uImport) {
-            try importM3UFile(fileURL, playlistId: playlistId, progress: progress)
+        let summary = try await Perf.measure(.m3uImport) {
+            try await importM3UFile(fileURL, playlistId: playlistId, progress: progress)
         }
         let imported = summary.liveCount + summary.movieCount + summary.episodeCount
         recordM3UDigest(download.digest, playlistId: playlistId, importedCount: imported)
@@ -256,101 +261,13 @@ extension ContentSyncManager {
         markPlaylistUpdated(playlistId)
     }
 
-    /// Stream-parses the playlist file and upserts entries batch by batch.
-    /// Runs synchronously on the actor — the same shape as the Xtream batch
-    /// loops — with one fresh, autosave-off context per batch so memory stays
-    /// flat no matter how large the playlist is.
-    private func importM3UFile(_ fileURL: URL, playlistId: UUID, progress: SyncProgress?) throws -> M3UImportSummary {
-        let state = M3UImportState()
-        // Bytes, not entries: the parse learns the entry count only once it has
-        // finished, so the file size is the only denominator a running import
-        // can report a fraction against. 0 means "unknown" — the fraction then
-        // stays 0, which SyncProgress renders as indeterminate.
-        let totalBytes = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-
-        seedImportState(state, playlistId: playlistId)
-
-        var headerEPGURL: String?
-        // Parsing and importing interleave — the parser hands over a batch, the
-        // actor writes it, the parser resumes — so `.m3uParse` is emitted once
-        // per gap between batches. Wrapping the whole parse call instead would
-        // only restate `.m3uImport`.
-        var parseInterval = Perf.begin(.m3uParse)
-        var batchIndex = 0
-        try M3UParser.parse(fileURL: fileURL, batchSize: 2000) { header in
-            headerEPGURL = header.epgURL
-        } onBatch: { batch, bytesConsumed in
-            Perf.end(parseInterval)
-            defer { parseInterval = Perf.begin(.m3uParse) }
-            guard state.firstError == nil else { return }
-            if state.noteCancellationIfNeeded() { return }
-            do {
-                try autoreleasepool {
-                    try self.importBatch(batch, playlistId: playlistId, state: state)
-                }
-                batchIndex += 1
-                let imported = state.totalImported
-                if batchIndex.isMultiple(of: Self.logBatchInterval) {
-                    Logger.database.info("m3u import: \(imported) items so far")
-                }
-                if batchIndex.isMultiple(of: Self.progressBatchInterval) {
-                    let fraction = totalBytes > 0 ? min(1, Double(bytesConsumed) / Double(totalBytes)) : 0
-                    Task { await progress?.update(detail: "\(imported) items", fraction: fraction) }
-                }
-            } catch {
-                state.firstError = error
-            }
-        }
-        Perf.end(parseInterval)
-
-        if let error = state.firstError {
-            // A cancellation is rethrown as-is rather than wrapped: `syncPlaylist`
-            // reads that as an abort and parks the playlist idle, where a
-            // `SyncError.databaseError` would wedge it in `.error`.
-            throw error is CancellationError ? error : SyncError.databaseError(error)
-        }
-
-        // A cancel landing after the last batch still has to stop here: the
-        // seen-sets only name the part of the file that was read, so sweeping on
-        // them would delete every row the unread tail would have kept.
-        try Task.checkCancellation()
-
-        pruneStaleM3URows(playlistId: playlistId, state: state)
-
-        return M3UImportSummary(
-            liveCount: state.importedLive,
-            movieCount: state.importedMovies,
-            episodeCount: state.importedEpisodes,
-            headerEPGURL: headerEPGURL
-        )
-    }
-
     // MARK: - Batch import
 
-    /// One batch of entries split by classification.
-    private struct ClassifiedBatch {
-        var live: [M3UEntry] = []
-        var movies: [M3UEntry] = []
-        var episodes: [(M3UEntry, series: String, season: Int, episode: Int, title: String)] = []
-    }
-
-    private func importBatch(_ entries: [M3UEntry], playlistId: UUID, state: M3UImportState) throws {
+    /// Writes one already-classified batch. Classification happens off this
+    /// actor, in `M3UBatchClassifier`, so everything here is store work.
+    func importBatch(_ batch: M3UClassifiedBatch, playlistId: UUID, state: M3UImportState) throws {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
-
-        let batch: ClassifiedBatch = Perf.measure(.m3uClassify) {
-            var batch = ClassifiedBatch()
-            for entry in entries {
-                let classification = M3UClassifier.classification(of: entry)
-                switch classification.kind {
-                case .live: batch.live.append(entry)
-                case .movie: batch.movies.append(entry)
-                case let .episode(series, season, episode):
-                    batch.episodes.append((entry, series, season, episode, classification.episodeTitle))
-                }
-            }
-            return batch
-        }
 
         try ensureCategories(for: batch, playlistId: playlistId, state: state, context: context)
         Perf.measure(.m3uUpsertLive) { importLive(batch.live, playlistId: playlistId, state: state, context: context) }
@@ -370,7 +287,7 @@ extension ContentSyncManager {
     /// Creates any categories this batch references for the first time.
     /// Group titles double as the category's `apiId` — m3u has no numeric ids.
     private func ensureCategories(
-        for batch: ClassifiedBatch,
+        for batch: M3UClassifiedBatch,
         playlistId: UUID,
         state: M3UImportState,
         context: ModelContext
@@ -488,16 +405,16 @@ extension ContentSyncManager {
     }
 
     private func importEpisodes(
-        _ entries: [(M3UEntry, series: String, season: Int, episode: Int, title: String)],
+        _ entries: [M3UClassifiedEpisode],
         playlistId: UUID,
         state: M3UImportState,
         context: ModelContext
     ) {
         guard !entries.isEmpty else { return }
 
-        let seriesIds = entries.map { "\(playlistId.uuidString)-series-\(M3UIdentity.key(for: $0.series))" }
+        let seriesIds = entries.map { M3UIdentity.seriesId(playlistId: playlistId, name: $0.series) }
         let episodeIds = entries.enumerated().map { index, entry in
-            "\(seriesIds[index])-episode-\(M3UIdentity.key(for: entry.0.url))"
+            M3UIdentity.episodeId(seriesId: seriesIds[index], url: entry.0.url)
         }
         state.seenSeriesIds.formUnion(seriesIds.lazy.map(M3UIdentity.hash64))
         state.seenEpisodeIds.formUnion(episodeIds.lazy.map(M3UIdentity.hash64))
@@ -546,10 +463,16 @@ extension ContentSyncManager {
                     title: "",
                     containerExtension: M3UClassifier.pathExtension(of: entry.url) ?? "mp4",
                     seasonNum: season,
-                    episodeNum: episodeNum,
-                    series: series
+                    episodeNum: episodeNum
                 )
                 context.insert(episode)
+                // Assigned after `insert`, never through the initializer:
+                // wiring the inverse on an instance the context does not hold
+                // yet makes `insert` migrate it out of the transient backing
+                // store. 150k episodes, same catalog: 125.5 s / 557 MB peak
+                // that way, 25.1 s / 74 MB this way.
+                // See `M3UEpisodeRelationshipBenchmarks`.
+                episode.series = series
                 existingEpisodes[episodeId] = episode
             }
             applyM3UEpisodeFields(from: entry, title: episodeTitle, to: episode)

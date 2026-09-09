@@ -71,7 +71,20 @@ final class Movie {
     /// When the title was last enriched from TMDB; nil means never.
     var tmdbEnrichedAt: Date?
     /// TMDB ids of similar titles, in TMDB's order, for "You May Also Like".
-    var similarTMDBIds: [Int] = []
+    ///
+    /// Optional on purpose: a non-optional `[Int] = []` is not free — SwiftData
+    /// archives an empty array as a ~219-byte `bplist00` BLOB on every row that
+    /// was never enriched, which on a large provider catalog is tens of MB of
+    /// pure NSKeyedArchiver round trips written during the cold import. `nil`
+    /// means "never enriched" and costs nothing. `trailersData` and
+    /// `externalRatingsData` below are optional for the same reason — do not
+    /// "tidy" this back to a defaulted array.
+    ///
+    /// `nil` and `[]` mean the same thing and must be read as such: lightweight
+    /// migration leaves rows written by the previous schema holding their
+    /// archived empty array, so a pre-upgrade catalog reads `[]` where a freshly
+    /// imported one reads `nil`. Never use `nil` as a "never enriched" sentinel.
+    var similarTMDBIds: [Int]?
     /// Encoded `[TitleVideo]` blob. SwiftData reliably persists `Data`, whereas a
     /// stored `[TitleVideo]` attribute (a collection of a custom Codable struct)
     /// traps in `ModelCoders` at save time. Access through `trailers`.
@@ -176,6 +189,14 @@ enum DownloadStatus: String, Codable {
 }
 
 extension Movie {
+    /// TMDB ids of similar titles. `similarTMDBIds` stores `nil` for "none" —
+    /// an empty array still archives a BLOB per row — and reads back as `[]` on
+    /// rows the previous schema wrote, so both ends of that rule live here.
+    var similarTitleIds: [Int] {
+        get { similarTMDBIds ?? [] }
+        set { similarTMDBIds = newValue.isEmpty ? nil : newValue }
+    }
+
     /// YouTube videos (trailers, teasers, clips) from TMDB, in display order.
     /// Backed by `trailersData` so SwiftData persists it as a plain `Data` blob.
     var trailers: [TitleVideo] {

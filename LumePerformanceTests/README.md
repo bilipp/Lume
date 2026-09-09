@@ -10,6 +10,13 @@ Scripts/run-performance-tests.sh ParsingBenchmarks                # one suite
 Scripts/run-performance-tests.sh ParsingBenchmarks/testXMLTVDateParsing
 ```
 
+The script builds into its own `-derivedDataPath` (`/tmp/lume-perf-dd`, override
+with `LUME_PERF_DD`) and pairs it with `-clonedSourcePackagesDirPath`
+(`~/Library/Developer/Lume-SharedSPM`, override with `LUME_PERF_SPM`). The pair
+is not optional: a private DerivedData without a shared package clone re-clones
+the whole package graph — KSPlayer's FFmpeg xcframeworks plus VLCKit's 865 MB
+one, ~6.4 GB per build dir.
+
 ## Why a separate configuration
 
 The suite builds under **Benchmark** = Release settings + `ENABLE_TESTABILITY`
@@ -21,11 +28,13 @@ measurement into fiction. `ENABLE_TESTABILITY` is what still allows
 `Benchmark` was added rather than reusing Release because enabling testability on
 Release would change what ships. Debug, Release and Sideload are untouched.
 
-## The four layers
+## The layers
 
 | Layer | Where | What it catches |
 |---|---|---|
 | Microbenchmarks | `ParsingBenchmarks`, `PersistenceBenchmarks`, `M3UPersistenceBenchmarks`, `EPGQueryBenchmarks` | Parser / import / query regressions |
+| End-to-end import | `M3UColdImportBenchmarks` | The whole production cold import, phase by phase |
+| Attribution harnesses | `M3UEpisodeRelationshipBenchmarks`, `M3UExistingRowFetchBenchmarks` | Which part of an import loop the time is actually in |
 | Signpost metrics | `SignpostBenchmarks` | A named production phase getting slower |
 | Field telemetry | `AppPerformanceMetrics` (MetricKit) in the app | What users actually experience |
 | Player QoE | `PlaybackQoE` in the app | Join time, rebuffering, startup failures |
@@ -81,26 +90,61 @@ which took ~4 minutes on an Apple TV 4K. Everything below was measured against
 that shape. Absolute seconds are from an iPhone 17 Pro simulator under the
 Benchmark configuration; the ratios are the portable part.
 
-**`context.save()` is ~90% of it.** Decode, object construction and the upsert
-lookup share the remaining tenth. An optimisation that does not reduce how much
-SwiftData has to write, or how often it is asked to write, is aimed at the wrong
-tenth.
+**`context.save()` is ~90% of it — on the Xtream path.** Decode, object
+construction and the upsert lookup share the remaining tenth. That figure was
+measured on the 282,288-row Xtream catalog described above, whose rows are
+47,568 series *shells* and no episodes at all, and it was never re-attributed to
+anything else. It does **not** describe the m3u cold path, where 86% of the
+entries are episodes: there, the largest single item turned out to be neither a
+`save()` nor a fetch but the `Episode` → `Series` relationship being wired
+through the initializer — 83% of episode-insert time, and 64% of the whole
+import (see *The m3u cold path, measured end to end* below). Read the 90% as
+what it is: the Xtream refresh's shape.
 
 ### Levers that were measured and are dead
 
 Each of these moved import cost by **under 6%** — under the run-to-run noise of a
-warm laptop. They were measured on a standalone 178k-row harness rather than
-through the suite, so the seconds below are internally comparable but do not line
-up with the benchmark table further down. Recorded so nobody spends another day
-on them:
+warm laptop. Recorded so nobody spends another day on them:
 
-| Lever | Result |
-|---|---|
-| `batchSize` 500 / 2,000 / 10,000 / 50,000 | all within noise |
-| Dropping all 11 `#Index` groups on `Movie` | 61.1 s → 60.9 s |
-| Removing `@Attribute(.unique)` | 15.98 s → 15.83 s |
-| Removing the per-batch existing-row lookup | 62.8 s → 62.6 s |
-| One shared context instead of a fresh one per batch | 19.68 s → 19.01 s |
+| Lever | Result | Re-measured since |
+|---|---|---|
+| `batchSize` 500 / 2,000 / 10,000 / 50,000 | all within noise | no |
+| Dropping all 11 `#Index` groups on `Movie` | 61.1 s → 60.9 s | no |
+| Removing `@Attribute(.unique)` | 15.98 s → 15.83 s | no |
+| Removing the per-batch existing-row lookup | 62.8 s → 62.6 s | **yes** — still cheap at 1.5M rows, see below |
+| One shared context instead of a fresh one per batch | 19.68 s → 19.01 s | no |
+
+**Read that table with two caveats.** It was measured on a standalone 178k-row
+harness that is *not in the repo* and cannot be re-run, so the seconds are
+internally comparable and line up with nothing else here. And it was measured on
+a movie-shaped catalog: index maintenance on bulk insert is superlinear in table
+size, so "6% at 178k rows" does not automatically transfer to the 1.5M-row
+`Episode` table an m3u cold import builds. Treat every row without a *yes* in the
+last column as **unverified for the episode-dominated cold path** — not wrong,
+just never checked there.
+
+The one row that was re-checked is the per-batch existing-row lookup, because
+`importEpisodes` runs two `IN`-clause fetches of up to 2,000 ids each against
+tables that grow to 1.5M rows. `M3UExistingRowFetchBenchmarks` times a single
+such fetch on a fresh `ModelContext`, mean of 20:
+
+| `Episode` rows in the table | 150k | 500k | 1.5M |
+|---|---|---|---|
+| Episodes, contiguous ids (the production shape) | 43.41 ms | 42.46 ms | 42.29 ms |
+| Episodes, ids spread across the table | 51.39 ms | 60.13 ms | 70.18 ms |
+| Series, deduped to ~60 ids | 3.61 ms | 3.74 ms | 3.76 ms |
+
+A real batch is 2,000 consecutive file entries, so the contiguous row is what
+production pays and it is **flat** — the unique index absorbs the extra tree
+depth, and only the spread control grows (+37% over 10× the rows). What that
+scan pays for is page locality, not table size. At ~46 ms per batch and 743
+batches both lookups together are ~34 s of a full-file import, which keeps the
+original "under 6%" verdict at provider scale — and that is an upper bound,
+since a cold import's fetches match nothing and so never materialise the 2,000
+rows these numbers include. **Do not remove the lookup** regardless of what it
+costs: `@Attribute(.unique)` turns a duplicate insert into a full-row UPSERT
+that resets `isFavorite` / `watchProgress` / enrichment (the bug fixed in
+f12b4b1), and an m3u file repeats stream URLs.
 
 `batchSize` stays at 2,000 as a **memory** contract, not a throughput one — which
 is why `PersistenceBenchmarks` reproduces the per-batch context shape deliberately
@@ -210,14 +254,42 @@ not here leaves it measuring a dirty check the app no longer has. What pins the
 production path is `M3UFieldApplicationTests` and
 `M3USeriesFieldApplicationTests`, not this benchmark.
 
-First run, iPhone 17 Pro simulator, Benchmark configuration — one machine, one
-sitting, so these are comparable to each other and to nothing else:
+That is not a hypothetical. `importEpisodes` moved its `episode.series`
+assignment out of the `Episode` initializer to after `context.insert`, and until
+the copy here was moved with it this benchmark was measuring an insert shape the
+app no longer performs — one that costs ~5× the clock and ~7× the peak
+footprint. The copies are back in lockstep as of that change; the numbers in the
+table below are from after it.
 
-| Benchmark | Clock | Peak RSS |
+`M3UColdImportBenchmarks` now covers the same store work through the *real*
+`ContentSyncManager`, which raises the fair question of whether these
+hand-written copies still earn their place. They do, for one reason: they are
+the only isolated **re-import** measurement on the m3u path
+(`testReimportFullM3UCatalogUnchanged`), and the cold suite's 600k import is ~3
+minutes per pass against this file's seconds. Keep them for the re-import and
+prune rows; reach for the cold suite for anything about a first import.
+
+iPhone 17 Pro simulator, Benchmark configuration — one machine, one sitting, so
+each column is comparable to itself and to nothing else. The *first* column is
+the original PR #202 run; the *now* column is after the cold-import work on this
+branch, which changed the model (`similarTMDBIds` optional) and this file (the
+`episode.series` lockstep fix), so the movement is not attributable to any one
+of them:
+
+| Benchmark | Clock (then → now) | Peak RSS (then → now) |
 |---|---|---|
-| `testImportFullM3UCatalog` (cold, ~177k rows) | 27.02 s | 248 MB |
-| `testReimportFullM3UCatalogUnchanged` | **5.21 s** | 242 MB |
-| `testPruneFullEpisodeCatalogWithNoDeletions` | 0.75 s | 243 MB |
+| `testImportFullM3UCatalog` (cold, ~177k rows) | 27.02 s → 25.99 s | 248 MB → **67.5 MB** |
+| `testReimportFullM3UCatalogUnchanged` | **5.21 s** → 5.75 s | 242 MB → **61.0 MB** |
+| `testPruneFullEpisodeCatalogWithNoDeletions` | 0.75 s → 0.81 s | 243 MB → **62.7 MB** |
+
+The clock is flat here while the cold-import suite's episode loop fell 5×, and
+that is informative rather than contradictory: this fixture divides its ~148k
+episodes evenly over 4,740 shows (~31 each), so no `Series.episodes` inverse
+ever holds more than a few dozen members. The real file's tail runs to 2,799,
+and the relationship cost scales with how big the inverse array gets — which is
+why the shape of the fixture, not just its row count, is what
+`M3UColdImportBenchmarks` and `M3UEpisodeRelationshipBenchmarks` were built to
+get right.
 
 The re-import is ~5x cheaper than the cold pass, which is the dirty check and the
 `hasChanges` gate doing on the m3u path what they already do on the Xtream one.
@@ -248,7 +320,7 @@ file:
 |---|---|---|
 | Season/episode regex, per import | ~75 s | ~21x cheaper |
 | The four seen-id registries, resident | +337 MB | ~19–33 MB |
-| `M3UParser.parse` peak RSS | 502 MB | 10 MB |
+| `M3UParser` peak RSS | 502 MB | 10 MB |
 
 **The regex was compiled 1,719,199 times, and then again 1,484,110 times.**
 `M3UClassifier.episodeInfo` declared its pattern as a literal inside the function
@@ -278,9 +350,12 @@ benign: a collision makes the sweep *keep* a stale row, never delete a live one.
 
 **The parser's chunk loop had no `autoreleasepool`.** `String(bytes:encoding:)`,
 `trimmingCharacters` and `Data.subdata`/`split` all autorelease per line, and
-`importM3UFile` is one uninterrupted synchronous stretch inside an actor job with
-no suspension point, so the enclosing pool never drained until the whole file was
-done: 502 MB peak RSS against 10 MB with a pool around the loop body.
+`importM3UFile` was then one uninterrupted synchronous stretch inside an actor
+job with no suspension point, so the enclosing pool never drained until the whole
+file was done: 502 MB peak RSS against 10 MB with a pool around the loop body.
+The import has since been split into a producer task and a consumer on the actor
+(`ContentSyncManager+M3UStream.swift`), which is why each side now carries its
+**own** pool — one pool on one side would drain neither the other's.
 `ParsingBenchmarks.testM3UParse120kEntries` cannot see this — 120k entries is only
 ~35 MB, well under where it hurts — which is why the number above is from the real
 file and not from the suite.
@@ -290,6 +365,155 @@ Attribution for all of this comes from the sub-phase signposts added alongside i
 sweep), nested inside the existing `M3UImport` boundary so older traces and
 baselines still resolve. Before them the m3u import was a single opaque number and
 none of the above could have been ranked.
+
+### The m3u cold path, measured end to end
+
+`M3UColdImportBenchmarks` is the first benchmark that drives the *production*
+cold import: it seeds a real `Playlist` whose `m3uURL` is a `file://` URL and
+calls `ContentSyncManager.syncPlaylist`, so the number covers the download stub,
+the streaming parse, classification, `ensureCategories`, `seedInsertOrder`, the
+three upsert loops, all five prune sweeps and the history purge — everything a
+user waits on except the network. `M3UPersistenceBenchmarks` measures the store
+work through hand-written copies and skips all the rest of that.
+
+- **Fixture.** `PerfFixtures.writeM3UProviderShape`, which bakes in the measured
+  provider mix (3% live / 11% movie / 86% episode) and the per-series long tail
+  (median 12, p99 279, max 2,799) with each show's episodes contiguous. The flat
+  `writeM3U` would miss the tail the episode cost is made of.
+- **Scale.** One constant, `entryCount`, at **600,000** — the real provider file
+  is 1,729,847. Raise that constant and nothing else to measure closer to full
+  scale (`showCount` is derived from it); a pass costs roughly linearly in it.
+  Don't commit a raise, or every future comparison shifts.
+- **Store.** `PerfStore.makeOnDiskContainer()`, destroyed per iteration. The
+  fixture is written once in `setUp` — 600k entries is ~180 MB and takes real
+  time — and both `M3UDigestStore` and `SweepSkipDefaults` are cleared around
+  every iteration, or the second pass measures `m3uImportIsRedundant` returning
+  early and reports a no-op as a win.
+- **Both metrics in one pass.** `XCTClockMetric` *and* `XCTMemoryMetric`
+  together: peak RSS is the Apple TV jetsam contract (no swap — a jetsammed sync
+  reads as "the sync never finishes"), and it has moved independently of the
+  clock more than once on this branch. Measuring them in separate passes would
+  double a ~3-minute import for no extra information.
+- **Every signpost in the same pass, too.** All twelve names — the eleven
+  `M3U*` ones plus `CatalogPurgeHistory` — go into the same `metrics:` array. One test per signpost would mean one full 600k import
+  per signpost.
+
+**`.m3uParse` is emitted once per *gap between batches*** — the parse and the
+write interleave, so it brackets the parser's turn, ~301 intervals at 600k
+entries and ~860 on the real file. A check that expects a single interval finds
+none. The same is true of `.m3uClassify` and the three `.m3uUpsert*`, which are
+per batch. `XCTOSSignpostMetric` keeps **one value per name per iteration** and
+that value is the *first* interval, not their sum, so read those five as a
+first-batch sample and not as a phase total. `.m3uImport`, the five sweeps and
+`.catalogPurgeHistory` are one interval each and are exact. The purge is
+emitted from `performSync` for every source, so it sits beside `.m3uImport`
+rather than inside it.
+
+`SignpostBenchmarks.testM3UImportSignposts` drives the same twelve names over a
+400-entry playlist. It is a tripwire, not a number: a renamed or dropped
+signpost otherwise turns this suite's per-phase split into silence rather than
+into a failure.
+
+#### Baseline vs final
+
+The m3u cold-import work, measured on this suite from end to end. iPhone 17 Pro
+simulator (iOS 26.4), Benchmark configuration, 600,000 entries / 15,000 shows —
+which the import resolves to 18,000 live, 66,000 movies and 516,000 episodes.
+One machine, one sitting; comparable to each other and to nothing else.
+
+| Stage | Clock | Peak RSS |
+|---|---|---|
+| Baseline (branch point) | 571.5 s | 1,120,276 kB |
+| `similarTMDBIds` optional on `Movie`/`Series` | 553.8 s | 1,082,314 kB |
+| Post-import persistent-history purge | 555.3 s | 1,140,232 kB |
+| `episode.series` assigned after `context.insert` | **200.2 s** | **173,214 kB** |
+| Bounded producer/consumer + classification off the writer | 188.3 s | 169,757 kB |
+| Final confirmation run | 191.9 s | 154,930 kB |
+| Re-run after the quality/simplify pass | 208.5 s | 194,972 kB |
+| **Total** | **571.5 s → 208.5 s (−63.5%, 2.7×)** | **1,094 MB → 190 MB (−83%, 5.7×)** |
+
+Rows four through six are, for the measured path, the same code; the spread
+between them (+1.9% then +8.6% on the clock, −8.7% then +25.8% on peak) is
+wider than one sitting's noise and is worth naming rather than averaging away.
+Two candidate explanations, neither separated by a single iteration each: the
+simplify pass did touch this path (the `similarTitleIds` accessor, the shared
+`PerfSupport` sync harness, the purge moving to `performSync`), and the machine
+had been building and testing continuously for ~8 hours by the last run — this
+file's own rule is that "a laptop that just finished a full build is 20–30%
+slower than a cold one", which covers a +8.6% clock on its own but not a +26%
+peak. Treat 208.5 s / 190 MB as the honest current figure and 191.9 s / 155 MB
+as the best seen; re-measure both on a cold machine with `iterationCount` > 1
+before crediting or blaming the simplify pass.
+
+Where the 191.9 s goes, from the same pass:
+
+| Phase | Seconds | Notes |
+|---|---|---|
+| `M3UImport` | 194.889 | one interval, the whole import |
+| ├ batch loop | ~130.0 | parse + classify + `ensureCategories` + the three upserts |
+| └ sweeps + purge | 64.923 | 33% of the import |
+| `M3UPruneEpisodes` | 58.301 | the single most expensive named phase now |
+| `M3UPruneMovies` | 4.456 | |
+| `M3UPruneSeries` | 0.730 | |
+| `M3UPruneLive` | 0.542 | |
+| `M3UPruneCategories` | 0.038 | |
+| `CatalogPurgeHistory` | 0.856 | measured while it still ran inside `M3UImport` |
+| `M3UParse` | 0.019 | **first inter-batch gap only** — ~301 of them, so ~6 s scaled |
+| `M3UClassify` | 0.021 | first batch only; ~6 s scaled |
+| `M3UUpsertLive` | 0.036 | first batch (2,000 live rows) |
+| `M3UUpsertMovies` / `M3UUpsertEpisodes` | ~0 | this fixture emits all live entries first, so batch 1 has neither |
+
+Splitting the three upsert loops against each other needs an Instruments Points
+of Interest trace; `XCTOSSignpostMetric` cannot, by construction (see the
+`.m3uParse` note above). What the batch loop is made of was answered instead by
+`M3UEpisodeRelationshipBenchmarks`, and that answer is the whole table above:
+104.7 s of a 126.3 s isolated episode loop was the relationship wiring alone.
+
+**Which levers actually moved the number.** One did almost all of it — moving
+`episode.series` after `context.insert`, worth −355 s and −967 MB, because
+building an `Episode` with `series:` set leaves an unregistered instance holding
+a relationship that `insert` then has to migrate out of the transient backing
+store. Taking classification off the writer was worth −12 s. Making
+`similarTMDBIds` optional was worth −18 s and −38 MB, all of it archiver
+round-trips on never-enriched rows. The history purge is not a throughput lever
+at all and was never expected to be: SwiftData records history unconditionally,
+so the purge only gives the pages back afterwards (~34 bytes per catalog row,
+~58 MB on the real file) for 0.86 s.
+
+**The `similarTMDBIds` row is not a migration event.** Every figure above comes
+from a store the suite created from scratch, so the optionality change was
+checked separately against a real `default.store` written by the *pre-change*
+schema (67 `Movie` and 23 `Series` rows, 58 of the movies holding the 219-byte
+archived empty array). Opened under the current schema it needs no migration at
+all: Core Data's `NSStoreModelVersionHashes` entry for `Movie` is byte-identical
+before and after — an attribute's optionality is not part of its version hash —
+and all 67 rows read back non-`nil`, i.e. legacy rows are `Optional([])` and
+only freshly imported ones are `nil`. Worth re-checking the same way after any
+further catalog attribute change, because the catalog container has no
+`VersionedSchema`/`MigrationPlan` and a load failure is a launch-time
+`fatalError` outside `DEBUG`: copy a pre-change `default.store` out of the
+simulator container and open it with the current schema.
+
+**Two things in this programme have no number, deliberately.** `ImportPacing`
+adds exactly zero delay at `.nominal` with Low Power Mode off, which is the only
+state a simulator ever reports, so it cannot move a benchmark and is pinned by
+stubbed unit tests instead. And 5a — the bounded producer/consumer channel — was
+never measured on its own; it shipped as the structural half of the pair whose
+combined effect is the −12 s row.
+
+**What is left on the table.** `M3UPruneEpisodes` is now a third of the import
+and has had no attention on this branch: it walks 516k rows with keyset paging
+purely to establish that nothing went away. Skipping it on a genuinely first
+import is the obvious idea and it is *not* free — an empty `lastSyncDate` does
+not prove an empty store, because a cancelled import commits the batches it
+finished, so the cheap test for "cold" is the one thing that has to be got right
+before the sweep can be skipped. Below that, the parse and classification are
+~12 s combined and the writer is the critical path by ~5×, which is why fanning
+classification across cores measured *slower* (see `M3UBatchClassifier`). And
+the file itself is the reason any of this is minutes: 600k entries here against
+1,729,847 in the real thing, so multiply by ~2.9 for the shape of a real cold
+import — and by an unknown factor again for a phone's NAND and thermals, which
+this suite cannot see.
 
 ### `num` is insert-only, and that is what makes the dirty check pay
 
@@ -347,13 +571,20 @@ stores 47,568 series shells and fetches a series' episodes on demand. Converting
 m3u to the same lazy shape is the single largest remaining lever and it is
 **deliberately not part of this work**.
 
-What is not known: every `Episode.series` assignment faults the `Series.episodes`
-inverse, ~1.48M times, and nobody has isolated that cost. It could dominate
-everything measured above. It is also the shape behind closed issue #45's
-`PersistentIdentifier … remapped to a temporary identifier` fatal error, so the
-question is not only "how slow" but "how safe". The `M3UUpsertEpisodes` signpost
-is what will answer it, on a device, against the real file — the benchmarks here
-run at a tenth scale, where a tenth of an unknown is still an unknown.
+It stayed deferred, but it is no longer the open question it was. The
+relationship cost that made it look like the only remaining lever has been
+isolated (`M3UEpisodeRelationshipBenchmarks`) and then removed in place: wiring
+`Episode.series` through the initializer was 83% of episode-insert time, and
+assigning it one statement later — after `context.insert` — took the isolated
+loop from 125.53 s / 557 MB to 25.10 s / 74 MB, within 3.5 s of never assigning
+the relationship at all. Eager materialisation now costs roughly what writing
+the rows costs. The lazy shape would still save the writes themselves, so it
+remains the largest theoretical lever, but it is no longer buying back a hidden
+5×.
+
+It is also the shape behind closed issue #45's `PersistentIdentifier … remapped
+to a temporary identifier` fatal error, so the question was never only "how
+slow" but "how safe".
 
 What makes it a separate decision rather than an optimisation: Continue Watching,
 Up Next, `NextEpisodeResolver`, offline episode browsing, episode search,
@@ -471,9 +702,18 @@ xcodebuild -project Lume.xcodeproj -scheme LumePerformance \
 
 `Perf` posts to an `OSSignposter` whose **subsystem is the app's bundle
 identifier** (`com.bilipp.lume`) and whose **category is `Performance`**. That
-feeds Instruments' Points of Interest lane, so the trace shows
-`SyncMovies` / `XtreamFetchMovies` / `XtreamDecodeMovies` / `UpsertMovies` /
-`PruneMovies` as intervals rather than an undifferentiated wall of stacks.
+feeds Instruments' Points of Interest lane, so the trace shows the sync phases
+as intervals rather than an undifferentiated wall of stacks — for an Xtream
+playlist `SyncMovies` / `XtreamFetchMovies` / `XtreamDecodeMovies` /
+`UpsertMovies` / `PruneMovies`, and for an m3u one the twelve `M3UDownload` /
+`M3UImport` / `M3UParse` / `M3UClassify` / `M3UUpsertLive` / `M3UUpsertMovies` /
+`M3UUpsertEpisodes` / `M3UPruneLive` / `M3UPruneMovies` / `M3UPruneEpisodes` /
+`M3UPruneSeries` / `M3UPruneCategories`, plus the source-neutral
+`CatalogPurgeHistory` after either. The m3u names are the same ones
+`M3UColdImportBenchmarks` measures, so an Apple TV trace and a simulator run are
+comparable *phase by phase* even though their absolute seconds are not — and
+this recipe is the only way to see the m3u pipeline on an Apple TV at all, since
+`LumePerformanceTests` excludes `appletvos`.
 
 ```bash
 xcrun xctrace record \
@@ -486,7 +726,10 @@ xcrun xctrace record \
   --output ~/Desktop/lume-sync-tvos.trace
 ```
 
-Start the recording, then trigger the sync on the device. `--attach Lume` keeps
+Start the recording, then trigger the sync on the device — add the playlist of
+the kind you are measuring (an m3u URL for the `M3U*` phases, Xtream credentials
+for the `Xtream*` ones); a refresh of an already-imported playlist measures a
+warm path, not the cold import the complaints are about. `--attach Lume` keeps
 launch out of the trace; use `--launch -- <path to Lume.app>` instead if the
 question is about launch. Filter the os_signpost instrument to subsystem
 `com.bilipp.lume`, category `Performance`.
@@ -524,7 +767,71 @@ lines in the exported debug log are the only telemetry Apple TV has.
 `.xcbaseline` files are keyed by a hardware hash. An Apple TV baseline is
 therefore a separate entry in `xcbaselines/…` and must never overwrite the iOS
 one — accepting a device measurement over a simulator baseline silently
-re-points every future comparison at different hardware.
+re-points every future comparison at different hardware. The same is true of an
+iPhone baseline: a device run is an *additional* entry, never an overwrite of
+the simulator one.
+
+## Tracing a real iPhone
+
+Everything the simulator suite reports is CPU and resident memory on a Mac. The
+complaint that started the m3u work — "6–8 minutes, the phone gets hot, 10% of
+the battery" — has three components the simulator physically cannot see:
+
+- **NAND write cost.** The simulator's store is a file on an SSD backed by page
+  cache and effectively unlimited write bandwidth. A phone's flash is not, and a
+  1.7M-row import is the largest sustained write the app ever performs.
+- **Thermal throttling.** A simulator never reports anything but
+  `.nominal`, which is exactly why `ImportPacing` takes its thermal state as an
+  injected closure and why its policy is pinned by stubbed unit tests rather
+  than by a measurement.
+- **Battery.** Not observable from a test at all; read it from the Energy Log
+  instrument or Settings → Battery after a cold import.
+
+So a device number is a different measurement, not a more accurate version of
+the same one — quote it as its own row, never as a correction to a simulator
+row.
+
+### 1. Install a Benchmark build
+
+As with the Apple TV: select the **LumePerformance** scheme and Run against the
+phone, or
+
+```bash
+xcrun xctrace list devices                       # find the iPhone UDID
+xcodebuild -project Lume.xcodeproj -scheme LumePerformance \
+  -destination 'platform=iOS,id=<IPHONE_UDID>' build
+```
+
+Never trace a Debug build.
+
+### 2. Record the import phases — from the GUI
+
+**`xctrace --attach` against a physical iPhone wedges on Xcode 26**: the
+recording never finalizes and the `.trace` is unreadable. Record from the
+Instruments GUI instead — *Time Profiler* + *os_signpost* + *Points of
+Interest*, target the device and the Lume process, start recording, add the
+playlist on the phone, stop when the sync cover disappears. Then read the
+intervals from the command line:
+
+```bash
+xcrun xctrace export --input ~/Desktop/lume-m3u-iphone.trace --toc
+xcrun xctrace export --input ~/Desktop/lume-m3u-iphone.trace \
+  --xpath '/trace-toc/run[@number="1"]/data/table[@schema="os-signpost"]'
+```
+
+Filter os_signpost to subsystem `com.bilipp.lume`, category `Performance`. The
+twelve signpost names are the same ones `M3UColdImportBenchmarks` measures, so a
+device trace and a simulator run are directly comparable *phase by phase* even
+though their absolute seconds are not.
+
+### 3. Footprint is a second pass, thermals a third
+
+Allocations and VM Tracker distort wall clock too much to share a run with the
+Time Profiler, so peak footprint needs its own recording (*Allocations* + *VM
+Tracker*, same target). Thermal behaviour needs a third: the phone has to be
+warm before the import starts for `.serious` to appear at all, so record it
+after a long playback session or a previous import rather than from cold. Three
+questions, three passes — trying to answer them in one gives three bad answers.
 
 ## Deliberately not covered
 

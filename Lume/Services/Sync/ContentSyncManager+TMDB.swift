@@ -85,7 +85,7 @@ nonisolated func applyMovieDetails(
     movie.tagline = details.tagline ?? movie.tagline
     movie.contentRating = details.contentRating ?? movie.contentRating
     movie.imdbId = details.imdbId ?? movie.imdbId
-    movie.similarTMDBIds = details.similarIDs
+    movie.similarTitleIds = details.similarIDs
     movie.trailers = details.videos
 
     if (movie.plot ?? "").isEmpty, let overview = details.overview {
@@ -140,7 +140,7 @@ nonisolated func applySeriesDetails(
     series.tagline = details.tagline ?? series.tagline
     series.contentRating = details.contentRating ?? series.contentRating
     series.imdbId = details.imdbId ?? series.imdbId
-    series.similarTMDBIds = details.similarIDs
+    series.similarTitleIds = details.similarIDs
     series.trailers = details.videos
 
     if (series.plot ?? "").isEmpty, let overview = details.overview {

@@ -51,8 +51,7 @@ extension ContentSyncManager {
             Logger.database.info("Xtream phase spacing already elapsed; continuing immediately")
             return
         }
-        let seconds = Double(remaining.components.seconds)
-            + Double(remaining.components.attoseconds) / 1e18
+        let seconds = remaining.seconds
         Logger.database.info(
             "Xtream phase spacing: waiting \(seconds, privacy: .public)s for the provider connection slot"
         )

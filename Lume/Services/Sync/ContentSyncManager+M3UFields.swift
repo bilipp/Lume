@@ -78,10 +78,14 @@ extension ContentSyncManager {
 // MARK: - Existing-row lookups for in-place upsert
 
 extension ContentSyncManager {
+    // Both are `nonisolated`: they read nothing but the context handed to them,
+    // which is what lets `LumePerformanceTests` time the shipped descriptors
+    // instead of a copy of them.
+
     /// The m3u counterpart of `existingSeries(in:playlistId:context:)`: a batch
     /// names the same series once per episode, so the ids are deduplicated
     /// before the fetch.
-    func existingSeries(ids: [String], context: ModelContext) -> [String: Series] {
+    nonisolated func existingSeries(ids: [String], context: ModelContext) -> [String: Series] {
         let uniqueIds = Array(Set(ids))
         var lookup: [String: Series] = [:]
         let fetched = (try? context.fetch(
@@ -93,7 +97,7 @@ extension ContentSyncManager {
         return lookup
     }
 
-    func existingEpisodes(ids: [String], context: ModelContext) -> [String: Episode] {
+    nonisolated func existingEpisodes(ids: [String], context: ModelContext) -> [String: Episode] {
         var lookup: [String: Episode] = [:]
         let fetched = (try? context.fetch(
             FetchDescriptor<Episode>(predicate: #Predicate { ids.contains($0.id) })
