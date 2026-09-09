@@ -85,6 +85,11 @@ final nonisolated class ImageMemoryCache: @unchecked Sendable {
 
     func removeAll() {
         cache.removeAllObjects()
+        // Clearing the caches is the user's "artwork is broken, try again" button
+        // (Settings → Storage). The pipeline's negative cache has to go with them:
+        // otherwise the URLs that failed minutes ago stay frozen out and the clear
+        // looks like it did nothing for the very posters that prompted it.
+        Task { await ImagePipeline.shared.forgetFailures() }
     }
 
     /// Drops every decoded image and logs why. Called on memory warnings and when
@@ -147,24 +152,31 @@ nonisolated enum ImageDecoder {
     /// edge — this both saves memory and is far faster than decoding full-size
     /// artwork only to draw it into a small card. `nil` decodes at full
     /// resolution (used for tvOS 4K heroes).
+    ///
+    /// Both sizes go through the same ImageIO path because of
+    /// `kCGImageSourceShouldCacheImmediately`: it forces the pixels to be produced
+    /// *here*, on the pipeline's detached load task. `PlatformImage(data:)` — what
+    /// the full-resolution branch used to return — only wraps the bytes, so the
+    /// decode happened lazily on the main thread the first time the image was
+    /// drawn: a whole 4K JPEG, on the frame a hero or backdrop fades in. Leaving
+    /// `kCGImageSourceThumbnailMaxPixelSize` unset yields the original dimensions,
+    /// so full resolution still means full resolution.
     static func decode(_ data: Data, maxPixelSize: CGFloat?) -> PlatformImage? {
-        guard let maxPixelSize else {
-            return PlatformImage(data: data)
-        }
-
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
             return PlatformImage(data: data)
         }
 
-        let thumbnailOptions = [
+        var thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
-        ] as CFDictionary
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        if let maxPixelSize {
+            thumbnailOptions[kCGImageSourceThumbnailMaxPixelSize] = maxPixelSize
+        }
 
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) else {
             return PlatformImage(data: data)
         }
 

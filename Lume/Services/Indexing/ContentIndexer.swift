@@ -10,8 +10,10 @@
 //  Designed to run slowly in the background: items are processed in small
 //  chunks on a dedicated ModelContext with pauses in between, so neither TMDB
 //  nor the main thread is hammered. The loop waits while a playlist sync is
-//  running and while the player is up — even a background-context save forces
-//  the main context to merge and re-run every @Query, which hitches KSPlayer.
+//  running, while an iCloud import is in flight, while the player is up and
+//  while the user is browsing — even a background-context save forces the main
+//  context to merge and re-run every @Query, which hitches KSPlayer and stalls
+//  browsing on a large catalog.
 //
 
 import Foundation
@@ -28,7 +30,17 @@ actor ContentIndexer {
     /// Pause between items — keeps TMDB traffic to a couple of requests per
     /// second at most.
     private let itemPause: Duration = .milliseconds(100)
-    /// Pause before re-checking when a sync or playback blocks indexing.
+    /// Extra pause between chunks, on top of the per-item pauses inside one.
+    /// A chunk ends in the save whose main-context merge re-runs every @Query,
+    /// so this is the knob that sets how often the whole app is disturbed:
+    /// 50 items × `itemPause` put a merge roughly every 5 s of a foreground
+    /// session — the same cadence that used to hitch KSPlayer — and this pushes
+    /// it towards 7 s. It costs run time (a full 227k-title pass is hours
+    /// either way) and buys back merges, which is the right trade: nobody is
+    /// waiting on the index.
+    private let chunkPause: Duration = .seconds(2)
+    /// Pause before re-checking when a sync, playback or browsing blocks
+    /// indexing.
     private let busyPause: Duration = .seconds(20)
     /// First wait before retrying a failed embedding-asset download; doubles
     /// each attempt up to `assetRetryMaxPause`. The OTA asset request times out
@@ -71,6 +83,11 @@ actor ContentIndexer {
             return
         }
 
+        // Wait before loading the model, not just before the first chunk:
+        // `LumeApp` kicks a pass on every launch, so the tens-of-MB embedding
+        // asset would otherwise load while Home is still fetching its rails.
+        try await waitWhileBusy(status: status)
+
         await status.setPreparing()
         let embedder = try TextEmbedder()
         // Release the model the moment the pass ends — completion, cancellation,
@@ -80,24 +97,39 @@ actor ContentIndexer {
         try await prepareEmbedder(embedder, status: status)
 
         while !Task.isCancelled {
-            if try await hasActiveSync() || status.isPlaybackActive || status.isCloudSyncActive {
-                await status.setWaiting()
-                try await Task.sleep(for: busyPause)
-                continue
-            }
+            try await waitWhileBusy(status: status)
 
             counts = try currentCounts()
             await status.update(indexed: counts.indexed, total: counts.total)
 
             let processed = try await indexNextChunk(embedder: embedder)
             if processed == 0 { break }
-            try await Task.sleep(for: itemPause)
+            try await Task.sleep(for: chunkPause)
         }
 
         try Task.checkCancellation()
         counts = try currentCounts()
         await status.finish(indexed: counts.indexed, total: counts.total)
         Logger.indexing.info("Content index complete: \(counts.indexed) of \(counts.total) titles")
+    }
+
+    /// Blocks while anything indexing has to stand aside for is happening: a
+    /// playlist sync, playback, a CloudKit import/export, or the user browsing.
+    /// All four are hurt the same way — the `context.save()` that ends a chunk
+    /// forces a main-context merge that re-runs every `@Query` in every mounted
+    /// tab, which hitches KSPlayer and stalls a browse of a large catalog (a
+    /// 227k-title library is ~4,500 of those merges, one per chunk, spread over
+    /// hours of ordinary use).
+    ///
+    /// Checked between chunks, not inside one: a chunk already in flight
+    /// finishes and saves, because abandoning it would only bring that same
+    /// save forward. Re-checked every `busyPause` rather than continuously —
+    /// nobody is waiting on the index, so resuming 20 s late costs nothing.
+    private func waitWhileBusy(status: ContentIndexingService) async throws {
+        while try await hasActiveSync() || status.isPlaybackActive || status.isCloudSyncActive || status.isUserBrowsing {
+            await status.setWaiting()
+            try await Task.sleep(for: busyPause)
+        }
     }
 
     /// Loads the embedding model, waiting and retrying when its assets fail to

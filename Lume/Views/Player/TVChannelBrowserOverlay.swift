@@ -342,23 +342,46 @@
         private func loadInitialContent() {
             guard let stream = TVPlayerContent.liveStream(for: media.contentRef, in: modelContext),
                   let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext) else { return }
-            playlistPrefix = "\(playlist.id.uuidString)-"
+            let prefix = "\(playlist.id.uuidString)-"
+            playlistPrefix = prefix
 
             let categorySort = CategorySortOption(rawValue: categorySortRaw) ?? .playlist
+            // Scoped in SQL. Unscoped this fetched every live category of every
+            // playlist — 1,734 rows on the measured store — and threw all but
+            // one playlist's away in Swift, from `onAppear`, with the stream
+            // already decoding. `starts(with:)` on the unique (and therefore
+            // indexed) `id` turns that into a range seek. `visibleCategories`
+            // still runs: it is what applies the parental filter, and sharing it
+            // with the Live TV rail is what keeps the two from disagreeing about
+            // what a category rail contains.
             let descriptor = FetchDescriptor<Category>(
-                predicate: #Predicate { $0.typeRaw == "live" && $0.isHidden == false }
+                predicate: #Predicate {
+                    $0.typeRaw == "live" && $0.isHidden == false && $0.id.starts(with: prefix)
+                }
             )
             let categories = categorySort.sort(
                 LiveChannelQuery.visibleCategories(
                     (try? modelContext.fetch(descriptor)) ?? [],
-                    playlistPrefix: playlistPrefix,
+                    playlistPrefix: prefix,
                     restriction: restriction
                 )
             )
 
+            // The two virtual collections used to be gated by
+            // `!fetchChannels(scope:).isEmpty`, which materialised the entire
+            // collection — 1,506 favorited channels on the measured store — to
+            // decide whether one rail row should exist, from `onAppear`, with
+            // the stream already decoding. `LiveChannelQuery`'s probes answer
+            // the same question with a `LIMIT 1` seek, and are the same
+            // descriptors the Live TV rail gates on, so the two surfaces can't
+            // disagree about which collections a rail offers.
             var rail: [LiveTVSection] = []
-            if !fetchChannels(scope: .favorites).isEmpty { rail.append(.favorites) }
-            if !fetchChannels(scope: .recentlyWatched).isEmpty { rail.append(.recentlyWatched) }
+            if hasVisible(LiveChannelQuery.favoritesProbe(playlistPrefix: prefix, restriction: restriction)) {
+                rail.append(.favorites)
+            }
+            if hasVisible(LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: prefix, restriction: restriction)) {
+                rail.append(.recentlyWatched)
+            }
             rail.append(contentsOf: categories.map(LiveTVSection.category))
             sections = rail
 
@@ -379,6 +402,13 @@
             if let currentChannelID, channels.contains(where: { $0.id == currentChannelID }) {
                 loadGuide(channelID: currentChannelID)
             }
+        }
+
+        /// Runs one of `LiveChannelQuery`'s existence probes. They carry their
+        /// own `fetchLimit = 1` and no `sortBy`, so this stops at the first
+        /// matching row instead of building a list to ask whether it is empty.
+        private func hasVisible(_ probe: FetchDescriptor<LiveStream>) -> Bool {
+            !((try? modelContext.fetch(probe)) ?? []).isEmpty
         }
 
         private func fetchChannels(scope: LiveChannelScope) -> [LiveStream] {

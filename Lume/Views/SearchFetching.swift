@@ -49,29 +49,37 @@ nonisolated enum SearchFetcher {
         let context = ModelContext(container)
         var hits = SearchHits()
 
+        // None of the three descriptors sorts. A `sortBy:` defeats `fetchLimit`:
+        // with an ORDER BY, SQLite has to find *and sort* every match before it
+        // can apply the LIMIT, so a bounded fetch still scanned the whole table
+        // (263 ms for movies alone on a 179k-title catalog, 479 ms for the three
+        // together) to show 50 rows. Without it the scan stops at the 50th hit.
+        // The per-type name order the list has always shown is applied over the
+        // hydrated rows instead — see `SearchView.assembleResults`.
         if request.wantMovies {
-            var descriptor = FetchDescriptor<Movie>(
-                predicate: searchMoviePredicate(scope: scope),
-                sortBy: [SortDescriptor(\.name)]
-            )
+            var descriptor = FetchDescriptor<Movie>(predicate: searchMoviePredicate(scope: scope))
             descriptor.fetchLimit = limit
             hits.movies = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
         }
 
+        // Each entity fetch is its own table scan, so a superseded query that
+        // ran all three burned the full cost for a result nobody would read.
+        // `SearchView.localSearch` forwards its cancellation into this task
+        // (`Task.detached` does not inherit it), and these checks turn that into
+        // an early exit between the scans. The partial hits returned here are
+        // discarded by the caller, which is cancelled too.
+        guard !Task.isCancelled else { return hits }
+
         if request.wantSeries {
-            var descriptor = FetchDescriptor<Series>(
-                predicate: searchSeriesPredicate(scope: scope),
-                sortBy: [SortDescriptor(\.name)]
-            )
+            var descriptor = FetchDescriptor<Series>(predicate: searchSeriesPredicate(scope: scope))
             descriptor.fetchLimit = limit
             hits.series = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
         }
 
+        guard !Task.isCancelled else { return hits }
+
         if request.wantLive {
-            var descriptor = FetchDescriptor<LiveStream>(
-                predicate: searchLiveStreamPredicate(scope: scope),
-                sortBy: [SortDescriptor(\.name)]
-            )
+            var descriptor = FetchDescriptor<LiveStream>(predicate: searchLiveStreamPredicate(scope: scope))
             descriptor.fetchLimit = limit
             hits.streams = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
         }
@@ -97,30 +105,58 @@ nonisolated struct SearchScope {
     var excludedOptional: Set<String?> {
         Set(excluded.map(String?.some))
     }
+
+    /// The playlist restriction as an id prefix. Every catalog row's id is
+    /// `"<playlist uuid>-<kind>-<provider id>"` (see `ContentSyncManager`), so a
+    /// prefix test on the row's own `id` scopes a fetch to one playlist — and
+    /// `id` is `@Attribute(.unique)`, i.e. indexed, the same range seek
+    /// `PlaylistDeletion` scopes with. The separator is part of the prefix so
+    /// the match can't run past the uuid into a longer id.
+    var playlistIDPrefix: String {
+        "\(playlistID)-"
+    }
 }
 
 /// Internal (not fileprivate) so the tests can run them against a SQLite store,
 /// where predicate SQL is actually generated.
+///
+/// The playlist scope is emitted only when it applies rather than being folded
+/// into an `||` with a captured flag: it used to read
+/// `categoryId?.localizedStandardContains(playlistID)`, a second
+/// `NSCoreDataStringSearch` per row — a full substring search used as a prefix
+/// test, and as expensive as the name match it was paired with.
 nonisolated func searchMoviePredicate(scope: SearchScope) -> Predicate<Movie> {
-    let (query, playlistID) = (scope.query, scope.playlistID)
-    let restrictToPlaylist = scope.restrictToPlaylist
+    let query = scope.query
     let excluded = scope.excludedOptional
     let filtersCategories = !excluded.isEmpty
+    guard scope.restrictToPlaylist else {
+        return #Predicate { movie in
+            movie.name.localizedStandardContains(query)
+                && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
+        }
+    }
+    let prefix = scope.playlistIDPrefix
     return #Predicate { movie in
         movie.name.localizedStandardContains(query)
-            && (!restrictToPlaylist || (movie.categoryId?.localizedStandardContains(playlistID) ?? false))
+            && movie.id.starts(with: prefix)
             && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
     }
 }
 
 nonisolated func searchSeriesPredicate(scope: SearchScope) -> Predicate<Series> {
-    let (query, playlistID) = (scope.query, scope.playlistID)
-    let restrictToPlaylist = scope.restrictToPlaylist
+    let query = scope.query
     let excluded = scope.excludedOptional
     let filtersCategories = !excluded.isEmpty
+    guard scope.restrictToPlaylist else {
+        return #Predicate { series in
+            series.name.localizedStandardContains(query)
+                && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
+        }
+    }
+    let prefix = scope.playlistIDPrefix
     return #Predicate { series in
         series.name.localizedStandardContains(query)
-            && (!restrictToPlaylist || (series.categoryId?.localizedStandardContains(playlistID) ?? false))
+            && series.id.starts(with: prefix)
             && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
     }
 }
@@ -128,14 +164,21 @@ nonisolated func searchSeriesPredicate(scope: SearchScope) -> Predicate<Series> 
 /// Live channels also carry their own Content Management visibility, so a
 /// channel hidden individually is excluded here as well.
 nonisolated func searchLiveStreamPredicate(scope: SearchScope) -> Predicate<LiveStream> {
-    let (query, playlistID) = (scope.query, scope.playlistID)
-    let restrictToPlaylist = scope.restrictToPlaylist
+    let query = scope.query
     let excluded = scope.excludedOptional
     let filtersCategories = !excluded.isEmpty
+    guard scope.restrictToPlaylist else {
+        return #Predicate { stream in
+            stream.name.localizedStandardContains(query)
+                && stream.isHidden == false
+                && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
+        }
+    }
+    let prefix = scope.playlistIDPrefix
     return #Predicate { stream in
         stream.name.localizedStandardContains(query)
             && stream.isHidden == false
-            && (!restrictToPlaylist || (stream.categoryId?.localizedStandardContains(playlistID) ?? false))
+            && stream.id.starts(with: prefix)
             && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
     }
 }

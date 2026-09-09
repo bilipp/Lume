@@ -8,11 +8,18 @@ final class EPGListing {
     // rows). Every now/next lookup and the guide window query filter by
     // `channelId` and the `start`/`end` time bounds, so index them — without
     // these, each channel card and guide open scans the whole guide table.
+    // The in-player lookups (now/next, the channel's upcoming list, the guide
+    // window) all bound on `end > now` rather than on `start`, so the
+    // `channelId + start` pair above can only seek to the channel and then walk
+    // every listing it ever had. `channelId + end` is the pair those predicates
+    // actually ask for — `TVPlayerContent.guideListings` has claimed this index
+    // in a comment since it was written, without it ever existing.
     #Index<EPGListing>(
         [\.channelId],
         [\.start],
         [\.end],
-        [\.channelId, \.start]
+        [\.channelId, \.start],
+        [\.channelId, \.end]
     )
 
     @Attribute(.unique) var id: String

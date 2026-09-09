@@ -54,6 +54,9 @@ struct MainTabView: View {
     /// that's already been handled.
     @State private var autoSyncAttempted: Set<UUID> = []
 
+    /// Memo behind `contentRestriction` — see `ContentRestrictionMemo`.
+    @State private var restrictionMemo = ContentRestrictionMemo()
+
     private var syncFrequency: SyncFrequency {
         SyncFrequency.resolve(syncFrequencyRaw)
     }
@@ -81,11 +84,16 @@ struct MainTabView: View {
     /// Hides categories (and their content) from every browse, Home and Search
     /// surface: the ones hidden in Content Management always, the restricted
     /// ones while a child profile is active.
+    ///
+    /// Routed through a memo: this root's body re-evaluates whenever any catalog
+    /// write moves one of its `@Query`s, and constructing a `ContentRestriction`
+    /// digests every excluded id — 433 of them on a real hidden-category set.
+    /// The two id sets are cheap to rebuild and compare; the digest is not.
     private var contentRestriction: ContentRestriction {
-        ContentRestriction(
+        restrictionMemo.restriction(
             isActive: profileManager?.activeProfileIsChild ?? false,
-            restrictedCategoryIDs: Set(restrictedCategories.map(\.id)),
-            hiddenCategoryIDs: Set(hiddenCategories.map(\.id))
+            restricted: Set(restrictedCategories.map(\.id)),
+            hidden: Set(hiddenCategories.map(\.id))
         )
     }
 
@@ -107,6 +115,12 @@ struct MainTabView: View {
         #endif
             .environment(router)
             .environment(\.contentRestriction, contentRestriction)
+            // A tab switch is the one browse interaction that has no scroll
+            // view of its own to stamp from, and it is the moment a merge is
+            // most expensive — the incoming tab is re-running its queries.
+            .onChange(of: router.selectedTab) {
+                ContentIndexingService.shared.noteUserInteraction()
+            }
         #if os(iOS)
             .tabBarMinimizeOnScrollDownIfAvailable()
         #endif
@@ -441,6 +455,40 @@ private extension View {
                 SyncProgressView(playlist: playlist, autoStart: true)
             }
         #endif
+    }
+}
+
+// MARK: - Restriction memo
+
+/// Hands back the previous `ContentRestriction` whenever the ids behind it
+/// haven't moved.
+///
+/// The restriction context is rebuilt from `MainTabView`'s `@Query` results on
+/// every body pass, and building one runs SHA-256 over every excluded category
+/// id (`ContentRestriction.visibilityToken`) plus 32 `String(format:)` calls —
+/// ~100 µs with 433 hidden categories, for a value that changes only when the
+/// user hides a category or switches to a child profile. Comparing the two id
+/// sets costs a fraction of that.
+///
+/// A plain reference held in `@State`: nothing on it is observed, so reading and
+/// updating it from `body` can't invalidate the view the way writing `@State`
+/// would.
+private final class ContentRestrictionMemo {
+    private var cached = ContentRestriction()
+
+    func restriction(isActive: Bool, restricted: Set<String>, hidden: Set<String>) -> ContentRestriction {
+        if cached.isActive == isActive,
+           cached.restrictedCategoryIDs == restricted,
+           cached.hiddenCategoryIDs == hidden
+        {
+            return cached
+        }
+        cached = ContentRestriction(
+            isActive: isActive,
+            restrictedCategoryIDs: restricted,
+            hiddenCategoryIDs: hidden
+        )
+        return cached
     }
 }
 
