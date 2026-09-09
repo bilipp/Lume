@@ -347,6 +347,13 @@ extension View {
                 // The player forces dark; a sheet raised from it inherits the
                 // app appearance otherwise and flashes light over the video.
                 .preferredColorScheme(.dark)
+            #if os(macOS)
+                // A macOS sheet is sized by its content, and a `List` has no
+                // ideal height to offer — without a frame the browser opened as
+                // a bare toolbar with the results collapsed to nothing, which
+                // reads as "no subtitles found".
+                .frame(minWidth: 460, idealWidth: 540, minHeight: 480, idealHeight: 600)
+            #endif
         }
     }
 }
