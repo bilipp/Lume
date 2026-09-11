@@ -100,6 +100,45 @@ struct ContentIndexTextTests {
         #expect(ContentIndexText.year(fromReleaseDate: "unknown") == nil)
     }
 
+    // MARK: - shortDocument
+
+    @Test func `short document keeps only title, year and genre`() {
+        let document = ContentIndexText.shortDocument(for: .init(
+            name: "Inception",
+            year: 2010,
+            genre: "Action, Science Fiction",
+            tagline: "Your mind is the scene of the crime.",
+            plot: "A thief who steals corporate secrets through dream-sharing technology.",
+            cast: "Leonardo DiCaprio, Joseph Gordon-Levitt"
+        ))
+        #expect(document == "Inception (2010). Action, Science Fiction.")
+    }
+
+    @Test func `short document skips empty parts`() {
+        let document = ContentIndexText.shortDocument(for: .init(
+            name: "Inception",
+            year: nil,
+            genre: "",
+            tagline: nil,
+            plot: nil,
+            cast: nil
+        ))
+        #expect(document == "Inception.")
+    }
+
+    @Test func `short document is a prefix of the full document`() {
+        let facts = ContentIndexText.TitleFacts(
+            name: "Inception",
+            year: 2010,
+            genre: "Action",
+            tagline: "Your mind is the scene of the crime.",
+            plot: "A thief who steals corporate secrets.",
+            cast: "Leonardo DiCaprio"
+        )
+        #expect(ContentIndexText.document(for: facts)
+            .hasPrefix(ContentIndexText.shortDocument(for: facts)))
+    }
+
     // MARK: - Embedding blob coding
 
     @Test func `vector blob roundtrips`() {

@@ -5,7 +5,11 @@
 //  Builds the local content index: resolves each movie and series against
 //  TMDB (searching by cleaned title when the provider supplies no id), applies
 //  the same enrichment the detail screens use, and stores an on-device
-//  embedding vector for future semantic search.
+//  embedding vector that "For You" ranks against.
+//
+//  Which embedding model that is depends on the platform (`TextEmbedder`), and
+//  the two produce incomparable vectors — so the pass stamps the vector space it
+//  used and drops everything it can no longer compare when that changes.
 //
 //  Designed to run slowly in the background: items are processed in small
 //  chunks on a dedicated ModelContext with pauses in between, so neither TMDB
@@ -48,6 +52,12 @@ actor ContentIndexer {
     /// the run (which would stall indexing until the next launch or sync).
     private let assetRetryPause: Duration = .seconds(15)
     private let assetRetryMaxPause: Duration = .seconds(300)
+    /// How many times one pass asks for the assets before giving up and ending
+    /// as `.unavailable`. Bounded on purpose — see `prepareEmbedder`.
+    private let assetRetryLimit = 5
+    /// Rows per batch when dropping embeddings the engine can no longer compare
+    /// — see `resetEmbeddingsIfSpaceChanged`.
+    private let resetBatchSize = 5000
 
     init(modelContainer: ModelContainer, tmdbClient: TMDBClient? = nil) {
         self.modelContainer = modelContainer
@@ -76,6 +86,26 @@ actor ContentIndexer {
     /// an unavailable embedding model, or on a transient network failure (the
     /// next kick retries — already-indexed items are never reprocessed).
     func run(status: ContentIndexingService) async throws {
+        // Which backend, and therefore which vector space, is settled first:
+        // choosing costs nothing (no assets, no load, no network) and the
+        // "already done" check below is only meaningful against the *current*
+        // space — a catalog embedded by the other backend is fully stamped and
+        // entirely unusable, and has to re-open the pass.
+        let embedder = try TextEmbedder.preferred()
+        // Release the model the moment the pass ends — completion, cancellation,
+        // or throw — so the tens-of-MB embedding model isn't left resident between
+        // passes or while the app is suspended in the background.
+        defer { embedder.unload() }
+
+        if EmbeddingSpaceStore.needsReset(to: embedder.spaceID) {
+            // Behind the same gate as everything else that saves: this writes
+            // across the catalog, and `LumeApp` kicks a pass while Home is still
+            // fetching its rails.
+            try await waitWhileBusy(status: status)
+            try dropStaleEmbeddings()
+        }
+        EmbeddingSpaceStore.set(embedder.spaceID)
+
         var counts = try currentCounts()
         await status.update(indexed: counts.indexed, total: counts.total)
         guard counts.indexed < counts.total else {
@@ -89,11 +119,6 @@ actor ContentIndexer {
         try await waitWhileBusy(status: status)
 
         await status.setPreparing()
-        let embedder = try TextEmbedder()
-        // Release the model the moment the pass ends — completion, cancellation,
-        // or throw — so the tens-of-MB embedding model isn't left resident between
-        // passes or while the app is suspended in the background.
-        defer { embedder.unload() }
         try await prepareEmbedder(embedder, status: status)
 
         while !Task.isCancelled {
@@ -136,18 +161,25 @@ actor ContentIndexer {
     /// download. The on-device asset request times out on slow connections;
     /// rather than abandoning the pass (which leaves indexing stalled until the
     /// next launch or sync) we back off and try again — the download usually
-    /// succeeds on a later attempt. A model that genuinely has no assets for
-    /// this device throws `EmbedderError`, which ends the run for good.
+    /// succeeds on a later attempt.
+    ///
+    /// Bounded, though. Retrying forever is how an unserved asset turns into a
+    /// pass that sits in `.preparing`/`.waiting` for the life of the process
+    /// without ever indexing a title. After `assetRetryLimit` attempts the run
+    /// ends as `.unavailable`; the next launch tries again from scratch.
+    /// `modelUnavailable` — no model for this device at all — ends it
+    /// immediately, since no amount of waiting fixes that.
     private func prepareEmbedder(_ embedder: TextEmbedder, status: ContentIndexingService) async throws {
         var pause = assetRetryPause
-        while true {
+        for attempt in 1 ... assetRetryLimit {
             try Task.checkCancellation()
             do {
                 try await embedder.prepare()
                 return
-            } catch let error as TextEmbedder.EmbedderError {
-                throw error
+            } catch TextEmbedder.EmbedderError.modelUnavailable {
+                throw TextEmbedder.EmbedderError.modelUnavailable
             } catch {
+                guard attempt < assetRetryLimit else { break }
                 let seconds = pause.components.seconds
                 Logger.indexing.warning("Embedding asset download failed, retrying in \(seconds)s: \(error)")
                 await status.setWaiting()
@@ -156,6 +188,57 @@ actor ContentIndexer {
                 await status.setPreparing()
             }
         }
+        // Local copy: SwiftFormat strips `self.` inside the autoclosure and the
+        // build then fails on the implicit capture (see CLAUDE.md).
+        let attempts = assetRetryLimit
+        Logger.indexing.error("Embedding assets unavailable after \(attempts) attempts")
+        throw TextEmbedder.EmbedderError.assetsUnavailable
+    }
+
+    // MARK: - Vector space
+
+    /// Drops every stored embedding, so the next chunks rebuild them in the
+    /// space the engine now compares in. Called when the backend changed under
+    /// the store — see `EmbeddingSpaceStore` for why that is otherwise invisible.
+    ///
+    /// `indexedAt` is cleared alongside `embeddingData` because it is the "this
+    /// title is done" marker `fetchPending` reads; `tmdbId` and the enrichment
+    /// stamp are deliberately left in place, so the rebuild costs no TMDB
+    /// traffic — `resolve` short-circuits on both and the items flow straight
+    /// through to `write`.
+    private func dropStaleEmbeddings() throws {
+        // Drained in batches on a fresh context each time, not fetched whole: a
+        // fully indexed catalog is hundreds of thousands of rows, and realising
+        // them all at once is exactly the kind of spike that gets an Apple TV
+        // jetsammed. Clearing the column shrinks the predicate's own result set,
+        // so each pass sees only what is left.
+        var dropped = 0
+        while true {
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+
+            var movies = FetchDescriptor<Movie>(predicate: #Predicate { $0.embeddingData != nil })
+            movies.fetchLimit = resetBatchSize
+            var series = FetchDescriptor<Series>(predicate: #Predicate { $0.embeddingData != nil })
+            series.fetchLimit = resetBatchSize
+
+            let staleMovies = try context.fetch(movies)
+            let staleSeries = try context.fetch(series)
+            if staleMovies.isEmpty, staleSeries.isEmpty { break }
+
+            for movie in staleMovies {
+                movie.embeddingData = nil
+                movie.indexedAt = nil
+            }
+            for show in staleSeries {
+                show.embeddingData = nil
+                show.indexedAt = nil
+            }
+            try context.save()
+            dropped += staleMovies.count + staleSeries.count
+        }
+
+        Logger.indexing.info("Embedding space changed; dropped \(dropped) vectors for re-embedding")
     }
 
     // MARK: - Chunk processing
@@ -180,6 +263,11 @@ actor ContentIndexer {
         let item: PendingItem
         let resolvedTMDBId: Int?
         let details: TMDBTitleDetails?
+        /// Whether resolving actually issued a TMDB request. False when the id
+        /// and enrichment were already stored, which is the whole of a re-embed
+        /// pass (see `resetEmbeddingsIfSpaceChanged`) — `itemPause` exists to
+        /// rate-limit TMDB, so an item that never touched it shouldn't wait.
+        let usedNetwork: Bool
     }
 
     /// Indexes up to `chunkSize` pending titles (movies first, then series).
@@ -205,8 +293,11 @@ actor ContentIndexer {
         for item in pending {
             do {
                 try Task.checkCancellation()
-                try await resolved.append(resolve(item))
-                try await Task.sleep(for: itemPause)
+                let result = try await resolve(item)
+                resolved.append(result)
+                if result.usedNetwork {
+                    try await Task.sleep(for: itemPause)
+                }
             } catch {
                 // Transient failure or cancellation: stop fetching, but still
                 // write the items already resolved so progress isn't lost.
@@ -279,11 +370,15 @@ actor ContentIndexer {
     /// (when not yet enriched) over the network, working only on values.
     private func resolve(_ item: PendingItem) async throws -> IndexResult {
         guard tmdbClient.isConfigured else {
-            return IndexResult(item: item, resolvedTMDBId: item.existingTMDBId, details: nil)
+            return IndexResult(
+                item: item, resolvedTMDBId: item.existingTMDBId, details: nil, usedNetwork: false
+            )
         }
 
+        var usedNetwork = false
         var tmdbId = item.existingTMDBId
         if tmdbId == nil {
+            usedNetwork = true
             tmdbId = try await skippingPermanentFailures {
                 switch item.kind {
                 case .movie: try await self.searchMovieID(query: item.title, year: item.year)
@@ -294,6 +389,7 @@ actor ContentIndexer {
 
         var details: TMDBTitleDetails?
         if item.needsEnrichment, let tmdbId {
+            usedNetwork = true
             details = try await skippingPermanentFailures {
                 switch item.kind {
                 case .movie: try await self.tmdbClient.movieDetails(tmdbId)
@@ -302,7 +398,9 @@ actor ContentIndexer {
             }
         }
 
-        return IndexResult(item: item, resolvedTMDBId: tmdbId, details: details)
+        return IndexResult(
+            item: item, resolvedTMDBId: tmdbId, details: details, usedNetwork: usedNetwork
+        )
     }
 
     /// Re-fetches the title on the write context and applies the resolved TMDB
@@ -326,14 +424,14 @@ actor ContentIndexer {
                 // detail view fully enriches (incl. cast) on first open.
                 applyMovieDetails(details, to: movie, context: context, includeCast: false)
             }
-            let document = ContentIndexText.document(for: .init(
+            let document = Self.document(for: .init(
                 name: result.item.title,
                 year: result.item.year,
                 genre: movie.genre,
                 tagline: movie.tagline,
                 plot: movie.plot,
                 cast: movie.actors
-            ))
+            ), embedder: embedder)
             if let vector = try? embedder.vector(for: document) {
                 movie.embeddingData = TextEmbedder.encode(vector)
             }
@@ -354,19 +452,31 @@ actor ContentIndexer {
                 // string; the detail view fully enriches (incl. cast) later.
                 applySeriesDetails(details, to: series, context: context, includeCast: false)
             }
-            let document = ContentIndexText.document(for: .init(
+            let document = Self.document(for: .init(
                 name: result.item.title,
                 year: result.item.year,
                 genre: series.genre,
                 tagline: series.tagline,
                 plot: series.plot,
                 cast: series.cast
-            ))
+            ), embedder: embedder)
             if let vector = try? embedder.vector(for: document) {
                 series.embeddingData = TextEmbedder.encode(vector)
             }
             series.indexedAt = Date()
         }
+    }
+
+    /// The document to embed for a title, in the shape this embedder's backend
+    /// can actually use. The coarse sentence backend (tvOS) drowns in a full
+    /// plot + cast document — see `TextEmbedder.prefersShortDocuments`.
+    private static func document(
+        for facts: ContentIndexText.TitleFacts,
+        embedder: TextEmbedder
+    ) -> String {
+        embedder.prefersShortDocuments
+            ? ContentIndexText.shortDocument(for: facts)
+            : ContentIndexText.document(for: facts)
     }
 
     // MARK: - TMDB search with year fallback

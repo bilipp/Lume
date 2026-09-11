@@ -105,6 +105,30 @@ nonisolated enum ContentIndexText {
         return parts.joined(separator: " ")
     }
 
+    /// The short form of the embedding document: just the title, year and
+    /// genre.
+    ///
+    /// For the coarse `NLEmbedding` sentence backend (tvOS), which the long
+    /// document defeats — the tagline, plot and cast dilute the few words that
+    /// actually distinguish one title from another until every pair of titles
+    /// sits at the same cosine. See `TextEmbedder.prefersShortDocuments` for
+    /// the measured margins.
+    static func shortDocument(for facts: TitleFacts) -> String {
+        var parts: [String] = []
+
+        var title = facts.name
+        if let year = facts.year {
+            title += " (\(year))"
+        }
+        parts.append(title + ".")
+
+        if let genre = facts.genre, !genre.isEmpty {
+            parts.append(genre + ".")
+        }
+
+        return parts.joined(separator: " ")
+    }
+
     /// Parses a year out of a provider release-date string ("2010-07-16",
     /// "2010").
     static func year(fromReleaseDate releaseDate: String?) -> Int? {
