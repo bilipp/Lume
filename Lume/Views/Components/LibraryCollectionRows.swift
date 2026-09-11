@@ -53,7 +53,7 @@ struct LibraryCollection: Hashable {
 }
 
 /// How many items each preview row shows before "Show All".
-private let collectionPreviewLimit = 20
+let collectionPreviewLimit = 20
 
 /// Upper bound on a preview row's fetch. A row renders `collectionPreviewLimit`
 /// items and only needs to know whether one more exists, but the hidden-category
@@ -62,14 +62,14 @@ private let collectionPreviewLimit = 20
 /// use — a viewer with many hidden categories must not end up with a short row
 /// or a missing "Show All". Unbounded, Recently Watched and Favorites re-fetched
 /// every matching row in the store on every catalog write.
-private let collectionRowFetchLimit = 200
+let collectionRowFetchLimit = 200
 
 /// Upper bound on the "Recently Added" fetch, preview row and "Show All" grid
 /// alike. Recently Watched and Favorites match small subsets, but every title
 /// carries an `added` timestamp, so that predicate matches the playlist whole —
 /// an unbounded fetch would hydrate the entire catalog on every change and
 /// stutter badly during sync. We only ever surface the newest slice.
-private let recentlyAddedFetchLimit = 200
+let recentlyAddedFetchLimit = 200
 
 // MARK: - Shared preview row
 
@@ -215,7 +215,12 @@ struct MovieCollectionView: View {
     }
 }
 
-private enum MovieCollectionQuery {
+/// Internal, not fileprivate, so the tests and benchmarks can build these
+/// descriptors and assert their shape — the `fetchLimit`, the playlist scope and
+/// the lexical `added` comparator are performance contracts a well-meaning
+/// refactor can undo without changing a single visible row. Same reasoning as
+/// the search predicates in `SearchFetching.swift`.
+enum MovieCollectionQuery {
     /// The fetch behind a preview row — always bounded, see
     /// `collectionRowFetchLimit`.
     static func rowDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Movie> {
@@ -337,7 +342,8 @@ struct SeriesCollectionView: View {
     }
 }
 
-private enum SeriesCollectionQuery {
+/// Internal for the same reason as `MovieCollectionQuery`.
+enum SeriesCollectionQuery {
     /// The fetch behind a preview row — always bounded, see
     /// `collectionRowFetchLimit`.
     static func rowDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Series> {
