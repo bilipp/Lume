@@ -32,7 +32,8 @@ Release would change what ships. Debug, Release and Sideload are untouched.
 
 | Layer | Where | What it catches |
 |---|---|---|
-| Microbenchmarks | `ParsingBenchmarks`, `PersistenceBenchmarks`, `M3UPersistenceBenchmarks`, `EPGQueryBenchmarks` | Parser / import / query regressions |
+| Microbenchmarks | `ParsingBenchmarks`, `PersistenceBenchmarks`, `M3UPersistenceBenchmarks` | Parser / import regressions |
+| Browse read path | `BrowseQueryBenchmarks`, `EPGQueryBenchmarks` | A browse fetch going back to scanning |
 | End-to-end import | `M3UColdImportBenchmarks` | The whole production cold import, phase by phase |
 | Attribution harnesses | `M3UEpisodeRelationshipBenchmarks`, `M3UExistingRowFetchBenchmarks` | Which part of an import loop the time is actually in |
 | Signpost metrics | `SignpostBenchmarks` | A named production phase getting slower |
@@ -44,6 +45,36 @@ diagnostic report the user can export (Settings → Diagnostics). They are liste
 here because they are the same measurement programme: the tests tell you whether
 a phase regressed on your machine, MetricKit and QoE tell you whether it matters
 in the field.
+
+## The browse path has two halves
+
+Import is not the only thing users wait on. A 284k-row catalog made every browse
+interaction expensive too — 1,904 ms of SQL on a cold launch, 739 ms on a tab
+switch, 1,158 ms on a single "Add to Favorites" — and none of it was covered
+here, because every other file in this target measures the sync path.
+
+`BrowseQueryBenchmarks` covers the fetches behind the Movies/Series rails, the
+Live TV section gates, a category preview row and search. What makes those
+regress is unusual, and worth knowing before reading the numbers: they are
+one-token changes that alter **no visible row**. A `sortBy:` added back to a
+bounded fetch, a dropped `fetchLimit`, `comparator: .lexical` lost to the
+`SortDescriptor` default. The app still shows exactly the right content — after
+scanning the whole table — so the change passes review, the unit suite and every
+screenshot.
+
+That shape needs a second, cheaper guard, because a benchmark only catches it if
+somebody runs the benchmark. `LumeTests/Services/BrowseQueryShapeTests.swift`
+asserts the contracts themselves — the limit is set, the probe has no sort, the
+scope is in the predicate, the comparator is lexical — and runs in the normal
+suite on every commit. Both halves were mutation-tested when they were written:
+removing `fetchLimit = 1` from the Live TV probe moved its benchmark
+0.004 s → 0.140 s *and* failed the shape test.
+
+Two benchmarks are deliberately a matched pair. `testSearchCommonTerm` and
+`testSearchRareTerm` measure the same fetch against a dense and a sparse term:
+without an ORDER BY, SQLite stops the scan at the 50th hit, so the common term is
+several times *faster* than the rare one. If they ever converge, a `sortBy:` has
+come back.
 
 ## Signposts are the load-bearing part
 
