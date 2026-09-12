@@ -4,7 +4,9 @@
 //
 //  Covers the shared quick-switch seam every switch surface reads its "which
 //  row is current" answer from: the stored-selection fallbacks of
-//  `[Playlist].active(for:)`, row ordering, and the `isCurrent` tag.
+//  `[Playlist].active(for:)`, row ordering, and the `isCurrent` tag. Also
+//  `owner(ofContentID:)`, which answers the other question — not which
+//  playlist is current, but which one a given row came from.
 //
 
 import Foundation
@@ -34,6 +36,33 @@ struct QuickSwitchResolverTests {
         }
         try context.save()
         return profiles
+    }
+
+    // MARK: - owner(ofContentID:)
+
+    @Test func `content resolves to the playlist whose prefix it carries`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
+        let id = "\(playlists[1].id.uuidString)-live-4021"
+
+        #expect(playlists.owner(ofContentID: id)?.id == playlists[1].id)
+    }
+
+    @Test func `content from a playlist that is gone owns nothing`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
+
+        #expect(playlists.owner(ofContentID: "\(UUID().uuidString)-live-4021") == nil)
+    }
+
+    @Test func `the owner is independent of which playlist is active`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
+        let id = "\(playlists[1].id.uuidString)-movie-77"
+
+        // The active playlist is First; the row is still Second's to play.
+        #expect(playlists.active(for: playlists[0].id.uuidString)?.id == playlists[0].id)
+        #expect(playlists.owner(ofContentID: id)?.id == playlists[1].id)
     }
 
     // MARK: - active(for:)
