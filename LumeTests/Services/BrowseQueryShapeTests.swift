@@ -215,7 +215,132 @@ struct BrowseQueryShapeTests {
         #expect(try context.fetch(parent).count == 1)
     }
 
+    // MARK: - In-player channel surfing is bounded
+
+    /// Surfing used to materialize the whole list to find the playing channel's
+    /// index and then wrap on the array — thousands of faulted rows on the main
+    /// actor for two ids. Positions are read one row at a time now, so the read
+    /// that resolves a neighbour has to stay a `LIMIT 1`.
+    @Test func `channel surfing reads one position at a time`() {
+        let scope = LiveChannelNavigator.scopeDescriptor(
+            scope: .category("cat-a"),
+            sort: .playlist,
+            playlistPrefix: prefix,
+            restriction: ContentRestriction(),
+            admittingHidden: nil
+        )
+        let position = LiveChannelNavigator.positionDescriptor(scope, at: 4000)
+        #expect(position.fetchLimit == 1)
+        #expect(position.fetchOffset == 4000)
+        #expect(position.sortBy == scope.sortBy)
+    }
+
+    /// The playlist scope has to be in the predicate, not applied to fetched
+    /// rows. Reading a list by position makes that a correctness property rather
+    /// than a speed one: the row at position `n` must be the row the viewer sees
+    /// at position `n`, so a neighbour from another playlist isn't slow, it's
+    /// wrong.
+    ///
+    /// On disk for the usual reason — an in-memory store evaluates predicates
+    /// without generating SQL, so a `starts(with:)` CoreData cannot render would
+    /// pass here and trap on device.
+    @Test func `channel surfing only walks the active playlist`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let (mine, theirs) = (makePlaylist(in: context), makePlaylist(in: context))
+
+        // The same category id in both playlists: without the prefix in the
+        // predicate the two lineups merge into one ring.
+        let ours = [1, 2].map { insertChannel(number: $0, playlist: mine, category: "shared", in: context) }
+        _ = insertChannel(number: 3, playlist: theirs, category: "shared", in: context)
+        try context.save()
+
+        let first = try #require(PlayableMedia.from(stream: ours[0], playlist: mine, scope: nil))
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: first, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(next?.contentRef == .live(ours[1].id))
+
+        // …and the ring wraps inside this playlist rather than running on into
+        // the other one's channels.
+        let second = try #require(PlayableMedia.from(stream: ours[1], playlist: mine, scope: nil))
+        let wrapped = LiveChannelNavigator.adjacentMedia(
+            for: second, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(wrapped?.contentRef == .live(ours[0].id))
+    }
+
+    /// Favorites and Recently Watched span every installed playlist, so they are
+    /// where the Swift-side prefix filter actually leaked.
+    @Test func `favorites surfing only walks the active playlist`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let (mine, theirs) = (makePlaylist(in: context), makePlaylist(in: context))
+
+        let ours = [1, 2].map { number -> LiveStream in
+            let channel = insertChannel(number: number, playlist: mine, category: "mine", in: context)
+            channel.isFavorite = true
+            return channel
+        }
+        insertChannel(number: 3, playlist: theirs, category: "theirs", in: context).isFavorite = true
+        try context.save()
+
+        let first = try #require(PlayableMedia.from(stream: ours[0], playlist: mine, scope: .favorites))
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: first, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(next?.contentRef == .live(ours[1].id))
+
+        let second = try #require(PlayableMedia.from(stream: ours[1], playlist: mine, scope: .favorites))
+        let wrapped = LiveChannelNavigator.adjacentMedia(
+            for: second, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(wrapped?.contentRef == .live(ours[0].id))
+    }
+
+    /// Episode and channel neighbours both resolve the owning playlist from the
+    /// row's id prefix. That used to fetch every installed playlist and match in
+    /// Swift; it is an indexed lookup now, and the fallback that keeps a legacy
+    /// id playable has to survive it.
+    @Test func `the owning playlist is found by id, with the fallback intact`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let ids = [makePlaylist(in: context), makePlaylist(in: context)].map(\.id)
+        try context.save()
+
+        let owner = try #require(ids.last)
+        #expect(PlaylistOwner.playlist(forPrefixedID: "\(owner.uuidString)-live-1", in: context)?.id == owner)
+        // Which playlist an id that names none falls back to is unspecified —
+        // an unsorted fetch has no order to promise — but it must still be one,
+        // or a legacy id stops resolving a stream URL at all.
+        let fallback = try #require(PlaylistOwner.playlist(forPrefixedID: "legacy-live-1", in: context))
+        #expect(ids.contains(fallback.id))
+    }
+
     // MARK: - Helpers
+
+    private func makePlaylist(in context: ModelContext) -> Playlist {
+        let playlist = Playlist(
+            name: "Test", serverURL: "http://example.com:8080", username: "user", password: "pass"
+        )
+        context.insert(playlist)
+        return playlist
+    }
+
+    @discardableResult
+    private func insertChannel(
+        number: Int, playlist: Playlist, category: String, in context: ModelContext
+    ) -> LiveStream {
+        let stream = LiveStream(
+            id: "\(playlist.id.uuidString)-live-\(number)",
+            streamId: number,
+            name: "Channel \(number)",
+            num: number,
+            categoryId: category
+        )
+        context.insert(stream)
+        return stream
+    }
 
     /// The container must be held for the test's duration — see
     /// `SearchPredicateTests` for what happens when it is not.

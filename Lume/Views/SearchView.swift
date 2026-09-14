@@ -170,7 +170,7 @@ struct SearchView: View {
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif
@@ -254,7 +254,7 @@ struct SearchView: View {
     /// searching across playlists, otherwise the active one if it happens to
     /// be a portal.
     private var portalPlaylists: [Playlist] {
-        let candidates = searchAllPlaylists ? playlists : [activePlaylist].compactMap { $0 }
+        let candidates = searchAllPlaylists ? playlists : [activePlaylist].compactMap(\.self)
         return candidates.filter { $0.sourceType == .stalker }
     }
 

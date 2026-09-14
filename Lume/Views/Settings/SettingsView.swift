@@ -40,8 +40,13 @@ struct SettingsView: View {
     #endif
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
-    @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
-    var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
+    #if os(tvOS)
+        /// tvOS only: off tvOS the transport row carries an always-available
+        /// Next Episode button, so `PlayerNextUpOverlay`'s outro-armed one —
+        /// and with it this switch — has nothing left to control.
+        @AppStorage(PlayerSettings.Playback.showNextEpisodeButtonKey)
+        var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
+    #endif
     @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
     var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
     /// Comma-separated preferred languages, empty meaning no preference (see `PreferredLanguageList`). Not `private`: read by the SettingsView+Language extension (separate file).
@@ -344,8 +349,6 @@ struct SettingsView: View {
             Section {
                 Toggle("Autoplay Next Episode", isOn: $autoPlayNext)
                     .disabled(!premium.isPremium)
-                Toggle("Show Next Episode Button", isOn: $showNextEpisodeButton)
-                    .disabled(!premium.isPremium)
                 Toggle("Show Skip Intro Button", isOn: $showSkipIntroButton)
                     .disabled(!premium.isPremium)
                 if !premium.isPremium {
@@ -358,7 +361,7 @@ struct SettingsView: View {
             } header: {
                 Text("Playback")
             } footer: {
-                Text("Automatically start the next episode when one finishes, and show a button near the end to skip ahead.")
+                Text("Automatically start the next episode when one finishes.")
             }
         }
 

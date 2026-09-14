@@ -96,3 +96,37 @@ extension Sequence where Element: CategorizedContent {
         return filter { !excluded.contains($0.categoryId ?? "") }
     }
 }
+
+// MARK: - Restriction memo
+
+/// Hands back the previous `ContentRestriction` whenever the ids behind it
+/// haven't moved.
+///
+/// The restriction context is rebuilt from its host's `@Query` results on every
+/// body pass, and building one runs SHA-256 over every excluded category id
+/// (`ContentRestriction.visibilityToken`) plus 32 `String(format:)` calls —
+/// ~100 µs with 433 hidden categories, for a value that changes only when the
+/// user hides a category or switches to a child profile. Comparing the two id
+/// sets costs a fraction of that.
+///
+/// A plain reference held in `@State`: nothing on it is observed, so reading and
+/// updating it from `body` can't invalidate the view the way writing `@State`
+/// would.
+final class ContentRestrictionMemo {
+    private var cached = ContentRestriction()
+
+    func restriction(isActive: Bool, restricted: Set<String>, hidden: Set<String>) -> ContentRestriction {
+        if cached.isActive == isActive,
+           cached.restrictedCategoryIDs == restricted,
+           cached.hiddenCategoryIDs == hidden
+        {
+            return cached
+        }
+        cached = ContentRestriction(
+            isActive: isActive,
+            restrictedCategoryIDs: restricted,
+            hiddenCategoryIDs: hidden
+        )
+        return cached
+    }
+}
