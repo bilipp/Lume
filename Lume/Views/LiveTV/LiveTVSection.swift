@@ -111,33 +111,57 @@ enum LiveChannelQuery {
     /// Builds the `@Query` descriptor for a scope. The category scope sorts by
     /// the user's content-sort choice; the virtual collections have an intrinsic
     /// order (favorites by their own custom order, recents by most-recent-first).
+    ///
+    /// Recently Watched caps *before* `scoped(_:…)` drops the other playlists'
+    /// rows, so the rail shows the part of the global newest `recentLimit` that
+    /// belongs to the active playlist. In-player surfing reproduces that order of
+    /// operations (`LiveChannelNavigator.recentsRing`) — move the prefix into
+    /// this predicate and the two compositions diverge.
     static func descriptor(for scope: LiveChannelScope, sort: ContentSortOption) -> FetchDescriptor<LiveStream> {
         switch scope {
         case let .category(categoryId):
             return FetchDescriptor<LiveStream>(
                 predicate: #Predicate { $0.categoryId == categoryId && $0.isHidden == false },
-                sortBy: sort.liveStreamDescriptors
+                sortBy: sortDescriptors(for: scope, sort: sort)
             )
+        case .favorites:
+            return FetchDescriptor<LiveStream>(
+                predicate: #Predicate { $0.isFavorite && $0.isHidden == false },
+                sortBy: sortDescriptors(for: scope, sort: sort)
+            )
+        case .recentlyWatched:
+            var descriptor = FetchDescriptor<LiveStream>(
+                predicate: #Predicate { $0.lastWatchedDate != nil && $0.isHidden == false },
+                sortBy: sortDescriptors(for: scope, sort: sort)
+            )
+            descriptor.fetchLimit = recentLimit
+            return descriptor
+        }
+    }
+
+    /// The order a scope's channel list is in. Shared with in-player surfing
+    /// (`LiveChannelNavigator`), which walks the same list one row at a time and
+    /// would otherwise carry a second copy of these orderings — a copy that can
+    /// drift, leaving the channel the buttons tune to next off by one from the
+    /// channel sitting below it in the list the viewer browsed.
+    static func sortDescriptors(
+        for scope: LiveChannelScope, sort: ContentSortOption
+    ) -> [SortDescriptor<LiveStream>] {
+        switch scope {
+        case .category:
+            sort.liveStreamDescriptors
         case .favorites:
             // `favoriteOrder` (nil-first) leads, exactly like `customOrder` for
             // categories: an un-reordered favorites list ties on nil and falls
             // through to the provider order, a reordered one sorts by the user's
             // arrangement. See ContentOrganizer.
-            return FetchDescriptor<LiveStream>(
-                predicate: #Predicate { $0.isFavorite && $0.isHidden == false },
-                sortBy: [
-                    SortDescriptor(\LiveStream.favoriteOrder),
-                    SortDescriptor(\LiveStream.num),
-                    SortDescriptor(\LiveStream.name)
-                ]
-            )
+            [
+                SortDescriptor(\LiveStream.favoriteOrder),
+                SortDescriptor(\LiveStream.num),
+                SortDescriptor(\LiveStream.name)
+            ]
         case .recentlyWatched:
-            var descriptor = FetchDescriptor<LiveStream>(
-                predicate: #Predicate { $0.lastWatchedDate != nil && $0.isHidden == false },
-                sortBy: [SortDescriptor(\LiveStream.lastWatchedDate, order: .reverse)]
-            )
-            descriptor.fetchLimit = recentLimit
-            return descriptor
+            [SortDescriptor(\LiveStream.lastWatchedDate, order: .reverse)]
         }
     }
 

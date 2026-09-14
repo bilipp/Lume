@@ -26,6 +26,7 @@
             scrubResetTask = nil
             episode = nil
             seasonEpisodes = []
+            episodeNav = .none
             movie = nil
             liveStream = nil
             epgNow = nil
@@ -40,6 +41,7 @@
                 episode = resolved
                 seasonEpisodes = TVPlayerContent.seasonEpisodes(for: resolved)
                 seriesPlaylist = TVPlayerContent.playlist(for: resolved.series, in: modelContext)
+                episodeNav = PlayerItemNavigation.episodeNeighbours(for: media.contentRef, in: modelContext)
             case .movie:
                 movie = TVPlayerContent.movie(for: media.contentRef, in: modelContext)
             case .live:
@@ -175,28 +177,28 @@
             }
         }
 
-        // MARK: Episode navigation
-
-        private var currentEpisodeIndex: Int? {
-            guard let episode else { return nil }
-            return seasonEpisodes.firstIndex { $0.id == episode.id }
-        }
-
-        var previousEpisode: Episode? {
-            guard let index = currentEpisodeIndex, index > 0 else { return nil }
-            return seasonEpisodes[index - 1]
-        }
-
-        var nextEpisode: Episode? {
-            guard let index = currentEpisodeIndex, index + 1 < seasonEpisodes.count else { return nil }
-            return seasonEpisodes[index + 1]
-        }
-
         // MARK: Actions
 
         func select(episode chosen: Episode) {
             guard let playlist = seriesPlaylist,
                   let newMedia = PlayableMedia.from(episode: chosen, playlist: playlist) else { return }
+            select(media: newMedia)
+        }
+
+        /// Play the episode on `step`'s side. Goes through the host's shared
+        /// swapper — the same path the on-screen buttons take on the other
+        /// platforms — so an explicit next press marks the episode it leaves
+        /// behind watched, debounces and announces itself.
+        func stepItem(_ step: PlayerMediaSwapper.Step) {
+            mediaSwapper.step(
+                step,
+                in: episodeNav,
+                onCompleteCurrentItem: { onCompleteCurrentItem?() },
+                select: { select(media: $0) }
+            )
+        }
+
+        func select(media newMedia: PlayableMedia) {
             withAnimation(.easeInOut(duration: 0.2)) { openTab = nil }
             onPanelOpenChange(false)
             focus = .transport

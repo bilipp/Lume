@@ -156,16 +156,19 @@ import SwiftUI
                     }
                     .buttonStyle(TVSettingsRowButtonStyle())
 
-                    if playlist.syncStatus == .syncing {
-                        TVSettingsValueRow("Status") {
-                            HStack(spacing: 8) {
+                    // Unconditional — see the iOS pane: the states worth
+                    // reading were the ones that used to render as no row.
+                    TVSettingsValueRow("Status") {
+                        HStack(spacing: 8) {
+                            if syncState == .syncing {
                                 ProgressView()
-                                Text("Syncing")
                             }
+                            Text(syncState.statusLabel)
+                                .foregroundStyle(syncState.tint)
                         }
                     }
 
-                    if let lastSync = playlist.lastSyncDate {
+                    if let lastSync = syncState.lastSyncDate {
                         TVSettingsValueRow("Last Synced") {
                             Text(lastSync, style: .relative)
                         }

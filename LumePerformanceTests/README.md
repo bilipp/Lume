@@ -34,6 +34,7 @@ Release would change what ships. Debug, Release and Sideload are untouched.
 |---|---|---|
 | Microbenchmarks | `ParsingBenchmarks`, `PersistenceBenchmarks`, `M3UPersistenceBenchmarks` | Parser / import regressions |
 | Browse read path | `BrowseQueryBenchmarks`, `EPGQueryBenchmarks` | A browse fetch going back to scanning |
+| Player navigation | `BrowseQueryBenchmarks+Navigation` | A previous/next lookup going back to reading the whole list |
 | End-to-end import | `M3UColdImportBenchmarks` | The whole production cold import, phase by phase |
 | Attribution harnesses | `M3UEpisodeRelationshipBenchmarks`, `M3UExistingRowFetchBenchmarks` | Which part of an import loop the time is actually in |
 | Signpost metrics | `SignpostBenchmarks` | A named production phase getting slower |
@@ -76,6 +77,82 @@ without an ORDER BY, SQLite stops the scan at the 50th hit, so the common term i
 several times *faster* than the rare one. If they ever converge, a `sortBy:` has
 come back.
 
+### The player's neighbour lookups
+
+`BrowseQueryBenchmarks+Navigation.swift` (an extension on the same class, in a
+second file only because the first is at the 600-line cap) covers the two
+lookups behind the in-player previous/next buttons. They belong with the browse
+path because they are the same kind of query and regress the same invisible way
+— but they run *during playback*, on the main actor, at every stream change,
+next to a decoder being torn down and rebuilt:
+
+- `testChannelSurfResolution` — `LiveChannelNavigator.adjacentMedia(for:offset:…)`
+  for both neighbours, inside a 4,000-channel **Favorites** list, with a second
+  playlist holding 4,000 favorites of its own. Favorites is the scope where the
+  playlist prefix has to be in the predicate: a category id already names its
+  playlist, so a category walk cannot read the wrong playlist's rows even
+  without it, while a favorites walk reads both playlists' lists the moment the
+  prefix leaves SQL — wrong rows, not merely slow ones.
+
+  Recently Watched is the one scope the ring deliberately does *not* walk. Its
+  browse list caps at `LiveChannelQuery.recentLimit` (50) rows across every
+  playlist and drops the other playlists' rows in Swift afterwards, so a
+  predicate-scoped ring caps after filtering and composes a different set of
+  channels. In-player surfing fetches that same capped page and filters it the
+  same way — 50 rows is affordable precisely because of the cap, and
+  `LumeTests/Services/LiveChannelRecentsRingTests.swift` walks a two-playlist
+  fixture step by step against the list the rail derives, so the two cannot
+  drift apart again unnoticed.
+- `testSeriesEpisodeResolution` — `NextEpisodeResolver.nextMedia` /
+  `.previousMedia` around the finale of a 480-episode show (20 × 24, near the
+  measured p99 of 279), in an `Episode` table of ~15k rows across two playlists.
+  Its `ModelContext` is rebuilt inside the loop, unlike every other benchmark
+  here: a `FetchDescriptor` runs its SQL however warm the context is, but a
+  relationship faults exactly **once** per context, so a reused one would
+  measure a walk of an already-materialized `Series.episodes` array from the
+  second iteration on — precisely the cost being watched.
+
+iPhone 17 Pro simulator, Benchmark configuration, `probeRepeats` (25) resolutions
+of *both* neighbours per iteration:
+
+| Benchmark | Clock | Per neighbour lookup |
+|---|---|---|
+| `testChannelSurfResolution` (4,000-channel favorites list) | 4.28 s | ~86 ms |
+| `testSeriesEpisodeResolution` (480-episode show, cold context) | 1.38 s | ~28 ms |
+
+**Read the channel number knowing what is in it**, because it is the one thing
+here that a bounded query did not make cheap. The ring reads ~14 positions to
+bisect for the playing channel, and every positional read re-applies the scope's
+`ORDER BY` — which for `.playlist` ends in a `name` tiebreak under the default
+localized comparator (`COLLATE NSCollateFinderlike`, the collation no index can
+serve). SQLite therefore sorts the scope's matching rows once per read, and the
+cost still grows with the length of the list. What the rewrite took out is the
+*materialization*, not the sort.
+
+Measured on the same fixture, changing one thing at a time:
+
+| Variant | Clock (50 lookups) |
+|---|---|
+| Ring walk, category scope | 3.41 s |
+| Ring walk, favorites scope (what ships, and what the benchmark measures) | 4.28 s |
+| Fetching the whole scope and finding the index in Swift (what it replaced) | 4.09 s |
+
+The third row is the interesting one and it is *not* an argument for going back.
+It was measured on a context that had already registered every row of the list,
+which is the materializing walk at its most flattering — the faulting it pays on
+a cold list is exactly what does not appear there, and neither does the resident
+cost of holding thousands of channels live while a decoder starts. The ordering
+itself is not this file's to change either: `ContentSortOption.liveStreamDescriptors`
+is the contract the browse list sorts by, and surfing must land on the row the
+viewer sees below the current one. If the sort is ever made seekable, it has to
+move in `LiveTVSection` and here together.
+
+The episode lookup has the same shape on a different axis: the bounded parts (the
+episode's own id, the owning playlist via `PlaylistOwner`) are seeks, and what is
+left is faulting the series' whole `episodes` inverse — ~28 ms for 480 episodes,
+and linear in the show's length. A long-running show is where to look if a season
+change ever feels slow.
+
 ## Signposts are the load-bearing part
 
 `Lume/Services/Diagnostics/PerformanceSignposts.swift` names every phase we have
@@ -112,6 +189,41 @@ shipped only reproduced on-disk.)
 Every configuration sets `cloudKitDatabase: .none`, without exception: the
 catalog's `@Attribute(.unique)` models crash container load when CloudKit
 mirroring is left at `.automatic` on an entitled host.
+
+### One correctness suite needs the same treatment
+
+The reasoning above is not only about cost. `LiveChannelNavigator.Ring` finds the
+playing channel's position by **bisection**: it reads one row at a time out of an
+ordering SQLite applies (`positionDescriptor`, `fetchOffset`/`fetchLimit = 1`) and
+compares each row it reads in *Swift*, through `SortDescriptor.compare`. That is
+correct only while the two orderings agree, and the axes on which they can part
+company — a localized collation (`COLLATE NSCollateFinderlike`, which is what a
+`String` key path's default comparator reaches SQLite as), SQLite's placement of
+a NULL in an optional sort key, a run of rows tied on every key the sort has —
+are exactly the ones an in-memory store cannot exhibit, because it evaluates the
+sort in Swift as well.
+
+`LumeTests/Services/LiveChannelNavigatorCollationTests.swift` is therefore an
+on-disk suite living in `LumeTests`, not here: it measures nothing, it pins
+agreement. It builds its container through `LumeTests/Helpers/OnDiskCatalogStore.swift`
+— the equivalent of `PerfStore.makeOnDiskContainer()` for a target that cannot
+import this one — and every expectation is derived by fetching the ring's own
+scope descriptor *whole* from the same on-disk context and reading the next
+index, never from a hand-written ordering, which would pin the test's guess about
+the collation instead of SQLite's answer. The three cases are a name sort over
+case-only, diacritic, punctuation- and digit-leading names; an 80-row run tied on
+`customOrder`, `num` and `name`; and NULL/non-NULL mixes of `customOrder` under
+`.playlist` and `favoriteOrder` under the Favorites scope.
+
+The tied-run case found a real defect rather than confirming one: the tied run
+used to be read once, 64 rows deep, and any channel further into the run than
+that had no resolvable position — surfing from it did nothing at all, silently.
+That 64 is now a page size and the run is read page by page, so it bounds a read
+rather than the answer.
+
+The default `LumeTests` helper, `makeTestContainer()`, is `isStoredInMemoryOnly:
+true`. Any future navigator test whose subject is an ordering has to opt out of
+it the same way, or it will pass no matter what the ring compares.
 
 ## What the import actually costs
 

@@ -35,6 +35,18 @@ extension [Playlist] {
         first(where: { $0.id.uuidString == storedID }) ?? first
     }
 
+    /// The playlist that synced a piece of content. Every catalog id is
+    /// prefixed with its playlist's UUID (see `ContentSyncManager`), and that
+    /// prefix is the only thing tying a row back to the server and credentials
+    /// that can actually play it. Callers that surface content from more than
+    /// one playlist — search with "Search All Playlists" on — must resolve the
+    /// owner this way rather than reaching for the active playlist. Returns
+    /// `nil` for an id no current playlist owns, so callers pick their own
+    /// fallback.
+    func owner(ofContentID contentID: String) -> Playlist? {
+        first { contentID.hasPrefix($0.id.uuidString) }
+    }
+
     /// The in-effect playlist's `id.uuidString`, or an empty string when there is
     /// no playlist at all. Never compare a raw stored value instead — it can name
     /// a deleted playlist.

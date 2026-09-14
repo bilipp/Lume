@@ -376,7 +376,7 @@ struct MovieDetailView: View {
               let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif

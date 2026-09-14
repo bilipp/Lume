@@ -531,7 +531,7 @@ private extension SeriesDetailView {
               let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif

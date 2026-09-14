@@ -37,6 +37,14 @@
         /// the host so channel switching works identically whether the controls
         /// are showing or hidden.
         var onSwitchChannel: (MoveCommandDirection) -> Void
+        /// The host's swap serialiser. The transport prev/next presses go
+        /// through it rather than calling `select(media:)` directly, so an
+        /// explicit press debounces, announces and completes the episode it
+        /// leaves behind exactly as the same press does on the other platforms.
+        let mediaSwapper: PlayerMediaSwapper
+        /// Invoked by an explicit next-episode press so the host marks the
+        /// episode left behind watched and scrobbles it.
+        var onCompleteCurrentItem: (() -> Void)?
         /// Raises the OpenSubtitles browser. `nil` when the search isn't
         /// available for this stream, which also drops the menu entry.
         var onSearchSubtitles: (() -> Void)?
@@ -53,6 +61,9 @@
         // Resolved SwiftData backing for the active stream.
         @State var episode: Episode?
         @State var seasonEpisodes: [Episode] = []
+        /// Transport prev/next targets, resolved once per stream across the
+        /// whole series (`seasonEpisodes` stays season-scoped for the rail).
+        @State var episodeNav: PlayerItemNavigation.Neighbours = .none
         @State var movie: Movie?
         @State var liveStream: LiveStream?
         @State var epgNow: EPGListing?
@@ -317,10 +328,8 @@
         @ViewBuilder
         private var leadingTransportButton: some View {
             if isSeries {
-                circleButton(systemImage: "backward.fill", focus: .previousItem, enabled: previousEpisode != nil) {
-                    if let previousEpisode {
-                        select(episode: previousEpisode)
-                    }
+                circleButton(systemImage: "backward.fill", focus: .previousItem, enabled: episodeNav.previous != nil) {
+                    stepItem(.previous)
                 }
             } else {
                 circleButton(systemImage: "backward.fill", focus: .previousItem) {
@@ -333,10 +342,8 @@
         @ViewBuilder
         private var trailingTransportButton: some View {
             if isSeries {
-                circleButton(systemImage: "forward.fill", focus: .nextItem, enabled: nextEpisode != nil) {
-                    if let nextEpisode {
-                        select(episode: nextEpisode)
-                    }
+                circleButton(systemImage: "forward.fill", focus: .nextItem, enabled: episodeNav.next != nil) {
+                    stepItem(.next)
                 }
             } else {
                 circleButton(systemImage: "forward.fill", focus: .nextItem) {

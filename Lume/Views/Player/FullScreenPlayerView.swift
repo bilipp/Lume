@@ -25,6 +25,12 @@ struct FullScreenPlayerView: View {
     /// finished title to be counted before it judges the session that
     /// finished it.
     @State var pendingProgressWrite: Task<Void, Never>?
+    /// The stream an explicit "next episode" already settled at full duration.
+    /// The swap that follows immediately flushes progress, and that flush would
+    /// otherwise record the position the viewer skipped from and undo the
+    /// completion. Non-private so `completeActiveEpisode` in
+    /// `FullScreenPlayerView+Navigation` can claim the ref before swapping.
+    @State var completedRef: PlayableMedia.ContentRef?
     #if os(macOS)
         @Environment(\.dismissWindow) private var dismissWindow
     #endif
@@ -38,7 +44,9 @@ struct FullScreenPlayerView: View {
     /// Advanced when an engine fails to start a stream, falling the player back
     /// to the next engine in the list. Reset to the primary engine whenever the
     /// active stream changes.
-    @State private var engineAttempt = 0
+    /// Non-private so the swap path in `FullScreenPlayerView+Navigation` can
+    /// restart the fallback chain for a newly selected stream.
+    @State var engineAttempt = 0
 
     /// Observes the active AirPlay route. Full-screen AirPlay *video* is only
     /// possible through `AVPlayer` (KSPlayer/VLCKit render into their own layers,
@@ -47,35 +55,41 @@ struct FullScreenPlayerView: View {
     /// engine preference. See `engine` / `castService`.
     @State private var castService = CastService.shared
 
-    /// Id of a stream AVPlayer couldn't start while casting over AirPlay (a codec
+    /// Ids of streams AVPlayer couldn't start while casting over AirPlay (a codec
     /// or container AVPlayer can't open — common for MPEG-TS / MKV IPTV that only
-    /// KSPlayer/VLCKit handle). Once set, the AirPlay-forces-AVPlayer override is
-    /// dropped for that stream so it plays on the user's engine locally with the
-    /// audio still on the receiver, instead of a dead "stream offline" error.
-    @State private var airPlayVideoUnsupported: String?
+    /// KSPlayer/VLCKit handle). Once a stream is in here the AirPlay-forces-AVPlayer
+    /// override is dropped for it, so it plays on the user's engine locally with
+    /// the audio still on the receiver, instead of a dead "stream offline" error.
+    /// A set, not one id, because in-player stepping comes back: surfing away
+    /// from an uncastable channel and back must not re-run the failed AVPlayer
+    /// attempt. Cleared only when the route goes away — a different receiver may
+    /// well handle what this one couldn't.
+    @State private var airPlayVideoUnsupported: Set<String> = []
 
     /// The only high-frequency playback state. An `@Observable` the host owns
     /// but never reads in its own body, so playback ticks invalidate just the
     /// scrubber/time labels rather than re-rendering the whole player tree. See
     /// `PlaybackClock`.
-    @State private var clock = PlaybackClock()
+    @State var clock = PlaybackClock()
 
     /// Writes watch progress on a private background `ModelContext`. Saving on
     /// the main context mid-playback hitches KSPlayer's render loop, so the
     /// sampler below only reads the clock and hands `Sendable` values to this
     /// actor. Created in `.task` once the environment's container is available.
-    @State private var progressWriter: WatchProgressWriter?
+    /// Non-private so the explicit-finish path in `FullScreenPlayerView+Navigation`
+    /// can write through the same actor rather than opening a second context.
+    @State var progressWriter: WatchProgressWriter?
 
     /// The stream currently playing. Starts as `media` but can be swapped when
     /// the viewer picks another episode from the in-player episode rail (tvOS).
-    @State private var activeMedia: PlayableMedia
+    @State var activeMedia: PlayableMedia
 
     /// The Stalker-resolved stand-in for `activeMedia`. Stalker streams arrive as
     /// a `lumestalker://` placeholder whose real URL is fetched via `create_link`
     /// at playback time; this holds the resolved copy once it lands. `nil` while
     /// resolution is in flight (the loading indicator shows). Engines that play a
     /// directly usable URL (Xtream / m3u) bypass this entirely — see `displayMedia`.
-    @State private var resolvedMedia: PlayableMedia?
+    @State var resolvedMedia: PlayableMedia?
 
     /// Set when Stalker `create_link` resolution fails, so the host shows the
     /// failure overlay instead of an endless spinner.
@@ -95,6 +109,30 @@ struct FullScreenPlayerView: View {
     /// only when the player tree is (re)built, never on the per-tick clock path.
     /// See `PlayerSkipIntroOverlay` / `PlayerNextUpOverlay`.
     @State private var skipSegments: IntroSegments?
+
+    /// What the previous/next transport controls play for the active stream.
+    /// Resolved once per stream in `.task(id:)` below, never in a body and never
+    /// on the per-tick clock path. Non-private so the lock-screen hook in
+    /// `FullScreenPlayerView+Navigation` reads the same answer the on-screen
+    /// controls do. See `FullScreenPlayerView+Navigation`.
+    @State var itemNeighbours = PlayerItemNavigation.Neighbours.none
+
+    /// Serialises every in-player stream change for this session, whichever
+    /// surface asked: the transport buttons, a macOS arrow key, the Siri Remote,
+    /// or the lock screen / Control Center / a headset's track buttons.
+    ///
+    /// One per player, threaded down to the engine view, rather than one per
+    /// surface — the cooldown exists to keep two decoder teardowns from being in
+    /// flight, and a swapper each would let a lock-screen press and an on-screen
+    /// press start one apiece inside the same 0.3 s. Not static either: iPadOS
+    /// can run several player scenes, which are genuinely independent.
+    @State var mediaSwapper = PlayerMediaSwapper()
+
+    /// The sort the viewer's channel list was in, and what they may watch. Read
+    /// in the host, not in each engine view: neighbours resolve once per stream.
+    @AppStorage(SortStorageKey.liveContent)
+    private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
+    @Environment(\.contentRestriction) private var contentRestriction
 
     init(media: PlayableMedia) {
         self.media = media
@@ -128,7 +166,7 @@ struct FullScreenPlayerView: View {
     private var isAirPlayOverride: Bool {
         castService.isAirPlayActive
             && priorityEngine != .avPlayer
-            && airPlayVideoUnsupported != activeMedia.id
+            && !airPlayVideoUnsupported.contains(activeMedia.id)
     }
 
     /// Whether another engine remains to fall back to after the current one.
@@ -163,21 +201,10 @@ struct FullScreenPlayerView: View {
             return
         }
         Logger.player.log("AirPlay: AVPlayer can't play this stream; reverting to \(priorityEngine.rawValue, privacy: .public) locally with audio-only AirPlay")
-        airPlayVideoUnsupported = activeMedia.id
+        airPlayVideoUnsupported.insert(activeMedia.id)
         // Resume the local engine where the cast attempt left off (VOD only).
         if !activeMedia.isLive, clock.current > 1 {
             resumeActiveMedia(at: clock.current)
-        }
-    }
-
-    /// Rebase the active stream to resume at `position`. Also rebases the
-    /// Stalker-resolved stand-in: it shares `activeMedia`'s id, so `displayMedia`
-    /// keeps returning it (and `.task(id:)` won't re-resolve) — without this the
-    /// engine taking over would start from the stand-in's stale `startTime`.
-    private func resumeActiveMedia(at position: TimeInterval) {
-        activeMedia = activeMedia.resuming(at: position)
-        if let resolved = resolvedMedia, resolved.id == activeMedia.id {
-            resolvedMedia = resolved.resuming(at: position)
         }
     }
 
@@ -215,6 +242,7 @@ struct FullScreenPlayerView: View {
         #endif
         .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.dark)
+        .macPlayerWindow(activeMedia: activeMedia, launchMedia: media) { switchMedia(to: $0) }
         // Synchronous on purpose, and ahead of the `.task` below: the engine
         // coordinators report `beginStartup` / `noteEngineFallback` from their
         // own appearance, and an async baseline can land after them — which
@@ -229,9 +257,6 @@ struct FullScreenPlayerView: View {
             // main context and hitch KSPlayer's render loop.
             ContentIndexingService.shared.isPlaybackActive = true
             configureAudioSessionForPlayback()
-            #if os(macOS)
-                enterMacFullScreen()
-            #endif
         }
         .task(id: activeMedia.id) {
             // Resolve a deferred Stalker placeholder into a real (short-lived)
@@ -248,18 +273,19 @@ struct FullScreenPlayerView: View {
             )
         }
         .task(id: activeMedia.id) {
-            // Resolve the next episode and the IntroDB segments for the active
-            // stream. Runs on appear and whenever the stream swaps (manual pick
-            // or auto-advance), so the queued episode always trails the one on
-            // screen. The segments feed two affordances — the skip-intro button
-            // (intro/recap windows) and the next-up arm time (outro window) — so
-            // the fetch needs one of them to be both enabled and reachable; the
-            // outro is dead weight with no next episode to advance to. Resolving
-            // the lookup key touches SwiftData on the main actor; the fetch
-            // itself is off it.
-            nextUpMedia = activeMedia.isLive
-                ? nil
-                : NextEpisodeResolver.nextMedia(after: activeMedia.contentRef, in: modelContext)
+            // Resolve the transport neighbours (previous/next episode or channel)
+            // and the IntroDB segments for the active stream. Runs on appear and
+            // whenever the stream swaps, so what the controls play always trails
+            // what is on screen. The segments feed two affordances — the
+            // skip-intro button (intro/recap windows) and the next-up arm time
+            // (outro window) — so the fetch needs one of them to be both enabled
+            // and reachable; the outro is dead weight with no next episode to
+            // advance to. Resolving the lookup key touches SwiftData on the main
+            // actor; the fetch itself is off it.
+            itemNeighbours = Self.resolveNeighbours(
+                for: activeMedia, sortRaw: liveContentSortRaw, restriction: contentRestriction, in: modelContext
+            )
+            nextUpMedia = Self.queuedEpisode(from: itemNeighbours)
             skipSegments = nil
             guard PremiumManager.shared.isPremium,
                   PlayerSettings.Playback.showSkipIntroButton
@@ -306,11 +332,11 @@ struct FullScreenPlayerView: View {
             // While the audio-only sentinel is set the engine stays on the
             // user's choice for both route directions — reassigning the media
             // would only restart a stream that is already playing locally.
-            let engineSwaps = airPlayVideoUnsupported != activeMedia.id
+            let engineSwaps = !airPlayVideoUnsupported.contains(activeMedia.id)
             if !isActive {
                 // The route is gone; a future cast (possibly to a different,
                 // more capable receiver) should retry AVPlayer video first.
-                airPlayVideoUnsupported = nil
+                airPlayVideoUnsupported.removeAll()
             }
             // Toggling AirPlay swaps the engine (see `engine`), which rebuilds the
             // player. Carry the current position across so a VOD stream resumes
@@ -362,21 +388,20 @@ struct FullScreenPlayerView: View {
         switch engine {
         case .lumeEngine:
             LumeEngineEngineView(
-                media: media,
-                clock: clock,
-                nextUpMedia: nextUpMedia,
+                media: media, clock: clock, mediaSwapper: mediaSwapper,
+                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
                 reportsStartupFailure: hasFallbackEngine,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
-                onSelectMedia: switchMedia
+                onSelectMedia: switchMedia,
+                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler
             )
             .id(engineAttempt)
         case .avPlayer:
             AVPlayerEngineView(
-                media: media,
-                clock: clock,
-                nextUpMedia: nextUpMedia,
+                media: media, clock: clock, mediaSwapper: mediaSwapper,
+                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
                 // During an AirPlay override there's no next engine to try, but
                 // report failure anyway so `handlePlaybackFailure` can revert to
@@ -387,31 +412,32 @@ struct FullScreenPlayerView: View {
                 reportsStartupFailure: isAirPlayOverride || hasFallbackEngine,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: handlePlaybackFailure,
-                onSelectMedia: switchMedia
+                onSelectMedia: switchMedia,
+                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler
             )
             .id(engineAttempt)
         case .ksPlayer:
             KSPlayerEngineView(
-                media: media,
-                clock: clock,
-                nextUpMedia: nextUpMedia,
+                media: media, clock: clock, mediaSwapper: mediaSwapper,
+                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
                 reportsStartupFailure: hasFallbackEngine,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
-                onSelectMedia: switchMedia
+                onSelectMedia: switchMedia,
+                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler
             )
             .id(engineAttempt)
         case .vlcKit:
             VLCPlayerEngineView(
-                media: media,
-                clock: clock,
-                nextUpMedia: nextUpMedia,
+                media: media, clock: clock, mediaSwapper: mediaSwapper,
+                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
                 reportsStartupFailure: hasFallbackEngine,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
-                onSelectMedia: switchMedia
+                onSelectMedia: switchMedia,
+                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler
             )
             .id(engineAttempt)
         }
@@ -437,21 +463,6 @@ struct FullScreenPlayerView: View {
     private func retryResolve() {
         engineAttempt = 0
         Task { await resolveActiveMedia() }
-    }
-
-    /// Persist the outgoing stream's progress, then swap in a new one. The
-    /// engine reconfigures its player when `activeMedia` changes.
-    private func switchMedia(to newMedia: PlayableMedia) {
-        guard newMedia.id != activeMedia.id else { return }
-        // Flush the outgoing stream's progress before the clock resets — capture
-        // happens synchronously inside `persistProgressDetached`.
-        persistProgressDetached(force: true)
-        clock.reset()
-        // Restart the fallback chain from the primary engine for the new stream.
-        engineAttempt = 0
-        activeMedia = newMedia
-        // Slide the outgoing channel into the recall slot so `right` can jump back.
-        LiveChannelHistory.record(newMedia)
     }
 
     private var closeButton: some View {
@@ -486,19 +497,6 @@ struct FullScreenPlayerView: View {
         #endif
     }
 
-    #if os(macOS)
-        private func enterMacFullScreen() {
-            // Wait for the window to mount before toggling fullscreen.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                guard let window = NSApp.keyWindow ?? NSApp.windows.last(where: { $0.isVisible }) else { return }
-                window.title = activeMedia.title
-                if !window.styleMask.contains(.fullScreen) {
-                    window.toggleFullScreen(nil)
-                }
-            }
-        }
-    #endif
-
     /// Seconds between progress samples. These only write `UserDefaults` now, so
     /// the cadence trades crash-recovery granularity against nothing meaningful.
     private static let progressSampleInterval: TimeInterval = 30
@@ -522,17 +520,23 @@ struct FullScreenPlayerView: View {
     /// resulting store merge can't disturb playback. Captures the clock
     /// synchronously *before* awaiting, so a subsequent `clock.reset()` can't
     /// race the read; clears the buffer entry once the write lands.
-    private func persistProgressDetached(force: Bool) {
+    func persistProgressDetached(force: Bool) {
         guard let writer = progressWriter else { return }
         if activeMedia.isLive, !force { return }
         let ref = activeMedia.contentRef
+        // An explicit "next episode" already settled this stream at its full
+        // duration. Recording the position it was skipped from would walk that
+        // back to unwatched, so the completion stands and this flush stands down.
+        if ref == completedRef { return }
         let now = clock.current
         let total = clock.duration
         // Held so `endReviewSession` can await it: `writer` is an actor, so the
         // await below suspends, and without the handle the review policy would
         // read `completedTitles` before this task increments it — the third
         // finished title would then only arm the *next* session.
+        let previous = pendingProgressWrite
         pendingProgressWrite = Task { @MainActor in
+            await previous?.value
             let completion = await writer.record(
                 ref: ref, progress: now, duration: total, force: force
             )
@@ -547,7 +551,7 @@ struct FullScreenPlayerView: View {
     /// One-time "watched" sync on Trakt. Runs at most once per title (when it
     /// crosses 90%), so the main-context fetch here is off the playback hot path.
     /// `TraktService` is `@MainActor`, hence this stays on the main actor.
-    private func syncTraktWatched(ref: PlayableMedia.ContentRef) {
+    func syncTraktWatched(ref: PlayableMedia.ContentRef) {
         switch ref {
         case let .movie(id):
             var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
