@@ -398,7 +398,7 @@ struct LiveTVView: View {
     private func present(_ media: PlayableMedia) {
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif

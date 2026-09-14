@@ -31,6 +31,12 @@ final class NowPlayingService {
         let play: () -> Void
         let pause: () -> Void
         let seek: (TimeInterval) -> Void
+        /// Play the stream on `step`'s side — the episode either side of this
+        /// one, or the channel one position along the live list — reporting
+        /// whether anything actually started. Supplied by the player host, which
+        /// owns both the swap and the resolved neighbours; the engine only
+        /// carries it here. `nil` where the host offers no in-player navigation.
+        var advance: ((PlayerMediaSwapper.Step) -> Bool)?
     }
 
     /// The stream whose session is currently published, if any. Read by the
@@ -127,6 +133,25 @@ final class NowPlayingService {
 
     private var commandTargets: [(MPRemoteCommand, Any)] = []
 
+    /// Whether the lock screen should offer next/previous track at all.
+    ///
+    /// Both halves are required. A stream with no axis (a movie) must not show
+    /// the buttons, and neither must a host that supplies no advance handler:
+    /// tvOS deliberately hands over a `nil` one — it drives stream changes from
+    /// the Siri Remote's own mapping — so enabling on the axis alone advertises
+    /// two buttons whose every press can only answer
+    /// `.noActionableNowPlayingItem`.
+    ///
+    /// Split out as a pure function because the service is a `@MainActor`
+    /// singleton with no injection seam, and this rule is the part worth
+    /// testing.
+    nonisolated static func advanceCommandsEnabled(
+        for media: PlayableMedia,
+        hasAdvanceHandler: Bool
+    ) -> Bool {
+        hasAdvanceHandler && PlayerItemNavigation.axis(for: media) != nil
+    }
+
     private func registerCommands(for media: PlayableMedia) {
         removeCommands()
         let center = MPRemoteCommandCenter.shared()
@@ -136,6 +161,21 @@ final class NowPlayingService {
         addTarget(center.togglePlayPauseCommand) { [weak self] _ in
             guard let self, let transport else { return .noActionableNowPlayingItem }
             return transport.isPlaying() ? remotePause() : remotePlay()
+        }
+
+        // Next/previous track: the neighbouring episode, or — on live TV —
+        // channel up/down. Configured before the seek commands' early return,
+        // which live streams take. A press that finds nothing reports
+        // `.noSuchContent`.
+        let canAdvance = Self.advanceCommandsEnabled(
+            for: media,
+            hasAdvanceHandler: transport?.advance != nil
+        )
+        center.nextTrackCommand.isEnabled = canAdvance
+        center.previousTrackCommand.isEnabled = canAdvance
+        if canAdvance {
+            addTarget(center.nextTrackCommand) { [weak self] _ in self?.remoteAdvance(.next) ?? .commandFailed }
+            addTarget(center.previousTrackCommand) { [weak self] _ in self?.remoteAdvance(.previous) ?? .commandFailed }
         }
 
         let canSeek = !media.isLive
@@ -184,6 +224,11 @@ final class NowPlayingService {
         if transport.isPlaying() { transport.pause() }
         publishDynamic(forcePlaying: false)
         return .success
+    }
+
+    private func remoteAdvance(_ step: PlayerMediaSwapper.Step) -> MPRemoteCommandHandlerStatus {
+        guard let advance = transport?.advance else { return .noActionableNowPlayingItem }
+        return advance(step) ? .success : .noSuchContent
     }
 
     private func remoteSeek(to position: TimeInterval) -> MPRemoteCommandHandlerStatus {

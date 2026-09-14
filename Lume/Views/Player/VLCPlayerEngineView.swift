@@ -30,10 +30,16 @@ struct VLCPlayerEngineView: View {
     /// only the scrubber leaf reads it. `@Bindable` so the iOS/macOS overlay can
     /// still take plain bindings.
     @Bindable var clock: PlaybackClock
+    let mediaSwapper: PlayerMediaSwapper
     /// The episode queued after `media`, resolved by the host. Drives the
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
     /// next.
     var nextUpMedia: PlayableMedia?
+    /// Previous/next stream for the transport controls, resolved once per stream
+    /// by the host: the surrounding episodes of a series, or the channels either
+    /// side of a live one. `neighboursUnknown` means the catalog has no episode
+    /// rows yet, which the controls render as disabled rather than absent.
+    var itemNeighbours = PlayerItemNavigation.Neighbours.none
     /// Intro / recap / outro windows for the active episode (from IntroDB). The
     /// openers drive the in-player Skip Intro button; the outro sets when the
     /// Next Episode button arms. `nil` when IntroDB knows nothing about it.
@@ -51,6 +57,15 @@ struct VLCPlayerEngineView: View {
     /// Invoked when the viewer picks a different stream (e.g. another episode)
     /// from the in-player overlay. The host swaps `media` in response.
     var onSelectMedia: ((PlayableMedia) -> Void)?
+    /// Invoked when an explicit "next episode" press leaves the current episode
+    /// behind, so the host can mark it watched and scrobble it. The press is
+    /// available from the first frame, below the completion line the automatic
+    /// advance relies on, so it has to say so itself.
+    var onCompleteCurrentItem: (() -> Void)?
+    /// What the lock screen's next/previous track buttons play, owned by the
+    /// host and handed to `NowPlayingService` with this engine's transport.
+    /// `nil` on tvOS, where the Siri Remote already owns stream changes.
+    var onRemoteAdvance: ((PlayerMediaSwapper.Step) -> Bool)?
 
     @StateObject private var coordinator = VLCPlayerCoordinator()
     @State private var isControlsVisible = true
@@ -70,6 +85,10 @@ struct VLCPlayerEngineView: View {
     @State private var isPanelOpen = false
     /// Bumped to ask the overlay to close its open panel (Menu/back press).
     @State private var panelCloseToken = 0
+    // Serialises stream changes for this session — the Siri remote's channel
+    // surfing and the on-screen transport controls share it, so two swaps can
+    // never be in flight at once. `internal` so the transport step in
+    // `VLCPlayerEngineView+Navigation.swift` can reach it; never read from a body.
     #if os(tvOS)
         /// The full channel browser (categories + channels) raised by a left
         /// press while watching live TV with the controls hidden.
@@ -82,12 +101,12 @@ struct VLCPlayerEngineView: View {
         /// Live-content sort the channel browser uses — read so in-player channel
         /// surfing follows the same order the viewer saw in the list.
         @AppStorage(SortStorageKey.liveContent)
-        private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
-        @Environment(\.modelContext) private var modelContext
+        var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
+        @Environment(\.modelContext) var modelContext
         /// Keeps channel surfing inside what this viewer may watch — a child
         /// profile must not be able to rock up/down, or recall the last channel,
         /// into a category a parent locked or the user hid.
-        @Environment(\.contentRestriction) private var restriction
+        @Environment(\.contentRestriction) var restriction
     #endif
 
     @Environment(\.dismiss) private var dismiss
@@ -184,7 +203,8 @@ struct VLCPlayerEngineView: View {
                     guard let coordinator, coordinator.isPlaying else { return }
                     coordinator.togglePlay()
                 },
-                seek: { [weak coordinator] in coordinator?.seek(to: $0) }
+                seek: { [weak coordinator] in coordinator?.seek(to: $0) },
+                advance: onRemoteAdvance
             ), owner: coordinator)
             scheduleHide()
         }
@@ -248,6 +268,10 @@ struct VLCPlayerEngineView: View {
             }
             .onKeyPress(.leftArrow) { coordinator.skip(by: -15); resetHideTimer(); return .handled }
             .onKeyPress(.rightArrow) { coordinator.skip(by: 15); resetHideTimer(); return .handled }
+            .liveChannelKeyNavigation(
+                neighbours: itemNeighbours, swapper: mediaSwapper,
+                onSelect: { onSelectMedia?($0) }, onResetHideTimer: resetHideTimer
+            )
             .onKeyPress(.space) { togglePlay(); return .handled }
             .onKeyPress(.escape) { closePlayer(); return .handled }
         #endif
@@ -307,6 +331,7 @@ struct VLCPlayerEngineView: View {
                 onSelectMedia: { onSelectMedia?($0) },
                 onPanelOpenChange: { setPanelOpen($0) },
                 onSwitchChannel: { switchLiveChannel($0) },
+                mediaSwapper: mediaSwapper, onCompleteCurrentItem: { onCompleteCurrentItem?() },
                 onSearchSubtitles: subtitleSearchAction
             )
         #else
@@ -322,7 +347,9 @@ struct VLCPlayerEngineView: View {
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
                 onScheduleHide: { scheduleHide() },
-                onSearchSubtitles: subtitleSearchAction
+                onSearchSubtitles: subtitleSearchAction,
+                itemNeighbours: itemNeighbours,
+                onStepItem: { stepItem($0) }
             )
         #endif
     }
@@ -344,36 +371,6 @@ struct VLCPlayerEngineView: View {
     }
 
     #if os(tvOS)
-        /// Change the live channel from the Siri Remote. Up/Down surf to the
-        /// adjacent channel, the way the viewer's `LiveSurfMode` maps the
-        /// press; Right recalls the channel watched just before this one (the
-        /// remote's "last" button).
-        /// The new channel's controls are surfaced briefly so its name and EPG
-        /// act as a banner. Falls back to summoning the controls when there's
-        /// nothing to jump to.
-        private func switchLiveChannel(_ direction: MoveCommandDirection) {
-            guard media.isLive else { return }
-            let target: PlayableMedia?
-            switch direction {
-            case .up, .down:
-                let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
-                    for: media, surfing: direction == .up ? .up : .down,
-                    mode: .preferred,
-                    sort: sort, restriction: restriction, in: modelContext
-                )
-            case .right:
-                target = LiveChannelHistory.recallMedia(
-                    in: modelContext, scope: media.channelScope, restriction: restriction
-                )
-            default:
-                return
-            }
-            guard let target else { showControls(); return }
-            onSelectMedia?(target)
-            showControls()
-        }
-
         /// The two-column category / channel browser, slid in over the leading
         /// edge. Picking a channel switches the stream and surfaces the controls
         /// briefly so the new channel's name and EPG act as a banner.
@@ -408,7 +405,7 @@ struct VLCPlayerEngineView: View {
         if isControlsVisible { scheduleHide() }
     }
 
-    private func showControls() {
+    func showControls() {
         guard !isControlsVisible else { resetHideTimer(); return }
         withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
         scheduleHide()
@@ -587,7 +584,8 @@ private extension View {
             startTime: 0,
             contentRef: .movie("preview")
         ),
-        clock: PlaybackClock()
+        clock: PlaybackClock(),
+        mediaSwapper: PlayerMediaSwapper()
     )
     .preferredColorScheme(.dark)
 }

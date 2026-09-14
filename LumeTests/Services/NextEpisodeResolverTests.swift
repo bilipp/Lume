@@ -2,9 +2,10 @@
 //  NextEpisodeResolverTests.swift
 //  LumeTests
 //
-//  Covers the "play next" resolution behind auto-advance and the in-player Next
-//  Episode button (`NextEpisodeResolver.nextMedia`): season-internal ordering,
-//  crossing a season boundary, the series finale, and non-episode input.
+//  Covers the "play next"/"play previous" resolution behind auto-advance and the
+//  in-player episode transport buttons (`NextEpisodeResolver.nextMedia` /
+//  `.previousMedia`): season-internal ordering, crossing a season boundary in
+//  both directions, the series finale and premiere, and non-episode input.
 //
 
 import Foundation
@@ -101,5 +102,43 @@ struct NextEpisodeResolverTests {
     @Test func `live input has no next episode`() throws {
         let (context, _, _) = try makeWorld(episodes: twoSeasons)
         #expect(NextEpisodeResolver.nextMedia(after: .live("l-1"), in: context) == nil)
+    }
+
+    @Test func `previous within the same season`() throws {
+        let (context, _, _) = try makeWorld(episodes: twoSeasons)
+        let previous = NextEpisodeResolver.previousMedia(before: ref(season: 1, episode: 2), in: context)
+        #expect(previous?.contentRef == ref(season: 1, episode: 1))
+    }
+
+    @Test func `previous crosses the season boundary backwards`() throws {
+        // The first episode of season 2 should fall back to the last of season 1.
+        let (context, _, _) = try makeWorld(episodes: twoSeasons)
+        let previous = NextEpisodeResolver.previousMedia(before: ref(season: 2, episode: 1), in: context)
+        #expect(previous?.contentRef == ref(season: 1, episode: 2))
+    }
+
+    @Test func `series premiere has no previous episode`() throws {
+        let (context, _, _) = try makeWorld(episodes: twoSeasons)
+        let previous = NextEpisodeResolver.previousMedia(before: ref(season: 1, episode: 1), in: context)
+        #expect(previous == nil)
+    }
+
+    @Test func `resolved previous media carries a playable URL`() throws {
+        let (context, _, _) = try makeWorld(episodes: twoSeasons)
+        let previous = try #require(
+            NextEpisodeResolver.previousMedia(before: ref(season: 2, episode: 1), in: context)
+        )
+        #expect(previous.url.absoluteString.contains("/series/"))
+        #expect(!previous.isLive)
+    }
+
+    @Test func `movie input has no previous episode`() throws {
+        let (context, _, _) = try makeWorld(episodes: twoSeasons)
+        #expect(NextEpisodeResolver.previousMedia(before: .movie("m-1"), in: context) == nil)
+    }
+
+    @Test func `live input has no previous episode`() throws {
+        let (context, _, _) = try makeWorld(episodes: twoSeasons)
+        #expect(NextEpisodeResolver.previousMedia(before: .live("l-1"), in: context) == nil)
     }
 }

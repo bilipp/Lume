@@ -305,16 +305,20 @@ struct LumeApp: App {
         #if os(macOS)
             WindowGroup(id: "player", for: PlayableMedia.self) { $media in
                 if let media {
-                    FullScreenPlayerView(media: media)
-                        .frame(minWidth: 800, minHeight: 450)
+                    // The player is its own window on macOS, so it does not
+                    // inherit the main scene's environment — without the
+                    // provider it resolves the permissive `@Entry` default and
+                    // a child profile surfs straight through locked categories.
+                    ContentRestrictionProvider {
+                        FullScreenPlayerView(media: media)
+                            .frame(minWidth: 800, minHeight: 450)
+                    }
                 }
             }
             .modelContainer(catalogContainer)
             .environment(TraktService.shared)
             .environment(PremiumManager.shared)
-            // The player is its own window on macOS, so it does not inherit
-            // the main scene's environment — without this the review prompt
-            // would read every macOS session as "no child watching".
+            // Also what the review prompt reads to tell a child session apart.
             .environment(profileManager)
             .windowStyle(.hiddenTitleBar)
             .windowResizability(.contentMinSize)

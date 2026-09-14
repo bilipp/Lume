@@ -26,22 +26,59 @@ enum NextEpisodeResolver {
         guard let current = try? context.fetch(descriptor).first,
               let series = current.series else { return nil }
 
-        let ordered = series.episodes.sorted {
-            ($0.seasonNum, $0.episodeNum) < ($1.seasonNum, $1.episodeNum)
-        }
-        guard let index = ordered.firstIndex(where: { $0.id == current.id }),
-              index + 1 < ordered.count else { return nil }
-
-        let next = ordered[index + 1]
-        guard let playlist = playlist(for: series, in: context) else { return nil }
+        guard let next = neighbour(of: current, in: series, after: true),
+              let playlist = playlist(for: series, in: context) else { return nil }
         return PlayableMedia.from(episode: next, playlist: playlist, client: client)
+    }
+
+    /// The episode before `ref` as `PlayableMedia`, or `nil` when `ref` is not an
+    /// episode, the series can't be resolved, this is the series premiere, or no
+    /// playlist can build a URL for it.
+    static func previousMedia(
+        before ref: PlayableMedia.ContentRef,
+        in context: ModelContext,
+        client: XtreamClient = XtreamClient()
+    ) -> PlayableMedia? {
+        guard case let .episode(id) = ref else { return nil }
+
+        var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let current = try? context.fetch(descriptor).first,
+              let series = current.series else { return nil }
+
+        guard let previous = neighbour(of: current, in: series, after: false),
+              let playlist = playlist(for: series, in: context) else { return nil }
+        return PlayableMedia.from(episode: previous, playlist: playlist, client: client)
+    }
+
+    /// The episode adjacent to `current` across the whole series, ordered by
+    /// `(season, episode)`.
+    ///
+    /// A single pass for the nearest key on the chosen side, rather than sorting
+    /// the relationship into a second array to read one element out of it: the
+    /// episodes are faulted either way, and a long-running show carries hundreds
+    /// of them through a lookup that runs on the main actor at every stream
+    /// change.
+    private static func neighbour(of current: Episode, in series: Series, after: Bool) -> Episode? {
+        let currentKey = (current.seasonNum, current.episodeNum)
+        var best: Episode?
+        for episode in series.episodes where episode.id != current.id {
+            let key = (episode.seasonNum, episode.episodeNum)
+            guard after ? key > currentKey : key < currentKey else { continue }
+            guard let found = best else {
+                best = episode
+                continue
+            }
+            let bestKey = (found.seasonNum, found.episodeNum)
+            if after ? key < bestKey : key > bestKey { best = episode }
+        }
+        return best
     }
 
     /// The playlist that owns a series, mirroring the detail screen and tvOS
     /// overlay logic: prefix-match on the playlist UUID, falling back to the
     /// first playlist.
     private static func playlist(for series: Series, in context: ModelContext) -> Playlist? {
-        let playlists = (try? context.fetch(FetchDescriptor<Playlist>())) ?? []
-        return playlists.first { series.id.hasPrefix($0.id.uuidString) } ?? playlists.first
+        PlaylistOwner.playlist(forPrefixedID: series.id, in: context)
     }
 }

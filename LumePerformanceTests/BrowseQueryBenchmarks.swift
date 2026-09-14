@@ -36,8 +36,12 @@ import Foundation
 import SwiftData
 import XCTest
 
+/// `BrowseQueryBenchmarks+Navigation.swift` extends this class with the
+/// in-player previous/next benchmarks, off the same two-playlist fixture — which
+/// is what the internal (rather than private) members below are for, and it is a
+/// second file only because this one is at SwiftLint's 600-line cap.
 final class BrowseQueryBenchmarks: XCTestCase {
-    private var store: (container: ModelContainer, directory: URL)!
+    var store: (container: ModelContainer, directory: URL)!
 
     private let movieCount = 20000
     private let seriesCount = 6000
@@ -66,20 +70,20 @@ final class BrowseQueryBenchmarks: XCTestCase {
     /// therefore runs the fetch as many times as one measured cold launch did
     /// (18-25), which puts the fast case just above the timer floor and the
     /// unbounded case far above it.
-    private let probeRepeats = 25
+    let probeRepeats = 25
 
     /// The active playlist. Row ids are `"<uuid>-<kind>-<n>"`, the shape
     /// `ContentSyncManager` writes and every browse predicate scopes on;
     /// `Category` derives the same shape from its `playlist` in `init`.
     /// `Playlist` mints its own id, so both are read back after seeding.
-    private var playlistID: UUID!
+    var playlistID: UUID!
     /// A second installed playlist. It exists so the scoping predicates have
     /// something to exclude: the bug this guards against is a fetch that reads
     /// every playlist's rows and filters in Swift afterwards, which is invisible
     /// until a second playlist is installed.
-    private var otherPlaylistID: UUID!
+    var otherPlaylistID: UUID!
 
-    private var prefix: String {
+    var prefix: String {
         "\(playlistID.uuidString)-"
     }
 
