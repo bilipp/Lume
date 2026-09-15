@@ -5,7 +5,7 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
     case vlcKit
     case ksPlayer
     case avPlayer
-    /// Lume's own FFmpeg 8 engine — in beta. Declared last so it appends to the
+    /// Lume's own FFmpeg 9 engine — in beta. Declared last so it appends to the
     /// END of existing priority lists (`PlayerEnginePriority.normalized`):
     /// available to opt into, never silently promoted while KSPlayer is default.
     case lumeEngine
@@ -28,7 +28,7 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
         case .vlcKit: "VLCKit 4 is VLC's native engine. Plays virtually any format and codec, with hardware-accelerated 4K HDR, Picture in Picture, and the broadest IPTV compatibility."
         case .ksPlayer: "KSPlayer is a powerful third-party player that supports a wide range of formats, including those commonly used in IPTV streams."
         case .avPlayer: "Native Apple player. Best for HLS and MP4. But does not support many formats used in IPTV streams."
-        case .lumeEngine: "Lume's own FFmpeg 8 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
+        case .lumeEngine: "Lume's own FFmpeg 9 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
         }
     }
 

@@ -80,13 +80,13 @@ Remote dependencies (KSPlayer, FFmpegKit, VLCKit) are resolved automatically by 
 first build.
 
 **[LumeEngine](https://github.com/bilipp/LumeEngine) is the exception.** Lume's own
-FFmpeg 8 engine (shipping as an opt-in beta engine) is referenced as a **local** Swift
+FFmpeg 9 engine (shipping as an opt-in beta engine) is referenced as a **local** Swift
 package at `../LumeEngine`, so the project will not resolve until you have cloned it as a
 sibling of `Lume/` **and** built its FFmpeg xcframework once:
 
 ```bash
 cd ../LumeEngine
-curl -sLo build/ffmpeg-8.1.2.tar.xz https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz
+curl -sLo build/ffmpeg-9.0.1.tar.xz https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz
 build/scripts/build-ffmpeg.sh macos-arm64     # + ios-arm64 / tvos-arm64 for device builds
 build/scripts/make-xcframework.sh
 ```
