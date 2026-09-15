@@ -162,7 +162,7 @@ Two separate `ModelContainer`s:
 - Frozen image + healthy audio on live TV = MPEG-TS 2³³ clock wrap; fixed by the `noteClockDrift()` watchdog.
 
 ### LumeEngine (beta, 4th engine)
-- Our own FFmpeg 8 engine, developed in the sibling repo [`bilipp/LumeEngine`](https://github.com/bilipp/LumeEngine) and referenced as a **local** SPM package at `../LumeEngine` — a clone without that sibling (and its FFmpeg xcframework built once) will not resolve. It has its own `AGENTS.md` and a `PLAN.md` that is authoritative for engine design.
+- Our own FFmpeg 9 engine, developed in the sibling repo [`bilipp/LumeEngine`](https://github.com/bilipp/LumeEngine) and referenced as a **local** SPM package at `../LumeEngine` — a clone without that sibling (and its FFmpeg xcframework built once) will not resolve. It has its own `AGENTS.md` and a `PLAN.md` that is authoritative for engine design.
 - App-side wiring only lives here (`Lume/Views/Player/LumeEngine*.swift`); demux/decode/render/sync bugs are engine-side. Decide which side a bug belongs to *before* editing.
 - Declared last in `PlayerEngineKind` so it appends to the end of existing priority lists — opt-in, never silently promoted while KSPlayer is the default.
 - The engine never retries on its own schedule: reconnect/backoff, engine fallback, and overlays stay Lume's job. If a fix would add retry policy to the engine, it belongs here instead.
