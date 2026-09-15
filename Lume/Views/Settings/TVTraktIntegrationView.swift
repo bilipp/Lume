@@ -9,6 +9,7 @@
 
 #if os(tvOS)
 
+    import SwiftData
     import SwiftUI
 
     struct TVTraktIntegrationView: View {
