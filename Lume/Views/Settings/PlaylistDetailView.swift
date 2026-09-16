@@ -52,12 +52,17 @@ struct PlaylistDetailView: View {
         playlist.sourceType == .stalker
     }
 
+    var isWebDAV: Bool {
+        playlist.sourceType == .webdav
+    }
+
     /// The localized section heading for the connection fields.
     var connectionSectionTitle: LocalizedStringKey {
         switch playlist.sourceType {
         case .xtream: "Server"
         case .m3u: "M3U Playlist"
         case .stalker: "Stalker Portal"
+        case .webdav: "WebDAV Share"
         }
     }
 
@@ -151,8 +156,8 @@ struct PlaylistDetailView: View {
         private var readOnlySection: some View {
             Section(connectionSectionTitle) {
                 LabeledContent("Name", value: playlist.name)
-                LabeledContent(isStalker ? "Portal URL" : "URL") {
-                    Text(playlist.serverURL)
+                LabeledContent(serverURLFieldTitle) {
+                    Text(playlist.displayURL)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .foregroundStyle(.secondary)
@@ -168,6 +173,18 @@ struct PlaylistDetailView: View {
                     LabeledContent("MAC Address", value: playlist.macAddress ?? "")
                     if !playlist.username.isEmpty {
                         LabeledContent("Username", value: playlist.username)
+                    }
+                } else if isWebDAV {
+                    // A WebDAV share can be anonymous, so each credential row
+                    // only appears when there is something to show.
+                    if !playlist.username.isEmpty {
+                        LabeledContent("Username", value: playlist.username)
+                    }
+                    if !playlist.password.isEmpty {
+                        LabeledContent("Password") {
+                            Text("\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     LabeledContent("Username", value: playlist.username)
@@ -209,6 +226,15 @@ struct PlaylistDetailView: View {
                         .textInputAutocapitalization(.characters)
                     #endif
                         .autocorrectionDisabled()
+                    TextField("Username (optional)", text: $editUsername)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                    #endif
+                        .autocorrectionDisabled()
+                        .textContentType(.username)
+                    SecureField("Password (optional)", text: $editPassword)
+                        .textContentType(.password)
+                } else if isWebDAV {
                     TextField("Username (optional)", text: $editUsername)
                     #if os(iOS)
                         .textInputAutocapitalization(.never)
@@ -316,6 +342,7 @@ struct PlaylistDetailView: View {
         case .xtream: "Server URL"
         case .m3u: "Playlist URL"
         case .stalker: "Portal URL"
+        case .webdav: "Share URL"
         }
     }
 }
@@ -345,6 +372,9 @@ extension PlaylistDetailView {
             playlist.epgURL = epgURL.isEmpty ? nil : epgURL
         } else if isStalker {
             playlist.macAddress = editMacAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            playlist.password = editPassword
+        } else if isWebDAV {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword
         } else {

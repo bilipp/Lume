@@ -16,6 +16,9 @@
     struct TVChannelsList: View {
         let scope: LiveChannelScope
         let playlistPrefix: String
+        /// The active playlist's source, so an empty list can say *why* it is
+        /// empty rather than tell a WebDAV user to sync again.
+        let sourceType: PlaylistSourceType?
         /// Seeds Multi-View with this channel, gated on Lume Pro by the host.
         let onStartMultiView: (LiveStream) -> Void
         let onPlay: (LiveStream) -> Void
@@ -40,11 +43,13 @@
             scope: LiveChannelScope,
             playlistPrefix: String,
             sort: ContentSortOption,
+            sourceType: PlaylistSourceType?,
             onStartMultiView: @escaping (LiveStream) -> Void,
             onPlay: @escaping (LiveStream) -> Void
         ) {
             self.scope = scope
             self.playlistPrefix = playlistPrefix
+            self.sourceType = sourceType
             self.onStartMultiView = onStartMultiView
             self.onPlay = onPlay
             _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
@@ -60,12 +65,17 @@
             ScrollView {
                 LazyVStack(spacing: 14) {
                     if channels.isEmpty {
-                        ContentUnavailableView(
-                            "No Channels",
-                            systemImage: "antenna.radiowaves.left.and.right",
-                            description: Text("This category has no channels")
-                        )
-                        .padding(.top, 80)
+                        if sourceType == .webdav {
+                            LiveTVEmptyState(sourceType: sourceType)
+                                .padding(.top, 80)
+                        } else {
+                            ContentUnavailableView(
+                                "No Channels",
+                                systemImage: "antenna.radiowaves.left.and.right",
+                                description: Text("This category has no channels")
+                            )
+                            .padding(.top, 80)
+                        }
                     } else {
                         if scope == .recentlyWatched {
                             clearButton
@@ -301,6 +311,10 @@
         /// (favorites / recently watched) collections in-memory.
         let playlistPrefix: String
 
+        /// The active playlist's source, forwarded so an empty channel list can
+        /// explain itself. See `LiveTVEmptyState`.
+        let sourceType: PlaylistSourceType?
+
         private var layoutMode: LiveTVLayoutMode {
             LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
         }
@@ -349,6 +363,7 @@
                         scope: section.scope,
                         playlistPrefix: playlistPrefix,
                         sort: contentSort,
+                        sourceType: sourceType,
                         onStartMultiView: onStartMultiView,
                         onPlay: onPlay
                     )

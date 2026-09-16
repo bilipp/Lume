@@ -38,7 +38,7 @@ final class StalkerPortalFlowTests: XCTestCase {
 
         // Fresh install shows the login form as root; otherwise add via Settings.
         if app.tabBars.firstMatch.waitForExistence(timeout: 5) {
-            app.buttons["gear"].tap()
+            app.settingsToolbarButton.tap()
             let addButton = app.buttons["Add Playlist"]
             XCTAssertTrue(addButton.waitForExistence(timeout: 3))
             addButton.tap()
@@ -93,7 +93,7 @@ final class StalkerPortalFlowTests: XCTestCase {
         // via the library toolbar's playlist switcher (a menu labelled with the
         // active playlist's name).
         app.tabBars.buttons["Live TV"].tap()
-        let switcher = app.buttons["Test Playlist"].firstMatch
+        let switcher = app.playlistSwitcher(named: "Test Playlist")
         XCTAssertTrue(switcher.waitForExistence(timeout: 15), "Playlist switcher not found")
         switcher.tap()
         let portalItem = app.buttons["Example Portal"].firstMatch
@@ -113,7 +113,7 @@ final class StalkerPortalFlowTests: XCTestCase {
         // Auto-sync is disabled under `-ui-testing`, so trigger a sync of the now-
         // active portal manually through the toolbar sync button → Start Sync, and
         // wait for it to finish (the sheet shows a "Done" button on success).
-        let syncButton = app.buttons["Syncing"]
+        let syncButton = app.syncToolbarButton
         XCTAssertTrue(syncButton.waitForExistence(timeout: 10), "Sync button not found")
         syncButton.tap()
         let startSync = app.buttons["Start Sync"]

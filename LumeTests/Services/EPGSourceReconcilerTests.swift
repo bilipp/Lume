@@ -21,25 +21,40 @@ struct EPGSourceReconcilerTests {
         #expect(urlString.contains("password=pass"))
     }
 
-    @Test func `guideURL for m3u playlist with epgURL returns it`() throws {
+    @Test func `guideURL for m3u playlist with epgURL returns it`() {
         let playlist = Playlist(name: "Test", m3uURL: "http://example.com/playlist.m3u", epgURL: "http://example.com/guide.xml")
         let url = EPGSourceReconciler.guideURL(for: playlist)
         #expect(url == "http://example.com/guide.xml")
     }
 
-    @Test func `guideURL for m3u playlist without epgURL returns nil`() throws {
+    @Test func `guideURL for m3u playlist without epgURL returns nil`() {
         let playlist = Playlist(name: "Test", m3uURL: "http://example.com/playlist.m3u")
         let url = EPGSourceReconciler.guideURL(for: playlist)
         #expect(url == nil)
     }
 
-    @Test func `guideURL for stalker playlist without epgURL returns nil`() throws {
+    @Test func `guideURL for stalker playlist without epgURL returns nil`() {
         let playlist = Playlist(name: "Test", portalURL: "http://portal.example.com", macAddress: "00:1A:79:12:34:56")
         let url = EPGSourceReconciler.guideURL(for: playlist)
         #expect(url == nil)
     }
 
-    @Test func `guideURL for stalker playlist with epgURL returns it`() throws {
+    @Test func `guideURL for webdav playlist returns nil`() {
+        let playlist = Playlist(name: "Test", webdavURL: "http://nas.local/Movies/", username: "u", password: "p")
+        #expect(EPGSourceReconciler.guideURL(for: playlist) == nil)
+    }
+
+    /// A share carries no XMLTV, so an `epgURL` that somehow reached the row
+    /// (a hand-edit, a future import path, a mirrored value from another
+    /// source type) must still not produce a source: the EPG scheduler would
+    /// retry the orphan on every pass, forever.
+    @Test func `guideURL for webdav playlist ignores a stray epgURL`() {
+        let playlist = Playlist(name: "Test", webdavURL: "http://nas.local/Movies/", username: "u", password: "p")
+        playlist.epgURL = "http://example.com/guide.xml"
+        #expect(EPGSourceReconciler.guideURL(for: playlist) == nil)
+    }
+
+    @Test func `guideURL for stalker playlist with epgURL returns it`() {
         let playlist = Playlist(name: "Test", portalURL: "http://portal.example.com", macAddress: "00:1A:79:12:34:56")
         playlist.epgURL = "http://example.com/stalker-guide.xml"
         let url = EPGSourceReconciler.guideURL(for: playlist)
@@ -161,6 +176,34 @@ struct EPGSourceReconcilerTests {
         #expect(sources.isEmpty)
     }
 
+    @Test func `apply creates no source for webdav playlist`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let playlist = Playlist(name: "NAS", webdavURL: "http://nas.local/Movies/", username: "u", password: "p")
+        context.insert(playlist)
+        try context.save()
+
+        let changed = EPGSourceReconciler.apply(playlist, in: context)
+        #expect(!changed)
+        #expect(try context.fetchCount(FetchDescriptor<EPGSource>()) == 0)
+    }
+
+    /// `LoginView.insertAndFinish` runs `reconcile` unconditionally for every
+    /// new playlist, so the no-source rule has to hold on that path too — not
+    /// just in `guideURL`.
+    @Test func `reconcile creates no source for webdav playlist`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let playlist = Playlist(name: "NAS", webdavURL: "http://nas.local/Movies/", username: "u", password: "p")
+        context.insert(playlist)
+        try context.save()
+
+        EPGSourceReconciler.reconcile(playlist, in: context)
+
+        #expect(try context.fetchCount(FetchDescriptor<EPGSource>()) == 0)
+        #expect(EPGSourceReconciler.linkedSourcesByPlaylist(in: context).isEmpty)
+    }
+
     // MARK: - reconcile
 
     @Test func `reconcile saves changes`() throws {
@@ -206,14 +249,14 @@ struct EPGSourceReconcilerTests {
     @Test func `linkedSourcesByPlaylist returns mapping`() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
-        let p1 = Playlist(name: "P1", serverURL: "http://a.com:8080", username: "u", password: "p")
-        let p2 = Playlist(name: "P2", m3uURL: "http://b.com/playlist.m3u", epgURL: "http://b.com/guide.xml")
-        context.insert(p1)
-        context.insert(p2)
+        let xtream = Playlist(name: "P1", serverURL: "http://a.com:8080", username: "u", password: "p")
+        let m3u = Playlist(name: "P2", m3uURL: "http://b.com/playlist.m3u", epgURL: "http://b.com/guide.xml")
+        context.insert(xtream)
+        context.insert(m3u)
         try context.save()
 
-        EPGSourceReconciler.reconcile(p1, in: context)
-        EPGSourceReconciler.reconcile(p2, in: context)
+        EPGSourceReconciler.reconcile(xtream, in: context)
+        EPGSourceReconciler.reconcile(m3u, in: context)
 
         let byPlaylist = EPGSourceReconciler.linkedSourcesByPlaylist(in: context)
         #expect(byPlaylist.count == 2)

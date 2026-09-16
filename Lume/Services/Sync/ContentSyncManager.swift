@@ -79,6 +79,7 @@ actor ContentSyncManager {
 
     let modelContainer: ModelContainer
     let xtreamClient: XtreamClient
+    let webdavClient: WebDAVClient
     private var activeSyncPlaylistIDs: Set<UUID> = []
 
     /// Number of items to process before saving and resetting the context.
@@ -86,9 +87,14 @@ actor ContentSyncManager {
 
     // MARK: - Initialization
 
-    init(modelContainer: ModelContainer, xtreamClient: XtreamClient = XtreamClient()) {
+    init(
+        modelContainer: ModelContainer,
+        xtreamClient: XtreamClient = XtreamClient(),
+        webdavClient: WebDAVClient = WebDAVClient()
+    ) {
         self.modelContainer = modelContainer
         self.xtreamClient = xtreamClient
+        self.webdavClient = webdavClient
     }
 
     // MARK: - Playlist Sync
@@ -152,6 +158,8 @@ actor ContentSyncManager {
             try await performM3USync(playlist: playlist, playlistId: playlistId, progress: progress)
         case .stalker:
             try await performStalkerSync(playlist: playlist, playlistId: playlistId, progress: progress, full: full)
+        case .webdav:
+            try await performWebDAVSync(playlist: playlist, playlistId: playlistId, progress: progress)
         }
 
         // Every source writes the same unread history rows (see the method).
@@ -445,6 +453,10 @@ actor ContentSyncManager {
             // m3u episodes are imported alongside the rest of the catalog during
             // sync, so there is nothing to fetch lazily here.
             []
+        case .webdav:
+            // WebDAV episodes are imported alongside the rest of the catalog
+            // during sync, so there is nothing to fetch lazily here.
+            []
         }
     }
 
@@ -570,30 +582,5 @@ actor ContentSyncManager {
 
         Logger.database.info("Completed syncing \(totalCount) live streams")
         await progress?.complete(.liveStreams)
-    }
-}
-
-// MARK: - Sync Error
-
-enum SyncError: LocalizedError {
-    case syncInProgress
-    case playlistNotFound
-    case invalidCredentials
-    case networkError(Error)
-    case databaseError(Error)
-
-    var errorDescription: String? {
-        switch self {
-        case .syncInProgress:
-            "A sync is already in progress for this playlist"
-        case .playlistNotFound:
-            "The playlist could not be found"
-        case .invalidCredentials:
-            "Invalid username or password"
-        case let .networkError(error):
-            "Network error: \(error.localizedDescription)"
-        case let .databaseError(error):
-            "Database error: \(error.localizedDescription)"
-        }
     }
 }

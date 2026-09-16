@@ -215,7 +215,7 @@ struct SettingsView: View {
 
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(playlist.name)
-                                    Text(playlist.serverURL)
+                                    Text(playlist.displayURL)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)

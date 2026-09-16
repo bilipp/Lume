@@ -58,6 +58,20 @@ struct ContentIndexTextTests {
         #expect(query.title == "Up - The Movie")
     }
 
+    @Test func `dot-separated scene filename is normalized`() {
+        let query = ContentIndexText.searchQuery(for: "The.Godfather.1972.1080p.BluRay.x264-GROUP")
+        #expect(query.title == "The Godfather")
+        #expect(query.year == 1972)
+    }
+
+    /// Only unambiguously scene-shaped names are rewritten — a provider name
+    /// that merely contains a dot keeps today's behaviour.
+    @Test func `dotted provider name with spaces is untouched`() {
+        let query = ContentIndexText.searchQuery(for: "Mr. Robot")
+        #expect(query.title == "Mr. Robot")
+        #expect(query.year == nil)
+    }
+
     @Test func `empty result falls back to the raw name`() {
         let query = ContentIndexText.searchQuery(for: "4K")
         #expect(query.title == "4K")

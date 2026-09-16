@@ -213,7 +213,11 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         PlaybackQoE.shared.beginStartup(engine: .avPlayer, isLive: media.isLive)
         startStartupWatchdog()
 
-        let asset = AVURLAsset(url: media.url)
+        let asset = if let headers = media.httpHeaders, !headers.isEmpty {
+            AVURLAsset(url: media.url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        } else {
+            AVURLAsset(url: media.url)
+        }
         let newItem = AVPlayerItem(asset: asset)
         newItem.preferredForwardBufferDuration = media.isLive ? 4 : 8
         item = newItem

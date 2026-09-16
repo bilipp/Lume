@@ -21,6 +21,13 @@ nonisolated enum ContentIndexText {
     static func searchQuery(for rawName: String) -> (title: String, year: Int?) {
         var name = rawName
 
+        // Dot-separated scene names ("The.Godfather.1972.1080p.x264-GRP") reach
+        // the indexer from WebDAV shares; every heuristic below assumes spaces.
+        // Only a name that is unambiguously scene-shaped is rewritten.
+        if let scene = MediaFilenameParser.sceneNormalizedName(rawName) {
+            name = scene
+        }
+
         // Bracketed groups are always tags, never part of the title.
         name = name.replacingOccurrences(of: #"\[[^\]]*\]"#, with: " ", options: .regularExpression)
 

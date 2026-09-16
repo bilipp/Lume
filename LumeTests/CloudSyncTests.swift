@@ -239,6 +239,69 @@ struct CloudSyncEngineTests {
         #expect(locals.first?.lastSyncDate == nil) // so auto-sync fetches its catalog
     }
 
+    @Test func `cloud webdav playlist creates a local webdav playlist`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let pid = UUID()
+        ctx.insert(SyncedPlaylist(
+            id: pid, name: "NAS", serverURL: "http://nas.local/Movies/", username: "nu", password: "np",
+            sourceTypeRaw: PlaylistSourceType.webdav.rawValue, epgURL: nil, syncEnabled: true
+        ))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(result.playlistsCreatedLocally == 1)
+        let local = try #require(try ctx.fetch(FetchDescriptor<Playlist>()).first)
+        // The credentials have to survive the pull: a share that arrives
+        // without them 401s on every PROPFIND and every playback open.
+        #expect(local.sourceType == .webdav)
+        #expect(local.serverURL == "http://nas.local/Movies/")
+        #expect(local.username == "nu")
+        #expect(local.password == "np")
+    }
+
+    /// A newer build can mirror a source type this one has never heard of.
+    /// `Playlist.sourceType` resolves an unknown raw value through `?? .xtream`,
+    /// so adopting the record would aim the Xtream pipeline at the user's own
+    /// server with their credentials — and then push that wrong raw value back
+    /// to CloudKit for every sibling device.
+    @Test func `cloud playlist with an unknown source type is skipped, not adopted as xtream`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let shadow = freshShadow()
+
+        // A known-good local playlist keeps the catalog non-empty, so the
+        // integrity gate can't be what suppresses the pull.
+        let existing = Playlist(name: "Mine", serverURL: "http://x", username: "u", password: "p")
+        ctx.insert(existing)
+
+        let pid = UUID()
+        ctx.insert(SyncedPlaylist(
+            id: pid, name: "From The Future", serverURL: "http://nas.local/Share/", username: "fu", password: "fp",
+            sourceTypeRaw: "quantumdav", epgURL: nil, syncEnabled: true
+        ))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: shadow)
+        let result = await engine.reconcile()
+
+        #expect(result.playlistsCreatedLocally == 0)
+        let locals = try ctx.fetch(FetchDescriptor<Playlist>())
+        #expect(locals.count == 1)
+        #expect(locals.first?.id == existing.id)
+        #expect(!locals.contains { $0.id == pid })
+
+        // The shadow stays untouched, so the record is still "new" to a later
+        // build that does understand the type — skipping must not baseline it.
+        #expect(shadow.playlistShadow(pid.uuidString) == nil)
+
+        // And the mirror is left exactly as it was: no rewrite to `xtream`.
+        let mirror = try #require(try ctx.fetch(FetchDescriptor<SyncedPlaylist>()).first { $0.id == pid })
+        #expect(mirror.sourceTypeRaw == "quantumdav")
+    }
+
     @Test func `cloud content state stays pending until its catalog item exists`() async throws {
         let container = try makeProfileTestContainer()
         let ctx = container.mainContext

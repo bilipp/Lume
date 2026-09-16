@@ -24,6 +24,8 @@ enum SyncStep: Int, CaseIterable, Identifiable {
     // m3u-only steps
     case playlistDownload
     case playlistImport
+    /// WebDAV-only: the recursive PROPFIND walk of the share.
+    case directoryWalk
 
     var id: Int {
         rawValue
@@ -45,6 +47,10 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         .authenticating, .movieCategories, .seriesCategories, .liveCategories, .liveStreams
     ]
 
+    /// The steps a WebDAV sync walks through, in order. The recursive PROPFIND
+    /// walk replaces the single m3u download phase.
+    static let webdavSteps: [SyncStep] = [.directoryWalk, .playlistImport]
+
     static func steps(for sourceType: PlaylistSourceType, full: Bool = false) -> [SyncStep] {
         switch sourceType {
         case .xtream: xtreamSteps
@@ -53,6 +59,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         // sync skips the movie/series content walk (loaded on demand); only a
         // full-catalog download walks everything.
         case .stalker: full ? xtreamSteps : stalkerDynamicSteps
+        case .webdav: webdavSteps
         }
     }
 
@@ -67,6 +74,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         case .liveStreams: "Live TV channels"
         case .playlistDownload: "Downloading playlist"
         case .playlistImport: "Importing content"
+        case .directoryWalk: "Scanning folders"
         }
     }
 
@@ -81,6 +89,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         case .liveStreams: "antenna.radiowaves.left.and.right"
         case .playlistDownload: "arrow.down.circle"
         case .playlistImport: "square.and.arrow.down.on.square"
+        case .directoryWalk: "folder.badge.gearshape"
         }
     }
 }

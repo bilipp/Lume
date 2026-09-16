@@ -25,8 +25,8 @@ struct LoginView: View {
 
     @State private var name = ""
     @State private var serverURL = ""
-    @State private var username = ""
-    @State private var password = ""
+    @State var username = ""
+    @State var password = ""
 
     // m3u fields
     @State private var m3uURL = ""
@@ -40,8 +40,13 @@ struct LoginView: View {
     @State private var portalURL = ""
     @State private var macAddress = StalkerMAC.generate()
 
-    @State private var isLoading = false
-    @State private var errorMessage: String?
+    /// The full URL of the shared folder. Not the server root: an Apache
+    /// `Alias` (or any share that isn't at "/") never shows up in a PROPFIND of
+    /// the root, so a hostname alone silently lists nothing.
+    @State var webdavURL = ""
+
+    @State var isLoading = false
+    @State var errorMessage: String?
 
     private var isFormValid: Bool {
         switch sourceType {
@@ -54,6 +59,8 @@ struct LoginView: View {
         case .stalker:
             !portalURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && StalkerMAC.isValid(macAddress.trimmingCharacters(in: .whitespacesAndNewlines))
+        case .webdav:
+            !webdavURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 
@@ -84,6 +91,7 @@ struct LoginView: View {
                             Text("Xtream").tag(PlaylistSourceType.xtream)
                             Text("M3U").tag(PlaylistSourceType.m3u)
                             Text("Stalker").tag(PlaylistSourceType.stalker)
+                            Text("WebDAV").tag(PlaylistSourceType.webdav)
                         }
                         .pickerStyle(.segmented)
                     }
@@ -92,6 +100,8 @@ struct LoginView: View {
                     case .xtream: xtreamSection
                     case .m3u: m3uSection
                     case .stalker: stalkerSection
+                    case .webdav:
+                        WebDAVLoginSection(name: $name, shareURL: $webdavURL, username: $username, password: $password)
                     }
 
                     if let errorMessage {
@@ -259,6 +269,7 @@ struct LoginView: View {
             case .xtream: "Your credentials are stored locally on this device."
             case .m3u: "The EPG URL is read from the playlist when left empty."
             case .stalker: "Enter the portal URL and the MAC address your provider authorized."
+            case .webdav: WebDAVAddCheck.hint
             }
         }
 
@@ -278,6 +289,7 @@ struct LoginView: View {
                         Text("Xtream").tag(PlaylistSourceType.xtream)
                         Text("M3U").tag(PlaylistSourceType.m3u)
                         Text("Stalker").tag(PlaylistSourceType.stalker)
+                        Text("WebDAV").tag(PlaylistSourceType.webdav)
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -297,6 +309,8 @@ struct LoginView: View {
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $macAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $username, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $password, isSecure: true, contentType: .password)
+                        case .webdav:
+                            WebDAVLoginFields(shareURL: $webdavURL, username: $username, password: $password)
                         }
                     }
 
@@ -360,6 +374,7 @@ struct LoginView: View {
             )
         case .m3u: addM3UPlaylist()
         case .stalker: addStalkerPlaylist()
+        case .webdav: addWebDAVPlaylist()
         }
     }
 
@@ -375,7 +390,7 @@ struct LoginView: View {
         loginXtream(serverURL: hint.baseURL, username: hint.username, password: hint.password)
     }
 
-    private var trimmedName: String {
+    var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -471,7 +486,7 @@ struct LoginView: View {
         }
     }
 
-    private func insertAndFinish(_ playlist: Playlist) {
+    func insertAndFinish(_ playlist: Playlist) {
         modelContext.insert(playlist)
         // Set up the playlist's EPG source so the guide refreshes on its own
         // schedule — EPG is no longer part of the content sync.
@@ -490,38 +505,6 @@ struct LoginView: View {
         // ContentView's @Query.
         if isModal {
             dismiss()
-        }
-    }
-}
-
-// MARK: - Connection-test timeout
-
-private extension LoginView {
-    struct ConnectionTimeoutError: LocalizedError {
-        var errorDescription: String? {
-            String(localized: "The connection timed out. Check the URL and your network, then try again.")
-        }
-    }
-
-    /// Runs an add-playlist connection test under an overall deadline, cancelling
-    /// the in-flight request and surfacing a timeout when it's exceeded.
-    ///
-    /// Each client has its own per-request timeout and (for Xtream) retry/backoff
-    /// tuned for *sync*, where retries matter; left unbounded, a wrong URL or
-    /// dead host can hang the add sheet for ~30–90s on a spinner with no way out.
-    /// This caps the test (default 20s) without weakening the sync path.
-    func withConnectionTimeout(_ seconds: Double = 20, _ operation: @escaping () async throws -> Void) async throws {
-        let work = Task { try await operation() }
-        let watchdog = Task {
-            try? await Task.sleep(for: .seconds(seconds))
-            work.cancel()
-        }
-        defer { watchdog.cancel() }
-        do {
-            try await work.value
-        } catch {
-            if work.isCancelled { throw ConnectionTimeoutError() }
-            throw error
         }
     }
 }

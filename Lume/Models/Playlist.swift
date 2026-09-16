@@ -73,12 +73,23 @@ final class Playlist {
         sourceTypeRaw = PlaylistSourceType.stalker.rawValue
         self.macAddress = macAddress
     }
+
+    /// Creates a WebDAV share playlist. `serverURL` holds the full collection
+    /// URL the recursive walk starts at — the share root is not discoverable,
+    /// so the user enters the whole path.
+    convenience init(name: String, webdavURL: String, username: String = "", password: String = "") {
+        self.init(name: name, serverURL: webdavURL, username: username, password: password)
+        sourceTypeRaw = PlaylistSourceType.webdav.rawValue
+    }
 }
 
 enum PlaylistSourceType: String, Codable {
     case xtream
     case m3u
     case stalker
+    /// Declared last so the raw values already persisted for the three cases
+    /// above keep their meaning.
+    case webdav
 }
 
 /// The container a playlist's live streams are requested in.
@@ -166,17 +177,58 @@ extension Playlist {
         set { streamFormatRaw = newValue.rawValue }
     }
 
-    /// Whether the stream container can be chosen for this playlist. Stalker
-    /// portals hand out a fully-formed stream URL per session through
-    /// `create_link`, so there is nothing for us to pick.
-    var supportsStreamFormatChoice: Bool {
-        sourceType != .stalker
+    /// The source type, or nil when the stored raw value comes from a newer
+    /// build than this one. Callers that would otherwise run the wrong pipeline
+    /// against a user's server must branch on this rather than on `sourceType`,
+    /// whose `?? .xtream` fallback would send Xtream requests to an unknown
+    /// source.
+    var knownSourceType: PlaylistSourceType? {
+        PlaylistSourceType(rawValue: sourceTypeRaw)
     }
 
-    /// Whether content from this playlist can be downloaded for offline playback.
-    /// Stalker portals hand out short-lived, per-session stream URLs, so there is
-    /// no stable URL to persist for offline use.
+    /// The only form of `serverURL` that may be rendered on screen: any
+    /// userinfo credentials are stripped, so a URL that carries them cannot be
+    /// shown, screenshotted or read aloud.
+    var displayURL: String {
+        guard var components = URLComponents(string: serverURL) else { return serverURL }
+        components.user = nil
+        components.password = nil
+        return components.string ?? serverURL
+    }
+
+    /// Whether the stream container can be chosen for this playlist. Written as
+    /// an exhaustive switch so a future source type cannot inherit a default.
+    var supportsStreamFormatChoice: Bool {
+        switch sourceType {
+        case .xtream, .m3u: true
+        // Stalker portals hand out a fully-formed stream URL per session
+        // through `create_link`, so there is nothing for us to pick.
+        case .stalker: false
+        // A WebDAV file is a plain byte range — there is no HLS/MPEG-TS choice
+        // to make.
+        case .webdav: false
+        }
+    }
+
+    /// Whether content from this playlist can be downloaded for offline
+    /// playback. Written as an exhaustive switch so a future source type cannot
+    /// inherit a default.
     var supportsDownloads: Bool {
-        sourceType != .stalker
+        switch sourceType {
+        case .xtream, .m3u: true
+        // Stalker portals hand out short-lived, per-session stream URLs, so
+        // there is no stable URL to persist for offline use.
+        case .stalker: false
+        // Deferred to a later change: a background URLSession cannot answer an
+        // auth challenge after the app is relaunched.
+        case .webdav: false
+        }
+    }
+
+    /// Whether a series' episodes are fetched from the provider on demand. m3u
+    /// and WebDAV import every episode during sync, so there is nothing to
+    /// fetch lazily.
+    var supportsPerSeriesEpisodeFetch: Bool {
+        sourceType == .xtream || sourceType == .stalker
     }
 }

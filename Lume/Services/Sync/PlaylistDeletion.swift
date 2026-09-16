@@ -49,12 +49,13 @@ nonisolated enum PlaylistDeletion {
     static func removeOrphanedContent(playlistID: UUID, in context: ModelContext) {
         let prefix = playlistID.uuidString
 
-        // The prune gate's skip counters and the m3u file fingerprint live in
-        // UserDefaults, outside every cascade, so nothing else ever collects
-        // them: they would leak for the lifetime of the install on each deleted
-        // playlist.
+        // The prune gate's skip counters, the m3u file fingerprint and the
+        // WebDAV listing fingerprint live in UserDefaults, outside every
+        // cascade, so nothing else ever collects them: they would leak for the
+        // lifetime of the install on each deleted playlist.
         SweepSkipDefaults.removeAll(playlistId: playlistID)
         M3UDigestStore.remove(playlistId: playlistID)
+        WebDAVDigestStore.remove(playlistId: playlistID)
 
         // Scope each fetch to the playlist in SQLite via the playlist-prefixed
         // id instead of hydrating the whole catalog into memory just to filter
