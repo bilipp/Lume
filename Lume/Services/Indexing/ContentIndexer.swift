@@ -103,7 +103,9 @@ actor ContentIndexer {
             await status.update(indexed: counts.indexed, total: counts.total)
 
             let processed = try await indexNextChunk(embedder: embedder)
-            if processed == 0 { break }
+            if processed == 0 {
+                break
+            }
             try await Task.sleep(for: chunkPause)
         }
 
@@ -222,8 +224,9 @@ actor ContentIndexer {
         if !resolved.isEmpty {
             let context = ModelContext(modelContainer)
             context.autosaveEnabled = false
+            let hidden = (try? Self.hiddenCategoryIDs(in: context)) ?? []
             for result in resolved {
-                write(result, context: context, embedder: embedder)
+                write(result, context: context, embedder: embedder, hiddenCategoryIDs: hidden)
             }
             do {
                 try context.save()
@@ -232,15 +235,22 @@ actor ContentIndexer {
             }
         }
 
-        if let failure { throw failure }
+        if let failure {
+            throw failure
+        }
         return resolved.count
     }
 
     /// Snapshots the next chunk of unindexed titles into plain values.
+    /// Titles in hidden categories are skipped: they never surface in search,
+    /// browse or recommendations, so indexing them would only burn TMDB
+    /// traffic and embedding time. Unhiding a category makes its titles
+    /// pending again for the next pass.
     private func fetchPending() throws -> [PendingItem] {
         let context = ModelContext(modelContainer)
+        let hidden = try Self.hiddenCategoryIDs(in: context)
 
-        var movieDescriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.indexedAt == nil })
+        var movieDescriptor = FetchDescriptor<Movie>(predicate: Self.pendingMoviePredicate(excluding: hidden))
         movieDescriptor.fetchLimit = chunkSize
         let movies = try context.fetch(movieDescriptor)
         var items: [PendingItem] = movies.map { movie in
@@ -256,7 +266,7 @@ actor ContentIndexer {
         }
 
         if movies.count < chunkSize {
-            var seriesDescriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.indexedAt == nil })
+            var seriesDescriptor = FetchDescriptor<Series>(predicate: Self.pendingSeriesPredicate(excluding: hidden))
             seriesDescriptor.fetchLimit = chunkSize - movies.count
             let series = try context.fetch(seriesDescriptor)
             items += series.map { item in
@@ -308,65 +318,95 @@ actor ContentIndexer {
     /// Re-fetches the title on the write context and applies the resolved TMDB
     /// data, embedding and index stamp. Synchronous: the object is realised and
     /// mutated while the store is open, never across an `await`. A title that
-    /// vanished since Phase 1 (deleted by a sync) is silently skipped.
-    private func write(_ result: IndexResult, context: ModelContext, embedder: TextEmbedder) {
+    /// vanished since Phase 1 (deleted by a sync) is silently skipped, as is
+    /// one whose category was hidden in the meantime — it stays unindexed
+    /// until unhidden.
+    private func write(
+        _ result: IndexResult,
+        context: ModelContext,
+        embedder: TextEmbedder,
+        hiddenCategoryIDs: Set<String>
+    ) {
         switch result.item.kind {
         case .movie:
-            let id = result.item.id
-            var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
-            descriptor.fetchLimit = 1
-            guard let movie = try? context.fetch(descriptor).first else { return }
-
-            if movie.tmdbId == nil, let tmdbId = result.resolvedTMDBId {
-                movie.tmdbId = tmdbId
-            }
-            if let details = result.details {
-                // Background context: skip the cast relationship — see
-                // applyMovieDetails. The embedding uses `movie.actors`, and the
-                // detail view fully enriches (incl. cast) on first open.
-                applyMovieDetails(details, to: movie, context: context, includeCast: false)
-            }
-            let document = ContentIndexText.document(for: .init(
-                name: result.item.title,
-                year: result.item.year,
-                genre: movie.genre,
-                tagline: movie.tagline,
-                plot: movie.plot,
-                cast: movie.actors
-            ))
-            if let vector = try? embedder.vector(for: document) {
-                movie.embeddingData = TextEmbedder.encode(vector)
-            }
-            movie.indexedAt = Date()
-
+            writeMovie(result, context: context, embedder: embedder, hiddenCategoryIDs: hiddenCategoryIDs)
         case .series:
-            let id = result.item.id
-            var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
-            descriptor.fetchLimit = 1
-            guard let series = try? context.fetch(descriptor).first else { return }
-
-            if series.tmdbId == nil, let tmdbId = result.resolvedTMDBId {
-                series.tmdbId = tmdbId
-            }
-            if let details = result.details {
-                // Background context: skip the cast relationship — see
-                // applySeriesDetails. The embedding uses the `series.cast`
-                // string; the detail view fully enriches (incl. cast) later.
-                applySeriesDetails(details, to: series, context: context, includeCast: false)
-            }
-            let document = ContentIndexText.document(for: .init(
-                name: result.item.title,
-                year: result.item.year,
-                genre: series.genre,
-                tagline: series.tagline,
-                plot: series.plot,
-                cast: series.cast
-            ))
-            if let vector = try? embedder.vector(for: document) {
-                series.embeddingData = TextEmbedder.encode(vector)
-            }
-            series.indexedAt = Date()
+            writeSeries(result, context: context, embedder: embedder, hiddenCategoryIDs: hiddenCategoryIDs)
         }
+    }
+
+    private func writeMovie(
+        _ result: IndexResult,
+        context: ModelContext,
+        embedder: TextEmbedder,
+        hiddenCategoryIDs: Set<String>
+    ) {
+        let id = result.item.id
+        var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let movie = try? context.fetch(descriptor).first else { return }
+        if let categoryId = movie.categoryId, hiddenCategoryIDs.contains(categoryId) {
+            return
+        }
+
+        if movie.tmdbId == nil, let tmdbId = result.resolvedTMDBId {
+            movie.tmdbId = tmdbId
+        }
+        if let details = result.details {
+            // Background context: skip the cast relationship — see
+            // applyMovieDetails. The embedding uses `movie.actors`, and the
+            // detail view fully enriches (incl. cast) on first open.
+            applyMovieDetails(details, to: movie, context: context, includeCast: false)
+        }
+        let document = ContentIndexText.document(for: .init(
+            name: result.item.title,
+            year: result.item.year,
+            genre: movie.genre,
+            tagline: movie.tagline,
+            plot: movie.plot,
+            cast: movie.actors
+        ))
+        if let vector = try? embedder.vector(for: document) {
+            movie.embeddingData = TextEmbedder.encode(vector)
+        }
+        movie.indexedAt = Date()
+    }
+
+    private func writeSeries(
+        _ result: IndexResult,
+        context: ModelContext,
+        embedder: TextEmbedder,
+        hiddenCategoryIDs: Set<String>
+    ) {
+        let id = result.item.id
+        var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let series = try? context.fetch(descriptor).first else { return }
+        if let categoryId = series.categoryId, hiddenCategoryIDs.contains(categoryId) {
+            return
+        }
+
+        if series.tmdbId == nil, let tmdbId = result.resolvedTMDBId {
+            series.tmdbId = tmdbId
+        }
+        if let details = result.details {
+            // Background context: skip the cast relationship — see
+            // applySeriesDetails. The embedding uses the `series.cast`
+            // string; the detail view fully enriches (incl. cast) later.
+            applySeriesDetails(details, to: series, context: context, includeCast: false)
+        }
+        let document = ContentIndexText.document(for: .init(
+            name: result.item.title,
+            year: result.item.year,
+            genre: series.genre,
+            tagline: series.tagline,
+            plot: series.plot,
+            cast: series.cast
+        ))
+        if let vector = try? embedder.vector(for: document) {
+            series.embeddingData = TextEmbedder.encode(vector)
+        }
+        series.indexedAt = Date()
     }
 
     // MARK: - TMDB search with year fallback
@@ -408,17 +448,87 @@ actor ContentIndexer {
         }
     }
 
+    // MARK: - Hidden categories
+
+    /// Ids of categories the user hid in Content Management. Read fresh on
+    /// every chunk and every progress poll so a category hidden or unhidden
+    /// mid-pass takes effect without waiting for the next kick.
+    static func hiddenCategoryIDs(in context: ModelContext) throws -> Set<String> {
+        let hidden = try context.fetch(
+            FetchDescriptor<Category>(predicate: #Predicate { $0.isHidden == true })
+        )
+        return Set(hidden.map(\.id))
+    }
+
+    /// The excluded ids as optionals, so a predicate can test the optional
+    /// `categoryId` against them directly — the same `Set<String?>` shape the
+    /// search predicates use, which is what survives SwiftData's SQL
+    /// generation (`?? ""` and nil-check-plus-unwrap do not).
+    private static func excludedOptional(_ excluded: Set<String>) -> (ids: Set<String?>, filters: Bool) {
+        (Set(excluded.map(String?.some)), !excluded.isEmpty)
+    }
+
+    static func pendingMoviePredicate(excluding excluded: Set<String>) -> Predicate<Movie> {
+        let (ids, filters) = excludedOptional(excluded)
+        return #Predicate {
+            $0.indexedAt == nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
+        }
+    }
+
+    static func pendingSeriesPredicate(excluding excluded: Set<String>) -> Predicate<Series> {
+        let (ids, filters) = excludedOptional(excluded)
+        return #Predicate {
+            $0.indexedAt == nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
+        }
+    }
+
+    static func visibleMoviePredicate(excluding excluded: Set<String>) -> Predicate<Movie> {
+        let (ids, filters) = excludedOptional(excluded)
+        return #Predicate {
+            !filters || $0.categoryId == nil || !ids.contains($0.categoryId)
+        }
+    }
+
+    static func visibleSeriesPredicate(excluding excluded: Set<String>) -> Predicate<Series> {
+        let (ids, filters) = excludedOptional(excluded)
+        return #Predicate {
+            !filters || $0.categoryId == nil || !ids.contains($0.categoryId)
+        }
+    }
+
+    static func indexedMoviePredicate(excluding excluded: Set<String>) -> Predicate<Movie> {
+        let (ids, filters) = excludedOptional(excluded)
+        return #Predicate {
+            $0.indexedAt != nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
+        }
+    }
+
+    static func indexedSeriesPredicate(excluding excluded: Set<String>) -> Predicate<Series> {
+        let (ids, filters) = excludedOptional(excluded)
+        return #Predicate {
+            $0.indexedAt != nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
+        }
+    }
+
     // MARK: - Store queries
 
+    /// Progress over visible titles only. Hidden titles are excluded from both
+    /// sides: they are never indexed, so counting them in the total would
+    /// leave the pass permanently short of complete.
     private func currentCounts() throws -> (indexed: Int, total: Int) {
         let context = ModelContext(modelContainer)
-        let totalMovies = try context.fetchCount(FetchDescriptor<Movie>())
-        let totalSeries = try context.fetchCount(FetchDescriptor<Series>())
+        let hidden = try Self.hiddenCategoryIDs(in: context)
+        let totalMovies = try context.fetchCount(
+            FetchDescriptor<Movie>(predicate: Self.visibleMoviePredicate(excluding: hidden))
+        )
+        let totalSeries = try context.fetchCount(
+            FetchDescriptor<Series>(predicate: Self.visibleSeriesPredicate(excluding: hidden))
+        )
         let indexedMovies = try context.fetchCount(
-            FetchDescriptor<Movie>(predicate: #Predicate { $0.indexedAt != nil })
+            FetchDescriptor<Movie>(predicate: Self.indexedMoviePredicate(excluding: hidden))
         )
         let indexedSeries = try context.fetchCount(
-            FetchDescriptor<Series>(predicate: #Predicate { $0.indexedAt != nil })
+            FetchDescriptor<Series>(predicate: Self.indexedSeriesPredicate(excluding: hidden))
         )
         return (indexedMovies + indexedSeries, totalMovies + totalSeries)
     }
