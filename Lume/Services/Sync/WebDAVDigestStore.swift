@@ -63,6 +63,12 @@ nonisolated enum WebDAVListingFingerprint {
 
     static func make(from signatures: [String]) -> String {
         var hasher = SHA256()
+        // Scheme marker: v1 hashed only the listing, so a share whose files
+        // never changed kept the per-subfolder categories v1 filed. v2 files
+        // every entry under the share root instead — the marker makes a stored
+        // v1 digest miss exactly once, triggering the one full re-import that
+        // moves existing installs onto the new grouping.
+        hasher.update(data: Data("webdav-listing/v2\n".utf8))
         for signature in signatures.sorted() {
             hasher.update(data: Data(signature.utf8))
             hasher.update(data: Data([0x0A]))

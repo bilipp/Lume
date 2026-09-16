@@ -36,9 +36,9 @@ struct HTTPBasicCredentialsTests {
     }
 
     @Test func `preserves existing percent encoding in the path`() throws {
-        let url = try #require(URL(string: "http://nas.local/Movies/Love.is.Blind.S02E01%5BEZTVx.to%5D.mkv"))
+        let url = try #require(URL(string: "http://nas.local/Movies/Harbor.Lights.S02E01%5BIndexer.to%5D.mkv"))
         let mrl = HTTPBasicCredentials.authenticatedURL(url, headers: Self.header(user: "u", password: "p"))
-        #expect(mrl?.absoluteString == "http://u:p@nas.local/Movies/Love.is.Blind.S02E01%5BEZTVx.to%5D.mkv")
+        #expect(mrl?.absoluteString == "http://u:p@nas.local/Movies/Harbor.Lights.S02E01%5BIndexer.to%5D.mkv")
     }
 
     @Test func `percent encodes credential characters`() throws {

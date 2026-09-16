@@ -167,7 +167,7 @@ struct WebDAVSyncTests {
     @Test func `walks a nested share into movies, episodes and categories`() async throws {
         let host = uniqueHost()
         defer { WebDAVTreeStubProtocol.remove(host: host) }
-        let episodeFile = "Love.is.Blind.Germany.S02E01.1080p.WEB.h264-EDITH%5BEZTVx.to%5D.mkv"
+        let episodeFile = "Harbor.Lights.S02E01.1080p.WEB.h264-NIGHT%5BIndexer.to%5D.mkv"
         WebDAVTreeStubProtocol.install(host: host, replies: [
             "/Movies/": collection("/Movies/", [
                 StubChild(href: "/Movies/Action/", isCollection: true),
@@ -192,7 +192,7 @@ struct WebDAVSyncTests {
         let movies = try context.fetch(FetchDescriptor<Movie>())
         #expect(Set(movies.map(\.name)) == ["Blade Runner 2049", "The Godfather 1972"])
         let godfather = try #require(movies.first { $0.name == "The Godfather 1972" })
-        #expect(godfather.categoryId == "\(playlistId.uuidString)-vod-Action")
+        #expect(godfather.categoryId == "\(playlistId.uuidString)-vod-Movies")
         // The server's own percent-encoding is preserved: re-encoding would turn
         // %20 into %2520 and every playback request would 404.
         #expect(godfather.directURL == "http://\(host)/Movies/Action/The.Godfather.1972.1080p.BluRay.x264-GROUP.mkv")
@@ -205,8 +205,8 @@ struct WebDAVSyncTests {
         let series = try context.fetch(FetchDescriptor<Series>())
         #expect(series.count == 1)
         let show = try #require(series.first)
-        #expect(show.name == "Love is Blind Germany")
-        #expect(show.categoryId == "\(playlistId.uuidString)-series-Shows")
+        #expect(show.name == "Harbor Lights")
+        #expect(show.categoryId == "\(playlistId.uuidString)-series-Movies")
         #expect(show.episodes.count == 1)
         let episode = try #require(show.episodes.first)
         #expect(episode.seasonNum == 2)
@@ -219,12 +219,62 @@ struct WebDAVSyncTests {
         #expect(try context.fetch(FetchDescriptor<LiveStream>()).isEmpty)
 
         let categories = try context.fetch(FetchDescriptor<Lume.Category>())
-        #expect(Set(categories.map(\.name)) == ["Movies", "Action", "Shows"])
+        #expect(Set(categories.map(\.name)) == ["Movies"])
         #expect(categories.allSatisfy { $0.type != .live })
 
         let stored = try #require(try context.fetch(FetchDescriptor<Playlist>()).first)
         #expect(stored.syncStatus == .idle)
         #expect(stored.lastSyncDate != nil)
+    }
+
+    // MARK: Per-episode subfolders
+
+    @Test func `episodes in own subfolders cluster into one series and one category`() async throws {
+        let host = uniqueHost()
+        defer { WebDAVTreeStubProtocol.remove(host: host) }
+        let secondFolder = "Harbor.Lights.S02E02.1080p.WEB.h264-NIGHT%5BIndexer.to%5D"
+        let thirdFolder = "Harbor.Lights.S02E03.1080p.WEB.h264-NIGHT%5BIndexer.to%5D"
+        WebDAVTreeStubProtocol.install(host: host, replies: [
+            "/Movies/": collection("/Movies/", [
+                StubChild(
+                    href: "/Movies/Harbor.Lights.S02E01.1080p.WEB.h264-NIGHT%5BIndexer.to%5D.mkv",
+                    isCollection: false
+                ),
+                StubChild(href: "/Movies/\(secondFolder)/", isCollection: true),
+                StubChild(href: "/Movies/\(thirdFolder)/", isCollection: true)
+            ]),
+            "/Movies/\(secondFolder)/": collection("/Movies/\(secondFolder)/", [
+                StubChild(
+                    href: "/Movies/\(secondFolder)/Harbor.Lights.S02E02.1080p.WEB.h264-NIGHT%5BIndexer.to%5D.mkv",
+                    isCollection: false
+                )
+            ]),
+            "/Movies/\(thirdFolder)/": collection("/Movies/\(thirdFolder)/", [
+                StubChild(href: "/Movies/\(thirdFolder)/video.mkv", isCollection: false)
+            ])
+        ])
+
+        let container = try makeTestContainer()
+        let playlist = try makePlaylist(container: container, url: "http://\(host)/Movies/")
+        let playlistId = playlist.id
+        try await makeManager(container: container).syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let series = try context.fetch(FetchDescriptor<Series>())
+        #expect(series.count == 1)
+        let show = try #require(series.first)
+        #expect(show.name == "Harbor Lights")
+        #expect(show.categoryId == "\(playlistId.uuidString)-series-Movies")
+        #expect(show.episodes.count == 3)
+        #expect(Set(show.episodes.map(\.episodeNum)) == [1, 2, 3])
+        #expect(show.episodes.allSatisfy { $0.seasonNum == 2 })
+
+        #expect(try context.fetch(FetchDescriptor<Movie>()).isEmpty)
+
+        let categories = try context.fetch(FetchDescriptor<Lume.Category>())
+        #expect(categories.count == 1)
+        #expect(categories.first?.name == "Movies")
+        #expect(categories.first?.type == .series)
     }
 
     // MARK: Cycles
@@ -310,7 +360,7 @@ struct WebDAVSyncTests {
         let after = ModelContext(container)
         #expect(try after.fetchCount(FetchDescriptor<Movie>()) == WebDAVWalkProducer.batchSize + 1)
         #expect(try after.fetch(FetchDescriptor<Movie>()).contains { $0.name == "Beta 2002" })
-        #expect(try after.fetchCount(FetchDescriptor<Lume.Category>()) == 2)
+        #expect(try after.fetchCount(FetchDescriptor<Lume.Category>()) == 1)
         let stored = try #require(try after.fetch(FetchDescriptor<Playlist>()).first)
         #expect(stored.syncStatus == .error)
     }

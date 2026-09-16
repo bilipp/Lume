@@ -17,18 +17,18 @@ struct WebDAVFilenameParserTests {
     /// the token must leave an *empty* episode title, not "1080p WEB h264".
     @Test func `scene episode filename yields series season episode and no junk title`() {
         let parsed = MediaFilenameParser.parse(
-            filename: "Love.is.Blind.Germany.S02E01.1080p.WEB.h264-EDITH[EZTVx.to].mkv",
+            filename: "Harbor.Lights.S02E01.1080p.WEB.h264-NIGHT[Indexer.to].mkv",
             folder: "Shows"
         )
 
-        #expect(parsed.kind == .episode(series: "Love is Blind Germany", season: 2, episode: 1, title: ""))
-        #expect(parsed.name == "Love is Blind Germany S02E01")
+        #expect(parsed.kind == .episode(series: "Harbor Lights", season: 2, episode: 1, title: ""))
+        #expect(parsed.name == "Harbor Lights S02E01")
         #expect(parsed.group == "Shows")
 
         // The synthesized name has to round-trip through the untouched m3u
         // classifier — that is what makes the import path reusable.
         let entry = M3UEntry(name: parsed.name, url: "http://nas/x.mkv", tvgId: nil, logo: nil, group: nil, type: nil)
-        #expect(M3UClassifier.classify(entry) == .episode(series: "Love is Blind Germany", season: 2, episode: 1))
+        #expect(M3UClassifier.classify(entry) == .episode(series: "Harbor Lights", season: 2, episode: 1))
     }
 
     /// The filename decides movie-vs-series, so a folder named "Movies" must
@@ -77,5 +77,59 @@ struct WebDAVFilenameParserTests {
         #expect(MediaFilenameParser.sceneNormalizedName("Der Pate (1972)") == nil)
         #expect(MediaFilenameParser.sceneNormalizedName("Inception") == nil)
         #expect(MediaFilenameParser.sceneNormalizedName("The.Godfather.1972.1080p.x264-GRP") == "The Godfather 1972")
+    }
+
+    @Test func `a generic file inside an episode-named folder inherits the episode`() {
+        let parsed = MediaFilenameParser.parse(
+            filename: "video.mkv",
+            folders: ["Harbor.Lights.S02E03.1080p.WEB.h264-NIGHT[Indexer.to]"]
+        )
+
+        #expect(parsed.kind == .episode(series: "Harbor Lights", season: 2, episode: 3, title: ""))
+        #expect(parsed.name == "Harbor Lights S02E03")
+    }
+
+    @Test func `a token-only file inside an episode-named folder inherits the series`() {
+        let parsed = MediaFilenameParser.parse(
+            filename: "S02E03.mkv",
+            folders: ["Harbor.Lights.S02E03.1080p.WEB.h264-NIGHT[Indexer.to]"]
+        )
+
+        #expect(parsed.kind == .episode(series: "Harbor Lights", season: 2, episode: 3, title: ""))
+        #expect(parsed.name == "Harbor Lights S02E03")
+    }
+
+    @Test func `a token-only file with a title keeps it under the folder series`() {
+        let parsed = MediaFilenameParser.parse(
+            filename: "S02E03 - Reunion.mkv",
+            folders: ["Harbor.Lights.S02E03.1080p.WEB.h264-NIGHT[Indexer.to]"]
+        )
+
+        #expect(parsed.kind == .episode(series: "Harbor Lights", season: 2, episode: 3, title: "Reunion"))
+        #expect(parsed.name == "Harbor Lights S02E03 Reunion")
+    }
+
+    @Test func `a numbered file inside show and season folders composes an episode`() {
+        let parsed = MediaFilenameParser.parse(
+            filename: "02 - Pilot.mkv",
+            folders: ["Breaking Bad", "Season 1"]
+        )
+
+        #expect(parsed.kind == .episode(series: "Breaking Bad", season: 1, episode: 2, title: "Pilot"))
+        #expect(parsed.name == "Breaking Bad S01E02 Pilot")
+    }
+
+    @Test func `a year titled movie is not read as an episode number`() {
+        let parsed = MediaFilenameParser.parse(filename: "2012.mkv", folders: ["Movies", "Disaster"])
+
+        #expect(parsed.kind == .movie)
+        #expect(parsed.name == "2012")
+    }
+
+    @Test func `a generically named movie file inherits the movie folder`() {
+        let parsed = MediaFilenameParser.parse(filename: "video.mkv", folders: ["Movies", "The Godfather (1972)"])
+
+        #expect(parsed.kind == .movie)
+        #expect(parsed.name == "The Godfather (1972)")
     }
 }

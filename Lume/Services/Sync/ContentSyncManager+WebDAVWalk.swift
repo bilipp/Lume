@@ -70,7 +70,8 @@ nonisolated enum WebDAVWalkProducer {
     ) async throws -> WebDAVWalkResult {
         let base = WebDAVClient.normalizedCollectionURL(root)
         let rootKey = visitKey(base)
-        var queue: [(url: URL, group: String?)] = [(base, lastSegment(of: base))]
+        let rootGroup = lastSegment(of: base)
+        var queue: [(url: URL, folders: [String])] = [(base, [])]
         // An index cursor rather than `removeFirst()`, which is O(n) per
         // directory on a share with thousands of folders.
         var cursor = 0
@@ -96,10 +97,10 @@ nonisolated enum WebDAVWalkProducer {
                     // otherwise walk forever. This is termination, not a depth
                     // or request cap.
                     guard visited.insert(key).inserted else { continue }
-                    queue.append((resource.url, resource.name))
+                    queue.append((resource.url, directory.folders + [resource.name]))
                     continue
                 }
-                guard let entry = entry(for: resource, group: directory.group) else { continue }
+                guard let entry = entry(for: resource, folders: directory.folders, group: rootGroup) else { continue }
                 result.entries.append(entry)
                 signatures.append(WebDAVListingFingerprint.signature(for: resource))
             }
@@ -141,18 +142,18 @@ nonisolated enum WebDAVWalkProducer {
 
     /// One media file as the m3u pipeline expects it, or `nil` for anything the
     /// catalog cannot play.
-    private static func entry(for resource: WebDAVResource, group: String?) -> M3UEntry? {
+    private static func entry(for resource: WebDAVResource, folders: [String], group: String?) -> M3UEntry? {
         guard let ext = M3UClassifier.pathExtension(of: resource.url.absoluteString),
               MediaFilenameParser.mediaExtensions.contains(ext)
         else { return nil }
 
-        let parsed = MediaFilenameParser.parse(filename: resource.name, folder: group)
+        let parsed = MediaFilenameParser.parse(filename: resource.name, folders: folders)
         return M3UEntry(
             name: parsed.name,
             url: resource.url.absoluteString,
             tvgId: nil,
             logo: nil,
-            group: parsed.group,
+            group: group,
             // A file share carries no live channels, and the explicit VOD
             // marker is the one signal `M3UClassifier` checks before its URL
             // heuristics — which would otherwise read a folder named "Live" or
@@ -190,8 +191,11 @@ nonisolated enum WebDAVWalkProducer {
         key == rootKey || key.hasPrefix(rootKey + "/")
     }
 
-    /// The collection's own folder name, which its immediate files inherit as
-    /// their browse category — the file-share equivalent of m3u's group-title.
+    /// The collection's own folder name. Every file in the share inherits it as
+    /// its browse category — the file-share equivalent of m3u's group-title. A
+    /// share has no curated categories, so subdividing by subfolder would file
+    /// each episode-named folder as its own category and scatter one series
+    /// across dozens of them.
     private static func lastSegment(of url: URL) -> String? {
         guard let segment = url.path(percentEncoded: false).split(separator: "/").last else { return nil }
         return String(segment)

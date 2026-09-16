@@ -108,7 +108,7 @@ private enum PropfindFixtures {
     <D:status>HTTP/1.1 200 OK</D:status></D:propstat>
     </D:response>
     <D:response xmlns:lp1="DAV:">
-    <D:href>/Movies/Love.is.Blind.Germany.S02E01.1080p.WEB.h264-EDITH%5bEZTVx.to%5d.mkv</D:href>
+    <D:href>/Movies/Harbor.Lights.S02E01.1080p.WEB.h264-NIGHT%5bIndexer.to%5d.mkv</D:href>
     <D:propstat><D:prop>
     <lp1:resourcetype/>
     <lp1:getcontentlength>2806609208</lp1:getcontentlength>
@@ -189,8 +189,8 @@ struct WebDAVPropfindParserTests {
         let file = try #require(resources.first)
 
         #expect(resources.count == 1)
-        #expect(file.url.absoluteString.hasSuffix("h264-EDITH%5bEZTVx.to%5d.mkv"))
-        #expect(file.name == "Love.is.Blind.Germany.S02E01.1080p.WEB.h264-EDITH[EZTVx.to].mkv")
+        #expect(file.url.absoluteString.hasSuffix("h264-NIGHT%5bIndexer.to%5d.mkv"))
+        #expect(file.name == "Harbor.Lights.S02E01.1080p.WEB.h264-NIGHT[Indexer.to].mkv")
         #expect(file.contentLength == 2_806_609_208)
     }
 
