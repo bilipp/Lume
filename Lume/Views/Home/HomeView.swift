@@ -180,62 +180,57 @@ struct HomeView: View {
                     #endif
                 }
             }
-            .platformNavigationTitle("Home")
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(heroItems.isEmpty ? .automatic : .hidden, for: .navigationBar)
-            #endif
-                .profileMenuToolbar()
-                .libraryToolbar(config: LibraryToolbarConfiguration(
-                    playlists: playlists,
-                    selectedPlaylistID: $selectedPlaylistID,
-                    categorySortRaw: $categorySortRaw,
-                    contentSortRaw: $contentSortRaw,
-                    showingSync: $showingSync,
-                    showingSettings: $showingSettings,
-                    activePlaylist: activePlaylist
-                ))
-                .navigationDestination(for: Movie.self) { movie in
-                    MovieDetailView(movie: movie, animationNamespace: animationNamespace)
-                    #if os(iOS)
-                        .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))
-                    #endif
-                }
-                .navigationDestination(for: Series.self) { series in
-                    SeriesDetailView(series: series, animationNamespace: animationNamespace)
-                    #if os(iOS)
-                        .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
-                    #endif
-                }
+            .profileMenuToolbar()
+            .libraryToolbar(config: LibraryToolbarConfiguration(
+                playlists: playlists,
+                selectedPlaylistID: $selectedPlaylistID,
+                categorySortRaw: $categorySortRaw,
+                contentSortRaw: $contentSortRaw,
+                showingSync: $showingSync,
+                showingSettings: $showingSettings,
+                activePlaylist: activePlaylist
+            ))
+            .navigationDestination(for: Movie.self) { movie in
+                MovieDetailView(movie: movie, animationNamespace: animationNamespace)
+                #if os(iOS)
+                    .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))
+                #endif
+            }
+            .navigationDestination(for: Series.self) { series in
+                SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                #if os(iOS)
+                    .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
+                #endif
+            }
             #if os(tvOS)
-                .navigationDestination(item: $selectedHero) { hero in
-                    if let movie = hero.movie {
-                        MovieDetailView(movie: movie, animationNamespace: animationNamespace)
-                    } else if let series = hero.series {
-                        SeriesDetailView(series: series, animationNamespace: animationNamespace)
-                    }
+            .navigationDestination(item: $selectedHero) { hero in
+                if let movie = hero.movie {
+                    MovieDetailView(movie: movie, animationNamespace: animationNamespace)
+                } else if let series = hero.series {
+                    SeriesDetailView(series: series, animationNamespace: animationNamespace)
                 }
+            }
             #endif
-                .task(id: trendingKey) {
-                    await loadTrending(cacheKey: trendingKey)
-                }
-                .task(id: watchlistKey) {
-                    await loadWatchlist(cacheKey: watchlistKey)
-                }
-                .task(id: recommendationsKey) {
-                    await loadRecommendations()
-                }
-                .task(id: seriesResumeKey) {
-                    await loadSeriesResume()
-                }
+            .task(id: trendingKey) {
+                await loadTrending(cacheKey: trendingKey)
+            }
+            .task(id: watchlistKey) {
+                await loadWatchlist(cacheKey: watchlistKey)
+            }
+            .task(id: recommendationsKey) {
+                await loadRecommendations()
+            }
+            .task(id: seriesResumeKey) {
+                await loadSeriesResume()
+            }
             #if os(iOS) || os(tvOS)
-                .fullScreenCover(item: $playingMedia) { media in
-                    FullScreenPlayerView(media: media)
-                }
+            .fullScreenCover(item: $playingMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
             #endif
             #if os(iOS)
-                .fullScreenCover(item: $multiViewLaunch) { launch in
-                    MultiViewScreen(seed: launch.seed)
+            .fullScreenCover(item: $multiViewLaunch) { launch in
+                MultiViewScreen(seed: launch.seed)
             }
             #endif
             .paywall(isPresented: $showingPaywall, highlight: .multiView)
