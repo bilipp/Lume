@@ -284,14 +284,14 @@ enum PlayerSettings {
     /// bare language codes (`de` matches a `de-AT` track), stored
     /// comma-separated — see `PreferredLanguageList`.
     ///
-    /// Defaults to EMPTY, which means no preference and behaviour identical
-    /// to before the setting existed. Nothing is seeded from
-    /// `Locale.preferredLanguages`.
+    /// Defaults to EMPTY, which means Automatic: playback tries the device's
+    /// preferred system languages in order and keeps the container's selection
+    /// when none are available.
     nonisolated enum Language {
         /// Ordered preferred audio languages.
         static let preferredAudioLanguagesKey = "player.preferredAudioLanguages"
 
-        /// Empty: no preferred language.
+        /// Empty: use the device's preferred languages automatically.
         static let preferredAudioLanguagesDefault = ""
     }
 
