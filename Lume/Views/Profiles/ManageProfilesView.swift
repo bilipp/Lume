@@ -150,11 +150,7 @@ struct ManageProfilesView: View {
                 ProfileAvatarView(profile: profile, size: 36)
                 Text(profile.name)
                 Spacer()
-                if isActive {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.tint)
-                }
+                profileStatus(profile, isActive: isActive)
             }
         }
         .buttonStyle(.plain)
@@ -185,5 +181,19 @@ struct ManageProfilesView: View {
             .tint(.indigo)
         }
         #endif
+    }
+
+    @ViewBuilder
+    private func profileStatus(_ profile: UserProfile, isActive: Bool) -> some View {
+        if profile.isPINProtected {
+            Image(systemName: "lock.fill")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+        if isActive {
+            Image(systemName: "checkmark")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.tint)
+        }
     }
 }

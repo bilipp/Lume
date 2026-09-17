@@ -168,6 +168,13 @@ final class ProfileManager {
         try? context.save()
     }
 
+    func updateProfilePIN(_ profile: UserProfile, pinHash: String) {
+        guard profile.pinHash != pinHash else { return }
+        profile.pinHash = pinHash
+        profile.updatedAt = Date()
+        try? context.save()
+    }
+
     /// Re-project the catalog onto another profile's saved state.
     func switchProfile(to id: UUID) async {
         guard id != activeProfileID, !isSwitching else { return }

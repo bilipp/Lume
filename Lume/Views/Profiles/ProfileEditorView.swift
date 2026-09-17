@@ -20,6 +20,8 @@ struct ProfileEditorView: View {
     @State private var symbolName: String
     @State private var color: ProfileColor
     @State private var isChild: Bool
+    @State private var pinHash: String
+    @State private var pinFlow: ProfilePINFlow?
     @State private var confirmingDeletion = false
 
     init(profile: UserProfile? = nil) {
@@ -28,6 +30,7 @@ struct ProfileEditorView: View {
         _symbolName = State(initialValue: profile?.symbolName ?? UserProfile.defaultSymbol)
         _color = State(initialValue: profile?.color ?? .blue)
         _isChild = State(initialValue: profile?.isChild ?? false)
+        _pinHash = State(initialValue: profile?.pinHash ?? "")
     }
 
     private var isEditing: Bool {
@@ -103,6 +106,8 @@ struct ProfileEditorView: View {
                     Text("Child profiles hide restricted categories from browsing and search. A parental-control PIN, if set, is required to switch away from a child profile.")
                 }
 
+                profilePINSection
+
                 if isEditing, allProfiles.count > 1 {
                     Section {
                         Button(role: .destructive) {
@@ -137,6 +142,54 @@ struct ProfileEditorView: View {
             .tvSettingsBackground()
             #endif
         }
+        #if os(tvOS)
+        .fullScreenCover(item: $pinFlow, content: profilePINFlowView)
+        #else
+        .sheet(item: $pinFlow, content: profilePINFlowView)
+        #endif
+    }
+
+    private var profilePINSection: some View {
+        Section {
+            if pinHash.isEmpty {
+                Button {
+                    pinFlow = .set
+                } label: {
+                    Label("Set a PIN", systemImage: "lock")
+                }
+            } else {
+                Button {
+                    pinFlow = .change
+                } label: {
+                    Label("Change PIN", systemImage: "lock.rotation")
+                }
+                Button(role: .destructive) {
+                    pinFlow = .remove
+                } label: {
+                    Label("Turn Off PIN", systemImage: "lock.open")
+                }
+            }
+        } header: {
+            Text("Profile PIN")
+        } footer: {
+            Text("Require this PIN whenever switching to this profile.")
+        }
+    }
+
+    @ViewBuilder
+    private func profilePINFlowView(_ flow: ProfilePINFlow) -> some View {
+        NavigationStack {
+            ProfilePINFlowView(
+                flow: flow,
+                existingHash: pinHash,
+                onUpdate: { pinHash = $0 },
+                onFinish: { pinFlow = nil }
+            )
+            .platformNavigationTitle("Profile PIN")
+        }
+        #if os(macOS)
+        .frame(minWidth: 380, idealWidth: 420, minHeight: 460, idealHeight: 520)
+        #endif
     }
 
     private var symbolGrid: some View {
@@ -208,8 +261,15 @@ struct ProfileEditorView: View {
         guard let profileManager, !trimmedName.isEmpty else { return }
         if let profile {
             profileManager.updateProfile(profile, name: trimmedName, symbolName: symbolName, color: color, isChild: isChild)
+            profileManager.updateProfilePIN(profile, pinHash: pinHash)
         } else {
-            profileManager.createProfile(name: trimmedName, symbolName: symbolName, color: color, isChild: isChild)
+            let profile = profileManager.createProfile(
+                name: trimmedName,
+                symbolName: symbolName,
+                color: color,
+                isChild: isChild
+            )
+            profileManager.updateProfilePIN(profile, pinHash: pinHash)
         }
         dismiss()
     }

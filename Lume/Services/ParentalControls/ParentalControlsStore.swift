@@ -147,7 +147,7 @@ nonisolated enum ParentalControlsStore {
               let data = result as? Data,
               let stored = String(data: data, encoding: .utf8)
         else { return false }
-        return stored == hash(pin)
+        return verify(pin: pin, against: stored)
     }
 
     /// Removes the stored PIN. A missing item is treated as success.
@@ -165,9 +165,17 @@ nonisolated enum ParentalControlsStore {
         return present
     }
 
-    private static func hash(_ pin: String) -> String {
+    /// Produces the same one-way representation used by both the global
+    /// parental PIN and profile-specific PINs.
+    static func hash(_ pin: String) -> String {
         SHA256.hash(data: Data((salt + pin).utf8))
             .map { String(format: "%02x", $0) }
             .joined()
+    }
+
+    /// Verifies a PIN against an already-persisted hash without touching the
+    /// keychain. Profile PIN hashes live on their CloudKit-synced profile row.
+    static func verify(pin: String, against storedHash: String) -> Bool {
+        !storedHash.isEmpty && storedHash == hash(pin)
     }
 }

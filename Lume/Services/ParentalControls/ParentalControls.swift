@@ -62,11 +62,22 @@ final class ParentalControls {
         ParentalControlsStore.verify(pin: pin)
     }
 
-    /// A PIN is required to switch *to* `target` when a PIN is set, the active
-    /// profile is a child, and the target is not — i.e. when leaving the kids'
-    /// profile for an unrestricted one. Switching into a child profile, or
-    /// between two child profiles, never prompts.
+    /// Verifies the credential needed to enter `target`. A profile-specific PIN
+    /// takes precedence; otherwise this is the existing child-profile escape
+    /// gate and uses the global parental PIN.
+    func verify(_ pin: String, toSwitchTo target: UserProfile) -> Bool {
+        if target.isPINProtected {
+            return ParentalControlsStore.verify(pin: pin, against: target.pinHash)
+        }
+        return verify(pin)
+    }
+
+    /// A PIN is required when the inactive target opted into profile protection,
+    /// or when the existing parental gate protects leaving a child profile for
+    /// an unrestricted one. Profiles remain unprotected by default.
     func requiresPIN(toSwitchTo target: UserProfile) -> Bool {
+        guard target.id != profileManager.activeProfileID else { return false }
+        if target.isPINProtected { return true }
         guard isPINSet, profileManager.activeProfile?.isChild == true else { return false }
         return !target.isChild
     }
