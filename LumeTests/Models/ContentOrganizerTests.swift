@@ -63,6 +63,52 @@ struct ContentOrganizerTests {
         #expect(cats.allSatisfy { !$0.isHidden })
     }
 
+    // MARK: - Bulk hide / show
+
+    @Test func `hide all sets the hidden flag on every item`() {
+        let cats = makeCategories(["A", "B", "C"])
+        cats[1].isHidden = true // already hidden — stays hidden
+
+        ContentOrganizer.hideAll(cats)
+        // Bound outside #expect: SwiftFormat rewrites the closure to a key path,
+        // which the macro can't type-check inline.
+        let allHidden = cats.allSatisfy(\.isHidden)
+        #expect(allHidden)
+    }
+
+    @Test func `hide all leaves the custom order untouched`() {
+        let cats = makeCategories(["A", "B", "C"])
+        ContentOrganizer.reorder(cats, from: IndexSet(integer: 2), to: 0)
+
+        ContentOrganizer.hideAll(cats)
+        // Hiding is not Reset: the user's arrangement survives.
+        #expect(CategorySortOption.playlist.sort(cats).map(\.name) == ["C", "A", "B"])
+    }
+
+    @Test func `hide all then show all on a subset opts that subset back in`() {
+        let cats = makeCategories(["UK One", "DE Eins", "UK Two"])
+        ContentOrganizer.hideAll(cats)
+
+        // The "hide everything, search UK, show the matches" prune.
+        let matches = cats.filter { $0.name.localizedCaseInsensitiveContains("UK") }
+        ContentOrganizer.showAll(matches)
+
+        #expect(cats.filter { !$0.isHidden }.map(\.name) == ["UK One", "UK Two"])
+    }
+
+    @Test func `hide all applies to live streams too`() {
+        let streams = [
+            LiveStream(id: "l-1", streamId: 1, name: "First", num: 1),
+            LiveStream(id: "l-2", streamId: 2, name: "Second", num: 2)
+        ]
+        ContentOrganizer.hideAll(streams)
+        let allHidden = streams.allSatisfy(\.isHidden)
+        #expect(allHidden)
+
+        ContentOrganizer.showAll(streams)
+        #expect(streams.allSatisfy { !$0.isHidden })
+    }
+
     // MARK: - LiveStream custom order precedence
 
     @Test func `live stream custom order overrides provider order`() {

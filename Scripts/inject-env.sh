@@ -68,6 +68,14 @@ else
     echo "warning: INTRO_DB_API_KEY not set in .env — IntroDB reads still work unauthenticated"
 fi
 
+OPENSUBTITLES_API_KEY="$(read_env OPENSUBTITLES_API_KEY)"
+if [ -n "$OPENSUBTITLES_API_KEY" ]; then
+    set_plist OpenSubtitlesAPIKey "$OPENSUBTITLES_API_KEY"
+    echo "Injected OPENSUBTITLES_API_KEY into Info.plist"
+else
+    echo "warning: OPENSUBTITLES_API_KEY not set in .env — subtitle search will be hidden"
+fi
+
 TRAKT_CLIENT_ID="$(read_env TRAKT_CLIENT_ID)"
 TRAKT_CLIENT_SECRET="$(read_env TRAKT_CLIENT_SECRET)"
 if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then

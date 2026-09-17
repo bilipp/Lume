@@ -18,6 +18,7 @@
 
 #if os(tvOS)
 
+    import SwiftData
     import SwiftUI
 
     // MARK: - Hero model
@@ -300,6 +301,7 @@
         let model: TVHeroModel
         let onSelect: (HeroItem) -> Void
 
+        @Environment(\.modelContext) private var modelContext
         @FocusState private var heroFocused: Bool
 
         var body: some View {
@@ -432,6 +434,10 @@
                         default: break
                         }
                     }
+                    // On the pill, never on the band or the slot: the menu's
+                    // owner has to be focusable, and the band's sizing and
+                    // section ordering are what keep the hero collapse working.
+                    .heroFavoriteMenu(hero, in: modelContext)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .focusSection()
@@ -523,6 +529,7 @@
                 }
             )
         }
+        .modelContainer(previewContainer())
     }
 
 #endif

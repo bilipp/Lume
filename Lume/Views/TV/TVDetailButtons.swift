@@ -118,6 +118,7 @@
         var body: some View {
             Button(action: action) {
                 Image(systemName: systemImage)
+                    .symbolReplaceTransition(value: systemImage)
                     .font(.system(size: 30, weight: .semibold))
             }
             .buttonStyle(TVGlassButtonStyle())

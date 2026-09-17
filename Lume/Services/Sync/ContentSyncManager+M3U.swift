@@ -48,29 +48,45 @@ nonisolated enum M3UClassifier {
     /// only this attribute tells them apart.
     static let vodTypeMarkers: Set<String> = ["video", "movie", "vod"]
 
+    /// The compiled season/episode token matcher. Hoisted because building it
+    /// per call recompiles the same ICU pattern once per entry, which is ~40 s
+    /// over a 1.7M-entry playlist. Matching on a shared instance is thread-safe.
+    private static let episodeToken = try! NSRegularExpression( // swiftlint:disable:this force_try
+        pattern: #"\bS\d{1,3}\s*E\d{1,4}\b|\b\d{1,3}x\d{1,4}\b"#,
+        options: [.caseInsensitive]
+    )
+
     static func classify(_ entry: M3UEntry) -> Kind {
+        classification(of: entry).kind
+    }
+
+    /// `classify`, plus the episode title taken from the very token match that
+    /// decided the entry is an episode. The import path reads the title from
+    /// here instead of calling `ContentSyncManager.cleanEpisodeTitle`, which
+    /// would run the identical pattern a second time over every episode name.
+    static func classification(of entry: M3UEntry) -> (kind: Kind, episodeTitle: String) {
         if let info = episodeInfo(in: entry.name) {
-            return .episode(series: info.series, season: info.season, episode: info.episode)
+            return (.episode(series: info.series, season: info.season, episode: info.episode), info.title)
         }
 
         // An explicit VOD `type` is the strongest signal — it wins over the URL
         // heuristics, which can't distinguish live from on-demand when a
         // provider serves both through the same `…/index.mpeg` endpoint shape.
         if let type = entry.type?.lowercased(), vodTypeMarkers.contains(type) {
-            return .movie
+            return (.movie, "")
         }
 
         let lowerURL = entry.url.lowercased()
         if lowerURL.contains("/movie/") || lowerURL.contains("/series/") {
-            return .movie
+            return (.movie, "")
         }
         if isLiveStreamURL(lowerURL) {
-            return .live
+            return (.live, "")
         }
         if let ext = pathExtension(of: lowerURL), vodExtensions.contains(ext) {
-            return .movie
+            return (.movie, "")
         }
-        return .live
+        return (.live, "")
     }
 
     /// Whether a URL is a live streaming endpoint rather than a VOD file.
@@ -91,11 +107,13 @@ nonisolated enum M3UClassifier {
     }
 
     /// Finds the first `SxxExx` / `NxM` token in a title and splits it into the
-    /// series name (everything before the token) and season/episode numbers.
-    /// Mirrors `ContentSyncManager.cleanEpisodeTitle`'s token grammar.
-    static func episodeInfo(in name: String) -> (series: String, season: Int, episode: Int)? {
-        let pattern = #"(?i)\bS\d{1,3}\s*E\d{1,4}\b|\b\d{1,3}x\d{1,4}\b"#
-        guard let match = name.range(of: pattern, options: .regularExpression) else {
+    /// series name (everything before the token), the season/episode numbers,
+    /// and the episode title (everything after it — byte-identical to what
+    /// `ContentSyncManager.cleanEpisodeTitle` derives from the same name).
+    static func episodeInfo(in name: String) -> (series: String, season: Int, episode: Int, title: String)? {
+        guard let found = episodeToken.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
+              let match = Range(found.range, in: name)
+        else {
             return nil
         }
 
@@ -124,7 +142,7 @@ nonisolated enum M3UClassifier {
             series = String(name[match.upperBound...]).trimmingCharacters(in: separators)
         }
         guard !series.isEmpty else { return nil }
-        return (series, season, episode)
+        return (series, season, episode, String(name[match.upperBound...]).trimmingCharacters(in: separators))
     }
 
     /// The path extension of a URL string, ignoring query and fragment.
@@ -170,47 +188,18 @@ nonisolated enum M3UIdentity {
     static func numericId(for string: String) -> Int {
         Int(bitPattern: UInt(truncatingIfNeeded: hash64(string)) & 0x7FFF_FFFF_FFFF_FFFF)
     }
-}
 
-// MARK: - Import state
+    // The composed row ids. `LumePerformanceTests` builds these to seed the
+    // stores it then times the shipped upsert against — a benchmark composing
+    // the shape by hand would silently measure inserts once this changed.
 
-/// Mutable registries that live across import batches: which categories exist,
-/// which series have been created, and running provider-order counters.
-private final nonisolated class M3UImportState {
-    /// Ensured category unique-ids, keyed by "\(typeRaw)|\(groupName)".
-    var knownCategories: Set<String> = []
-    /// Next first-appearance sort order per category type.
-    var categoryOrder: [String: Int] = [:]
-    /// Running provider-order counters.
-    var liveNum = 0
-    var movieNum = 0
-    var seriesNum = 0
-
-    var importedLive = 0
-    var importedMovies = 0
-    var importedEpisodes = 0
-
-    /// Ids seen this sync, accumulated across batches so a post-import sweep can
-    /// prune rows the file no longer contains. Categories keyed "\(typeRaw)|\(apiId)".
-    var seenLiveIds: Set<String> = []
-    var seenMovieIds: Set<String> = []
-    var seenSeriesIds: Set<String> = []
-    var seenEpisodeIds: Set<String> = []
-    var seenCategoryKeys: Set<String> = []
-
-    /// First error hit inside a batch; aborts the remaining batches.
-    var firstError: Error?
-
-    var totalImported: Int {
-        importedLive + importedMovies + importedEpisodes
+    static func seriesId(playlistId: UUID, name: String) -> String {
+        "\(playlistId.uuidString)-series-\(key(for: name))"
     }
-}
 
-nonisolated struct M3UImportSummary {
-    var liveCount = 0
-    var movieCount = 0
-    var episodeCount = 0
-    var headerEPGURL: String?
+    static func episodeId(seriesId: String, url: String) -> String {
+        "\(seriesId)-episode-\(key(for: url))"
+    }
 }
 
 // MARK: - Sync pipeline
@@ -228,23 +217,38 @@ extension ContentSyncManager {
         // Local imported files are parsed in place; only downloads are temp
         // files we own and must clean up.
         let isRemote = !(URL(string: serverURL)?.isFileURL ?? false)
-        let downloadInterval = Perf.begin(.m3uDownload)
-        let fileURL = try await client.downloadPlaylist(from: serverURL)
-        Perf.end(downloadInterval)
+        // `Perf.measure` ends the interval in a `defer`: a failed download and a
+        // cancelled one both throw, and an interval left open never resolves in
+        // a trace.
+        let download = try await Perf.measure(.m3uDownload) {
+            try await client.downloadPlaylist(from: serverURL)
+        }
+        let fileURL = download.url
         defer { if isRemote { try? FileManager.default.removeItem(at: fileURL) } }
         await progress?.complete(.playlistDownload)
+
+        if m3uImportIsRedundant(digest: download.digest, playlistId: playlistId) {
+            await completeSkippedM3USync(
+                playlistId: playlistId, fileURL: fileURL, storedEPGURL: storedEPGURL, progress: progress
+            )
+            return
+        }
 
         await progress?.start(.playlistImport)
         // Download and import are separate intervals on purpose: profiling a
         // 600k-entry playlist showed the SwiftData import — not the download —
         // owning the multi-minute wait, and one combined number hid that.
-        let importInterval = Perf.begin(.m3uImport)
-        let summary = try importM3UFile(fileURL, playlistId: playlistId, progress: progress)
-        Perf.end(importInterval)
+        // `Perf.measure` again, for the same reason: a cancelled import throws,
+        // and that is now a routine path rather than an edge case.
+        let summary = try await Perf.measure(.m3uImport) {
+            try await importM3UFile(fileURL, playlistId: playlistId, progress: progress)
+        }
+        let imported = summary.liveCount + summary.movieCount + summary.episodeCount
+        recordM3UDigest(download.digest, playlistId: playlistId, importedCount: imported)
         Logger.database.info(
             "m3u import finished: \(summary.liveCount) live, \(summary.movieCount) movies, \(summary.episodeCount) episodes"
         )
-        await progress?.update(detail: "\(summary.liveCount + summary.movieCount + summary.episodeCount) items", fraction: 1)
+        await progress?.update(detail: "\(imported) items", fraction: 1)
         await progress?.complete(.playlistImport)
 
         // When the user didn't supply a guide URL, adopt (and remember) the
@@ -257,111 +261,33 @@ extension ContentSyncManager {
         markPlaylistUpdated(playlistId)
     }
 
-    /// Stream-parses the playlist file and upserts entries batch by batch.
-    /// Runs synchronously on the actor — the same shape as the Xtream batch
-    /// loops — with one fresh, autosave-off context per batch so memory stays
-    /// flat no matter how large the playlist is.
-    private func importM3UFile(_ fileURL: URL, playlistId: UUID, progress: SyncProgress?) throws -> M3UImportSummary {
-        let state = M3UImportState()
-
-        // Seed the category registry with categories from previous syncs so
-        // they are updated in place (re-inserting would be an upsert that
-        // wipes isHidden / customOrder).
-        for type in CategoryType.allCases {
-            let lookup = buildExistingCategoryLookup(
-                context: ModelContext(modelContainer), playlistId: playlistId, type: type
-            )
-            for apiId in lookup.keys {
-                state.knownCategories.insert("\(type.rawValue)|\(apiId)")
-            }
-            state.categoryOrder[type.rawValue] = lookup.count
-        }
-
-        var headerEPGURL: String?
-        try M3UParser.parse(fileURL: fileURL, batchSize: 2000) { header in
-            headerEPGURL = header.epgURL
-        } onBatch: { batch in
-            guard state.firstError == nil else { return }
-            do {
-                try autoreleasepool {
-                    try self.importBatch(batch, playlistId: playlistId, state: state)
-                }
-                let imported = state.totalImported
-                Logger.database.info("m3u import: \(imported) items so far")
-                Task { await progress?.update(detail: "\(imported) items") }
-            } catch {
-                state.firstError = error
-            }
-        }
-
-        if let error = state.firstError {
-            throw SyncError.databaseError(error)
-        }
-
-        // Sweep rows the file no longer carries. Gate on a non-empty import:
-        // total == 0 means the download/parse produced nothing (failure or empty
-        // file), where sweeping would wipe the catalog. Once the file is known
-        // good, a per-kind zero is legitimate — a live-only playlist correctly
-        // prunes any movies/series left from when it carried them.
-        if state.totalImported > 0 {
-            pruneStaleLiveStreams(playlistId: playlistId, seenIds: state.seenLiveIds)
-            pruneStaleMovies(playlistId: playlistId, seenIds: state.seenMovieIds)
-            pruneStaleEpisodes(playlistId: playlistId, seenIds: state.seenEpisodeIds)
-            pruneStaleSeries(playlistId: playlistId, seenIds: state.seenSeriesIds)
-            for type in CategoryType.allCases {
-                let typePrefix = "\(type.rawValue)|"
-                let seenApiIds = Set(
-                    state.seenCategoryKeys
-                        .filter { $0.hasPrefix(typePrefix) }
-                        .map { String($0.dropFirst(typePrefix.count)) }
-                )
-                pruneStaleCategories(playlistId: playlistId, type: type, seenApiIds: seenApiIds)
-            }
-        }
-
-        return M3UImportSummary(
-            liveCount: state.importedLive,
-            movieCount: state.importedMovies,
-            episodeCount: state.importedEpisodes,
-            headerEPGURL: headerEPGURL
-        )
-    }
-
     // MARK: - Batch import
 
-    /// One batch of entries split by classification.
-    private struct ClassifiedBatch {
-        var live: [M3UEntry] = []
-        var movies: [M3UEntry] = []
-        var episodes: [(M3UEntry, series: String, season: Int, episode: Int)] = []
-    }
-
-    private func importBatch(_ entries: [M3UEntry], playlistId: UUID, state: M3UImportState) throws {
+    /// Writes one already-classified batch. Classification happens off this
+    /// actor, in `M3UBatchClassifier`, so everything here is store work.
+    func importBatch(_ batch: M3UClassifiedBatch, playlistId: UUID, state: M3UImportState) throws {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
 
-        var batch = ClassifiedBatch()
-        for entry in entries {
-            switch M3UClassifier.classify(entry) {
-            case .live: batch.live.append(entry)
-            case .movie: batch.movies.append(entry)
-            case let .episode(series, season, episode):
-                batch.episodes.append((entry, series, season, episode))
-            }
+        try ensureCategories(for: batch, playlistId: playlistId, state: state, context: context)
+        Perf.measure(.m3uUpsertLive) { importLive(batch.live, playlistId: playlistId, state: state, context: context) }
+        Perf.measure(.m3uUpsertMovies) {
+            importMovies(batch.movies, playlistId: playlistId, state: state, context: context)
+        }
+        Perf.measure(.m3uUpsertEpisodes) {
+            importEpisodes(batch.episodes, playlistId: playlistId, state: state, context: context)
         }
 
-        try ensureCategories(for: batch, playlistId: playlistId, state: state, context: context)
-        importLive(batch.live, playlistId: playlistId, state: state, context: context)
-        importMovies(batch.movies, playlistId: playlistId, state: state, context: context)
-        importEpisodes(batch.episodes, playlistId: playlistId, state: state, context: context)
-
-        try context.save()
+        // A re-sync where the provider changed nothing leaves the context clean
+        // (see ContentSyncManager+M3UFields): skip save() entirely rather than
+        // pay a full transaction for zero rows.
+        if context.hasChanges { try context.save() }
     }
 
     /// Creates any categories this batch references for the first time.
     /// Group titles double as the category's `apiId` — m3u has no numeric ids.
     private func ensureCategories(
-        for batch: ClassifiedBatch,
+        for batch: M3UClassifiedBatch,
         playlistId: UUID,
         state: M3UImportState,
         context: ModelContext
@@ -383,7 +309,7 @@ extension ContentSyncManager {
         for entry in batch.movies {
             collect(entry.group, type: .vod)
         }
-        for (entry, _, _, _) in batch.episodes {
+        for (entry, _, _, _, _) in batch.episodes {
             collect(entry.group, type: .series)
         }
 
@@ -411,7 +337,7 @@ extension ContentSyncManager {
     private func importLive(_ entries: [M3UEntry], playlistId: UUID, state: M3UImportState, context: ModelContext) {
         guard !entries.isEmpty else { return }
         let ids = entries.map { "\(playlistId.uuidString)-live-\(M3UIdentity.key(for: $0.url))" }
-        state.seenLiveIds.formUnion(ids)
+        state.seenLiveIds.formUnion(ids.lazy.map(M3UIdentity.hash64))
         var existing: [String: LiveStream] = [:]
         let fetched = (try? context.fetch(
             FetchDescriptor<LiveStream>(predicate: #Predicate { ids.contains($0.id) })
@@ -428,14 +354,18 @@ extension ContentSyncManager {
                 stream = LiveStream(id: id, streamId: M3UIdentity.numericId(for: entry.url), name: "")
                 context.insert(stream)
                 existing[id] = stream
+                // Assigned only on insert, and only ever past the highest `num`
+                // this playlist stores (see `M3UImportState.liveNum`): an
+                // existing row keeps its original `num` forever, so a reordered
+                // file leaves the whole tail clean for the dirty check.
+                stream.num = state.liveNum
+                state.liveNum += 1
             }
-            stream.name = entry.name
-            stream.streamIcon = entry.logo
-            stream.epgChannelId = entry.tvgId
-            stream.directURL = entry.url
-            stream.num = state.liveNum
-            stream.categoryId = categoryId(for: entry.group, type: .live, playlistId: playlistId)
-            state.liveNum += 1
+            applyM3ULiveStreamFields(
+                from: entry,
+                to: stream,
+                categoryId: categoryId(for: entry.group, type: .live, playlistId: playlistId)
+            )
         }
         state.importedLive += entries.count
     }
@@ -443,7 +373,7 @@ extension ContentSyncManager {
     private func importMovies(_ entries: [M3UEntry], playlistId: UUID, state: M3UImportState, context: ModelContext) {
         guard !entries.isEmpty else { return }
         let ids = entries.map { "\(playlistId.uuidString)-movie-\(M3UIdentity.key(for: $0.url))" }
-        state.seenMovieIds.formUnion(ids)
+        state.seenMovieIds.formUnion(ids.lazy.map(M3UIdentity.hash64))
         var existing: [String: Movie] = [:]
         let fetched = (try? context.fetch(
             FetchDescriptor<Movie>(predicate: #Predicate { ids.contains($0.id) })
@@ -460,37 +390,46 @@ extension ContentSyncManager {
                 movie = Movie(id: id, streamId: M3UIdentity.numericId(for: entry.url), name: "")
                 context.insert(movie)
                 existing[id] = movie
+                // Assigned only on insert, for the reason spelled out in
+                // `importLive`.
+                movie.num = state.movieNum
+                state.movieNum += 1
             }
-            movie.name = entry.name
-            movie.streamIcon = entry.logo
-            movie.directURL = entry.url
-            movie.containerExtension = M3UClassifier.pathExtension(of: entry.url)
-            movie.num = state.movieNum
-            movie.categoryId = categoryId(for: entry.group, type: .vod, playlistId: playlistId)
-            state.movieNum += 1
+            applyM3UMovieFields(
+                from: entry,
+                to: movie,
+                categoryId: categoryId(for: entry.group, type: .vod, playlistId: playlistId)
+            )
         }
         state.importedMovies += entries.count
     }
 
     private func importEpisodes(
-        _ entries: [(M3UEntry, series: String, season: Int, episode: Int)],
+        _ entries: [M3UClassifiedEpisode],
         playlistId: UUID,
         state: M3UImportState,
         context: ModelContext
     ) {
         guard !entries.isEmpty else { return }
 
-        let seriesIds = entries.map { "\(playlistId.uuidString)-series-\(M3UIdentity.key(for: $0.series))" }
+        let seriesIds = entries.map { M3UIdentity.seriesId(playlistId: playlistId, name: $0.series) }
         let episodeIds = entries.enumerated().map { index, entry in
-            "\(seriesIds[index])-episode-\(M3UIdentity.key(for: entry.0.url))"
+            M3UIdentity.episodeId(seriesId: seriesIds[index], url: entry.0.url)
         }
-        state.seenSeriesIds.formUnion(seriesIds)
-        state.seenEpisodeIds.formUnion(episodeIds)
+        state.seenSeriesIds.formUnion(seriesIds.lazy.map(M3UIdentity.hash64))
+        state.seenEpisodeIds.formUnion(episodeIds.lazy.map(M3UIdentity.hash64))
         var seriesById = existingSeries(ids: seriesIds, context: context)
         var existingEpisodes = existingEpisodes(ids: episodeIds, context: context)
+        // The series fields are per-series, not per-episode: one show can carry
+        // ~2,800 episodes in a provider file, all naming the same group title.
+        // This cache is deliberately local to the batch — every batch runs on a
+        // fresh ModelContext, so it can never stand in for rows this context
+        // does not hold. Only 44 of ~47,440 series in a provider file span more
+        // than one group title; for those the batch's first entry wins.
+        var seriesApplied = Set<String>()
 
         for (index, item) in entries.enumerated() {
-            let (entry, seriesName, season, episodeNum) = item
+            let (entry, seriesName, season, episodeNum, episodeTitle) = item
             let seriesId = seriesIds[index]
 
             let series: Series
@@ -503,9 +442,14 @@ extension ContentSyncManager {
                 context.insert(series)
                 seriesById[seriesId] = series
             }
-            series.categoryId = categoryId(for: entry.group, type: .series, playlistId: playlistId)
-            if series.cover == nil {
-                series.cover = entry.logo
+            // A series with no cover yet keeps consulting later entries, so an
+            // early episode without artwork doesn't leave the show blank.
+            if seriesApplied.insert(seriesId).inserted || series.cover == nil {
+                applyM3USeriesFields(
+                    from: entry,
+                    to: series,
+                    categoryId: categoryId(for: entry.group, type: .series, playlistId: playlistId)
+                )
             }
 
             let episodeId = episodeIds[index]
@@ -519,45 +463,26 @@ extension ContentSyncManager {
                     title: "",
                     containerExtension: M3UClassifier.pathExtension(of: entry.url) ?? "mp4",
                     seasonNum: season,
-                    episodeNum: episodeNum,
-                    series: series
+                    episodeNum: episodeNum
                 )
                 context.insert(episode)
+                // Assigned after `insert`, never through the initializer:
+                // wiring the inverse on an instance the context does not hold
+                // yet makes `insert` migrate it out of the transient backing
+                // store. 150k episodes, same catalog: 125.5 s / 557 MB peak
+                // that way, 25.1 s / 74 MB this way.
+                // See `M3UEpisodeRelationshipBenchmarks`.
+                episode.series = series
                 existingEpisodes[episodeId] = episode
             }
-            episode.title = Self.cleanEpisodeTitle(entry.name)
-            episode.directSource = entry.url
-            episode.movieImage = entry.logo
+            applyM3UEpisodeFields(from: entry, title: episodeTitle, to: episode)
             state.importedEpisodes += 1
         }
     }
 
-    private func existingSeries(ids: [String], context: ModelContext) -> [String: Series] {
-        let uniqueIds = Array(Set(ids))
-        var lookup: [String: Series] = [:]
-        let fetched = (try? context.fetch(
-            FetchDescriptor<Series>(predicate: #Predicate { uniqueIds.contains($0.id) })
-        )) ?? []
-        for series in fetched {
-            lookup[series.id] = series
-        }
-        return lookup
-    }
-
-    private func existingEpisodes(ids: [String], context: ModelContext) -> [String: Episode] {
-        var lookup: [String: Episode] = [:]
-        let fetched = (try? context.fetch(
-            FetchDescriptor<Episode>(predicate: #Predicate { ids.contains($0.id) })
-        )) ?? []
-        for episode in fetched {
-            lookup[episode.id] = episode
-        }
-        return lookup
-    }
-
     // MARK: - Playlist bookkeeping
 
-    private func persistDiscoveredEPGURL(_ url: String, playlistId: UUID) {
+    func persistDiscoveredEPGURL(_ url: String, playlistId: UUID) {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
         guard let playlist = try? context.fetch(
@@ -569,7 +494,7 @@ extension ContentSyncManager {
         Logger.database.info("Adopted EPG URL from playlist url-tvg header")
     }
 
-    private func markPlaylistUpdated(_ playlistId: UUID) {
+    func markPlaylistUpdated(_ playlistId: UUID) {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
         guard let playlist = try? context.fetch(

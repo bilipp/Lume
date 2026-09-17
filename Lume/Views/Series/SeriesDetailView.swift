@@ -90,6 +90,10 @@ struct SeriesDetailView: View {
                         isLoadingTMDB = false
                     }
                 }
+                // Separate task so a stale-cache refresh runs alongside the
+                // enrichment chain above instead of delaying the first paint,
+                // and still gets cancelled when the screen goes away.
+                .task(id: series.id) { await refreshEpisodesIfStale() }
                 .onChange(of: series.similarTMDBIds) { resolveSimilar() }
                 .onChange(of: refreshToken) { resolveSimilar() }
                 .onChange(of: series.episodes.count) { recomputeSeasons() }
@@ -351,6 +355,7 @@ struct SeriesDetailView: View {
                 } label: {
                     Image(systemName: series.isFavorite ? "heart.fill" : "heart")
                         .foregroundStyle(series.isFavorite ? .red : .primary)
+                        .symbolReplaceTransition(value: series.isFavorite)
                 }
                 .help(series.isFavorite ? "Remove from Favorites" : "Add to Favorites")
             }
@@ -427,16 +432,35 @@ struct SeriesDetailView: View {
         selectedSeason = determineDefaultSeason()
     }
 
+    /// Re-pulls a cached episode list once the playlist has synced past it. The
+    /// cached episodes stay on screen while it runs and new ones merge in, so
+    /// this is silent unless something actually changed. The empty case is the
+    /// blocking `loadEpisodesIfNeeded` path's job.
+    ///
+    /// m3u is skipped: it imports and prunes episodes alongside the rest of the
+    /// catalog on every sync, so there is nothing to pull per-series there.
+    private func refreshEpisodesIfStale() async {
+        guard !series.episodes.isEmpty,
+              let playlist = seriesPlaylist,
+              playlist.sourceType != .m3u,
+              series.episodesAreStale(lastSyncedAt: playlist.lastSyncDate)
+        else { return }
+        await loadEpisodes()
+    }
+
     private func loadEpisodes() async {
         guard let playlist = seriesPlaylist, !isLoadingEpisodes else { return }
         isLoadingEpisodes = true
         defer { isLoadingEpisodes = false }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        let parsed = await (try? manager.fetchEpisodes(
+        // A failed fetch must not reach `insertEpisodes`: it stamps the episode
+        // cache, which would call the list fresh until the staleness window
+        // reopens — the exact thing keeping a device an episode behind.
+        guard let parsed = try? await manager.fetchEpisodes(
             seriesId: series.seriesId,
             seriesElementId: series.id,
             playlist: playlist
-        )) ?? []
+        ) else { return }
         // Insert through the view's own context, attaching to `series`, so its
         // episodes relationship — and this view — update synchronously.
         await MainActor.run { series.insertEpisodes(parsed, into: modelContext) }
@@ -466,7 +490,7 @@ struct SeriesDetailView: View {
 
 private extension SeriesDetailView {
     func resolveSimilar() {
-        let ids = series.similarTMDBIds
+        let ids = series.similarTitleIds
         guard !ids.isEmpty else { similar = []; return }
 
         let playlistPrefix = series.id.components(separatedBy: "-series-").first
@@ -507,15 +531,14 @@ private extension SeriesDetailView {
               let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif
     }
 
     func toggleFavorite() {
-        series.isFavorite.toggle()
-        series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+        MediaFavorites.toggle(series, in: modelContext)
     }
 
     func toggleWatched(_ episode: Episode) {

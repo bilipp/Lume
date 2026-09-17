@@ -200,8 +200,10 @@ extension CloudSyncEngine {
 
     /// Categories sync their Content Management visibility (`isHidden`) and
     /// ordering (`customOrder`). Only customized rows are fetched, so a playlist
-    /// the user never touched produces no mirror records. `isRestricted` is a
-    /// device-global parental control and is deliberately excluded.
+    /// the user never touched produces no mirror records. `isRestricted` is
+    /// deliberately excluded here: it is a parental control a parent sets *about*
+    /// a child profile, not per-profile state, so it syncs on its own
+    /// non-profile-scoped channel — see `CloudSyncEngine+Parental`.
     func categoryEntries() throws -> [(String, LocalContentEntry)] {
         let categories = try catalogContext.fetch(FetchDescriptor<Category>(
             predicate: #Predicate { $0.isHidden || $0.customOrder != nil }

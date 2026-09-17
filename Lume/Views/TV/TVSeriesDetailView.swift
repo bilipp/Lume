@@ -87,6 +87,10 @@
                 // by the focus engine while the button is disabled).
                 focus = .play
             }
+            // Separate task so a stale-cache refresh runs alongside the
+            // enrichment chain above instead of delaying the first paint, and
+            // still gets cancelled when the screen goes away.
+            .task(id: series.id) { await refreshEpisodesIfStale() }
             .onChange(of: series.similarTMDBIds) { resolveSimilar() }
             .onChange(of: refreshToken) { resolveSimilar() }
         }
@@ -117,11 +121,15 @@
                     if !similar.isEmpty {
                         TVRail(title: "You May Also Like", items: similar) { item in
                             posterLink(for: item)
+                                .mediaFavoriteMenu(item, in: modelContext)
                         }
                     }
 
                     if !otherSources.isEmpty {
                         TVRail(title: "Other Sources", items: otherSources) { source in
+                            // No favorite menu: an entry here is the same title on
+                            // a *different* playlist, so favoriting it would create a
+                            // favorite the playlist-scoped Favorites rail never shows.
                             posterLink(for: source.item, badge: source.playlistName)
                         }
                     }
@@ -409,22 +417,46 @@
             selectedSeason = determineDefaultSeason()
         }
 
-        private func loadEpisodes() async {
+        /// Re-pulls a cached episode list once the playlist has synced past it. The
+        /// cached episodes stay on screen while it runs and new ones merge in, so
+        /// this is silent unless something actually changed. The empty case is the
+        /// blocking `loadEpisodesIfNeeded` path's job.
+        ///
+        /// m3u is skipped: it imports and prunes episodes alongside the rest of the
+        /// catalog on every sync, so there is nothing to pull per-series there.
+        private func refreshEpisodesIfStale() async {
+            guard !series.episodes.isEmpty,
+                  let playlist = seriesPlaylist,
+                  playlist.sourceType != .m3u,
+                  series.episodesAreStale(lastSyncedAt: playlist.lastSyncDate)
+            else { return }
+            await loadEpisodes(resetsSeason: false)
+        }
+
+        /// - Parameter resetsSeason: whether to re-pick the season to open on.
+        ///   False for a background refresh, which must not yank the selector
+        ///   out from under someone browsing a season.
+        private func loadEpisodes(resetsSeason: Bool = true) async {
             guard let playlist = seriesPlaylist, !isLoadingEpisodes else { return }
             isLoadingEpisodes = true
             defer { isLoadingEpisodes = false }
             let manager = ContentSyncManager(modelContainer: modelContext.container)
-            let parsed = await (try? manager.fetchEpisodes(
+            // A failed fetch must not reach `insertEpisodes`: it stamps the episode
+            // cache, which would call the list fresh until the staleness window
+            // reopens — the exact thing keeping a device an episode behind.
+            guard let parsed = try? await manager.fetchEpisodes(
                 seriesId: series.seriesId,
                 seriesElementId: series.id,
                 playlist: playlist
-            )) ?? []
+            ) else { return }
             // Insert through the view's own context, attaching to `series`, so its
             // episodes relationship — and this view — update synchronously. Writing
             // through a background context left the relationship stale until a later
             // cross-context merge, so episodes only appeared after navigating back.
             await MainActor.run { series.insertEpisodes(parsed, into: modelContext) }
-            selectedSeason = determineDefaultSeason()
+            if resetsSeason {
+                selectedSeason = determineDefaultSeason()
+            }
         }
 
         private func enrichIfNeeded() async {
@@ -451,8 +483,7 @@
         }
 
         func toggleFavorite() {
-            series.isFavorite.toggle()
-            series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+            MediaFavorites.toggle(series, in: modelContext)
         }
 
         func toggleWatched(_ episode: Episode) {
@@ -472,7 +503,7 @@
         }
 
         func resolveSimilar() {
-            let ids = series.similarTMDBIds
+            let ids = series.similarTitleIds
             guard !ids.isEmpty else { similar = []; return }
 
             let playlistPrefix = series.id.components(separatedBy: "-series-").first

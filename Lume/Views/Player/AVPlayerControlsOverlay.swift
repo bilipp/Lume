@@ -22,6 +22,14 @@ import SwiftUI
         var onTogglePlay: () -> Void
         var onResetHideTimer: () -> Void
         var onScheduleHide: () -> Void
+        /// Previous/next stream for the transport pair, resolved once per stream
+        /// by the player host. Never derived here — enablement must not depend
+        /// on anything the playback clock drives.
+        var itemNeighbours = PlayerItemNavigation.Neighbours.none
+        /// Plays the neighbour on that side. Routed back through the host's
+        /// swapper so two presses can't stack a second decoder teardown on the
+        /// first.
+        var onStepItem: ((PlayerMediaSwapper.Step) -> Void)?
 
         @Environment(\.modelContext) private var modelContext
         /// Mirrors the backing model's favorite flag; refreshed when the media
@@ -102,8 +110,27 @@ import SwiftUI
 
         // MARK: - Center Transport
 
+        /// The episode pair turns this into a five-circle row, which is wider
+        /// than a phone in portrait at the spacing the three-button row used.
+        /// Close the gaps rather than let the outer buttons clip off-screen.
         private var centerTransport: some View {
-            HStack(spacing: 32) {
+            ViewThatFits(in: .horizontal) {
+                transportRow(spacing: 32)
+                transportRow(spacing: 12)
+            }
+        }
+
+        private func transportRow(spacing: CGFloat) -> some View {
+            HStack(spacing: spacing) {
+                if itemNeighbours.axis != nil {
+                    PlayerItemNavButton(
+                        step: .previous,
+                        neighbours: itemNeighbours,
+                        onStep: { onStepItem?($0) },
+                        onResetHideTimer: onResetHideTimer
+                    )
+                }
+
                 if !media.isLive {
                     Button {
                         coordinator.skip(by: -15)
@@ -135,6 +162,15 @@ import SwiftUI
                     .buttonStyle(.plain)
                     .accessibilityLabel("Skip forward 15 seconds")
                 }
+
+                if itemNeighbours.axis != nil {
+                    PlayerItemNavButton(
+                        step: .next,
+                        neighbours: itemNeighbours,
+                        onStep: { onStepItem?($0) },
+                        onResetHideTimer: onResetHideTimer
+                    )
+                }
             }
         }
 
@@ -161,6 +197,11 @@ import SwiftUI
 
         private var titleBlock: some View {
             VStack(alignment: .leading, spacing: 2) {
+                StreamInfoCaption(
+                    media: media,
+                    videoInfo: coordinator.videoInfo,
+                    engine: .avPlayer
+                )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)
@@ -192,9 +233,15 @@ import SwiftUI
 
         private var secondaryControls: some View {
             HStack(spacing: 4) {
-                if !coordinator.textTrackOptions.isEmpty { subtitleMenu }
-                if coordinator.audioTrackOptions.count > 1 { audioTrackMenu }
-                if !media.isLive { playbackRateMenu }
+                if !coordinator.textTrackOptions.isEmpty {
+                    subtitleMenu
+                }
+                if coordinator.audioTrackOptions.count > 1 {
+                    audioTrackMenu
+                }
+                if !media.isLive {
+                    playbackRateMenu
+                }
                 contentModeButton
                 favoriteButton
             }
@@ -222,20 +269,21 @@ import SwiftUI
                     coordinator.selectTextTrack(id: nil)
                     onResetHideTimer()
                 } label: {
-                    checkmarkLabel("Off", checked: !hasSelection)
+                    playerCheckmarkLabel("Off", checked: !hasSelection)
                 }
                 ForEach(tracks) { track in
                     Button {
                         coordinator.selectTextTrack(id: track.id)
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.label, checked: track.isSelected)
+                        playerCheckmarkLabel(verbatim: track.label, checked: track.isSelected)
                     }
                 }
             } label: {
                 pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Subtitles", selected: tracks.first(where: \.isSelected)?.label, fallback: "Off")
         }
 
         @ViewBuilder
@@ -247,13 +295,14 @@ import SwiftUI
                         coordinator.selectAudioTrack(id: track.id)
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(track.label, checked: track.isSelected)
+                        playerCheckmarkLabel(verbatim: track.label, checked: track.isSelected)
                     }
                 }
             } label: {
                 pillGlyph("waveform")
             }
             .menuIndicator(.hidden)
+            .trackMenuAccessibility("Audio Track", selected: tracks.first(where: \.isSelected)?.label, fallback: "Default")
         }
 
         private var playbackRateMenu: some View {
@@ -263,7 +312,7 @@ import SwiftUI
                         coordinator.playbackRate = rate
                         onResetHideTimer()
                     } label: {
-                        checkmarkLabel(rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                        playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
                     }
                 }
             } label: {
@@ -347,6 +396,8 @@ import SwiftUI
         /// its own — the enclosing capsule is the single glass surface.
         private func pillGlyph(_ systemName: String, dimmed: Bool = false) -> some View {
             Image(systemName: systemName)
+                // Covers every toggling glyph in the bar — play/pause, mute, heart.
+                .symbolReplaceTransition(value: systemName)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(dimmed ? .white.opacity(0.55) : .white)
                 .frame(width: 44, height: 44)
@@ -356,15 +407,6 @@ import SwiftUI
         /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
         private func rateString(_ rate: Float) -> String {
             String(format: "%g×", rate)
-        }
-
-        @ViewBuilder
-        private func checkmarkLabel(_ title: String, checked: Bool) -> some View {
-            if checked {
-                Label(title, systemImage: "checkmark")
-            } else {
-                Text(title)
-            }
         }
 
         private func timeString(from time: TimeInterval) -> String {

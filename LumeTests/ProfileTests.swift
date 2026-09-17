@@ -19,37 +19,13 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct ProfileEngineTests {
-    private func makeContainer() throws -> ModelContainer {
-        let fullSchema = Schema([
-            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
-            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self,
-            SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self
-        ])
-        let localConfig = ModelConfiguration(
-            "local",
-            schema: Schema([
-                Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
-                Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
-            ]),
-            isStoredInMemoryOnly: true,
-            cloudKitDatabase: .none
-        )
-        let cloudConfig = ModelConfiguration(
-            "cloud",
-            schema: Schema([SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self]),
-            isStoredInMemoryOnly: true,
-            cloudKitDatabase: .none
-        )
-        return try ModelContainer(for: fullSchema, configurations: localConfig, cloudConfig)
-    }
-
     private func freshShadow() -> CloudSyncShadow {
         let suite = UserDefaults(suiteName: "profiles.test.\(UUID().uuidString)")!
         return CloudSyncShadow(defaults: suite)
     }
 
     @Test func `bootstrap creates a default profile and claims legacy records`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         ctx.insert(UserContentState(contentId: "pl-movie-1", kind: .movie, isFavorite: true))
         try ctx.save()
@@ -68,7 +44,7 @@ struct ProfileEngineTests {
     }
 
     @Test func `bootstrap collapses duplicate default profiles keeping the earliest`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         ctx.insert(UserProfile(id: UserProfile.defaultProfileID, name: "First", createdAt: Date(timeIntervalSince1970: 100)))
         ctx.insert(UserProfile(id: UserProfile.defaultProfileID, name: "Second", createdAt: Date(timeIntervalSince1970: 200)))
@@ -84,7 +60,7 @@ struct ProfileEngineTests {
     }
 
     @Test func `reconcile collapses a duplicate default profile imported from another device`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         // Simulates a freshly-synced device: its own bootstrap-created default
         // profile, plus the original device's default (same fixed id) that
@@ -113,7 +89,7 @@ struct ProfileEngineTests {
     }
 
     @Test func `switching profiles flushes the old profile and hydrates the new`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         let profileA = UUID()
         let profileB = UUID()
@@ -153,7 +129,7 @@ struct ProfileEngineTests {
     }
 
     @Test func `reconcile only projects the active profile's mirrors`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         let profileA = UUID()
         let profileB = UUID()
@@ -184,7 +160,7 @@ struct ProfileEngineTests {
     }
 
     @Test func `purging a profile deletes only its records`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         let profileA = UUID()
         let profileB = UUID()
@@ -198,5 +174,190 @@ struct ProfileEngineTests {
         let remaining = try ctx.fetch(FetchDescriptor<UserContentState>())
         #expect(remaining.count == 1)
         #expect(remaining.first?.profileID == profileB)
+    }
+
+    // MARK: - ProfileManager switch contract
+
+    /// A `ProfileManager` over the in-memory two-configuration container (the
+    /// catalog and cloud stores are two configurations of the same container).
+    /// The coordinator runs with `cloudKitEnabled: false`: touching `CKContainer`
+    /// from an un-entitled test binary crashes, and that path still reconciles
+    /// the local store.
+    private func makeManager(_ container: ModelContainer) -> (ProfileManager, CloudSyncCoordinator) {
+        let coordinator = CloudSyncCoordinator(
+            catalogContainer: container,
+            cloudContainer: container,
+            cloudKitContainerIdentifier: "iCloud.lume.tests.invalid",
+            cloudKitEnabled: false
+        )
+        let manager = ProfileManager(
+            catalogContainer: container,
+            cloudContainer: container,
+            coordinator: coordinator
+        )
+        return (manager, coordinator)
+    }
+
+    /// Starts a switch and returns once it has reached its first suspension
+    /// point, so the caller can observe the in-flight state.
+    private func beginSwitch(_ manager: ProfileManager, to id: UUID) async -> Task<Void, Never> {
+        let task = Task { await manager.switchProfile(to: id) }
+        var spins = 0
+        while !manager.isSwitching, spins < 500 {
+            await Task.yield()
+            spins += 1
+        }
+        return task
+    }
+
+    /// A reconcile is debounced by 600 ms and coalesces, so its only observable
+    /// trace is `status.lastReconcile` moving on. Polls rather than sleeping a
+    /// fixed amount; `attempts` is kept short when asserting that none arrives.
+    private func waitForReconcile(
+        _ coordinator: CloudSyncCoordinator,
+        after previous: Date?,
+        attempts: Int = 100
+    ) async -> Date? {
+        for _ in 0 ..< attempts {
+            if let date = coordinator.status.lastReconcile, date != previous {
+                return date
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return nil
+    }
+
+    @Test func `switching to the already-active profile is a no-op`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let active = UUID()
+        ctx.insert(UserProfile(id: active, name: "Me", createdAt: Date(timeIntervalSince1970: 100)))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        ActiveProfileStore.current = active
+        defer { ActiveProfileStore.current = saved }
+
+        let (manager, coordinator) = makeManager(container)
+        #expect(manager.activeProfileID == active)
+
+        await manager.switchProfile(to: active)
+
+        #expect(manager.isSwitching == false)
+        #expect(manager.pendingProfileName == nil)
+        #expect(manager.activeProfileID == active)
+        // No switch work ran, so the trailing re-baselining reconcile never fired.
+        let reconciled = await waitForReconcile(coordinator, after: nil, attempts: 20)
+        #expect(reconciled == nil)
+    }
+
+    @Test func `a switch already in flight refuses a second target`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let profileA = UUID()
+        let profileB = UUID()
+        let profileC = UUID()
+        ctx.insert(UserProfile(id: profileA, name: "A", createdAt: Date(timeIntervalSince1970: 100)))
+        ctx.insert(UserProfile(id: profileB, name: "B", createdAt: Date(timeIntervalSince1970: 200)))
+        ctx.insert(UserProfile(id: profileC, name: "C", createdAt: Date(timeIntervalSince1970: 300)))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        ActiveProfileStore.current = profileA
+        defer { ActiveProfileStore.current = saved }
+
+        let (manager, _) = makeManager(container)
+        let switching = await beginSwitch(manager, to: profileB)
+        #expect(manager.isSwitching)
+
+        await manager.switchProfile(to: profileC)
+        #expect(manager.pendingProfileName == "B")
+
+        await switching.value
+        #expect(manager.activeProfileID == profileB)
+        #expect(ActiveProfileStore.current == profileB)
+    }
+
+    @Test func `pendingProfileName holds the target while switching and clears after`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let profileA = UUID()
+        let profileB = UUID()
+        ctx.insert(UserProfile(id: profileA, name: "Grown-ups", createdAt: Date(timeIntervalSince1970: 100)))
+        ctx.insert(UserProfile(id: profileB, name: "Kids", createdAt: Date(timeIntervalSince1970: 200)))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        ActiveProfileStore.current = profileA
+        defer { ActiveProfileStore.current = saved }
+
+        let (manager, _) = makeManager(container)
+        #expect(manager.pendingProfileName == nil)
+
+        let switching = await beginSwitch(manager, to: profileB)
+        #expect(manager.pendingProfileName == "Kids")
+
+        await switching.value
+        #expect(manager.isSwitching == false)
+        #expect(manager.pendingProfileName == nil)
+    }
+
+    @Test func `a profile switch flushes pending catalog edits before exporting`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        // Autosave off so "unsaved" stays unsaved: the only save in this test is
+        // the flush at the top of `switchProfile`, which is what's under test.
+        ctx.autosaveEnabled = false
+        let profileA = UUID()
+        let profileB = UUID()
+        ctx.insert(UserProfile(id: profileA, name: "A", createdAt: Date(timeIntervalSince1970: 100)))
+        ctx.insert(UserProfile(id: profileB, name: "B", createdAt: Date(timeIntervalSince1970: 200)))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        ActiveProfileStore.current = profileA
+        defer { ActiveProfileStore.current = saved }
+
+        let (manager, _) = makeManager(container)
+
+        // A favorite toggled moments ago that no save has reached yet. Without the
+        // flush the engine's background context exports a stale catalog and this
+        // state is lost instead of landing in profile A's mirror.
+        let movie = Movie(id: "pl-movie-1", streamId: 1, name: "Film")
+        movie.isFavorite = true
+        movie.watchProgress = 100
+        ctx.insert(movie)
+
+        await manager.switchProfile(to: profileB)
+
+        let mirror = try ctx.fetch(FetchDescriptor<UserContentState>()).first { $0.profileID == profileA }
+        #expect(mirror?.isFavorite == true)
+        #expect(mirror?.watchProgress == 100)
+    }
+
+    @Test func `exactly one reconcile follows a profile switch`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let profileA = UUID()
+        let profileB = UUID()
+        ctx.insert(UserProfile(id: profileA, name: "A", createdAt: Date(timeIntervalSince1970: 100)))
+        ctx.insert(UserProfile(id: profileB, name: "B", createdAt: Date(timeIntervalSince1970: 200)))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        ActiveProfileStore.current = profileA
+        defer { ActiveProfileStore.current = saved }
+
+        let (manager, coordinator) = makeManager(container)
+        #expect(coordinator.status.lastReconcile == nil)
+
+        await manager.switchProfile(to: profileB)
+
+        let first = await waitForReconcile(coordinator, after: nil)
+        #expect(first != nil)
+        // The re-baselining pass is the only one the switch queues; a second
+        // would move `lastReconcile` on again.
+        let second = await waitForReconcile(coordinator, after: first, attempts: 20)
+        #expect(second == nil)
     }
 }

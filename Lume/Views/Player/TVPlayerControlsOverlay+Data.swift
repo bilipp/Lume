@@ -26,6 +26,7 @@
             scrubResetTask = nil
             episode = nil
             seasonEpisodes = []
+            episodeNav = .none
             movie = nil
             liveStream = nil
             epgNow = nil
@@ -40,6 +41,7 @@
                 episode = resolved
                 seasonEpisodes = TVPlayerContent.seasonEpisodes(for: resolved)
                 seriesPlaylist = TVPlayerContent.playlist(for: resolved.series, in: modelContext)
+                episodeNav = PlayerItemNavigation.episodeNeighbours(for: media.contentRef, in: modelContext)
             case .movie:
                 movie = TVPlayerContent.movie(for: media.contentRef, in: modelContext)
             case .live:
@@ -49,21 +51,55 @@
                 let now = Date()
                 epgNow = listings.first { $0.start <= now && now < $0.end }
                 epgNext = listings.first { $0.start > now }
-                recentChannels = TVPlayerContent.recentChannels(in: modelContext)
+                recentChannels = TVPlayerContent.recentChannels(in: modelContext, restriction: restriction)
                 recentNowTitles = TVPlayerContent.nowProgrammeTitles(for: recentChannels, in: modelContext)
             }
         }
 
+        /// Resolves the owning playlist off the main actor, once per stream.
+        /// The player's other SwiftData reads run on the view context; this one
+        /// must not, because it runs while the stream is starting. The tvOS
+        /// caption names no category, and resolves its own
+        /// EPG, so only the playlist is fetched here.
+        func resolveStreamInfo() async {
+            streamInfoPlaylistName = nil
+            streamInfoPlaylistName = await PlayerStreamInfo.playlistNameDetached(
+                for: media.contentRef,
+                container: modelContext.container
+            )
+        }
+
         // MARK: Captions
 
+        /// The shared, platform-neutral caption derivation, so the tvOS chrome
+        /// and the iOS / macOS / visionOS caption can never drift. tvOS resolves
+        /// its own `EPGListing`s, so they are mapped into the snapshot's value
+        /// form here; `engine` is `nil` because the tvOS caption names none.
+        var infoSnapshot: PlayerInfoSnapshot {
+            PlayerInfoSnapshot(
+                media: media,
+                details: StreamInfoDetails(
+                    playlistName: streamInfoPlaylistName,
+                    epg: ChannelEPG(
+                        current: epgNow.map(EPGSlot.init),
+                        next: epgNext.map(EPGSlot.init)
+                    )
+                ),
+                videoInfo: coordinator.videoInfo,
+                engine: nil,
+                detailLevel: PlayerSettings.StreamInfo.detailLevel
+            )
+        }
+
+        /// tvOS keeps its own layout, so it takes the snapshot's programme half
+        /// rather than the full `captionParts`, whose technical tail it renders
+        /// separately and right-aligned as `techCaption`.
         var topCaption: String? {
-            if media.isLive { return epgNow?.title }
-            if isSeries { return media.subtitle }
-            return nil
+            infoSnapshot.programmeCaption
         }
 
         var techCaption: String {
-            coordinator.videoInfo?.captionParts.joined(separator: "  ·  ") ?? ""
+            infoSnapshot.techCaption
         }
 
         // MARK: Scrubbing (VOD)
@@ -141,28 +177,28 @@
             }
         }
 
-        // MARK: Episode navigation
-
-        private var currentEpisodeIndex: Int? {
-            guard let episode else { return nil }
-            return seasonEpisodes.firstIndex { $0.id == episode.id }
-        }
-
-        var previousEpisode: Episode? {
-            guard let index = currentEpisodeIndex, index > 0 else { return nil }
-            return seasonEpisodes[index - 1]
-        }
-
-        var nextEpisode: Episode? {
-            guard let index = currentEpisodeIndex, index + 1 < seasonEpisodes.count else { return nil }
-            return seasonEpisodes[index + 1]
-        }
-
         // MARK: Actions
 
         func select(episode chosen: Episode) {
             guard let playlist = seriesPlaylist,
                   let newMedia = PlayableMedia.from(episode: chosen, playlist: playlist) else { return }
+            select(media: newMedia)
+        }
+
+        /// Play the episode on `step`'s side. Goes through the host's shared
+        /// swapper — the same path the on-screen buttons take on the other
+        /// platforms — so an explicit next press marks the episode it leaves
+        /// behind watched, debounces and announces itself.
+        func stepItem(_ step: PlayerMediaSwapper.Step) {
+            mediaSwapper.step(
+                step,
+                in: episodeNav,
+                onCompleteCurrentItem: { onCompleteCurrentItem?() },
+                select: { select(media: $0) }
+            )
+        }
+
+        func select(media newMedia: PlayableMedia) {
             withAnimation(.easeInOut(duration: 0.2)) { openTab = nil }
             onPanelOpenChange(false)
             focus = .transport
@@ -171,7 +207,9 @@
 
         func select(channel stream: LiveStream) {
             guard let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext),
-                  let newMedia = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+                  let newMedia = PlayableMedia.from(
+                      stream: stream, playlist: playlist, scope: media.channelScope
+                  ) else { return }
             withAnimation(.easeInOut(duration: 0.2)) { openTab = nil }
             onPanelOpenChange(false)
             focus = .transport
@@ -258,10 +296,7 @@
         var infoBadges: [String] {
             var badges: [String] = []
             if let rating = contentRatingBadge, !rating.isEmpty { badges.append(rating) }
-            if let info = coordinator.videoInfo {
-                if !info.qualityTag.isEmpty { badges.append(info.qualityTag) }
-                if let codec = info.codec, !codec.isEmpty { badges.append(codec.uppercased()) }
-            }
+            badges.append(contentsOf: infoSnapshot.infoBadges)
             return badges
         }
 
@@ -290,15 +325,12 @@
 
         func toggleFavorite() {
             if isSeries, let series = episode?.series {
-                series.isFavorite.toggle()
-                series.addedToWatchlistDate = series.isFavorite ? Date() : nil
+                MediaFavorites.toggle(series, in: modelContext)
             } else if media.isLive, let liveStream {
-                liveStream.isFavorite.toggle()
+                LiveChannelFavorites.toggle(liveStream, in: modelContext)
             } else if let movie {
-                movie.isFavorite.toggle()
-                movie.addedToWatchlistDate = movie.isFavorite ? Date() : nil
+                MediaFavorites.toggle(movie, in: modelContext)
             }
-            try? modelContext.save()
             onResetHideTimer()
         }
 

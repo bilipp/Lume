@@ -15,6 +15,13 @@ final class Series {
     // catalog on a large library.
     // `indexedAt` backs the content indexer's pending/progress scans, run once
     // per chunk for a whole indexing pass.
+    // `lastModified` is the sort key for the "Recently Added" rail, which asks
+    // for a handful of rows off the top of a descending sort. Unindexed that
+    // plans as a full scan plus "USE TEMP B-TREE FOR ORDER BY" — the whole table
+    // sorted to hand back 20 rows. As with `Movie.added`, the index only pays
+    // off while the ordering stays a binary comparison: a `SortDescriptor` on a
+    // String key path defaults to `.localizedStandard`, which emits
+    // `COLLATE NSCollateFinderlike` and no b-tree can serve that.
     #Index<Series>(
         [\.tmdbId],
         [\.isFavorite],
@@ -23,7 +30,8 @@ final class Series {
         [\.recommendationVoteRaw],
         [\.categoryId],
         [\.genre],
-        [\.indexedAt]
+        [\.indexedAt],
+        [\.lastModified]
     )
 
     @Attribute(.unique) var id: String
@@ -53,7 +61,20 @@ final class Series {
     /// When the title was last enriched from TMDB; nil means never.
     var tmdbEnrichedAt: Date?
     /// TMDB ids of similar titles, in TMDB's order, for "You May Also Like".
-    var similarTMDBIds: [Int] = []
+    ///
+    /// Optional on purpose: a non-optional `[Int] = []` is not free — SwiftData
+    /// archives an empty array as a ~219-byte `bplist00` BLOB on every row that
+    /// was never enriched, which on a large provider catalog is tens of MB of
+    /// pure NSKeyedArchiver round trips written during the cold import. `nil`
+    /// means "never enriched" and costs nothing. `trailersData` and
+    /// `externalRatingsData` below are optional for the same reason — do not
+    /// "tidy" this back to a defaulted array.
+    ///
+    /// `nil` and `[]` mean the same thing and must be read as such: lightweight
+    /// migration leaves rows written by the previous schema holding their
+    /// archived empty array, so a pre-upgrade catalog reads `[]` where a freshly
+    /// imported one reads `nil`. Never use `nil` as a "never enriched" sentinel.
+    var similarTMDBIds: [Int]?
     /// Encoded `[TitleVideo]` blob. SwiftData reliably persists `Data`, whereas a
     /// stored `[TitleVideo]` attribute (a collection of a custom Codable struct)
     /// traps in `ModelCoders` at save time. Access through `trailers`.
@@ -84,6 +105,17 @@ final class Series {
 
     var categoryId: String?
     @Relationship(deleteRule: .cascade) var episodes: [Episode] = []
+
+    // MARK: Episode cache (Xtream / Stalker — lazy-fetched on the detail screen)
+
+    /// When this series' episode list was last pulled from the provider; nil
+    /// means never. Playlist sync doesn't touch episodes for the lazy pipelines,
+    /// so without a stamp a device that already cached a season would never see
+    /// a newly added episode. See `episodesAreStale(lastSyncedAt:)`.
+    var episodesFetchedAt: Date?
+    /// The provider's `lastModified` at the time of that fetch, so a bumped
+    /// value invalidates the cache immediately.
+    var episodesFetchedLastModified: String?
 
     var isFavorite: Bool = false
     /// A user-defined order for the unified Favorites collection, spanning movies,
@@ -138,6 +170,14 @@ final class Series {
 }
 
 extension Series {
+    /// TMDB ids of similar titles. `similarTMDBIds` stores `nil` for "none" —
+    /// an empty array still archives a BLOB per row — and reads back as `[]` on
+    /// rows the previous schema wrote, so both ends of that rule live here.
+    var similarTitleIds: [Int] {
+        get { similarTMDBIds ?? [] }
+        set { similarTMDBIds = newValue.isEmpty ? nil : newValue }
+    }
+
     /// YouTube videos (trailers, teasers, clips) from TMDB, in display order.
     /// Backed by `trailersData` so SwiftData persists it as a plain `Data` blob.
     var trailers: [TitleVideo] {
@@ -167,5 +207,24 @@ extension Series {
     var recommendationVote: RecommendationVote? {
         get { RecommendationVote(rawValue: recommendationVoteRaw) }
         set { recommendationVoteRaw = newValue?.rawValue ?? 0 }
+    }
+
+    /// Whether the lazily-fetched episode list should be pulled again.
+    ///
+    /// Xtream and Stalker episodes are fetched per-series on the detail screen
+    /// and are never swept by playlist sync, so a cached season would otherwise
+    /// stick forever — an episode the provider added shows up on whichever
+    /// device happened to open the series afterwards and stays missing on the
+    /// others. Sync is what reopens the question: a `lastModified` the provider
+    /// bumped is the exact signal, and a playlist that has synced since the
+    /// fetch covers portals that don't maintain the field.
+    ///
+    /// - Parameter lastSyncedAt: the owning playlist's `lastSyncDate`, stamped
+    ///   only when a sync finishes successfully.
+    func episodesAreStale(lastSyncedAt: Date?) -> Bool {
+        guard let episodesFetchedAt else { return true }
+        if episodesFetchedLastModified != lastModified { return true }
+        guard let lastSyncedAt else { return false }
+        return lastSyncedAt > episodesFetchedAt
     }
 }

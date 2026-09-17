@@ -155,8 +155,9 @@ extension CloudSyncEngine {
             stream.isHidden = false
         // `customOrder` is device-local (not projected per profile) — leave it.
         case let category as Category:
-            // `isRestricted` is a device-global parental control, not synced
-            // per-profile state — leave it untouched.
+            // `isRestricted` is a parental control, not per-profile state: it
+            // syncs on its own channel (`CloudSyncEngine+Parental`) and must
+            // survive a profile switch — leave it untouched.
             category.isHidden = false
             category.customOrder = nil
         default:

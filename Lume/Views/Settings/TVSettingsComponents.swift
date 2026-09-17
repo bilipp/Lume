@@ -21,10 +21,14 @@
         static let rowCornerRadius: CGFloat = 10
         static let labelFontSize: CGFloat = 18
         static let secondaryFontSize: CGFloat = 20
+        static let statusFontSize: CGFloat = 24
+        static let titleFontSize: CGFloat = 46
         static let contentMaxWidth: CGFloat = 760
         /// Width of the Settings detail pane content (sits next to the sidebar, so
         /// it gets a touch more room than the full-screen `contentMaxWidth`).
         static let detailMaxWidth: CGFloat = 860
+        /// Width of a secondary column sitting beside a `contentMaxWidth` one.
+        static let sideColumnWidth: CGFloat = 560
         static let background = Color(white: 0.09)
     }
 
@@ -32,6 +36,14 @@
         /// The flat dark fill shared by every tvOS settings surface.
         func tvSettingsBackground() -> some View {
             background(TVSettingsMetrics.background.ignoresSafeArea())
+        }
+
+        /// The quiet secondary line shared by the status and empty-state
+        /// messages, inset to line up with the row labels above it.
+        func tvSettingsSecondaryText() -> some View {
+            font(.system(size: TVSettingsMetrics.statusFontSize))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
         }
     }
 
@@ -129,6 +141,93 @@
                 .textContentType(contentType)
                 .autocorrectionDisabled()
             }
+        }
+    }
+
+    // MARK: - Reorderable row
+
+    /// One row of a reorderable tvOS settings list: caller-supplied leading
+    /// content, then up / down controls and an optional remove button. The row
+    /// is a full-width focus band — a narrow target wouldn't catch "down" from
+    /// the row above.
+    ///
+    /// `onMove` receives the offset (-1 / +1); `name` is only used for the
+    /// controls' VoiceOver labels.
+    struct TVSettingsReorderRow<Leading: View>: View {
+        private let name: String
+        private let index: Int
+        private let count: Int
+        private let onMove: (Int) -> Void
+        private let onRemove: (() -> Void)?
+        private let leading: Leading
+
+        init(
+            name: String,
+            index: Int,
+            count: Int,
+            onMove: @escaping (Int) -> Void,
+            onRemove: (() -> Void)? = nil,
+            @ViewBuilder leading: () -> Leading
+        ) {
+            self.name = name
+            self.index = index
+            self.count = count
+            self.onMove = onMove
+            self.onRemove = onRemove
+            self.leading = leading()
+        }
+
+        var body: some View {
+            HStack(spacing: 16) {
+                leading
+
+                Spacer(minLength: 0)
+
+                Button {
+                    onMove(-1)
+                } label: {
+                    Image(systemName: "chevron.up")
+                }
+                .buttonStyle(TVContentIconButtonStyle())
+                .disabled(index == 0)
+                .accessibilityLabel("Move \(name) up")
+
+                Button {
+                    onMove(1)
+                } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .buttonStyle(TVContentIconButtonStyle())
+                .disabled(index == count - 1)
+                .accessibilityLabel("Move \(name) down")
+
+                if let onRemove {
+                    Button(action: onRemove) {
+                        Image(systemName: "minus")
+                    }
+                    .buttonStyle(TVContentIconButtonStyle())
+                    .accessibilityLabel("Remove \(name)")
+                }
+            }
+            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            .padding(.vertical, TVSettingsMetrics.rowVPadding)
+            .background(
+                RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+            )
+        }
+    }
+
+    // MARK: - Reordering
+
+    extension Array {
+        /// Swaps the element at `index` with the one `offset` slots away,
+        /// reporting whether the move was in bounds.
+        mutating func move(at index: Int, by offset: Int) -> Bool {
+            let target = index + offset
+            guard indices.contains(index), indices.contains(target) else { return false }
+            swapAt(index, target)
+            return true
         }
     }
 

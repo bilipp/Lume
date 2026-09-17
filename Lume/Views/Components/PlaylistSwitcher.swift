@@ -19,15 +19,6 @@ enum PlaylistSelectionStore {
     static let key = "lume.selectedPlaylistID"
 }
 
-extension [Playlist] {
-    /// Resolves the stored selection to a concrete playlist, falling back to the
-    /// first available playlist when the stored id is empty or no longer exists
-    /// (e.g. the selected playlist was deleted).
-    func active(for storedID: String) -> Playlist? {
-        first(where: { $0.id.uuidString == storedID }) ?? first
-    }
-}
-
 // MARK: - Switcher
 
 /// Toolbar menu that switches the global active playlist. Drop one into any
@@ -99,7 +90,7 @@ struct PlaylistSwitcher: View {
     /// The id that is actually in effect, accounting for the empty-default /
     /// deleted-playlist fallback to the first playlist.
     private var effectiveID: String {
-        playlists.active(for: selectedPlaylistID)?.id.uuidString ?? ""
+        playlists.activeID(for: selectedPlaylistID)
     }
 
     private var effectiveName: String {

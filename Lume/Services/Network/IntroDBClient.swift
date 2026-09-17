@@ -4,8 +4,9 @@
 //
 //  Read-only client for IntroDB (https://introdb.app), which crowd-sources
 //  intro / recap / outro timestamps for TV episodes, keyed by the *series'*
-//  IMDb id plus season and episode. Used to offer an in-player "Skip Intro"
-//  button (see `PlayerSkipIntroOverlay`).
+//  IMDb id plus season and episode. The openers drive an in-player "Skip
+//  Intro" button (see `PlayerSkipIntroOverlay`); the outro sets when the Next
+//  Episode button arms (see `OutroTrigger` / `PlayerNextUpOverlay`).
 //
 //  IntroDB's read endpoint needs no authentication. The optional API key lives
 //  in the git-ignored `.env` file (INTRO_DB_API_KEY) and is injected into
@@ -96,10 +97,15 @@ nonisolated struct IntroDBClient {
 // MARK: - Domain model
 
 /// Intro / recap / outro timestamps for one episode, in seconds from the start.
-/// Only the openers (`intro`, `recap`) drive the in-player skip button today;
-/// `outro` is decoded for completeness but the end-of-episode affordance is
-/// owned by `PlayerNextUpOverlay`.
+/// The openers (`intro`, `recap`) drive the in-player skip button; `outro`
+/// feeds `OutroTrigger`, which sets when `PlayerNextUpOverlay` arms its Next
+/// Episode button. There is no separate "Skip Outro" affordance.
 nonisolated struct IntroSegments: Equatable {
+    /// Shortest window worth acting on, shared by every consumer of this data:
+    /// below it a "Skip Intro" button would flash for a one-second stinger and
+    /// an outro window is too small to be a credits roll.
+    static let minimumUsableDuration: TimeInterval = 5
+
     struct Segment: Equatable {
         let start: TimeInterval
         let end: TimeInterval

@@ -104,6 +104,10 @@ import SwiftUI
                         } onDelete: {
                             itemToDelete = DeletionTarget(id: movie.id, name: movie.name)
                         }
+                        .mediaFavoriteMenu(
+                            isFavorite: { movie.isFavorite },
+                            onToggleFavorite: { MediaFavorites.toggle(movie, in: modelContext) }
+                        )
                     }
                 }
             }
@@ -119,6 +123,7 @@ import SwiftUI
                         } onDelete: {
                             itemToDelete = DeletionTarget(id: episode.id, name: episode.title)
                         }
+                        .episodeFavoriteMenu(episode, in: modelContext)
                     }
                 }
             }

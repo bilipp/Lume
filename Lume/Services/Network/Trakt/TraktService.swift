@@ -107,7 +107,9 @@ final class TraktService {
 
             while !Task.isCancelled, Date() < deadline {
                 try await Task.sleep(for: .seconds(interval))
-                if Task.isCancelled { return }
+                if Task.isCancelled {
+                    return
+                }
 
                 do {
                     let response = try await client.pollForToken(deviceCode: code.deviceCode)
@@ -165,10 +167,13 @@ final class TraktService {
             try? await client.revokeToken(accessToken)
         }
         TraktTokenStore.clear()
+        // Parked watched state belongs to the account that was just signed out.
+        TraktPendingWatchedStore.clearAll()
         tokens = nil
         username = nil
         pendingCode = nil
         isConnecting = false
+        lastImport = nil
     }
 
     // MARK: - Watched sync (fire-and-forget)
@@ -251,9 +256,13 @@ final class TraktService {
     /// concurrent refreshes into a single request.
     private func validAccessToken() async -> String? {
         guard let current = tokens else { return nil }
-        if !current.needsRefresh { return current.accessToken }
+        if !current.needsRefresh {
+            return current.accessToken
+        }
 
-        if let refreshTask { return await refreshTask.value }
+        if let refreshTask {
+            return await refreshTask.value
+        }
 
         let task = Task { [weak self] () -> String? in
             guard let self else { return nil }

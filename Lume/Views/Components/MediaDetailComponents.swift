@@ -9,6 +9,7 @@
 //  SeriesDetailView compose these so the two screens stay visually identical.
 //
 
+import SwiftData
 import SwiftUI
 
 extension View {
@@ -19,6 +20,19 @@ extension View {
         } else {
             self
         }
+    }
+
+    /// Morphs between the two SF Symbols of a toggle (favorite, watched) instead of
+    /// hard-cutting when `value` flips.
+    ///
+    /// `contentTransition` only animates inside a transaction that carries an
+    /// animation. The toggle actions mutate their SwiftData model directly rather
+    /// than through `withAnimation` — deliberately, since wrapping a model mutation
+    /// would animate every view observing it — so the scoped `.animation` supplies
+    /// the transaction here instead.
+    func symbolReplaceTransition(value: some Equatable) -> some View {
+        contentTransition(.symbolEffect(.replace))
+            .animation(.smooth(duration: 0.25), value: value)
     }
 }
 
@@ -248,6 +262,9 @@ struct GlassIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
+                // Toggle callers (favorite, watched, download) swap their glyph in
+                // place; constant-symbol callers such as Back are unaffected.
+                .symbolReplaceTransition(value: systemImage)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
@@ -335,26 +352,31 @@ struct SimilarRow: View {
     let items: [HomeMediaItem]
     var animationNamespace: Namespace.ID?
 
+    @Environment(\.modelContext) private var modelContext
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
                 ForEach(items) { item in
-                    switch item {
-                    case let .movie(movie):
-                        NavigationLink(value: movie) {
-                            DetailPosterCard(title: item.title, imageURL: item.imageURL)
-                                .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
+                    Group {
+                        switch item {
+                        case let .movie(movie):
+                            NavigationLink(value: movie) {
+                                DetailPosterCard(title: item.title, imageURL: item.imageURL)
+                                    .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
+                            }
+                            .buttonStyle(.plain)
+                        case let .series(series):
+                            NavigationLink(value: series) {
+                                DetailPosterCard(title: item.title, imageURL: item.imageURL)
+                                    .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
+                            }
+                            .buttonStyle(.plain)
+                        case .live:
+                            EmptyView()
                         }
-                        .buttonStyle(.plain)
-                    case let .series(series):
-                        NavigationLink(value: series) {
-                            DetailPosterCard(title: item.title, imageURL: item.imageURL)
-                                .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
-                        }
-                        .buttonStyle(.plain)
-                    case .live:
-                        EmptyView()
                     }
+                    .mediaFavoriteMenu(item, in: modelContext)
                 }
             }
             .padding(.horizontal, DetailMetrics.contentPadding)
@@ -545,6 +567,7 @@ enum DetailFormat {
     let movie1 = Movie(id: "preview-sim-1", streamId: 1, name: "Similar Movie 1")
     let movie2 = Movie(id: "preview-sim-2", streamId: 2, name: "Similar Movie 2")
     SimilarRow(items: [.movie(movie1), .movie(movie2)])
+        .modelContainer(previewContainer())
 }
 
 #Preview("DetailPosterCard") {

@@ -55,7 +55,8 @@ struct RecommendationEngineTests {
         vector: [Float],
         favorite: Bool = false,
         watched: Bool = false,
-        vote: RecommendationVote? = nil
+        vote: RecommendationVote? = nil,
+        category: String? = nil
     ) {
         let movie = Movie(id: id, streamId: 1, name: id)
         movie.embeddingData = TextEmbedder.encode(vector)
@@ -63,6 +64,7 @@ struct RecommendationEngineTests {
         movie.isFavorite = favorite
         movie.isWatched = watched
         movie.recommendationVote = vote
+        movie.categoryId = category
         container.mainContext.insert(movie)
     }
 
@@ -172,5 +174,52 @@ struct RecommendationEngineTests {
         // A zero interval forces a fresh rank every call, so the new title wins.
         let second = await makeEngine(container, cacheStore: store, interval: 0).recommendations().map(\.id)
         #expect(second.first == "closer")
+    }
+
+    // MARK: - Content Management visibility
+
+    @Test func `candidates in an excluded category are never ranked`() async throws {
+        let container = try makeTestContainer()
+        makeMovie(container, id: "liked", vector: [1, 0, 0, 0], favorite: true, category: "en")
+        makeMovie(container, id: "hidden-closer", vector: [0.99, 0.01, 0, 0], category: "nl")
+        makeMovie(container, id: "visible", vector: [0.9, 0.1, 0, 0], category: "en")
+        try container.mainContext.save()
+
+        let ids = await makeEngine(container).recommendations(excluding: ["nl"]).map(\.id)
+        #expect(!ids.contains("hidden-closer"))
+        #expect(ids.first == "visible")
+    }
+
+    @Test func `changing the excluded set invalidates the cached list`() async throws {
+        let container = try makeTestContainer()
+        makeMovie(container, id: "liked", vector: [1, 0, 0, 0], favorite: true, category: "en")
+        makeMovie(container, id: "dutch", vector: [0.9, 0.1, 0, 0], category: "nl")
+        try container.mainContext.save()
+
+        let store = isolatedStore()
+        let hidden = await makeEngine(container, cacheStore: store).recommendations(excluding: ["nl"]).map(\.id)
+        #expect(!hidden.contains("dutch"))
+
+        // Un-hiding must not wait out the (day-long) recalculation interval.
+        let shown = await makeEngine(container, cacheStore: store).recommendations().map(\.id)
+        #expect(shown.contains("dutch"))
+    }
+
+    @Test func `a cache written before visibility tracking is recomputed`() throws {
+        let legacy = Data(#"{"computedAt": 0, "items": [{"id": "a", "kind": "movie"}]}"#.utf8)
+        let decoded = try JSONDecoder().decode(RecommendationCache.self, from: legacy)
+        #expect(decoded.visibilityToken == nil)
+        #expect(decoded.visibilityToken != ContentRestriction.visibilityToken(for: []))
+    }
+
+    @Test func `the visibility token is order independent and set specific`() {
+        #expect(
+            ContentRestriction.visibilityToken(for: ["a", "b"])
+                == ContentRestriction.visibilityToken(for: ["b", "a"])
+        )
+        #expect(
+            ContentRestriction.visibilityToken(for: ["a"])
+                != ContentRestriction.visibilityToken(for: ["a", "b"])
+        )
     }
 }

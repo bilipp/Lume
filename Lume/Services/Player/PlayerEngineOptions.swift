@@ -174,6 +174,55 @@ enum KSMaxBufferPreset {
 
 // MARK: - Lume Engine choices
 
+/// When the Lume Engine runs its deinterlacer. Unlike VLCKit's toggle, leaving
+/// this on costs nothing for progressive streams and does not give up hardware
+/// decoding for interlaced ones — the engine downloads VideoToolbox frames and
+/// filters them, rather than falling back to a software decoder.
+enum LumeDeinterlaceMode: String, CaseIterable, Identifiable {
+    /// Show fields woven, as the stream carries them.
+    case off
+    /// Filter once the decoder reports interlaced frames.
+    case auto
+    /// Filter regardless of what the stream claims — for IPTV transcoders that
+    /// ship interlaced content without flagging it.
+    case always
+
+    static let defaultValue: LumeDeinterlaceMode = .auto
+
+    var id: String {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .off: String(localized: "Off")
+        case .auto: String(localized: "Automatic")
+        case .always: String(localized: "Always")
+        }
+    }
+}
+
+/// How many frames the Lume Engine's deinterlacer emits per interlaced frame.
+enum LumeDeinterlaceRate: String, CaseIterable, Identifiable {
+    /// One frame per field: 1080i50 becomes 1080p50.
+    case field
+    /// One frame per input frame: 1080i50 becomes 1080p25.
+    case frame
+
+    static let defaultValue: LumeDeinterlaceRate = .field
+
+    var id: String {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .field: String(localized: "Doubled")
+        case .frame: String(localized: "Original")
+        }
+    }
+}
+
 /// Buffer-target presets (milliseconds of decoded media held before playback
 /// starts or resumes) offered for the Lume Engine's live and on-demand streams.
 enum LumeBufferPreset {
@@ -382,6 +431,8 @@ struct KSPlayerOptions {
 /// builds its `PlayerConfiguration`.
 struct LumeEngineOptions {
     var hardwareDecode: Bool
+    var deinterlaceMode: LumeDeinterlaceMode
+    var deinterlaceRate: LumeDeinterlaceRate
     var httpReconnect: Bool
     /// Buffer targets before starting/resuming playback, in milliseconds.
     var liveBuffer: Int
@@ -401,8 +452,12 @@ struct LumeEngineOptions {
         let ioTimeout = LumeIOTimeout(rawValue: defaults.integer(PlayerSettings.Lume.ioTimeoutKey, default: LumeIOTimeout.defaultValue.rawValue)) ?? .defaultValue
         let probeSize = LumeProbeSize(rawValue: defaults.integer(PlayerSettings.Lume.probeSizeKey, default: LumeProbeSize.auto.rawValue)) ?? .auto
         let analyzeDuration = LumeAnalyzeDuration(rawValue: defaults.integer(PlayerSettings.Lume.analyzeDurationKey, default: LumeAnalyzeDuration.auto.rawValue)) ?? .auto
+        let deinterlaceMode = LumeDeinterlaceMode(rawValue: defaults.string(forKey: PlayerSettings.Lume.deinterlaceModeKey) ?? "") ?? .defaultValue
+        let deinterlaceRate = LumeDeinterlaceRate(rawValue: defaults.string(forKey: PlayerSettings.Lume.deinterlaceRateKey) ?? "") ?? .defaultValue
         return LumeEngineOptions(
             hardwareDecode: defaults.bool(PlayerSettings.Lume.hardwareDecodeKey, default: PlayerSettings.Lume.hardwareDecodeDefault),
+            deinterlaceMode: deinterlaceMode,
+            deinterlaceRate: deinterlaceRate,
             httpReconnect: defaults.bool(PlayerSettings.Lume.httpReconnectKey, default: PlayerSettings.Lume.httpReconnectDefault),
             liveBuffer: defaults.integer(PlayerSettings.Lume.liveBufferKey, default: PlayerSettings.Lume.liveBufferDefault),
             vodBuffer: defaults.integer(PlayerSettings.Lume.vodBufferKey, default: PlayerSettings.Lume.vodBufferDefault),
@@ -412,6 +467,31 @@ struct LumeEngineOptions {
             ioTimeout: ioTimeout.optionValue,
             probeSize: probeSize.optionValue,
             analyzeDuration: analyzeDuration.optionValue
+        )
+    }
+}
+
+// MARK: - Preferred track languages
+
+/// A point-in-time read of the engine-independent preferred audio languages,
+/// taken when a stream is configured (the preference is deliberately not
+/// re-read mid-session). An empty list means no preference, and every engine
+/// then leaves track selection exactly as the container asks for it.
+nonisolated struct PlayerLanguageOptions {
+    /// Bare `de`-style codes, normalized on load: `AVMediaSelectionGroup`'s
+    /// preferred-language filter and LumeEngine's `PlayerConfiguration` both
+    /// need real language identifiers rather than something to match on, and
+    /// `TrackLanguageMatcher` normalizes its own input anyway. Entries that
+    /// name no single language are dropped.
+    var preferredAudioLanguages: [String]
+
+    static func load(from defaults: UserDefaults = .standard) -> PlayerLanguageOptions {
+        let stored = PreferredLanguageList.decode(
+            defaults.string(forKey: PlayerSettings.Language.preferredAudioLanguagesKey)
+                ?? PlayerSettings.Language.preferredAudioLanguagesDefault
+        )
+        return PlayerLanguageOptions(
+            preferredAudioLanguages: PreferredLanguageList.normalized(stored.compactMap(TrackLanguageMatcher.normalize))
         )
     }
 }

@@ -18,25 +18,29 @@ private func writeTempPlaylist(_ content: String) throws -> URL {
     return url
 }
 
-private func parseAll(_ content: String, batchSize: Int = 2000) throws -> (entries: [M3UEntry], header: M3UHeader?) {
+private func parseAll(
+    _ content: String, batchSize: Int = 2000
+) async throws -> (entries: [M3UEntry], header: M3UHeader?) {
     let url = try writeTempPlaylist(content)
     defer { try? FileManager.default.removeItem(at: url) }
     var entries: [M3UEntry] = []
     var header: M3UHeader?
-    try M3UParser.parse(fileURL: url, batchSize: batchSize) { header = $0 } onBatch: { entries.append(contentsOf: $0) }
+    try await M3UParser.parseStreaming(fileURL: url, batchSize: batchSize) { header = $0 } onBatch: { batch, _ in
+        entries.append(contentsOf: batch)
+    }
     return (entries, header)
 }
 
 // MARK: - Parser
 
 struct M3UParserTests {
-    @Test func `parses attributes, group and name`() throws {
+    @Test func `parses attributes, group and name`() async throws {
         let playlist = """
         #EXTM3U url-tvg="http://example.com/guide.xml"
         #EXTINF:-1 tvg-id="chan.1" tvg-name="Channel One" tvg-logo="http://example.com/1.png" group-title="News",Channel One HD
         http://example.com/live/1.ts
         """
-        let (entries, header) = try parseAll(playlist)
+        let (entries, header) = try await parseAll(playlist)
 
         #expect(header?.epgURL == "http://example.com/guide.xml")
         #expect(entries.count == 1)
@@ -48,47 +52,47 @@ struct M3UParserTests {
         #expect(entry.url == "http://example.com/live/1.ts")
     }
 
-    @Test func `attribute values may contain commas`() throws {
+    @Test func `attribute values may contain commas`() async throws {
         let playlist = """
         #EXTM3U
         #EXTINF:-1 group-title="News, Politics & More",The Channel
         http://example.com/live/2.ts
         """
-        let entries = try parseAll(playlist).entries
+        let entries = try await parseAll(playlist).entries
         #expect(entries.first?.group == "News, Politics & More")
         #expect(entries.first?.name == "The Channel")
     }
 
-    @Test func `handles CRLF line endings`() throws {
+    @Test func `handles CRLF line endings`() async throws {
         let playlist = "#EXTM3U\r\n#EXTINF:-1 tvg-id=\"a\",Chan A\r\nhttp://example.com/a.ts\r\n"
-        let entries = try parseAll(playlist).entries
+        let entries = try await parseAll(playlist).entries
         #expect(entries.count == 1)
         #expect(entries.first?.name == "Chan A")
         #expect(entries.first?.url == "http://example.com/a.ts")
     }
 
-    @Test func `EXTGRP supplies the group when group-title is missing`() throws {
+    @Test func `EXTGRP supplies the group when group-title is missing`() async throws {
         let playlist = """
         #EXTM3U
         #EXTINF:-1,Chan B
         #EXTGRP:Sports
         http://example.com/b.ts
         """
-        let entries = try parseAll(playlist).entries
+        let entries = try await parseAll(playlist).entries
         #expect(entries.first?.group == "Sports")
     }
 
-    @Test func `plain m3u of bare URLs yields entries`() throws {
+    @Test func `plain m3u of bare URLs yields entries`() async throws {
         let playlist = """
         http://example.com/streams/first.ts
         http://example.com/streams/second.ts
         """
-        let entries = try parseAll(playlist).entries
+        let entries = try await parseAll(playlist).entries
         #expect(entries.count == 2)
         #expect(entries.first?.name == "first")
     }
 
-    @Test func `skips unknown directives and blank lines`() throws {
+    @Test func `skips unknown directives and blank lines`() async throws {
         let playlist = """
         #EXTM3U
         #EXTINF:-1,Chan C
@@ -97,24 +101,24 @@ struct M3UParserTests {
         #KODIPROP:inputstream=adaptive
         http://example.com/c.m3u8
         """
-        let entries = try parseAll(playlist).entries
+        let entries = try await parseAll(playlist).entries
         #expect(entries.count == 1)
         #expect(entries.first?.url == "http://example.com/c.m3u8")
     }
 
-    @Test func `falls back to tvg-name when display name is missing`() throws {
+    @Test func `falls back to tvg-name when display name is missing`() async throws {
         let playlist = """
         #EXTM3U
         #EXTINF:-1 tvg-name="Named via tvg",
         http://example.com/d.ts
         """
-        let entries = try parseAll(playlist).entries
+        let entries = try await parseAll(playlist).entries
         #expect(entries.first?.name == "Named via tvg")
     }
 
     /// Exercises the chunked reader's carry logic: the file is much larger
     /// than one 512 KB read, so lines straddle chunk boundaries.
-    @Test func `parses a large playlist across chunk boundaries`() throws {
+    @Test func `parses a large playlist across chunk boundaries`() async throws {
         var content = "#EXTM3U\n"
         let count = 30000
         for index in 0 ..< count {
@@ -127,7 +131,7 @@ struct M3UParserTests {
         var total = 0
         var firstEntry: M3UEntry?
         var lastEntry: M3UEntry?
-        let returned = try M3UParser.parse(fileURL: url, batchSize: 2000) { batch in
+        let returned = try await M3UParser.parseStreaming(fileURL: url, batchSize: 2000) { batch, _ in
             if firstEntry == nil { firstEntry = batch.first }
             lastEntry = batch.last
             total += batch.count
@@ -138,6 +142,32 @@ struct M3UParserTests {
         #expect(firstEntry?.name == "Channel 0")
         #expect(lastEntry?.name == "Channel \(count - 1)")
         #expect(lastEntry?.url == "http://example.com/live/\(count - 1).ts")
+    }
+
+    /// The byte offset handed to `onBatch` is what the importer turns into a
+    /// progress fraction, so it has to grow monotonically and stay inside the
+    /// file it is measured against.
+    @Test func `reports bytes consumed with every batch`() async throws {
+        var content = "#EXTM3U\n"
+        let count = 12000
+        for index in 0 ..< count {
+            content += "#EXTINF:-1 group-title=\"Group \(index % 25)\",Channel \(index)\n"
+            content += "http://example.com/live/\(index).ts\n"
+        }
+        let url = try writeTempPlaylist(content)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let fileSize = try #require((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize)
+
+        var offsets: [Int] = []
+        try await M3UParser.parseStreaming(fileURL: url, batchSize: 2000) { _, bytesConsumed in
+            offsets.append(bytesConsumed)
+        }
+
+        #expect(offsets.count == count / 2000)
+        #expect(offsets.first ?? 0 > 0)
+        #expect(offsets == offsets.sorted())
+        #expect((offsets.last ?? 0) <= fileSize + 1)
+        #expect(Double(offsets.last ?? 0) / Double(fileSize) > 0.9)
     }
 }
 
@@ -212,6 +242,30 @@ struct M3UClassifierTests {
         #expect(M3UClassifier.classify(entry(name: "Some Special", url: "http://example.com/series/u/p/7.mp4")) == .movie)
     }
 
+    @Test func `episode titles match the shared cleaner`() {
+        // The import path takes the episode title from the classifier's own
+        // token match instead of re-running the pattern via
+        // `cleanEpisodeTitle`; the two must stay byte-identical.
+        let names = [
+            "Dark S02E05",
+            "Breaking Bad S05E16 Felina",
+            "The Wire - S01 E03 - The Buys",
+            "Dark 2x05",
+            "S01E01 Pilot",
+            "Breaking Bad - S05E16",
+            "Show: S01E02: Episode Name",
+            "Serie S01E01 Pokémon"
+        ]
+        for name in names {
+            #expect(M3UClassifier.episodeInfo(in: name)?.title == ContentSyncManager.cleanEpisodeTitle(name))
+        }
+
+        // Shapes that are not episodes at all have no title to compare.
+        #expect(M3UClassifier.episodeInfo(in: "Foo TV 640x480") == nil)
+        #expect(M3UClassifier.episodeInfo(in: "Bar 640x480") == nil)
+        #expect(M3UClassifier.episodeInfo(in: "Some Special") == nil)
+    }
+
     @Test func `pathExtension ignores query and fragment`() {
         #expect(M3UClassifier.pathExtension(of: "http://e.com/a/b.mp4?t=1.x#f") == "mp4")
         #expect(M3UClassifier.pathExtension(of: "http://e.com/a/b") == nil)
@@ -272,5 +326,37 @@ struct M3UClientValidationTests {
         let plain = "http://host/playlist.m3u?type=gigablue"
         #expect(M3UClient.normalizedPlaylistURL(plain) == plain)
         #expect(M3UClient.normalizedPlaylistURL("not a url") == "not a url")
+    }
+
+    @Test func `reads the xtream account out of a get.php url`() {
+        let hint = M3UClient.xtreamCredentials(
+            in: "http://host:8080/get.php?username=alice&password=s3cret&type=m3u_plus&output=ts"
+        )
+        #expect(hint?.baseURL == "http://host:8080")
+        #expect(hint?.username == "alice")
+        #expect(hint?.password == "s3cret")
+        // The default port is not spelled out, and a nested path still counts.
+        #expect(M3UClient.xtreamCredentials(in: "https://host/panel/get.php?username=a&password=b")?
+            .baseURL == "https://host")
+    }
+
+    @Test func `a get.php url without credentials is not an xtream hint`() {
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?type=m3u_plus") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?username=alice") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?password=s3cret") == nil)
+        // Present but empty is not an account we could offer to add.
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?username=&password=s3cret") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "http://host/get.php?username=alice&password=") == nil)
+    }
+
+    @Test func `a plain m3u file url is not an xtream hint`() {
+        #expect(M3UClient.xtreamCredentials(in: "http://host/playlist.m3u?username=a&password=b") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "file:///tmp/playlist.m3u") == nil)
+    }
+
+    @Test func `a non get.php http url is not an xtream hint`() {
+        #expect(M3UClient.xtreamCredentials(in: "http://host/player_api.php?username=a&password=b") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "http://host/") == nil)
+        #expect(M3UClient.xtreamCredentials(in: "not a url") == nil)
     }
 }

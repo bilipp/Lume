@@ -1,5 +1,6 @@
 import Foundation
 @testable import Lume
+import SwiftData
 import Testing
 
 struct ContentSyncManagerLogicTests {
@@ -68,6 +69,79 @@ struct ContentSyncManagerLogicTests {
     @Test func `clean title preserves non ASCII`() {
         let result = ContentSyncManager.cleanEpisodeTitle("Serie S01E01 Pokémon")
         #expect(result == "Pokémon")
+    }
+
+    // MARK: - Inter-phase request spacing
+
+    @Test func `no previous request needs no spacing`() {
+        #expect(ContentSyncManager.outstandingPhaseSpacing(since: nil) == .zero)
+    }
+
+    @Test func `a phase that took longer than the spacing waits not at all`() {
+        let now = ContinuousClock.now
+        let remaining = ContentSyncManager.outstandingPhaseSpacing(
+            since: now - .seconds(45),
+            now: now
+        )
+        #expect(remaining == .zero)
+    }
+
+    @Test func `a fast phase waits only the outstanding remainder`() {
+        let now = ContinuousClock.now
+        let remaining = ContentSyncManager.outstandingPhaseSpacing(
+            since: now - .milliseconds(500),
+            now: now
+        )
+        #expect(remaining == .milliseconds(1500))
+    }
+
+    @Test func `spacing never exceeds the configured gap`() {
+        let now = ContinuousClock.now
+        let remaining = ContentSyncManager.outstandingPhaseSpacing(
+            since: now + .seconds(30),
+            now: now
+        )
+        #expect(remaining == ContentSyncManager.contentPhaseRequestSpacing)
+    }
+
+    @Test func `a phase exactly at the spacing boundary waits not at all`() {
+        let now = ContinuousClock.now
+        let remaining = ContentSyncManager.outstandingPhaseSpacing(
+            since: now - ContentSyncManager.contentPhaseRequestSpacing,
+            now: now
+        )
+        #expect(remaining == .zero)
+    }
+
+    // MARK: - historyPurgeIsSafe
+
+    @Test func `history purge refuses the CloudKit mirror configuration`() throws {
+        let schema = Schema([
+            SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
+            SyncedParentalPIN.self, SyncedCategoryRestriction.self
+        ])
+        let mirror = ModelConfiguration(
+            ContentSyncManager.cloudMirrorConfigurationName,
+            schema: schema,
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
+        )
+        let container = try ModelContainer(for: schema, configurations: mirror)
+        #expect(ContentSyncManager.historyPurgeIsSafe(for: container.configurations) == false)
+    }
+
+    @Test func `history purge allows the local catalog configuration`() throws {
+        let schema = Schema([
+            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
+            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
+        ])
+        let catalog = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
+        )
+        let container = try ModelContainer(for: schema, configurations: catalog)
+        #expect(ContentSyncManager.historyPurgeIsSafe(for: container.configurations))
     }
 
     // MARK: - SyncStatus

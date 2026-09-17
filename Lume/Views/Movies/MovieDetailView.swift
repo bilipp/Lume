@@ -303,7 +303,7 @@ struct MovieDetailView: View {
     }
 
     private func resolveSimilar() {
-        let ids = movie.similarTMDBIds
+        let ids = movie.similarTitleIds
         guard !ids.isEmpty else { similar = []; return }
 
         // Scope to the same playlist this movie belongs to.
@@ -376,7 +376,7 @@ struct MovieDetailView: View {
               let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif
@@ -392,8 +392,7 @@ struct MovieDetailView: View {
     }
 
     private func toggleFavorite() {
-        movie.isFavorite.toggle()
-        movie.addedToWatchlistDate = movie.isFavorite ? Date() : nil
+        MediaFavorites.toggle(movie, in: modelContext)
     }
 
     private func toggleWatched() {
@@ -445,6 +444,7 @@ struct MovieDetailView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button { toggleWatched() } label: {
                         Image(systemName: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
+                            .symbolReplaceTransition(value: movie.isWatched)
                     }
                     .help(movie.isWatched ? "Mark as Unwatched" : "Mark as Watched")
                 }
@@ -452,6 +452,7 @@ struct MovieDetailView: View {
                     Button { toggleFavorite() } label: {
                         Image(systemName: movie.isFavorite ? "heart.fill" : "heart")
                             .foregroundStyle(movie.isFavorite ? .red : .primary)
+                            .symbolReplaceTransition(value: movie.isFavorite)
                     }
                     .help(movie.isFavorite ? "Remove from Favorites" : "Add to Favorites")
                 }

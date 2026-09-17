@@ -10,6 +10,7 @@
 
 #if !os(tvOS)
 
+    import SwiftData
     import SwiftUI
 
     struct TraktIntegrationView: View {
@@ -34,7 +35,9 @@
             .paywall(isPresented: $showPaywall, highlight: .trakt)
             .onDisappear {
                 // Stop polling if the user backs out mid-connect.
-                if !trakt.isConnected { trakt.cancelConnect() }
+                if !trakt.isConnected {
+                    trakt.cancelConnect()
+                }
             }
         }
 
@@ -167,8 +170,13 @@
                 Text("Your watched history is already up to date.")
                     .foregroundStyle(.green)
             } else {
-                Text("Imported \(summary.moviesMarked) movie\(summary.moviesMarked == 1 ? "" : "s") and \(summary.episodesMarked) episode\(summary.episodesMarked == 1 ? "" : "s").")
-                    .foregroundStyle(.green)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Imported \(summary.moviesMarked) movie\(summary.moviesMarked == 1 ? "" : "s") and \(summary.episodesMarked) episode\(summary.episodesMarked == 1 ? "" : "s").")
+                    if summary.showsQueued > 0 {
+                        Text("\(summary.showsQueued) show\(summary.showsQueued == 1 ? "" : "s") will be marked the first time you open them.")
+                    }
+                }
+                .foregroundStyle(.green)
             }
         }
     }

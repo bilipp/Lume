@@ -18,9 +18,11 @@ struct MainTabView: View {
     @Environment(PlaylistSwitchModel.self) private var playlistSwitch: PlaylistSwitchModel?
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Query private var playlists: [Playlist]
-    /// Categories marked restricted. Fetched once here so a single source feeds
-    /// the restriction context every content surface reads from the environment.
+    /// Categories marked restricted, and categories hidden in Content
+    /// Management. Fetched once here so a single source feeds the restriction
+    /// context every content surface reads from the environment.
     @Query(filter: #Predicate<Category> { $0.isRestricted }) private var restrictedCategories: [Category]
+    @Query(filter: #Predicate<Category> { $0.isHidden }) private var hiddenCategories: [Category]
 
     @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
@@ -32,6 +34,17 @@ struct MainTabView: View {
     /// Playback launched from a `lume://play/...` deep link (widgets, Top Shelf).
     /// Presented here — not in HomeView — because the link can arrive on any tab.
     @State private var playingMedia: PlayableMedia?
+
+    /// The stream a `lume://resume` deep link (a Live Activity tap) asked to
+    /// reopen. Presented directly here, independent of any tab's own player
+    /// cover.
+    @State private var resumeMedia: PlayableMedia?
+
+    /// Whether a `lume://downloads` deep link (a download Live Activity tap)
+    /// asked for the downloads list. Presented as a sheet from here rather than
+    /// pushed into Settings, so the link doesn't disturb whatever the user had
+    /// open.
+    @State private var showsDownloads = false
 
     /// Playlists waiting to be auto-synced, and the one currently shown in the
     /// blocking progress cover. Auto-sync is presented (not silent) so the user
@@ -45,6 +58,9 @@ struct MainTabView: View {
     /// that's already been handled.
     @State private var autoSyncAttempted: Set<UUID> = []
 
+    /// Memo behind `contentRestriction` — see `ContentRestrictionMemo`.
+    @State private var restrictionMemo = ContentRestrictionMemo()
+
     private var syncFrequency: SyncFrequency {
         SyncFrequency.resolve(syncFrequencyRaw)
     }
@@ -55,33 +71,80 @@ struct MainTabView: View {
         CommandLine.arguments.contains("-ui-testing")
     }
 
-    /// Hides restricted categories (and their content) from every browse, Home
-    /// and Search surface while a child profile is active.
+    /// Whether the browse UI is covered, or the user is somewhere a rating
+    /// sheet has no business appearing — the sync cover, the downloads sheet, or
+    /// a playlist / profile switch. Players, paywalls and Settings are not
+    /// listed: every one of them reports itself, and `appStoreReviewPrompt`
+    /// already holds the fire while any is on screen. Settings has to, because
+    /// on every platform that shows the prompt it is a sheet on the library
+    /// toolbar rather than a tab, and so invisible to this root.
+    private var hasBlockingPresentation: Bool {
+        activeSyncPlaylist != nil
+            || showsDownloads
+            || playlistSwitch?.isSwitching == true
+            || profileManager?.isSwitching == true
+    }
+
+    /// Hides categories (and their content) from every browse, Home and Search
+    /// surface: the ones hidden in Content Management always, the restricted
+    /// ones while a child profile is active.
+    ///
+    /// Routed through a memo: this root's body re-evaluates whenever any catalog
+    /// write moves one of its `@Query`s, and constructing a `ContentRestriction`
+    /// digests every excluded id — 433 of them on a real hidden-category set.
+    /// The two id sets are cheap to rebuild and compare; the digest is not.
     private var contentRestriction: ContentRestriction {
-        ContentRestriction(
+        restrictionMemo.restriction(
             isActive: profileManager?.activeProfileIsChild ?? false,
-            restrictedCategoryIDs: Set(restrictedCategories.map(\.id))
+            restricted: Set(restrictedCategories.map(\.id)),
+            hidden: Set(hiddenCategories.map(\.id))
         )
     }
 
     var body: some View {
         @Bindable var router = router
         return tabView(selection: $router.selectedTab)
+        #if os(tvOS)
+            .disabled(blockingOverlayOwnsScreen || router.isQuickSwitchPresented)
+            // Attached OUTSIDE `.disabled` so the same button closes the modal it
+            // opened, and above the tabs but below every player: the engines are
+            // presented as `fullScreenCover`s from inside a tab, so their own
+            // `onPlayPauseCommand` sits above this one in the focused chain and is
+            // never shadowed. The guard covers the plain overlays instead, which
+            // tvOS focus reaches straight through.
+            .onPlayPauseCommand {
+                guard playPauseTogglesQuickSwitch else { return }
+                router.isQuickSwitchPresented.toggle()
+            }
+        #endif
             .environment(router)
             .environment(\.contentRestriction, contentRestriction)
+            // A tab switch is the one browse interaction that has no scroll
+            // view of its own to stamp from, and it is the moment a merge is
+            // most expensive — the incoming tab is re-running its queries.
+            .onChange(of: router.selectedTab) {
+                ContentIndexingService.shared.noteUserInteraction()
+            }
         #if os(iOS)
             .tabBarMinimizeOnScrollDownIfAvailable()
         #endif
             .onOpenURL { url in
                 handleDeepLink(url)
             }
+        #if !os(macOS)
+            .fullScreenCover(item: $resumeMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
+        #endif
             .task(id: playlists.count) {
                 // On launch (and whenever a playlist is added) sync any playlist that
                 // is due per the configured frequency.
                 enqueueDueSyncs(playlists)
             }
             .onChange(of: selectedPlaylistID) {
-                // On playlist switch, sync the newly selected one if it's due.
+                // On playlist switch, sync the newly selected one if it's due —
+                // unless the switch asked to land in the cached catalog instead.
+                guard playlistSwitch?.consumeDeferredDueSync() != true else { return }
                 if let playlist = playlists.active(for: selectedPlaylistID) {
                     enqueueDueSyncs([playlist])
                 }
@@ -99,16 +162,46 @@ struct MainTabView: View {
             }
         #endif
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
-            .overlay {
-                if playlistSwitch?.isSwitching == true {
-                    PlaylistSwitchOverlay(playlistName: playlistSwitch?.targetName ?? "")
-                        .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: playlistSwitch?.isSwitching)
+            .downloadsSheet(isPresented: $showsDownloads)
+            .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
+            // The one fire point for the rating sheet. Here rather than at the
+            // eleven player presentation sites: this view is the browse root,
+            // so reaching it *is* the "player gone, nothing over it" condition.
+            .appStoreReviewPrompt(isBlocked: hasBlockingPresentation)
+        #if os(tvOS)
+            .overlay { tvOverlays }
+        #endif
     }
 
     #if os(tvOS)
+        /// The plain overlays layered over the tabs. One always-mounted container,
+        /// so the fade is a transaction over this layer instead of over every
+        /// animatable attribute in every live tab.
+        private var tvOverlays: some View {
+            ZStack {
+                if let launch = router.multiViewLaunch {
+                    MultiViewScreen(
+                        seed: launch.seed,
+                        onClose: { router.multiViewLaunch = nil }
+                    )
+                    // A launch's own id, so a grid started from a channel is a
+                    // new view rather than the previous one re-rendered — which
+                    // would keep the earlier session and drop the seed.
+                    .id(launch.id)
+                    .transition(.opacity)
+                }
+
+                if router.isQuickSwitchPresented {
+                    // Built only while presented: a permanently mounted list of
+                    // focusable rows would regrow the focus/AX responder walk
+                    // that `activeOnly(_:selection:)` exists to contain.
+                    TVQuickSwitchOverlay(router: router, playlists: playlists)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: router.isQuickSwitchPresented)
+        }
+
         private func tabView(selection: Binding<AppTab>) -> some View {
             TabView(selection: selection) {
                 Tab(value: AppTab.search) {
@@ -149,6 +242,29 @@ struct MainTabView: View {
             }
         }
 
+        /// Whether something layered over the tabs owns the screen: tvOS focus is
+        /// not clipped by z-order, so the tab bar and the cards behind a plain
+        /// overlay would still take presses. The playlist switch is deliberately
+        /// absent — it settles in under half a second, and disabling the tabs for
+        /// it would move focus and hand it back somewhere else.
+        private var blockingOverlayOwnsScreen: Bool {
+            router.isMultiViewPresented
+                || activeSyncPlaylist != nil
+                || profileManager?.isSwitching == true
+        }
+
+        /// Whether Play/Pause may toggle the quick-switch modal right now. Off
+        /// while a blocking overlay owns the screen, and off when neither column
+        /// would have a focusable row — an empty modal over a disabled tab bar has
+        /// nothing to hand focus to, and so nothing to deliver Menu either.
+        private var playPauseTogglesQuickSwitch: Bool {
+            if router.isQuickSwitchPresented {
+                return true
+            }
+            guard !blockingOverlayOwnsScreen else { return false }
+            return !playlists.isEmpty || profileManager?.isReady == true
+        }
+
         /// tvOS `TabView` keeps every *visited* tab's view hierarchy alive, and
         /// each remote press triggers a focus/accessibility responder walk over
         /// the whole window — a device trace showed those walks dominating the
@@ -184,16 +300,22 @@ struct MainTabView: View {
                     LiveTVView()
                 }
 
-                // An explicit label is required: the `Tab(_:systemImage:value:role:)`
-                // convenience is 26-only, and the label-less initializer's
-                // `DefaultTabLabel` renders nothing in the pre-Liquid Glass macOS 15
-                // tab bar — the search tab was invisible there. Supplying the label
-                // keeps `role: .search` (so 26 still gets the dedicated search
-                // treatment) while staying visible on macOS 15 / iOS 18.
-                Tab(value: AppTab.search, role: .search) {
-                    SearchView()
-                } label: {
-                    Label("Search", systemImage: "magnifyingglass")
+                // macOS 15's tab bar drops a `role: .search` tab entirely — even
+                // with an explicit label (the previous workaround), the search tab
+                // never renders, leaving no way to reach Search there. macOS 26
+                // renders the role correctly, as do iOS/visionOS 18+, so only
+                // macOS 15 falls back to a plain tab and every other system keeps
+                // the dedicated search treatment.
+                if #unavailable(macOS 26) {
+                    Tab("Search", systemImage: "magnifyingglass", value: AppTab.search) {
+                        SearchView()
+                    }
+                } else {
+                    Tab(value: AppTab.search, role: .search) {
+                        SearchView()
+                    } label: {
+                        Label("Search", systemImage: "magnifyingglass")
+                    }
                 }
             }
         }
@@ -204,8 +326,9 @@ struct MainTabView: View {
     /// Resolves a `lume://movie/{tmdbId}` / `lume://series/{tmdbId}` link to a
     /// catalog item, switches to the matching tab and pushes its detail screen.
     /// `play`/`open` links (from widgets and the Top Shelf) launch playback or
-    /// a detail screen by catalog id. Silently ignores unknown links and titles
-    /// not present in the catalog (e.g. a tmdbId that was never synced).
+    /// a detail screen by catalog id; `resume`/`downloads` serve the Live
+    /// Activities. Silently ignores unknown links and titles not present in the
+    /// catalog (e.g. a tmdbId that was never synced).
     private func handleDeepLink(_ url: URL) {
         guard let link = DeepLink(url: url) else { return }
         switch link {
@@ -217,12 +340,37 @@ struct MainTabView: View {
         case let .series(tmdbId):
             guard let series = resolveSeries(tmdbId: tmdbId) else { return }
             openSeriesDetail(series)
+        case .playMovie, .playEpisode, .playLive, .openSeries:
+            handleWidgetLink(link)
+        case .resume:
+            // The Live Activity was tapped. When a player session is already
+            // up, foregrounding the app is all that's needed; otherwise reopen
+            // the last played stream where it left off.
+            guard NowPlayingService.shared.currentMedia == nil,
+                  let media = PlaybackResumeStore.load() else { return }
+            #if os(macOS)
+                MacPlayerWindowRouter.shared.play(media, using: openWindow)
+            #else
+                resumeMedia = media
+            #endif
+        case .downloads:
+            // The download Live Activity was tapped.
+            showsDownloads = true
+        }
+    }
+
+    /// Handles a widget / Top Shelf link: `play` launches playback, `open`
+    /// pushes a series detail screen — both by catalog id.
+    private func handleWidgetLink(_ link: DeepLink) {
+        switch link {
         case .playMovie, .playEpisode, .playLive:
             present(resolvePlayable(link))
         case let .openSeries(id):
             guard let series = fetchFirst(FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })),
                   !contentRestriction.hides(categoryID: series.categoryId) else { return }
             openSeriesDetail(series)
+        default:
+            break
         }
     }
 
@@ -337,6 +485,37 @@ struct MainTabView: View {
     private func promoteNextIfIdle() {
         guard activeSyncPlaylist == nil, !syncQueue.isEmpty else { return }
         activeSyncPlaylist = syncQueue.removeFirst()
+    }
+}
+
+// MARK: - Downloads sheet presentation
+
+private extension View {
+    /// Presents the downloads list as a sheet, in the same navigation + dismiss
+    /// chrome Settings gives it. The download Live Activity's tap target, so it
+    /// is reachable without disturbing whatever tab the user had open.
+    @ViewBuilder
+    func downloadsSheet(isPresented: Binding<Bool>) -> some View {
+        #if os(tvOS)
+            // tvOS has no downloads feature to show.
+            self
+        #else
+            sheet(isPresented: isPresented) {
+                NavigationStack {
+                    DownloadsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { isPresented.wrappedValue = false }
+                            }
+                        }
+                }
+                #if os(macOS)
+                // A `List` in a frameless macOS sheet collapses to zero
+                // height, leaving the sheet rendering as a bare toolbar.
+                .frame(minWidth: 480, minHeight: 440)
+                #endif
+            }
+        #endif
     }
 }
 

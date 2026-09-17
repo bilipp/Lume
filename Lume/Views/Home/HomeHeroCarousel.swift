@@ -13,6 +13,7 @@
 //  to the view width instead of the scroll view's unbounded-width proposal.
 //
 
+import SwiftData
 import SwiftUI
 
 struct HomeHeroCarousel: View {
@@ -334,6 +335,7 @@ private struct HeroSlot: Identifiable {
         )
     ]
     HomeHeroCarousel(items: items)
+        .modelContainer(previewContainer())
 }
 
 #Preview("Single Item") {
@@ -345,6 +347,7 @@ private struct HeroSlot: Identifiable {
         )
     ]
     HomeHeroCarousel(items: items)
+        .modelContainer(previewContainer())
 }
 
 #Preview("Empty") {

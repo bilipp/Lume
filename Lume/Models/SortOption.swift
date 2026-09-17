@@ -99,7 +99,13 @@ enum ContentSortOption: String, CaseIterable, Identifiable {
     // Each model has its own "added" field (Movie/LiveStream: `added`;
     // Series: `lastModified`). The Xtream API ships these as Unix timestamp
     // strings, so a lexicographic sort matches numeric order for the 10-digit
-    // range this app will encounter.
+    // range this app will encounter. `comparator: .lexical` is what carries that
+    // into SQL: the default for a String key path is `.localizedStandard`, which
+    // emits `COLLATE NSCollateFinderlike`, and no b-tree can serve that — the
+    // `#Index` on `Movie.added` only pays off while the ordering stays a binary
+    // comparison. 222.4 ms → 92.6 ms on the "Recently Added" query of a
+    // 179k-title catalog. The name cases below keep the localized comparator on
+    // purpose: there the linguistic ordering is the behaviour users expect.
 
     var movieDescriptors: [SortDescriptor<Movie>] {
         switch self {
@@ -110,9 +116,9 @@ enum ContentSortOption: String, CaseIterable, Identifiable {
         case .nameDescending:
             [SortDescriptor(\Movie.name, order: .reverse)]
         case .newest:
-            [SortDescriptor(\Movie.added, order: .reverse), SortDescriptor(\Movie.num)]
+            [SortDescriptor(\Movie.added, comparator: .lexical, order: .reverse), SortDescriptor(\Movie.num)]
         case .oldest:
-            [SortDescriptor(\Movie.added, order: .forward), SortDescriptor(\Movie.num)]
+            [SortDescriptor(\Movie.added, comparator: .lexical, order: .forward), SortDescriptor(\Movie.num)]
         }
     }
 
@@ -125,9 +131,9 @@ enum ContentSortOption: String, CaseIterable, Identifiable {
         case .nameDescending:
             [SortDescriptor(\Series.name, order: .reverse)]
         case .newest:
-            [SortDescriptor(\Series.lastModified, order: .reverse), SortDescriptor(\Series.num)]
+            [SortDescriptor(\Series.lastModified, comparator: .lexical, order: .reverse), SortDescriptor(\Series.num)]
         case .oldest:
-            [SortDescriptor(\Series.lastModified, order: .forward), SortDescriptor(\Series.num)]
+            [SortDescriptor(\Series.lastModified, comparator: .lexical, order: .forward), SortDescriptor(\Series.num)]
         }
     }
 
@@ -143,9 +149,9 @@ enum ContentSortOption: String, CaseIterable, Identifiable {
         case .nameDescending:
             [SortDescriptor(\LiveStream.name, order: .reverse)]
         case .newest:
-            [SortDescriptor(\LiveStream.added, order: .reverse), SortDescriptor(\LiveStream.num)]
+            [SortDescriptor(\LiveStream.added, comparator: .lexical, order: .reverse), SortDescriptor(\LiveStream.num)]
         case .oldest:
-            [SortDescriptor(\LiveStream.added, order: .forward), SortDescriptor(\LiveStream.num)]
+            [SortDescriptor(\LiveStream.added, comparator: .lexical, order: .forward), SortDescriptor(\LiveStream.num)]
         }
     }
 }

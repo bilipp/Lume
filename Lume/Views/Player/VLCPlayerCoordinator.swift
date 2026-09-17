@@ -58,6 +58,11 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         }
     }
 
+    /// Set before `configure` for a Multi-View tile: with several tiles playing
+    /// at once, Picture in Picture belongs to the full-screen player alone. The
+    /// rest of the embedded surface lives in `VLCPlayerCoordinator+MultiView`.
+    var isEmbedded = false
+
     var onTime: ((TimeInterval) -> Void)?
     var onDuration: ((TimeInterval) -> Void)?
 
@@ -71,6 +76,21 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// Snapshot of the user's VLCKit options, refreshed from `UserDefaults` each
     /// time a stream is configured or reloaded.
     private var options = VLCPlayerOptions.load()
+
+    /// Snapshot of the viewer's preferred track languages, refreshed each time
+    /// a stream is configured or reloaded — never mid-session, so a change in
+    /// Settings applies the next time playback starts.
+    var languageOptions = PlayerLanguageOptions(preferredAudioLanguages: [])
+
+    /// Holds the preferred-language pass to once per opened stream; it is
+    /// driven from the state change, which fires on every transition. Reset
+    /// wherever the media is rebuilt, which hands libvlc fresh tracks.
+    var didApplyPreferredLanguages = false
+
+    /// A manual audio / subtitle pick outranks the preference for the rest of
+    /// this stream. Kept across a same-URL rebuild (reconnect, Try Again) and
+    /// cleared when the URL changes, so it cannot leak into the next channel.
+    var hasManualTrackSelection = false
 
     private var needsResume = false
     private var didSeekResume = false
@@ -133,6 +153,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         startTime = media.startTime
         needsResume = !media.isLive && media.startTime > 1
         options = VLCPlayerOptions.load()
+        languageOptions = PlayerLanguageOptions.load()
         mediaURL = media.url
         retry.reset()
         hasStartedPlayback = false
@@ -141,9 +162,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         startStartupWatchdog()
         mediaPlayer.delegate = self
 
-        let vlcMedia = VLCMedia(url: media.url)
-        applyMediaOptions(to: vlcMedia, isLive: media.isLive)
-        mediaPlayer.media = vlcMedia
+        installMedia(media.url, isLive: media.isLive)
         let deinterlaceOn = options.deinterlace
         // swiftlint:disable:next line_length
         Logger.player.log("configure: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
@@ -151,6 +170,15 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         applyDeinterlace()
         isPlaying = true
         startStatsLogging()
+    }
+
+    /// Every rebuild path goes through here: a fresh `VLCMedia` invalidates the
+    /// track list, so the preferred-language latch must reset with it.
+    private func installMedia(_ url: URL, isLive: Bool) {
+        let media = VLCMedia(url: url)
+        applyMediaOptions(to: media, isLive: isLive)
+        mediaPlayer.media = media
+        didApplyPreferredLanguages = false
     }
 
     private func applyMediaOptions(to media: VLCMedia?, isLive: Bool) {
@@ -195,6 +223,8 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         resumeLanded = false
         videoInfo = nil
         options = VLCPlayerOptions.load()
+        languageOptions = PlayerLanguageOptions.load()
+        if media.url != mediaURL { hasManualTrackSelection = false }
         mediaURL = media.url
         lastKnownTime = 0
         retry.reset()
@@ -203,9 +233,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         PlaybackQoE.shared.beginStartup(engine: .vlcKit, isLive: media.isLive)
         startStartupWatchdog()
 
-        let vlcMedia = VLCMedia(url: media.url)
-        applyMediaOptions(to: vlcMedia, isLive: media.isLive)
-        mediaPlayer.media = vlcMedia
+        installMedia(media.url, isLive: media.isLive)
         let deinterlaceOn = options.deinterlace
         // swiftlint:disable:next line_length
         Logger.player.log("reload: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
@@ -294,9 +322,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         retry.reset()
         startStartupWatchdog()
 
-        let vlcMedia = VLCMedia(url: mediaURL)
-        applyMediaOptions(to: vlcMedia, isLive: isLive)
-        mediaPlayer.media = vlcMedia
+        installMedia(mediaURL, isLive: isLive)
         mediaPlayer.play()
         applyDeinterlace()
         isPlaying = true
@@ -317,9 +343,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
             resumeLanded = false
         }
 
-        let vlcMedia = VLCMedia(url: mediaURL)
-        applyMediaOptions(to: vlcMedia, isLive: isLive)
-        mediaPlayer.media = vlcMedia
+        installMedia(mediaURL, isLive: isLive)
         mediaPlayer.play()
         applyDeinterlace()
         isPlaying = true
@@ -432,29 +456,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Tracks
-
-    var audioTracks: [VLCMediaPlayer.Track] {
-        mediaPlayer.audioTracks
-    }
-
-    var textTracks: [VLCMediaPlayer.Track] {
-        mediaPlayer.textTracks
-    }
-
-    func selectAudioTrack(_ track: VLCMediaPlayer.Track) {
-        track.isSelectedExclusively = true
-        objectWillChange.send()
-    }
-
-    func selectTextTrack(_ track: VLCMediaPlayer.Track?) {
-        if let track {
-            track.isSelectedExclusively = true
-        } else {
-            mediaPlayer.deselectAllTextTracks()
-        }
-        objectWillChange.send()
-    }
+    // Track listing and selection live in VLCPlayerCoordinator+Languages.
 }
 
 // MARK: - VLCMediaPlayerDelegate
@@ -473,6 +475,7 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
             isPipSupported = pipController != nil
             pipController?.invalidatePlaybackState()
             refreshVideoInfo()
+            applyPreferredLanguagesIfNeeded()
         }
     }
 
@@ -544,9 +547,11 @@ extension VLCPlayerCoordinator: VLCDrawable, VLCPictureInPictureDrawable, VLCPic
         hostView?.bounds ?? .zero
     }
 
-    /// VLCPictureInPictureDrawable
+    /// VLCPictureInPictureDrawable. Returning `nil` is how a Multi-View tile
+    /// opts out: on iOS/tvOS the coordinator has to be the drawable for VLC to
+    /// render at all, so PiP is declined here rather than by withholding it.
     func mediaController() -> (any VLCPictureInPictureMediaControlling)? {
-        self
+        isEmbedded ? nil : self
     }
 
     func pictureInPictureReady() -> ((any VLCPictureInPictureWindowControlling)?) -> Void {

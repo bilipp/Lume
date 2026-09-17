@@ -66,21 +66,33 @@ struct SearchView: View {
                                 switch result {
                                 case let .movie(movie):
                                     NavigationLink(value: movie) {
-                                        SearchResultRow(result: result)
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
                                             .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
                                     }
+                                    .mediaFavoriteMenu(
+                                        isFavorite: { movie.isFavorite },
+                                        onToggleFavorite: { MediaFavorites.toggle(movie, in: modelContext) }
+                                    )
                                 case let .series(series):
                                     NavigationLink(value: series) {
-                                        SearchResultRow(result: result)
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
                                             .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
                                     }
+                                    .mediaFavoriteMenu(
+                                        isFavorite: { series.isFavorite },
+                                        onToggleFavorite: { MediaFavorites.toggle(series, in: modelContext) }
+                                    )
                                 case let .liveStream(stream):
                                     Button {
                                         playChannel(stream)
                                     } label: {
-                                        SearchResultRow(result: result)
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
                                     }
                                     .buttonStyle(.plain)
+                                    .liveChannelMenu(
+                                        isFavorite: stream.isFavorite,
+                                        onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) }
+                                    )
                                 }
                             }
                         } header: {
@@ -138,12 +150,27 @@ struct SearchView: View {
         playlists.active(for: selectedPlaylistID)
     }
 
+    /// The owning playlist's name, for rows that could have come from any of
+    /// them. Only while searching across several playlists: with one playlist
+    /// in play it's the same badge on every row, and the point of it is telling
+    /// two identically-named rows from different providers apart.
+    private func playlistName(for result: SearchResult) -> String? {
+        guard searchAllPlaylists, playlists.count > 1 else { return nil }
+        return playlists.owner(ofContentID: result.contentID)?.name
+    }
+
     private func playChannel(_ stream: LiveStream) {
-        guard let playlist = activePlaylist,
+        // Cross-playlist search surfaces channels the active playlist can't
+        // stream: a live URL is built from its playlist's server, credentials
+        // and portal, so playing a foreign channel with the active playlist
+        // asks the wrong provider for it. Stream ids are per-provider integers,
+        // so that doesn't reliably fail — it can quietly play whichever channel
+        // holds the same id over there.
+        guard let playlist = playlists.owner(ofContentID: stream.id) ?? activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif
@@ -172,12 +199,13 @@ struct SearchView: View {
         let wantLive = filter == .all || filter == .liveTV
 
         // A Stalker portal's movies/series aren't synced locally, so they can
-        // only be found through the portal's own search API. Live TV (which
+        // only be found through the portal's own search API — asked of every
+        // Stalker playlist in scope, not just the active one. Live TV (which
         // *is* synced) and every other source type use the local predicate
         // search. Cross-playlist search still runs the local pass too, so other
         // playlists' synced content is included.
         let usePortalForVODSeries = playlist?.sourceType == .stalker && !searchAllPlaylists
-        let portal = await portalSearch(query: query, playlist: playlist, wantMovies: wantMovies, wantSeries: wantSeries)
+        let portal = await portalSearch(query: query, wantMovies: wantMovies, wantSeries: wantSeries)
         guard !Task.isCancelled else { return }
 
         let localHits = await localSearch(
@@ -191,17 +219,43 @@ struct SearchView: View {
         results = assembleResults(portal: portal, localHits: localHits)
     }
 
-    /// Portal search hits (element ids) for a Stalker active playlist; empty
-    /// otherwise.
+    /// Portal search hits (element ids) from every Stalker playlist in scope.
+    /// A Stalker catalog's movies and series are never synced into the store,
+    /// so the portal's own search API is the only way to reach them — which
+    /// left a non-active Stalker playlist invisible to search whatever
+    /// "Search All Playlists" was set to, since the local pass has nothing of
+    /// its VOD to find.
     private func portalSearch(
-        query: String, playlist: Playlist?, wantMovies: Bool, wantSeries: Bool
+        query: String, wantMovies: Bool, wantSeries: Bool
     ) async -> (movies: [String], series: [String]) {
-        guard let playlist, playlist.sourceType == .stalker, wantMovies || wantSeries else { return ([], []) }
+        let targets = portalPlaylists
+        guard !targets.isEmpty, wantMovies || wantSeries else { return ([], []) }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
-        return await manager.searchStalker(
-            query: query, playlist: playlist,
-            includeMovies: wantMovies, includeSeries: wantSeries, limit: resultLimit
-        )
+        var movies: [[String]] = []
+        var series: [[String]] = []
+        // One portal at a time: these are separate providers, each with its own
+        // connection allowance, and a Stalker middleware is quick to refuse a
+        // second session. The debounce means only a settled query gets here,
+        // and cancellation stops the walk before the next portal is asked.
+        for playlist in targets {
+            guard !Task.isCancelled else { break }
+            let hits = await manager.searchStalker(
+                query: query, playlist: playlist,
+                includeMovies: wantMovies, includeSeries: wantSeries, limit: resultLimit
+            )
+            movies.append(hits.movies)
+            series.append(hits.series)
+        }
+        // Each portal ranks its own hits, so rotate rather than concatenate.
+        return (interleaved(movies, limit: resultLimit), interleaved(series, limit: resultLimit))
+    }
+
+    /// The Stalker playlists this search asks directly: all of them while
+    /// searching across playlists, otherwise the active one if it happens to
+    /// be a portal.
+    private var portalPlaylists: [Playlist] {
+        let candidates = searchAllPlaylists ? playlists : [activePlaylist].compactMap(\.self)
+        return candidates.filter { $0.sourceType == .stalker }
     }
 
     /// Bounded local predicate search, run off the main thread.
@@ -209,9 +263,11 @@ struct SearchView: View {
         query: String, playlist: Playlist?, wantMovies: Bool, wantSeries: Bool, wantLive: Bool
     ) async -> SearchHits {
         // Scope to the active playlist unless cross-playlist search is on. Every
-        // category id is prefixed with its playlist's UUID (see Category.id),
-        // which appears nowhere else, so matching it within categoryId limits
-        // results to that playlist.
+        // catalog row's id carries its playlist's UUID as a prefix (see
+        // `SearchScope.playlistIDPrefix`), so a prefix test on the indexed `id`
+        // limits results to that playlist. Hidden/restricted categories are
+        // excluded in the fetch rather than afterwards, so `resultLimit` isn't
+        // spent on rows the viewer will never see.
         let request = SearchRequest(
             query: query,
             playlistID: playlist?.id.uuidString ?? "",
@@ -219,12 +275,25 @@ struct SearchView: View {
             wantMovies: wantMovies,
             wantSeries: wantSeries,
             wantLive: wantLive,
+            excludedCategoryIDs: restriction.excludedCategoryIDs,
             limit: resultLimit
         )
         let container = modelContext.container
-        return await Task.detached(priority: .userInitiated) {
+        // `Task.detached` starts an unstructured task, which does not inherit
+        // this one's cancellation: every keystroke that settled into a query
+        // used to leave its scans running to the end, so on a large catalog the
+        // superseded work piled up behind the query the viewer is waiting for.
+        // Forwarding the cancellation lets `SearchFetcher` bail between its
+        // three scans; the partial hits it returns are dropped by
+        // `updateResults`, which is the task being cancelled.
+        let fetch = Task.detached(priority: .userInitiated) {
             SearchFetcher.fetch(container: container, request: request)
-        }.value
+        }
+        return await withTaskCancellationHandler {
+            await fetch.value
+        } onCancel: {
+            fetch.cancel()
+        }
     }
 
     /// Portal hits first (relevance order), then the local pass. Hydrates rows
@@ -245,16 +314,35 @@ struct SearchView: View {
         for series in hydrateSeries(ids: portal.series) {
             add(.series(series), categoryID: series.categoryId)
         }
-        for id in localHits.movies {
-            if let movie = modelContext.model(for: id) as? Movie { add(.movie(movie), categoryID: movie.categoryId) }
+        // The local fetches deliberately run without an ORDER BY so SQLite can
+        // stop at the per-type limit instead of sorting every match first (see
+        // `SearchFetcher.fetch`). The per-type, name-ascending order the list
+        // has always shown is restored here, over at most `resultLimit`
+        // hydrated rows per type. `localizedStandardCompare` is what
+        // `SortDescriptor(\.name)` used, so the ordering is unchanged.
+        for movie in hydrateSortedByName(localHits.movies, name: \Movie.name) {
+            add(.movie(movie), categoryID: movie.categoryId)
         }
-        for id in localHits.series {
-            if let series = modelContext.model(for: id) as? Series { add(.series(series), categoryID: series.categoryId) }
+        for series in hydrateSortedByName(localHits.series, name: \Series.name) {
+            add(.series(series), categoryID: series.categoryId)
         }
-        for id in localHits.streams {
-            if let stream = modelContext.model(for: id) as? LiveStream { add(.liveStream(stream), categoryID: stream.categoryId) }
+        for stream in hydrateSortedByName(localHits.streams, name: \LiveStream.name) {
+            add(.liveStream(stream), categoryID: stream.categoryId)
         }
         return matches
+    }
+
+    /// Hydrates rows the background fetch matched, in name order. The fetch
+    /// itself no longer sorts (a `sortBy:` would make SQLite sort every match
+    /// before applying the limit), so this is where the list's per-type
+    /// alphabetical order comes from — over at most `resultLimit` rows.
+    /// `localizedStandardCompare` is the comparator `SortDescriptor(\.name)`
+    /// defaulted to, so the resulting order is the same one the list showed.
+    private func hydrateSortedByName<Model: PersistentModel>(
+        _ ids: [PersistentIdentifier], name: KeyPath<Model, String>
+    ) -> [Model] {
+        ids.compactMap { modelContext.model(for: $0) as? Model }
+            .sorted { $0[keyPath: name].localizedStandardCompare($1[keyPath: name]) == .orderedAscending }
     }
 
     /// Fetches `Movie` rows for the given ids in one query, returned in id order.
@@ -275,80 +363,6 @@ struct SearchView: View {
         )) ?? []
         let byId = Dictionary(fetched.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return ids.compactMap { byId[$0] }
-    }
-}
-
-// MARK: - Off-main search fetch
-
-/// The matched rows' persistent identifiers, grouped by type. Plain value type
-/// so it can cross back from the background fetch context.
-private nonisolated struct SearchHits {
-    var movies: [PersistentIdentifier] = []
-    var series: [PersistentIdentifier] = []
-    var streams: [PersistentIdentifier] = []
-}
-
-/// The settled query and the per-type toggles, bundled so the off-main fetch
-/// takes a single `Sendable` value.
-private nonisolated struct SearchRequest {
-    let query: String
-    let playlistID: String
-    let restrictToPlaylist: Bool
-    let wantMovies: Bool
-    let wantSeries: Bool
-    let wantLive: Bool
-    let limit: Int
-}
-
-/// Runs the bounded `localizedStandardContains` fetches on a background
-/// `ModelContext` and returns only identifiers — never managed objects, which
-/// can't cross actor boundaries.
-private nonisolated enum SearchFetcher {
-    static func fetch(container: ModelContainer, request: SearchRequest) -> SearchHits {
-        let query = request.query
-        let playlistID = request.playlistID
-        let restrictToPlaylist = request.restrictToPlaylist
-        let limit = request.limit
-        let context = ModelContext(container)
-        var hits = SearchHits()
-
-        if request.wantMovies {
-            var descriptor = FetchDescriptor<Movie>(
-                predicate: #Predicate { movie in
-                    movie.name.localizedStandardContains(query)
-                        && (!restrictToPlaylist || (movie.categoryId?.localizedStandardContains(playlistID) ?? false))
-                },
-                sortBy: [SortDescriptor(\.name)]
-            )
-            descriptor.fetchLimit = limit
-            hits.movies = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
-        }
-
-        if request.wantSeries {
-            var descriptor = FetchDescriptor<Series>(
-                predicate: #Predicate { series in
-                    series.name.localizedStandardContains(query)
-                        && (!restrictToPlaylist || (series.categoryId?.localizedStandardContains(playlistID) ?? false))
-                },
-                sortBy: [SortDescriptor(\.name)]
-            )
-            descriptor.fetchLimit = limit
-            hits.series = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
-        }
-
-        if request.wantLive {
-            var descriptor = FetchDescriptor<LiveStream>(
-                predicate: #Predicate { stream in
-                    stream.name.localizedStandardContains(query)
-                        && (!restrictToPlaylist || (stream.categoryId?.localizedStandardContains(playlistID) ?? false))
-                },
-                sortBy: [SortDescriptor(\.name)]
-            )
-            descriptor.fetchLimit = limit
-            hits.streams = ((try? context.fetch(descriptor)) ?? []).map(\.persistentModelID)
-        }
-
-        return hits
     }
 }
 
@@ -406,6 +420,17 @@ enum SearchResult: Identifiable, Hashable {
         }
     }
 
+    /// The catalog row's own id, which carries the owning playlist's UUID as a
+    /// prefix. `id` above namespaces by kind so a movie and a channel can't
+    /// collide in the list; this one is what `owner(ofContentID:)` reads.
+    var contentID: String {
+        switch self {
+        case let .movie(movie): movie.id
+        case let .series(series): series.id
+        case let .liveStream(stream): stream.id
+        }
+    }
+
     static func == (lhs: SearchResult, rhs: SearchResult) -> Bool {
         lhs.id == rhs.id
     }
@@ -419,6 +444,8 @@ enum SearchResult: Identifiable, Hashable {
 
 struct SearchResultRow: View {
     let result: SearchResult
+    /// Which playlist this row came from, or `nil` to leave the badge off.
+    var playlistName: String?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -458,12 +485,24 @@ struct SearchResultRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 4) {
-                    Image(systemName: categoryIcon)
-                    Text(LocalizedStringKey(categoryName))
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: categoryIcon)
+                        Text(LocalizedStringKey(categoryName))
+                    }
+                    .foregroundStyle(.blue)
+                    // Only present while searching across playlists, where the
+                    // category alone doesn't say which provider a row is from.
+                    if let playlistName {
+                        HStack(spacing: 4) {
+                            Image(systemName: "rectangle.stack")
+                            Text(playlistName)
+                        }
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    }
                 }
                 .font(.caption2)
-                .foregroundStyle(.blue)
             }
 
             Spacer()

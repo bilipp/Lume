@@ -87,6 +87,31 @@ actor WatchProgressWriter {
         }
     }
 
+    /// Mark `ref` watched outright, whatever the clock reads, returning a
+    /// `Completion` if this is the write that finished it.
+    ///
+    /// The viewer asking for the next episode is the one case that completes an
+    /// item below the 90% line `record` measures: the transport button is live
+    /// from the first frame, and without this the episode left behind would keep
+    /// its place in Continue Watching and never reach Trakt.
+    @discardableResult
+    func markWatched(ref: PlayableMedia.ContentRef, duration: TimeInterval) -> Completion? {
+        lastRef = ref
+        lastProgress = duration
+        do {
+            switch ref {
+            case let .movie(id):
+                return try writeMovie(id: id, progress: duration, completed: true, ref: ref)
+            case let .episode(id):
+                return try writeEpisode(id: id, progress: duration, completed: true, ref: ref)
+            case .live:
+                return nil
+            }
+        } catch {
+            return nil
+        }
+    }
+
     private func writeMovie(
         id: String,
         progress: TimeInterval,

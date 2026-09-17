@@ -88,12 +88,7 @@ struct EPGSettingsView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(sources) { source in
-                        EPGSourceRow(source: source)
-                            .swipeActions(edge: .trailing) {
-                                if source.isManual {
-                                    Button("Delete", role: .destructive) { delete(source) }
-                                }
-                            }
+                        sourceRow(source)
                     }
                 }
 
@@ -106,6 +101,32 @@ struct EPGSettingsView: View {
                 Text("Sources")
             } footer: {
                 Text("Guide data is matched to channels across all your playlists.")
+            }
+        }
+
+        /// One source row, with a delete affordance only when the source is
+        /// deletable at all. Playlist-linked sources are regenerated from their
+        /// playlist on every reconcile, so offering to delete one would just
+        /// show it coming back.
+        ///
+        /// Manual sources carry three, because no single one covers every
+        /// platform: swipe is the iOS idiom but does nothing on macOS (AppKit
+        /// list rows have no swipe gesture), which left a custom XMLTV feed
+        /// added on a Mac with no way to remove it at all. macOS gets a visible
+        /// trash button — a context menu alone is about as discoverable as the
+        /// swipe was — and the context menu comes along for both platforms.
+        @ViewBuilder
+        func sourceRow(_ source: EPGSource) -> some View {
+            if source.isManual {
+                EPGSourceRow(source: source, onDelete: { delete(source) })
+                    .swipeActions(edge: .trailing) {
+                        Button("Delete", role: .destructive) { delete(source) }
+                    }
+                    .contextMenu {
+                        Button("Delete", role: .destructive) { delete(source) }
+                    }
+            } else {
+                EPGSourceRow(source: source)
             }
         }
 
@@ -141,8 +162,30 @@ struct EPGSettingsView: View {
 
     private struct EPGSourceRow: View {
         @Bindable var source: EPGSource
+        /// Non-nil only for deletable (manual) sources. Drives the macOS trash
+        /// button; the swipe action and context menu are applied by the caller.
+        var onDelete: (() -> Void)?
 
         var body: some View {
+            #if os(macOS)
+                HStack(spacing: 12) {
+                    toggle
+                    if let onDelete {
+                        Button(role: .destructive, action: onDelete) {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.red)
+                        .help("Delete this guide source")
+                        .accessibilityLabel(Text("Delete \(source.name)"))
+                    }
+                }
+            #else
+                toggle
+            #endif
+        }
+
+        private var toggle: some View {
             Toggle(isOn: $source.isEnabled) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(source.name)

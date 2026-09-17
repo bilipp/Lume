@@ -6,8 +6,10 @@ import SwiftUI
 ///
 /// A focused button fades in whenever the playhead sits inside a known intro or
 /// recap window (data from `IntroDBClient`) and seeks just past it on activation.
-/// Outro / end-credits skipping is intentionally left to the existing Next
-/// Episode button and auto-advance, so the two affordances never overlap.
+/// There is deliberately no "Skip Outro" button: end-credits handling stays
+/// with the existing Next Episode button and auto-advance, so the two
+/// affordances never overlap. IntroDB's outro window is still used — it refines
+/// when `PlayerNextUpOverlay` arms, it does not add a button here.
 ///
 /// Reads the high-frequency `PlaybackClock`, so it re-renders on each tick — a
 /// deliberately small leaf (like the scrubber) that never lifts that dependency
@@ -24,6 +26,16 @@ struct PlayerSkipIntroOverlay: View {
     /// Seeks the underlying player to an absolute time, in seconds.
     let onSeek: (TimeInterval) -> Void
 
+    /// The viewer's "Show Skip Intro Button" preference. Enforced here rather
+    /// than at the fetch site: the same `IntroSegments` value also carries the
+    /// outro window that `PlayerNextUpOverlay` arms on, so the host fetches it
+    /// whenever *either* affordance is enabled. Gating the button on the fetch
+    /// alone would resurrect it for anyone who turned it off but kept the Next
+    /// Episode button on. Safe as an `@AppStorage` because this is a leaf —
+    /// the player tree above it never re-renders on a toggle.
+    @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
+    private var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+
     #if os(tvOS)
         @FocusState private var buttonFocused: Bool
         /// Set when the viewer presses Menu on the button, so it stays dismissed
@@ -32,9 +44,7 @@ struct PlayerSkipIntroOverlay: View {
         @State private var dismissedSegment: ActiveSegment?
     #endif
 
-    /// Segments shorter than this aren't worth a button — avoids flashing an
-    /// affordance for a one-second stinger.
-    private let minimumDuration: TimeInterval = 5
+    private let minimumDuration = IntroSegments.minimumUsableDuration
 
     private enum Kind: Equatable { case intro, recap }
 
@@ -45,16 +55,16 @@ struct PlayerSkipIntroOverlay: View {
 
     var body: some View {
         Group {
-            if let active, showsButton(for: active) {
-                skipButton(for: active)
+            if let visibleSegment {
+                skipButton(for: visibleSegment)
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .allowsHitTesting(active != nil)
-        .animation(.easeInOut(duration: 0.25), value: active)
+        .allowsHitTesting(visibleSegment != nil)
+        .animation(.easeInOut(duration: 0.25), value: visibleSegment)
         #if os(tvOS)
-            .onChange(of: active) { _, value in
+            .onChange(of: visibleSegment) { _, value in
                 // Pull focus onto the button the moment it appears so the viewer can
                 // skip with a single Select.
                 if value != nil { Task { @MainActor in buttonFocused = true } }
@@ -66,6 +76,15 @@ struct PlayerSkipIntroOverlay: View {
     }
 
     // MARK: - Gating
+
+    /// The segment the button is actually showing for — the one under the
+    /// playhead, after the setting, dismissal and controls gates. The setting is
+    /// checked before the clock is read, so a viewer with the button off records
+    /// no dependency on the 10 Hz `PlaybackClock` at all.
+    private var visibleSegment: ActiveSegment? {
+        guard showSkipIntroButton, let active, showsButton(for: active) else { return nil }
+        return active
+    }
 
     /// The segment the playhead currently sits inside, or `nil` when between or
     /// outside segments. A recap takes precedence over an intro when both windows

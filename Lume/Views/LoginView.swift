@@ -57,6 +57,16 @@ struct LoginView: View {
         }
     }
 
+    /// The Xtream account behind the entered m3u URL, when that URL is really an
+    /// Xtream `get.php` endpoint. Drives the hint and its "Add as Xtream Login"
+    /// button, which adds a *new* Xtream playlist from these credentials — it
+    /// never converts an m3u playlist in place, because the two pipelines
+    /// disagree on content identity (see `XtreamCredentialsHint`).
+    private var xtreamHint: XtreamCredentialsHint? {
+        guard sourceType == .m3u else { return nil }
+        return M3UClient.xtreamCredentials(in: m3uURL.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
     var body: some View {
         #if os(tvOS)
             tvBody
@@ -163,7 +173,7 @@ struct LoginView: View {
             }
         }
 
-        private var m3uSection: some View {
+        @ViewBuilder private var m3uSection: some View {
             Section {
                 TextField("e.g. My IPTV", text: $name)
                     .textContentType(.name)
@@ -189,6 +199,12 @@ struct LoginView: View {
                 Text("M3U Playlist")
             } footer: {
                 Text("Enter the playlist URL or choose a local m3u/m3u8 file. The EPG URL is read from the playlist when left empty.")
+            }
+
+            if let xtreamHint {
+                Section {
+                    XtreamLoginHint(isLoading: isLoading) { addAsXtream(xtreamHint) }
+                }
             }
         }
 
@@ -289,6 +305,11 @@ struct LoginView: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
+                    if let xtreamHint {
+                        XtreamLoginHint(isLoading: isLoading) { addAsXtream(xtreamHint) }
+                            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    }
+
                     if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.circle.fill")
                             .font(.system(size: TVSettingsMetrics.secondaryFontSize))
@@ -331,17 +352,34 @@ struct LoginView: View {
 
     private func addPlaylist() {
         switch sourceType {
-        case .xtream: loginXtream()
+        case .xtream:
+            loginXtream(
+                serverURL: serverURL.trimmingCharacters(in: .whitespacesAndNewlines),
+                username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+                password: password
+            )
         case .m3u: addM3UPlaylist()
         case .stalker: addStalkerPlaylist()
         }
+    }
+
+    /// Adds the provider behind an Xtream `get.php` m3u URL as an Xtream
+    /// playlist, using the credentials the URL carries. The form is switched
+    /// over and pre-filled as well, so a login that fails leaves the user on a
+    /// ready-to-edit Xtream form instead of the m3u one.
+    private func addAsXtream(_ hint: XtreamCredentialsHint) {
+        serverURL = hint.baseURL
+        username = hint.username
+        password = hint.password
+        sourceType = .xtream
+        loginXtream(serverURL: hint.baseURL, username: hint.username, password: hint.password)
     }
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func loginXtream() {
+    private func loginXtream(serverURL: String, username: String, password: String) {
         isLoading = true
         errorMessage = nil
 
@@ -350,8 +388,8 @@ struct LoginView: View {
         Task {
             let playlist = Playlist(
                 name: playlistName,
-                serverURL: serverURL.trimmingCharacters(in: .whitespacesAndNewlines),
-                username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+                serverURL: serverURL,
+                username: username,
                 password: password
             )
 

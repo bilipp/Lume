@@ -2,9 +2,10 @@
 //  LumeWidgetsBundle.swift
 //  LumeWidgets
 //
-//  Home Screen / Desktop widgets (iOS, iPadOS, macOS). All three widgets render
-//  the snapshot the app exports to the App Group container — the extension
-//  never touches SwiftData or the network beyond fetching artwork.
+//  Home Screen / Desktop widgets (iOS, iPadOS, macOS) plus the Live Activities.
+//  The Home Screen widgets render the snapshot the app exports to the App Group
+//  container — the extension never touches SwiftData or the network beyond
+//  fetching artwork.
 //
 
 import SwiftUI
@@ -16,5 +17,7 @@ struct LumeWidgetsBundle: WidgetBundle {
         ContinueWatchingWidget()
         FavoritesWidget()
         OnNowWidget()
+        PlaybackLiveActivity()
+        DownloadLiveActivity()
     }
 }

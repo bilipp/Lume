@@ -3,67 +3,6 @@ import os
 import OSLog
 import SwiftData
 
-// MARK: - Data types
-
-/// Live progress for a single active or queued download.
-///
-/// A per-item `@Observable` box rather than a value in the `activeDownloads`
-/// dictionary: `@Observable` tracks access at stored-property granularity, so
-/// views that read a *value* out of the dictionary observe the whole
-/// dictionary — every progress tick for any download re-rendered every
-/// visible episode card. With a box, ticks mutate the box's own properties
-/// and only the card rendering that download re-renders; the dictionary
-/// itself changes only when a download starts, finishes, or fails.
-@Observable
-final class ActiveDownload: Identifiable {
-    let id: String
-    let title: String
-    var fractionCompleted: Double
-    var bytesWritten: Int64 = 0
-    var totalBytes: Int64 = 0
-    /// Ring-buffer of (timestamp, cumulative bytes) used for speed estimation.
-    /// Capped at 5 seconds of history; populated at most every 500 ms.
-    var samples: [(date: Date, bytes: Int64)] = []
-
-    init(id: String, title: String, fractionCompleted: Double = 0) {
-        self.id = id
-        self.title = title
-        self.fractionCompleted = fractionCompleted
-    }
-
-    /// Bytes per second averaged over the sample window, or nil if too few samples.
-    var speedBytesPerSec: Double? {
-        guard samples.count >= 2 else { return nil }
-        let elapsed = samples.last!.date.timeIntervalSince(samples.first!.date)
-        guard elapsed > 0.3 else { return nil }
-        return Double(samples.last!.bytes - samples.first!.bytes) / elapsed
-    }
-
-    /// Estimated seconds remaining based on current speed, or nil if unknown.
-    var estimatedSecondsRemaining: Double? {
-        guard let speed = speedBytesPerSec, speed > 0, totalBytes > bytesWritten else { return nil }
-        return Double(totalBytes - bytesWritten) / speed
-    }
-
-    /// Human-readable "3.2 MB/s · 2 min" caption, or nil while still measuring.
-    var statsLine: String? {
-        guard fractionCompleted > 0, let speed = speedBytesPerSec, speed > 0 else { return nil }
-        let speedStr = ByteCountFormatter.string(fromByteCount: Int64(speed), countStyle: .memory) + "/s"
-        guard let eta = estimatedSecondsRemaining, eta > 1 else { return speedStr }
-        let etaStr = Duration.seconds(eta).formatted(
-            .units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 2)
-        )
-        return "\(speedStr) · \(etaStr)"
-    }
-}
-
-private struct PendingDownload {
-    let id: String
-    let title: String
-    let url: URL
-    let filename: String
-}
-
 // MARK: - DownloadManager
 
 /// Central download manager. Serialises file downloads, persists completion
@@ -105,11 +44,34 @@ final class DownloadManager: NSObject {
     private var idToFilename: [String: String] = [:]
     private var pendingQueue: [PendingDownload] = []
 
+    /// Handed over by `UIApplicationDelegate` when the app is relaunched to
+    /// receive background session events. Must be called once the session has
+    /// finished delivering them, or the system considers the relaunch unfinished.
+    private var backgroundCompletionHandler: (() -> Void)?
+
     // MARK: - Init
+
+    /// Identifier of the shared background session. Stable across launches —
+    /// it is how the app reconnects to transfers `nsurlsessiond` is still running.
+    private static let sessionIdentifier = "bilipp.Lume.downloads"
 
     override private init() {
         super.init()
-        let config = URLSessionConfiguration.default
+        // A *background* configuration, not `.default`: a default session is
+        // owned by the app process, so the system suspends it along with the app
+        // and downloads stall the moment the user leaves Lume. A background
+        // session hands the transfer to `nsurlsessiond`, which keeps running
+        // while the app is suspended or terminated.
+        let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
+        // Relaunch the app in the background to deliver completion events, so a
+        // download that finishes while Lume is not running still gets its file
+        // moved into place and its status persisted.
+        config.sessionSendsLaunchEvents = true
+        // These are user-initiated: the person tapped Download and expects it to
+        // start now, not whenever the system next decides conditions are ideal.
+        // (The default flips to `true` for sessions created while in the
+        // background, so it has to be set explicitly rather than left alone.)
+        config.isDiscretionary = false
         config.timeoutIntervalForResource = 0
         session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         ensureDownloadsDirectory()
@@ -119,6 +81,78 @@ final class DownloadManager: NSObject {
 
     func configure(container: ModelContainer) {
         modelContainer = container
+    }
+
+    /// Re-adopts whatever the background session is still transferring, then
+    /// reconciles the catalog against it. Call once per launch, after
+    /// `configure(container:)`.
+    ///
+    /// The session outlives the process, so after a relaunch `nsurlsessiond`
+    /// still holds the tasks while every map here is empty. Each task carries
+    /// its own `DownloadTaskInfo`, which is enough to rebuild them.
+    func restoreBackgroundSession() async {
+        var liveIDs: Set<String> = []
+        for task in await session.allTasks {
+            guard let download = task as? URLSessionDownloadTask,
+                  let info = DownloadTaskInfo(taskDescription: task.taskDescription)
+            else {
+                // Nothing here can route this task's file to a destination —
+                // an orphan from an older build, or a non-download task. Drop it
+                // rather than leave it consuming bandwidth for no one.
+                task.cancel()
+                continue
+            }
+            liveIDs.insert(info.id)
+            taskMap[task.taskIdentifier] = info.id
+            idToTask[info.id] = download
+            idToFilename[info.id] = info.filename
+            let active = ActiveDownload(id: info.id, title: info.title)
+            let expected = task.countOfBytesExpectedToReceive
+            if expected > 0 {
+                active.totalBytes = expected
+                active.bytesWritten = task.countOfBytesReceived
+                active.fractionCompleted = Double(task.countOfBytesReceived) / Double(expected)
+            }
+            activeDownloads[info.id] = active
+        }
+        Logger.downloads.info("Adopted \(liveIDs.count) in-flight background download(s)")
+        // A leftover Live Activity has to be cleaned up when nothing is in
+        // flight any more — a force-quit cancels the session's tasks and would
+        // otherwise leave the banner up for hours. But if this launch happened
+        // *to deliver* background events, those completions are still on their
+        // way and belong in the closing summary, so leave ending it to
+        // `urlSessionDidFinishEvents` once they have all landed.
+        refreshLiveActivity(force: true, endsWhenIdle: backgroundCompletionHandler == nil)
+
+        guard let container = modelContainer else { return }
+        let capturedIDs = liveIDs
+        let directory = downloadsDirectory
+        Task.detached {
+            await DownloadManager.recoverInterruptedDownloads(
+                liveIDs: capturedIDs,
+                directory: directory,
+                container: container
+            )
+        }
+    }
+
+    /// Stores the completion handler the system hands over when it relaunches
+    /// the app to deliver background session events, to be invoked from
+    /// `urlSessionDidFinishEvents(forBackgroundURLSession:)`.
+    ///
+    /// Reaching this method is also what *recreates* the session: a background
+    /// session only delivers its queued events to a session object built with
+    /// the same identifier, and `DownloadManager.shared` is lazy, so a
+    /// background relaunch would otherwise never touch it.
+    func handleBackgroundSessionEvents(
+        identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        guard identifier == Self.sessionIdentifier else {
+            completionHandler()
+            return
+        }
+        backgroundCompletionHandler = completionHandler
     }
 
     // MARK: - Public API
@@ -135,7 +169,7 @@ final class DownloadManager: NSObject {
         guard let url = directURL ?? XtreamClient().buildMovieURL(for: movie, playlist: playlist) else { return }
 
         let ext = movie.containerExtension ?? "mp4"
-        let filename = "\(sanitize(id)).\(ext)"
+        let filename = "\(Self.sanitize(id)).\(ext)"
         idToFilename[id] = filename
         enqueue(PendingDownload(id: id, title: movie.name, url: url, filename: filename))
     }
@@ -152,7 +186,7 @@ final class DownloadManager: NSObject {
         guard let url = directURL ?? XtreamClient().buildEpisodeURL(for: episode, playlist: playlist) else { return }
 
         let ext = episode.containerExtension
-        let filename = "\(sanitize(id)).\(ext)"
+        let filename = "\(Self.sanitize(id)).\(ext)"
         let title = episode.series.map { "\($0.name) S\(episode.seasonNum)E\(episode.episodeNum)" } ?? episode.title
         idToFilename[id] = filename
         enqueue(PendingDownload(id: id, title: title, url: url, filename: filename))
@@ -165,6 +199,7 @@ final class DownloadManager: NSObject {
         pendingIDs.remove(id)
         pendingQueue.removeAll { $0.id == id }
         scheduleModelUpdate(id: id, status: nil, localURL: nil)
+        refreshLiveActivity(force: true)
     }
 
     func deleteLocalFile(id: String) {
@@ -173,7 +208,7 @@ final class DownloadManager: NSObject {
             let fileURL = downloadsDirectory.appendingPathComponent(filename)
             try? FileManager.default.removeItem(at: fileURL)
         } else {
-            let sanitizedID = sanitize(id)
+            let sanitizedID = Self.sanitize(id)
             let all = (try? FileManager.default.contentsOfDirectory(at: downloadsDirectory, includingPropertiesForKeys: nil)) ?? []
             for file in all where file.deletingPathExtension().lastPathComponent == sanitizedID {
                 try? FileManager.default.removeItem(at: file)
@@ -197,18 +232,53 @@ final class DownloadManager: NSObject {
 
     // MARK: - Directory
 
-    var downloadsDirectory: URL {
+    /// `nonisolated` so `didFinishDownloadingTo` can resolve the destination and
+    /// move the file before returning, without hopping to the main actor first.
+    nonisolated var downloadsDirectory: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Downloads", isDirectory: true)
     }
 
     // MARK: - Private
 
-    private func ensureDownloadsDirectory() {
+    private nonisolated func ensureDownloadsDirectory() {
         try? FileManager.default.createDirectory(
             at: downloadsDirectory,
             withIntermediateDirectories: true
         )
+        Self.excludeFromBackup(downloadsDirectory)
+    }
+
+    /// Keeps downloaded media out of the user's iCloud / Finder backup.
+    ///
+    /// `Documents` is backed up by default, so a handful of downloaded films
+    /// silently added gigabytes to the user's backup — against Apple's Data
+    /// Storage Guidelines, which put content the app can fetch again but the
+    /// user expects offline in exactly this "do not back up" bucket. Apps have
+    /// been rejected over far smaller amounts.
+    ///
+    /// Set on the *directory*, which covers everything already inside it and
+    /// everything added later, so individual downloads need no bookkeeping.
+    ///
+    /// Deliberately not `Library/Caches`, the other usual answer: the system may
+    /// purge Caches under storage pressure, which would delete the film someone
+    /// downloaded for a flight. This attribute gives the semantics actually
+    /// wanted — not backed up, and never purged.
+    ///
+    /// Idempotent, and called on every launch rather than only at creation, so
+    /// installs that already have a downloads directory are corrected too.
+    nonisolated static func excludeFromBackup(_ url: URL) {
+        var url = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+            try url.setResourceValues(values)
+        } catch {
+            // Not fatal — downloads still work, they just keep getting backed
+            // up. Logged because the symptom (a bloated backup) is otherwise
+            // invisible from inside the app.
+            Logger.downloads.error("Failed to exclude downloads from backup: \(error.localizedDescription)")
+        }
     }
 
     private var maxConcurrent: Int {
@@ -230,10 +300,16 @@ final class DownloadManager: NSObject {
             pendingIDs.remove(item.id)
             startTask(item)
         }
+        // The single choke point every start, finish and failure funnels
+        // through, so the Live Activity only needs one hook to see all three.
+        refreshLiveActivity(force: true)
     }
 
     private func startTask(_ item: PendingDownload) {
         let task = session.downloadTask(with: item.url)
+        task.taskDescription = DownloadTaskInfo(
+            id: item.id, title: item.title, filename: item.filename
+        ).taskDescription
         taskMap[task.taskIdentifier] = item.id
         idToTask[item.id] = task
         activeDownloads[item.id] = ActiveDownload(id: item.id, title: item.title)
@@ -287,7 +363,7 @@ final class DownloadManager: NSObject {
         }
     }
 
-    private nonisolated func sanitize(_ id: String) -> String {
+    nonisolated static func sanitize(_ id: String) -> String {
         id.replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: ":", with: "_")
     }
@@ -309,7 +385,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let taskID = downloadTask.taskIdentifier
         let now = Date()
         let shouldPublish = progressPublishGate.withLock { lastPublish in
-            if let last = lastPublish[taskID], now.timeIntervalSince(last) < 0.25 { return false }
+            if let last = lastPublish[taskID], now.timeIntervalSince(last) < 0.25 {
+                return false
+            }
             lastPublish[taskID] = now
             return true
         }
@@ -325,6 +403,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 download.samples.append((date: now, bytes: totalBytesWritten))
                 download.samples = download.samples.filter { $0.date >= now.addingTimeInterval(-5) }
             }
+            self.refreshLiveActivity()
         }
     }
 
@@ -337,62 +416,112 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let responseURL = downloadTask.response?.url ?? downloadTask.currentRequest?.url
         let ext = responseURL?.pathExtension.isEmpty == false ? responseURL!.pathExtension : "mp4"
 
-        // URLSession deletes `location` the moment this delegate returns — move it
-        // synchronously to a stable interim path before dispatching to the main actor.
-        let interimDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("lume-dl", isDirectory: true)
-        let interim = interimDir.appendingPathComponent("\(taskID).\(ext)")
+        // Resolve the destination from the task itself rather than from any map
+        // on the main actor: with a background session this callback can arrive
+        // in a process that was relaunched purely to receive it, where those maps
+        // are still empty.
+        guard let info = DownloadTaskInfo(taskDescription: downloadTask.taskDescription) else {
+            finishWithoutTaskInfo(taskID: taskID, location: location, ext: ext)
+            return
+        }
+
+        // URLSession deletes `location` the moment this delegate returns, and the
+        // process may be suspended before any hop to the main actor runs — so the
+        // file has to reach its *final* home synchronously, right here.
+        let destination = downloadsDirectory.appendingPathComponent(info.filename)
         do {
-            try FileManager.default.createDirectory(at: interimDir, withIntermediateDirectories: true)
+            try moveIntoDownloads(from: location, to: destination)
+        } catch {
+            Logger.downloads.error("Failed to save download for \(info.id): \(error)")
+            Task { @MainActor in
+                self.handleFailure(taskID: taskID, id: info.id)
+                self.promoteIfNeeded()
+            }
+            return
+        }
+        Logger.downloads.info("Download complete: \(info.id)")
+        Task { @MainActor in
+            self.finalizeDownload(taskID: taskID, info: info, destination: destination)
+        }
+    }
+
+    /// Moves a finished transfer into the downloads directory, replacing any
+    /// previous file for the same item.
+    private nonisolated func moveIntoDownloads(from location: URL, to destination: URL) throws {
+        try FileManager.default.createDirectory(
+            at: downloadsDirectory, withIntermediateDirectories: true
+        )
+        // Re-apply in case the directory was removed and recreated since
+        // launch — a recreated one would carry no exclusion, and every
+        // download after that would start being backed up again.
+        Self.excludeFromBackup(downloadsDirectory)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: location, to: destination)
+    }
+
+    /// Completion path for a task whose `DownloadTaskInfo` could not be decoded.
+    /// Only reachable if encoding it failed when the task was created — which,
+    /// for three strings, it does not — but a finished multi-gigabyte transfer is
+    /// not something to drop on an "impossible" branch. Stages the file out of
+    /// `location` (which URLSession deletes on return) so the content id can be
+    /// resolved from `taskMap` on the main actor.
+    private nonisolated func finishWithoutTaskInfo(taskID: Int, location: URL, ext: String) {
+        let interim = FileManager.default.temporaryDirectory
+            .appendingPathComponent("lume-dl", isDirectory: true)
+            .appendingPathComponent("\(taskID).\(ext)")
+        var staged = true
+        do {
+            try FileManager.default.createDirectory(
+                at: interim.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
             if FileManager.default.fileExists(atPath: interim.path) {
                 try FileManager.default.removeItem(at: interim)
             }
             try FileManager.default.moveItem(at: location, to: interim)
         } catch {
-            Task { @MainActor in
-                guard let id = self.taskMap[taskID] else { return }
-                Logger.downloads.error("Failed to stage download for \(id): \(error)")
+            Logger.downloads.error("Failed to stage download for task \(taskID): \(error)")
+            staged = false
+        }
+        Task { @MainActor in
+            guard let id = self.taskMap[taskID] else {
+                try? FileManager.default.removeItem(at: interim)
+                return
+            }
+            let filename = self.idToFilename[id] ?? "\(Self.sanitize(id)).\(ext)"
+            self.idToFilename[id] = filename
+            let destination = self.downloadsDirectory.appendingPathComponent(filename)
+            do {
+                guard staged else { throw CocoaError(.fileNoSuchFile) }
+                try self.moveIntoDownloads(from: interim, to: destination)
+            } catch {
+                Logger.downloads.error("Failed to save download for \(id): \(error)")
+                try? FileManager.default.removeItem(at: interim)
                 self.handleFailure(taskID: taskID, id: id)
                 self.promoteIfNeeded()
+                return
             }
-            return
+            Logger.downloads.info("Download complete: \(id)")
+            self.finalizeDownload(
+                taskID: taskID,
+                info: DownloadTaskInfo(id: id, title: id, filename: filename),
+                destination: destination
+            )
         }
-        Task { @MainActor in self.finalizeDownload(taskID: taskID, interim: interim, ext: ext) }
     }
 
+    /// Main-actor bookkeeping once the file is already in place: clear the live
+    /// maps and persist the completed status.
     @MainActor
-    private func finalizeDownload(taskID: Int, interim: URL, ext: String) {
+    private func finalizeDownload(taskID: Int, info: DownloadTaskInfo, destination: URL) {
         _ = progressPublishGate.withLock { $0.removeValue(forKey: taskID) }
-        guard let id = taskMap[taskID] else {
-            try? FileManager.default.removeItem(at: interim)
-            return
-        }
-        let filename: String
-        if let name = idToFilename[id] {
-            filename = name
-        } else {
-            filename = "\(sanitize(id)).\(ext)"
-            idToFilename[id] = filename
-        }
-        let destination = downloadsDirectory.appendingPathComponent(filename)
-        do {
-            try FileManager.default.createDirectory(
-                at: downloadsDirectory, withIntermediateDirectories: true
-            )
-            if FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.removeItem(at: destination)
-            }
-            try FileManager.default.moveItem(at: interim, to: destination)
-            Logger.downloads.info("Download complete: \(id)")
-            activeDownloads.removeValue(forKey: id)
-            taskMap.removeValue(forKey: taskID)
-            idToTask.removeValue(forKey: id)
-            scheduleModelUpdate(id: id, status: .completed, localURL: destination.path)
-        } catch {
-            Logger.downloads.error("Failed to save download for \(id): \(error)")
-            try? FileManager.default.removeItem(at: interim)
-            handleFailure(taskID: taskID, id: id)
-        }
+        idToFilename[info.id] = info.filename
+        activeDownloads.removeValue(forKey: info.id)
+        taskMap.removeValue(forKey: taskID)
+        idToTask.removeValue(forKey: info.id)
+        scheduleModelUpdate(id: info.id, status: .completed, localURL: destination.path)
+        noteLiveActivityCompleted()
         promoteIfNeeded()
     }
 
@@ -402,12 +531,35 @@ extension DownloadManager: URLSessionDownloadDelegate {
         didCompleteWithError error: Error?
     ) {
         guard let error else { return }
+        // Cancellation is the user tapping the X: `cancelDownload` has already
+        // cleared the item's state and status, so recording a failure here would
+        // resurrect the row as a failed download.
+        if (error as? URLError)?.code == .cancelled {
+            return
+        }
         let taskID = task.taskIdentifier
+        // As in `didFinishDownloadingTo`, the task may outlive the process that
+        // started it, so `taskMap` is not guaranteed to know it.
+        let restoredID = DownloadTaskInfo(taskDescription: task.taskDescription)?.id
         Task { @MainActor in
-            guard let id = self.taskMap[taskID] else { return }
+            guard let id = self.taskMap[taskID] ?? restoredID else { return }
             Logger.downloads.error("Download failed for \(id): \(error)")
             self.handleFailure(taskID: taskID, id: id)
             self.promoteIfNeeded()
+        }
+    }
+
+    /// The session has delivered every event queued while the app was away.
+    /// Releasing the stored handler tells the system the background relaunch is
+    /// finished; failing to call it gets the app throttled out of future ones.
+    nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession _: URLSession) {
+        Task { @MainActor in
+            // Every completion this relaunch carried is now counted, so the
+            // Live Activity can close with a summary that includes them.
+            self.refreshLiveActivity(force: true)
+            let handler = self.backgroundCompletionHandler
+            self.backgroundCompletionHandler = nil
+            handler?()
         }
     }
 
@@ -418,5 +570,6 @@ extension DownloadManager: URLSessionDownloadDelegate {
         taskMap.removeValue(forKey: taskID)
         idToTask.removeValue(forKey: id)
         scheduleModelUpdate(id: id, status: .failed, localURL: nil)
+        noteLiveActivityFailed()
     }
 }

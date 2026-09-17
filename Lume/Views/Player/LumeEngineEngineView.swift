@@ -26,12 +26,19 @@ struct LumeEngineEngineView: View {
     /// Holding the object and never reading `current`/`duration` in this body
     /// keeps the engine view off the tick path; only the scrubber leaf reads it.
     @Bindable var clock: PlaybackClock
+    let mediaSwapper: PlayerMediaSwapper
     /// The episode queued after `media`, resolved by the host. Drives the
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
     /// next.
     var nextUpMedia: PlayableMedia?
-    /// Intro / recap windows for the active episode (from IntroDB), driving the
-    /// in-player Skip Intro button. `nil` when there is nothing to skip.
+    /// Previous/next stream for the transport controls, resolved once per stream
+    /// by the host: the surrounding episodes of a series, or the channels either
+    /// side of a live one. `neighboursUnknown` means the catalog has no episode
+    /// rows yet, which the controls render as disabled rather than absent.
+    var itemNeighbours = PlayerItemNavigation.Neighbours.none
+    /// Intro / recap / outro windows for the active episode (from IntroDB). The
+    /// openers drive the in-player Skip Intro button; the outro sets when the
+    /// Next Episode button arms. `nil` when IntroDB knows nothing about it.
     var skipSegments: IntroSegments?
     /// When true, an initial-load failure reports to the host via
     /// `onPlaybackFailed` (which decides what to try next) instead of raising
@@ -47,11 +54,24 @@ struct LumeEngineEngineView: View {
     /// live channel via the Siri remote) from the in-player overlay. The host
     /// swaps `media` in response.
     var onSelectMedia: ((PlayableMedia) -> Void)?
+    /// Invoked when an explicit "next episode" press leaves the current episode
+    /// behind, so the host can mark it watched and scrobble it. The press is
+    /// available from the first frame, below the completion line the automatic
+    /// advance relies on, so it has to say so itself.
+    var onCompleteCurrentItem: (() -> Void)?
+    /// What the lock screen's next/previous track buttons play, owned by the
+    /// host and handed to `NowPlayingService` with this engine's transport.
+    /// `nil` on tvOS, where the Siri Remote already owns stream changes.
+    var onRemoteAdvance: ((PlayerMediaSwapper.Step) -> Bool)?
 
     @StateObject private var coordinator = LumeEngineCoordinator()
     /// Drives bounded backoff reconnects when the stream drops mid-playback.
     @State private var reconnector = PlaybackRetryController()
     @State private var isControlsVisible = true
+    /// Presents the OpenSubtitles browser. Held here rather than in the controls
+    /// overlay: the overlay is removed when the controls auto-hide, which would
+    /// take a sheet anchored there down with it mid-search.
+    @State private var isSearchingSubtitles = false
     /// Set once the stream is given up on (initial-load failure with no fallback
     /// left, or the reconnect budget spent). Swaps the player for the
     /// `PlayerErrorIndicator` (Try Again / Back).
@@ -65,6 +85,10 @@ struct LumeEngineEngineView: View {
     @State private var isPanelOpen = false
     /// Bumped to ask the overlay to close its open panel (Menu/back press).
     @State private var panelCloseToken = 0
+    // Serialises stream changes for this session — the Siri remote's channel
+    // surfing and the on-screen transport controls share it, so two swaps can
+    // never be in flight at once. `internal` so the transport step in
+    // `LumeEngineEngineView+Navigation.swift` can reach it; never read from a body.
     #if os(tvOS)
         /// The full channel browser (categories + channels) raised by a left
         /// press while watching live TV with the controls hidden.
@@ -77,6 +101,10 @@ struct LumeEngineEngineView: View {
         @AppStorage(SortStorageKey.liveContent)
         private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
         @Environment(\.modelContext) private var modelContext
+        /// Keeps channel surfing inside what this viewer may watch — a child
+        /// profile must not be able to rock up/down, or recall the last channel,
+        /// into a category a parent locked or the user hid.
+        @Environment(\.contentRestriction) private var restriction
     #endif
 
     @Environment(\.dismiss) private var dismiss
@@ -116,30 +144,21 @@ struct LumeEngineEngineView: View {
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
 
-            if let nextUpMedia {
-                PlayerNextUpOverlay(
-                    nextMedia: nextUpMedia,
-                    clock: clock,
-                    controlsVisible: isControlsVisible,
-                    onPlayNext: { onSelectMedia?($0) }
-                )
-            }
-
-            if let skipSegments {
-                PlayerSkipIntroOverlay(
-                    segments: skipSegments,
-                    clock: clock,
-                    controlsVisible: isControlsVisible,
-                    onSeek: { time in
-                        coordinator.seek(to: time)
-                        #if os(tvOS)
-                            // The skip button held focus; hand it back to the
-                            // tap-catcher so the remote keeps working.
-                            Task { @MainActor in catcherFocused = true }
-                        #endif
-                    }
-                )
-            }
+            PlayerEpisodeOverlays(
+                segments: skipSegments,
+                nextUpMedia: nextUpMedia,
+                clock: clock,
+                controlsVisible: isControlsVisible,
+                onSeek: { time in
+                    coordinator.seek(to: time)
+                    #if os(tvOS)
+                        // The skip button held focus; hand it back to the
+                        // tap-catcher so the remote keeps working.
+                        Task { @MainActor in catcherFocused = true }
+                    #endif
+                },
+                onSelectMedia: { onSelectMedia?($0) }
+            )
 
             #if os(tvOS)
                 if isChannelBrowserOpen {
@@ -161,18 +180,35 @@ struct LumeEngineEngineView: View {
                 .transition(.opacity)
             }
         }
+        .subtitleSearch(isPresented: $isSearchingSubtitles, media: media) { subtitle in
+            coordinator.loadExternalSubtitle(subtitle)
+        }
         .preferredColorScheme(.dark)
         .onAppear {
             wireCoordinator()
             coordinator.startupTimeout = usesQuickStartupTimeout ? 15 : 40
             clock.reset()
             coordinator.configure(media: media)
+            NowPlayingService.shared.attachTransport(.init(
+                isPlaying: { [weak coordinator] in coordinator?.isPlaying ?? false },
+                play: { [weak coordinator] in
+                    guard let coordinator, !coordinator.isPlaying else { return }
+                    coordinator.togglePlay()
+                },
+                pause: { [weak coordinator] in
+                    guard let coordinator, coordinator.isPlaying else { return }
+                    coordinator.togglePlay()
+                },
+                seek: { [weak coordinator] in coordinator?.seek(to: $0) },
+                advance: onRemoteAdvance
+            ), owner: coordinator)
             scheduleHide()
         }
         .onDisappear {
             hideTask?.cancel()
             hoverHideTask?.cancel()
             reconnector.cancel()
+            NowPlayingService.shared.detachTransport(owner: coordinator)
             coordinator.tearDown()
         }
         .onChange(of: coordinator.isPlaying) { _, _ in
@@ -233,6 +269,10 @@ struct LumeEngineEngineView: View {
             }
             .onKeyPress(.leftArrow) { coordinator.skip(by: -15); resetHideTimer(); return .handled }
             .onKeyPress(.rightArrow) { coordinator.skip(by: 15); resetHideTimer(); return .handled }
+            .liveChannelKeyNavigation(
+                neighbours: itemNeighbours, swapper: mediaSwapper,
+                onSelect: { onSelectMedia?($0) }, onResetHideTimer: resetHideTimer
+            )
             .onKeyPress(.space) { togglePlay(); return .handled }
             .onKeyPress(.escape) { closePlayer(); return .handled }
         #endif
@@ -277,7 +317,7 @@ struct LumeEngineEngineView: View {
             // Yield focus to the failure overlay's buttons when a stream dies.
             .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
-            .onMoveCommand { direction in
+            .tvRemoteMoveCommand { direction in
                 // Watching live TV with the controls hidden, left opens the
                 // channel browser, up/down surf adjacent channels and right
                 // recalls the last channel watched. Any other move summons the
@@ -311,7 +351,9 @@ struct LumeEngineEngineView: View {
                 onResetHideTimer: { resetHideTimer() },
                 onSelectMedia: { onSelectMedia?($0) },
                 onPanelOpenChange: { setPanelOpen($0) },
-                onSwitchChannel: { switchLiveChannel($0) }
+                onSwitchChannel: { switchLiveChannel($0) },
+                mediaSwapper: mediaSwapper, onCompleteCurrentItem: { onCompleteCurrentItem?() },
+                onSearchSubtitles: subtitleSearchAction
             )
         #else
             LumeEngineControlsOverlay(
@@ -324,9 +366,21 @@ struct LumeEngineEngineView: View {
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
-                onScheduleHide: { scheduleHide() }
+                onScheduleHide: { scheduleHide() },
+                onSearchSubtitles: subtitleSearchAction,
+                itemNeighbours: itemNeighbours,
+                onStepItem: { stepItem($0) }
             )
         #endif
+    }
+
+    /// Raises the OpenSubtitles browser, or `nil` when this stream can't use it
+    /// (a live channel, no API key in the build, or an engine that can't
+    /// side-load a subtitle file).
+    private var subtitleSearchAction: (() -> Void)? {
+        guard OpenSubtitlesService.supportsSearch(for: media),
+              coordinator.supportsExternalSubtitles else { return nil }
+        return { isSearchingSubtitles = true }
     }
 
     // MARK: - Actions
@@ -338,26 +392,18 @@ struct LumeEngineEngineView: View {
 
     #if os(tvOS)
         /// Change the live channel from the Siri Remote. Up/Down surf to the
-        /// adjacent channel (a TV remote's channel rocker); Right recalls the
-        /// channel watched just before this one. Falls back to summoning the
-        /// controls when there's nothing to jump to.
+        /// adjacent channel, the way the viewer's `LiveSurfMode` maps the
+        /// press; Right recalls the channel watched just before this one.
+        /// Falls back to summoning the controls when there's nothing to jump to.
         private func switchLiveChannel(_ direction: MoveCommandDirection) {
-            guard media.isLive else { return }
-            let target: PlayableMedia?
-            switch direction {
-            case .up, .down:
-                let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
-                    for: media, offset: direction == .up ? 1 : -1, sort: sort, in: modelContext
-                )
-            case .right:
-                target = LiveChannelHistory.recallMedia(in: modelContext)
-            default:
-                return
-            }
-            guard let target else { showControls(); return }
-            onSelectMedia?(target)
-            showControls()
+            mediaSwapper.surf(
+                direction, from: media,
+                through: .init(
+                    sortRaw: liveContentSortRaw, restriction: restriction, context: modelContext
+                ),
+                select: { onSelectMedia?($0) },
+                showControls: showControls
+            )
         }
 
         /// The two-column category / channel browser, slid in over the leading
@@ -447,7 +493,7 @@ struct LumeEngineEngineView: View {
 
     private func scheduleHide() {
         hideTask?.cancel()
-        guard coordinator.isPlaying, !isPanelOpen else { return }
+        guard coordinator.isPlaying, !isPanelOpen, !PlayerControlsAutoHide.isSuppressed else { return }
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
             guard !Task.isCancelled, coordinator.isPlaying else { return }

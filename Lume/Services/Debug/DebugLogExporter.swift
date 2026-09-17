@@ -85,16 +85,26 @@ nonisolated struct DebugLogExporter {
         }
 
         let entries = try store.getEntries(at: position, matching: predicate)
-        return entries
-            .compactMap { $0 as? OSLogEntryLog }
-            .map { entry in
-                let time = Self.entryStamp.string(from: entry.date)
+        return entries.compactMap { entry -> String? in
+            switch entry {
+            case let log as OSLogEntryLog:
+                let time = Self.entryStamp.string(from: log.date)
                 // Last line of defense: even if a future call site accidentally
                 // interpolates a URL with `privacy: .public`, it must not reach
                 // a shared report — stream URLs carry playlist credentials.
-                let message = LogRedaction.scrubURLs(in: entry.composedMessage)
-                return "\(time)  [\(entry.category)] \(Self.label(for: entry.level))  \(message)"
+                let message = LogRedaction.scrubURLs(in: log.composedMessage)
+                return "\(time)  [\(log.category)] \(Self.label(for: log.level))  \(message)"
+            case let signpost as OSLogEntrySignpost:
+                // MetricKit is compiled out on tvOS, so on Apple TV the `Perf`
+                // intervals are the only phase timing a field report can carry.
+                let time = Self.entryStamp.string(from: signpost.date)
+                let message = LogRedaction.scrubURLs(in: signpost.composedMessage)
+                let head = "\(time)  [\(signpost.category)] \(Self.signpostLabel(for: signpost.signpostType))  \(signpost.signpostName) #\(signpost.signpostIdentifier)"
+                return message.isEmpty ? head : "\(head)  \(message)"
+            default:
+                return nil
             }
+        }
     }
 
     /// The debugging session start, floored to `maxLookback` so an ancient
@@ -223,6 +233,16 @@ nonisolated struct DebugLogExporter {
             result.append(Character(UnicodeScalar(UInt8(value))))
         }
         return identifier.isEmpty ? "unknown" : identifier
+    }
+
+    static func signpostLabel(for type: OSLogEntrySignpost.SignpostType) -> String {
+        switch type {
+        case .intervalBegin: "signpost-begin"
+        case .intervalEnd: "signpost-end"
+        case .event: "signpost-event"
+        case .undefined: "signpost"
+        @unknown default: "signpost"
+        }
     }
 
     static func label(for level: OSLogEntryLog.Level) -> String {

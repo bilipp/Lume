@@ -133,49 +133,110 @@ extension ContentSyncManager {
 
     /// Copies the provider-owned fields from a movie DTO onto an existing or
     /// freshly-inserted `Movie`, leaving user state and TMDB enrichment intact.
-    func applyMovieFields(from dto: XtreamVODStream, to movie: Movie, playlistPrefix: String) {
-        movie.name = dto.name ?? ""
-        movie.streamIcon = dto.streamIcon
-        movie.rating = dto.rating ?? 0
-        movie.rating5Based = dto.rating5Based ?? 0
-        movie.added = dto.added
-        movie.containerExtension = dto.containerExtension
-        movie.tmdb = dto.tmdb
-        movie.num = dto.num ?? 0
-        movie.isAdult = dto.isAdult ?? 0
+    ///
+    /// Every write is guarded by an inequality test. SwiftData marks a row dirty
+    /// on *assignment*, not on change, so re-writing an identical value makes
+    /// `save()` rewrite (and re-index) the whole row — the dominant cost of a
+    /// re-sync where almost nothing changed.
+    ///
+    /// The guards must compare exactly what the unguarded assignment would have
+    /// stored: `nil` and `""` are distinct values here (the provider sends both,
+    /// and the lenient decoders preserve the difference), and the `Double`
+    /// comparisons must stay exact. Any tolerance — treating empty as nil,
+    /// rounding a rating — silently *stops* applying a legitimate provider
+    /// update, which is harder to notice than the reverse.
+    ///
+    /// The cyclomatic-complexity opt-out below is deliberate: this is a flat
+    /// field copy with one independent guard per provider field, not branching
+    /// logic.
+    func applyMovieFields(from dto: XtreamVODStream, to movie: Movie, playlistPrefix: String) { // swiftlint:disable:this cyclomatic_complexity
+        let name = dto.name ?? ""
+        if movie.name != name { movie.name = name }
+        if movie.streamIcon != dto.streamIcon { movie.streamIcon = dto.streamIcon }
+        let rating = dto.rating ?? 0
+        if movie.rating != rating { movie.rating = rating }
+        let rating5Based = dto.rating5Based ?? 0
+        if movie.rating5Based != rating5Based { movie.rating5Based = rating5Based }
+        if movie.added != dto.added { movie.added = dto.added }
+        if movie.containerExtension != dto.containerExtension { movie.containerExtension = dto.containerExtension }
+        if movie.tmdb != dto.tmdb { movie.tmdb = dto.tmdb }
+        let num = dto.num ?? 0
+        if movie.num != num { movie.num = num }
+        let isAdult = dto.isAdult ?? 0
+        if movie.isAdult != isAdult { movie.isAdult = isAdult }
 
         if let catIdStr = dto.categoryId {
-            movie.categoryId = playlistPrefix + catIdStr
+            let categoryId = playlistPrefix + catIdStr
+            if movie.categoryId != categoryId { movie.categoryId = categoryId }
         }
-        if let tmdbString = dto.tmdb, let tmdbInt = Int(tmdbString) {
+        if let tmdbString = dto.tmdb, let tmdbInt = Int(tmdbString), movie.tmdbId != tmdbInt {
             movie.tmdbId = tmdbInt
         }
     }
 
     /// Copies the provider-owned fields from a series DTO onto an existing or
     /// freshly-inserted `Series`, leaving user state and TMDB enrichment intact.
-    func applySeriesFields(from dto: XtreamSeries, to series: Series, playlistPrefix: String) {
-        series.name = dto.name ?? ""
-        series.cover = dto.cover
-        series.plot = dto.plot
-        series.cast = dto.cast
-        series.director = dto.director
+    ///
+    /// Dirty-checked for the same reason, and under the same exactness rules, as
+    /// `applyMovieFields`, including the complexity opt-out. `rating` and
+    /// `rating5Based` are stored as the provider's own strings here, so no
+    /// numeric normalisation applies — `"7"` and `"7.0"` are different values
+    /// and must stay so.
+    func applySeriesFields(from dto: XtreamSeries, to series: Series, playlistPrefix: String) { // swiftlint:disable:this cyclomatic_complexity
+        let name = dto.name ?? ""
+        if series.name != name { series.name = name }
+        if series.cover != dto.cover { series.cover = dto.cover }
+        if series.plot != dto.plot { series.plot = dto.plot }
+        if series.cast != dto.cast { series.cast = dto.cast }
+        if series.director != dto.director { series.director = dto.director }
         // Provider genre is the fallback only: it seeds an unset genre but never
         // overwrites one TMDB has supplied — TMDB is the primary source (see
-        // `GenreParser.providerFallback`).
-        series.genre = GenreParser.providerFallback(current: series.genre, provider: dto.genre)
-        series.releaseDate = dto.releaseDate
-        series.lastModified = dto.lastModified
-        series.rating = dto.rating
-        series.rating5Based = dto.rating5Based
-        series.tmdb = dto.tmdb
-        series.num = dto.num ?? 0
+        // `GenreParser.providerFallback`). The guard therefore compares the
+        // computed result; comparing `dto.genre` would rewrite every
+        // TMDB-enriched row on every sync and never settle.
+        let genre = GenreParser.providerFallback(current: series.genre, provider: dto.genre)
+        if series.genre != genre { series.genre = genre }
+        if series.releaseDate != dto.releaseDate { series.releaseDate = dto.releaseDate }
+        if series.lastModified != dto.lastModified { series.lastModified = dto.lastModified }
+        if series.rating != dto.rating { series.rating = dto.rating }
+        if series.rating5Based != dto.rating5Based { series.rating5Based = dto.rating5Based }
+        if series.tmdb != dto.tmdb { series.tmdb = dto.tmdb }
+        let num = dto.num ?? 0
+        if series.num != num { series.num = num }
 
         if let catIdStr = dto.categoryId {
-            series.categoryId = playlistPrefix + catIdStr
+            let categoryId = playlistPrefix + catIdStr
+            if series.categoryId != categoryId { series.categoryId = categoryId }
         }
-        if let tmdbString = dto.tmdb, let tmdbInt = Int(tmdbString) {
+        if let tmdbString = dto.tmdb, let tmdbInt = Int(tmdbString), series.tmdbId != tmdbInt {
             series.tmdbId = tmdbInt
+        }
+    }
+
+    /// Copies the provider-owned fields from a live-stream DTO onto an existing
+    /// or freshly-inserted `LiveStream`, leaving user state intact.
+    ///
+    /// Dirty-checked for the same reason, and under the same exactness rules, as
+    /// `applyMovieFields`, including the complexity opt-out.
+    func applyLiveStreamFields(from dto: XtreamLiveStream, to stream: LiveStream, playlistPrefix: String) { // swiftlint:disable:this cyclomatic_complexity
+        let name = dto.name ?? ""
+        if stream.name != name { stream.name = name }
+        if stream.streamIcon != dto.streamIcon { stream.streamIcon = dto.streamIcon }
+        if stream.epgChannelId != dto.epgChannelId { stream.epgChannelId = dto.epgChannelId }
+        if stream.added != dto.added { stream.added = dto.added }
+        if stream.customSid != dto.customSid { stream.customSid = dto.customSid }
+        let tvArchive = dto.tvArchive ?? 0
+        if stream.tvArchive != tvArchive { stream.tvArchive = tvArchive }
+        let tvArchiveDuration = dto.tvArchiveDuration ?? 0
+        if stream.tvArchiveDuration != tvArchiveDuration { stream.tvArchiveDuration = tvArchiveDuration }
+        let isAdult = dto.isAdult ?? 0
+        if stream.isAdult != isAdult { stream.isAdult = isAdult }
+        let num = dto.num ?? 0
+        if stream.num != num { stream.num = num }
+
+        if let catIdStr = dto.categoryId {
+            let categoryId = playlistPrefix + catIdStr
+            if stream.categoryId != categoryId { stream.categoryId = categoryId }
         }
     }
 

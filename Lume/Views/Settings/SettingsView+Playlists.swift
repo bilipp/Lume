@@ -2,10 +2,12 @@
 //  SettingsView+Playlists.swift
 //  Lume
 //
-//  The tvOS Playlists settings pane. tvOS has no toolbar playlist switcher (the
-//  immersive home has no toolbar), so Settings is the entry point for switching
-//  the active playlist, adding new ones and editing them — mirroring the Profiles
-//  pane. iOS/macOS use the PlaylistSwitcher in the library toolbar instead.
+//  The tvOS Playlists settings pane — the management surface: add, edit, delete,
+//  and switch the active playlist. A switch made here presents the blocking sync
+//  cover; the fast path that skips it is the Play/Pause quick-switch overlay
+//  (TVQuickSwitchOverlay), which switches only. tvOS has no toolbar to host a
+//  PlaylistSwitcher (the immersive home has none); iOS/macOS use that switcher in
+//  the library toolbar instead.
 //
 
 import SwiftUI
@@ -74,29 +76,13 @@ import SwiftUI
         /// deleted fallback the content tabs use, so the first playlist reads as
         /// active by default.
         private func tvPlaylistRow(_ playlist: Playlist) -> some View {
-            let isActive = playlist.id.uuidString == effectivePlaylistID
-            return HStack(spacing: 16) {
-                Button {
+            HStack(spacing: 16) {
+                TVPlaylistSwitchRow(
+                    playlist: playlist,
+                    isActive: playlist.id.uuidString == effectivePlaylistID
+                ) {
                     switchPlaylist(to: playlist)
-                } label: {
-                    HStack(spacing: 16) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(playlist.name)
-                            Text(playlist.serverURL)
-                                .font(.system(size: 20))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                        Spacer(minLength: 0)
-                        if isActive {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(.tint)
-                        }
-                    }
                 }
-                .buttonStyle(TVSettingsRowButtonStyle())
 
                 Button {
                     selectedPlaylist = playlist
@@ -109,9 +95,9 @@ import SwiftUI
         }
 
         /// The active playlist's id, accounting for the empty-default / deleted
-        /// fallback to the first playlist (matches `[Playlist].active(for:)`).
+        /// fallback to the first playlist.
         private var effectivePlaylistID: String {
-            playlists.active(for: selectedPlaylistID)?.id.uuidString ?? ""
+            playlists.activeID(for: selectedPlaylistID)
         }
 
         /// Switches the global selection, routing through the blocking overlay when

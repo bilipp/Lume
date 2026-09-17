@@ -10,10 +10,22 @@
 
 import Foundation
 
-/// A cached recommendation list plus when it was produced.
+/// A cached recommendation list plus when it was produced and the content
+/// visibility it was ranked under.
 nonisolated struct RecommendationCache: Codable, Equatable {
     var computedAt: Date
     var items: [ScoredRecommendation]
+    /// `ContentRestriction.visibilityToken` for the categories excluded when the
+    /// list was computed. `nil` for a cache written before visibility was accounted for,
+    /// which therefore never matches and recomputes once. Optional so decoding
+    /// those older entries still succeeds.
+    var visibilityToken: String?
+
+    init(computedAt: Date, items: [ScoredRecommendation], visibilityToken: String? = nil) {
+        self.computedAt = computedAt
+        self.items = items
+        self.visibilityToken = visibilityToken
+    }
 }
 
 nonisolated struct RecommendationCacheStore {

@@ -7,6 +7,7 @@
 //  inside `TVHomeScreen`.)
 //
 
+import SwiftData
 import SwiftUI
 
 // MARK: - Title / overview / buttons
@@ -14,6 +15,8 @@ import SwiftUI
 struct HeroInfo: View {
     let hero: HeroItem
     let isCompact: Bool
+
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -54,7 +57,11 @@ struct HeroInfo: View {
 
     private var actionButtons: some View {
         // Full-width when compact so the button spans the stacked layout.
+        // The Details button is the hero's only affordance, so it also carries
+        // the favorite menu — the carousel surface below owns swipe paging and
+        // the info crossfade, and a menu there would fight both.
         detailsButton(fullWidth: isCompact)
+            .heroFavoriteMenu(hero, in: modelContext)
     }
 
     @ViewBuilder

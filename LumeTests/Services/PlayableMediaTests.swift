@@ -121,7 +121,7 @@ struct PlayableMediaTests {
         #expect(media.contentRef == .live("l-3"))
         #expect(media.startTime == 0)
         #expect(media.url.absoluteString.contains("/timeshift/user/pass/60/"))
-        #expect(media.url.absoluteString.hasSuffix("/300.m3u8"))
+        #expect(media.url.absoluteString.hasSuffix("/300.ts"))
     }
 
     @Test func `catchup returns nil without archive`() {
@@ -220,6 +220,29 @@ struct PlayableMediaTests {
         let decoded = try JSONDecoder().decode(PlayableMedia.self, from: data)
         #expect(decoded.isLive == true)
         #expect(decoded.contentRef == .live("l-1"))
+    }
+
+    @Test func `launch scope survives a round trip and stream hand-offs`() throws {
+        let media = try PlayableMedia(
+            id: "live-2",
+            url: #require(URL(string: "http://example.com/live.m3u8")),
+            title: "Live",
+            subtitle: nil,
+            posterURL: nil,
+            kind: .live,
+            startTime: 0,
+            contentRef: .live("l-2"),
+            channelScope: .favorites
+        )
+        let data = try JSONEncoder().encode(media)
+        let decoded = try JSONDecoder().decode(PlayableMedia.self, from: data)
+        #expect(decoded.channelScope == .favorites)
+
+        // Switching engines mid-playback and resolving a Stalker placeholder
+        // both rebuild the media — the scope has to survive both.
+        let other = try #require(URL(string: "http://example.com/other.m3u8"))
+        #expect(media.resuming(at: 30).channelScope == .favorites)
+        #expect(media.replacingURL(other).channelScope == .favorites)
     }
 
     // MARK: - Hashable

@@ -7,10 +7,13 @@
 //
 //  • Memory + disk caching (see `ImagePipeline`), so images survive cell reuse
 //    and app launches instead of re-downloading and flashing placeholders.
-//  • Automatic retry on transient network failures.
+//  • Automatic retry on transient network failures, and a short freeze-out for
+//    URLs that just failed so a dead poster isn't re-requested on every pass.
 //  • Optional downsampling via `maxPixelSize` (longest edge in points; converted
 //    to pixels using the display scale) to cut memory and decode time for cards.
 //    Pass `nil` for full-resolution artwork such as tvOS 4K heroes.
+//  • Fades in artwork that had to be fetched, while keeping cache hits instant.
+//    Pass an explicit `transaction` to override, or `Transaction()` to disable.
 //
 //  The closure API mirrors `AsyncImage` — it hands back an `AsyncImagePhase`
 //  (`.empty` / `.success` / `.failure`) — so migrating a call site is usually
@@ -29,15 +32,22 @@ struct CachedAsyncImage<Content: View>: View {
     @Environment(\.displayScale) private var displayScale
     @State private var phase: AsyncImagePhase = .empty
 
+    /// Fades artwork in once it arrives from the network so posters don't hard-cut
+    /// from placeholder to image. Cache hits are unaffected — `load()` resolves
+    /// those synchronously outside the transaction, so they still appear instantly.
+    static var defaultTransaction: Transaction {
+        Transaction(animation: .easeIn(duration: 0.2))
+    }
+
     init(
         url: URL?,
         maxPixelSize: CGFloat? = nil,
-        transaction: Transaction = Transaction(),
+        transaction: Transaction? = nil,
         @ViewBuilder content: @escaping (AsyncImagePhase) -> Content
     ) {
         self.url = url
         self.maxPixelSize = maxPixelSize
-        self.transaction = transaction
+        self.transaction = transaction ?? Self.defaultTransaction
         self.content = content
     }
 
@@ -82,9 +92,14 @@ struct CachedAsyncImage<Content: View>: View {
             withTransaction(transaction) {
                 phase = .success(Image(platformImage: image))
             }
-        } catch is CancellationError {
-            // View went away mid-load; the detached fetch still warms the cache.
         } catch {
+            // The cell scrolled away mid-load: the shared fetch is now cancelled
+            // with us (see `ImagePipeline`) so the posters still on screen aren't
+            // stuck behind it. Leave the phase alone — this view is going away, and
+            // a stored .failure would show the broken-artwork placeholder for a
+            // beat if it comes back. `URLSession` reports a cancelled request as
+            // `URLError.cancelled` rather than `CancellationError`, hence the helper.
+            guard !ImagePipeline.isCancellation(error) else { return }
             withTransaction(transaction) {
                 phase = .failure(error)
             }

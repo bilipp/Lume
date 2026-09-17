@@ -5,7 +5,7 @@ xcuserdata/
 
 .env
 
-ExampleData/
+ExampleData
 
 build/
 
@@ -19,7 +19,7 @@ build/
 # Lefthook personal overrides
 lefthook-local.yml
 
-# Claude Code skills (local-only)
-.claude/skills/
+# Claude Code config (local-only)
+.claude/
 
 .xcodebuildmcp/

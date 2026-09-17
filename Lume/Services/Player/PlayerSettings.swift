@@ -1,11 +1,11 @@
 import Foundation
 import SwiftUI
 
-enum PlayerEngineKind: String, CaseIterable, Identifiable {
+nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
     case vlcKit
     case ksPlayer
     case avPlayer
-    /// Lume's own FFmpeg 8 engine — in beta. Declared last so it appends to the
+    /// Lume's own FFmpeg 9 engine — in beta. Declared last so it appends to the
     /// END of existing priority lists (`PlayerEnginePriority.normalized`):
     /// available to opt into, never silently promoted while KSPlayer is default.
     case lumeEngine
@@ -28,7 +28,7 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
         case .vlcKit: "VLCKit 4 is VLC's native engine. Plays virtually any format and codec, with hardware-accelerated 4K HDR, Picture in Picture, and the broadest IPTV compatibility."
         case .ksPlayer: "KSPlayer is a powerful third-party player that supports a wide range of formats, including those commonly used in IPTV streams."
         case .avPlayer: "Native Apple player. Best for HLS and MP4. But does not support many formats used in IPTV streams."
-        case .lumeEngine: "Lume's own FFmpeg 8 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
+        case .lumeEngine: "Lume's own FFmpeg 9 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
         }
     }
 
@@ -54,6 +54,33 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
         #else
             return .avPlayer
         #endif
+    }
+}
+
+/// How much the in-player stream-information caption spells out. A two-level
+/// preset rather than per-element toggles: Simple carries programme context
+/// (playlist, EPG), Advanced adds the technical
+/// readout (quality, codec, frame rate, engine).
+nonisolated enum StreamInfoDetailLevel: String, CaseIterable, Identifiable {
+    case simple
+    case advanced
+
+    var id: String {
+        rawValue
+    }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .simple: "Simple"
+        case .advanced: "Advanced"
+        }
+    }
+
+    var footer: LocalizedStringResource {
+        switch self {
+        case .simple: "Shows the playlist and what's on now."
+        case .advanced: "Adds the technical readout: quality, codec, frame rate, and playback engine."
+        }
     }
 }
 
@@ -103,6 +130,35 @@ enum PlayerEnginePriority {
     }
 }
 
+/// The ordered list of language codes a viewer prefers for a track kind, most
+/// preferred first. Persisted as a comma-separated raw string under
+/// `PlayerSettings.Language`'s keys, because `@AppStorage` cannot bind
+/// `[String]`. An empty list means no preference at all: track selection is
+/// left exactly as the container asks for it.
+nonisolated enum PreferredLanguageList {
+    /// Parse the comma-separated raw value into language codes.
+    static func decode(_ raw: String) -> [String] {
+        normalized(raw.split(separator: ",").map(String.init))
+    }
+
+    static func encode(_ list: [String]) -> String {
+        normalized(list).joined(separator: ",")
+    }
+
+    /// Keep the given order, trimmed of whitespace, without empty tokens or
+    /// case-insensitive duplicates.
+    static func normalized(_ codes: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for code in codes {
+            let trimmed = code.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, seen.insert(trimmed.lowercased()).inserted else { continue }
+            result.append(trimmed)
+        }
+        return result
+    }
+}
+
 enum PlayerSettings {
     static let engineKey = "player.engine"
 
@@ -115,6 +171,34 @@ enum PlayerSettings {
     /// in the built-in player.
     static let externalPlayerKey = "player.externalPlayer"
 
+    /// Raw value of the `ExternalPlayerScope` the hand-off is limited to —
+    /// VOD, live TV, or both. Unset (or unrecognised) means VOD only; see
+    /// `ExternalPlayerScope.default`.
+    static let externalPlayerScopeKey = "player.externalPlayerScope"
+
+    /// Raw value of the `LiveSurfMode` up and down on the remote follow while a
+    /// live channel is playing. Unset (or unrecognised) means the channel
+    /// rocker; see `LiveSurfMode.default`.
+    static let liveSurfModeKey = "player.liveSurfMode"
+
+    /// Whether swipes across the Siri Remote's touch surface drive the player's
+    /// directional actions — channel surfing, the channel browser, the last
+    /// channel, and summoning the controls. On by default, which is how the
+    /// player has always behaved and how tvOS reads everywhere else; off leaves
+    /// those actions to a click on the remote's direction buttons, for viewers
+    /// who change channel by brushing the surface. tvOS only — see
+    /// `RemoteDirectionGate` for how the two are told apart.
+    static let tvRemoteSwipesKey = "player.tvRemoteSwipes"
+
+    static let tvRemoteSwipesDefault = true
+
+    /// Whether swipe input is honoured, read off `UserDefaults` directly (so the
+    /// player host needn't hold an `@AppStorage` that would re-render the whole
+    /// player tree when toggled).
+    static var tvRemoteSwipesEnabled: Bool {
+        UserDefaults.standard.bool(tvRemoteSwipesKey, default: tvRemoteSwipesDefault)
+    }
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default
@@ -123,10 +207,14 @@ enum PlayerSettings {
         /// Automatically start the next episode once the current one finishes.
         static let autoPlayNextKey = "player.autoPlayNext"
         /// Surface a focused "Next Episode" button once the current episode is
-        /// near its end (mirrors the ≥90% "watched" line).
+        /// near its end — IntroDB's outro window when one is known and plausible,
+        /// otherwise the ≥90% "watched" line, and never before it.
         static let showNextEpisodeButtonKey = "player.showNextEpisodeButton"
         /// Surface a "Skip Intro" / "Skip Recap" button while the playhead sits
         /// inside an intro or recap window known to IntroDB (TV episodes only).
+        /// The IntroDB fetch this gates is shared with `showNextEpisodeButton`:
+        /// the same response also carries the outro window that sets when the
+        /// Next Episode button arms, so either toggle being on triggers it.
         static let showSkipIntroButtonKey = "player.showSkipIntroButton"
 
         static let autoPlayNextDefault = true
@@ -135,12 +223,76 @@ enum PlayerSettings {
 
         /// Whether the skip-intro affordance is enabled, read off `UserDefaults`
         /// directly (so the player host needn't hold an `@AppStorage` that would
-        /// re-render the whole player tree when toggled). Honours the default
-        /// when the key was never written.
+        /// re-render the whole player tree when toggled).
         static var showSkipIntroButton: Bool {
-            UserDefaults.standard.object(forKey: showSkipIntroButtonKey) as? Bool
-                ?? showSkipIntroButtonDefault
+            UserDefaults.standard.bool(showSkipIntroButtonKey, default: showSkipIntroButtonDefault)
         }
+
+        /// Whether the next-episode affordance is enabled, read off `UserDefaults`
+        /// directly for the same reason as `showSkipIntroButton`.
+        static var showNextEpisodeButton: Bool {
+            UserDefaults.standard.bool(showNextEpisodeButtonKey, default: showNextEpisodeButtonDefault)
+        }
+    }
+
+    // MARK: - Stream information
+
+    /// The in-player stream-information caption. On by default off tvOS, where
+    /// it rides the controls overlay and so is only visible while they are; on
+    /// tvOS the caption is part of the always-on player chrome and `enabled` is
+    /// never consulted.
+    enum StreamInfo {
+        static let enabledKey = "player.streamInfo.enabled"
+        static let detailLevelKey = "player.streamInfo.detailLevel"
+
+        /// On: the caption only appears with the controls, which are already a
+        /// deliberate tap away, so it costs nothing to a viewer who never wants
+        /// it and needs no discovery from one who does. tvOS ignores this.
+        static let enabledDefault = true
+
+        /// Advanced on tvOS so the existing technical caption (`4K · H264 ·
+        /// 24 fps`) keeps rendering exactly as it does today; Simple elsewhere,
+        /// where the caption is new and shares space with the transport controls.
+        static var detailLevelDefault: StreamInfoDetailLevel {
+            #if os(tvOS)
+                .advanced
+            #else
+                .simple
+            #endif
+        }
+
+        /// Whether the caption is shown, read off `UserDefaults` directly (so the
+        /// player host needn't hold an `@AppStorage` that would re-render the
+        /// whole player tree when toggled).
+        static var isEnabled: Bool {
+            UserDefaults.standard.bool(enabledKey, default: enabledDefault)
+        }
+
+        /// How much the caption spells out, read off `UserDefaults` directly for
+        /// the same reason as `isEnabled`.
+        static var detailLevel: StreamInfoDetailLevel {
+            guard let raw = UserDefaults.standard.string(forKey: detailLevelKey) else {
+                return detailLevelDefault
+            }
+            return StreamInfoDetailLevel(rawValue: raw) ?? detailLevelDefault
+        }
+    }
+
+    // MARK: - Preferred track languages
+
+    /// Engine-independent preferred audio track languages: an ordered list of
+    /// bare language codes (`de` matches a `de-AT` track), stored
+    /// comma-separated — see `PreferredLanguageList`.
+    ///
+    /// Defaults to EMPTY, which means no preference and behaviour identical
+    /// to before the setting existed. Nothing is seeded from
+    /// `Locale.preferredLanguages`.
+    nonisolated enum Language {
+        /// Ordered preferred audio languages.
+        static let preferredAudioLanguagesKey = "player.preferredAudioLanguages"
+
+        /// Empty: no preferred language.
+        static let preferredAudioLanguagesDefault = ""
     }
 
     /// Legacy top-level key for VLC's deinterlace toggle, kept stable so the
@@ -291,6 +443,8 @@ enum PlayerSettings {
     /// everything else.
     enum Lume {
         static let hardwareDecodeKey = "player.lume.hardwareDecode"
+        static let deinterlaceModeKey = "player.lume.deinterlaceMode"
+        static let deinterlaceRateKey = "player.lume.deinterlaceRate"
         static let httpReconnectKey = "player.lume.httpReconnect"
         static let liveBufferKey = "player.lume.liveBuffer"
         static let vodBufferKey = "player.lume.vodBuffer"
@@ -319,7 +473,8 @@ enum PlayerSettings {
         /// values so each `@AppStorage` binding reverts to its default.
         static var allKeys: [String] {
             [
-                hardwareDecodeKey, httpReconnectKey, liveBufferKey, vodBufferKey,
+                hardwareDecodeKey, deinterlaceModeKey, deinterlaceRateKey,
+                httpReconnectKey, liveBufferKey, vodBufferKey,
                 videoQueueDepthKey, audioQueueDepthKey, stallThresholdKey,
                 ioTimeoutKey, probeSizeKey, analyzeDurationKey
             ]

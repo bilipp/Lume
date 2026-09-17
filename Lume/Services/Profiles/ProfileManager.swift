@@ -34,9 +34,23 @@ final class ProfileManager {
     /// True once launch bootstrap has resolved the active profile and claimed any
     /// legacy records. The switcher waits on this before offering a switch.
     private(set) var isReady = false
+    /// The profile a switch is re-projecting the catalog onto. The single stored
+    /// piece of switch state — the flag and the overlay's copy both derive from
+    /// it, so they cannot drift apart.
+    private var switchingToProfileID: UUID?
+
     /// True while a profile switch is re-projecting the catalog — the UI blocks
     /// interaction so a half-projected catalog is never shown.
-    private(set) var isSwitching = false
+    var isSwitching: Bool {
+        switchingToProfileID != nil
+    }
+
+    /// Name of the profile being switched to, for the blocking progress overlay.
+    var pendingProfileName: String? {
+        switchingToProfileID.flatMap {
+            QuickSwitchResolver.currentProfile(in: profiles, activeProfileID: $0)?.name
+        }
+    }
 
     /// The profile roster the UI reads (instead of a `@Query`). `UserProfile`
     /// lives in the cloud store — a separate container the browse `@Query`s don't
@@ -158,7 +172,7 @@ final class ProfileManager {
     func switchProfile(to id: UUID) async {
         guard id != activeProfileID, !isSwitching else { return }
         let from = activeProfileID
-        isSwitching = true
+        switchingToProfileID = id
         // Flush any pending catalog edits (e.g. a favorite toggled moments ago,
         // not yet autosaved) so the engine — which reads the catalog through its
         // own background context — exports the outgoing profile's *current* state
@@ -170,7 +184,7 @@ final class ProfileManager {
         // no window where the catalog and the active-profile pointer disagree.
         await coordinator.switchProfile(from: from, to: id)
         activeProfileID = id
-        isSwitching = false
+        switchingToProfileID = nil
         // Re-baseline the freshly projected state against the cloud.
         coordinator.reconcile()
     }

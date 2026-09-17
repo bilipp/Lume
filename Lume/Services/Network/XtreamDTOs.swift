@@ -65,6 +65,7 @@ struct XtreamList<Element: Decodable>: Decodable {
     init(from decoder: Decoder) throws {
         if var unkeyed = try? decoder.unkeyedContainer() {
             var result: [Element] = []
+            if let count = unkeyed.count { result.reserveCapacity(count) }
             var firstError: Error?
             while !unkeyed.isAtEnd {
                 do {
@@ -86,6 +87,7 @@ struct XtreamList<Element: Decodable>: Decodable {
             ($0.intValue ?? .max, $0.stringValue) < ($1.intValue ?? .max, $1.stringValue)
         }
         var result: [Element] = []
+        result.reserveCapacity(sortedKeys.count)
         var firstError: Error?
         for key in sortedKeys {
             do {

@@ -2,9 +2,9 @@
 //  ContentRestrictionTests.swift
 //  LumeTests
 //
-//  Covers the parental-control content filter: restricted categories (and the
-//  content in them) are excluded only while a child profile is active, and a
-//  parent profile keeps seeing everything.
+//  Covers the content-visibility filter: categories hidden in Content
+//  Management are excluded for every profile, while restricted categories (and
+//  the content in them) are excluded only while a child profile is active.
 //
 
 import Foundation
@@ -53,5 +53,32 @@ struct ContentRestrictionTests {
         let items = [StubItem(categoryId: "a"), StubItem(categoryId: "b")]
         let restriction = ContentRestriction(isActive: true, restrictedCategoryIDs: [])
         #expect(items.excludingRestricted(restriction).count == 2)
+    }
+
+    // MARK: - Content Management visibility
+
+    @Test func `hidden categories are hidden from every profile`() {
+        let restriction = ContentRestriction(isActive: false, hiddenCategoryIDs: ["nl"])
+        #expect(restriction.hides(categoryID: "nl") == true)
+        #expect(restriction.hides(categoryID: "en") == false)
+        #expect(restriction.hides(categoryID: nil) == false)
+    }
+
+    @Test func `excluded ids combine hidden and restricted only for a child profile`() {
+        let parent = ContentRestriction(
+            isActive: false, restrictedCategoryIDs: ["adult"], hiddenCategoryIDs: ["nl"]
+        )
+        #expect(parent.excludedCategoryIDs == ["nl"])
+
+        let child = ContentRestriction(
+            isActive: true, restrictedCategoryIDs: ["adult"], hiddenCategoryIDs: ["nl"]
+        )
+        #expect(child.excludedCategoryIDs == ["nl", "adult"])
+    }
+
+    @Test func `excluding restricted drops hidden categories on a parent profile`() {
+        let items = [StubItem(categoryId: "nl"), StubItem(categoryId: "en"), StubItem(categoryId: nil)]
+        let restriction = ContentRestriction(isActive: false, hiddenCategoryIDs: ["nl"])
+        #expect(items.excludingRestricted(restriction).map(\.categoryId) == ["en", nil])
     }
 }

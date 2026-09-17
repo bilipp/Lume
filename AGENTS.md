@@ -13,10 +13,29 @@ open Lume.xcodeproj   # pick scheme "Lume", any destination
 # CLI build (iOS Simulator)
 xcodebuild build \
   -project Lume.xcodeproj -scheme Lume \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -clonedSourcePackagesDirPath ~/Library/Developer/Lume-SharedSPM
 ```
 
 The project injects API secrets from a repo-root `.env` file via `Scripts/inject-env.sh`. The file is gitignored; features degrade gracefully when it's absent.
+
+### Private DerivedData needs a shared package clone
+
+Parallel builds (per platform, per worker, per worktree) each need their own
+`-derivedDataPath /tmp/lume-dd-<label>` — the project has several DerivedData
+dirs and a bare `xcodebuild` can install a stale app. **Always pair that with
+`-clonedSourcePackagesDirPath ~/Library/Developer/Lume-SharedSPM`.** Without it
+each private DerivedData re-clones the whole package graph — KSPlayer's FFmpeg
+xcframeworks plus VLCKit's 865 MB xcframework, **6.4 GB per build dir**; eight
+of them once filled `/tmp` with 65 GB. Sharing one clone dir also builds faster
+and dodges the botched-checkout race that breaks multi-platform archiving.
+
+Delete your `-derivedDataPath` dir when the task is done, or run
+`Scripts/clean-build-cache.sh` (report only; `--apply` to reclaim, `--deep` to
+also drop DeviceSupport, the SwiftPM download cache and idle simulators). It
+deliberately keeps the two live package checkouts and each checkout's
+`.build/tools`, which is what the pre-commit hook runs SwiftFormat/SwiftLint
+from.
 
 ---
 
@@ -25,17 +44,21 @@ The project injects API secrets from a repo-root `.env` file via `Scripts/inject
 Tests deploy to **iOS 26.4+ Simulator only** — never tvOS. Use an iPhone 17 Pro or newer sim; iOS 26.2 sims fail with a deployment-target mismatch (exit 65).
 
 ```bash
+# Every invocation below takes the shared package clone — see "Private
+# DerivedData needs a shared package clone" above.
+SPM=(-clonedSourcePackagesDirPath ~/Library/Developer/Lume-SharedSPM)
+
 # Full suite
-xcodebuild test -project Lume.xcodeproj -scheme Lume \
+xcodebuild test -project Lume.xcodeproj -scheme Lume "${SPM[@]}" \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 
 # Unit tests only
-xcodebuild test -project Lume.xcodeproj -scheme Lume \
+xcodebuild test -project Lume.xcodeproj -scheme Lume "${SPM[@]}" \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -only-testing:LumeTests
 
 # UI tests only
-xcodebuild test -project Lume.xcodeproj -scheme Lume \
+xcodebuild test -project Lume.xcodeproj -scheme Lume "${SPM[@]}" \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -only-testing:LumeUITests
 ```
@@ -60,6 +83,19 @@ Scripts/run-performance-tests.sh ParsingBenchmarks  # one suite
   what the Benchmark configuration exists for.
 - Store benchmarks use **on-disk** containers (`PerfStore`); in-memory skips
   SQLite, the very cost being measured.
+- **`context.save()` is ~90% of the *Xtream* import.** That figure is from a
+  282,288-row Xtream catalog of series shells; it does not describe the m3u cold
+  path, where 86% of the entries are episodes. There the biggest single item was
+  wiring `Episode.series` through the initializer instead of assigning it after
+  `context.insert` — 64% of the whole import.
+- **Four knobs were measured at under 6%** — `batchSize` (500/2k/10k/50k all
+  within noise), the 11 `#Index` groups on `Movie`, `@Attribute(.unique)`, and
+  the per-batch existing-row lookup. On a 178k-row harness that no longer
+  exists; only the existing-row lookup has been re-verified at 1.5M rows. Don't
+  re-derive them; `LumePerformanceTests/README.md` carries the numbers.
+- **`M3UColdImportBenchmarks` is the end-to-end one** — it drives the real
+  `ContentSyncManager.syncPlaylist` over a provider-shaped `file://` playlist,
+  with clock, peak RSS and every m3u signpost in one pass.
 - Fixtures are generated per run from a fixed seed (`PerfFixtures`), never
   committed.
 - App-defined phases are named once in `Services/Diagnostics/PerformanceSignposts.swift`
@@ -126,7 +162,7 @@ Two separate `ModelContainer`s:
 - Frozen image + healthy audio on live TV = MPEG-TS 2³³ clock wrap; fixed by the `noteClockDrift()` watchdog.
 
 ### LumeEngine (beta, 4th engine)
-- Our own FFmpeg 8 engine, developed in the sibling repo [`bilipp/LumeEngine`](https://github.com/bilipp/LumeEngine) and referenced as a **local** SPM package at `../LumeEngine` — a clone without that sibling (and its FFmpeg xcframework built once) will not resolve. It has its own `AGENTS.md` and a `PLAN.md` that is authoritative for engine design.
+- Our own FFmpeg 9 engine, developed in the sibling repo [`bilipp/LumeEngine`](https://github.com/bilipp/LumeEngine) and referenced as a **local** SPM package at `../LumeEngine` — a clone without that sibling (and its FFmpeg xcframework built once) will not resolve. It has its own `AGENTS.md` and a `PLAN.md` that is authoritative for engine design.
 - App-side wiring only lives here (`Lume/Views/Player/LumeEngine*.swift`); demux/decode/render/sync bugs are engine-side. Decide which side a bug belongs to *before* editing.
 - Declared last in `PlayerEngineKind` so it appends to the end of existing priority lists — opt-in, never silently promoted while KSPlayer is the default.
 - The engine never retries on its own schedule: reconnect/backoff, engine fallback, and overlays stay Lume's job. If a fix would add retry policy to the engine, it belongs here instead.

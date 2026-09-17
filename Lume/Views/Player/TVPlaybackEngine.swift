@@ -19,8 +19,12 @@
     /// `@MainActor` because the overlay (a SwiftUI `View`) only ever touches it
     /// from the main actor — this lets a main-actor adapter (KSPlayer) and a
     /// nonisolated coordinator (VLCKit) both satisfy it.
+    ///
+    /// Refines `ExternalSubtitleLoading` so the overlay's subtitle menu can
+    /// offer the OpenSubtitles search against any engine that can side-load a
+    /// file (all of them but AVPlayer, which declares itself unsupported).
     @MainActor
-    protocol TVPlaybackEngine: ObservableObject {
+    protocol TVPlaybackEngine: ObservableObject, ExternalSubtitleLoading {
         /// Drives the central play / pause glyph; must be published so the
         /// overlay re-renders when playback state flips.
         var isPlaying: Bool { get }
@@ -78,21 +82,21 @@
             }
         }
 
+        /// Manual picks route through the coordinator's `select…Track(_:)`
+        /// entry points, which are what tell the preferred-language pass to
+        /// stand down for the rest of this stream.
         func selectAudioTrack(id: String) {
             guard let index = Int(id), mediaPlayer.audioTracks.indices.contains(index) else { return }
-            mediaPlayer.audioTracks[index].isSelectedExclusively = true
-            objectWillChange.send()
+            selectAudioTrack(mediaPlayer.audioTracks[index])
         }
 
         func selectTextTrack(id: String?) {
             guard let id else {
-                mediaPlayer.deselectAllTextTracks()
-                objectWillChange.send()
+                selectTextTrack(nil)
                 return
             }
             guard let index = Int(id), mediaPlayer.textTracks.indices.contains(index) else { return }
-            mediaPlayer.textTracks[index].isSelectedExclusively = true
-            objectWillChange.send()
+            selectTextTrack(mediaPlayer.textTracks[index])
         }
     }
 

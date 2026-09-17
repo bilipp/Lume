@@ -49,8 +49,55 @@ nonisolated extension PerfSignpost {
     static let syncMovies = PerfSignpost("SyncMovies")
     static let syncSeries = PerfSignpost("SyncSeries")
     static let syncLiveStreams = PerfSignpost("SyncLiveStreams")
+
+    // Content sync sub-phases. Nested inside the SyncMovies/SyncSeries/
+    // SyncLiveStreams intervals above, which stay as the outer boundary so
+    // existing traces and benchmark baselines keep resolving.
+    static let xtreamFetchMovies = PerfSignpost("XtreamFetchMovies")
+    static let xtreamDecodeMovies = PerfSignpost("XtreamDecodeMovies")
+    static let upsertMovies = PerfSignpost("UpsertMovies")
+    static let pruneMovies = PerfSignpost("PruneMovies")
+    static let xtreamFetchSeries = PerfSignpost("XtreamFetchSeries")
+    static let xtreamDecodeSeries = PerfSignpost("XtreamDecodeSeries")
+    static let upsertSeries = PerfSignpost("UpsertSeries")
+    static let pruneSeries = PerfSignpost("PruneSeries")
+    static let xtreamFetchLiveStreams = PerfSignpost("XtreamFetchLiveStreams")
+    static let xtreamDecodeLiveStreams = PerfSignpost("XtreamDecodeLiveStreams")
+    static let upsertLiveStreams = PerfSignpost("UpsertLiveStreams")
+    static let pruneLiveStreams = PerfSignpost("PruneLiveStreams")
+
+    /// Only emitted when the sync actually has to wait between content phases
+    /// to respect a provider's one-connection cap — its absence in a trace is
+    /// the signal that the spacing cost nothing.
+    static let xtreamPhaseSpacing = PerfSignpost("XtreamPhaseSpacing")
+
     static let m3uDownload = PerfSignpost("M3UDownload")
     static let m3uImport = PerfSignpost("M3UImport")
+
+    // M3U import sub-phases. Nested inside the M3UImport interval above, which
+    // stays as the outer boundary so existing traces and benchmark baselines
+    // keep resolving.
+    /// Emitted once per *gap between batches*, not once per import: parsing and
+    /// importing interleave, so a provider file produces ~860 short intervals
+    /// whose union is the scan time. A trace or `XCTOSSignpostMetric` expecting
+    /// one interval per import will not find one — sum them instead.
+    static let m3uParse = PerfSignpost("M3UParse")
+    static let m3uClassify = PerfSignpost("M3UClassify")
+    static let m3uUpsertLive = PerfSignpost("M3UUpsertLive")
+    static let m3uUpsertMovies = PerfSignpost("M3UUpsertMovies")
+    static let m3uUpsertEpisodes = PerfSignpost("M3UUpsertEpisodes")
+    static let m3uPruneLive = PerfSignpost("M3UPruneLive")
+    static let m3uPruneMovies = PerfSignpost("M3UPruneMovies")
+    static let m3uPruneEpisodes = PerfSignpost("M3UPruneEpisodes")
+    static let m3uPruneSeries = PerfSignpost("M3UPruneSeries")
+    static let m3uPruneCategories = PerfSignpost("M3UPruneCategories")
+
+    /// The post-sync persistent-history purge. Its own phase because it is the
+    /// only part of a catalog sync that does work the user gets nothing from —
+    /// it exists purely to give back what SwiftData wrote behind the writes.
+    /// Sits outside `.m3uImport`: every source path emits it, so it is not an
+    /// m3u sub-phase.
+    static let catalogPurgeHistory = PerfSignpost("CatalogPurgeHistory")
 
     // EPG
     static let epgSourceSync = PerfSignpost("EPGSourceSync")

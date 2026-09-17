@@ -2,8 +2,9 @@ import SwiftData
 import SwiftUI
 
 /// The top-left profile switcher: the active profile's avatar, tapping it opens
-/// a menu to switch profile or manage profiles. iOS / macOS only — tvOS surfaces
-/// profiles through Settings to avoid disturbing the immersive home's focus.
+/// a menu to switch profile or manage profiles. iOS / macOS only — placing it on
+/// the immersive tvOS home would disturb its focus, so tvOS switches through the
+/// Play/Pause quick-switch overlay and manages profiles in Settings.
 ///
 /// Hidden while there's only a single profile: there's nothing to switch to, and
 /// creating more profiles stays reachable through Settings.
@@ -89,7 +90,9 @@ struct ProfileMenu: View {
 extension View {
     /// Places the ``ProfileMenu`` in the navigation bar's leading edge. Shared by
     /// the top-level library screens (Home, Movies, Series). iOS / macOS only —
-    /// tvOS surfaces profiles through Settings.
+    /// tvOS and visionOS have no toolbar to place it in: tvOS switches through
+    /// the Play/Pause quick-switch overlay, visionOS through Settings;
+    /// management is in Settings on both.
     func profileMenuToolbar() -> some View {
         #if os(iOS)
             toolbar {

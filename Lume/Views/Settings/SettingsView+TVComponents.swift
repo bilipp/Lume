@@ -71,6 +71,20 @@ import SwiftUI
             return cycle[(index + 1) % cycle.count]
         }
 
+        /// Advances the hand-off scope through both → VOD → live TV → both.
+        func nextExternalPlayerScopeRaw(after raw: String) -> String {
+            let cycle = ExternalPlayerScope.allCases.map(\.rawValue)
+            guard let index = cycle.firstIndex(of: raw) else { return ExternalPlayerScope.default.rawValue }
+            return cycle[(index + 1) % cycle.count]
+        }
+
+        /// Advances the surf mapping between the two `LiveSurfMode` cases.
+        func nextLiveSurfModeRaw(after raw: String) -> String {
+            let cycle = LiveSurfMode.allCases.map(\.rawValue)
+            guard let index = cycle.firstIndex(of: raw) else { return LiveSurfMode.default.rawValue }
+            return cycle[(index + 1) % cycle.count]
+        }
+
         var tvAboutDetail: some View {
             VStack(alignment: .leading, spacing: 36) {
                 VStack(alignment: .leading, spacing: 8) {

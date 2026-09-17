@@ -35,6 +35,13 @@ struct DebugLogExporterTests {
         #expect(DebugLogExporter.label(for: .undefined) == "—")
     }
 
+    @Test func `signpost labels map every case`() {
+        #expect(DebugLogExporter.signpostLabel(for: .intervalBegin) == "signpost-begin")
+        #expect(DebugLogExporter.signpostLabel(for: .intervalEnd) == "signpost-end")
+        #expect(DebugLogExporter.signpostLabel(for: .event) == "signpost-event")
+        #expect(DebugLogExporter.signpostLabel(for: .undefined) == "signpost")
+    }
+
     @Test func `device model is never empty`() {
         #expect(!DebugLogExporter.deviceModel.isEmpty)
     }

@@ -5,10 +5,18 @@ import SwiftUI
 /// showing and keep focus sane on tvOS).
 ///
 /// Two independent behaviours, each gated on its own setting:
-///   • a focused **Next Episode** button that fades in once the episode crosses
-///     90% (the same line at which it becomes "watched"), and
+///   • a focused **Next Episode** button, tvOS only, that fades in when the
+///     episode reaches its outro — IntroDB's decoded credits window when one was
+///     fetched and is plausible for this encode, otherwise 90% of the duration.
+///     The armed time is clamped so it can only ever be *later* than that 90%
+///     line, never earlier, so pressing the button always leaves the episode
+///     past the "watched" threshold. Every other platform puts an
+///     always-available Next Episode button in the transport row instead
+///     (`PlayerItemNavButton`), and showing both would be two competing controls
+///     over the same video — and
 ///   • **auto-advance**, which swaps to the next episode as the current one
-///     reaches its end.
+///     reaches its end, on every platform. Auto-advance is deliberately not
+///     outro-aware: it still fires only at the very end of the stream.
 ///
 /// Both read the high-frequency `PlaybackClock`, so this view re-renders on each
 /// tick — it is deliberately a small leaf (like the scrubber) and never lifts
@@ -19,10 +27,12 @@ struct PlayerNextUpOverlay: View {
     /// The shared playback clock. Read here (and only here) so ticking it
     /// invalidates just this overlay, not the engine view above it.
     let clock: PlaybackClock
-    /// Whether the engine's own controls overlay is currently showing. The
-    /// button hides while the controls are up, so the two don't fight for focus
-    /// (tvOS) or overlap the scrubber (iOS/macOS).
+    /// Whether the engine's own controls overlay is currently showing. The tvOS
+    /// button hides while the controls are up, so the two don't fight for focus.
     let controlsVisible: Bool
+    /// The IntroDB outro window for this episode when known; nil keeps the
+    /// legacy 90% behaviour.
+    let outro: IntroSegments.Segment?
     let onPlayNext: (PlayableMedia) -> Void
 
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
@@ -46,10 +56,6 @@ struct PlayerNextUpOverlay: View {
         /// when the media changes.
         @State private var dismissed = false
     #endif
-
-    /// Fraction at which the Next Episode button appears — matched to the ≥90%
-    /// "watched" threshold so the button shows up alongside that state change.
-    private let buttonThreshold = 0.90
 
     var body: some View {
         Group {
@@ -88,14 +94,29 @@ struct PlayerNextUpOverlay: View {
         return min(max(clock.current / clock.duration, 0), 1)
     }
 
-    private var showsButton: Bool {
-        guard premium.isPremium, showNextButton, !controlsVisible, clock.current > 0, fraction >= buttonThreshold else {
+    /// True once playback has reached the arm point `OutroTrigger` computes.
+    /// It returns nil for a live or unknown-duration stream, which never arms.
+    private var isArmed: Bool {
+        guard let armTime = OutroTrigger.armTime(outro: outro, duration: clock.duration) else {
             return false
         }
+        return clock.current >= armTime
+    }
+
+    private var showsButton: Bool {
         #if os(tvOS)
+            guard premium.isPremium, showNextButton, !controlsVisible, clock.current > 0, isArmed else {
+                return false
+            }
             if dismissed { return false }
+            return true
+        #else
+            // iOS / macOS / visionOS carry an always-available Next Episode
+            // button in the transport row (`PlayerItemNavButton`), so this
+            // outro-armed one would be a second, differently-gated control over
+            // the same video. Auto-advance below is untouched.
+            return false
         #endif
-        return true
     }
 
     /// True as the episode reaches its end: within the last few seconds, or past
@@ -138,22 +159,8 @@ struct PlayerNextUpOverlay: View {
             // rather than closing the player outright.
             .onExitCommand { dismissed = true }
         #else
-            Button { onPlayNext(nextMedia) } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("Next Episode")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .contentShape(Capsule())
-                .glassEffectCompat(.regularInteractive, in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 20)
-            .padding(.bottom, 40)
+            // Never reached: `showsButton` is false off tvOS.
+            EmptyView()
         #endif
     }
 }

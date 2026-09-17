@@ -9,6 +9,7 @@
 
 #if os(tvOS)
 
+    import SwiftData
     import SwiftUI
 
     struct TVTraktIntegrationView: View {
@@ -157,19 +158,22 @@
             }
         }
 
-        @ViewBuilder
         private func importStatus(_ summary: TraktImportSummary) -> some View {
-            let text = if summary.failed {
-                Text("Couldn't import from Trakt. Please try again.")
-            } else if summary.markedNothing {
-                Text("Your watched history is already up to date.")
-            } else {
-                Text("Imported \(summary.moviesMarked) movie\(summary.moviesMarked == 1 ? "" : "s") and \(summary.episodesMarked) episode\(summary.episodesMarked == 1 ? "" : "s").")
+            VStack(alignment: .leading, spacing: 4) {
+                if summary.failed {
+                    Text("Couldn't import from Trakt. Please try again.")
+                } else if summary.markedNothing {
+                    Text("Your watched history is already up to date.")
+                } else {
+                    Text("Imported \(summary.moviesMarked) movie\(summary.moviesMarked == 1 ? "" : "s") and \(summary.episodesMarked) episode\(summary.episodesMarked == 1 ? "" : "s").")
+                    if summary.showsQueued > 0 {
+                        Text("\(summary.showsQueued) show\(summary.showsQueued == 1 ? "" : "s") will be marked the first time you open them.")
+                    }
+                }
             }
-            text
-                .font(.system(size: 22))
-                .foregroundStyle(summary.failed ? .red : .green)
-                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            .font(.system(size: 22))
+            .foregroundStyle(summary.failed ? .red : .green)
+            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
         }
     }
 

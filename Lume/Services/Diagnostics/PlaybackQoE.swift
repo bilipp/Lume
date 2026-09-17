@@ -105,6 +105,13 @@ final class PlaybackQoE {
 
     private let defaults: UserDefaults
 
+    /// While set, every session hook below is a no-op. The summary models one
+    /// stream at a time — join time, rebuffer ratio, exits before video start —
+    /// so Multi-View, which runs up to four streams concurrently through the
+    /// same coordinators, would fill it with meaningless numbers. Held for the
+    /// lifetime of `MultiViewScreen` rather than checked at each call site.
+    var isSuspended = false
+
     // MARK: - Session lifecycle
 
     /// A playback attempt has started: the engine has been handed a URL and the
@@ -113,6 +120,7 @@ final class PlaybackQoE {
     /// Safe to call again for a retry or a live-channel swap — the previous
     /// attempt is closed out first, so a zap counts as its own session.
     func beginStartup(engine: PlayerEngineKind, isLive: Bool) {
+        guard !isSuspended else { return }
         if startupBegan != nil {
             endSession()
         }
@@ -128,7 +136,7 @@ final class PlaybackQoE {
     /// The first frame is on screen. Closes the startup interval and records
     /// join time. Idempotent within a session.
     func noteFirstFrame() {
-        guard let startupBegan, firstFrameAt == nil, let engine else { return }
+        guard !isSuspended, let startupBegan, firstFrameAt == nil, let engine else { return }
         let now = Date()
         let joinTime = now.timeIntervalSince(startupBegan)
         firstFrameAt = now
@@ -153,14 +161,14 @@ final class PlaybackQoE {
     /// A mid-stream stall began (startup buffering doesn't count — that's join
     /// time). No-op before the first frame or while already stalled.
     func noteStallBegan() {
-        guard firstFrameAt != nil, stallBegan == nil else { return }
+        guard !isSuspended, firstFrameAt != nil, stallBegan == nil else { return }
         stallBegan = Date()
         Perf.event(.playerRebuffer)
     }
 
     /// The stall cleared. Adds its duration to the rebuffer total.
     func noteStallEnded() {
-        guard let stallBegan, let engine else { return }
+        guard !isSuspended, let stallBegan, let engine else { return }
         let seconds = Date().timeIntervalSince(stallBegan)
         self.stallBegan = nil
         mutate(engine) {
@@ -172,7 +180,7 @@ final class PlaybackQoE {
 
     /// The engine gave up before producing a frame.
     func noteStartupFailure() {
-        guard let engine else { return }
+        guard !isSuspended, let engine else { return }
         Perf.event(.playerStartupFailure)
         mutate(engine) { $0.startupFailures += 1 }
         persist()
@@ -180,6 +188,7 @@ final class PlaybackQoE {
 
     /// The host is switching to the next engine in the priority list.
     func noteEngineFallback(to next: PlayerEngineKind) {
+        guard !isSuspended else { return }
         Perf.event(.playerEngineFallback)
         summary.engineFallbacks += 1
         let previous = engine?.rawValue ?? "none"
@@ -194,7 +203,7 @@ final class PlaybackQoE {
     /// any open interval and — if no frame ever arrived — counts an exit before
     /// video start.
     func endSession() {
-        guard let engine, let startupBegan else { return }
+        guard !isSuspended, let engine, let startupBegan else { return }
         if let interval {
             Perf.end(interval)
             self.interval = nil

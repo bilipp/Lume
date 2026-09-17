@@ -38,7 +38,11 @@ import SwiftUI
                 return
             }
             var disabled = HomeLayoutSettings.decodeDisabled(homeDisabledSectionsRaw)
-            if disabled.contains(section) { disabled.remove(section) } else { disabled.insert(section) }
+            if disabled.contains(section) {
+                disabled.remove(section)
+            } else {
+                disabled.insert(section)
+            }
             homeDisabledSectionsRaw = HomeLayoutSettings.encodeDisabled(disabled)
         }
 
@@ -46,9 +50,7 @@ import SwiftUI
         /// order. Mirrors `moveEngine` in the player pane.
         private func moveSection(at index: Int, by offset: Int) {
             var list = homeSections
-            let target = index + offset
-            guard list.indices.contains(index), list.indices.contains(target) else { return }
-            list.swapAt(index, target)
+            guard list.move(at: index, by: offset) else { return }
             homeSectionOrderRaw = HomeLayoutSettings.encode(HomeLayoutSettings.normalized(list))
         }
 
@@ -75,53 +77,33 @@ import SwiftUI
         /// `tvEnginePriorityRow`.
         private func tvHomeSectionRow(section: HomeSection, index: Int) -> some View {
             let enabled = isHomeSectionEnabled(section)
-            return HStack(spacing: 16) {
-                Button {
-                    toggleHomeSection(section)
-                } label: {
-                    Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
+            return TVSettingsReorderRow(
+                name: section.displayName,
+                index: index,
+                count: homeSections.count,
+                onMove: { moveSection(at: index, by: $0) },
+                leading: {
+                    Button {
+                        toggleHomeSection(section)
+                    } label: {
+                        Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
+                    }
+                    .buttonStyle(TVContentIconButtonStyle())
+                    .accessibilityLabel(section.displayName)
+                    .accessibilityValue(enabled ? Text("On") : Text("Off"))
+
+                    Label(section.title, systemImage: section.systemImage)
+                        .font(.system(size: TVSettingsMetrics.rowFontSize))
+                        .foregroundStyle(enabled ? .primary : .secondary)
+
+                    // "For You" is a Lume Pro feature; badge it for free users
+                    // (Sideload/owned builds are always premium, so this never shows).
+                    if section == .forYou, !premium.isPremium {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.tint)
+                    }
                 }
-                .buttonStyle(TVContentIconButtonStyle())
-                .accessibilityLabel(section.displayName)
-                .accessibilityValue(enabled ? Text("On") : Text("Off"))
-
-                Label(section.title, systemImage: section.systemImage)
-                    .font(.system(size: TVSettingsMetrics.rowFontSize))
-                    .foregroundStyle(enabled ? .primary : .secondary)
-
-                // "For You" is a Lume Pro feature; badge it for free users
-                // (Sideload/owned builds are always premium, so this never shows).
-                if section == .forYou, !premium.isPremium {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.tint)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    moveSection(at: index, by: -1)
-                } label: {
-                    Image(systemName: "chevron.up")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-                .disabled(index == 0)
-                .accessibilityLabel("Move \(section.displayName) up")
-
-                Button {
-                    moveSection(at: index, by: 1)
-                } label: {
-                    Image(systemName: "chevron.down")
-                }
-                .buttonStyle(TVContentIconButtonStyle())
-                .disabled(index == homeSections.count - 1)
-                .accessibilityLabel("Move \(section.displayName) down")
-            }
-            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-            .padding(.vertical, TVSettingsMetrics.rowVPadding)
-            .background(
-                RoundedRectangle(cornerRadius: TVSettingsMetrics.rowCornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
             )
         }
     }

@@ -23,12 +23,19 @@ struct AVPlayerEngineView: View {
     /// than as `@Binding` scalars — see `VLCPlayerEngineView` for why this keeps
     /// the engine view off the per-tick re-render path.
     @Bindable var clock: PlaybackClock
+    let mediaSwapper: PlayerMediaSwapper
     /// The episode queued after `media`, resolved by the host. Drives the
     /// end-of-episode Next Up affordances; `nil` when there is nothing to play
     /// next.
     var nextUpMedia: PlayableMedia?
-    /// Intro / recap windows for the active episode (from IntroDB), driving the
-    /// in-player Skip Intro button. `nil` when there is nothing to skip.
+    /// Previous/next stream for the transport controls, resolved once per stream
+    /// by the host: the surrounding episodes of a series, or the channels either
+    /// side of a live one. `neighboursUnknown` means the catalog has no episode
+    /// rows yet, which the controls render as disabled rather than absent.
+    var itemNeighbours = PlayerItemNavigation.Neighbours.none
+    /// Intro / recap / outro windows for the active episode (from IntroDB). The
+    /// openers drive the in-player Skip Intro button; the outro sets when the
+    /// Next Episode button arms. `nil` when IntroDB knows nothing about it.
     var skipSegments: IntroSegments?
     /// When true, an initial-load failure reports to the host via
     /// `onPlaybackFailed` (which decides what to try next — another engine, or
@@ -44,6 +51,15 @@ struct AVPlayerEngineView: View {
     /// Invoked when the viewer picks a different stream (another episode, or a
     /// live channel via the Siri remote) from the in-player overlay.
     var onSelectMedia: ((PlayableMedia) -> Void)?
+    /// Invoked when an explicit "next episode" press leaves the current episode
+    /// behind, so the host can mark it watched and scrobble it. The press is
+    /// available from the first frame, below the completion line the automatic
+    /// advance relies on, so it has to say so itself.
+    var onCompleteCurrentItem: (() -> Void)?
+    /// What the lock screen's next/previous track buttons play, owned by the
+    /// host and handed to `NowPlayingService` with this engine's transport.
+    /// `nil` on tvOS, where the Siri Remote already owns stream changes.
+    var onRemoteAdvance: ((PlayerMediaSwapper.Step) -> Bool)?
 
     @StateObject private var coordinator = AVPlayerCoordinator()
     @State private var isControlsVisible = true
@@ -59,6 +75,10 @@ struct AVPlayerEngineView: View {
     @State private var isPanelOpen = false
     /// Bumped to ask the overlay to close its open panel (Menu/back press).
     @State private var panelCloseToken = 0
+    // Serialises stream changes for this session — the Siri remote's channel
+    // surfing and the on-screen transport controls share it, so two swaps can
+    // never be in flight at once. `internal` so the transport step in
+    // `AVPlayerEngineView+Navigation.swift` can reach it; never read from a body.
     #if os(tvOS)
         /// The full channel browser (categories + channels) raised by a left
         /// press while watching live TV with the controls hidden.
@@ -71,6 +91,10 @@ struct AVPlayerEngineView: View {
         @AppStorage(SortStorageKey.liveContent)
         private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
         @Environment(\.modelContext) private var modelContext
+        /// Keeps channel surfing inside what this viewer may watch — a child
+        /// profile must not be able to rock up/down, or recall the last channel,
+        /// into a category a parent locked or the user hid.
+        @Environment(\.contentRestriction) private var restriction
     #endif
 
     @Environment(\.dismiss) private var dismiss
@@ -107,30 +131,21 @@ struct AVPlayerEngineView: View {
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
 
-            if let nextUpMedia {
-                PlayerNextUpOverlay(
-                    nextMedia: nextUpMedia,
-                    clock: clock,
-                    controlsVisible: isControlsVisible,
-                    onPlayNext: { onSelectMedia?($0) }
-                )
-            }
-
-            if let skipSegments {
-                PlayerSkipIntroOverlay(
-                    segments: skipSegments,
-                    clock: clock,
-                    controlsVisible: isControlsVisible,
-                    onSeek: { time in
-                        coordinator.seek(to: time)
-                        #if os(tvOS)
-                            // The skip button held focus; hand it back to the
-                            // tap-catcher so the remote keeps working.
-                            Task { @MainActor in catcherFocused = true }
-                        #endif
-                    }
-                )
-            }
+            PlayerEpisodeOverlays(
+                segments: skipSegments,
+                nextUpMedia: nextUpMedia,
+                clock: clock,
+                controlsVisible: isControlsVisible,
+                onSeek: { time in
+                    coordinator.seek(to: time)
+                    #if os(tvOS)
+                        // The skip button held focus; hand it back to the
+                        // tap-catcher so the remote keeps working.
+                        Task { @MainActor in catcherFocused = true }
+                    #endif
+                },
+                onSelectMedia: { onSelectMedia?($0) }
+            )
 
             #if os(tvOS)
                 if isChannelBrowserOpen {
@@ -158,11 +173,25 @@ struct AVPlayerEngineView: View {
             coordinator.onPlaybackFailure = { reportFailure() }
             coordinator.startupTimeout = usesQuickStartupTimeout ? fallbackStartupTimeout : startupTimeout
             coordinator.configure(media: media)
+            NowPlayingService.shared.attachTransport(.init(
+                isPlaying: { [weak coordinator] in coordinator?.isPlaying ?? false },
+                play: { [weak coordinator] in
+                    guard let coordinator, !coordinator.isPlaying else { return }
+                    coordinator.togglePlay()
+                },
+                pause: { [weak coordinator] in
+                    guard let coordinator, coordinator.isPlaying else { return }
+                    coordinator.togglePlay()
+                },
+                seek: { [weak coordinator] in coordinator?.seek(to: $0) },
+                advance: onRemoteAdvance
+            ), owner: coordinator)
             scheduleHide()
         }
         .onDisappear {
             hideTask?.cancel()
             hoverHideTask?.cancel()
+            NowPlayingService.shared.detachTransport(owner: coordinator)
             coordinator.tearDown()
         }
         .onChange(of: coordinator.isPlaying) { _, _ in
@@ -210,6 +239,10 @@ struct AVPlayerEngineView: View {
             }
             .onKeyPress(.leftArrow) { coordinator.skip(by: -15); resetHideTimer(); return .handled }
             .onKeyPress(.rightArrow) { coordinator.skip(by: 15); resetHideTimer(); return .handled }
+            .liveChannelKeyNavigation(
+                neighbours: itemNeighbours, swapper: mediaSwapper,
+                onSelect: { onSelectMedia?($0) }, onResetHideTimer: resetHideTimer
+            )
             .onKeyPress(.space) { togglePlay(); return .handled }
             .onKeyPress(.escape) { closePlayer(); return .handled }
         #endif
@@ -227,7 +260,7 @@ struct AVPlayerEngineView: View {
             // Yield focus to the failure overlay's buttons when a stream dies.
             .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
-            .onMoveCommand { direction in
+            .tvRemoteMoveCommand { direction in
                 // Left opens the channel browser; up/down surf adjacent
                 // channels; right recalls the last channel watched.
                 if media.isLive, direction == .left {
@@ -259,7 +292,8 @@ struct AVPlayerEngineView: View {
                 onResetHideTimer: { resetHideTimer() },
                 onSelectMedia: { onSelectMedia?($0) },
                 onPanelOpenChange: { setPanelOpen($0) },
-                onSwitchChannel: { switchLiveChannel($0) }
+                onSwitchChannel: { switchLiveChannel($0) },
+                mediaSwapper: mediaSwapper, onCompleteCurrentItem: { onCompleteCurrentItem?() }
             )
         #else
             AVPlayerControlsOverlay(
@@ -273,7 +307,9 @@ struct AVPlayerEngineView: View {
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
                 onResetHideTimer: { resetHideTimer() },
-                onScheduleHide: { scheduleHide() }
+                onScheduleHide: { scheduleHide() },
+                itemNeighbours: itemNeighbours,
+                onStepItem: { stepItem($0) }
             )
         #endif
     }
@@ -291,22 +327,14 @@ struct AVPlayerEngineView: View {
         /// one. Falls back to summoning the controls when there's nothing to
         /// jump to.
         private func switchLiveChannel(_ direction: MoveCommandDirection) {
-            guard media.isLive else { return }
-            let target: PlayableMedia?
-            switch direction {
-            case .up, .down:
-                let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
-                    for: media, offset: direction == .up ? 1 : -1, sort: sort, in: modelContext
-                )
-            case .right:
-                target = LiveChannelHistory.recallMedia(in: modelContext)
-            default:
-                return
-            }
-            guard let target else { showControls(); return }
-            onSelectMedia?(target)
-            showControls()
+            mediaSwapper.surf(
+                direction, from: media,
+                through: .init(
+                    sortRaw: liveContentSortRaw, restriction: restriction, context: modelContext
+                ),
+                select: { onSelectMedia?($0) },
+                showControls: showControls
+            )
         }
 
         /// The two-column category / channel browser, slid in over the leading
@@ -396,7 +424,7 @@ struct AVPlayerEngineView: View {
 
     private func scheduleHide() {
         hideTask?.cancel()
-        guard coordinator.isPlaying, !isPanelOpen else { return }
+        guard coordinator.isPlaying, !isPanelOpen, !PlayerControlsAutoHide.isSuppressed else { return }
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
             guard !Task.isCancelled, coordinator.isPlaying else { return }
@@ -550,7 +578,8 @@ private extension View {
             startTime: 0,
             contentRef: .movie("preview")
         ),
-        clock: PlaybackClock()
+        clock: PlaybackClock(),
+        mediaSwapper: PlayerMediaSwapper()
     )
     .preferredColorScheme(.dark)
 }

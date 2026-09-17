@@ -16,41 +16,13 @@ import Testing
 
 @MainActor
 struct CloudSyncDeletionTests {
-    private func makeContainer() throws -> ModelContainer {
-        let fullSchema = Schema([
-            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
-            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self,
-            SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self
-        ])
-        // `cloudKitDatabase: .none` is required on both stores: the catalog uses
-        // `@Attribute(.unique)`, which CloudKit forbids, and the default
-        // `.automatic` mirrors to CloudKit on a signed/entitled test host and
-        // fails the load with `loadIssueModelContainer`.
-        let localConfig = ModelConfiguration(
-            "local",
-            schema: Schema([
-                Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
-                Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
-            ]),
-            isStoredInMemoryOnly: true,
-            cloudKitDatabase: .none
-        )
-        let cloudConfig = ModelConfiguration(
-            "cloud",
-            schema: Schema([SyncedPlaylist.self, UserContentState.self, SyncedEPGSource.self]),
-            isStoredInMemoryOnly: true,
-            cloudKitDatabase: .none
-        )
-        return try ModelContainer(for: fullSchema, configurations: localConfig, cloudConfig)
-    }
-
     private func freshShadow() -> CloudSyncShadow {
         let suite = UserDefaults(suiteName: "cloudsync.deletion.test.\(UUID().uuidString)")!
         return CloudSyncShadow(defaults: suite)
     }
 
     @Test func `deleting the last playlist propagates to the cloud instead of resurrecting`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
         let shadow = freshShadow()
 
@@ -89,7 +61,7 @@ struct CloudSyncDeletionTests {
     }
 
     @Test func `deleting one of several playlists leaves the survivor untouched`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
 
         let doomed = Playlist(name: "Doomed", serverURL: "http://a", username: "u", password: "p")
@@ -117,7 +89,7 @@ struct CloudSyncDeletionTests {
     }
 
     @Test func `deleting a never-synced playlist works without a mirror or shadow`() async throws {
-        let container = try makeContainer()
+        let container = try makeProfileTestContainer()
         let ctx = container.mainContext
 
         let playlist = Playlist(name: "Local Only", serverURL: "http://x", username: "u", password: "p")

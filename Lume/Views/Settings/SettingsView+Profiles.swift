@@ -2,10 +2,11 @@
 //  SettingsView+Profiles.swift
 //  Lume
 //
-//  The tvOS Profiles settings pane. tvOS has no top-left profile switcher (it
-//  would disturb the immersive home's focus), so Settings is the entry point for
-//  switching, adding and editing profiles there. iOS/macOS use the top-left
-//  ProfileMenu instead.
+//  The tvOS Profiles settings pane — the management surface: switch, add, edit
+//  and delete profiles. Switching alone also has a fast path, the Play/Pause
+//  quick-switch overlay (TVQuickSwitchOverlay). tvOS carries no top-left
+//  ProfileMenu (it would disturb the immersive home's focus); iOS/macOS use that
+//  menu instead.
 //
 
 import SwiftData
@@ -54,9 +55,15 @@ import SwiftUI
         @Environment(ProfileManager.self) private var profileManager: ProfileManager?
         @Environment(ParentalControls.self) private var parental: ParentalControls?
         /// The roster comes from `ProfileManager` — `UserProfile` lives in the
-        /// cloud store (a separate container this view's env context doesn't bind to).
-        private var profiles: [UserProfile] {
-            profileManager?.profiles ?? []
+        /// cloud store (a separate container this view's env context doesn't bind
+        /// to) — and which row is active is resolved the same way every other
+        /// switch surface resolves it.
+        private var profileRows: [QuickSwitchRow<UserProfile>] {
+            guard let profileManager else { return [] }
+            return QuickSwitchResolver.profileRows(
+                profileManager.profiles,
+                activeProfileID: profileManager.activeProfileID
+            )
         }
 
         @State private var creatingProfile = false
@@ -81,12 +88,12 @@ import SwiftUI
             VStack(alignment: .leading, spacing: 8) {
                 TVSettingsSectionLabel("Profiles")
 
-                ForEach(profiles) { profile in
-                    row(profile)
+                ForEach(profileRows) { profileRow in
+                    row(profileRow)
                 }
 
                 Button {
-                    if premium.isPremium || profiles.isEmpty {
+                    if premium.isPremium || profileRows.isEmpty {
                         creatingProfile = true
                     } else {
                         showPaywall = true
@@ -173,29 +180,17 @@ import SwiftUI
             }
         }
 
-        private func row(_ profile: UserProfile) -> some View {
-            let isActive = profile.id == profileManager?.activeProfileID
+        private func row(_ profileRow: QuickSwitchRow<UserProfile>) -> some View {
+            let profile = profileRow.item
             return HStack(spacing: 16) {
-                Button {
-                    guard let profileManager, !isActive else { return }
+                TVProfileSwitchRow(profile: profile, isActive: profileRow.isCurrent) {
+                    guard let profileManager, !profileRow.isCurrent else { return }
                     if parental?.requiresPIN(toSwitchTo: profile) == true {
                         pendingSwitch = profile
                     } else {
                         Task { await profileManager.switchProfile(to: profile.id) }
                     }
-                } label: {
-                    HStack(spacing: 16) {
-                        ProfileAvatarView(profile: profile, size: 44)
-                        Text(profile.name)
-                        Spacer(minLength: 0)
-                        if isActive {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(.tint)
-                        }
-                    }
                 }
-                .buttonStyle(TVSettingsRowButtonStyle())
 
                 Button {
                     editingProfile = profile

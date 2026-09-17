@@ -128,8 +128,7 @@ struct FavoriteManagementView: View {
     }
 
     private func remove(_ entry: FavoriteEntry) {
-        entry.model.isFavorite = false
-        entry.model.favoriteOrder = nil
+        MediaFavorites.clearFavoriteState(entry.model)
     }
 
     private func reset() {

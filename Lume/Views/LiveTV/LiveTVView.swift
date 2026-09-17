@@ -40,18 +40,27 @@ struct LiveTVView: View {
     @Query(filter: #Predicate<Category> { $0.typeRaw == "live" && $0.isHidden == false })
     private var categories: [Category]
 
-    /// Drives whether the Favorites / Recently Watched virtual sections appear in
-    /// the rail. Queried across all playlists, then scoped in-memory by prefix.
-    @Query(filter: #Predicate<LiveStream> { $0.isFavorite && $0.isHidden == false })
-    private var favoriteStreams: [LiveStream]
-    @Query(filter: #Predicate<LiveStream> { $0.lastWatchedDate != nil && $0.isHidden == false })
-    private var recentStreams: [LiveStream]
+    /// Keeps the rail's categories from being filtered and sorted on every body
+    /// pass — see `LiveTVCategoryMemo`. Whether the two virtual sections appear
+    /// is `LiveTVSections`' job; it owns the bounded probes that answer it.
+    @State private var categoryMemo = LiveTVCategoryMemo()
 
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @State private var selectedSection: LiveTVSection?
+    /// The playlist `selectedSection` was last seeded for — see `seedSelection`.
+    @State private var seededPrefix: String?
     @State private var showingSync = false
     @State private var playingMedia: PlayableMedia?
     @State private var showingSettings = false
+    #if os(tvOS)
+        @Environment(DeepLinkRouter.self) private var router
+    #else
+        /// Non-nil while Multi-View is up; carries the channels it opened with,
+        /// when it was started from a channel rather than the toolbar.
+        @State private var multiViewLaunch: MultiViewLaunch?
+    #endif
+    @State private var showingPaywall = false
+    @State private var premium = PremiumManager.shared
 
     @AppStorage(SortStorageKey.liveCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.liveContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
@@ -89,8 +98,9 @@ struct LiveTVView: View {
                     scope: section.scope,
                     playlistPrefix: playlistPrefix,
                     sort: contentSort,
-                    onPlay: { playChannel($0) },
-                    onPlayCatchup: { playCatchup($0, cell: $1) }
+                    onPlay: { playChannel($0, scope: section.scope) },
+                    onPlayCatchup: { playCatchup($0, cell: $1) },
+                    onStartMultiView: { startMultiView(with: $0) }
                 )
             } else {
                 channelList(for: section)
@@ -102,14 +112,22 @@ struct LiveTVView: View {
     @ViewBuilder
     private func channelList(for section: LiveTVSection) -> some View {
         #if os(tvOS)
-            TVChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                playChannel(stream)
-            }
+            TVChannelsList(
+                scope: section.scope,
+                playlistPrefix: playlistPrefix,
+                sort: contentSort,
+                onStartMultiView: { startMultiView(with: $0) },
+                onPlay: { playChannel($0, scope: section.scope) }
+            )
             .frame(maxWidth: .infinity)
         #else
-            ChannelsList(scope: section.scope, playlistPrefix: playlistPrefix, sort: contentSort) { stream in
-                playChannel(stream)
-            }
+            ChannelsList(
+                scope: section.scope,
+                playlistPrefix: playlistPrefix,
+                sort: contentSort,
+                onStartMultiView: { startMultiView(with: $0) },
+                onPlay: { playChannel($0, scope: section.scope) }
+            )
         #endif
     }
 
@@ -131,18 +149,18 @@ struct LiveTVView: View {
                         )
                     }
                 } else {
-                    // Resolve the rail's sections (and the displayed one) once
-                    // per render — both `displayedSection` and the layouts read
-                    // them, and each resolve filters + sorts the categories.
-                    let sections = sortedSections
-                    let displayed = displayedSection(in: sections)
-                    #if os(iOS)
-                        iOSLayout(sections: sections, displayed: displayed)
-                    #elseif os(tvOS)
-                        tvOSLayout(sections: sections, displayed: displayed)
-                    #else
-                        macOSLayout(sections: sections, displayed: displayed)
-                    #endif
+                    // The rail resolves in a child view: gating the two virtual
+                    // sections is a pair of playlist-scoped `LIMIT 1` probes, and
+                    // a `@Query` carries that scope only when its descriptor is
+                    // built in an `init` the active playlist reaches.
+                    LiveTVSections(
+                        playlistPrefix: playlistPrefix,
+                        restriction: restriction,
+                        categorySections: categorySections
+                    ) { sections in
+                        layout(for: sections)
+                            .task(id: playlistPrefix) { seedSelection(from: sections) }
+                    }
                 }
             }
             .platformNavigationTitle("Live TV")
@@ -159,6 +177,16 @@ struct LiveTVView: View {
                         layoutModePicker
                             .frame(maxWidth: 240)
                     }
+                    // Its own ToolbarItem with a titled Label, for the same
+                    // reason `LibraryToolbar` splits its buttons up: an item
+                    // pushed into the "..." overflow needs a menu representation.
+                    ToolbarItem(placement: .automatic) {
+                        Button {
+                            openMultiView()
+                        } label: {
+                            Label("Multi-View", systemImage: "rectangle.split.2x2")
+                        }
+                    }
                 }
             }
             #endif
@@ -171,26 +199,35 @@ struct LiveTVView: View {
                 showingSettings: $showingSettings,
                 activePlaylist: activePlaylist
             ))
-            .task {
-                if selectedSection == nil, let first = sortedSections.first {
-                    selectedSection = first
-                }
-            }
-            .onChange(of: selectedPlaylistID) {
-                // Switching playlists invalidates the current selection, which
-                // belongs to the previous playlist. Reset to the new playlist's
-                // first section so the channel list stays in sync.
-                selectedSection = sortedSections.first
-            }
             #if os(iOS) || os(tvOS)
             .fullScreenCover(item: $playingMedia) { media in
                 FullScreenPlayerView(media: media)
             }
             #endif
+            #if os(iOS)
+            .fullScreenCover(item: $multiViewLaunch) { launch in
+                MultiViewScreen(seed: launch.seed)
+            }
+            #endif
+            .paywall(isPresented: $showingPaywall, highlight: .multiView)
         }
     }
 
     // MARK: - Platform-specific layouts
+
+    /// This platform's browse layout for the resolved rail. The displayed
+    /// section resolves here, once per render — rail and detail pane both need it.
+    @ViewBuilder
+    private func layout(for sections: [LiveTVSection]) -> some View {
+        let displayed = displayedSection(in: sections)
+        #if os(iOS)
+            iOSLayout(sections: sections, displayed: displayed)
+        #elseif os(tvOS)
+            tvOSLayout(sections: sections, displayed: displayed)
+        #else
+            macOSLayout(sections: sections, displayed: displayed)
+        #endif
+    }
 
     #if os(iOS)
         private func iOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
@@ -247,8 +284,10 @@ struct LiveTVView: View {
                 displayedSection: displayed,
                 layoutModeRaw: $layoutModeRaw,
                 contentSort: contentSort,
-                onPlay: { playChannel($0) },
+                onPlay: { playChannel($0, scope: displayed?.scope) },
                 onPlayCatchup: { playCatchup($0, cell: $1) },
+                onOpenMultiView: { openMultiView() },
+                onStartMultiView: { startMultiView(with: $0) },
                 playlistPrefix: playlistPrefix
             )
         }
@@ -265,39 +304,33 @@ struct LiveTVView: View {
         activePlaylist.map { "\($0.id.uuidString)-" } ?? ""
     }
 
-    /// Categories scoped to the active playlist. The `@Query` fetches every
-    /// playlist's categories (SwiftData can't parameterize a `@Query` on view
-    /// state), so we isolate by the playlist-prefixed category `id` here.
-    private var sortedCategories: [Category] {
-        guard let playlistId = activePlaylist?.id else { return [] }
-        let prefix = "\(playlistId.uuidString)-"
-        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) })
+    /// The rail's category entries: the active playlist's live categories this
+    /// viewer may see, in the chosen order. The `@Query` fetches every playlist's
+    /// categories (SwiftData can't parameterize a `@Query` on view state), so the
+    /// isolation by playlist-prefixed `id` — and the sort — happen here, memoized
+    /// so a body pass that changed nothing about them costs a key comparison.
+    private var categorySections: [LiveTVSection] {
+        categoryMemo.sections(
+            categories: categories,
+            playlistPrefix: playlistPrefix,
+            sort: categorySort,
+            restriction: restriction
+        )
     }
 
-    /// Whether the active playlist has any favorited / recently-watched channels,
-    /// gating the corresponding virtual sections so empty collections never show.
-    /// Channels in restricted categories are excluded while a child profile is
-    /// active, so those collections never surface restricted content.
-    private var hasFavorites: Bool {
-        !playlistPrefix.isEmpty && favoriteStreams.contains {
-            $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.categoryId)
+    /// Points the rail at its first section. On first appearance that only means
+    /// seeding an empty selection; on a playlist switch it resets unconditionally,
+    /// because the previous selection belonged to the playlist that just went
+    /// away — the two moments the removed `.task` / `.onChange(of:)` pair covered.
+    /// Anything narrower (a category hidden in Content Management, the last
+    /// favorite removed) is left to `displayedSection(in:)`, as before.
+    private func seedSelection(from sections: [LiveTVSection]) {
+        if seededPrefix != nil, seededPrefix != playlistPrefix {
+            selectedSection = sections.first
+        } else if selectedSection == nil {
+            selectedSection = sections.first
         }
-    }
-
-    private var hasRecents: Bool {
-        !playlistPrefix.isEmpty && recentStreams.contains {
-            $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.categoryId)
-        }
-    }
-
-    /// The rail's entries: the virtual collections (when non-empty) pinned above
-    /// the synced categories.
-    private var sortedSections: [LiveTVSection] {
-        var sections: [LiveTVSection] = []
-        if hasFavorites { sections.append(.favorites) }
-        if hasRecents { sections.append(.recentlyWatched) }
-        sections.append(contentsOf: sortedCategories.map(LiveTVSection.category))
-        return sections
+        seededPrefix = playlistPrefix
     }
 
     /// The section to render in the detail pane. Normally the user's selection,
@@ -311,9 +344,11 @@ struct LiveTVView: View {
             : sections.first
     }
 
-    private func playChannel(_ stream: LiveStream) {
+    /// `scope` is the section the channel was picked from; it travels with the
+    /// media so in-player channel surfing stays inside that list.
+    private func playChannel(_ stream: LiveStream, scope: LiveChannelScope?) {
         guard let playlist = activePlaylist,
-              let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+              let media = PlayableMedia.from(stream: stream, playlist: playlist, scope: scope) else { return }
         present(media)
     }
 
@@ -330,296 +365,43 @@ struct LiveTVView: View {
         present(media)
     }
 
+    /// Opens Multi-View on a channel picked from the list, so the grid starts
+    /// with something playing rather than two empty tiles.
+    private func startMultiView(with stream: LiveStream) {
+        guard let playlist = activePlaylist,
+              let media = PlayableMedia.from(stream: stream, playlist: playlist)
+        else {
+            return
+        }
+        openMultiView(seed: [media])
+    }
+
+    /// Opens Multi-View, or the paywall when the viewer isn't on Lume Pro.
+    private func openMultiView(seed: [PlayableMedia] = []) {
+        guard premium.isPremium else {
+            showingPaywall = true
+            return
+        }
+        #if os(macOS)
+            // The window is a singleton, so it cannot be built around a launch:
+            // hand the channels over and let the grid adopt them on appear.
+            MultiViewLaunchQueue.shared.pending = seed
+            openWindow(id: "multiview")
+        #elseif os(tvOS)
+            // Presented by `MainTabView`, above the tab bar — see the router.
+            router.multiViewLaunch = MultiViewLaunch(seed: seed)
+        #else
+            multiViewLaunch = MultiViewLaunch(seed: seed)
+        #endif
+    }
+
     private func present(_ media: PlayableMedia) {
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif
-    }
-}
-
-// MARK: - Category Sidebar
-
-struct CategorySidebar: View {
-    let sections: [LiveTVSection]
-    @Binding var selectedSection: LiveTVSection?
-
-    var body: some View {
-        List(sections) { section in
-            let isSelected = selectedSection?.id == section.id
-            Button {
-                selectedSection = section
-            } label: {
-                HStack(spacing: 8) {
-                    if let icon = section.icon {
-                        Image(systemName: icon)
-                            .font(.subheadline)
-                            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                    }
-                    section.titleText
-                        .font(.headline)
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .listRowBackground(
-                isSelected
-                    ? Color.accentColor.opacity(0.15)
-                    : Color.clear
-            )
-        }
-        #if !os(tvOS)
-        .listStyle(.sidebar)
-        #endif
-    }
-}
-
-// MARK: - iOS Category Bar
-
-#if os(iOS)
-    /// iOS category selector. A horizontal pill strip is unscannable once a
-    /// playlist syncs hundreds of categories, so the current section is shown as a
-    /// single button that opens a searchable list of every section instead.
-    struct CategoryBar: View {
-        let sections: [LiveTVSection]
-        @Binding var selectedSection: LiveTVSection?
-
-        @State private var showingPicker = false
-
-        /// The section the button reflects — the user's selection, or the first
-        /// available one if that selection has since disappeared (mirrors
-        /// `displayedSection(in:)`).
-        private var currentSection: LiveTVSection? {
-            guard let selectedSection else { return sections.first }
-            return sections.first { $0.id == selectedSection.id } ?? sections.first
-        }
-
-        var body: some View {
-            Button {
-                showingPicker = true
-            } label: {
-                HStack(spacing: 8) {
-                    if let icon = currentSection?.icon {
-                        Image(systemName: icon)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    (currentSection?.titleText ?? Text("Select a Category"))
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .background(.bar)
-            .sheet(isPresented: $showingPicker) {
-                CategoryPickerSheet(sections: sections, selectedSection: $selectedSection)
-            }
-
-            Divider()
-        }
-    }
-
-    /// Searchable list of every Live TV section. Type to filter hundreds of
-    /// synced categories down to a handful; the virtual collections stay pinned
-    /// at the top while the search field is empty.
-    private struct CategoryPickerSheet: View {
-        let sections: [LiveTVSection]
-        @Binding var selectedSection: LiveTVSection?
-
-        @Environment(\.dismiss) private var dismiss
-        @State private var query = ""
-
-        private var filteredSections: [LiveTVSection] {
-            let trimmed = query.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { return sections }
-            return sections.filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
-        }
-
-        var body: some View {
-            NavigationStack {
-                List(filteredSections) { section in
-                    let isSelected = selectedSection?.id == section.id
-                    Button {
-                        selectedSection = section
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 12) {
-                            if let icon = section.icon {
-                                Image(systemName: icon)
-                                    .foregroundStyle(.secondary)
-                            }
-                            section.titleText
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            if isSelected {
-                                Image(systemName: "checkmark")
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.tint)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .listStyle(.plain)
-                .overlay {
-                    if filteredSections.isEmpty {
-                        ContentUnavailableView.search(text: query)
-                    }
-                }
-                .searchable(text: $query, prompt: "Search categories")
-                .navigationTitle("Categories")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
-                    }
-                }
-            }
-        }
-    }
-#endif
-
-// MARK: - Channels List
-
-struct ChannelsList: View {
-    let scope: LiveChannelScope
-    let playlistPrefix: String
-    let onPlay: (LiveStream) -> Void
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.contentRestriction) private var restriction
-    @Query private var streams: [LiveStream]
-    /// Now/next EPG for the visible channels, resolved in one off-main fetch
-    /// (see `ChannelEPGSnapshot`) instead of a per-card `@Query`.
-    @State private var epgByChannel: [String: ChannelEPG] = [:]
-    /// Observed so the EPG lookup refreshes when a guide import finishes.
-    @State private var epgSync = EPGSyncService.shared
-    /// How many channels are currently rendered. Grows by a page as the list
-    /// nears its end so a large category loads lazily instead of all at once.
-    @State private var visibleCount = LiveChannelQuery.pageSize
-    /// Drives the "Clear Recently Watched" confirmation alert.
-    @State private var confirmingClear = false
-
-    init(scope: LiveChannelScope, playlistPrefix: String, sort: ContentSortOption, onPlay: @escaping (LiveStream) -> Void) {
-        self.scope = scope
-        self.playlistPrefix = playlistPrefix
-        self.onPlay = onPlay
-        _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
-    }
-
-    private var scopedStreams: [LiveStream] {
-        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
-            .excludingRestricted(restriction)
-    }
-
-    /// Clears a channel's watch timestamp so it drops out of the Recently
-    /// Watched list. The @Query-backed list updates once the change is saved.
-    private func removeFromRecentlyWatched(_ stream: LiveStream) {
-        stream.lastWatchedDate = nil
-        try? modelContext.save()
-    }
-
-    /// Empties the whole Recently Watched list for the active playlist. The
-    /// section drops away on its own once the last timestamp clears (its parent
-    /// gates it on `hasRecents`).
-    private func clearRecentlyWatched() {
-        let container = modelContext.container
-        Task { await StorageManager.clearRecentlyWatchedChannels(playlistPrefix: playlistPrefix, container: container) }
-    }
-
-    /// A trailing "Clear" button shown above the Recently Watched list. Stays
-    /// out of the scroll view so it's always reachable no matter how far the
-    /// list is scrolled.
-    private var clearHeader: some View {
-        HStack {
-            Spacer()
-            Button(role: .destructive) {
-                confirmingClear = true
-            } label: {
-                Label("Clear", systemImage: "trash")
-                    .font(.subheadline)
-            }
-            .buttonStyle(.borderless)
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-    }
-
-    var body: some View {
-        let channels = scopedStreams
-        let visible = Array(channels.prefix(visibleCount))
-        VStack(spacing: 0) {
-            if scope == .recentlyWatched, !channels.isEmpty {
-                clearHeader
-            }
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    if channels.isEmpty {
-                        ContentUnavailableView(
-                            "No Channels",
-                            systemImage: "antenna.radiowaves.left.and.right",
-                            description: Text("This category has no channels")
-                        )
-                    } else {
-                        ForEach(visible) { stream in
-                            Button {
-                                onPlay(stream)
-                            } label: {
-                                LiveStreamCardView(stream: stream, epg: epgByChannel[stream.epgChannelId ?? ""])
-                                    .padding(.horizontal)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .recentlyWatchedRemoveMenu(scope == .recentlyWatched ? { removeFromRecentlyWatched(stream) } : nil)
-                            .onAppear {
-                                if stream.id == visible.last?.id, visibleCount < channels.count {
-                                    visibleCount = min(visibleCount + LiveChannelQuery.pageSize, channels.count)
-                                }
-                            }
-
-                            Divider()
-                                .padding(.leading, 88)
-                        }
-                    }
-                }
-            }
-            // Reload when the visible window or channel set changes, or a guide
-            // import settles — EPG is resolved only for the channels on screen.
-            .task(id: "\(channels.count)-\(visible.count)-\(epgSync.isSyncing)") {
-                await loadEPG(for: visible)
-            }
-        }
-        .alert("Clear Recently Watched", isPresented: $confirmingClear) {
-            Button("Clear", role: .destructive) { clearRecentlyWatched() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This clears the list of channels you've recently watched. Your favorites and the channels themselves aren't affected.")
-        }
-    }
-
-    private func loadEPG(for channels: [LiveStream]) async {
-        let channelIds = Array(Set(channels.compactMap(\.epgChannelId).filter { !$0.isEmpty }))
-        guard !channelIds.isEmpty else {
-            epgByChannel = [:]
-            return
-        }
-        let container = modelContext.container
-        let now = Date()
-        epgByChannel = await Task.detached(priority: .userInitiated) {
-            ChannelEPGLoader.load(container: container, channelIds: channelIds, now: now)
-        }.value
     }
 }
 

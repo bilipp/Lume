@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://code.videolan.org/videolan/VLCKit.git",
       "state" : {
-        "revision" : "5d3535a664e7815765a5cee40d9b22527d7299cc",
-        "version" : "4.0.0-a22"
+        "revision" : "6cbc4e7b248aa51ec0906697abb30ecae47194b7",
+        "version" : "4.0.0-a24"
       }
     }
   ],

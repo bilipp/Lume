@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 // The pure, side-effect-free heart of iCloud sync: a three-way merge over a
@@ -155,6 +156,81 @@ nonisolated struct EPGSourceValues: Codable, Equatable {
 
     static func mergeConflict(local _: EPGSourceValues, cloud: EPGSourceValues) -> EPGSourceValues {
         cloud
+    }
+}
+
+// MARK: - Parental controls
+
+/// The syncable state of the parental-control PIN: the salted hash exactly as
+/// `ParentalControlsStore` holds it in the keychain. `nil` (no value at all)
+/// means no PIN is set — so the three-way merge distinguishes "never had a PIN"
+/// from "the parent turned it off", which a bare two-way mirror could not.
+///
+/// `updatedAt` is deliberately *not* a field here: it would make every timestamp
+/// difference read as a change and churn the shadow on every pass. The record's
+/// own `updatedAt` exists only to dedupe duplicate singletons.
+///
+/// Two fields, with deliberately different lifetimes. `hash` is the payload —
+/// what gets written to the keychain or the cloud mirror when a verdict carries
+/// this value. `fingerprint` is a digest *of* that hash, and is the only thing
+/// `Codable` and `Equatable` touch: the shadow baseline is persisted to
+/// `UserDefaults`, and writing the real hash there would undo the whole reason
+/// `ParentalControlsStore` keeps it in the keychain instead. A baseline decoded
+/// from disk therefore carries an empty `hash`, which is harmless — the engine
+/// only ever writes a verdict payload that came from the local or the cloud
+/// side, never from the shadow.
+nonisolated struct ParentalPINValues: Codable, Equatable {
+    /// Salted SHA-256 of the PIN. Empty on a value decoded from the shadow.
+    var hash: String
+    /// Digest of `hash` — the merge's entire notion of identity.
+    private var fingerprint: String
+
+    init(hash: String) {
+        self.hash = hash
+        fingerprint = Self.digest(of: hash)
+    }
+
+    private static func digest(of hash: String) -> String {
+        SHA256.hash(data: Data(hash.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    static func == (lhs: ParentalPINValues, rhs: ParentalPINValues) -> Bool {
+        lhs.fingerprint == rhs.fingerprint
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case fingerprint
+    }
+
+    /// Only the fingerprint round-trips; `hash` is reconstructed from whichever
+    /// live side the next pass reads it from.
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        fingerprint = try container.decode(String.self, forKey: .fingerprint)
+        hash = ""
+    }
+
+    /// Conflict policy: cloud wins, matching playlist config and EPG sources. A
+    /// PIN has no field-level merge — two different PINs set on two devices
+    /// before they converged is a genuine either/or, and a deterministic pick
+    /// beats a clever one. The loser's device can set it again from Settings.
+    static func mergeConflict(local _: ParentalPINValues, cloud: ParentalPINValues) -> ParentalPINValues {
+        cloud
+    }
+}
+
+/// The syncable state of a category's parental restriction. Presence *is* the
+/// restriction — an unrestricted category has no value and no cloud record — so
+/// this only ever carries `true`, and lifting a restriction surfaces as `nil`.
+nonisolated struct CategoryRestrictionValues: Codable, Equatable {
+    var isRestricted: Bool = true
+
+    /// Both sides say `true` whenever both sides have a value, so a conflict can
+    /// only be "restricted vs restricted". Either input is the same answer.
+    static func mergeConflict(local: CategoryRestrictionValues, cloud _: CategoryRestrictionValues) -> CategoryRestrictionValues {
+        local
     }
 }
 

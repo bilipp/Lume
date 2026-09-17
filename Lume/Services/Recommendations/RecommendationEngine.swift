@@ -68,16 +68,24 @@ actor RecommendationEngine {
     }
 
     /// The top `limit` unwatched titles for the active profile, best first.
+    /// Candidates in `excludedCategoryIDs` (hidden in Content Management, or
+    /// restricted for a child profile) never enter the ranking, so the row isn't
+    /// filled with titles the caller has to drop again.
     ///
     /// Throttled: a non-empty list computed within `recalculationInterval` is
     /// returned from the cache instead of re-ranking the catalog. The caller
     /// re-validates each entry against live state, so a freshly watched, favorited
     /// or voted title still drops out between recomputes. Empty when the user has
     /// no taste signals yet — the caller then simply hides the row.
-    func recommendations(limit: Int = 30) -> [ScoredRecommendation] {
+    func recommendations(limit: Int = 30, excluding excludedCategoryIDs: Set<String> = []) -> [ScoredRecommendation] {
         let profileID = ActiveProfileStore.current
+        let visibility = ContentRestriction.visibilityToken(for: excludedCategoryIDs)
+        // A changed visibility set invalidates the cache: the list was ranked
+        // against the previous one, so titles the user just un-hid would stay
+        // missing until the interval elapsed.
         if let cached = cacheStore.cache(for: profileID),
            !cached.items.isEmpty,
+           cached.visibilityToken == visibility,
            Date().timeIntervalSince(cached.computedAt) < recalculationInterval
         {
             return cached.items
@@ -87,12 +95,17 @@ actor RecommendationEngine {
             return []
         }
         let dislike = RecommendationScoring.centroid(of: dislikeSignals())
-        let ranked = rankCandidates(limit: limit, taste: taste, dislike: dislike)
+        let ranked = rankCandidates(
+            limit: limit, taste: taste, dislike: dislike, excluding: excludedCategoryIDs
+        )
 
         // Only cache a real result — an empty one means "no signal yet", which
         // should retry cheaply as soon as the user favorites or watches something.
         if !ranked.isEmpty {
-            cacheStore.save(RecommendationCache(computedAt: Date(), items: ranked), for: profileID)
+            cacheStore.save(
+                RecommendationCache(computedAt: Date(), items: ranked, visibilityToken: visibility),
+                for: profileID
+            )
         }
         return ranked
     }
@@ -170,9 +183,13 @@ actor RecommendationEngine {
 
     // MARK: - Candidate ranking
 
-    /// Scores every unwatched candidate against the taste profile a page at a
-    /// time, keeping only the running top `limit`.
-    private func rankCandidates(limit: Int, taste: [Float], dislike: [Float]?) -> [ScoredRecommendation] {
+    /// Scores every unwatched, visible candidate against the taste profile a page
+    /// at a time, keeping only the running top `limit`. The pages already walk
+    /// the whole candidate set, so the category exclusion is applied in memory
+    /// rather than widening the (index-served) predicate.
+    private func rankCandidates(
+        limit: Int, taste: [Float], dislike: [Float]?, excluding excluded: Set<String>
+    ) -> [ScoredRecommendation] {
         var top: [(item: ScoredRecommendation, score: Float)] = []
 
         func consider(_ id: String, _ kind: RecommendedKind, _ score: Float) {
@@ -184,49 +201,49 @@ actor RecommendationEngine {
 
         // Movies: unwatched, not favorited, never opened, not yet voted on (a
         // voted title — up or down — has already left the rail).
-        var movieOffset = 0
-        while true {
-            let context = ModelContext(modelContainer)
-            var descriptor = FetchDescriptor<Movie>(
-                predicate: #Predicate {
-                    $0.embeddingData != nil && !$0.isWatched && !$0.isFavorite
-                        && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0
-                },
-                sortBy: [SortDescriptor(\.id)]
-            )
-            descriptor.fetchOffset = movieOffset
-            descriptor.fetchLimit = pageSize
-            let page = (try? context.fetch(descriptor)) ?? []
-            for movie in page {
-                guard let vector = movie.embeddingData.map(TextEmbedder.decode) else { continue }
-                consider(movie.id, .movie, RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike))
-            }
-            if page.count < pageSize { break }
-            movieOffset += pageSize
+        forEachPage(predicate: #Predicate<Movie> {
+            $0.embeddingData != nil && !$0.isWatched && !$0.isFavorite
+                && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0
+        }, sortBy: [SortDescriptor(\.id)]) { movie in
+            guard !excluded.contains(movie.categoryId ?? ""),
+                  let vector = movie.embeddingData.map(TextEmbedder.decode) else { return }
+            consider(movie.id, .movie, RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike))
         }
 
         // Series: not favorited, never opened, not yet voted on.
-        var seriesOffset = 0
-        while true {
-            let context = ModelContext(modelContainer)
-            var descriptor = FetchDescriptor<Series>(
-                predicate: #Predicate {
-                    $0.embeddingData != nil && !$0.isFavorite
-                        && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0
-                },
-                sortBy: [SortDescriptor(\.id)]
-            )
-            descriptor.fetchOffset = seriesOffset
-            descriptor.fetchLimit = pageSize
-            let page = (try? context.fetch(descriptor)) ?? []
-            for show in page {
-                guard let vector = show.embeddingData.map(TextEmbedder.decode) else { continue }
-                consider(show.id, .series, RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike))
-            }
-            if page.count < pageSize { break }
-            seriesOffset += pageSize
+        forEachPage(predicate: #Predicate<Series> {
+            $0.embeddingData != nil && !$0.isFavorite
+                && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0
+        }, sortBy: [SortDescriptor(\.id)]) { show in
+            guard !excluded.contains(show.categoryId ?? ""),
+                  let vector = show.embeddingData.map(TextEmbedder.decode) else { return }
+            consider(show.id, .series, RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike))
         }
 
         return top.map(\.item)
+    }
+
+    /// Walks every matching row `pageSize` at a time on a fresh context per page,
+    /// so no managed object outlives the page it came from — what keeps peak
+    /// memory bounded regardless of catalog size. `sortBy` must be stable, or
+    /// offset paging would skip or repeat rows.
+    private func forEachPage<Model: PersistentModel>(
+        predicate: Predicate<Model>,
+        sortBy: [SortDescriptor<Model>],
+        body: (Model) -> Void
+    ) {
+        var offset = 0
+        while true {
+            let context = ModelContext(modelContainer)
+            var descriptor = FetchDescriptor<Model>(predicate: predicate, sortBy: sortBy)
+            descriptor.fetchOffset = offset
+            descriptor.fetchLimit = pageSize
+            let page = (try? context.fetch(descriptor)) ?? []
+            page.forEach(body)
+            if page.count < pageSize {
+                return
+            }
+            offset += pageSize
+        }
     }
 }

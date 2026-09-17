@@ -61,6 +61,10 @@ struct LiveChannelHistoryTests {
         return try #require(UserDefaults(suiteName: suite))
     }
 
+    /// No profile is a child and nothing is hidden — the plain recall tests
+    /// care about the recall pair, not about visibility filtering.
+    private let unrestricted = ContentRestriction()
+
     private let threeChannels: [(num: Int, name: String, category: String)] = [
         (num: 1, name: "Alpha", category: "cat-a"),
         (num: 2, name: "Bravo", category: "cat-a"),
@@ -78,7 +82,7 @@ struct LiveChannelHistoryTests {
         LiveChannelHistory.record(alpha, defaults: defaults)
         LiveChannelHistory.record(delta, defaults: defaults)
 
-        let recalled = LiveChannelHistory.recallMedia(in: context, defaults: defaults)
+        let recalled = LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, defaults: defaults)
         #expect(recalled?.contentRef == alpha.contentRef)
     }
 
@@ -89,7 +93,7 @@ struct LiveChannelHistoryTests {
 
         LiveChannelHistory.record(alpha, defaults: defaults)
 
-        #expect(LiveChannelHistory.recallMedia(in: context, defaults: defaults) == nil)
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, defaults: defaults) == nil)
     }
 
     @Test func `recall toggles between the two most recent channels`() throws {
@@ -101,12 +105,12 @@ struct LiveChannelHistoryTests {
         LiveChannelHistory.record(alpha, defaults: defaults)
         LiveChannelHistory.record(bravo, defaults: defaults)
         // On Bravo, recall points at Alpha.
-        #expect(LiveChannelHistory.recallMedia(in: context, defaults: defaults)?.contentRef == alpha.contentRef)
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, defaults: defaults)?.contentRef == alpha.contentRef)
 
         // Acting on the recall (switching to Alpha) records it, so recall now
         // points back at Bravo — the classic last-button toggle.
         LiveChannelHistory.record(alpha, defaults: defaults)
-        #expect(LiveChannelHistory.recallMedia(in: context, defaults: defaults)?.contentRef == bravo.contentRef)
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, defaults: defaults)?.contentRef == bravo.contentRef)
     }
 
     @Test func `reselecting the current channel leaves recall untouched`() throws {
@@ -120,7 +124,7 @@ struct LiveChannelHistoryTests {
         // Re-recording the current channel must not push Bravo into "previous".
         LiveChannelHistory.record(bravo, defaults: defaults)
 
-        #expect(LiveChannelHistory.recallMedia(in: context, defaults: defaults)?.contentRef == alpha.contentRef)
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, defaults: defaults)?.contentRef == alpha.contentRef)
     }
 
     @Test func `non-live media does not clobber the recall pair`() throws {
@@ -138,7 +142,48 @@ struct LiveChannelHistoryTests {
         // A VOD detour between channels must leave the live recall intact.
         LiveChannelHistory.record(movie, defaults: defaults)
 
-        #expect(LiveChannelHistory.recallMedia(in: context, defaults: defaults)?.contentRef == alpha.contentRef)
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, defaults: defaults)?.contentRef == alpha.contentRef)
+    }
+
+    @Test func `recall skips a channel hidden since it was watched`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let defaults = try makeDefaults()
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        LiveChannelHistory.record(alpha, defaults: defaults)
+        LiveChannelHistory.record(bravo, defaults: defaults)
+        try hide(streamId: 100, playlist: playlist, in: context)
+
+        // The recall pair predates the hiding, so recall is the last surface
+        // that would still tune to a channel no list will show.
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, defaults: defaults) == nil)
+    }
+
+    @Test func `a child profile cannot recall into a locked category`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let defaults = try makeDefaults()
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        LiveChannelHistory.record(alpha, defaults: defaults)
+        LiveChannelHistory.record(bravo, defaults: defaults)
+
+        let restricted = ContentRestriction(isActive: true, restrictedCategoryIDs: ["cat-a"])
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: restricted, defaults: defaults) == nil)
+        // isActive false — a lock applies only while a child profile is active.
+        let parent = ContentRestriction(isActive: false, restrictedCategoryIDs: ["cat-a"])
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: parent, defaults: defaults)?
+            .contentRef == alpha.contentRef)
+    }
+
+    /// Hides a channel in Content Management, as the settings screen would.
+    private func hide(streamId: Int, playlist: Playlist, in context: ModelContext) throws {
+        let id = "\(playlist.id.uuidString)-live-\(streamId)"
+        var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        try #require(try context.fetch(descriptor).first).isHidden = true
+        try context.save()
     }
 
     // MARK: - Recents list
@@ -213,12 +258,12 @@ struct LiveChannelHistoryTests {
             channelId(forStreamId: 101, playlist: playlist),
             channelId(forStreamId: 100, playlist: playlist)
         ])
-        #expect(LiveChannelHistory.recallMedia(in: context, profileID: profileA, defaults: defaults)?
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, profileID: profileA, defaults: defaults)?
             .contentRef == alpha.contentRef)
 
         // Profile B starts empty — A's history doesn't leak across.
         #expect(LiveChannelHistory.recentChannelIds(profileID: profileB, defaults: defaults).isEmpty)
-        #expect(LiveChannelHistory.recallMedia(in: context, profileID: profileB, defaults: defaults) == nil)
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, profileID: profileB, defaults: defaults) == nil)
     }
 
     @Test func `the default profile reuses an upgrading user's existing history`() throws {
@@ -253,6 +298,6 @@ struct LiveChannelHistoryTests {
         LiveChannelHistory.purge(profileID: profile, defaults: defaults)
 
         #expect(LiveChannelHistory.recentChannelIds(profileID: profile, defaults: defaults).isEmpty)
-        #expect(LiveChannelHistory.recallMedia(in: context, profileID: profile, defaults: defaults) == nil)
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, profileID: profile, defaults: defaults) == nil)
     }
 }

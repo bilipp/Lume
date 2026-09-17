@@ -28,6 +28,12 @@ class XtreamClient: APIClient {
     let configuration: Configuration
     let session: URLSession
 
+    /// When the most recent request released the connection, on a monotonic
+    /// clock. Read by `ContentSyncManager` to space consecutive bulk requests
+    /// apart without re-paying wall clock the sync has already spent elsewhere.
+    /// Stamped on failures too — a 401/403 still occupied the slot.
+    private(set) var lastRequestFinishedAt: ContinuousClock.Instant?
+
     nonisolated init(configuration: Configuration, urlSession: URLSession? = nil) {
         self.configuration = configuration
         session = urlSession ?? Self.makeSession(timeout: configuration.timeout)
@@ -98,6 +104,14 @@ class XtreamClient: APIClient {
         return components?.url
     }
 
+    /// Signposts wrapping the two halves of a bulk request, so a trace can tell
+    /// a slow transfer apart from a slow decode. Only the three catalog
+    /// endpoints supply one; every other call leaves the phases unnamed.
+    nonisolated struct RequestPhases {
+        let fetch: PerfSignpost
+        let decode: PerfSignpost
+    }
+
     /// Maximum number of attempts (1 initial + retries) for a single request.
     private static let maxAttempts = 3
 
@@ -111,17 +125,22 @@ class XtreamClient: APIClient {
     ///   has already proven the credentials, a 401/403 is almost always the
     ///   provider's connection/rate limit rather than bad credentials. Login
     ///   (`getInfo`) leaves it `false` so wrong credentials fail fast.
-    private func request<T: Decodable>(_ url: URL, action: String, retryAuthFailure: Bool = true) async throws -> T {
+    private func request<T: Decodable>(
+        _ url: URL,
+        action: String,
+        retryAuthFailure: Bool = true,
+        phases: RequestPhases? = nil
+    ) async throws -> T {
         var attempt = 0
         while true {
             attempt += 1
             do {
-                return try await performRequest(url)
+                return try await performRequest(url, action: action, phases: phases)
             } catch let error as XtreamError {
                 let retriable = error.isRetriable || (retryAuthFailure && error.isAuthFailure)
                 guard retriable, attempt < Self.maxAttempts else {
                     Logger.network.error(
-                        "Xtream \(action, privacy: .public) request failed permanently (\(error.logDescription, privacy: .public)) after \(attempt) attempt(s)"
+                        "Xtream \(action, privacy: .public) request failed permanently (\(error.logDescription, privacy: .public)) after \(attempt, privacy: .public) attempt(s)"
                     )
                     throw error
                 }
@@ -129,24 +148,49 @@ class XtreamClient: APIClient {
                 // Exponential backoff: 2s, then 4s. Gives the provider time to
                 // release the connection slot / clear the rate-limit window.
                 let delay = pow(2.0, Double(attempt))
+                let reason = error.logDescription
+                let retryLabel = "\(attempt)/\(Self.maxAttempts - 1)"
                 Logger.network.warning(
-                    "Xtream \(action, privacy: .public) request failed (\(error.logDescription, privacy: .public)); retry \(attempt)/\(Self.maxAttempts - 1) in \(delay)s"
+                    "Xtream \(action, privacy: .public) failed (\(reason, privacy: .public)); retry \(retryLabel, privacy: .public) after \(delay, privacy: .public)s"
                 )
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                Logger.network.warning(
+                    "Xtream \(action, privacy: .public) backoff of \(delay, privacy: .public)s elapsed; retrying (attempt \(attempt + 1, privacy: .public))"
+                )
             }
         }
     }
 
     /// A single request attempt. Network-level failures are wrapped into
     /// `XtreamError.networkError` so callers see a consistent error type.
-    private func performRequest<T: Decodable>(_ url: URL) async throws -> T {
+    private func performRequest<T: Decodable>(_ url: URL, action: String, phases: RequestPhases? = nil) async throws -> T {
+        #if DEBUG
+            // VERIFIED, not defensive: `XtreamClient` declares no isolation, so
+            // `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` infers `@MainActor` for the
+            // whole type (unlike the sibling `nonisolated class M3UClient`). This
+            // holds even when the caller is `actor ContentSyncManager`, and the body
+            // never leaves that domain, so the bulk transfer's continuation and the
+            // multi-hundred-thousand-element `decoder.decode` below both run on the
+            // main actor. Remove only together with making the type `nonisolated`.
+            MainActor.assertIsolated("XtreamClient.performRequest runs on the main actor")
+        #endif
         let data: Data
         let response: URLResponse
+        let fetchInterval = phases.map { Perf.begin($0.fetch) }
         do {
             (data, response) = try await session.data(from: url)
         } catch {
+            if let fetchInterval { Perf.end(fetchInterval) }
+            lastRequestFinishedAt = ContinuousClock.now
             throw XtreamError.networkError(error)
         }
+        if let fetchInterval { Perf.end(fetchInterval) }
+        lastRequestFinishedAt = ContinuousClock.now
+
+        let byteCount = data.count
+        Logger.network.info(
+            "Xtream \(action, privacy: .public) payload \(byteCount, privacy: .public) bytes"
+        )
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw XtreamError.invalidResponse
@@ -160,6 +204,8 @@ class XtreamClient: APIClient {
             throw XtreamError.serverError(httpResponse.statusCode)
         }
 
+        let decodeInterval = phases.map { Perf.begin($0.decode) }
+        defer { if let decodeInterval { Perf.end(decodeInterval) } }
         do {
             let decoder = JSONDecoder()
             return try decoder.decode(T.self, from: data)
@@ -216,7 +262,7 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        let list: XtreamList<XtreamLiveStream> = try await request(url, action: "get_live_streams")
+        let list: XtreamList<XtreamLiveStream> = try await request(url, action: "get_live_streams", phases: RequestPhases(fetch: .xtreamFetchLiveStreams, decode: .xtreamDecodeLiveStreams))
         return list.items
     }
 
@@ -251,7 +297,7 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        let list: XtreamList<XtreamVODStream> = try await request(url, action: "get_vod_streams")
+        let list: XtreamList<XtreamVODStream> = try await request(url, action: "get_vod_streams", phases: RequestPhases(fetch: .xtreamFetchMovies, decode: .xtreamDecodeMovies))
         return list.items
     }
 
@@ -302,7 +348,7 @@ class XtreamClient: APIClient {
             throw XtreamError.invalidURL
         }
 
-        let list: XtreamList<XtreamSeries> = try await request(url, action: "get_series")
+        let list: XtreamList<XtreamSeries> = try await request(url, action: "get_series", phases: RequestPhases(fetch: .xtreamFetchSeries, decode: .xtreamDecodeSeries))
         return list.items
     }
 
@@ -400,21 +446,33 @@ class XtreamClient: APIClient {
         return URL(string: "\(playlist.serverURL)/series/\(playlist.username)/\(playlist.password)/\(episode.episodeId).\(ext)")
     }
 
-    /// Builds a playback URL for a live stream
-    func buildLiveStreamURL(for stream: LiveStream, playlist: Playlist, format: StreamFormat = .m3u8) -> URL? {
-        URL(string: "\(playlist.serverURL)/live/\(playlist.username)/\(playlist.password)/\(stream.streamId).\(format.rawValue)")
+    /// Builds a playback URL for a live stream. `format` overrides the
+    /// playlist's own container preference; when omitted the playlist decides,
+    /// falling back to HLS.
+    func buildLiveStreamURL(for stream: LiveStream, playlist: Playlist, format: StreamFormat? = nil) -> URL? {
+        let ext = Self.resolvedFormat(format, playlist: playlist, fallback: .m3u8).rawValue
+        return URL(string: "\(playlist.serverURL)/live/\(playlist.username)/\(playlist.password)/\(stream.streamId).\(ext)")
+    }
+
+    private nonisolated static func resolvedFormat(
+        _ requested: StreamFormat?,
+        playlist: Playlist,
+        fallback: StreamFormat
+    ) -> StreamFormat {
+        requested ?? playlist.streamFormat.xtreamFormat ?? fallback
     }
 
     /// `Y-m-d:H-i` is the start format Xtream Codes panels expect in a timeshift
-    /// path. Formatted in the device's local timezone — the panel interprets the
-    /// value as wall-clock time, and EPG `start` dates are absolute instants, so
-    /// this keeps the requested moment aligned with what the guide showed.
-    private nonisolated static let timeshiftStartFormatter: DateFormatter = {
+    /// path. The value is wall-clock time in the timezone advertised by the
+    /// account. Fall back to the device timezone for older panels that omit it,
+    /// preserving Lume's historical behaviour for those providers.
+    private nonisolated static func timeshiftStartString(for start: Date, playlist: Playlist) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd:HH-mm"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
+        formatter.timeZone = playlist.serverTimezone.flatMap(TimeZone.init(identifier:)) ?? .current
+        return formatter.string(from: start)
+    }
 
     /// Builds a catch-up / timeshift URL for a past programme on a live stream.
     ///
@@ -428,103 +486,15 @@ class XtreamClient: APIClient {
         playlist: Playlist,
         start: Date,
         durationMinutes: Int,
-        format: StreamFormat = .m3u8
+        format: StreamFormat? = nil
     ) -> URL? {
         guard durationMinutes > 0 else { return nil }
-        let startString = Self.timeshiftStartFormatter.string(from: start)
-        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(format.rawValue)")
-    }
-}
-
-// MARK: - XMLTV Parser
-
-/// A parsed XMLTV programme ready for direct insertion.
-struct ParsedProgramme {
-    let channelId: String
-    let title: String
-    let description: String
-    let start: Date
-    let end: Date
-}
-
-/// Streaming SAX parser that yields batches via a callback to keep memory flat.
-final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
-    private var batch: [ParsedProgramme] = []
-    private let batchSize: Int
-    private let onBatch: ([ParsedProgramme]) -> Void
-    private(set) var totalCount: Int = 0
-
-    private var currentStart: String?
-    private var currentStop: String?
-    private var currentChannel: String?
-    private var currentTitle: String?
-    private var currentDesc: String?
-    private var currentText: String = ""
-
-    init(batchSize: Int = 2000, onBatch: @escaping ([ParsedProgramme]) -> Void) {
-        self.batchSize = batchSize
-        self.onBatch = onBatch
-    }
-
-    /// Parse an XMLTV file from disk, calling `onBatch` for every `batchSize` programmes.
-    static func parse(fileURL: URL, batchSize: Int = 2000, onBatch: @escaping ([ParsedProgramme]) -> Void) -> Int {
-        guard let xmlParser = XMLParser(contentsOf: fileURL) else { return 0 }
-        let delegate = XMLTVParser(batchSize: batchSize, onBatch: onBatch)
-        xmlParser.delegate = delegate
-        xmlParser.parse()
-        // Flush remaining
-        if !delegate.batch.isEmpty {
-            onBatch(delegate.batch)
-        }
-        return delegate.totalCount
-    }
-
-    func parser(_: XMLParser, didStartElement elementName: String, namespaceURI _: String?, qualifiedName _: String?, attributes attributeDict: [String: String] = [:]) {
-        currentText = ""
-        if elementName == "programme" {
-            currentStart = attributeDict["start"]
-            currentStop = attributeDict["stop"]
-            currentChannel = attributeDict["channel"]
-            currentTitle = nil
-            currentDesc = nil
-        }
-    }
-
-    func parser(_: XMLParser, foundCharacters string: String) {
-        currentText += string
-    }
-
-    func parser(_: XMLParser, didEndElement elementName: String, namespaceURI _: String?, qualifiedName _: String?) {
-        if elementName == "programme" {
-            if let startDate = XMLTVDate.parse(currentStart),
-               let endDate = XMLTVDate.parse(currentStop),
-               let channel = currentChannel,
-               let title = currentTitle, !title.isEmpty
-            {
-                batch.append(ParsedProgramme(
-                    channelId: channel,
-                    title: title,
-                    description: currentDesc ?? "",
-                    start: startDate,
-                    end: endDate
-                ))
-                totalCount += 1
-
-                if batch.count >= batchSize {
-                    onBatch(batch)
-                    batch.removeAll(keepingCapacity: true)
-                }
-            }
-            currentStart = nil
-            currentStop = nil
-            currentChannel = nil
-            currentTitle = nil
-            currentDesc = nil
-        } else if elementName == "title" {
-            currentTitle = (currentTitle ?? "") + currentText
-        } else if elementName == "desc" {
-            currentDesc = (currentDesc ?? "") + currentText
-        }
+        // Xtream-compatible panels commonly expose catch-up as an MPEG-TS
+        // resource even when normal live playback defaults to HLS. Respect an
+        // explicit playlist/argument choice, but prefer TS when it is unknown.
+        let ext = Self.resolvedFormat(format, playlist: playlist, fallback: .tsStream).rawValue
+        let startString = Self.timeshiftStartString(for: start, playlist: playlist)
+        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(ext)")
     }
 }
 

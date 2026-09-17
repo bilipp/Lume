@@ -37,14 +37,33 @@
         /// the host so channel switching works identically whether the controls
         /// are showing or hidden.
         var onSwitchChannel: (MoveCommandDirection) -> Void
+        /// The host's swap serialiser. The transport prev/next presses go
+        /// through it rather than calling `select(media:)` directly, so an
+        /// explicit press debounces, announces and completes the episode it
+        /// leaves behind exactly as the same press does on the other platforms.
+        let mediaSwapper: PlayerMediaSwapper
+        /// Invoked by an explicit next-episode press so the host marks the
+        /// episode left behind watched and scrobbles it.
+        var onCompleteCurrentItem: (() -> Void)?
+        /// Raises the OpenSubtitles browser. `nil` when the search isn't
+        /// available for this stream, which also drops the menu entry.
+        var onSearchSubtitles: (() -> Void)?
 
         /// `internal` (not `private`) so the derived-data extension in
         /// `TVPlayerControlsOverlay+Data.swift` can read this view's state.
         @Environment(\.modelContext) var modelContext
+        /// Parental filter for the Recent channels rail. That rail is a channel
+        /// list the viewer can tune from, so it owes the same filtering the Live
+        /// TV lists do — a channel watched before its category was locked must
+        /// not stay one tab away.
+        @Environment(\.contentRestriction) var restriction
 
         // Resolved SwiftData backing for the active stream.
         @State var episode: Episode?
         @State var seasonEpisodes: [Episode] = []
+        /// Transport prev/next targets, resolved once per stream across the
+        /// whole series (`seasonEpisodes` stays season-scoped for the rail).
+        @State var episodeNav: PlayerItemNavigation.Neighbours = .none
         @State var movie: Movie?
         @State var liveStream: LiveStream?
         @State var epgNow: EPGListing?
@@ -52,6 +71,9 @@
         @State var seriesPlaylist: Playlist?
         @State var recentChannels: [LiveStream] = []
         @State var recentNowTitles: [String: String] = [:]
+        /// Programme-level context for the caption (the owning playlist),
+        /// resolved once per stream off the main actor and held as a value.
+        @State var streamInfoPlaylistName: String?
 
         // Scrubbing (VOD only). The progress bar is focusable; selecting it
         // pauses playback and enters a scrub mode where left/right step the
@@ -89,11 +111,13 @@
                 .padding(.bottom, 56)
             }
             .defaultFocus($focus, .transport)
-            .onMoveCommand { direction in
+            .tvRemoteMoveCommand { direction in
                 // While scrubbing, left/right step the playhead; vertical moves
                 // are swallowed so focus can't escape the bar.
                 if isScrubbing {
-                    if direction == .left || direction == .right { moveScrub(direction) }
+                    if direction == .left || direction == .right {
+                        moveScrub(direction)
+                    }
                     return
                 }
                 // With the controls up, up/down still surf channels — but only
@@ -105,9 +129,14 @@
             // The host bumps `panelCloseToken` on a Menu/back press. Mid-scrub
             // that cancels the scrub; otherwise it closes an open panel.
             .onChange(of: panelCloseToken) {
-                if isScrubbing { cancelScrub() } else { closePanel() }
+                if isScrubbing {
+                    cancelScrub()
+                } else {
+                    closePanel()
+                }
             }
             .task(id: media.id) { resolveContent() }
+            .task(id: media.id) { await resolveStreamInfo() }
             .onAppear {
                 // Every time the controls reappear this is a fresh subtree;
                 // `defaultFocus` alone is unreliable here, so place focus on the
@@ -178,6 +207,7 @@
                                 .font(.system(size: 26, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.85))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .frame(maxWidth: 900, alignment: .leading)
                         }
                         Text(media.title)
@@ -235,10 +265,14 @@
         // MARK: - Tabs
 
         var tabKinds: [TabKind] {
-            if isSeries { return [.episodes, .info] }
+            if isSeries {
+                return [.episodes, .info]
+            }
             // The recents rail only earns a tab once there's somewhere to switch
             // to — i.e. a channel beyond the one playing now.
-            if media.isLive, recentChannels.count > 1 { return [.recent, .info] }
+            if media.isLive, recentChannels.count > 1 {
+                return [.recent, .info]
+            }
             return [.info]
         }
 
@@ -274,6 +308,7 @@
 
                 Button(action: onTogglePlay) {
                     Image(systemName: coordinator.isPlaying ? "pause.fill" : "play.fill")
+                        .symbolReplaceTransition(value: coordinator.isPlaying)
                 }
                 .buttonStyle(TVPlayerCircleButtonStyle(diameter: 78, glyphSize: 30))
                 .focused($focus, equals: .transport)
@@ -293,8 +328,8 @@
         @ViewBuilder
         private var leadingTransportButton: some View {
             if isSeries {
-                circleButton(systemImage: "backward.fill", focus: .previousItem, enabled: previousEpisode != nil) {
-                    if let previousEpisode { select(episode: previousEpisode) }
+                circleButton(systemImage: "backward.fill", focus: .previousItem, enabled: episodeNav.previous != nil) {
+                    stepItem(.previous)
                 }
             } else {
                 circleButton(systemImage: "backward.fill", focus: .previousItem) {
@@ -307,8 +342,8 @@
         @ViewBuilder
         private var trailingTransportButton: some View {
             if isSeries {
-                circleButton(systemImage: "forward.fill", focus: .nextItem, enabled: nextEpisode != nil) {
-                    if let nextEpisode { select(episode: nextEpisode) }
+                circleButton(systemImage: "forward.fill", focus: .nextItem, enabled: episodeNav.next != nil) {
+                    stepItem(.next)
                 }
             } else {
                 circleButton(systemImage: "forward.fill", focus: .nextItem) {
@@ -348,6 +383,7 @@
         private var favoriteButton: some View {
             Button(action: toggleFavorite) {
                 Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .symbolReplaceTransition(value: isFavorite)
             }
             .buttonStyle(TVPlayerCircleButtonStyle())
             .focused($focus, equals: .favorite)
@@ -377,13 +413,14 @@
                 .menuIndicator(.hidden)
                 .buttonStyle(TVPlayerCircleButtonStyle())
                 .focused($focus, equals: .audio)
+                .trackMenuAccessibility("Audio Track", selected: tracks.first(where: \.isSelected)?.label, fallback: "Default")
             }
         }
 
         @ViewBuilder
         private var subtitleMenu: some View {
             let tracks = coordinator.textTrackOptions
-            if !tracks.isEmpty {
+            if !tracks.isEmpty || onSearchSubtitles != nil {
                 Menu {
                     Button {
                         coordinator.selectTextTrack(id: nil)
@@ -407,12 +444,21 @@
                             }
                         }
                     }
+                    if let onSearchSubtitles {
+                        Button {
+                            onSearchSubtitles()
+                            onResetHideTimer()
+                        } label: {
+                            Label("Search Online…", systemImage: "magnifyingglass")
+                        }
+                    }
                 } label: {
                     Image(systemName: "captions.bubble")
                 }
                 .menuIndicator(.hidden)
                 .buttonStyle(TVPlayerCircleButtonStyle())
                 .focused($focus, equals: .subtitles)
+                .trackMenuAccessibility("Subtitles", selected: tracks.first(where: \.isSelected)?.label, fallback: "Off")
             }
         }
 
@@ -509,12 +555,16 @@
         }
 
         private var leadingTimeLabel: String {
-            if isLive, let epgNow { return Self.wallClock(epgNow.start) }
+            if isLive, let epgNow {
+                return Self.wallClock(epgNow.start)
+            }
             return Self.timeString(isScrubbing ? scrubTarget : clock.current)
         }
 
         private var trailingTimeLabel: String {
-            if isLive, let epgNow { return Self.wallClock(epgNow.end) }
+            if isLive, let epgNow {
+                return Self.wallClock(epgNow.end)
+            }
             let reference = isScrubbing ? scrubTarget : clock.current
             return "-" + Self.timeString(max(clock.duration - reference, 0))
         }

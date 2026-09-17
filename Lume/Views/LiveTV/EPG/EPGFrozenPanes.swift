@@ -9,6 +9,7 @@
 //  highlight is driven by the scroller, not by real focus.
 //
 
+import SwiftData
 import SwiftUI
 
 // MARK: - Ruler strip
@@ -63,6 +64,9 @@ struct EPGFrozenColumn: View {
     /// tvOS channel hub performs on select. Unused on tvOS, where the focus
     /// strip owns activation.
     var onSelectChannel: (EPGChannelRow) -> Void = { _ in }
+    /// Seeds Multi-View from a channel's long-press menu. Unused on tvOS, for
+    /// the same reason as `onSelectChannel`.
+    var onStartMultiView: (EPGChannelRow) -> Void = { _ in }
 
     var body: some View {
         Color.clear
@@ -78,7 +82,8 @@ struct EPGFrozenColumn: View {
                     metrics: metrics,
                     sync: sync,
                     focusedRowIndex: focusedRowIndex,
-                    onSelectChannel: onSelectChannel
+                    onSelectChannel: onSelectChannel,
+                    onStartMultiView: onStartMultiView
                 )
                 .equatable()
                 .offset(y: -sync.mirror.y)
@@ -106,9 +111,14 @@ struct EPGColumnCells: View, Equatable {
     /// Observed for `rowWindow` only (per-property tracking).
     let sync: EPGScrollSync
     let focusedRowIndex: Int?
+    #if !os(tvOS)
+        /// For the long-press menu's favourite toggle.
+        @Environment(\.modelContext) private var modelContext
+    #endif
     /// Deliberately outside `==` — a fresh closure identity alone must not
     /// re-run the body.
     var onSelectChannel: (EPGChannelRow) -> Void = { _ in }
+    var onStartMultiView: (EPGChannelRow) -> Void = { _ in }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.rows.count == rhs.rows.count
@@ -154,7 +164,9 @@ struct EPGColumnCells: View, Equatable {
 
     /// On tvOS the cell stays a plain view — the focus strip is the guide's
     /// only focusable and owns activation. Everywhere else it's a button that
-    /// plays the channel live.
+    /// plays the channel live, and carries the same long-press menu as a
+    /// channel row in the list. The programme blocks keep their own menu: the
+    /// channel actions belong to the channel, not to what happens to be on it.
     @ViewBuilder
     private func cell(for entry: IndexedRow) -> some View {
         #if os(tvOS)
@@ -167,6 +179,11 @@ struct EPGColumnCells: View, Equatable {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .liveChannelMenu(
+                isFavorite: entry.row.stream.isFavorite,
+                onToggleFavorite: { LiveChannelFavorites.toggle(entry.row.stream, in: modelContext) },
+                onStartMultiView: { onStartMultiView(entry.row) }
+            )
         #endif
     }
 }

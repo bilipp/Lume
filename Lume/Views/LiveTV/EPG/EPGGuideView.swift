@@ -19,12 +19,19 @@ struct EPGGuideView: View {
     let playlistPrefix: String
     let onPlay: (LiveStream) -> Void
     let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
+    /// Seeds Multi-View from a channel's long-press menu in the column.
+    let onStartMultiView: (LiveStream) -> Void
     /// tvOS: non-zero asks the guide to take real focus (a rail category was
     /// just activated); `onDidClaimFocus` resets it once claimed.
     let focusToken: Int
     let onDidClaimFocus: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    /// The guide is a channel list like any other, so it owes the viewer the same
+    /// parental filtering. It matters most in the Favorites and Recently Watched
+    /// scopes, which span categories: a channel favorited before its category was
+    /// locked would otherwise stay reachable — and playable — from the guide.
+    @Environment(\.contentRestriction) private var restriction
     @Query private var streams: [LiveStream]
 
     private let timeline: EPGTimeline
@@ -50,6 +57,7 @@ struct EPGGuideView: View {
         sort: ContentSortOption,
         onPlay: @escaping (LiveStream) -> Void,
         onPlayCatchup: @escaping (LiveStream, EPGProgramCell) -> Void = { _, _ in },
+        onStartMultiView: @escaping (LiveStream) -> Void = { _ in },
         focusToken: Int = 0,
         onDidClaimFocus: @escaping () -> Void = {}
     ) {
@@ -57,6 +65,7 @@ struct EPGGuideView: View {
         self.playlistPrefix = playlistPrefix
         self.onPlay = onPlay
         self.onPlayCatchup = onPlayCatchup
+        self.onStartMultiView = onStartMultiView
         self.focusToken = focusToken
         self.onDidClaimFocus = onDidClaimFocus
 
@@ -72,7 +81,7 @@ struct EPGGuideView: View {
     }
 
     private var scopedStreams: [LiveStream] {
-        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix)
+        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
     }
 
     var body: some View {
@@ -91,6 +100,7 @@ struct EPGGuideView: View {
                     dataVersion: dataVersion,
                     onPlay: onPlay,
                     onPlayCatchup: onPlayCatchup,
+                    onStartMultiView: onStartMultiView,
                     focusToken: focusToken,
                     onDidClaimFocus: onDidClaimFocus
                 )

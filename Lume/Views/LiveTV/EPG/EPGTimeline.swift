@@ -78,6 +78,25 @@ nonisolated struct EPGTimeline: Equatable {
     }
 }
 
+// MARK: - Sticky text
+
+/// How far a programme block's text has to shift to stay inside the viewport.
+///
+/// Blocks sit at their absolute timeline offset and draw their text at their
+/// own leading edge, so a programme that started before the viewport's leading
+/// edge — the in-progress one the guide opens on — would render its title
+/// off-screen. Shifting by the hidden amount pins the text to the visible part
+/// of the block; the cap stops it from sliding out of the block's own trailing
+/// edge as the block scrolls away.
+///
+/// `nonisolated`: called from the `visualEffect` closure, which is `@Sendable`.
+nonisolated enum EPGStickyText {
+    static func shift(blockMinX: CGFloat, blockWidth: CGFloat, inset: CGFloat) -> CGFloat {
+        guard blockMinX < 0 else { return 0 }
+        return min(-blockMinX, max(0, blockWidth - inset * 2))
+    }
+}
+
 // MARK: - Grid model
 
 /// One cell in a channel row: either a real programme or a gap filler that keeps
@@ -164,17 +183,40 @@ enum EPGGridBuilder {
         }
     }
 
-    /// Turns a channel's sorted listings into contiguous cells spanning the
-    /// whole window, inserting gap fillers wherever data is missing.
+    /// Anything left of a programme after overlap trimming that is shorter than
+    /// this is treated as debris rather than a cell: it would render a sliver
+    /// too narrow to label, and on tvOS focus could still land on it.
+    private nonisolated static let minimumCellDuration: TimeInterval = 60
+
+    /// Turns a channel's listings into contiguous cells spanning the whole
+    /// window, inserting gap fillers wherever data is missing.
+    ///
+    /// Listings are not assumed to be sorted or disjoint. XMLTV in the wild
+    /// overlaps programmes on the same channel, and cells are placed at their
+    /// absolute timeline offset — so an overlap would draw two blocks on the
+    /// same pixels and smear their titles together. The sweep below resolves
+    /// each contested span in favour of whichever programme starts first
+    /// (shortest first on a tie), trimming the loser's leading edge, so the
+    /// row always comes out sorted, disjoint and edge-to-edge.
+    ///
     /// `nonisolated`: runs on a background task for large categories.
     nonisolated static func cells(for listings: [EPGWindowListing], timeline: EPGTimeline) -> [EPGProgramCell] {
         var cells: [EPGProgramCell] = []
         var cursor = timeline.start
 
-        for listing in listings {
-            let clampedStart = max(listing.start, timeline.start)
+        let ordered = listings.sorted {
+            $0.start == $1.start ? $0.end < $1.end : $0.start < $1.start
+        }
+
+        for listing in ordered {
             let clampedEnd = min(listing.end, timeline.end)
-            guard clampedEnd > clampedStart else { continue }
+            // Already covered by a cell that runs at least this far — the
+            // cursor never moves backwards, so a contained listing is dropped
+            // instead of rewinding the row into a spurious gap.
+            guard clampedEnd > cursor else { continue }
+
+            let clampedStart = max(max(listing.start, timeline.start), cursor)
+            guard clampedEnd.timeIntervalSince(clampedStart) >= minimumCellDuration else { continue }
 
             if clampedStart > cursor {
                 cells.append(gap(from: cursor, to: clampedStart, timeline: timeline))

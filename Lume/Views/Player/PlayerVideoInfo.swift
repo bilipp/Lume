@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// Resolution / frame-rate / codec snapshot for the current video track.
 ///
@@ -11,14 +12,16 @@ import Foundation
 /// Engine-agnostic and unguarded by platform: the shared tvOS overlay
 /// (`TVPlayerControlsOverlay`) and the AVPlayer iOS / macOS overlay both consume
 /// it, and the AVPlayer coordinator produces it on every platform.
-struct PlayerTrackOption: Identifiable, Hashable {
+/// `nonisolated` because the language matcher reads these off the main actor
+/// (KSPlayer's `wantedAudio` override, VLCKit's delegate thread).
+nonisolated struct PlayerTrackOption: Identifiable, Hashable {
     /// Opaque, engine-defined identifier handed back to `select…Track(id:)`.
     let id: String
     let label: String
     let isSelected: Bool
 }
 
-struct PlayerVideoInfo: Equatable {
+nonisolated struct PlayerVideoInfo: Equatable {
     let width: Int
     let height: Int
     let fps: Double
@@ -45,16 +48,76 @@ struct PlayerVideoInfo: Equatable {
     /// Compact pieces for the overlay's right-hand technical caption, e.g.
     /// `["4K", "H264", "24 fps"]`.
     var captionParts: [String] {
+        var parts = badgeParts
+        if let frameRateText {
+            parts.append(String(localized: "\(frameRateText) fps"))
+        }
+        return parts
+    }
+
+    /// The same pieces with the abbreviations spelled out, for the caption's
+    /// single VoiceOver label — "24 frames per second", never "24 f p s".
+    var spokenCaptionParts: [String] {
+        var parts = badgeParts
+        if let frameRateText {
+            parts.append(String(localized: "\(frameRateText) frames per second"))
+        }
+        return parts
+    }
+
+    /// The quality tag and codec alone — the caption's leading pieces, and the
+    /// whole of the info panel's video badge row.
+    var badgeParts: [String] {
         var parts: [String] = []
         if !qualityTag.isEmpty { parts.append(qualityTag) }
         if let codec, !codec.isEmpty { parts.append(codec.uppercased()) }
-        if fps > 0 {
-            let rounded = (fps * 100).rounded() / 100
-            let text = rounded.truncatingRemainder(dividingBy: 1) == 0
-                ? String(format: "%.0f", rounded)
-                : String(format: "%.2f", rounded)
-            parts.append("\(text) fps")
-        }
         return parts
+    }
+
+    /// `nil` when no usable rate has been reported — AVPlayer never reports one,
+    /// so the part collapses instead of rendering "0 fps".
+    private var frameRateText: String? {
+        guard fps > 0 else { return nil }
+        // Locale-aware: `String(format:)` would force a period decimal
+        // separator, which is wrong in de/fr/es/pt/it. Integral rates still
+        // render bare ("24"), fractional ones to two places ("23.98").
+        let rounded = (fps * 100).rounded() / 100
+        let places = rounded.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+        return rounded.formatted(.number.precision(.fractionLength(places)))
+    }
+}
+
+/// A track-menu entry: the title, with a leading checkmark when it is the
+/// selected one. Shared by every engine overlay's subtitle / audio / rate menu.
+@ViewBuilder
+func playerCheckmarkLabel(_ title: LocalizedStringKey, checked: Bool) -> some View {
+    if checked {
+        Label(title, systemImage: "checkmark")
+    } else {
+        Text(title)
+    }
+}
+
+/// Engine-supplied track names and rate numbers must never reach a
+/// localization lookup — this overload is the verbatim one.
+@ViewBuilder
+func playerCheckmarkLabel(verbatim title: String, checked: Bool) -> some View {
+    if checked {
+        Label { Text(verbatim: title) } icon: { Image(systemName: "checkmark") }
+    } else {
+        Text(verbatim: title)
+    }
+}
+
+extension View {
+    /// VoiceOver label and value for a track menu: the enabled track's own
+    /// name, or the menu's own no-selection wording.
+    func trackMenuAccessibility(
+        _ label: LocalizedStringKey,
+        selected: String?,
+        fallback: LocalizedStringKey
+    ) -> some View {
+        accessibilityLabel(label)
+            .accessibilityValue(selected.flatMap { $0.isEmpty ? nil : Text(verbatim: $0) } ?? Text(fallback))
     }
 }

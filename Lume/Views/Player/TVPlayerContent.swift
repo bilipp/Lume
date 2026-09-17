@@ -63,12 +63,25 @@
         /// into models for the in-player "Recent" rail. Order follows
         /// `LiveChannelHistory`; channels that no longer resolve (e.g. removed in
         /// a sync) are simply dropped.
-        static func recentChannels(in context: ModelContext, defaults: UserDefaults = .standard) -> [LiveStream] {
+        ///
+        /// `restriction` is required, like `LiveChannelQuery.scoped`'s: this rail
+        /// is a channel list the viewer can tune from, and history cuts across
+        /// categories, so a channel watched *before* its category was locked
+        /// would otherwise stay one tab away for a child mid-playback. Hidden
+        /// channels drop out for the same reason every other channel query
+        /// filters them.
+        static func recentChannels(
+            in context: ModelContext,
+            restriction: ContentRestriction,
+            defaults: UserDefaults = .standard
+        ) -> [LiveStream] {
             let ids = LiveChannelHistory.recentChannelIds(defaults: defaults)
             guard !ids.isEmpty else { return [] }
-            let descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { ids.contains($0.id) })
-            let byId = Dictionary(((try? context.fetch(descriptor)) ?? []).map { ($0.id, $0) },
-                                  uniquingKeysWith: { first, _ in first })
+            let descriptor = FetchDescriptor<LiveStream>(
+                predicate: #Predicate { ids.contains($0.id) && $0.isHidden == false }
+            )
+            let visible = ((try? context.fetch(descriptor)) ?? []).excludingRestricted(restriction)
+            let byId = Dictionary(visible.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             return ids.compactMap { byId[$0] }
         }
 
@@ -88,14 +101,28 @@
 
         // MARK: - EPG
 
-        /// Upcoming/ongoing EPG listings for a channel, soonest first.
+        /// How many rows `epgListings` returns. Its one caller
+        /// (`TVPlayerControlsOverlay.resolveContent`) reads exactly two values
+        /// out of the result — the programme airing now and the one after it —
+        /// and, ordered by start, those are the first two rows. Unbounded, the
+        /// fetch handed it the channel's whole remaining guide instead: 615 rows
+        /// on the measured store, 1,209 on the busiest channel, hydrated on
+        /// every controls wake and every channel surf while the stream decodes.
+        /// The slack above two absorbs the overlapping and duplicated entries
+        /// providers ship, which would otherwise push "next" out of the window.
+        private static let nowNextLimit = 6
+
+        /// Upcoming/ongoing EPG listings for a channel, soonest first, bounded
+        /// to the now/next window the caller reads (`nowNextLimit`). The
+        /// `channelId + end` index seeks straight to the remaining guide.
         static func epgListings(channelId: String?, in context: ModelContext) -> [EPGListing] {
             guard let channelId, !channelId.isEmpty else { return [] }
             let now = Date()
-            let descriptor = FetchDescriptor<EPGListing>(
+            var descriptor = FetchDescriptor<EPGListing>(
                 predicate: #Predicate { $0.channelId == channelId && $0.end > now },
                 sortBy: [SortDescriptor(\.start)]
             )
+            descriptor.fetchLimit = nowNextLimit
             return (try? context.fetch(descriptor)) ?? []
         }
 

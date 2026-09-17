@@ -31,10 +31,39 @@ struct ChannelManagementView: View {
         )
     }
 
+    @State private var showHideAllConfirmation = false
+
+    #if !os(tvOS)
+        @State private var searchText = ""
+    #endif
+
+    /// What the screen is actually showing, and therefore what the bulk hide /
+    /// show actions apply to — the whole category unless a search narrows it.
+    private var listedStreams: [LiveStream] {
+        #if os(tvOS)
+            streams
+        #else
+            guard !searchText.isEmpty else { return streams }
+            return streams.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        #endif
+    }
+
     private func move(from source: IndexSet, to destination: Int) {
         ContentOrganizer.reorder(streams, from: source, to: destination)
     }
 
+    #if !os(tvOS)
+        /// A filtered list's offsets don't map onto the full group, so reordering
+        /// is only offered when nothing is filtered out.
+        private var moveHandler: ((IndexSet, Int) -> Void)? {
+            guard searchText.isEmpty else { return nil }
+            return move
+        }
+    #endif
+
+    /// Reset deliberately spans the whole category rather than the listed
+    /// subset: `customOrder` is stamped densely across a group, so clearing part
+    /// of one would leave it half-ordered.
     private func reset() {
         ContentOrganizer.resetOrder(streams)
         ContentOrganizer.showAll(streams)
@@ -58,9 +87,12 @@ struct ChannelManagementView: View {
                         HStack {
                             TVSettingsSectionLabel("Channels")
                             Spacer()
-                            Button("Reset") { reset() }
-                                .buttonStyle(TVSettingsActionButtonStyle())
-                                .disabled(streams.isEmpty || isReordering)
+                            ContentBulkActionButtons(
+                                showAll: { ContentOrganizer.showAll(listedStreams) },
+                                hideAll: { showHideAllConfirmation = true },
+                                reset: reset
+                            )
+                            .disabled(streams.isEmpty || isReordering)
                         }
 
                         if isReordering {
@@ -94,16 +126,32 @@ struct ChannelManagementView: View {
                 }
             }
             .tvSettingsBackground()
+            .hideAllConfirmation("Hide All Channels?", isPresented: $showHideAllConfirmation) {
+                ContentOrganizer.hideAll(listedStreams)
+            }
         }
     #else
         var body: some View {
             List {
+                if !streams.isEmpty {
+                    Section {
+                        ContentBulkActionsRow(
+                            showAll: { ContentOrganizer.showAll(listedStreams) },
+                            hideAll: { showHideAllConfirmation = true },
+                            reset: reset
+                        )
+                    }
+                }
+
                 Section {
                     if streams.isEmpty {
                         Text("This category has no channels.")
                             .foregroundStyle(.secondary)
+                    } else if listedStreams.isEmpty {
+                        Text("No channels match your search.")
+                            .foregroundStyle(.secondary)
                     } else {
-                        ForEach(streams) { stream in
+                        ForEach(listedStreams) { stream in
                             ChannelManageRow(
                                 title: stream.name,
                                 iconURL: URL(string: stream.streamIcon ?? ""),
@@ -111,15 +159,16 @@ struct ChannelManagementView: View {
                                 onToggleHidden: { stream.isHidden.toggle() }
                             )
                         }
-                        .onMove(perform: move)
+                        .onMove(perform: moveHandler)
                     }
                 } footer: {
-                    Text("Hide channels to remove them from this category, or drag to reorder. Reset restores the provider's order and shows everything.")
+                    Text(footerText)
                 }
             }
             #if os(macOS)
             .listStyle(.inset(alternatesRowBackgrounds: true))
             #endif
+            .searchable(text: $searchText, prompt: Text("Search Channels"))
             .navigationTitle(category.name)
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
@@ -130,11 +179,18 @@ struct ChannelManagementView: View {
                             EditButton()
                         }
                     #endif
-                    ToolbarItem(placement: .automatic) {
-                        Button("Reset", role: .destructive) { reset() }
-                            .disabled(streams.isEmpty)
-                    }
                 }
+                .hideAllConfirmation("Hide All Channels?", isPresented: $showHideAllConfirmation) {
+                    ContentOrganizer.hideAll(listedStreams)
+                }
+        }
+
+        private var footerText: String {
+            [
+                String(localized: "Hide channels to remove them from this category, or drag to reorder."),
+                String(localized: "Show All and Hide All apply to whatever the list is showing, so you can search first and bulk-apply to the matches."),
+                String(localized: "Reset restores the provider's order and shows everything.")
+            ].joined(separator: " ")
         }
     #endif
 }

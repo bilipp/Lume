@@ -20,7 +20,9 @@ final class SubtitleCueModel: ObservableObject {
     /// Assigns only on an actual change, so an unchanged cue repeated across
     /// ticks doesn't invalidate the leaf ten times a second.
     func update(_ newText: String?) {
-        if text != newText { text = newText }
+        if text != newText {
+            text = newText
+        }
     }
 }
 
@@ -75,6 +77,38 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     var onRecovered: (() -> Void)?
     var startupTimeout: TimeInterval = 40
 
+    /// Silences this player without pausing it — Multi-View mutes every tile
+    /// except the one carrying the audio.
+    ///
+    /// For a Multi-View tile this gives the audio lane up entirely rather than
+    /// turning the volume down: a muted renderer keeps pulling frames and keeps
+    /// its claim on the audio output route, and on tvOS a second claimant never
+    /// becomes ready — which stalls the synchronizer that tile's video shares,
+    /// freezing it on its first frame. The full-screen player is the only
+    /// session playing, so a volume mute is right there and spares it a lane
+    /// rebuild on every toggle.
+    var isMuted = false {
+        didSet {
+            guard isMuted != oldValue else { return }
+            applyMute()
+        }
+    }
+
+    private func applyMute() {
+        guard let session else { return }
+        // Volume first in both directions: unmuting before the lane is built
+        // means the first frames are already audible, and muting before it is
+        // torn down means nothing leaks out during teardown.
+        session.renderer.isMuted = isMuted
+        guard isEmbedded else { return }
+        let enabled = !isMuted
+        Task { await session.setAudioEnabled(enabled) }
+    }
+
+    /// Set before `configure` for a Multi-View tile: with several tiles playing
+    /// at once, Picture in Picture belongs to the full-screen player alone.
+    var isEmbedded = false
+
     /// The engine's video surface for the hosting representable.
     private(set) var displayLayer: LumeDisplayLayer?
 
@@ -88,12 +122,31 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     private var tickCount = 0
     private var startupTask: Task<Void, Never>?
     private var reportedFailure = false
+    /// Mirrors `PlayerSession.selectedAudioTrackIndex`, read back after `open`
+    /// rather than assumed: the engine starts on its own preferred/default
+    /// pick, which is not necessarily the first track.
+    private var selectedAudioID: String?
     private var selectedSubtitleID: String?
+    /// A manual pick in the audio or subtitle menu outranks the preferred
+    /// languages for the rest of this stream: the engine has no rebuild in
+    /// place, so a stall recovery re-opens through `makeConfiguration` and
+    /// would otherwise re-assert the preference over the viewer's choice.
+    /// Cleared when the URL changes, so it cannot leak into the next channel
+    /// or episode. Persisted nowhere.
+    private var hasManualTrackSelection = false
+    /// The sidecar subtitle file loaded from the OpenSubtitles search, if any.
+    /// Kept so the track survives a switch to an embedded track and back — the
+    /// engine's sidecar loader is a one-shot parse, so re-selecting means
+    /// re-reading the file.
+    private var externalSubtitle: ExternalSubtitle?
 
     // MARK: Lifecycle
 
     func configure(media: PlayableMedia) {
         tearDown()
+        if media.url != currentMedia?.url {
+            hasManualTrackSelection = false
+        }
         currentMedia = media
         reportedFailure = false
         // After `tearDown` (which closes any previous session) so a reload counts
@@ -104,6 +157,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         self.session = session
         displayLayer = session.renderer.displayLayer
         session.renderer.audioTimePitchAlgorithm = .timeDomain
+        session.renderer.isMuted = isMuted
 
         eventTask = Task { [events = session.events] in
             for await event in events {
@@ -122,9 +176,16 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             do {
                 let info = try await session.open(url: media.url.absoluteString)
                 self.mediaInfo = info
+                self.selectedAudioID = await session.selectedAudioTrackIndex.map { String($0) }
+                // Non-nil only when the engine turned a forced track on by
+                // itself because the chosen audio is foreign to the viewer;
+                // embedded subtitles otherwise start off as they always have.
+                self.selectedSubtitleID = await session.selectedSubtitleTrackIndex.map { String($0) }
                 self.publishTracks(info: info)
                 self.publishVideoInfo(info: info)
-                self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                if !self.isEmbedded {
+                    self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                }
                 // Resume position is handled by the engine via
                 // configuration.startPosition (seek-before-first-read).
                 if media.startTime > 1, !media.isLive, !info.isSeekable {
@@ -196,6 +257,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         isBuffering = false
         hasStartedPlayback = false
         subtitleCues.update(nil)
+        // The sidecar lane belongs to the session that just went away; a fresh
+        // session starts with no cues, so the menu must not keep advertising it.
+        externalSubtitle = nil
+        selectedAudioID = nil
+        selectedSubtitleID = nil
         isPipActive = false
     }
 
@@ -236,19 +302,28 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     func selectAudioTrack(id: String) {
         guard let index = Int32(id) else { return }
+        hasManualTrackSelection = true
         let session = session
         Task { await session?.selectAudioTrack(index) }
+        selectedAudioID = id
         if let info = mediaInfo {
-            publishTracks(info: info, selectedAudioID: id)
+            publishTracks(info: info)
         }
     }
 
     func selectTextTrack(id: String?) {
+        hasManualTrackSelection = true
         selectedSubtitleID = id
+        if let external = externalSubtitle, id == Self.externalTrackID {
+            loadExternalSubtitleFile(external)
+            return
+        }
         let session = session
         let index = id.flatMap(Int32.init)
         Task { await session?.selectSubtitleTrack(index) }
-        if id == nil { subtitleCues.update(nil) }
+        if id == nil {
+            subtitleCues.update(nil)
+        }
         if let info = mediaInfo {
             publishTracks(info: info)
         }
@@ -268,10 +343,34 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             configuration.startPosition = media.startTime
         }
         configuration.hardwareDecode = options.hardwareDecode ? .videoToolbox : .software
+        configuration.deinterlace = Self.deinterlacing(for: options)
         configuration.bufferTarget = Double(media.isLive ? options.liveBuffer : options.vodBuffer) / 1000
         configuration.videoQueueDepth = options.videoQueueDepth
         configuration.audioQueueDepth = options.audioQueueDepth
+        // A Multi-View tile opens with an audio lane only if it is the audible
+        // one. A muted tile that decodes audio anyway still claims the audio
+        // output route, and on tvOS a second claimant never becomes ready —
+        // which stalls the synchronizer its video lane shares, freezing the tile
+        // on its first frame with no failure event. It also spares an Apple TV
+        // three audio decoders it would throw away. `isMuted` moves the lane
+        // afterwards (see `applyMute`); this is only the opening state.
+        configuration.enableAudio = !(isEmbedded && isMuted)
+        configuration.muted = isMuted
         configuration.stallThreshold = Double(options.stallThreshold)
+        // Resolved engine-side while the pipeline is built, before the demuxer
+        // streams a byte: selecting after `open()` would route through a seek
+        // that discards `startPosition` on a VOD resume and that many live IPTV
+        // endpoints do not survive. Empty lists (the default, and what a manual
+        // pick leaves for the rest of this stream) mean the engine keeps the
+        // container's own selection.
+        if !hasManualTrackSelection {
+            let languages = PlayerLanguageOptions.load()
+            configuration.preferredAudioLanguages = languages.preferredAudioLanguages
+            // Subtitling untranslated dialogue is Lume's rule, not the
+            // engine's — the same one `AVPlayerCoordinator+Languages` applies
+            // on AVFoundation.
+            configuration.autoEnableForcedSubtitlesForForeignAudio = true
+        }
         configuration.demuxer.enableReconnect = options.httpReconnect
         configuration.demuxer.ioTimeout = options.ioTimeout
         // The open timeout stays tied to the engine-fallback budget rather than
@@ -284,6 +383,22 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             configuration.demuxer.maxAnalyzeDuration = analyzeDuration
         }
         return configuration
+    }
+
+    /// Translates the stored deinterlace choices into the engine's policy.
+    /// Kept out of `makeConfiguration` so it stays a pure mapping between two
+    /// vocabularies — Lume's settings on one side, the engine's on the other.
+    private static func deinterlacing(for options: LumeEngineOptions) -> VideoDecoder.Deinterlacing {
+        let mode: VideoDecoder.Deinterlacing.Mode = switch options.deinterlaceMode {
+        case .off: .off
+        case .auto: .auto
+        case .always: .always
+        }
+        let rate: VideoDecoder.Deinterlacing.Rate = switch options.deinterlaceRate {
+        case .field: .field
+        case .frame: .frame
+        }
+        return VideoDecoder.Deinterlacing(mode: mode, rate: rate)
     }
 
     private func handle(event: PlayerEvent) {
@@ -351,17 +466,21 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         }
     }
 
-    private func publishTracks(info: MediaInfo, selectedAudioID: String? = nil) {
+    private func publishTracks(info: MediaInfo) {
+        // `selectedAudioID` mirrors the engine's own `selectedAudioTrackIndex`,
+        // which it sets whenever an audio track exists. Falling back to the
+        // first row while it is still nil keeps the menu from rendering with no
+        // checkmark at all.
+        let audioFallsBackToFirst = selectedAudioID == nil
         audioTrackOptions = info.audioTracks.enumerated().map { position, track in
             let id = String(track.index)
-            let fallbackSelected = selectedAudioID == nil && position == 0
             return PlayerTrackOption(
                 id: id,
                 label: trackLabel(track, fallback: "Audio \(position + 1)"),
-                isSelected: selectedAudioID.map { $0 == id } ?? fallbackSelected
+                isSelected: selectedAudioID == id || (audioFallsBackToFirst && position == 0)
             )
         }
-        textTrackOptions = info.subtitleTracks.enumerated().map { position, track in
+        var options = info.subtitleTracks.enumerated().map { position, track in
             let id = String(track.index)
             return PlayerTrackOption(
                 id: id,
@@ -369,6 +488,14 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 isSelected: selectedSubtitleID == id
             )
         }
+        if let external = externalSubtitle {
+            options.append(PlayerTrackOption(
+                id: Self.externalTrackID,
+                label: external.label,
+                isSelected: selectedSubtitleID == Self.externalTrackID
+            ))
+        }
+        textTrackOptions = options
     }
 
     private func publishVideoInfo(info: MediaInfo) {
@@ -382,9 +509,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     }
 
     private func trackLabel(_ track: TrackInfo, fallback: String) -> String {
-        if let title = track.title, !title.isEmpty { return title }
+        if let title = track.title, !title.isEmpty {
+            return title
+        }
         if let language = track.language, !language.isEmpty {
-            return Locale.current.localizedString(forLanguageCode: language) ?? language
+            return TrackLanguageMatcher.displayName(for: language)
         }
         return fallback
     }
@@ -402,6 +531,45 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         let now = session.renderer.currentTime
         guard let info = mediaInfo, now != .min else { return 0 }
         return max(0, MediaTime.seconds(now - info.startTime))
+    }
+}
+
+// MARK: - External subtitles
+
+extension LumeEngineCoordinator: ExternalSubtitleLoading {
+    /// Id for the sidecar track in the overlay's subtitle menu. Prefixed so it
+    /// can never collide with an embedded track's stream index.
+    static var externalTrackID: String {
+        "external"
+    }
+
+    func loadExternalSubtitle(_ subtitle: ExternalSubtitle) {
+        externalSubtitle = subtitle
+        selectedSubtitleID = Self.externalTrackID
+        loadExternalSubtitleFile(subtitle)
+    }
+
+    /// Hands the file to the engine, which parses it in full and replaces
+    /// whatever subtitle lane was active. On failure the track is dropped from
+    /// the menu rather than left selected but silent.
+    private func loadExternalSubtitleFile(_ subtitle: ExternalSubtitle) {
+        subtitleCues.update(nil)
+        if let info = mediaInfo {
+            publishTracks(info: info)
+        }
+        let session = session
+        Task {
+            do {
+                try await session?.loadExternalSubtitles(url: subtitle.fileURL.absoluteString)
+            } catch {
+                Logger.player.error("LumeEngine could not load external subtitles: \(LogRedaction.describe(error), privacy: .public)")
+                self.externalSubtitle = nil
+                self.selectedSubtitleID = nil
+                if let info = self.mediaInfo {
+                    self.publishTracks(info: info)
+                }
+            }
+        }
     }
 }
 

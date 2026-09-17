@@ -47,21 +47,47 @@ final class ParsingBenchmarks: XCTestCase {
         assertFixtureIsSubstantial(fixture, minimumBytes: 5_000_000)
 
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
-            var count = 0
-            var urlBytes = 0
+            let outcome = parseSynchronously(fileURL: fixture, batchSize: 2000)
+            if let error = outcome.error {
+                XCTFail("m3u parse threw: \(error)")
+            }
+            XCTAssertEqual(outcome.count, 120_000)
+            XCTAssertGreaterThan(outcome.urlBytes, 0)
+        }
+    }
+
+    /// Carries the parse's results back across the `Task.detached` hand-off;
+    /// `var`s captured by a concurrently-executing closure cannot. Read only
+    /// after the expectation has been fulfilled.
+    private final class ParseOutcome: @unchecked Sendable {
+        var count = 0
+        var urlBytes = 0
+        var error: Error?
+    }
+
+    /// `parseStreaming` is the driver the import runs and it is async, while
+    /// `measure`'s block is not — so the parse is driven from a task and waited
+    /// on by spinning the run loop, exactly as `syncPlaylistSynchronously` does.
+    private func parseSynchronously(fileURL: URL, batchSize: Int) -> ParseOutcome {
+        let outcome = ParseOutcome()
+        let finished = expectation(description: "m3u parse")
+        Task.detached {
             do {
-                count = try M3UParser.parse(fileURL: fixture, batchSize: 2000) { batch in
+                outcome.count = try await M3UParser.parseStreaming(
+                    fileURL: fileURL, batchSize: batchSize
+                ) { batch, _ in
                     // Touch every entry so the optimizer can't discard the parse.
                     for entry in batch {
-                        urlBytes += entry.url.utf8.count
+                        outcome.urlBytes += entry.url.utf8.count
                     }
                 }
             } catch {
-                XCTFail("m3u parse threw: \(error)")
+                outcome.error = error
             }
-            XCTAssertEqual(count, 120_000)
-            XCTAssertGreaterThan(urlBytes, 0)
+            finished.fulfill()
         }
+        wait(for: [finished], timeout: 600)
+        return outcome
     }
 
     /// `#EXTINF` attribute scanning in isolation. It runs once per playlist line,
@@ -83,28 +109,59 @@ final class ParsingBenchmarks: XCTestCase {
 
     /// Classification is the other per-entry cost of an m3u import — it decides
     /// live vs movie vs episode for every single line.
-    func testM3UClassification() {
-        let names = [
-            "Channel 12 HD",
-            "Movie Title 2019 (2019)",
-            "Show Name S03E11",
-            "Some Show 1x04 Pilot"
-        ]
-        let entries = (0 ..< 4000).map { index in
-            M3UEntry(
-                name: names[index % names.count],
-                url: "https://example.invalid/stream/\(index).ts",
-                tvgId: index.isMultiple(of: 2) ? "ch\(index)" : nil,
-                logo: nil,
-                group: "Group \(index % 100)",
-                type: nil
-            )
+    ///
+    /// Measured over provider-shaped entries rather than synthetic ones: 86% of
+    /// a real export carries a season/episode token, so this is the benchmark
+    /// that actually exercises `M3UClassifier`'s ICU matching. The four-name,
+    /// `/stream/`-URL version this replaced classified a mix that does not occur
+    /// in provider files, so it could not gate that work at all.
+    ///
+    /// The parse happens outside `measure` — this is the classifier in
+    /// isolation, the way `testM3UExtInfAttributeScan` isolates attribute
+    /// scanning.
+    func testM3UClassification() async throws {
+        let entryCount = 60000
+        let fixture = try PerfFixtures.writeM3UProviderShape(
+            entryCount: entryCount, showCount: 1400, to: scratch
+        )
+        assertFixtureIsSubstantial(fixture, minimumBytes: 12_000_000)
+
+        var entries: [M3UEntry] = []
+        entries.reserveCapacity(entryCount)
+        try await M3UParser.parseStreaming(fileURL: fixture, batchSize: 4000) { batch, _ in
+            entries.append(contentsOf: batch)
         }
 
-        measure(metrics: [XCTClockMetric()]) {
-            for entry in entries {
-                _ = M3UClassifier.classify(entry)
+        let expectedLive = entryCount * PerfFixtures.providerLiveShare / 100
+        let expectedMovies = entryCount * PerfFixtures.providerMovieShare / 100
+        let expectedEpisodes = entryCount - expectedLive - expectedMovies
+
+        // Fixture fidelity, checked once and outside `measure`: a generator that
+        // stopped emitting episode-shaped names would make this benchmark look
+        // several times faster instead of failing.
+        var live = 0
+        var movies = 0
+        var episodes = 0
+        for entry in entries {
+            switch M3UClassifier.classify(entry) {
+            case .live: live += 1
+            case .movie: movies += 1
+            case .episode: episodes += 1
             }
+        }
+        XCTAssertEqual(entries.count, entryCount)
+        XCTAssertEqual(live, expectedLive)
+        XCTAssertEqual(movies, expectedMovies)
+        XCTAssertEqual(episodes, expectedEpisodes)
+
+        // Assertion outside the inner loop: a per-entry XCTAssert would dominate
+        // the number being measured.
+        measure(metrics: [XCTClockMetric()]) {
+            var vod = 0
+            for entry in entries where M3UClassifier.classify(entry) != .live {
+                vod += 1
+            }
+            XCTAssertEqual(vod, expectedMovies + expectedEpisodes)
         }
     }
 
@@ -187,5 +244,42 @@ final class ParsingBenchmarks: XCTestCase {
                 XCTFail("Xtream VOD decode threw: \(error)")
             }
         }
+    }
+
+    // MARK: - Fixture fidelity
+
+    /// Non-measuring guard on the three Xtream generators: bytes/row inside the
+    /// band the real provider occupies, and every generated row surviving the
+    /// DTOs.
+    ///
+    /// `XtreamList` drops an element it cannot decode and only rethrows when
+    /// *every* element fails, so a fixture whose shape the DTOs reject comes back
+    /// as a short array rather than an error — the decode benchmarks above would
+    /// quietly measure less work instead of failing.
+    func testXtreamFixturesMatchProviderRowShape() throws {
+        let rows = 5000
+        let decoder = JSONDecoder()
+
+        let vod = try PerfFixtures.xtreamVODStreamsJSON(count: rows)
+        assertBytesPerRow(vod, rows: rows, expected: 367)
+        let movies = try decoder.decode(XtreamList<XtreamVODStream>.self, from: vod).items
+        XCTAssertEqual(movies.count, rows)
+        XCTAssertTrue(movies.allSatisfy { $0.streamId != nil && $0.name?.isEmpty == false })
+        XCTAssertTrue(movies.contains { ($0.rating ?? 0) > 0 }, "the String `rating` path decoded nothing")
+        XCTAssertTrue(movies.contains { ($0.rating5Based ?? 0) > 0 }, "the numeric `rating_5based` path decoded nothing")
+
+        let series = try PerfFixtures.xtreamSeriesJSON(count: rows)
+        assertBytesPerRow(series, rows: rows, expected: 1033)
+        let shows = try decoder.decode(XtreamList<XtreamSeries>.self, from: series).items
+        XCTAssertEqual(shows.count, rows)
+        XCTAssertTrue(shows.allSatisfy { $0.seriesId != nil && $0.rating5Based?.isEmpty == false })
+        XCTAssertTrue(shows.allSatisfy { ($0.plot?.count ?? 0) > 200 }, "series rows carry ~1 KB of text")
+
+        let live = try PerfFixtures.xtreamLiveStreamsJSON(count: rows)
+        assertBytesPerRow(live, rows: rows, expected: 356)
+        let channels = try decoder.decode(XtreamList<XtreamLiveStream>.self, from: live).items
+        XCTAssertEqual(channels.count, rows)
+        XCTAssertTrue(channels.allSatisfy { $0.streamId != nil && $0.isAdult == 0 })
+        XCTAssertTrue(channels.contains { $0.tvArchive == 1 }, "the numeric `tv_archive` path decoded nothing")
     }
 }

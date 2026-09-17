@@ -7,6 +7,7 @@
 //  file focused on data loading and screen composition.
 //
 
+import SwiftData
 import SwiftUI
 
 // MARK: - Row
@@ -14,6 +15,9 @@ import SwiftUI
 struct HomeRow: View {
     let title: LocalizedStringKey
     let items: [HomeMediaItem]
+    /// Resume fractions keyed by series id, resolved once for the whole screen
+    /// (`SeriesResumeLoader`) rather than per card — see `HomeMediaItem`.
+    let seriesResume: [String: Double]
     let onPlayLive: (LiveStream) -> Void
     /// When set, each card gains a "Remove from Recently Watched" context menu.
     /// Only the Recently Watched row passes this; the others leave it nil.
@@ -21,6 +25,8 @@ struct HomeRow: View {
     /// When set, each card gains up/down vote actions. Only the "For You" row
     /// passes this; the others leave it nil.
     var onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
+    /// Seeds Multi-View from a channel card's long-press menu.
+    var onStartMultiView: ((LiveStream) -> Void)?
     var animationNamespace: Namespace.ID?
 
     var body: some View {
@@ -34,7 +40,15 @@ struct HomeRow: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: PosterCardMetrics.railSpacing) {
                     ForEach(items) { item in
-                        HomeItemCell(item: item, onPlayLive: onPlayLive, onRemove: onRemove, onVote: onVote, animationNamespace: animationNamespace)
+                        HomeItemCell(
+                            item: item,
+                            seriesResume: seriesResume,
+                            onPlayLive: onPlayLive,
+                            onRemove: onRemove,
+                            onVote: onVote,
+                            onStartMultiView: onStartMultiView,
+                            animationNamespace: animationNamespace
+                        )
                     }
                 }
                 .padding(.horizontal)
@@ -48,9 +62,11 @@ struct HomeRow: View {
 
 private struct HomeItemCell: View {
     let item: HomeMediaItem
+    let seriesResume: [String: Double]
     let onPlayLive: (LiveStream) -> Void
     var onRemove: ((HomeMediaItem) -> Void)?
     var onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
+    var onStartMultiView: ((LiveStream) -> Void)?
     var animationNamespace: Namespace.ID?
 
     var body: some View {
@@ -58,13 +74,13 @@ private struct HomeItemCell: View {
             switch item {
             case let .movie(movie):
                 NavigationLink(value: movie) {
-                    HomePosterCard(title: item.title, imageURL: item.imageURL, progress: item.progress)
+                    HomePosterCard(title: item.title, imageURL: item.imageURL, progress: progress)
                         .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
                 }
                 .posterCardButtonStyle()
             case let .series(series):
                 NavigationLink(value: series) {
-                    HomePosterCard(title: item.title, imageURL: item.imageURL, progress: item.progress)
+                    HomePosterCard(title: item.title, imageURL: item.imageURL, progress: progress)
                         .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
                 }
                 .posterCardButtonStyle()
@@ -77,8 +93,52 @@ private struct HomeItemCell: View {
                 .posterCardButtonStyle()
             }
         }
-        .recentlyWatchedRemoveMenu(onRemove.map { action in { action(item) } })
-        .recommendationVoteMenu(onVote.map { action in { vote in action(item, vote) } })
+        .modifier(HomeItemMenu(
+            item: item,
+            onRemove: onRemove,
+            onVote: onVote,
+            onStartMultiView: onStartMultiView
+        ))
+    }
+
+    private var progress: Double? {
+        item.progress(seriesResume: seriesResume)
+    }
+}
+
+/// The card's long-press menu. A channel gets the full channel menu — the same
+/// one its row in Live TV carries, and the live favorite semantic (the flag
+/// alone, no watchlist date) — while a movie or series gets the VOD one. Every
+/// action a card offers is built here, in a single menu: only the outermost
+/// `contextMenu` on a view survives, so a stacked second modifier would silently
+/// replace the first.
+private struct HomeItemMenu: ViewModifier {
+    let item: HomeMediaItem
+    let onRemove: ((HomeMediaItem) -> Void)?
+    let onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
+    let onStartMultiView: ((LiveStream) -> Void)?
+    @Environment(\.modelContext) private var modelContext
+
+    func body(content: Content) -> some View {
+        let removeFromRecents = onRemove.map { action in { action(item) } }
+        let voteAction = onVote.map { action in { (vote: RecommendationVote) in action(item, vote) } }
+
+        switch item {
+        case let .live(stream):
+            content.liveChannelMenu(
+                isFavorite: stream.isFavorite,
+                onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) },
+                onStartMultiView: onStartMultiView.map { action in { action(stream) } },
+                onRemoveFromRecents: removeFromRecents
+            )
+        default:
+            content.mediaFavoriteMenu(
+                item,
+                in: modelContext,
+                onRemoveFromRecents: removeFromRecents,
+                onVote: voteAction
+            )
+        }
     }
 }
 
@@ -90,6 +150,7 @@ private struct HomeItemCell: View {
 /// nudges the user toward the actions that seed recommendations.
 struct ForYouRow: View {
     let items: [HomeMediaItem]
+    let seriesResume: [String: Double]
     let isLoading: Bool
     let onPlayLive: (LiveStream) -> Void
     let onVote: (HomeMediaItem, RecommendationVote) -> Void
@@ -107,7 +168,14 @@ struct ForYouRow: View {
                     .padding(.horizontal)
             }
         } else {
-            HomeRow(title: "For You", items: items, onPlayLive: onPlayLive, onVote: onVote, animationNamespace: animationNamespace)
+            HomeRow(
+                title: "For You",
+                items: items,
+                seriesResume: seriesResume,
+                onPlayLive: onPlayLive,
+                onVote: onVote,
+                animationNamespace: animationNamespace
+            )
         }
     }
 
@@ -126,34 +194,6 @@ struct ForYouRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-// MARK: - Recommendation vote menu
-
-extension View {
-    /// Attaches thumbs up / thumbs down actions for a "For You" recommendation
-    /// when an action is provided, otherwise leaves the view untouched. Surfaced
-    /// by the same secondary-action gesture as the remove menu (long-press on
-    /// iOS/tvOS, right-click on macOS).
-    @ViewBuilder
-    func recommendationVoteMenu(_ vote: ((RecommendationVote) -> Void)?) -> some View {
-        if let vote {
-            contextMenu {
-                Button {
-                    vote(.upvote)
-                } label: {
-                    Label("More Like This", systemImage: "hand.thumbsup")
-                }
-                Button(role: .destructive) {
-                    vote(.downvote)
-                } label: {
-                    Label("Not Interested", systemImage: "hand.thumbsdown")
-                }
-            }
-        } else {
-            self
-        }
     }
 }
 

@@ -12,6 +12,13 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
     var contentPulled = 0
     var epgSourcesPushed = 0
     var epgSourcesPulled = 0
+    /// Parental-control records (the PIN and category restrictions) moved this
+    /// pass. Counted together — they are one feature and one reconcile step.
+    var parentalPushed = 0
+    var parentalPulled = 0
+    /// Restrictions whose category hasn't synced to this device yet — left
+    /// pending (shadow untouched) so a later pass applies them.
+    var parentalPending = 0
     /// Cloud states whose local catalog item hasn't synced yet — left pending
     /// (shadow untouched) so a later pass applies them once the catalog lands.
     var contentPending = 0
@@ -120,6 +127,9 @@ actor CloudSyncEngine {
             try reconcileProfiles()
             let livePrefixes = try reconcilePlaylists(into: &result)
             try reconcileContent(livePrefixes: livePrefixes, into: &result)
+            // Parental controls: the PIN and category restrictions. Neither is
+            // profile-scoped, so this runs once per pass rather than per profile.
+            try reconcileParentalControls(livePrefixes: livePrefixes, into: &result)
             // Manual EPG sources sync as their own lightweight mirror; each
             // playlist's derived (linked) source is regenerated locally so it
             // appears on every device that has the playlist.
@@ -132,7 +142,7 @@ actor CloudSyncEngine {
             // 3-way merge is idempotent).
             try saveStores()
             shadow.persist()
-            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled)") // swiftlint:disable:this line_length
+            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled) par +\(result.parentalPushed)/\(result.parentalPulled) pend \(result.parentalPending)") // swiftlint:disable:this line_length
         } catch {
             Logger.sync.error("Reconcile failed: \(error.localizedDescription)")
         }

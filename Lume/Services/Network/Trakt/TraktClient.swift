@@ -38,6 +38,21 @@ nonisolated struct TraktClient {
     static let shared = TraktClient()
 
     private let baseURL = "https://api.trakt.tv"
+
+    /// Requested page size for paginated collections. Trakt's documented maximum.
+    private static let pageSize = 250
+
+    /// Page size for `extended=progress`, which Trakt caps at 100 because it
+    /// carries the season/episode progress. Asking for more doesn't just return
+    /// fewer items: `X-Pagination-Page-Count` is computed against the *applied*
+    /// limit, so a mismatched request risks a page walk that ends early and
+    /// silently imports a fraction of the history. Request what will be applied.
+    private static let progressPageSize = 100
+
+    /// Hard stop on the page walk so a server that keeps reporting more pages
+    /// can't spin the import forever.
+    private static let pageWalkLimit = 200
+
     private let session: URLSession
     private let clientID: String?
     private let clientSecret: String?
@@ -154,7 +169,11 @@ nonisolated struct TraktClient {
     /// The user's full watchlist (movies and shows), each carrying its external
     /// ids so the home screen can match against the local library by TMDB id.
     func watchlist(accessToken: String) async throws -> [TraktWatchlistItem] {
-        try await get("/sync/watchlist?extended=full", accessToken: accessToken)
+        try await allPages(
+            "/sync/watchlist",
+            query: [URLQueryItem(name: "extended", value: "full")],
+            accessToken: accessToken
+        )
     }
 
     // MARK: - Watched history (import)
@@ -162,13 +181,21 @@ nonisolated struct TraktClient {
     /// Every movie in the user's watched history, each carrying its TMDB id so
     /// the import can match it against the local library.
     func watchedMovies(accessToken: String) async throws -> [TraktWatchedMovie] {
-        try await get("/sync/watched/movies", accessToken: accessToken)
+        try await allPages("/sync/watched/movies", accessToken: accessToken)
     }
 
     /// Every show in the user's watched history with the watched seasons and
     /// episodes nested, so the import can mark the matching local episodes.
     func watchedShows(accessToken: String) async throws -> [TraktWatchedShow] {
-        try await get("/sync/watched/shows", accessToken: accessToken)
+        // Since Trakt's 2026 watched-endpoint change the default response carries
+        // no season progress at all, and `extended=full`/`noseason` are no-ops.
+        // `extended=progress` is the only mode that still nests the episodes.
+        try await allPages(
+            "/sync/watched/shows",
+            query: [URLQueryItem(name: "extended", value: "progress")],
+            pageSize: Self.progressPageSize,
+            accessToken: accessToken
+        )
     }
 
     // MARK: - Networking
@@ -176,7 +203,44 @@ nonisolated struct TraktClient {
     private func get<T: Decodable>(_ path: String, accessToken: String? = nil) async throws -> T {
         var request = try makeRequest(path: path, method: "GET", accessToken: accessToken)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        return try await send(request)
+        return try await send(request).value
+    }
+
+    /// Walks every page of a collection endpoint and returns the concatenated
+    /// items. Trakt paginates these server-side and caps the page size per
+    /// endpoint, so the requested `limit` is a hint: the walk follows the
+    /// `X-Pagination-Page-Count` of each response rather than assuming one.
+    private func allPages<T: Decodable>(
+        _ path: String,
+        query: [URLQueryItem] = [],
+        pageSize: Int = TraktClient.pageSize,
+        accessToken: String
+    ) async throws -> [T] {
+        var items: [T] = []
+        var page = 1
+        var pageCount = 1
+
+        while page <= pageCount, page <= Self.pageWalkLimit {
+            let pageQuery = query + [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(pageSize))
+            ]
+            var request = try makeRequest(path: path, method: "GET", query: pageQuery, accessToken: accessToken)
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            let (batch, response): ([T], HTTPURLResponse) = try await send(request)
+            if batch.isEmpty {
+                break
+            }
+            items += batch
+
+            if let header = response.value(forHTTPHeaderField: "X-Pagination-Page-Count"),
+               let reported = Int(header)
+            {
+                pageCount = reported
+            }
+            page += 1
+        }
+        return items
     }
 
     private func post<T: Decodable>(
@@ -189,11 +253,22 @@ nonisolated struct TraktClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONEncoder().encode(body)
-        return try await send(request)
+        return try await send(request).value
     }
 
-    private func makeRequest(path: String, method: String, accessToken: String?) throws -> URLRequest {
-        guard let clientID, let url = URL(string: baseURL + path) else { throw TraktError.notConfigured }
+    private func makeRequest(
+        path: String,
+        method: String,
+        query: [URLQueryItem] = [],
+        accessToken: String?
+    ) throws -> URLRequest {
+        guard let clientID, var components = URLComponents(string: baseURL + path) else {
+            throw TraktError.notConfigured
+        }
+        if !query.isEmpty {
+            components.queryItems = (components.queryItems ?? []) + query
+        }
+        guard let url = components.url else { throw TraktError.notConfigured }
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("2", forHTTPHeaderField: "trakt-api-version")
@@ -204,21 +279,23 @@ nonisolated struct TraktClient {
         return request
     }
 
-    private func send<T: Decodable>(_ request: URLRequest) async throws -> T {
+    private func send<T: Decodable>(_ request: URLRequest) async throws -> (value: T, response: HTTPURLResponse) {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw TraktError.invalidResponse }
         guard (200 ... 299).contains(http.statusCode) else {
-            if http.statusCode == 401 { throw TraktError.notAuthenticated }
+            if http.statusCode == 401 {
+                throw TraktError.notAuthenticated
+            }
             throw TraktError.server(http.statusCode)
         }
 
         // Some endpoints (revoke) return an empty body; tolerate that for the
         // sentinel `EmptyResponse` decode.
         if data.isEmpty, let empty = EmptyResponse() as? T {
-            return empty
+            return (empty, http)
         }
         do {
-            return try JSONDecoder().decode(T.self, from: data)
+            return try (JSONDecoder().decode(T.self, from: data), http)
         } catch {
             throw TraktError.decoding
         }
@@ -323,8 +400,12 @@ struct TraktSyncItems: Encodable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        if !movies.isEmpty { try container.encode(movies, forKey: .movies) }
-        if !shows.isEmpty { try container.encode(shows, forKey: .shows) }
+        if !movies.isEmpty {
+            try container.encode(movies, forKey: .movies)
+        }
+        if !shows.isEmpty {
+            try container.encode(shows, forKey: .shows)
+        }
     }
 
     enum CodingKeys: String, CodingKey {
@@ -382,6 +463,24 @@ struct TraktWatchedMovie: Decodable {
 struct TraktWatchedShow: Decodable {
     let show: TraktWatchedMedia
     let seasons: [TraktWatchedSeason]
+
+    init(show: TraktWatchedMedia, seasons: [TraktWatchedSeason]) {
+        self.show = show
+        self.seasons = seasons
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        show = try container.decode(TraktWatchedMedia.self, forKey: .show)
+        // Trakt only nests the seasons for `extended=progress`. A missing key
+        // means "no episode progress", not a broken response — failing here
+        // would abort the whole import.
+        seasons = try container.decodeIfPresent([TraktWatchedSeason].self, forKey: .seasons) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case show, seasons
+    }
 }
 
 struct TraktWatchedSeason: Decodable {
