@@ -11,6 +11,9 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    #if os(macOS)
+        @Environment(\.openWindow) private var openWindow
+    #endif
     // Optional so previews (which don't inject it) don't crash.
     @Environment(PlaylistSwitchModel.self) private var playlistSwitch: PlaylistSwitchModel?
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
@@ -28,6 +31,10 @@ struct MainTabView: View {
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
     @State private var router = DeepLinkRouter()
 
+    /// Playback launched from a `lume://play/...` deep link (widgets, Top Shelf).
+    /// Presented here — not in HomeView — because the link can arrive on any tab.
+    @State private var playingMedia: PlayableMedia?
+
     /// The stream a `lume://resume` deep link (a Live Activity tap) asked to
     /// reopen. Presented directly here, independent of any tab's own player
     /// cover.
@@ -38,9 +45,6 @@ struct MainTabView: View {
     /// pushed into Settings, so the link doesn't disturb whatever the user had
     /// open.
     @State private var showsDownloads = false
-    #if os(macOS)
-        @Environment(\.openWindow) private var openWindow
-    #endif
 
     /// Playlists waiting to be auto-synced, and the one currently shown in the
     /// blocking progress cover. Auto-sync is presented (not silent) so the user
@@ -152,6 +156,11 @@ struct MainTabView: View {
                     enqueueDueSyncs(playlists)
                 }
             }
+        #if os(iOS) || os(tvOS)
+            .fullScreenCover(item: $playingMedia) { media in
+                FullScreenPlayerView(media: media)
+            }
+        #endif
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
             .downloadsSheet(isPresented: $showsDownloads)
             .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
@@ -316,8 +325,10 @@ struct MainTabView: View {
 
     /// Resolves a `lume://movie/{tmdbId}` / `lume://series/{tmdbId}` link to a
     /// catalog item, switches to the matching tab and pushes its detail screen.
-    /// Silently ignores unknown links and titles not present in the catalog
-    /// (e.g. a tmdbId that was never synced or enriched).
+    /// `play`/`open` links (from widgets and the Top Shelf) launch playback or
+    /// a detail screen by catalog id; `resume`/`downloads` serve the Live
+    /// Activities. Silently ignores unknown links and titles not present in the
+    /// catalog (e.g. a tmdbId that was never synced).
     private func handleDeepLink(_ url: URL) {
         guard let link = DeepLink(url: url) else { return }
         switch link {
@@ -328,9 +339,9 @@ struct MainTabView: View {
             router.moviesPath.append(movie)
         case let .series(tmdbId):
             guard let series = resolveSeries(tmdbId: tmdbId) else { return }
-            router.selectedTab = .series
-            router.seriesPath = NavigationPath()
-            router.seriesPath.append(series)
+            openSeriesDetail(series)
+        case .playMovie, .playEpisode, .playLive, .openSeries:
+            handleWidgetLink(link)
         case .resume:
             // The Live Activity was tapped. When a player session is already
             // up, foregrounding the app is all that's needed; otherwise reopen
@@ -346,6 +357,77 @@ struct MainTabView: View {
             // The download Live Activity was tapped.
             showsDownloads = true
         }
+    }
+
+    /// Handles a widget / Top Shelf link: `play` launches playback, `open`
+    /// pushes a series detail screen — both by catalog id.
+    private func handleWidgetLink(_ link: DeepLink) {
+        switch link {
+        case .playMovie, .playEpisode, .playLive:
+            present(resolvePlayable(link))
+        case let .openSeries(id):
+            guard let series = fetchFirst(FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })),
+                  !contentRestriction.hides(categoryID: series.categoryId) else { return }
+            openSeriesDetail(series)
+        default:
+            break
+        }
+    }
+
+    private func openSeriesDetail(_ series: Series) {
+        router.selectedTab = .series
+        router.seriesPath = NavigationPath()
+        router.seriesPath.append(series)
+    }
+
+    /// Resolves a `play` deep link to playable media: fetch the catalog item by
+    /// id, hide restricted categories from child profiles, find the owning
+    /// playlist and build the stream URL.
+    private func resolvePlayable(_ link: DeepLink) -> PlayableMedia? {
+        switch link {
+        case let .playMovie(id):
+            guard let movie = fetchFirst(FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })),
+                  !contentRestriction.hides(categoryID: movie.categoryId),
+                  let playlist = owningPlaylist(of: id) else { return nil }
+            return PlayableMedia.from(movie: movie, playlist: playlist)
+        case let .playEpisode(id):
+            guard let episode = fetchFirst(FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })),
+                  let playlist = owningPlaylist(of: id) else { return nil }
+            return PlayableMedia.from(episode: episode, playlist: playlist)
+        case let .playLive(id):
+            guard let stream = fetchFirst(FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })),
+                  !contentRestriction.hides(categoryID: stream.categoryId),
+                  let playlist = owningPlaylist(of: id) else { return nil }
+            return PlayableMedia.from(stream: stream, playlist: playlist)
+        default:
+            return nil
+        }
+    }
+
+    /// Starts playback of deep-linked media, mirroring the in-app play paths:
+    /// external player hand-off first, then a player window (macOS) or a
+    /// full-screen cover (iOS/tvOS).
+    private func present(_ media: PlayableMedia?) {
+        guard let media else { return }
+        if ExternalPlayback.open(media) { return }
+        #if os(macOS)
+            openWindow(id: "player", value: media)
+        #else
+            playingMedia = media
+        #endif
+    }
+
+    /// Fetches the first match of a catalog-id lookup.
+    private func fetchFirst<Model: PersistentModel>(_ descriptor: FetchDescriptor<Model>) -> Model? {
+        var descriptor = descriptor
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    /// The playlist that owns a catalog item — ids are prefixed with the owning
+    /// playlist's UUID (same convention as `NextEpisodeResolver.playlist(for:)`).
+    private func owningPlaylist(of id: String) -> Playlist? {
+        playlists.first { id.hasPrefix("\($0.id.uuidString)-") } ?? playlists.first
     }
 
     /// Finds a movie by `tmdbId`, preferring the active playlist but falling back
