@@ -56,6 +56,10 @@ struct PlaylistDetailView: View {
         playlist.sourceType == .webdav
     }
 
+    var isJellyfin: Bool {
+        playlist.sourceType == .jellyfin
+    }
+
     /// The localized section heading for the connection fields.
     var connectionSectionTitle: LocalizedStringKey {
         switch playlist.sourceType {
@@ -63,6 +67,7 @@ struct PlaylistDetailView: View {
         case .m3u: "M3U Playlist"
         case .stalker: "Stalker Portal"
         case .webdav: "WebDAV Share"
+        case .jellyfin: "Jellyfin Server"
         }
     }
 
@@ -343,6 +348,7 @@ struct PlaylistDetailView: View {
         case .m3u: "Playlist URL"
         case .stalker: "Portal URL"
         case .webdav: "Share URL"
+        case .jellyfin: "Server URL"
         }
     }
 }
@@ -377,6 +383,13 @@ extension PlaylistDetailView {
         } else if isWebDAV {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword
+        } else if isJellyfin {
+            playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            playlist.password = editPassword
+            // The stored session belongs to the previous address/credentials:
+            // drop it and let the next sync log in again.
+            playlist.jellyfinAccessToken = nil
+            playlist.jellyfinUserId = nil
         } else {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword

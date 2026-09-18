@@ -45,6 +45,11 @@ struct LoginView: View {
     /// the root, so a hostname alone silently lists nothing.
     @State var webdavURL = ""
 
+    /// The Jellyfin server's base address — the URL opened in a browser, e.g.
+    /// `http://192.168.1.10:8096`. Unlike a WebDAV share this is the server
+    /// root: libraries are discovered through the API.
+    @State var jellyfinURL = ""
+
     @State var isLoading = false
     @State var errorMessage: String?
 
@@ -61,6 +66,10 @@ struct LoginView: View {
                 && StalkerMAC.isValid(macAddress.trimmingCharacters(in: .whitespacesAndNewlines))
         case .webdav:
             !webdavURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .jellyfin:
+            !jellyfinURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !password.isEmpty
         }
     }
 
@@ -92,16 +101,26 @@ struct LoginView: View {
                             Text("M3U").tag(PlaylistSourceType.m3u)
                             Text("Stalker").tag(PlaylistSourceType.stalker)
                             Text("WebDAV").tag(PlaylistSourceType.webdav)
+                            Text("Jellyfin").tag(PlaylistSourceType.jellyfin)
                         }
                         .pickerStyle(.segmented)
                     }
 
                     switch sourceType {
-                    case .xtream: xtreamSection
-                    case .m3u: m3uSection
-                    case .stalker: stalkerSection
+                    case .xtream:
+                        XtreamLoginSection(name: $name, serverURL: $serverURL, username: $username, password: $password)
+                    case .m3u:
+                        M3ULoginSection(
+                            name: $name, m3uURL: $m3uURL, epgURL: $epgURL,
+                            showFileImporter: $showFileImporter, xtreamHint: xtreamHint,
+                            isLoading: isLoading, onAddAsXtream: addAsXtream
+                        )
+                    case .stalker:
+                        StalkerLoginSection(name: $name, portalURL: $portalURL, macAddress: $macAddress, username: $username, password: $password)
                     case .webdav:
                         WebDAVLoginSection(name: $name, shareURL: $webdavURL, username: $username, password: $password)
+                    case .jellyfin:
+                        JellyfinLoginSection(name: $name, serverURL: $jellyfinURL, username: $username, password: $password)
                     }
 
                     if let errorMessage {
@@ -154,113 +173,9 @@ struct LoginView: View {
             }
         }
 
-        private var xtreamSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com:8080", text: $serverURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                TextField("Username", text: $username)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.username)
-
-                SecureField("Password", text: $password)
-                    .textContentType(.password)
-            } header: {
-                Text("Server Connection")
-            } footer: {
-                Text("Your credentials are stored locally on this device.")
-            }
-        }
-
-        @ViewBuilder private var m3uSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com/playlist.m3u", text: $m3uURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                Button("Choose Local File…") { showFileImporter = true }
-
-                TextField("EPG URL (optional)", text: $epgURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-            } header: {
-                Text("M3U Playlist")
-            } footer: {
-                Text("Enter the playlist URL or choose a local m3u/m3u8 file. The EPG URL is read from the playlist when left empty.")
-            }
-
-            if let xtreamHint {
-                Section {
-                    XtreamLoginHint(isLoading: isLoading) { addAsXtream(xtreamHint) }
-                }
-            }
-        }
-
-        private var stalkerSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com:8080/c/", text: $portalURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                HStack {
-                    TextField("MAC Address", text: $macAddress)
-                    #if os(iOS)
-                        .textInputAutocapitalization(.characters)
-                    #endif
-                        .autocorrectionDisabled()
-                    Button {
-                        macAddress = StalkerMAC.generate()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Generate a new MAC address")
-                }
-
-                TextField("Username (optional)", text: $username)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.username)
-
-                SecureField("Password (optional)", text: $password)
-                    .textContentType(.password)
-            } header: {
-                Text("Stalker Portal")
-            } footer: {
-                Text("Enter the portal URL and the MAC address your provider authorized. Most portals need only the portal URL and MAC.")
-            }
-        }
+        // The iOS/macOS source sections live in LoginView+SourceSections.swift
+        // (and LoginView+WebDAV.swift / LoginView+Jellyfin.swift) so this type
+        // stays within the body-length limit.
     #endif
 
     #if os(tvOS)
@@ -270,6 +185,7 @@ struct LoginView: View {
             case .m3u: "The EPG URL is read from the playlist when left empty."
             case .stalker: "Enter the portal URL and the MAC address your provider authorized."
             case .webdav: WebDAVAddCheck.hint
+            case .jellyfin: JellyfinAddCheck.hint
             }
         }
 
@@ -290,6 +206,7 @@ struct LoginView: View {
                         Text("M3U").tag(PlaylistSourceType.m3u)
                         Text("Stalker").tag(PlaylistSourceType.stalker)
                         Text("WebDAV").tag(PlaylistSourceType.webdav)
+                        Text("Jellyfin").tag(PlaylistSourceType.jellyfin)
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -311,6 +228,8 @@ struct LoginView: View {
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $password, isSecure: true, contentType: .password)
                         case .webdav:
                             WebDAVLoginFields(shareURL: $webdavURL, username: $username, password: $password)
+                        case .jellyfin:
+                            JellyfinLoginFields(serverURL: $jellyfinURL, username: $username, password: $password)
                         }
                     }
 
@@ -375,6 +294,7 @@ struct LoginView: View {
         case .m3u: addM3UPlaylist()
         case .stalker: addStalkerPlaylist()
         case .webdav: addWebDAVPlaylist()
+        case .jellyfin: addJellyfinPlaylist()
         }
     }
 
@@ -530,7 +450,9 @@ struct LoginView: View {
             case let .success(pickedURL):
                 let accessing = pickedURL.startAccessingSecurityScopedResource()
                 defer {
-                    if accessing { pickedURL.stopAccessingSecurityScopedResource() }
+                    if accessing {
+                        pickedURL.stopAccessingSecurityScopedResource()
+                    }
                 }
                 do {
                     let directory = try FileManager.default

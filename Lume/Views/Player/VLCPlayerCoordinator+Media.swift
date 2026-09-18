@@ -17,7 +17,10 @@ extension VLCPlayerCoordinator {
         // The credential-bearing MRL exists only for this call: it is never
         // stored back onto `mediaURL`, so it cannot reach a deep link, a Cast
         // payload, a download task description or window-restoration state.
-        let media = VLCMedia(url: HTTPBasicCredentials.authenticatedURL(url, headers: httpHeaders) ?? url)
+        // VLCKit sends no headers, so both header-carrying sources are folded
+        // into the URL here: WebDAV's Basic userinfo, Jellyfin's api_key.
+        let media = VLCMedia(url: HTTPBasicCredentials.authenticatedURL(url, headers: httpHeaders)
+            ?? JellyfinPlaybackAuth.authenticatedURL(url, headers: httpHeaders) ?? url)
         applyMediaOptions(to: media, isLive: isLive)
         mediaPlayer.media = media
         didApplyPreferredLanguages = false

@@ -51,6 +51,11 @@ enum SyncStep: Int, CaseIterable, Identifiable {
     /// walk replaces the single m3u download phase.
     static let webdavSteps: [SyncStep] = [.directoryWalk, .playlistImport]
 
+    /// The steps a Jellyfin sync walks through, in order: login, then the two
+    /// library kinds. There are no live channels and no categories to fetch —
+    /// a category per library is created inline.
+    static let jellyfinSteps: [SyncStep] = [.authenticating, .movies, .series]
+
     static func steps(for sourceType: PlaylistSourceType, full: Bool = false) -> [SyncStep] {
         switch sourceType {
         case .xtream: xtreamSteps
@@ -60,6 +65,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         // full-catalog download walks everything.
         case .stalker: full ? xtreamSteps : stalkerDynamicSteps
         case .webdav: webdavSteps
+        case .jellyfin: jellyfinSteps
         }
     }
 

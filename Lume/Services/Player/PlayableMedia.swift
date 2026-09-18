@@ -124,6 +124,21 @@ extension PlayableMedia {
         return ["Authorization": "Basic \(token)"]
     }
 
+    /// The session-token header a Jellyfin server needs at playback time. The
+    /// stored stream URLs are token-free on purpose (see the property comment),
+    /// so the session authenticates the request instead. `nil` before the
+    /// playlist's first sync, which is what issues the session.
+    private static func jellyfinHeaders(for playlist: Playlist) -> [String: String]? {
+        guard playlist.sourceType == .jellyfin else { return nil }
+        return JellyfinClient.playbackHeaders(token: playlist.jellyfinAccessToken)
+    }
+
+    /// The auth headers for the playlist's source, if it authenticates per
+    /// request rather than per URL. `nil` for the URL-credential sources.
+    private static func authHeaders(for playlist: Playlist) -> [String: String]? {
+        webdavHeaders(for: playlist) ?? jellyfinHeaders(for: playlist)
+    }
+
     static func from(movie: Movie, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
         // Prefer local file for offline/downloaded playback
         if let path = movie.localFileURL,
@@ -152,7 +167,7 @@ extension PlayableMedia {
             kind: .vod,
             startTime: movie.watchProgress,
             contentRef: .movie(movie.id),
-            httpHeaders: webdavHeaders(for: playlist)
+            httpHeaders: authHeaders(for: playlist)
         )
     }
 
@@ -165,8 +180,9 @@ extension PlayableMedia {
             guard let cmd = directURL else { return nil }
             return StalkerLink.placeholder(type: .vod, cmd: cmd)
         }
-        // WebDAV deliberately takes the direct-URL path: the walk stored the
-        // resolved file URL, and there is nothing to build.
+        // WebDAV and Jellyfin deliberately take the direct-URL path: the walk
+        // stored the resolved file URL (WebDAV) or the sync stored the
+        // token-free stream URL (Jellyfin), and there is nothing to build.
         return directURL.flatMap(URL.init(string:)) ?? build()
     }
 
@@ -193,7 +209,7 @@ extension PlayableMedia {
         case .stalker:
             guard let cmd = episode.directSource, let placeholder = StalkerLink.placeholder(type: .vod, cmd: cmd) else { return nil }
             url = placeholder
-        case .m3u, .webdav:
+        case .m3u, .webdav, .jellyfin:
             guard let resolved = episode.directSource.flatMap(URL.init(string:)) else { return nil }
             url = resolved
         case .xtream:
@@ -211,7 +227,7 @@ extension PlayableMedia {
             kind: .vod,
             startTime: episode.watchProgress,
             contentRef: .episode(episode.id),
-            httpHeaders: webdavHeaders(for: playlist)
+            httpHeaders: authHeaders(for: playlist)
         )
     }
 
@@ -229,8 +245,8 @@ extension PlayableMedia {
             guard let cmd = stream.directURL, let placeholder = StalkerLink.placeholder(type: .itv, cmd: cmd) else { return nil }
             url = placeholder
         } else {
-            // WebDAV deliberately takes this direct-URL path too, though a
-            // WebDAV playlist has no live channels to reach it with.
+            // WebDAV and Jellyfin deliberately take this direct-URL path too,
+            // though neither playlist kind has live channels to reach it with.
             // An m3u channel plays at the URL the playlist listed; the chosen
             // container rewrites it only when the provider used one of the two
             // interchangeable live endpoints. Xtream URLs are built with it.
@@ -248,7 +264,7 @@ extension PlayableMedia {
             startTime: 0,
             contentRef: .live(stream.id),
             channelScope: scope,
-            httpHeaders: webdavHeaders(for: playlist)
+            httpHeaders: authHeaders(for: playlist)
         )
     }
 

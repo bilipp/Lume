@@ -61,6 +61,9 @@ import SwiftUI
                         } else if isWebDAV {
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                        } else if isJellyfin {
+                            TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
+                            TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
                         } else {
                             TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
@@ -92,8 +95,11 @@ import SwiftUI
                                 TVSettingsValueRow("Username", value: playlist.username)
                             }
                             if !playlist.password.isEmpty {
-                                TVSettingsValueRow("Password") { Text("\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}") }
+                                TVSettingsValueRow("Password") { Text("••••••••") }
                             }
+                        } else if isJellyfin {
+                            TVSettingsValueRow("Username", value: playlist.username)
+                            TVSettingsValueRow("Password") { Text("••••••••") }
                         } else {
                             TVSettingsValueRow("Username", value: playlist.username)
                             TVSettingsValueRow("Password") { Text("••••••••") }

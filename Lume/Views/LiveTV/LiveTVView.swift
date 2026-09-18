@@ -299,9 +299,10 @@ struct LiveTVView: View {
 
     /// A WebDAV share carries no live channels, so its rail stays empty even
     /// when another playlist has live categories — the unscoped `categories`
-    /// query cannot see that on its own.
+    /// query cannot see that on its own. Same for Jellyfin, whose Live TV
+    /// tuner API is not synced.
     private var webdavHasNoLiveChannels: Bool {
-        activePlaylist?.knownSourceType == .webdav && categorySections.isEmpty
+        (activePlaylist?.knownSourceType == .webdav || activePlaylist?.knownSourceType == .jellyfin) && categorySections.isEmpty
     }
 
     /// The id prefix every Category / LiveStream of the active playlist shares.

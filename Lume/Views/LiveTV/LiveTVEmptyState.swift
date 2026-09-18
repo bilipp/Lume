@@ -9,7 +9,8 @@ import SwiftUI
 
 /// A WebDAV playlist is a tree of media files on a file share — it can never
 /// carry live channels, so the generic "sync to load channels" copy would send
-/// the user into an endless re-sync loop.
+/// the user into an endless re-sync loop. Same for Jellyfin, whose Live TV
+/// tuner API is not synced.
 struct LiveTVEmptyState: View {
     let sourceType: PlaylistSourceType?
 
@@ -19,6 +20,12 @@ struct LiveTVEmptyState: View {
                 "No Live Channels",
                 systemImage: "folder",
                 description: Text("This WebDAV share has no live channels — it carries movies and series only.")
+            )
+        } else if sourceType == .jellyfin {
+            ContentUnavailableView(
+                "No Live Channels",
+                systemImage: "folder",
+                description: Text("This Jellyfin server has no live channels here — it carries movies and series only.")
             )
         } else {
             ContentUnavailableView(

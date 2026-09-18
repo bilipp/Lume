@@ -33,6 +33,14 @@ final class Playlist {
     /// `00:1A:79:xx:xx:xx`). `nil` for Xtream / m3u sources.
     var macAddress: String?
 
+    /// Jellyfin session, filled at login and refreshed on every sync. The
+    /// access token authenticates stream and image requests; the user id scopes
+    /// library queries. Both are device-local (a sibling device re-authenticates
+    /// with the mirrored username/password on its next sync), so neither is
+    /// mirrored to CloudKit. `nil` for every other source type.
+    var jellyfinAccessToken: String?
+    var jellyfinUserId: String?
+
     var serverTimezone: String?
     var serverVersion: String?
 
@@ -81,15 +89,28 @@ final class Playlist {
         self.init(name: name, serverURL: webdavURL, username: username, password: password)
         sourceTypeRaw = PlaylistSourceType.webdav.rawValue
     }
+
+    /// Creates a Jellyfin server playlist. `serverURL` holds the server base
+    /// URL (e.g. `http://192.168.1.10:8096`); `accessToken`/`userId` are the
+    /// session from the login handshake. Stored alongside the password so a
+    /// rotated or revoked token can be re-issued on the next sync.
+    convenience init(name: String, jellyfinURL: String, username: String, password: String, accessToken: String, userId: String) {
+        self.init(name: name, serverURL: jellyfinURL, username: username, password: password)
+        sourceTypeRaw = PlaylistSourceType.jellyfin.rawValue
+        jellyfinAccessToken = accessToken
+        jellyfinUserId = userId
+    }
 }
 
 enum PlaylistSourceType: String, Codable {
     case xtream
     case m3u
     case stalker
-    /// Declared last so the raw values already persisted for the three cases
-    /// above keep their meaning.
+    /// Declared after the original three so the raw values already persisted
+    /// for those cases keep their meaning. (String raw values, so order is
+    /// only a convention — new cases always append here.)
     case webdav
+    case jellyfin
 }
 
 /// The container a playlist's live streams are requested in.
@@ -207,6 +228,9 @@ extension Playlist {
         // A WebDAV file is a plain byte range — there is no HLS/MPEG-TS choice
         // to make.
         case .webdav: false
+        // A Jellyfin direct stream is a plain byte range too — transcoding
+        // profiles are a later change.
+        case .jellyfin: false
         }
     }
 
@@ -222,6 +246,9 @@ extension Playlist {
         // Deferred to a later change: a background URLSession cannot answer an
         // auth challenge after the app is relaunched.
         case .webdav: false
+        // Deferred to a later change: downloads need the session token as a
+        // header the background session cannot re-issue after relaunch.
+        case .jellyfin: false
         }
     }
 

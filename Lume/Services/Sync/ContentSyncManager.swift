@@ -9,69 +9,6 @@ import Foundation
 import OSLog
 import SwiftData
 
-// MARK: - ParsedEpisode
-
-/// A provider episode parsed off the main actor, ready to be turned into an
-/// `Episode` model by the caller on its own context. Value type so it can cross
-/// the actor boundary safely.
-struct ParsedEpisode {
-    let id: String
-    let episodeId: String
-    let title: String
-    let containerExtension: String
-    let seasonNum: Int
-    let episodeNum: Int
-    let added: String?
-    let directSource: String?
-    let durationSecs: Int?
-    let movieImage: String?
-    let rating: Double?
-    let airDate: String?
-    let plot: String?
-}
-
-extension Series {
-    /// Materializes fetched episodes on `context` and links them to this series,
-    /// de-duping against any already present (Episode.id is unique). Mutating the
-    /// `episodes` relationship directly updates any observing SwiftUI view, so the
-    /// caller must run this on the same context the view renders from.
-    ///
-    /// Additive on purpose: a refresh merges in episodes the provider has added
-    /// since the last fetch and never deletes, so a provider hiccup (a short or
-    /// empty `get_series_info` response) can't wipe rows that carry watch
-    /// progress. Call only after a *successful* fetch — it stamps the episode
-    /// cache, which suppresses further refreshes until it goes stale again.
-    func insertEpisodes(_ parsed: [ParsedEpisode], into context: ModelContext) {
-        let existingIds = Set(episodes.map(\.id))
-        for parsed in parsed where !existingIds.contains(parsed.id) {
-            let episode = Episode(
-                id: parsed.id,
-                episodeId: parsed.episodeId,
-                title: parsed.title,
-                containerExtension: parsed.containerExtension,
-                seasonNum: parsed.seasonNum,
-                episodeNum: parsed.episodeNum,
-                added: parsed.added,
-                directSource: parsed.directSource
-            )
-            episode.durationSecs = parsed.durationSecs
-            episode.movieImage = parsed.movieImage
-            episode.rating = parsed.rating
-            episode.airDate = parsed.airDate
-            episode.plot = parsed.plot
-            context.insert(episode)
-            episodes.append(episode)
-        }
-        // A Trakt import can only mark episodes that exist, so anything it
-        // parked for this series is applied here — the one place episodes ever
-        // materialize for Xtream and Stalker.
-        TraktWatchedImporter.applyPending(to: self)
-        episodesFetchedAt = Date()
-        episodesFetchedLastModified = lastModified
-        try? context.save()
-    }
-}
-
 // MARK: - ContentSyncManager
 
 actor ContentSyncManager {
@@ -80,6 +17,7 @@ actor ContentSyncManager {
     let modelContainer: ModelContainer
     let xtreamClient: XtreamClient
     let webdavClient: WebDAVClient
+    let jellyfinClient: JellyfinClient
     private var activeSyncPlaylistIDs: Set<UUID> = []
 
     /// Number of items to process before saving and resetting the context.
@@ -90,11 +28,13 @@ actor ContentSyncManager {
     init(
         modelContainer: ModelContainer,
         xtreamClient: XtreamClient = XtreamClient(),
-        webdavClient: WebDAVClient = WebDAVClient()
+        webdavClient: WebDAVClient = WebDAVClient(),
+        jellyfinClient: JellyfinClient = JellyfinClient()
     ) {
         self.modelContainer = modelContainer
         self.xtreamClient = xtreamClient
         self.webdavClient = webdavClient
+        self.jellyfinClient = jellyfinClient
     }
 
     // MARK: - Playlist Sync
@@ -160,6 +100,8 @@ actor ContentSyncManager {
             try await performStalkerSync(playlist: playlist, playlistId: playlistId, progress: progress, full: full)
         case .webdav:
             try await performWebDAVSync(playlist: playlist, playlistId: playlistId, progress: progress)
+        case .jellyfin:
+            try await performJellyfinSync(playlist: playlist, playlistId: playlistId, progress: progress)
         }
 
         // Every source writes the same unread history rows (see the method).
@@ -336,7 +278,9 @@ actor ContentSyncManager {
                     // A re-sync where the provider changed nothing leaves the
                     // context clean (see applyMovieFields): skip save() entirely
                     // rather than pay a full transaction for zero rows.
-                    if context.hasChanges { try context.save() }
+                    if context.hasChanges {
+                        try context.save()
+                    }
                     Logger.database.info("Synced movies \(batchStart + 1)–\(batchEnd) of \(totalCount)")
                 }
                 await progress?.update(
@@ -410,7 +354,9 @@ actor ContentSyncManager {
                     // A re-sync where the provider changed nothing leaves the
                     // context clean (see applySeriesFields): skip save() entirely
                     // rather than pay a full transaction for zero rows.
-                    if context.hasChanges { try context.save() }
+                    if context.hasChanges {
+                        try context.save()
+                    }
                     Logger.database.info("Synced series \(batchStart + 1)–\(batchEnd) of \(totalCount)")
                 }
                 await progress?.update(
@@ -455,6 +401,10 @@ actor ContentSyncManager {
             []
         case .webdav:
             // WebDAV episodes are imported alongside the rest of the catalog
+            // during sync, so there is nothing to fetch lazily here.
+            []
+        case .jellyfin:
+            // Jellyfin episodes are imported alongside the rest of the catalog
             // during sync, so there is nothing to fetch lazily here.
             []
         }
@@ -562,7 +512,9 @@ actor ContentSyncManager {
                     // A re-sync where the provider changed nothing leaves the
                     // context clean (see applyLiveStreamFields): skip save() entirely
                     // rather than pay a full transaction for zero rows.
-                    if context.hasChanges { try context.save() }
+                    if context.hasChanges {
+                        try context.save()
+                    }
                     Logger.database.info("Synced streams \(batchStart + 1)–\(batchEnd) of \(totalCount)")
                 }
                 await progress?.update(
