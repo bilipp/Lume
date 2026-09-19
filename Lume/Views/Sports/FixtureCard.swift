@@ -49,7 +49,7 @@ struct FixtureCard: View {
             statusColumn
                 .frame(width: 64)
 
-            if fixture.home?.team != nil || fixture.away?.team != nil {
+            if fixture.hasTeams {
                 teamRows
             } else {
                 eventRow
@@ -133,13 +133,15 @@ struct FixtureCard: View {
         }
     }
 
+    /// A competitor-less event (a race weekend, a fight night): its name over
+    /// its venue.
     private var eventRow: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(fixture.leagueName)
+            Text(verbatim: fixture.eventTitle)
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
-            if let venue = fixture.venue {
-                Text(venue).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            if let subtitle = fixture.eventSubtitle {
+                Text(verbatim: subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
     }
@@ -206,7 +208,7 @@ struct FixtureCard: View {
         if let home = fixture.home?.team, let away = fixture.away?.team {
             parts.append(String(localized: "\(home.name) versus \(away.name)"))
         } else {
-            parts.append(fixture.venue ?? fixture.leagueName)
+            parts.append(fixture.eventTitle)
         }
         switch fixture.status.state {
         case .scheduled:

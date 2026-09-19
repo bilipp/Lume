@@ -145,8 +145,22 @@ nonisolated enum SportsMatcher {
     /// sports-tagged listing outranks a same-name coincidence in generic text.
     private static func mentionsSport(_ category: String) -> Bool {
         let haystack = normalize(category)
-        return ["sport", "soccer", "football", "fussball"].contains { containsWord($0, in: haystack) }
+        return sportWords.contains { containsWord($0, in: haystack) }
     }
+
+    /// Category words, across the app's languages, for every sport in the
+    /// catalogue. Lowercase and accent-free to match `normalize` output.
+    private static let sportWords: [String] = [
+        "sport", "sports", "deportes", "esporte", "esportes",
+        "soccer", "football", "fussball", "futbol", "futebol", "calcio", "voetbal",
+        "basketball", "basket", "baloncesto", "basquete",
+        "hockey", "eishockey",
+        "baseball", "beisbol", "softball",
+        "rugby", "afl",
+        "lacrosse",
+        "motorsport", "racing", "formel", "formula", "formule", "nascar", "indycar",
+        "mma", "ufc", "kampfsport", "boxing", "boxen"
+    ]
 
     /// How many of a team's distinctive tokens appear in the normalized text.
     private static func matchCount(_ tokens: Set<String>, in haystack: String) -> Int {

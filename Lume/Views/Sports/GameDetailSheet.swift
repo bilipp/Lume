@@ -68,7 +68,7 @@ struct GameDetailSheet: View {
     private var header: some View {
         VStack(spacing: 18) {
             leagueLine
-            if fixture.home?.team != nil || fixture.away?.team != nil {
+            if fixture.hasTeams {
                 matchup
             } else {
                 eventHeader
@@ -119,8 +119,13 @@ struct GameDetailSheet: View {
 
     private var eventHeader: some View {
         VStack(spacing: 12) {
-            if let venue = fixture.venue {
-                Text(verbatim: venue).font(.title3.weight(.bold))
+            Text(verbatim: fixture.eventTitle)
+                .font(.title3.weight(.bold))
+                .multilineTextAlignment(.center)
+            if let subtitle = fixture.eventSubtitle {
+                Text(verbatim: subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
             centerStatus
         }

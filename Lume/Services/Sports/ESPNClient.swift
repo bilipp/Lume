@@ -167,10 +167,13 @@ nonisolated struct ESPNClient: SportsDataProvider {
 // MARK: - Mapping
 
 nonisolated extension ESPNClient {
+    /// The catalogue's curated name and abbreviation label every fixture; the
+    /// response's own ("German Bundesliga", "Rugby League" for the NRL,
+    /// "NASCAR-PREMIER") only fill a blank.
     static func mapScoreboard(_ scoreboard: ESPNScoreboard, league: SportsLeague) -> [SportsFixture] {
         let info = scoreboard.leagues?.first
-        let leagueName = info?.name ?? league.name
-        let leagueAbbreviation = info?.abbreviation ?? league.abbreviation
+        let leagueName = league.name.isEmpty ? (info?.name ?? "") : league.name
+        let leagueAbbreviation = league.abbreviation.isEmpty ? (info?.abbreviation ?? "") : league.abbreviation
         let isRacing = league.sport == "racing"
 
         return (scoreboard.events ?? []).compactMap { event in
@@ -231,10 +234,17 @@ nonisolated extension ESPNClient {
             status: status,
             home: home,
             away: away,
-            venue: competition?.venue?.fullName,
+            venue: competition?.venue?.fullName ?? event.circuit?.fullName,
             broadcasters: broadcasters,
-            sessions: sessions
+            sessions: sessions,
+            name: nonEmpty(event.name),
+            shortName: nonEmpty(event.shortName)
         )
+    }
+
+    private static func nonEmpty(_ text: String?) -> String? {
+        guard let text, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        return text
     }
 
     static func mapStatus(_ status: ESPNStatus?) -> SportsFixtureStatus {
@@ -313,13 +323,23 @@ nonisolated extension ESPNClient {
 
     // MARK: Standings
 
+    /// Walks every group (conferences, F1's driver/constructor tables) plus a
+    /// single-table league's root entries (AFL, NBL). A group that names no kind
+    /// is read from its rows: athlete entries are drivers (NASCAR, IndyCar).
     static func mapStandings(_ response: ESPNStandingsResponse) -> [SportsStandingRow] {
+        var groups: [(name: String?, entries: [ESPNStandingsEntry])] = (response.children ?? []).map {
+            ($0.name, $0.standings?.entries ?? [])
+        }
+        if let rootEntries = response.standings?.entries, !rootEntries.isEmpty {
+            groups.append((nil, rootEntries))
+        }
+
         var rows: [SportsStandingRow] = []
-        for child in response.children ?? [] {
-            let kind = standingKind(childName: child.name)
-            let entries = child.standings?.entries ?? []
-            for (index, entry) in entries.enumerated() {
-                if let row = mapStandingEntry(entry, kind: kind, fallbackRank: index + 1) {
+        for group in groups {
+            let kind = standingKind(childName: group.name)
+            for (index, entry) in group.entries.enumerated() {
+                let resolvedKind = kind == .team && entry.team == nil && entry.athlete != nil ? .driver : kind
+                if let row = mapStandingEntry(entry, kind: resolvedKind, fallbackRank: index + 1) {
                     rows.append(row)
                 }
             }
@@ -363,6 +383,16 @@ nonisolated extension ESPNClient {
             return stat.displayValue.flatMap { Int($0) }
         }
 
+        /// The first of several provider spellings for one figure — rugby and
+        /// the NRL say `gamesWon`/`gamesLost`/`gamesDrawn`/`pointsDifference`
+        /// where every other sport says `wins`/`losses`/`ties`/`pointDifferential`.
+        func intStat(anyOf names: [String]) -> Int? {
+            for name in names {
+                if let value = intStat(name) { return value }
+            }
+            return nil
+        }
+
         func rankStat() -> Int? {
             if let rank = intStat("rank") { return rank }
             if let stat = byAbbreviation["RK"], let value = stat.value ?? stat.displayValue.flatMap({ Double($0) }) {
@@ -372,7 +402,7 @@ nonisolated extension ESPNClient {
         }
 
         func pointsStat() -> Int? {
-            if let points = intStat("points") { return points }
+            if let points = intStat(anyOf: ["points", "championshipPts"]) { return points }
             if let stat = byAbbreviation["PTS"], let value = stat.value ?? stat.displayValue.flatMap({ Double($0) }) {
                 return Int(value)
             }
@@ -397,10 +427,10 @@ nonisolated extension ESPNClient {
                 name: team.displayName ?? team.shortDisplayName ?? teamId,
                 rank: stats.rankStat() ?? fallbackRank,
                 played: stats.intStat("gamesPlayed"),
-                wins: stats.intStat("wins"),
-                draws: stats.intStat("ties"),
-                losses: stats.intStat("losses"),
-                goalDifference: stats.intStat("pointDifferential"),
+                wins: stats.intStat(anyOf: ["wins", "gamesWon"]),
+                draws: stats.intStat(anyOf: ["ties", "gamesDrawn"]),
+                losses: stats.intStat(anyOf: ["losses", "gamesLost"]),
+                goalDifference: stats.intStat(anyOf: ["pointDifferential", "pointsDifference"]),
                 points: stats.pointsStat(),
                 extra: stats.extra
             )

@@ -178,6 +178,20 @@ struct SportsMatcherTests {
         #expect(try #require(result).channelId == "tagged")
     }
 
+    @Test func `a non-football sports category earns the same bonus`() throws {
+        for category in ["Motorsport", "Basketball", "Eishockey", "Rugby", "Deportes"] {
+            let result = SportsMatcher.bestMatch(
+                for: fixture(home: "Arsenal", away: "Chelsea"),
+                in: [
+                    candidate("Arsenal vs Chelsea", channel: "plain"),
+                    candidate("Arsenal vs Chelsea", category: category, channel: "tagged")
+                ],
+                aliases: noAliases
+            )
+            #expect(try #require(result).channelId == "tagged", "\(category)")
+        }
+    }
+
     // MARK: - Subtitle weighting
 
     @Test func `a subtitle hit outweighs a title hit`() throws {

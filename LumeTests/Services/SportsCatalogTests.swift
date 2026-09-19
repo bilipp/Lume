@@ -56,15 +56,74 @@ struct SportsCatalogTests {
     }
 
     @Test func `every pre-follow id resolves to a catalog league`() {
-        let regions: [Locale.Region?] = [
-            Locale.Region("DE"), Locale.Region("GB"), Locale.Region("US"),
-            Locale.Region("ES"), Locale.Region("IT"), Locale.Region("FR"),
-            Locale.Region("PT"), Locale.Region("BR"), Locale.Region("JP"), nil
+        let codes = [
+            "DE", "AT", "CH", "GB", "IE", "US", "CA", "ES", "IT", "FR", "NL", "PT", "BE", "TR", "GR", "DK", "NO",
+            "SE", "RU", "MX", "BR", "AR", "CL", "CO", "PE", "UY", "PY", "EC", "BO", "VE", "AU", "NZ", "ZA", "SA",
+            "JP", "CN", "KR"
         ]
+        let regions: [Locale.Region?] = codes.map { Locale.Region($0) } + [nil]
         for region in regions {
-            for leagueID in SportsCatalog.regionPreFollows(for: region) {
-                #expect(SportsCatalog.league(id: leagueID) != nil)
+            let follows = SportsCatalog.regionPreFollows(for: region)
+            #expect(!follows.isEmpty)
+            for leagueID in follows {
+                #expect(SportsCatalog.league(id: leagueID) != nil, "\(String(describing: region)) → \(leagueID)")
             }
         }
+    }
+
+    @Test func `regionPreFollows Australia leads with the AFL and NRL`() {
+        let follows = SportsCatalog.regionPreFollows(for: Locale.Region("AU"))
+        #expect(follows.first == id("australian-football", "afl"))
+        #expect(follows.contains(id("rugby-league", "3")))
+    }
+
+    // MARK: - Catalogue shape
+
+    @Test func `every region section has at least one league`() {
+        for region in SportsRegion.allCases {
+            #expect(!SportsCatalog.leagues(in: region).isEmpty, "\(region)")
+        }
+    }
+
+    @Test func `the catalogue spans football and the other sports`() {
+        let sports = Set(SportsCatalog.leagues.map(\.sport))
+        let expected = [
+            "soccer", "football", "basketball", "hockey", "baseball", "rugby", "rugby-league",
+            "australian-football", "lacrosse", "racing", "mma"
+        ]
+        for sport in expected {
+            #expect(sports.contains(sport), "\(sport)")
+        }
+        #expect(SportsCatalog.leagues.count(where: { $0.sport == "soccer" }) >= 100)
+        #expect(SportsCatalog.leagues.count >= 140)
+    }
+
+    @Test func `every league has a name and a short abbreviation`() {
+        for league in SportsCatalog.leagues {
+            #expect(!league.name.isEmpty, "\(league.id)")
+            #expect(!league.abbreviation.isEmpty, "\(league.id)")
+            #expect(league.abbreviation.count <= 12, "\(league.id)")
+        }
+    }
+
+    // MARK: - Browse order
+
+    @Test func `browse order lifts the home sections and keeps every region once`() {
+        let base = SportsCatalog.regionsInOrder
+        #expect(base.first == .germany)
+        #expect(Set(base).count == base.count)
+        #expect(Set(base) == Set(SportsRegion.allCases))
+
+        let unitedStates = SportsCatalog.browseRegions(for: Locale.Region("US"))
+        #expect(Array(unitedStates.prefix(4)) == [.americanFootball, .basketball, .baseball, .iceHockey])
+        #expect(Set(unitedStates) == Set(base))
+        #expect(unitedStates.count == base.count)
+
+        let britain = SportsCatalog.browseRegions(for: Locale.Region("GB"))
+        #expect(britain.first == .ukAndIreland)
+        #expect(britain[1] == .germany)
+
+        #expect(SportsCatalog.browseRegions(for: Locale.Region("ZZ")) == base)
+        #expect(SportsCatalog.browseRegions(for: nil) == base)
     }
 }

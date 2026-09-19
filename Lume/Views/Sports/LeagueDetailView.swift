@@ -132,11 +132,17 @@ struct LeagueDetailView: View {
         }
     }
 
-    /// A Formula 1 race weekend: the round's venue and each session's time.
+    /// A race weekend: the round's name and venue, then each session's time (or
+    /// the single start for series without session data).
     private func weekendCard(_ fixture: SportsFixture) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: fixture.venue ?? fixture.leagueName)
+            Text(verbatim: fixture.eventTitle)
                 .font(.headline)
+            if let subtitle = fixture.eventSubtitle {
+                Text(verbatim: subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             if fixture.sessions.isEmpty {
                 sessionRow(name: fixture.leagueAbbreviation, date: fixture.startDate)
             } else {

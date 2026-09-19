@@ -57,15 +57,26 @@ nonisolated extension SportsLeague {
 /// Region buckets for the Manage Teams browser. Section titles are localised at
 /// the view layer; the raw value is stable, non-user-facing data.
 nonisolated enum SportsRegion: String, Codable, Hashable, CaseIterable {
-    case europe
-    case ukAndIreland
     case germany
+    case ukAndIreland
     case spain
     case italy
     case france
-    case americas
-    case usLeagues
+    case netherlands
+    case portugal
+    case europe
+    case clubCompetitions
     case international
+    case womensFootball
+    case americas
+    case restOfWorld
+    case americanFootball
+    case basketball
+    case iceHockey
+    case baseball
+    case rugby
+    case australianFootball
+    case lacrosse
     case motorsport
     case combat
 }
@@ -190,6 +201,12 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
     let broadcasters: [String]
     /// Race-sport sessions; empty for team fixtures.
     let sessions: [SportsSession]
+    /// The provider's event title and its short form ("Italian Grand Prix" /
+    /// "Italian GP", "UFC 332: Silva vs. Wang" / "UFC 332"). What a card shows
+    /// when the event has no two teams to name it by; `nil` in snapshots written
+    /// before the field existed.
+    let name: String?
+    let shortName: String?
 
     init(
         id: String,
@@ -202,7 +219,9 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         away: SportsCompetitor? = nil,
         venue: String? = nil,
         broadcasters: [String] = [],
-        sessions: [SportsSession] = []
+        sessions: [SportsSession] = [],
+        name: String? = nil,
+        shortName: String? = nil
     ) {
         self.id = id
         self.leagueId = leagueId
@@ -215,6 +234,34 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         self.venue = venue
         self.broadcasters = broadcasters
         self.sessions = sessions
+        self.name = name
+        self.shortName = shortName
+    }
+}
+
+nonisolated extension SportsFixture {
+    /// Whether the event is named by two teams (a match) rather than by itself
+    /// (a race weekend, a fight night).
+    var hasTeams: Bool {
+        home?.team != nil || away?.team != nil
+    }
+
+    /// The title for a competitor-less event: the provider's event name, else the
+    /// venue, else the competition.
+    var eventTitle: String {
+        name ?? venue ?? leagueName
+    }
+
+    /// The compact title for narrow cards ("Italian GP", "UFC 332").
+    var eventShortTitle: String {
+        shortName ?? eventTitle
+    }
+
+    /// The venue line under an event title, only when it adds something the
+    /// title didn't already say.
+    var eventSubtitle: String? {
+        guard let venue, name != nil else { return nil }
+        return venue
     }
 }
 

@@ -75,7 +75,7 @@
         private var header: some View {
             VStack(spacing: 24) {
                 leagueLine
-                if fixture.home?.team != nil || fixture.away?.team != nil {
+                if fixture.hasTeams {
                     matchup
                 } else {
                     eventHeader
@@ -125,8 +125,14 @@
 
         private var eventHeader: some View {
             VStack(spacing: 16) {
-                if let venue = fixture.venue {
-                    Text(verbatim: venue).font(.system(size: 40, weight: .bold)).foregroundStyle(.white)
+                Text(verbatim: fixture.eventTitle)
+                    .font(.system(size: 40, weight: .bold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                if let subtitle = fixture.eventSubtitle {
+                    Text(verbatim: subtitle)
+                        .font(.system(size: 28))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
                 centerStatus
             }

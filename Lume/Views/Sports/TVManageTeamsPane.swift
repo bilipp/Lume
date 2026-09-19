@@ -177,15 +177,10 @@
             }
         }
 
-        /// Regions in the catalogue's browse order (first appearance), matching the
-        /// curated grouping without a second ordering to maintain.
+        /// The catalogue's browse order with the viewer's home sections lifted to
+        /// the top.
         private var regionsInOrder: [SportsRegion] {
-            var seen: Set<SportsRegion> = []
-            var result: [SportsRegion] = []
-            for league in SportsCatalog.leagues where seen.insert(league.region).inserted {
-                result.append(league.region)
-            }
-            return result
+            SportsCatalog.browseRegions(for: Locale.current.region)
         }
     }
 

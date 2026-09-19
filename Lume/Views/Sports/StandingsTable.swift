@@ -7,6 +7,8 @@
 //  rank, team, and the GP W D L GD PTS columns — as a `Grid` so the columns
 //  align across rows and every cell scales with Dynamic Type (no fixed heights).
 //  A followed team's row is starred and washed with a subtle highlight band.
+//  A championship table of drivers or constructors (F1, IndyCar, NASCAR) has
+//  no games-played figures, so it collapses to rank, name and points.
 //
 //  It stays deliberately dumb: it takes a flat `[SportsStandingRow]` plus the
 //  set of followed team ids and an optional tap callback. The caller decides
@@ -42,6 +44,12 @@ struct StandingsTable: View {
         self.showsHeader = showsHeader
     }
 
+    /// Whether every row is a driver or constructor: the season-long points
+    /// tables of motorsport, which have no per-game columns.
+    private var isChampionshipTable: Bool {
+        !rows.isEmpty && rows.allSatisfy { $0.kind != .team }
+    }
+
     var body: some View {
         Grid(alignment: .center, horizontalSpacing: 0, verticalSpacing: 0) {
             if showsHeader {
@@ -66,12 +74,14 @@ struct StandingsTable: View {
     private var headerRow: some View {
         GridRow {
             headerCell("RK").gridColumnAlignment(.trailing)
-            headerCell("Team", alignment: .leading).gridColumnAlignment(.leading)
-            headerCell("GP").gridColumnAlignment(.trailing)
-            headerCell("W").gridColumnAlignment(.trailing)
-            headerCell("D").gridColumnAlignment(.trailing)
-            headerCell("L").gridColumnAlignment(.trailing)
-            headerCell("GD").gridColumnAlignment(.trailing)
+            headerCell(isChampionshipTable ? "" : "Team", alignment: .leading).gridColumnAlignment(.leading)
+            if !isChampionshipTable {
+                headerCell("GP").gridColumnAlignment(.trailing)
+                headerCell("W").gridColumnAlignment(.trailing)
+                headerCell("D").gridColumnAlignment(.trailing)
+                headerCell("L").gridColumnAlignment(.trailing)
+                headerCell("GD").gridColumnAlignment(.trailing)
+            }
             headerCell("PTS").gridColumnAlignment(.trailing)
         }
         .accessibilityHidden(true)
@@ -83,11 +93,13 @@ struct StandingsTable: View {
         GridRow {
             numberCell(row.rank, followed: followed)
             teamCell(row, followed: followed)
-            statCell(row.played, followed: followed, accessibility: statLabel(row.played) { Text("Games played \($0)") })
-            statCell(row.wins, followed: followed, accessibility: statLabel(row.wins) { Text("Wins \($0)") })
-            statCell(row.draws, followed: followed, accessibility: statLabel(row.draws) { Text("Draws \($0)") })
-            statCell(row.losses, followed: followed, accessibility: statLabel(row.losses) { Text("Losses \($0)") })
-            statCell(row.goalDifference, followed: followed, accessibility: statLabel(row.goalDifference) { Text("Goal difference \($0)") })
+            if !isChampionshipTable {
+                statCell(row.played, followed: followed, accessibility: statLabel(row.played) { Text("Games played \($0)") })
+                statCell(row.wins, followed: followed, accessibility: statLabel(row.wins) { Text("Wins \($0)") })
+                statCell(row.draws, followed: followed, accessibility: statLabel(row.draws) { Text("Draws \($0)") })
+                statCell(row.losses, followed: followed, accessibility: statLabel(row.losses) { Text("Losses \($0)") })
+                statCell(row.goalDifference, followed: followed, accessibility: statLabel(row.goalDifference) { Text("Goal difference \($0)") })
+            }
             pointsCell(row.points, followed: followed)
         }
     }

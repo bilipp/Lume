@@ -37,7 +37,7 @@
             if let home = home?.team, let away = away?.team {
                 parts.append(String(localized: "\(home.name) versus \(away.name)"))
             } else {
-                parts.append(venue ?? leagueName)
+                parts.append(eventTitle)
             }
             let score = String(localized: "\(home?.score ?? 0) to \(away?.score ?? 0)")
             switch status.state {
@@ -129,10 +129,11 @@
             }
         }
 
-        /// Competitor-less events (an F1 weekend): the event name and its time.
+        /// Competitor-less events (a race weekend, a fight night): the event name
+        /// and its time.
         private var eventLine: some View {
             VStack(spacing: 10) {
-                Text(verbatim: fixture.venue ?? fixture.leagueName)
+                Text(verbatim: fixture.eventShortTitle)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.white)
                     .lineLimit(2)

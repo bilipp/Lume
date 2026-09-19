@@ -83,6 +83,8 @@ nonisolated struct ESPNEvent: Codable, Hashable {
     let shortName: String?
     let status: ESPNStatus?
     let competitions: [ESPNCompetition]?
+    /// Racing events carry their track here instead of a competition venue.
+    let circuit: ESPNVenue?
 }
 
 nonisolated struct ESPNStatus: Codable, Hashable {
@@ -158,6 +160,8 @@ nonisolated struct ESPNTeamWrapper: Codable, Hashable {
 
 nonisolated struct ESPNStandingsResponse: Codable, Hashable {
     let children: [ESPNStandingsChild]?
+    /// Single-table leagues (AFL, NBL) put the entries here with no `children`.
+    let standings: ESPNStandingsGroup?
 }
 
 nonisolated struct ESPNStandingsChild: Codable, Hashable {

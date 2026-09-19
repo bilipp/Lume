@@ -238,15 +238,10 @@ struct ManageTeamsSheet: View {
         !searchText.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    /// Regions in the catalogue's browse order (first appearance), so the picker
-    /// matches the curated grouping without a second ordering to maintain.
+    /// The catalogue's browse order with the viewer's home sections lifted to
+    /// the top.
     private var regionsInOrder: [SportsRegion] {
-        var seen: Set<SportsRegion> = []
-        var result: [SportsRegion] = []
-        for league in SportsCatalog.leagues where seen.insert(league.region).inserted {
-            result.append(league.region)
-        }
-        return result
+        SportsCatalog.browseRegions(for: Locale.current.region)
     }
 
     private var matchingLeagues: [SportsLeague] {
@@ -285,15 +280,26 @@ nonisolated extension SportsRegion {
     /// grouping, so their names are localised here (team and league names are not).
     var displayName: LocalizedStringResource {
         switch self {
-        case .europe: "Europe"
-        case .ukAndIreland: "UK & Ireland"
         case .germany: "Germany"
+        case .ukAndIreland: "UK & Ireland"
         case .spain: "Spain"
         case .italy: "Italy"
         case .france: "France"
+        case .netherlands: "Netherlands"
+        case .portugal: "Portugal"
+        case .europe: "Europe"
+        case .clubCompetitions: "International Club Cups"
+        case .international: "National Teams"
+        case .womensFootball: "Women's Football"
         case .americas: "Americas"
-        case .usLeagues: "US Leagues"
-        case .international: "International"
+        case .restOfWorld: "Rest of World"
+        case .americanFootball: "American Football"
+        case .basketball: "Basketball"
+        case .iceHockey: "Ice Hockey"
+        case .baseball: "Baseball"
+        case .rugby: "Rugby"
+        case .australianFootball: "Australian Football"
+        case .lacrosse: "Lacrosse"
         case .motorsport: "Motorsport"
         case .combat: "Combat Sports"
         }
