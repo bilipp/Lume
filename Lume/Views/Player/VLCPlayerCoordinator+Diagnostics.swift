@@ -86,13 +86,17 @@ extension VLCPlayerCoordinator {
             let state = VLCMediaPlayerStateToString(mediaPlayer.state)
 
             // Deltas over the sample window (≈2s). First sample has no baseline.
+            // Wrapping subtraction: libVLC resets or hands back garbage counters
+            // around a stream restart, and a trap here (seen live on a Sky feed
+            // after the KSPlayer→VLC fallback) would take the whole app down for
+            // a debug-only log line.
             let prev = lastStats
-            let dDisplayed = stats.displayedPictures - (prev?.displayedPictures ?? stats.displayedPictures)
-            let dLate = stats.latePictures - (prev?.latePictures ?? stats.latePictures)
-            let dLost = stats.lostPictures - (prev?.lostPictures ?? stats.lostPictures)
-            let dLostAudio = stats.lostAudioBuffers - (prev?.lostAudioBuffers ?? stats.lostAudioBuffers)
-            let dDiscont = stats.demuxDiscontinuity - (prev?.demuxDiscontinuity ?? stats.demuxDiscontinuity)
-            let dCorrupt = stats.demuxCorrupted - (prev?.demuxCorrupted ?? stats.demuxCorrupted)
+            let dDisplayed = stats.displayedPictures &- (prev?.displayedPictures ?? stats.displayedPictures)
+            let dLate = stats.latePictures &- (prev?.latePictures ?? stats.latePictures)
+            let dLost = stats.lostPictures &- (prev?.lostPictures ?? stats.lostPictures)
+            let dLostAudio = stats.lostAudioBuffers &- (prev?.lostAudioBuffers ?? stats.lostAudioBuffers)
+            let dDiscont = stats.demuxDiscontinuity &- (prev?.demuxDiscontinuity ?? stats.demuxDiscontinuity)
+            let dCorrupt = stats.demuxCorrupted &- (prev?.demuxCorrupted ?? stats.demuxCorrupted)
 
             let inputKbps = stats.inputBitrate * 8000 // bytes/ms → kbit/s
             let demuxKbps = stats.demuxBitrate * 8000

@@ -13,10 +13,15 @@
         @AppStorage(HomeLayoutSettings.disabledSectionsKey) private var disabledSectionsRaw = ""
         @State private var premium = PremiumManager.shared
         @State private var showPaywall = false
+        @State private var paywallHighlight: PremiumFeature = .recommendations
 
         private var sections: [HomeSection] {
             HomeLayoutSettings.resolve(orderRaw: sectionOrderRaw)
         }
+
+        /// Home rows gated behind Lume Pro — badged with a crown and paywalled
+        /// when a free user turns one on.
+        private static let premiumSections: Set<HomeSection> = [.forYou, .sports]
 
         var body: some View {
             List {
@@ -40,14 +45,15 @@
                 // the Player Engines list). Toggles stay interactive in edit mode.
                 .environment(\.editMode, .constant(.active))
             #endif
-                .paywall(isPresented: $showPaywall, highlight: .recommendations)
+                .paywall(isPresented: $showPaywall, highlight: paywallHighlight)
         }
 
         @ViewBuilder
         private func rowLabel(for section: HomeSection) -> some View {
-            // "For You" is a Lume Pro feature: badge it with a crown for free users
-            // (Sideload/owned builds are always premium, so the crown never shows).
-            if section == .forYou, !premium.isPremium {
+            // "For You" and "Sports" are Lume Pro features: badge them with a crown
+            // for free users (Sideload/owned builds are always premium, so the crown
+            // never shows).
+            if Self.premiumSections.contains(section), !premium.isPremium {
                 Label {
                     HStack(spacing: 6) {
                         Text(section.title)
@@ -75,6 +81,7 @@
                         if isOn, !premium.isPremium {
                             // Don't enable; surface the paywall. The toggle snaps
                             // back to off because the getter still returns false.
+                            paywallHighlight = .recommendations
                             showPaywall = true
                             return
                         }
@@ -85,6 +92,14 @@
             return Binding(
                 get: { HomeLayoutSettings.isEnabled(section, disabledRaw: disabledSectionsRaw) },
                 set: { isOn in
+                    // "Sports" is a Lume Pro feature: a free user turning it on gets
+                    // the paywall instead, and the toggle snaps back off because the
+                    // disabled set is left unchanged.
+                    if isOn, section == .sports, !premium.isPremium {
+                        paywallHighlight = .sportsHub
+                        showPaywall = true
+                        return
+                    }
                     var disabled = HomeLayoutSettings.decodeDisabled(disabledSectionsRaw)
                     if isOn { disabled.remove(section) } else { disabled.insert(section) }
                     disabledSectionsRaw = HomeLayoutSettings.encodeDisabled(disabled)

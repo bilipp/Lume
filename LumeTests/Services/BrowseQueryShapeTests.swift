@@ -342,6 +342,38 @@ struct BrowseQueryShapeTests {
         return stream
     }
 
+    // MARK: - The sports resolver's EPG fetch stays scoped
+
+    /// The fixture→channel resolver's guide fetch must stay the scoped,
+    /// partial fetch it was written as: bounded by a `#Predicate` (the kickoff
+    /// window *and* the candidate channel ids) and — like the guide loaders —
+    /// never dragging in `listingDescription`, the widest column, which no part
+    /// of matching reads. Dropping the predicate turns it into the unscoped
+    /// time-only guide scan the loaders exist to avoid; adding
+    /// `listingDescription` back doubles the row width for nothing.
+    @Test func `sports resolver EPG fetch is scoped and omits the description`() {
+        let descriptor = SportsChannelResolver.epgCandidateDescriptor(
+            channelIds: ["ch1", "ch2"], windowStart: .now, windowEnd: .now.addingTimeInterval(3600)
+        )
+        #expect(descriptor.predicate != nil, "the guide fetch must be bounded, not a full scan")
+        let props = descriptor.propertiesToFetch
+        #expect(!props.isEmpty, "a partial fetch, not the whole row")
+        #expect(!props.contains(\EPGListing.listingDescription), "the widest column must stay out")
+        for kept: PartialKeyPath<EPGListing> in [\.channelId, \.title, \.subtitle, \.category, \.start, \.end] {
+            #expect(props.contains(kept))
+        }
+    }
+
+    /// The candidate-channel fetch must run its exclusion (hidden channels and
+    /// restricted categories) as a `#Predicate` in SQLite, not by fetching every
+    /// channel and filtering in Swift afterwards.
+    @Test func `sports resolver channel fetch filters in SQLite`() {
+        let descriptor = SportsChannelResolver.candidateStreamDescriptor(
+            restriction: ContentRestriction(hiddenCategoryIDs: ["hidden-cat"])
+        )
+        #expect(descriptor.predicate != nil)
+    }
+
     /// The container must be held for the test's duration — see
     /// `SearchPredicateTests` for what happens when it is not.
     private func makeSQLiteContainer() throws -> ModelContainer {

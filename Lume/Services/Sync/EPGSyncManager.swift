@@ -190,7 +190,11 @@ actor EPGSyncManager {
                         title: programme.title,
                         listingDescription: programme.description,
                         start: programme.start,
-                        end: programme.end
+                        end: programme.end,
+                        subtitle: programme.subtitle,
+                        category: programme.categories.isEmpty
+                            ? nil
+                            : programme.categories.joined(separator: ", ")
                     ))
                     result.count += 1
                     result.channelIDs.insert(programme.channelId)

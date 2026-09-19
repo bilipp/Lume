@@ -109,6 +109,14 @@ nonisolated extension PerfSignpost {
     static let homeTrendingLoad = PerfSignpost("HomeTrendingLoad")
     static let homeRecommendations = PerfSignpost("HomeRecommendations")
 
+    /// Sports
+    /// The off-main batch fixture→channel resolve (`SportsChannelResolver`): two
+    /// bounded catalog fetches plus the in-Swift match.
+    static let sportsChannelResolve = PerfSignpost("SportsChannelResolve")
+    /// A `SportsSyncService` fixture/standings/teams refresh for a followed
+    /// league.
+    static let sportsFixtureRefresh = PerfSignpost("SportsFixtureRefresh")
+
     // Player
     static let playerStartup = PerfSignpost("PlayerStartup")
     static let playerRebuffer = PerfSignpost("PlayerRebuffer")

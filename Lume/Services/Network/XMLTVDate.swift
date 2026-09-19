@@ -28,44 +28,65 @@ enum XMLTVDate {
     }
 
     /// Fast path for the canonical XMLTV timestamp `YYYYMMDDHHMMSS ±HHMM`
-    /// (e.g. `20240625203000 +0000`) — the exact shape `formatter` accepts.
-    /// Returns nil for any other shape so the formatter handles it, keeping
-    /// behaviour identical while avoiding ICU parsing for the >99% case.
+    /// (e.g. `20240625203000 +0000`) and its offset-less forms
+    /// `YYYYMMDDHHMMSS` (14 digits) and `YYYYMMDDHHMM` (12 digits). The XMLTV
+    /// DTD says "if no explicit timezone is given, UTC is assumed", so the
+    /// offset-less shapes parse as UTC here rather than falling through to the
+    /// ~600× slower `DateFormatter` (which rejects them, silently dropping the
+    /// programme). Returns nil for any other shape so the formatter handles it.
     private static func fastParse(_ string: String) -> Date? {
         let bytes = Array(string.utf8)
-        // 14 date digits + space + sign + 4 offset digits = 20 bytes exactly.
-        guard bytes.count == 20 else { return nil }
 
-        func digits(_ start: Int, _ count: Int) -> Int? {
-            var value = 0
-            for offset in start ..< (start + count) {
-                let byte = bytes[offset]
-                guard byte >= 0x30, byte <= 0x39 else { return nil }
-                value = value * 10 + Int(byte - 0x30)
-            }
-            return value
-        }
+        // Seconds and the UTC offset are the only fields that vary by shape;
+        // the leading `YYYYMMDDHHMM` is common to all three.
+        guard let tail = secondAndOffset(bytes) else { return nil }
 
-        guard let year = digits(0, 4), let month = digits(4, 2), let day = digits(6, 2),
-              let hour = digits(8, 2), let minute = digits(10, 2), let second = digits(12, 2),
-              bytes[14] == 0x20 // space
-        else { return nil }
-
-        let sign: Int
-        switch bytes[15] {
-        case 0x2B: sign = 1 // '+'
-        case 0x2D: sign = -1 // '-'
-        default: return nil
-        }
-        guard let offsetHours = digits(16, 2), let offsetMinutes = digits(18, 2),
+        guard let year = digits(bytes, 0, 4), let month = digits(bytes, 4, 2), let day = digits(bytes, 6, 2),
+              let hour = digits(bytes, 8, 2), let minute = digits(bytes, 10, 2),
               month >= 1, month <= 12, day >= 1, day <= 31,
-              hour < 24, minute < 60, second < 60
+              hour < 24, minute < 60, tail.second < 60
         else { return nil }
 
-        let offsetSeconds = sign * (offsetHours * 3600 + offsetMinutes * 60)
         let days = daysFromCivil(year: year, month: month, day: day)
-        let epoch = days * 86400 + hour * 3600 + minute * 60 + second - offsetSeconds
+        let epoch = days * 86400 + hour * 3600 + minute * 60 + tail.second - tail.offsetSeconds
         return Date(timeIntervalSince1970: TimeInterval(epoch))
+    }
+
+    /// Reads `count` ASCII digits from `bytes` starting at `start`, or nil if any
+    /// byte in the range is not `0`–`9`.
+    private static func digits(_ bytes: [UInt8], _ start: Int, _ count: Int) -> Int? {
+        var value = 0
+        for offset in start ..< (start + count) {
+            let byte = bytes[offset]
+            guard byte >= 0x30, byte <= 0x39 else { return nil }
+            value = value * 10 + Int(byte - 0x30)
+        }
+        return value
+    }
+
+    /// Parses the seconds field and UTC offset for the three accepted shapes,
+    /// returning nil for any other byte length or malformed offset.
+    private static func secondAndOffset(_ bytes: [UInt8]) -> (second: Int, offsetSeconds: Int)? {
+        switch bytes.count {
+        case 20:
+            // 14 date digits + space + sign + 4 offset digits = 20 bytes exactly.
+            guard let sec = digits(bytes, 12, 2), bytes[14] == 0x20 else { return nil }
+            let sign: Int
+            switch bytes[15] {
+            case 0x2B: sign = 1 // '+'
+            case 0x2D: sign = -1 // '-'
+            default: return nil
+            }
+            guard let offsetHours = digits(bytes, 16, 2), let offsetMinutes = digits(bytes, 18, 2) else { return nil }
+            return (sec, sign * (offsetHours * 3600 + offsetMinutes * 60))
+        case 14:
+            guard let sec = digits(bytes, 12, 2) else { return nil }
+            return (sec, 0)
+        case 12:
+            return (0, 0)
+        default:
+            return nil
+        }
     }
 
     /// Days from 1970-01-01 to a proleptic-Gregorian date (Howard Hinnant's

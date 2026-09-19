@@ -149,6 +149,7 @@ struct SettingsView: View {
                     searchSection
                     autoSyncSection
                     epgSection
+                    sportsSection
                     CloudSyncSection()
                     if trakt.isConfigured {
                         integrationsSection
@@ -523,6 +524,7 @@ struct SettingsView: View {
                         }
                     case .profiles: TVProfilesSettingsView()
                     case .home: tvHomeLayoutDetail
+                    case .sports: TVSportsSettingsPane()
                     case .epg: EPGSettingsView()
                     case .search: tvSearchDetail
                     case .storage: StorageManagementView()

@@ -84,6 +84,16 @@ extension SyncFrequency {
     /// lives here rather than on any one source.
     static let epgLastSyncKey = "lume.epgLastSyncDate"
 
+    /// UserDefaults key holding the guide-schema version the store was last
+    /// refreshed under. Bumped whenever a release starts capturing new XMLTV
+    /// signals (sub-titles, categories) so existing users' next launch treats
+    /// the guide refresh as due once and back-fills the new columns.
+    static let epgSchemaKey = "epg.schemaVersion"
+
+    /// The guide-schema version this build ingests. A stored value below this
+    /// forces one EPG refresh; see `EPGSyncService.isDue`.
+    static let epgCurrentSchemaVersion = 2
+
     /// Resolves a stored raw value to a case, falling back to the EPG default.
     static func resolveEPG(_ raw: String) -> SyncFrequency {
         SyncFrequency(rawValue: raw) ?? epgDefaultValue
@@ -101,6 +111,14 @@ enum EPGSyncSchedule {
         set {
             UserDefaults.standard.set(newValue?.timeIntervalSince1970 ?? 0, forKey: SyncFrequency.epgLastSyncKey)
         }
+    }
+
+    /// The guide-schema version the store was last refreshed under. Absent (0)
+    /// for stores predating the stamp, which is below the current version and so
+    /// forces one refresh.
+    static var schemaVersion: Int {
+        get { UserDefaults.standard.integer(forKey: SyncFrequency.epgSchemaKey) }
+        set { UserDefaults.standard.set(newValue, forKey: SyncFrequency.epgSchemaKey) }
     }
 }
 

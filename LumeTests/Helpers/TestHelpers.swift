@@ -56,7 +56,7 @@ func makeProfileTestContainer() throws -> ModelContainer {
     ]
     let cloudModels: [any PersistentModel.Type] = [
         SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
-        SyncedParentalPIN.self, SyncedCategoryRestriction.self
+        SyncedParentalPIN.self, SyncedCategoryRestriction.self, SyncedSportsFollow.self
     ]
     let localConfig = ModelConfiguration(
         "local",

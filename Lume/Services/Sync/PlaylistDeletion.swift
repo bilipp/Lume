@@ -55,6 +55,11 @@ nonisolated enum PlaylistDeletion {
         // playlist.
         SweepSkipDefaults.removeAll(playlistId: playlistID)
         M3UDigestStore.remove(playlistId: playlistID)
+        // Remembered sports channel picks name a channel in this playlist; drop
+        // them here so both deletion paths (Settings and the iCloud reconcile's
+        // `CloudSyncEngine.deletePlaylist`, which funnels through this method)
+        // leave no dangling pin.
+        SportsChannelPicks().remove(playlistID: playlistID)
 
         // Scope each fetch to the playlist in SQLite via the playlist-prefixed
         // id instead of hydrating the whole catalog into memory just to filter

@@ -128,7 +128,10 @@ struct LumeApp: App {
             SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
             // Parental controls. Not profile-scoped, unlike `UserContentState` —
             // see `CloudSyncEngine+Parental` for why that distinction matters.
-            SyncedParentalPIN.self, SyncedCategoryRestriction.self
+            SyncedParentalPIN.self, SyncedCategoryRestriction.self,
+            // Followed sports leagues/teams — per-profile, ordered, no local
+            // counterpart (read through `SportsFollowService`).
+            SyncedSportsFollow.self
         ])
         let cloudConfiguration = ModelConfiguration(
             ContentSyncManager.cloudMirrorConfigurationName,
@@ -276,6 +279,13 @@ struct LumeApp: App {
                     // the refresh instead once the sync queue drains.
                     EPGSyncService.shared.configure(container: catalogContainer)
                     EPGSyncService.shared.syncIfDue()
+
+                    // Refresh sports fixtures / standings on their own schedule.
+                    // Hits ESPN, not the provider host, so it never competes with
+                    // a playlist sync for the account's one connection.
+                    SportsFollowService.shared.configure(container: cloudContainer, profileManager: profileManager)
+                    SportsSyncService.shared.configure(followSource: SportsFollowService.shared)
+                    SportsSyncService.shared.syncIfDue()
                 }
                 .onChange(of: cloudSync.status.lastReconcile) {
                     // A reconcile may have pulled a PIN this device didn't have
@@ -283,6 +293,9 @@ struct LumeApp: App {
                     // caches that as `isPINSet`, so it has to be told to re-read
                     // or the gates stay wrong until the next launch.
                     parentalControls.refreshFromStore()
+                    // A reconcile may have pulled or deduped this profile's sports
+                    // follows; re-read them so the hub reflects the merged set.
+                    SportsFollowService.shared.reload()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     cloudSync.handleScenePhaseChange(to: phase)

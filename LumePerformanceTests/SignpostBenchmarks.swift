@@ -148,6 +148,7 @@ final class SignpostBenchmarks: XCTestCase {
             .catalogPurgeHistory,
             .epgSourceSync, .epgIngest, .channelEPGLoad, .guideWindowLoad,
             .homeTrendingLoad, .homeRecommendations,
+            .sportsChannelResolve, .sportsFixtureRefresh,
             .playerStartup, .playerRebuffer, .playerEngineFallback, .playerStartupFailure
         ]
         let names = all.map(\.metricName)

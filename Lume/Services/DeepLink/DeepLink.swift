@@ -55,5 +55,5 @@ nonisolated enum DeepLink: Equatable {
 /// The main tab bar's selectable tabs. Hoisted out of `MainTabView` so a deep
 /// link can switch tabs through `DeepLinkRouter`.
 nonisolated enum AppTab: Hashable {
-    case search, home, movies, series, liveTV, settings
+    case search, home, movies, series, liveTV, sports, settings
 }
