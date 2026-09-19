@@ -65,11 +65,20 @@ final class EPGSyncService {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         let playlists = (try? context.fetch(FetchDescriptor<Playlist>())) ?? []
+        // Auto-sync only runs for the playlist on screen (plus any that has
+        // never synced), so the guide has to read the same selection to know
+        // which of these is actually about to start.
+        let activeID = playlists.activeID(
+            for: UserDefaults.standard.string(forKey: PlaylistSelectionStore.key) ?? ""
+        )
         return playlists.contains { playlist in
             AutoSync.blocksEPGRefresh(
-                syncEnabled: playlist.syncEnabled,
-                status: playlist.syncStatus,
-                lastSyncDate: playlist.lastSyncDate,
+                AutoSync.Candidate(
+                    syncEnabled: playlist.syncEnabled,
+                    status: playlist.syncStatus,
+                    lastSyncDate: playlist.lastSyncDate,
+                    isActive: playlist.id.uuidString == activeID
+                ),
                 frequency: frequency
             )
         }
