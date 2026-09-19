@@ -11,6 +11,10 @@
 //  which the launch / playlist-switch / foreground triggers in `MainTabView`
 //  call through.
 //
+//  Being due is necessary but not sufficient: a due playlist that is not the
+//  one on screen waits for the viewer to switch to it. See `AutoSync.shouldSync`
+//  for why.
+//
 
 import Foundation
 import SwiftUI
@@ -109,26 +113,50 @@ enum EPGSyncSchedule {
 /// The full gate for "should this playlist auto-sync right now". Pure so it can
 /// be unit-tested without SwiftUI / SwiftData state.
 enum AutoSync {
-    /// - Parameters:
-    ///   - syncEnabled: the playlist's own opt-in flag.
-    ///   - status: its current sync status (skip if already syncing).
-    ///   - lastSyncDate: when it last finished a successful sync.
-    ///   - frequency: the global frequency setting.
-    ///   - alreadyStarted: whether this session has already kicked off a sync for
-    ///     it that hasn't finished yet (avoids double-triggering from rapid view
-    ///     updates before `status` flips to `.syncing`).
+    /// A playlist as the auto-sync gates see it. Grouped because these four
+    /// always travel together, and taken loose rather than as a `Playlist` so
+    /// the gates stay testable without a `ModelContext` — the same reason
+    /// `PlaylistSyncState.resolve` next door takes its fields loose.
+    struct Candidate {
+        /// The playlist's own opt-in flag.
+        let syncEnabled: Bool
+        /// Its current sync status (skip if already syncing).
+        let status: SyncStatus
+        /// When it last finished a successful sync.
+        let lastSyncDate: Date?
+        /// Whether this is the playlist the content tabs are showing.
+        let isActive: Bool
+    }
+
+    /// Auto-sync hands the screen to a blocking progress cover, so with several
+    /// playlists configured, launching used to mean sitting through one cover
+    /// per playlist — on a large catalog, minutes each.
+    ///
+    /// Only the active playlist earns that. Every content surface scopes to
+    /// `playlists.active(for:)`, so a stale *other* playlist changes nothing the
+    /// viewer can see; it syncs when they switch to it, which is the moment its
+    /// freshness starts to matter and which `MainTabView` already triggers on.
+    ///
+    /// The exception is a playlist that has never finished a sync, which runs
+    /// wherever it is: it has no cached catalog to fall back on, so deferring it
+    /// is the difference between "not the newest" and "empty". Adding a playlist
+    /// from Settings doesn't select it, so without this carve-out a newly added
+    /// one would sit unsynced until the viewer went looking for it.
+    ///
+    /// - Parameter alreadyStarted: whether this session has already kicked off a
+    ///   sync for it that hasn't finished yet (avoids double-triggering from
+    ///   rapid view updates before `status` flips to `.syncing`).
     static func shouldSync(
-        syncEnabled: Bool,
-        status: SyncStatus,
-        lastSyncDate: Date?,
+        _ candidate: Candidate,
         frequency: SyncFrequency,
         alreadyStarted: Bool,
         now: Date = Date()
     ) -> Bool {
-        syncEnabled
-            && status != .syncing
+        candidate.syncEnabled
+            && candidate.status != .syncing
             && !alreadyStarted
-            && frequency.isDue(lastSyncDate: lastSyncDate, now: now)
+            && (candidate.isActive || candidate.lastSyncDate == nil)
+            && frequency.isDue(lastSyncDate: candidate.lastSyncDate, now: now)
     }
 
     /// Whether a background EPG refresh must stand aside for this playlist:
@@ -140,17 +168,18 @@ enum AutoSync {
     /// leave the account briefly blocked, failing the sync's next requests
     /// too). Deferring costs nothing: the post-sync hook re-kicks the refresh
     /// as soon as the content sync queue drains.
+    ///
+    /// Reads `isActive` for the same reason `shouldSync` does, and it matters
+    /// more here: a stale non-active playlist is not going to sync until the
+    /// viewer switches to it, so treating it as imminent would stand the guide
+    /// down indefinitely waiting for a sync that never starts.
     static func blocksEPGRefresh(
-        syncEnabled: Bool,
-        status: SyncStatus,
-        lastSyncDate: Date?,
+        _ candidate: Candidate,
         frequency: SyncFrequency,
         now: Date = Date()
     ) -> Bool {
-        status == .syncing || shouldSync(
-            syncEnabled: syncEnabled,
-            status: status,
-            lastSyncDate: lastSyncDate,
+        candidate.status == .syncing || shouldSync(
+            candidate,
             frequency: frequency,
             alreadyStarted: false,
             now: now
