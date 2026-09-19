@@ -35,6 +35,10 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
     /// lost or recreated `default.store`): the stale shadow was dropped so this
     /// pass pulls the surviving cloud records back instead of pushing deletions.
     var recoveredFromEmptyLocalStore = false
+    /// A fetch or save failed after reconciliation began. Pending context
+    /// changes and shadow mutations were rolled back; a later pass can retry
+    /// from the last successful baseline.
+    var failed = false
 }
 
 /// A local catalog item paired with its current syncable state, gathered up-front
@@ -63,6 +67,16 @@ nonisolated struct LocalContentEntry {
 /// containers (so CloudKit's churn can't invalidate catalog `@Query`s). Each store
 /// op routes to its own context; a reconcile saves both, then persists the shadow.
 actor CloudSyncEngine {
+    enum StoreRole {
+        case catalog
+        case cloud
+    }
+
+    #if DEBUG
+        typealias SaveFailureInjector = @Sendable (StoreRole) throws -> Void
+        private var saveFailureInjector: SaveFailureInjector?
+    #endif
+
     /// The local-only catalog store (Playlist, Movie, Series, Episode, LiveStream).
     let catalogContext: ModelContext
     /// The CloudKit-mirrored store (SyncedPlaylist, UserContentState, UserProfile).
@@ -90,12 +104,17 @@ actor CloudSyncEngine {
         /// behavior. Production uses the two-container designated init above so
         /// CloudKit's churn can't invalidate the catalog; the reconcile/merge logic
         /// the tests exercise routes identically either way.
-        init(container: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow()) {
+        init(
+            container: ModelContainer,
+            shadow: CloudSyncShadow = CloudSyncShadow(),
+            saveFailureInjector: SaveFailureInjector? = nil
+        ) {
             let ctx = ModelContext(container)
             ctx.autosaveEnabled = false
             catalogContext = ctx
             cloudContext = ctx
             self.shadow = shadow
+            self.saveFailureInjector = saveFailureInjector
         }
     #endif
 
@@ -106,6 +125,7 @@ actor CloudSyncEngine {
     func reconcile() -> CloudSyncReconcileResult {
         activeProfileID = ActiveProfileStore.current ?? UserProfile.defaultProfileID
         var result = CloudSyncReconcileResult()
+        let shadowCheckpoint = shadow.checkpoint()
 
         switch localCatalogReadiness() {
         case .ready:
@@ -152,6 +172,12 @@ actor CloudSyncEngine {
             shadow.persist()
             Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled) par +\(result.parentalPushed)/\(result.parentalPulled) pend \(result.parentalPending) sports \(result.sportsFollowsKept)-\(result.sportsFollowsDeduped)") // swiftlint:disable:this line_length
         } catch {
+            catalogContext.rollback()
+            if cloudContext !== catalogContext {
+                cloudContext.rollback()
+            }
+            shadow.restore(shadowCheckpoint)
+            result.failed = true
             Logger.sync.error("Reconcile failed: \(error.localizedDescription)")
         }
         return result
@@ -161,8 +187,31 @@ actor CloudSyncEngine {
     /// change lands locally before its mirror state is acknowledged. Callers that
     /// also persist the shadow must do so only after this returns without throwing.
     func saveStores() throws {
-        if catalogContext.hasChanges { try catalogContext.save() }
-        if cloudContext.hasChanges { try cloudContext.save() }
+        try save(catalogContext, role: .catalog)
+        if cloudContext !== catalogContext {
+            try save(cloudContext, role: .cloud)
+        }
+    }
+
+    func saveProfileSwitchStores() throws {
+        // Save the outgoing profile's mirror first. If this fails, the catalog
+        // projection is still only in memory and can be rolled back intact. If
+        // the catalog save fails second, the harmless extra mirror snapshot is
+        // durable but the old profile remains active and its catalog projection
+        // remains in place.
+        try save(cloudContext, role: .cloud)
+        if catalogContext !== cloudContext {
+            try save(catalogContext, role: .catalog)
+        }
+    }
+
+    private func save(_ context: ModelContext, role: StoreRole) throws {
+        #if DEBUG
+            try saveFailureInjector?(role)
+        #endif
+        if context.hasChanges {
+            try context.save()
+        }
     }
 
     // MARK: - Playlists

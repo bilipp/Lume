@@ -14,6 +14,10 @@ import Foundation
 import SwiftData
 import Testing
 
+private nonisolated enum InjectedProfileSaveError: Error {
+    case forced
+}
+
 /// Serialized: the reconcile-scoping test reads the active profile from
 /// `ActiveProfileStore` (UserDefaults.standard), shared process-wide state.
 @MainActor
@@ -128,6 +132,60 @@ struct ProfileEngineTests {
         #expect(projected?.watchProgress == 500)
     }
 
+    @Test func `failed profile switch keeps the old projection pointer and shadow`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let profileA = UUID()
+        let profileB = UUID()
+        let movieID = "pl-movie-1"
+        let movie = Movie(id: movieID, streamId: 1, name: "Film")
+        movie.isFavorite = true
+        ctx.insert(movie)
+        ctx.insert(UserContentState(
+            contentId: movieID,
+            kind: .movie,
+            profileID: profileB,
+            watchProgress: 500,
+            isWatched: true
+        ))
+        try ctx.save()
+
+        let baseline = ContentStateValues(
+            watchProgress: 100,
+            isWatched: false,
+            lastWatchedDate: nil,
+            isFavorite: true,
+            addedToWatchlistDate: nil,
+            favoriteOrder: nil,
+            customOrder: nil
+        )
+        let shadow = freshShadow()
+        shadow.setContentShadow(movieID, baseline)
+        shadow.persist()
+
+        let saved = ActiveProfileStore.current
+        ActiveProfileStore.current = profileA
+        defer { ActiveProfileStore.current = saved }
+
+        let engine = CloudSyncEngine(
+            container: container,
+            shadow: shadow,
+            saveFailureInjector: { role in
+                if role == .cloud { throw InjectedProfileSaveError.forced }
+            }
+        )
+
+        await #expect(throws: InjectedProfileSaveError.self) {
+            try await engine.switchProfile(from: profileA, to: profileB)
+        }
+
+        #expect(ActiveProfileStore.current == profileA)
+        #expect(shadow.contentShadow(movieID) == baseline)
+        let projected = try #require(ctx.fetch(FetchDescriptor<Movie>()).first)
+        #expect(projected.isFavorite)
+        #expect(projected.watchProgress == 0)
+    }
+
     @Test func `reconcile only projects the active profile's mirrors`() async throws {
         let container = try makeProfileTestContainer()
         let ctx = container.mainContext
@@ -198,9 +256,49 @@ struct ProfileEngineTests {
         return (manager, coordinator)
     }
 
+    @Test func `profile manager reports a failed switch without changing its active profile`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let profileA = UUID()
+        let profileB = UUID()
+        ctx.insert(UserProfile(id: profileA, name: "A"))
+        ctx.insert(UserProfile(id: profileB, name: "B"))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        ActiveProfileStore.current = profileA
+        defer { ActiveProfileStore.current = saved }
+
+        let engine = CloudSyncEngine(
+            container: container,
+            shadow: freshShadow(),
+            saveFailureInjector: { _ in throw InjectedProfileSaveError.forced }
+        )
+        let coordinator = CloudSyncCoordinator(
+            catalogContainer: container,
+            cloudContainer: container,
+            cloudKitContainerIdentifier: "iCloud.lume.tests.invalid",
+            cloudKitEnabled: false,
+            engine: engine
+        )
+        let manager = ProfileManager(
+            catalogContainer: container,
+            cloudContainer: container,
+            coordinator: coordinator
+        )
+
+        let switched = await manager.switchProfile(to: profileB)
+
+        #expect(!switched)
+        #expect(manager.activeProfileID == profileA)
+        #expect(ActiveProfileStore.current == profileA)
+        #expect(!manager.isSwitching)
+        #expect(manager.pendingProfileName == nil)
+    }
+
     /// Starts a switch and returns once it has reached its first suspension
     /// point, so the caller can observe the in-flight state.
-    private func beginSwitch(_ manager: ProfileManager, to id: UUID) async -> Task<Void, Never> {
+    private func beginSwitch(_ manager: ProfileManager, to id: UUID) async -> Task<Bool, Never> {
         let task = Task { await manager.switchProfile(to: id) }
         var spins = 0
         while !manager.isSwitching, spins < 500 {
