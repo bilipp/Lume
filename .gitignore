@@ -21,5 +21,7 @@ lefthook-local.yml
 
 # Claude Code config (local-only)
 .claude/
+.agents/
+.opencode/
 
 .xcodebuildmcp/

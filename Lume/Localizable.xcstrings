@@ -7730,6 +7730,58 @@
         }
       }
     },
+    "Connect Simkl Account" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl-Konto verbinden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar cuenta de Simkl"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecter un compte Simkl"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collega account Simkl"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simklアカウントを接続"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl 계정 연결"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar Conta do Simkl"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接Simkl账户"
+          }
+        }
+      }
+    },
     "Connect to your IPTV provider" : {
       "localizations" : {
         "de" : {
@@ -8092,6 +8144,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不同步继续"
+          }
+        }
+      }
+    },
+    "Couldn't import from Simkl. Please try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import von Simkl fehlgeschlagen. Bitte versuche es erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido importar desde Simkl. Inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’importer depuis Simkl. Veuillez réessayer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile importare da Simkl. Riprova."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simklからインポートできませんでした。もう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl에서 가져올 수 없습니다. 다시 시도하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível importar do Simkl. Tente novamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从Simkl导入。请重试。"
           }
         }
       }
@@ -12036,6 +12140,58 @@
         }
       }
     },
+    "Enter this code at simkl.com/pin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib diesen Code auf simkl.com/pin ein"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce este código en simkl.com/pin"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez ce code sur simkl.com/pin"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci questo codice su simkl.com/pin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pinでこのコードを入力"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin에서 이 코드를 입력하세요"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insira este código em simkl.com/pin"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在simkl.com/pin输入此代码"
+          }
+        }
+      }
+    },
     "Enter this code at trakt.tv/activate" : {
       "localizations" : {
         "de" : {
@@ -15590,6 +15746,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图片缓存"
+          }
+        }
+      }
+    },
+    "Import Watched from Simkl" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angesehenes von Simkl importieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar lo visto de Simkl"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer les contenus vus depuis Simkl"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa i contenuti visti da Simkl"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simklから視聴済みをインポート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl에서 시청함 가져오기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar Assistidos do Simkl"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从Simkl导入已观看记录"
           }
         }
       }
@@ -24225,6 +24433,58 @@
         }
       }
     },
+    "Open simkl.com/pin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir simkl.com/pin"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir simkl.com/pin"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri simkl.com/pin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pinを開く"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin 열기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir simkl.com/pin"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开simkl.com/pin"
+          }
+        }
+      }
+    },
     "Open Source" : {
       "localizations" : {
         "de" : {
@@ -29896,6 +30156,58 @@
         }
       }
     },
+    "Scrobble what you watch to Simkl and import your Simkl history." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übertrage, was du ansiehst, an Simkl und importiere deinen Simkl-Verlauf."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registra lo que ves en Simkl e importa tu historial de Simkl."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrobblez ce que vous regardez vers Simkl et importez votre historique Simkl."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esegui lo scrobble di ciò che guardi su Simkl e importa la tua cronologia di Simkl."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "視聴した内容をSimklにスクロブルし、Simklの履歴をインポートします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시청 내역을 Simkl에 스크로블하고 Simkl 기록을 가져오세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faça scrobble do que você assiste no Simkl e importe seu histórico do Simkl."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将您观看的内容记录到Simkl，并导入您的Simkl历史记录。"
+          }
+        }
+      }
+    },
     "Search" : {
       "localizations" : {
         "de" : {
@@ -32344,6 +32656,162 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已登录"
+          }
+        }
+      }
+    },
+    "Simkl" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl"
+          }
+        }
+      }
+    },
+    "Simkl Integration" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl-Integration"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Integración con Simkl"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intégration Simkl"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Integrazione Simkl"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl連携"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl 연동"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Integração com o Simkl"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simkl集成"
+          }
+        }
+      }
+    },
+    "simkl.com/pin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "simkl.com/pin"
           }
         }
       }
@@ -35013,6 +35481,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同步播放列表"
+          }
+        }
+      }
+    },
+    "Sync the movies and episodes you watch to Simkl." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisiere die Filme und Episoden, die du ansiehst, mit Simkl."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincroniza con Simkl las películas y los episodios que ves."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisez les films et les épisodes que vous regardez avec Simkl."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizza i film e gli episodi che guardi con Simkl."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "視聴した映画やエピソードをSimklに同期します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시청한 영화와 에피소드를 Simkl에 동기화하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronize os filmes e episódios que você assiste com o Simkl."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将您观看的电影和剧集同步到Simkl。"
           }
         }
       }
@@ -39399,6 +39919,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已观看"
+          }
+        }
+      }
+    },
+    "Watched movies and episodes sync to your Simkl history. Import marks titles you've already watched on Simkl as watched here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesehene Filme und Episoden werden mit deinem Simkl-Verlauf synchronisiert. Beim Import werden Titel, die du auf Simkl bereits gesehen hast, hier als gesehen markiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las películas y los episodios vistos se sincronizan con tu historial de Simkl. La importación marca aquí como vistos los títulos que ya has visto en Simkl."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les films et épisodes vus se synchronisent avec votre historique Simkl. L’importation marque ici comme vus les titres que vous avez déjà regardés sur Simkl."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I film e gli episodi visti si sincronizzano con la tua cronologia di Simkl. L'importazione contrassegna come visti qui i titoli che hai già visto su Simkl."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "視聴済みの映画やエピソードがSimklの履歴に同期されます。インポートすると、Simklですでに視聴済みのタイトルがここでも視聴済みになります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시청한 영화와 에피소드가 Simkl 기록에 동기화됩니다. 가져오기를 하면 Simkl에서 이미 시청한 제목이 여기에서도 시청함으로 표시됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmes e episódios assistidos são sincronizados com seu histórico do Simkl. A importação marca como assistidos aqui os títulos que você já assistiu no Simkl."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已观看的电影和剧集会同步到您的Simkl历史记录。导入会将您已在Simkl上观看的标题在此处标为已观看。"
           }
         }
       }

@@ -62,7 +62,8 @@ in beta.
 It is built entirely in **SwiftUI** with a single, platform-adaptive codebase that
 runs on iPhone, iPad, Mac, Apple TV, and Apple Vision Pro. Content is enriched with
 artwork, cast, trailers, and ratings from **TMDB** and **MDBList** (IMDb, Rotten Tomatoes,
-Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to **Trakt**.
+Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to
+**Trakt** and **Simkl**.
 
 > **Note** — Lume is a player only. It ships with **no channels, streams, or content**
 > of its own. You bring your own Xtream Codes credentials or M3U playlist from a
@@ -158,6 +159,7 @@ adapted per size class
 - **Skip Intro / Recap** overlay during playback, powered by IntroDB skip windows
 - **OpenSubtitles** search from the player's subtitle menu — find and load an external subtitle track for any movie or episode whose stream ships without one
 - Optional **Trakt** scrobbling — plus one-tap import of your existing Trakt watched history — and **TMDB** metadata enrichment
+- Optional **Simkl** scrobbling via the OAuth 2.0 device flow, with watched-history import on connect and the manual re-import for later
 - **Clear watch history** from Settings to reset progress, watched markers, and last-watched dates across all content
 - **Now Playing integration** — lock-screen / Control Center metadata, artwork, and remote controls on every engine; playback on Apple TV surfaces on your iPhone's Apple TV remote
 - **Live Activity + Dynamic Island** (iOS) — glanceable now & next programme with live progress on the Lock Screen; tap to jump straight back into playback. **Background downloads** get one too: progress, speed and ETA for the file closest to finishing plus how many are behind it, updated while Lume is closed; tap to open the downloads list
@@ -248,6 +250,7 @@ Lume follows a clean, layered SwiftUI architecture:
 │    ├─ TMDBClient          metadata / artwork enrichment   │
 │    ├─ MDBListClient       aggregator ratings (IMDb, RT, …)│
 │    ├─ TraktService        OAuth device flow + scrobbling  │
+│    ├─ SimklService        OAuth device flow + scrobbling  │
 │    ├─ OpenSubtitlesClient external subtitle search        │
 │    ├─ ContentSyncManager  background catalog indexing     │
 │    └─ ImagePipeline        cached async image loading     │
@@ -264,7 +267,7 @@ Lume follows a clean, layered SwiftUI architecture:
 - **Persistence** — SwiftData (8 model types, local catalog index)
 - **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer · LumeEngine (FFmpeg 9, beta)
 - **Networking** — `URLSession` with typed endpoints, retry/backoff, and error classification
-- **Integrations** — TMDB (metadata), MDBList (ratings), Trakt (device OAuth + scrobbling), OpenSubtitles (external subtitle tracks)
+- **Integrations** — TMDB (metadata), MDBList (ratings), Trakt & Simkl (device OAuth + scrobbling), OpenSubtitles (external subtitle tracks)
 - **Localization** — 9 languages via String Catalogs (English, German, French, Spanish, Italian, Portuguese, Japanese, Korean, Simplified Chinese)
 
 **Dependencies** (Swift Package Manager)
@@ -286,7 +289,7 @@ Lume/
 ├── ContentView.swift        Root view / login gate
 ├── Models/                  SwiftData models & sort options
 ├── Services/
-│   ├── Network/             Xtream, M3U, TMDB, MDBList, Trakt, OpenSubtitles clients
+│   ├── Network/             Xtream, M3U, TMDB, MDBList, Trakt, Simkl, OpenSubtitles clients
 │   ├── Sync/                Content sync manager & progress
 │   ├── Player/              Playable media, settings, history, NextUp
 │   └── Images/              Image cache & pipeline
@@ -296,7 +299,7 @@ Lume/
 │   ├── Movies/ · Series/    Browse & detail views
 │   ├── Player/              AVPlayer / KSPlayer / VLC engines, overlays, channel browser
 │   ├── TV/                  tvOS-specific detail screens
-│   ├── Settings/            Playlists, sync, Trakt, player engine options, content mgmt
+│   ├── Settings/            Playlists, sync, Trakt & Simkl, player engine options, content mgmt
 │   └── Components/          Reusable cards, toolbars, grids, ratings chips
 └── Assets.xcassets/         App icon & tvOS brand assets
 
@@ -317,6 +320,7 @@ The easiest way to use Lume is to [**download it from the App Store**](https://a
 - An **Xtream Codes** account (server URL, username, password), an **M3U/M3U8 playlist URL**, or a **Stalker portal** (portal URL + MAC address)
 - *(Optional)* a [TMDB](https://www.themoviedb.org/settings/api) API access token for metadata enrichment
 - *(Optional)* a [Trakt](https://trakt.tv/oauth/applications) application for scrobbling
+- *(Optional)* a [Simkl](https://simkl.com/settings/developer/new/) application for scrobbling (OAuth V2 — "TV, devices & command line" registration needs only the client id)
 - *(Optional)* an [MDBList](https://mdblist.com/preferences/) API key for IMDb / Rotten Tomatoes / Metacritic / Trakt / Letterboxd ratings
 - *(Optional)* an [IntroDB](https://introdb.app) API key for intro / recap skip windows
 - *(Optional)* an [OpenSubtitles](https://www.opensubtitles.com/consumers) consumer API key for in-player subtitle search
@@ -389,12 +393,22 @@ OPENSUBTITLES_API_KEY=your_opensubtitles_api_key
 # Trakt — watch scrobbling (device OAuth flow)
 TRAKT_CLIENT_ID=your_trakt_client_id
 TRAKT_CLIENT_SECRET=your_trakt_client_secret
+
+# Simkl — watch scrobbling (OAuth 2.0 device flow, AUTH V2)
+SIMKL_CLIENT_ID=your_simkl_client_id
+SIMKL_CLIENT_SECRET=
 ```
 
 Every key is optional — Lume builds and runs fine with an empty `.env` or none at all.
 
 Trakt uses the **device OAuth flow** (no embedded web view), which works on tvOS as
 well as iOS/macOS. Tokens are stored securely in the Keychain.
+
+Simkl uses the **OAuth 2.0 device flow** (AUTH V2, RFC 8628) — likewise no web view,
+so it works on every platform including tvOS, and access tokens are refreshed
+automatically. A "TV, devices & command line" registration has no secret; the secret
+line is only for a "Server apps & services" registration. Tokens are stored in the
+Keychain as well.
 
 OpenSubtitles needs both halves: the API key above identifies the build, while
 *downloading* a subtitle needs a free [opensubtitles.com](https://www.opensubtitles.com)
@@ -411,7 +425,7 @@ and UI automation (**XCTest**).
 
 | Target | Framework | Coverage |
 |---|---|---|
-| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt token store, content organizing, **M3U parser/classifier/sync**, **MDBList client**, **OpenSubtitles client & subtitle-search query**, **Next Episode resolver**, **Gzip file streaming** |
+| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt & Simkl token stores + watched importers + Simkl client, content organizing, **M3U parser/classifier/sync**, **MDBList client**, **OpenSubtitles client & subtitle-search query**, **Next Episode resolver**, **Gzip file streaming** |
 | `LumeUITests` | XCTest | App launch & performance, login flow, tab navigation, playlist detail, settings, **M3U playlist import flow** |
 
 Run the full suite:

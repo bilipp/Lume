@@ -85,3 +85,17 @@ if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then
 else
     echo "warning: TRAKT_CLIENT_ID/SECRET not set in .env — Trakt integration will be hidden"
 fi
+
+SIMKL_CLIENT_ID="$(read_env SIMKL_CLIENT_ID)"
+if [ -n "$SIMKL_CLIENT_ID" ]; then
+    set_plist SimklClientID "$SIMKL_CLIENT_ID"
+    # Simkl's TV/device OAuth registrations carry no secret; one present for a
+    # server-app registration is forwarded when set.
+    SIMKL_CLIENT_SECRET="$(read_env SIMKL_CLIENT_SECRET)"
+    if [ -n "$SIMKL_CLIENT_SECRET" ]; then
+        set_plist SimklClientSecret "$SIMKL_CLIENT_SECRET"
+    fi
+    echo "Injected Simkl credentials into Info.plist"
+else
+    echo "warning: SIMKL_CLIENT_ID not set in .env — Simkl integration will be hidden"
+fi
