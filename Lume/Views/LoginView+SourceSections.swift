@@ -4,7 +4,7 @@
 //
 //  The iOS/macOS source sections of the add-playlist form, split out of
 //  LoginView to keep that type within the project's body-length limit. They
-//  take what they render as bindings — like `WebDAVLoginSection` — so the
+//  take what they render as bindings — like `MediaServerLoginSection` — so the
 //  form state stays in `LoginView`.
 //
 //  The tvOS form has no `Section` chrome and builds its fields inline in

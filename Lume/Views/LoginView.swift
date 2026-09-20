@@ -4,6 +4,27 @@ import SwiftUI
     import UniformTypeIdentifiers
 #endif
 
+/// The add-playlist form's source picker. Xtream / m3u / Stalker map 1:1 onto
+/// `PlaylistSourceType`; the media-server entry covers every server kind the
+/// URL auto-detection knows (Jellyfin, WebDAV, later Plex/Emby) instead of
+/// asking upfront. A form-level enum — `PlaylistSourceType` persists one
+/// detected kind per playlist and must not gain a "maybe either" case.
+enum LoginSourceType: String, CaseIterable {
+    case xtream
+    case m3u
+    case stalker
+    case mediaServer
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .xtream: "Xtream"
+        case .m3u: "M3U"
+        case .stalker: "Stalker"
+        case .mediaServer: "Media Server"
+        }
+    }
+}
+
 struct LoginView: View {
     /// Whether this view is presented modally (the Settings "Add Playlist"
     /// sheet / cover) and should therefore offer a Cancel button and dismiss
@@ -21,7 +42,7 @@ struct LoginView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @State private var sourceType: PlaylistSourceType = .xtream
+    @State private var sourceType: LoginSourceType = .xtream
 
     @State private var name = ""
     @State private var serverURL = ""
@@ -40,15 +61,11 @@ struct LoginView: View {
     @State private var portalURL = ""
     @State private var macAddress = StalkerMAC.generate()
 
-    /// The full URL of the shared folder. Not the server root: an Apache
-    /// `Alias` (or any share that isn't at "/") never shows up in a PROPFIND of
-    /// the root, so a hostname alone silently lists nothing.
-    @State var webdavURL = ""
-
-    /// The Jellyfin server's base address — the URL opened in a browser, e.g.
-    /// `http://192.168.1.10:8096`. Unlike a WebDAV share this is the server
-    /// root: libraries are discovered through the API.
-    @State var jellyfinURL = ""
+    /// The media-server address: a Jellyfin base URL
+    /// (`http://192.168.1.10:8096`) or the full path of a WebDAV folder. The
+    /// kind is detected from the URL — unlike a fixed per-kind field, this one
+    /// cannot silently list nothing because of a wrong assumption.
+    @State var mediaServerURL = ""
 
     @State var isLoading = false
     @State var errorMessage: String?
@@ -64,12 +81,11 @@ struct LoginView: View {
         case .stalker:
             !portalURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && StalkerMAC.isValid(macAddress.trimmingCharacters(in: .whitespacesAndNewlines))
-        case .webdav:
-            !webdavURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .jellyfin:
-            !jellyfinURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && !password.isEmpty
+        case .mediaServer:
+            // Credentials stay optional here: an anonymous WebDAV share needs
+            // none, and a Jellyfin server without them gets a dedicated
+            // "enter your username and password" error from the check itself.
+            !mediaServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 
@@ -97,11 +113,9 @@ struct LoginView: View {
                 Form {
                     Section {
                         Picker("Playlist Type", selection: $sourceType) {
-                            Text("Xtream").tag(PlaylistSourceType.xtream)
-                            Text("M3U").tag(PlaylistSourceType.m3u)
-                            Text("Stalker").tag(PlaylistSourceType.stalker)
-                            Text("WebDAV").tag(PlaylistSourceType.webdav)
-                            Text("Jellyfin").tag(PlaylistSourceType.jellyfin)
+                            ForEach(LoginSourceType.allCases, id: \.self) { type in
+                                Text(type.title).tag(type)
+                            }
                         }
                         .pickerStyle(.segmented)
                     }
@@ -117,10 +131,8 @@ struct LoginView: View {
                         )
                     case .stalker:
                         StalkerLoginSection(name: $name, portalURL: $portalURL, macAddress: $macAddress, username: $username, password: $password)
-                    case .webdav:
-                        WebDAVLoginSection(name: $name, shareURL: $webdavURL, username: $username, password: $password)
-                    case .jellyfin:
-                        JellyfinLoginSection(name: $name, serverURL: $jellyfinURL, username: $username, password: $password)
+                    case .mediaServer:
+                        MediaServerLoginSection(name: $name, serverURL: $mediaServerURL, username: $username, password: $password)
                     }
 
                     if let errorMessage {
@@ -184,8 +196,7 @@ struct LoginView: View {
             case .xtream: "Your credentials are stored locally on this device."
             case .m3u: "The EPG URL is read from the playlist when left empty."
             case .stalker: "Enter the portal URL and the MAC address your provider authorized."
-            case .webdav: WebDAVAddCheck.hint
-            case .jellyfin: JellyfinAddCheck.hint
+            case .mediaServer: MediaServerAddCheck.hint
             }
         }
 
@@ -202,11 +213,9 @@ struct LoginView: View {
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
                     Picker("Playlist Type", selection: $sourceType) {
-                        Text("Xtream").tag(PlaylistSourceType.xtream)
-                        Text("M3U").tag(PlaylistSourceType.m3u)
-                        Text("Stalker").tag(PlaylistSourceType.stalker)
-                        Text("WebDAV").tag(PlaylistSourceType.webdav)
-                        Text("Jellyfin").tag(PlaylistSourceType.jellyfin)
+                        ForEach(LoginSourceType.allCases, id: \.self) { type in
+                            Text(type.title).tag(type)
+                        }
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -226,10 +235,8 @@ struct LoginView: View {
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $macAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $username, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $password, isSecure: true, contentType: .password)
-                        case .webdav:
-                            WebDAVLoginFields(shareURL: $webdavURL, username: $username, password: $password)
-                        case .jellyfin:
-                            JellyfinLoginFields(serverURL: $jellyfinURL, username: $username, password: $password)
+                        case .mediaServer:
+                            MediaServerLoginFields(serverURL: $mediaServerURL, username: $username, password: $password)
                         }
                     }
 
@@ -293,8 +300,7 @@ struct LoginView: View {
             )
         case .m3u: addM3UPlaylist()
         case .stalker: addStalkerPlaylist()
-        case .webdav: addWebDAVPlaylist()
-        case .jellyfin: addJellyfinPlaylist()
+        case .mediaServer: addMediaServerPlaylist()
         }
     }
 

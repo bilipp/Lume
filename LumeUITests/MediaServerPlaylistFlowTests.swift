@@ -1,18 +1,19 @@
 import XCTest
 
-/// End-to-end WebDAV add-playlist flow through the login form.
+/// End-to-end media-server add-playlist flow through the login form.
 ///
-/// There is no WebDAV server to add against here, so this covers the form
+/// There is no media server to add against here, so this covers the form
 /// itself: the segment gating the fields, and that a failed connection test
-/// reports rather than silently adding the playlist. Which of the four
-/// failures gets which copy is decided by `WebDAVAddCheck.message` and covered
-/// in `WebDAVAddCheckTests` — pure, and so not at the mercy of what a host on
-/// the build machine happens to answer.
-final class WebDAVPlaylistFlowTests: XCTestCase {
+/// reports rather than silently adding the playlist. Which failure gets which
+/// copy is decided by `MediaServerAddCheck.message` (delegating to the
+/// per-kind checks) and covered in unit tests — pure, and so not at the mercy
+/// of what a host on the build machine happens to answer.
+final class MediaServerPlaylistFlowTests: XCTestCase {
     /// Port 1 (`tcpmux`) is never listening, so the connect fails immediately
     /// rather than waiting out the form's 20s deadline — and `localhost`
     /// classifies as a local address, which is what selects the
-    /// local-network copy.
+    /// local-network copy. Both probes fail on it, so detection reports the
+    /// network error rather than "unsupported".
     private let unreachableShare = "http://localhost:1/Movies/"
 
     override func setUpWithError() throws {
@@ -21,11 +22,11 @@ final class WebDAVPlaylistFlowTests: XCTestCase {
 
     // MARK: - Tests
 
-    func testWebDAVShareThatCannotBeReachedExplainsLocalNetworkPermission() {
+    func testMediaServerThatCannotBeReachedExplainsLocalNetworkPermission() {
         let app = XCUIApplication()
         launchAndOpenAddForm(app)
-        selectWebDAVSegment(app)
-        fillWebDAVForm(app, url: unreachableShare, username: "bilipp", password: "test")
+        selectMediaServerSegment(app)
+        fillMediaServerForm(app, url: unreachableShare, username: "bilipp", password: "test")
         submit(app)
 
         // A declined local-network prompt is indistinguishable from an
@@ -37,27 +38,27 @@ final class WebDAVPlaylistFlowTests: XCTestCase {
 
         // The form must still be standing: a failed connection test may never
         // insert the playlist and dismiss.
-        XCTAssertTrue(shareURLField(app).exists, "Form was dismissed despite a failed connection test")
+        XCTAssertTrue(serverURLField(app).exists, "Form was dismissed despite a failed connection test")
     }
 
-    /// The WebDAV fields only exist while the WebDAV segment is selected — the
-    /// form dispatches the whole field stack off `sourceType`.
-    func testWebDAVFieldsAppearOnlyForTheWebDAVSegment() {
+    /// The media-server fields only exist while the Media Server segment is
+    /// selected — the form dispatches the whole field stack off `sourceType`.
+    func testMediaServerFieldsAppearOnlyForTheMediaServerSegment() {
         let app = XCUIApplication()
         launchAndOpenAddForm(app)
 
-        selectWebDAVSegment(app)
-        XCTAssertTrue(shareURLField(app).waitForExistence(timeout: 5))
+        selectMediaServerSegment(app)
+        XCTAssertTrue(serverURLField(app).waitForExistence(timeout: 5))
 
         // Attached so the four-segment picker can be eyeballed at the narrowest
-        // supported width, where a fifth source type would start truncating.
+        // supported width.
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "WebDAV-add-form"
+        shot.name = "MediaServer-add-form"
         shot.lifetime = .keepAlways
         add(shot)
 
         app.buttons["Xtream"].tap()
-        XCTAssertTrue(shareURLField(app).waitForNonExistence(timeout: 5), "Share URL field outlived the WebDAV segment")
+        XCTAssertTrue(serverURLField(app).waitForNonExistence(timeout: 5), "Server URL field outlived the Media Server segment")
     }
 
     // MARK: - Steps
@@ -79,23 +80,23 @@ final class WebDAVPlaylistFlowTests: XCTestCase {
         }
     }
 
-    private func selectWebDAVSegment(_ app: XCUIApplication) {
-        let segment = app.buttons["WebDAV"]
-        XCTAssertTrue(segment.waitForExistence(timeout: 5), "No WebDAV segment.\n\(app.debugDescription)")
+    private func selectMediaServerSegment(_ app: XCUIApplication) {
+        let segment = app.buttons["Media Server"]
+        XCTAssertTrue(segment.waitForExistence(timeout: 5), "No Media Server segment.\n\(app.debugDescription)")
         segment.tap()
     }
 
-    private func shareURLField(_ app: XCUIApplication) -> XCUIElement {
-        app.textFields["e.g. http://192.168.1.10:8080/Movies/"]
+    private func serverURLField(_ app: XCUIApplication) -> XCUIElement {
+        app.textFields["e.g. http://192.168.1.10:8096"]
     }
 
-    private func fillWebDAVForm(_ app: XCUIApplication, url: String, username: String, password: String) {
+    private func fillMediaServerForm(_ app: XCUIApplication, url: String, username: String, password: String) {
         let nameField = app.textFields["e.g. My Media Server"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 5), "No WebDAV name field.\n\(app.debugDescription)")
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5), "No media-server name field.\n\(app.debugDescription)")
         nameField.tap()
         nameField.typeText("My NAS")
 
-        let urlField = shareURLField(app)
+        let urlField = serverURLField(app)
         urlField.tap()
         urlField.typeText(url)
 

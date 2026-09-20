@@ -8,100 +8,12 @@
 
 import SwiftUI
 
-// MARK: - Fields
-
-#if !os(tvOS)
-    /// The WebDAV fields of the add-playlist form. A `Section`, so it composes
-    /// into `LoginView`'s `Form` the same way the inline source sections do.
-    struct WebDAVLoginSection: View {
-        @Binding var name: String
-        @Binding var shareURL: String
-        @Binding var username: String
-        @Binding var password: String
-
-        var body: some View {
-            Section {
-                TextField("e.g. My Media Server", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://192.168.1.10:8080/Movies/", text: $shareURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                TextField("Username (optional)", text: $username)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.username)
-
-                SecureField("Password (optional)", text: $password)
-                    .textContentType(.password)
-            } header: {
-                Text("WebDAV Share")
-            } footer: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Enter the full URL of the folder that holds your media — a server's root address usually isn't browsable.")
-                    Text("Leave the username and password empty for an anonymous share.")
-                    Text("The first connection asks permission to find devices on your local network. If you decline it, only the system Settings app can allow it again.")
-                }
-            }
-        }
-    }
-#endif
-
-#if os(tvOS)
-    /// The tvOS counterpart: bare labelled fields, since the tvOS form has no
-    /// `Section` chrome and supplies its own name field.
-    struct WebDAVLoginFields: View {
-        @Binding var shareURL: String
-        @Binding var username: String
-        @Binding var password: String
-
-        var body: some View {
-            TVSettingsField(title: "Share URL", placeholder: "e.g. http://192.168.1.10:8080/Movies/", text: $shareURL, contentType: .URL)
-            TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $username, contentType: .username)
-            TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $password, isSecure: true, contentType: .password)
-        }
-    }
-#endif
-
-// MARK: - Add playlist
-
-extension LoginView {
-    func addWebDAVPlaylist() {
-        isLoading = true
-        errorMessage = nil
-
-        let playlistName = trimmedName.isEmpty ? "My Playlist" : trimmedName
-        let user = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        let input = WebDAVAddCheck.Input(url: webdavURL, username: user, password: password)
-
-        Task {
-            do {
-                try await withConnectionTimeout {
-                    let url = try await WebDAVAddCheck.verify(input)
-                    // An anonymous share stores no password: a stray one would
-                    // be sent as a Basic header the server never asked for.
-                    let playlist = Playlist(
-                        name: playlistName,
-                        webdavURL: url,
-                        username: user,
-                        password: user.isEmpty ? "" : password
-                    )
-                    insertAndFinish(playlist)
-                }
-            } catch {
-                errorMessage = WebDAVAddCheck.message(for: error, input: input, timedOut: error is ConnectionTimeoutError)
-                isLoading = false
-            }
-        }
-    }
-}
+// The form fields moved to `MediaServerLoginSection` / `MediaServerLoginFields`
+// (LoginView+MediaServer.swift): the form no longer asks for the server kind
+// upfront, it detects Jellyfin vs. WebDAV from the URL. Playlist construction
+// moved to `addMediaServerPlaylist` there for the same reason; what stays here
+// is the WebDAV connection test and its failure copy, which the media-server
+// check delegates to.
 
 // MARK: - Connection test
 
@@ -123,14 +35,15 @@ enum WebDAVAddCheck {
         case emptyShare
     }
 
-    /// Returns the URL to store on success.
-    static func verify(_ input: Input) async throws -> String {
+    /// Returns the URL to store on success. `urlSession` is a test seam (see
+    /// `MediaServerAddCheck.verify`); production callers leave it `nil`.
+    static func verify(_ input: Input, urlSession: URLSession? = nil) async throws -> String {
         let trimmed = input.url.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed), url.host != nil else { throw WebDAVError.invalidURL }
 
         let user = input.username.trimmingCharacters(in: .whitespacesAndNewlines)
         let credentials = user.isEmpty ? nil : WebDAVCredentials(username: user, password: input.password)
-        let client = WebDAVClient()
+        let client = WebDAVClient(urlSession: urlSession)
         // Depth 0 first: it answers as fast on a share with thousands of files
         // as on an empty one, so a wrong host or a wrong password fails without
         // waiting out a listing.
@@ -143,7 +56,7 @@ enum WebDAVAddCheck {
 
     static func message(for error: Error, input: Input, timedOut: Bool) -> String {
         let host = URL(string: input.url.trimmingCharacters(in: .whitespacesAndNewlines))?.host
-        if timedOut, isLocalHost(host) { return localNetworkMessage }
+        if timedOut, ServerAddressHelp.isLocalHost(host) { return ServerAddressHelp.localNetworkMessage }
         if error is AddError { return emptyShareMessage }
         guard let webdavError = error as? WebDAVError else { return error.localizedDescription }
         switch webdavError {
@@ -151,8 +64,8 @@ enum WebDAVAddCheck {
             return String(localized: "The server rejected this username and password. Leave both empty if the share allows anonymous access.")
         case .notAWebDAVServer:
             return String(localized: "That URL doesn't answer as a WebDAV share. Enter the full path of the shared folder, not just the server address.")
-        case let .networkError(underlying) where isLocalHost(host) && isUnreachable(underlying):
-            return localNetworkMessage
+        case let .networkError(underlying) where ServerAddressHelp.isLocalHost(host) && ServerAddressHelp.isUnreachable(underlying):
+            return ServerAddressHelp.localNetworkMessage
         default:
             return webdavError.localizedDescription
         }
@@ -169,33 +82,6 @@ enum WebDAVAddCheck {
         String(localized: "That folder is empty. Enter the full path of the folder that holds your media — a server's root address usually lists nothing.")
     }
 
-    /// A declined local-network prompt is indistinguishable from an unreachable
-    /// host: iOS and tvOS just fail the connection. Only the system Settings app
-    /// can reverse it, and on tvOS there is no other affordance at all.
-    private static var localNetworkMessage: String {
-        String(localized: "Lume couldn't reach that address on your local network. If you declined the local network prompt, only the system Settings app can allow it again.")
-    }
-
-    private static func isLocalHost(_ host: String?) -> Bool {
-        guard let host = host?.lowercased(), !host.isEmpty else { return false }
-        if host == "localhost" || host.hasSuffix(".local") || !host.contains(".") { return true }
-        if host.hasPrefix("10.") || host.hasPrefix("192.168.") { return true }
-        let parts = host.split(separator: ".")
-        if parts.count == 4, parts[0] == "172", let block = Int(parts[1]), (16 ... 31).contains(block) {
-            return true
-        }
-        return false
-    }
-
-    private static func isUnreachable(_ error: Error) -> Bool {
-        let nsError = error as NSError
-        guard nsError.domain == NSURLErrorDomain else { return false }
-        return [
-            NSURLErrorTimedOut,
-            NSURLErrorCannotConnectToHost,
-            NSURLErrorCannotFindHost,
-            NSURLErrorNetworkConnectionLost,
-            NSURLErrorNotConnectedToInternet
-        ].contains(nsError.code)
-    }
+    // The local-network copy and the private-address classifier live in
+    // `ServerAddressHelp`, shared with the Jellyfin and media-server checks.
 }
