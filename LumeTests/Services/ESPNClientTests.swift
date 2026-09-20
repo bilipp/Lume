@@ -236,6 +236,8 @@ struct ESPNClientTests {
           "keyEvents": [
             {"type": {"text": "Goal"}, "clock": {"displayValue": "23'"}, "team": {"id": "132"},
              "scoringPlay": true, "athletesInvolved": [{"displayName": "Harry Kane"}]},
+            {"type": {"text": "Start Delay"}, "clock": {"displayValue": "29'"}, "text": "Delay in match because of an injury."},
+            {"type": {"text": "End Delay"}, "clock": {"displayValue": "30'"}, "text": "Delay over."},
             {"type": {"text": "Yellow Card"}, "clock": {"displayValue": "41'"}, "team": {"id": "124"},
              "yellowCard": true, "athletesInvolved": [{"displayName": "Julian Brandt"}]}
           ]
@@ -246,6 +248,7 @@ struct ESPNClientTests {
 
         let detail = try #require(try await client.eventDetail(league: soccerLeague(), eventId: "401773"))
 
+        // The two stoppage markers are dropped; the goal and the card remain.
         #expect(detail.keyEvents.count == 2)
         let goal = try #require(detail.keyEvents.first)
         #expect(goal.isGoal == true)
@@ -412,17 +415,6 @@ struct ESPNClientTests {
         #expect(SportsStandingRow.grouped(rows).count == 1)
     }
 
-    @Test func `grouping an ungrouped cache still separates drivers from constructors`() {
-        let rows = [
-            SportsStandingRow(id: "d1", kind: .driver, name: "Driver A", rank: 1, points: 10),
-            SportsStandingRow(id: "d2", kind: .driver, name: "Driver B", rank: 2, points: 8),
-            SportsStandingRow(id: "c1", kind: .constructor, name: "Team A", rank: 1, points: 18)
-        ]
-        let groups = SportsStandingRow.grouped(rows)
-        #expect(groups.map(\.kind) == [.driver, .constructor])
-        #expect(groups.map(\.rows.count) == [2, 1])
-    }
-
     @Test func `rugby stat names map to the shared columns`() async throws {
         let body = """
         {"children": [{"name": "Top 14", "standings": {"entries": [
@@ -485,5 +477,19 @@ struct ESPNClientTests {
 
     @Test func `always configured`() {
         #expect(ESPNClient().isConfigured == true)
+    }
+}
+
+/// Pure grouping of standing rows — no client, no stub.
+struct StandingsGroupingTests {
+    @Test func `grouping an ungrouped cache still separates drivers from constructors`() {
+        let rows = [
+            SportsStandingRow(id: "d1", kind: .driver, name: "Driver A", rank: 1, points: 10),
+            SportsStandingRow(id: "d2", kind: .driver, name: "Driver B", rank: 2, points: 8),
+            SportsStandingRow(id: "c1", kind: .constructor, name: "Team A", rank: 1, points: 18)
+        ]
+        let groups = SportsStandingRow.grouped(rows)
+        #expect(groups.map(\.kind) == [.driver, .constructor])
+        #expect(groups.map(\.rows.count) == [2, 1])
     }
 }

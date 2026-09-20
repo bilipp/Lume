@@ -469,10 +469,18 @@ nonisolated extension ESPNClient {
 
     static func mapEventDetail(_ response: ESPNSummaryResponse) -> SportsEventDetail {
         SportsEventDetail(
-            keyEvents: (response.keyEvents ?? []).map(mapKeyEvent),
+            keyEvents: (response.keyEvents ?? []).filter(isTimelineWorthy).map(mapKeyEvent),
             teamStats: mapTeamStats(response.boxscore),
             lineups: (response.rosters ?? []).compactMap(mapLineup)
         )
+    }
+
+    /// ESPN's soccer feed logs every stoppage as a "Start Delay" / "End Delay"
+    /// pair (injuries, VAR checks), each of them twice. They tell the viewer
+    /// nothing the clock doesn't, so they never reach the timeline.
+    private static func isTimelineWorthy(_ event: ESPNKeyEvent) -> Bool {
+        let type = (event.type?.text ?? "").lowercased()
+        return !type.contains("delay")
     }
 
     private static func mapKeyEvent(_ event: ESPNKeyEvent) -> SportsKeyEvent {
