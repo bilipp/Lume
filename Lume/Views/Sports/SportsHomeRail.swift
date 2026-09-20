@@ -242,10 +242,14 @@ struct SportsHomeRail: View {
 
         // MARK: - Lifecycle
 
+        /// Loads the cached snapshots, then fetches any followed league that has
+        /// none — the system may purge `Caches/` between launches, and the daily
+        /// refresh alone would leave the rail empty until it next fell due.
         private func warm() {
             guard premium.isPremium else { return }
             store.loadCached(leagueIds: displayLeagueIds)
             SportsSyncService.shared.syncIfDue()
+            SportsSyncService.shared.refreshMissing()
         }
 
         /// Re-runs when the fixture set changes or an EPG/catalog sync finishes

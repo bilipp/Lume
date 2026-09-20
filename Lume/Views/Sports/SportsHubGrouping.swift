@@ -115,7 +115,7 @@ struct SportsHubGrouping {
             groups.append(SportsFixtureGroup(
                 id: league.id,
                 title: league.name,
-                logoURL: league.logoURL,
+                logoURL: leagueFixtures.first?.leagueLogoURL ?? league.logoURL,
                 leagueId: league.id,
                 fixtures: leagueFixtures
             ))

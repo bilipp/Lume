@@ -172,10 +172,13 @@ import SwiftUI
 
         // MARK: - Lifecycle
 
+        /// Loads the cached snapshots, then fetches any followed league that has
+        /// none (see `PhoneSportsHomeRail.warm`).
         private func warm() {
             guard premium.isPremium else { return }
             store.loadCached(leagueIds: displayLeagueIds)
             SportsSyncService.shared.syncIfDue()
+            SportsSyncService.shared.refreshMissing()
         }
 
         private var resolveKey: String {

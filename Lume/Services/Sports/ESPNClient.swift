@@ -172,28 +172,29 @@ nonisolated extension ESPNClient {
     /// "NASCAR-PREMIER") only fill a blank.
     static func mapScoreboard(_ scoreboard: ESPNScoreboard, league: SportsLeague) -> [SportsFixture] {
         let info = scoreboard.leagues?.first
-        let leagueName = league.name.isEmpty ? (info?.name ?? "") : league.name
-        let leagueAbbreviation = league.abbreviation.isEmpty ? (info?.abbreviation ?? "") : league.abbreviation
-        let isRacing = league.sport == "racing"
-
-        return (scoreboard.events ?? []).compactMap { event in
-            mapEvent(
-                event,
-                league: league,
-                leagueName: leagueName,
-                leagueAbbreviation: leagueAbbreviation,
-                isRacing: isRacing
-            )
-        }
+        let context = ScoreboardContext(
+            league: league,
+            leagueName: league.name.isEmpty ? (info?.name ?? "") : league.name,
+            leagueAbbreviation: league.abbreviation.isEmpty ? (info?.abbreviation ?? "") : league.abbreviation,
+            leagueLogoURL: logo(info?.logos, dark: false),
+            isRacing: league.sport == "racing"
+        )
+        return (scoreboard.events ?? []).compactMap { mapEvent($0, context: context) }
     }
 
-    private static func mapEvent(
-        _ event: ESPNEvent,
-        league: SportsLeague,
-        leagueName: String,
-        leagueAbbreviation: String,
-        isRacing: Bool
-    ) -> SportsFixture? {
+    /// What every event of one scoreboard response shares: the competition's
+    /// labels and crest, and whether its events are race weekends.
+    private struct ScoreboardContext {
+        let league: SportsLeague
+        let leagueName: String
+        let leagueAbbreviation: String
+        let leagueLogoURL: URL?
+        let isRacing: Bool
+    }
+
+    private static func mapEvent(_ event: ESPNEvent, context: ScoreboardContext) -> SportsFixture? {
+        let league = context.league
+        let isRacing = context.isRacing
         guard let id = event.id else { return nil }
         let competition = event.competitions?.first
         let startDate = parseDate(event.date) ?? competition.flatMap { parseDate($0.date) } ?? Date.distantPast
@@ -228,8 +229,8 @@ nonisolated extension ESPNClient {
         return SportsFixture(
             id: id,
             leagueId: league.id,
-            leagueName: leagueName,
-            leagueAbbreviation: leagueAbbreviation,
+            leagueName: context.leagueName,
+            leagueAbbreviation: context.leagueAbbreviation,
             startDate: startDate,
             status: status,
             home: home,
@@ -238,7 +239,8 @@ nonisolated extension ESPNClient {
             broadcasters: broadcasters,
             sessions: sessions,
             name: nonEmpty(event.name),
-            shortName: nonEmpty(event.shortName)
+            shortName: nonEmpty(event.shortName),
+            leagueLogoURL: context.leagueLogoURL
         )
     }
 

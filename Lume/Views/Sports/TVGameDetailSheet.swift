@@ -135,14 +135,24 @@
 
         private var eventHeader: some View {
             VStack(spacing: 16) {
-                Text(verbatim: fixture.eventTitle)
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                if let subtitle = fixture.eventSubtitle {
-                    Text(verbatim: subtitle)
+                if let kind = fixture.sessionKind {
+                    Text(kind.displayName)
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(verbatim: fixture.eventTitle)
                         .font(.system(size: 28))
                         .foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text(verbatim: fixture.eventTitle)
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    if let subtitle = fixture.eventSubtitle {
+                        Text(verbatim: subtitle)
+                            .font(.system(size: 28))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
                 }
                 if fixture.sessions.isEmpty || fixture.status.state != .scheduled {
                     centerStatus
@@ -157,10 +167,11 @@
         private var sessionList: some View {
             VStack(spacing: 6) {
                 ForEach(Array(fixture.sessions.enumerated()), id: \.offset) { _, session in
+                    let isCurrent = session.kind == fixture.sessionKind
                     HStack {
                         Text(session.kind.displayName)
-                            .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 28, weight: isCurrent ? .bold : .medium))
+                            .foregroundStyle(isCurrent ? .white : .white.opacity(0.85))
                         Spacer()
                         Text(session.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
                             .font(.system(size: 26))
@@ -447,7 +458,7 @@
         // MARK: - Derived
 
         private var leagueLogoURL: URL? {
-            SportsCatalog.league(id: fixture.leagueId)?.logoURL
+            fixture.leagueLogoURL ?? SportsCatalog.league(id: fixture.leagueId)?.logoURL
         }
     }
 #endif

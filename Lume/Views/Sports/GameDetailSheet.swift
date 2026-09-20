@@ -128,15 +128,26 @@ struct GameDetailSheet: View {
         }
     }
 
+    /// A session card is titled by its session, with the Grand Prix beneath; a
+    /// whole weekend or a fight night is titled by its name, with the venue.
     private var eventHeader: some View {
         VStack(spacing: 12) {
-            Text(verbatim: fixture.eventTitle)
-                .font(.title3.weight(.bold))
-                .multilineTextAlignment(.center)
-            if let subtitle = fixture.eventSubtitle {
-                Text(verbatim: subtitle)
+            if let kind = fixture.sessionKind {
+                Text(kind.displayName)
+                    .font(.title3.weight(.bold))
+                Text(verbatim: fixture.eventTitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                Text(verbatim: fixture.eventTitle)
+                    .font(.title3.weight(.bold))
+                    .multilineTextAlignment(.center)
+                if let subtitle = fixture.eventSubtitle {
+                    Text(verbatim: subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
             if fixture.sessions.isEmpty || fixture.status.state != .scheduled {
                 centerStatus
@@ -152,10 +163,12 @@ struct GameDetailSheet: View {
     private var sessionList: some View {
         VStack(spacing: 0) {
             ForEach(Array(fixture.sessions.enumerated()), id: \.offset) { index, session in
+                let isCurrent = session.kind == fixture.sessionKind
                 if index > 0 { Divider().opacity(0.35) }
                 HStack {
                     Text(session.kind.displayName)
-                        .font(.subheadline.weight(.medium))
+                        .font(.subheadline.weight(isCurrent ? .bold : .medium))
+                        .foregroundStyle(isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     Spacer()
                     Text(session.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
                         .font(.subheadline)
@@ -386,7 +399,7 @@ struct GameDetailSheet: View {
     // MARK: - Derived
 
     private var leagueLogoURL: URL? {
-        SportsCatalog.league(id: fixture.leagueId)?.logoURL
+        fixture.leagueLogoURL ?? SportsCatalog.league(id: fixture.leagueId)?.logoURL
     }
 }
 

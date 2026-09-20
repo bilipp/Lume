@@ -228,6 +228,9 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
     /// `expandedBySession`); `nil` on the weekend itself and on every other
     /// fixture.
     let sessionKind: SportsSessionKind?
+    /// The competition's crest as the provider served it with this fixture — the
+    /// curated catalogue carries none, so this is where headers get theirs.
+    let leagueLogoURL: URL?
 
     init(
         id: String,
@@ -243,7 +246,8 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         sessions: [SportsSession] = [],
         name: String? = nil,
         shortName: String? = nil,
-        sessionKind: SportsSessionKind? = nil
+        sessionKind: SportsSessionKind? = nil,
+        leagueLogoURL: URL? = nil
     ) {
         self.id = id
         self.leagueId = leagueId
@@ -259,6 +263,7 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         self.name = name
         self.shortName = shortName
         self.sessionKind = sessionKind
+        self.leagueLogoURL = leagueLogoURL
     }
 }
 
@@ -288,7 +293,8 @@ nonisolated extension SportsFixture {
                 sessions: sessions,
                 name: name,
                 shortName: shortName,
-                sessionKind: session.kind
+                sessionKind: session.kind,
+                leagueLogoURL: leagueLogoURL
             )
         }
     }

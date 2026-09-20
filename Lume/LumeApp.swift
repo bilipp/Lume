@@ -290,6 +290,11 @@ struct LumeApp: App {
                     SportsFollowService.shared.configure(container: cloudContainer, profileManager: profileManager)
                     SportsSyncService.shared.configure(followSource: SportsFollowService.shared)
                     SportsSyncService.shared.syncIfDue()
+                    // Loads the cached snapshots and fetches any followed league
+                    // that has none, so the Home rail has data on first render even
+                    // after the system purged Caches/ — a hidden rail never appears
+                    // and so could never warm itself.
+                    SportsSyncService.shared.refreshMissing()
                 }
                 .onChange(of: cloudSync.status.lastReconcile) {
                     // A reconcile may have pulled a PIN this device didn't have

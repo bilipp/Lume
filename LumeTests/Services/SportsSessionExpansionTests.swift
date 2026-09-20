@@ -30,7 +30,8 @@ struct SportsSessionExpansionTests {
                 SportsSession(kind: .race, date: fp1.addingTimeInterval(50 * 3600))
             ],
             name: "Azerbaijan Grand Prix",
-            shortName: "Azerbaijan GP"
+            shortName: "Azerbaijan GP",
+            leagueLogoURL: URL(string: "https://a.espncdn.com/i/teamlogos/leagues/500/f1.png")
         )
     }
 
@@ -42,6 +43,7 @@ struct SportsSessionExpansionTests {
         #expect(Set(cards.map(\.id)).count == 5)
         #expect(cards.allSatisfy { $0.eventId == "600" })
         #expect(cards.allSatisfy { $0.name == "Azerbaijan Grand Prix" && $0.sessions.count == 5 })
+        #expect(cards.allSatisfy { $0.leagueLogoURL == weekend().leagueLogoURL })
         #expect(cards.allSatisfy { $0.headlineDate == $0.startDate && !$0.headlineIsOnAnotherDay })
     }
 

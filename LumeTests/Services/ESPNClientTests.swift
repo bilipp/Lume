@@ -47,7 +47,9 @@ struct ESPNClientTests {
 
     private static let bundesligaScoreboardJSON = """
     {
-      "leagues": [{"name": "German Bundesliga", "abbreviation": "GER", "slug": "ger.1"}],
+      "leagues": [{"name": "German Bundesliga", "abbreviation": "GER", "slug": "ger.1",
+        "logos": [{"href": "https://a.espncdn.com/i/leaguelogos/soccer/500/10.png", "rel": ["full", "default"]},
+                  {"href": "https://a.espncdn.com/i/leaguelogos/soccer/500-dark/10.png", "rel": ["full", "dark"]}]}],
       "events": [{
         "id": "401773",
         "date": "2026-09-18T18:30Z",
@@ -85,9 +87,11 @@ struct ESPNClientTests {
         #expect(fixtures.count == 1)
         let fixture = try #require(fixtures.first)
         #expect(fixture.id == "401773")
-        // The catalogue's curated labels win over the response's own.
+        // The catalogue's curated labels win over the response's own; the crest
+        // only the response knows rides along.
         #expect(fixture.leagueName == "Bundesliga")
         #expect(fixture.leagueAbbreviation == "BUND")
+        #expect(fixture.leagueLogoURL?.absoluteString == "https://a.espncdn.com/i/leaguelogos/soccer/500/10.png")
         #expect(fixture.status.state == .inProgress)
         #expect(fixture.status.detail == "45'")
         #expect(fixture.venue == "Allianz Arena")
