@@ -144,8 +144,38 @@
                         .font(.system(size: 28))
                         .foregroundStyle(.white.opacity(0.7))
                 }
-                centerStatus
+                if fixture.sessions.isEmpty || fixture.status.state != .scheduled {
+                    centerStatus
+                }
+                if !fixture.sessions.isEmpty {
+                    sessionList
+                }
             }
+        }
+
+        /// A race weekend's timetable: every session with its day and time.
+        private var sessionList: some View {
+            VStack(spacing: 6) {
+                ForEach(Array(fixture.sessions.enumerated()), id: \.offset) { _, session in
+                    HStack {
+                        Text(session.kind.displayName)
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Text(session.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
+                            .font(.system(size: 26))
+                            .foregroundStyle(.white.opacity(0.6))
+                        Text(session.date, format: .dateTime.hour().minute())
+                            .font(.system(size: 28, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 110, alignment: .trailing)
+                    }
+                    .tvFocusRow()
+                }
+            }
+            .frame(maxWidth: 900)
+            .padding(.top, 8)
         }
 
         private func teamColumn(_ competitor: SportsCompetitor) -> some View {

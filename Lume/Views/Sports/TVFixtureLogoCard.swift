@@ -42,7 +42,9 @@
             let score = String(localized: "\(home?.score ?? 0) to \(away?.score ?? 0)")
             switch status.state {
             case .scheduled:
-                parts.append(startDate.formatted(date: .omitted, time: .shortened))
+                parts.append(headlineDate.formatted(
+                    date: headlineIsOnAnotherDay ? .abbreviated : .omitted, time: .shortened
+                ))
             case .inProgress:
                 parts.append(String(localized: "Live"))
                 if hasTeams { parts.append(score) }
@@ -138,10 +140,15 @@
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                Text(fixture.startDate, format: .dateTime.hour().minute())
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.8))
+                Text(
+                    fixture.headlineDate,
+                    format: fixture.headlineIsOnAnotherDay
+                        ? .dateTime.weekday(.abbreviated).hour().minute()
+                        : .dateTime.hour().minute()
+                )
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.8))
             }
             .frame(maxHeight: .infinity)
         }

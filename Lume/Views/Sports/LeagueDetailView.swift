@@ -147,7 +147,7 @@ struct LeagueDetailView: View {
                 sessionRow(name: fixture.leagueAbbreviation, date: fixture.startDate)
             } else {
                 ForEach(Array(fixture.sessions.enumerated()), id: \.offset) { _, session in
-                    sessionRow(name: session.kind.rawValue, date: session.date)
+                    sessionRow(name: String(localized: session.kind.displayName), date: session.date)
                 }
             }
         }
@@ -161,7 +161,7 @@ struct LeagueDetailView: View {
             Text(verbatim: name)
                 .font(.subheadline.weight(.medium))
             Spacer()
-            Text(date, format: .dateTime.weekday(.abbreviated).hour().minute())
+            Text(date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute())
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()

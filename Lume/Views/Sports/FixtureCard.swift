@@ -92,7 +92,12 @@ struct FixtureCard: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.secondary)
             case .scheduled:
-                Text(fixture.startDate, format: .dateTime.hour().minute())
+                if fixture.headlineIsOnAnotherDay {
+                    Text(fixture.headlineDate, format: .dateTime.weekday(.abbreviated))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                Text(fixture.headlineDate, format: .dateTime.hour().minute())
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
             }
@@ -213,7 +218,9 @@ struct FixtureCard: View {
         }
         switch fixture.status.state {
         case .scheduled:
-            parts.append(fixture.startDate.formatted(date: .omitted, time: .shortened))
+            parts.append(fixture.headlineDate.formatted(
+                date: fixture.headlineIsOnAnotherDay ? .abbreviated : .omitted, time: .shortened
+            ))
         case .inProgress:
             parts.append(String(localized: "Live"))
             if fixture.hasTeams { parts.append(scoreSpokenLine) }

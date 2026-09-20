@@ -174,12 +174,29 @@ nonisolated struct SportsCompetitor: Codable, Hashable {
 }
 
 /// A weekend session for a race sport (F1): FP1/FP2/FP3/Qual/Race and its time.
+/// A race weekend's sessions, keyed by ESPN's competition type abbreviations.
+/// Sprint weekends replace FP2/FP3 with `SS` (sprint qualifying) and `SR`
+/// (the sprint itself).
 nonisolated enum SportsSessionKind: String, Codable, Hashable {
     case fp1 = "FP1"
     case fp2 = "FP2"
     case fp3 = "FP3"
+    case sprintQualifying = "SS"
+    case sprint = "SR"
     case qualifying = "Qual"
     case race = "Race"
+
+    var displayName: LocalizedStringResource {
+        switch self {
+        case .fp1: "Free Practice 1"
+        case .fp2: "Free Practice 2"
+        case .fp3: "Free Practice 3"
+        case .sprintQualifying: "Sprint Qualifying"
+        case .sprint: "Sprint"
+        case .qualifying: "Qualifying"
+        case .race: "Race"
+        }
+    }
 }
 
 nonisolated struct SportsSession: Codable, Hashable {
@@ -262,6 +279,24 @@ nonisolated extension SportsFixture {
     var eventSubtitle: String? {
         guard let venue, name != nil else { return nil }
         return venue
+    }
+
+    /// The weekend's main event — the race — when the provider listed sessions.
+    var raceSession: SportsSession? {
+        sessions.first { $0.kind == .race } ?? sessions.last
+    }
+
+    /// The moment a card headlines: the race for a weekend with sessions
+    /// (`startDate` is the first practice, which is not what anyone tunes in
+    /// for), else the fixture's own start.
+    var headlineDate: Date {
+        raceSession?.date ?? startDate
+    }
+
+    /// Whether the headline falls on a different day than the fixture's start,
+    /// so a card must name the day next to the time.
+    var headlineIsOnAnotherDay: Bool {
+        !Calendar.current.isDate(headlineDate, inSameDayAs: startDate)
     }
 }
 

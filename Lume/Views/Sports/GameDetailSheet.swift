@@ -138,8 +138,41 @@ struct GameDetailSheet: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            centerStatus
+            if fixture.sessions.isEmpty || fixture.status.state != .scheduled {
+                centerStatus
+            }
+            if !fixture.sessions.isEmpty {
+                sessionList
+            }
         }
+    }
+
+    /// A race weekend's timetable — every session with its day and time, in
+    /// place of the single first-practice start the fixture date would show.
+    private var sessionList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(fixture.sessions.enumerated()), id: \.offset) { index, session in
+                if index > 0 { Divider().opacity(0.35) }
+                HStack {
+                    Text(session.kind.displayName)
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text(session.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(session.date, format: .dateTime.hour().minute())
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .frame(minWidth: 52, alignment: .trailing)
+                }
+                .padding(.vertical, 8)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
+        .glassEffectCompat(.regular, in: RoundedRectangle(cornerRadius: 16))
+        .padding(.top, 4)
     }
 
     private func teamColumn(_ competitor: SportsCompetitor) -> some View {
