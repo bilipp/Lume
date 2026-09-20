@@ -114,6 +114,7 @@ struct LeagueDetailView: View {
             fixture: fixture,
             resolved: resolved[fixture.id] ?? [],
             isFollowed: { follows.isFollowing($0.id) },
+            showsLeagueMark: false,
             onOpenDetail: { selectedFixture = fixture },
             onWatch: watch,
             onFollowToggle: toggleFollow,

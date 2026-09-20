@@ -15,11 +15,14 @@
 
     struct TVFixtureLogoCard: View {
         let fixture: SportsFixture
+        /// Off inside a rail that is already one competition, where the crest
+        /// would only repeat the rail's heading.
+        var showsLeagueMark = true
         var onSelect: () -> Void
 
         var body: some View {
             Button(action: onSelect) {
-                TVFixtureLogoCardContent(fixture: fixture)
+                TVFixtureLogoCardContent(fixture: fixture, showsLeagueMark: showsLeagueMark)
             }
             .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
             .accessibilityElement(children: .ignore)
@@ -63,6 +66,7 @@
 
     private struct TVFixtureLogoCardContent: View {
         let fixture: SportsFixture
+        let showsLeagueMark: Bool
         @Environment(\.isFocused) private var isFocused
 
         /// The header line pins to the top on every card so a row of mixed team
@@ -98,29 +102,36 @@
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
 
-        /// The competition's crest and abbreviation, then the status at the
+        /// The competition's crest (its abbreviation only when no crest is
+        /// known; nothing in a single-league rail), then the status at the
         /// trailing edge.
         private var topLine: some View {
             HStack(spacing: 8) {
-                if let logo = fixture.leagueLogoURL {
+                if !showsLeagueMark {
+                    EmptyView()
+                } else if let logo = fixture.leagueLogoURL ?? SportsCatalog.league(id: fixture.leagueId)?.logoURL {
                     LeagueCrest(url: logo, size: 26)
+                } else {
+                    Text(verbatim: fixture.leagueAbbreviation)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
                 }
-                Text(verbatim: fixture.leagueAbbreviation)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.6))
-                    .lineLimit(1)
                 Spacer(minLength: 8)
                 switch fixture.status.state {
                 case .inProgress:
                     LiveBadge(fontSize: 17)
                 case .final:
-                    Text("FT").font(.callout.weight(.bold)).foregroundStyle(.white.opacity(0.8))
+                    EndedBadge(fontSize: 17)
                 case .postponed:
                     Text("PP").font(.callout.weight(.bold)).foregroundStyle(.white.opacity(0.7))
                 case .scheduled:
                     EmptyView()
                 }
             }
+            // A scheduled card in a single-league rail has nothing on this line;
+            // hold its height so the crests stay level with the neighbours'.
+            .frame(minHeight: 26)
         }
 
         /// Kickoff time before the game; the score once it is live or over.

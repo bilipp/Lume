@@ -88,9 +88,12 @@ struct SportsHubGrouping {
         }
         // Within a section `SportsFixture.displayOrder` already puts live games
         // first, upcoming next and finished last.
-        if scopeIsLeague {
+        if case let .league(leagueId) = scope {
+            // The header carries the crest the cards drop, same as a league
+            // cluster under My Teams; no chevron, since the hub is already scoped.
+            let logoURL = fixtures.first?.leagueLogoURL ?? SportsCatalog.league(id: leagueId)?.logoURL
             return fixtures.isEmpty ? [] : [SportsFixtureGroup(
-                id: "all", title: scopeTitle, logoURL: nil, leagueId: nil, fixtures: fixtures
+                id: "all", title: scopeTitle, logoURL: logoURL, leagueId: nil, fixtures: fixtures, isSingleLeague: true
             )]
         }
         return byMyTeamsAndLeague(fixtures)
@@ -117,7 +120,8 @@ struct SportsHubGrouping {
                 title: league.name,
                 logoURL: leagueFixtures.first?.leagueLogoURL ?? league.logoURL,
                 leagueId: league.id,
-                fixtures: leagueFixtures
+                fixtures: leagueFixtures,
+                isSingleLeague: true
             ))
         }
         return groups

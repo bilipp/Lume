@@ -20,6 +20,10 @@ struct SportsFixtureGroup: Identifiable {
     /// Non-nil for a league group — the chevron scopes the hub to this league.
     let leagueId: String?
     let fixtures: [SportsFixture]
+    /// True when every card in the group belongs to one competition the header
+    /// already names, so the cards drop their own league crest as noise. The
+    /// "My Teams" band and the Upcoming days mix leagues and keep it.
+    var isSingleLeague = false
 
     /// Groups fixtures by calendar day, newest header first, for the Upcoming
     /// list. Each group's title is Today / Tomorrow / a "weekday, d MMM" line.
@@ -76,15 +80,16 @@ struct SportsSectionsView: View {
     private func section(for group: SportsFixtureGroup) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             header(for: group)
-            ForEach(group.fixtures) { card(for: $0) }
+            ForEach(group.fixtures) { card(for: $0, in: group) }
         }
     }
 
-    private func card(for fixture: SportsFixture) -> some View {
+    private func card(for fixture: SportsFixture, in group: SportsFixtureGroup) -> some View {
         FixtureCard(
             fixture: fixture,
             resolved: resolved[fixture.id] ?? [],
             isFollowed: isFollowed,
+            showsLeagueMark: !group.isSingleLeague,
             onOpenDetail: { onOpenDetail(fixture) },
             onWatch: onWatch,
             onFollowToggle: onFollowToggle,

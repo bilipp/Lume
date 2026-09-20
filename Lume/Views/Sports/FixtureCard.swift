@@ -4,7 +4,7 @@
 //
 //  One fixture in the Sports Hub: a rounded glass card washed with a subtle
 //  diagonal home→away team-colour gradient. Left column is the kickoff time
-//  (or LIVE / FT) and the competition abbreviation; the middle stacks the two
+//  (or LIVE / FT) and the competition crest; the middle stacks the two
 //  teams (crest + name, the followed one starred, the winner bold and the loser
 //  dimmed); the right shows the score once there is one. A live fixture with a
 //  single confident channel gets a one-tap play glyph; every card taps through
@@ -18,6 +18,10 @@ struct FixtureCard: View {
     let fixture: SportsFixture
     let resolved: [ResolvedChannel]
     let isFollowed: (SportsTeam) -> Bool
+    /// Off inside a section that is already one competition (a league group on
+    /// Today, a league-scoped hub, a league's own screen), where the crest
+    /// would only repeat the header.
+    var showsLeagueMark = true
     var onOpenDetail: () -> Void
     var onWatch: (ResolvedChannel) -> Void
     var onFollowToggle: (SportsTeam) -> Void
@@ -84,7 +88,7 @@ struct FixtureCard: View {
                         .foregroundStyle(.secondary)
                 }
             case .final:
-                Text("FT").font(.caption.weight(.bold))
+                EndedBadge(fontSize: 10)
             case .postponed:
                 Text(fixture.status.shortDetail.isEmpty ? "PP" : fixture.status.shortDetail)
                     .font(.caption2.weight(.bold))
@@ -99,6 +103,21 @@ struct FixtureCard: View {
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
             }
+            if showsLeagueMark {
+                leagueMark
+            }
+        }
+    }
+
+    /// The competition's crest; its abbreviation only when no crest is known.
+    /// This is the card's one league mark — the event row draws none — so a
+    /// Formula 1 session never shows the same logo twice.
+    @ViewBuilder
+    private var leagueMark: some View {
+        if let logo = fixture.leagueLogoURL ?? SportsCatalog.league(id: fixture.leagueId)?.logoURL {
+            LeagueCrest(url: logo, size: 18)
+                .padding(.top, 2)
+        } else {
             Text(fixture.leagueAbbreviation)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -140,9 +159,6 @@ struct FixtureCard: View {
     /// Grand Prix; a fight night or a race weekend shows its name over its venue.
     private var eventRow: some View {
         HStack(spacing: 12) {
-            if let logo = fixture.leagueLogoURL {
-                LeagueCrest(url: logo, size: 36)
-            }
             VStack(alignment: .leading, spacing: 2) {
                 if let kind = fixture.sessionKind {
                     Text(kind.displayName)

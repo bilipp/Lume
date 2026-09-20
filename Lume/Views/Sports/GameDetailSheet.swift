@@ -101,11 +101,6 @@ struct GameDetailSheet: View {
             }
             Text(verbatim: fixture.leagueName)
                 .font(.subheadline.weight(.semibold))
-            if fixture.status.state != .scheduled, !fixture.status.displayDetail.isEmpty {
-                Text(verbatim: "· \(fixture.status.displayDetail)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
         }
         .frame(maxWidth: .infinity)
         .multilineTextAlignment(.center)
@@ -214,22 +209,18 @@ struct GameDetailSheet: View {
     private var centerStatus: some View {
         switch fixture.status.state {
         case .final:
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 scoreText
-                Text("Final")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                EndedBadge(fontSize: 12)
             }
         case .inProgress:
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 scoreText
-                HStack(spacing: 8) {
-                    LiveBadge(fontSize: 12)
-                    if !fixture.status.shortDetail.isEmpty {
-                        Text(verbatim: fixture.status.shortDetail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                LiveBadge(fontSize: 12)
+                if !fixture.status.shortDetail.isEmpty {
+                    Text(verbatim: fixture.status.shortDetail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         case .scheduled, .postponed:
@@ -240,13 +231,18 @@ struct GameDetailSheet: View {
     }
 
     /// The two-sided score; a race or fight night has none, so its header keeps
-    /// just the status line.
+    /// just the status line. It claims its width before the team columns do —
+    /// an HStack otherwise hands it a third of the row and a high-scoring game
+    /// truncates to "19…" — and shrinks rather than clips if even that is tight.
     @ViewBuilder
     private var scoreText: some View {
         if fixture.hasTeams {
             Text(verbatim: "\(fixture.home?.score ?? 0) – \(fixture.away?.score ?? 0)")
                 .font(.system(size: 44, weight: .bold, design: .rounded))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .layoutPriority(1)
         }
     }
 

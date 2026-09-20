@@ -172,10 +172,10 @@
                 TVSportsTitleChrome {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         Text(verbatim: scopeTitle)
-                            .font(.system(size: 44, weight: .bold))
+                            .font(.system(size: 34, weight: .bold))
                             .lineLimit(1)
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 22, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.white.opacity(0.55))
                     }
                 }
@@ -200,9 +200,11 @@
 
         // MARK: - Sections
 
+        /// The heading matches `HomeRow`'s — subheadline, bold, secondary — so
+        /// the hub's rails read like every other rail on the tvOS Home.
         private func section(for group: SportsFixtureGroup) -> some View {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
                     if let logoURL = group.logoURL {
                         CachedAsyncImage(url: logoURL, maxPixelSize: 40) { phase in
                             if case let .success(image) = phase {
@@ -211,20 +213,23 @@
                                 Color.clear
                             }
                         }
-                        .frame(width: 28, height: 28)
+                        .frame(width: 22, height: 22)
                         .accessibilityHidden(true)
                     }
                     Text(verbatim: group.title)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(.white)
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 60)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 24) {
                         ForEach(group.fixtures) { fixture in
-                            TVFixtureLogoCard(fixture: fixture) { selectedFixture = fixture }
-                                .focused($focus, equals: .card(fixture.id))
+                            TVFixtureLogoCard(fixture: fixture, showsLeagueMark: !group.isSingleLeague) {
+                                selectedFixture = fixture
+                            }
+                            .focused($focus, equals: .card(fixture.id))
                         }
                     }
                     .padding(.horizontal, 60)

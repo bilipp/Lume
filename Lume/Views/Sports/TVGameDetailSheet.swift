@@ -109,11 +109,6 @@
                 Text(verbatim: fixture.leagueName)
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
-                if fixture.status.state != .scheduled, !fixture.status.displayDetail.isEmpty {
-                    Text(verbatim: "· \(fixture.status.displayDetail)")
-                        .font(.system(size: 26))
-                        .foregroundStyle(.white.opacity(0.55))
-                }
             }
         }
 
@@ -217,21 +212,17 @@
         private var centerStatus: some View {
             switch fixture.status.state {
             case .final:
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     scoreText
-                    Text("Final")
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.6))
+                    EndedBadge(fontSize: 22)
                 }
             case .inProgress:
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     scoreText
-                    HStack(spacing: 12) {
-                        LiveBadge(fontSize: 22)
-                        if !fixture.status.shortDetail.isEmpty {
-                            Text(verbatim: fixture.status.shortDetail)
-                                .font(.system(size: 26)).foregroundStyle(.white.opacity(0.7))
-                        }
+                    LiveBadge(fontSize: 22)
+                    if !fixture.status.shortDetail.isEmpty {
+                        Text(verbatim: fixture.status.shortDetail)
+                            .font(.system(size: 26)).foregroundStyle(.white.opacity(0.7))
                     }
                 }
             case .scheduled, .postponed:
@@ -249,6 +240,9 @@
                     .font(.system(size: 80, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .layoutPriority(1)
             }
         }
 
