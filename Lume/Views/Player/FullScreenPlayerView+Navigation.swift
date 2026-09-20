@@ -131,7 +131,7 @@ extension FullScreenPlayerView {
             let completion = await writer.markWatched(ref: ref, duration: total)
             WatchProgressBuffer.remove(ref: ref)
             if let completion {
-                syncTraktWatched(ref: completion.ref)
+                syncWatchedServices(ref: completion.ref)
                 AppStoreReviewPrompt.shared.noteCompletedTitle()
             }
         }

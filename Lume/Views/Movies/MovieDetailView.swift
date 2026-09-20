@@ -404,6 +404,7 @@ struct MovieDetailView: View {
             #endif
         }
         TraktService.shared.syncWatched(movie: movie, watched: movie.isWatched)
+        SimklService.shared.syncWatched(movie: movie, watched: movie.isWatched)
     }
 }
 

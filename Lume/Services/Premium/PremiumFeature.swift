@@ -15,6 +15,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     case downloads
     case multipleProfiles
     case trakt
+    case simkl
     case playbackControls
     case recommendations
     case multiView
@@ -29,6 +30,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .downloads: "Offline Downloads"
         case .multipleProfiles: "Multiple Profiles"
         case .trakt: "Trakt Integration"
+        case .simkl: "Simkl Integration"
         case .playbackControls: "Smart Playback"
         case .recommendations: "For You Recommendations"
         case .multiView: "Multi-View"
@@ -41,6 +43,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .downloads: "Save movies and episodes to watch offline, anywhere."
         case .multipleProfiles: "Give everyone their own watch history, progress and favorites."
         case .trakt: "Scrobble what you watch and surface your Trakt watchlist on Home."
+        case .simkl: "Scrobble what you watch to Simkl and import your Simkl history."
         case .playbackControls: "Autoplay the next episode, skip intros, and jump ahead with one tap."
         case .recommendations: "Get an on-device \"For You\" row tuned to your taste from your library and what you watch."
         case .multiView: "Watch up to four live channels side by side — across playlists, so a single-connection provider is no obstacle."
@@ -53,6 +56,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .downloads: "arrow.down.circle"
         case .multipleProfiles: "person.2.crop.square.stack"
         case .trakt: "rectangle.stack.badge.play"
+        case .simkl: "rectangle.stack.badge.checkmark"
         case .playbackControls: "forward.end.alt"
         case .recommendations: "sparkles"
         case .multiView: "rectangle.split.2x2"
