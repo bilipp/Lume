@@ -226,8 +226,8 @@
             case .inProgress:
                 VStack(spacing: 8) {
                     scoreText
-                    HStack(spacing: 8) {
-                        Text("LIVE").font(.system(size: 26, weight: .heavy)).foregroundStyle(.red)
+                    HStack(spacing: 12) {
+                        LiveBadge(fontSize: 22)
                         if !fixture.status.shortDetail.isEmpty {
                             Text(verbatim: fixture.status.shortDetail)
                                 .font(.system(size: 26)).foregroundStyle(.white.opacity(0.7))

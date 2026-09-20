@@ -98,8 +98,13 @@
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
 
+        /// The competition's crest and abbreviation, then the status at the
+        /// trailing edge.
         private var topLine: some View {
-            HStack {
+            HStack(spacing: 8) {
+                if let logo = fixture.leagueLogoURL {
+                    LeagueCrest(url: logo, size: 26)
+                }
                 Text(verbatim: fixture.leagueAbbreviation)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.6))
@@ -107,7 +112,7 @@
                 Spacer(minLength: 8)
                 switch fixture.status.state {
                 case .inProgress:
-                    Text("LIVE").font(.callout.weight(.heavy)).foregroundStyle(.red)
+                    LiveBadge(fontSize: 17)
                 case .final:
                     Text("FT").font(.callout.weight(.bold)).foregroundStyle(.white.opacity(0.8))
                 case .postponed:

@@ -223,10 +223,8 @@ struct GameDetailSheet: View {
         case .inProgress:
             VStack(spacing: 4) {
                 scoreText
-                HStack(spacing: 4) {
-                    Text("LIVE")
-                        .font(.caption.weight(.heavy))
-                        .foregroundStyle(.red)
+                HStack(spacing: 8) {
+                    LiveBadge(fontSize: 12)
                     if !fixture.status.shortDetail.isEmpty {
                         Text(verbatim: fixture.status.shortDetail)
                             .font(.caption)

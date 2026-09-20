@@ -77,9 +77,7 @@ struct FixtureCard: View {
         VStack(spacing: 4) {
             switch fixture.status.state {
             case .inProgress:
-                Text("LIVE")
-                    .font(.caption2.weight(.heavy))
-                    .foregroundStyle(.red)
+                LiveBadge(fontSize: 10)
                 if !fixture.status.shortDetail.isEmpty {
                     Text(fixture.status.shortDetail)
                         .font(.caption2)
@@ -141,18 +139,23 @@ struct FixtureCard: View {
     /// A competitor-less event: a session card shows the session over the
     /// Grand Prix; a fight night or a race weekend shows its name over its venue.
     private var eventRow: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if let kind = fixture.sessionKind {
-                Text(kind.displayName)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                Text(verbatim: fixture.eventTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            } else {
-                Text(verbatim: fixture.eventTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                if let subtitle = fixture.eventSubtitle {
-                    Text(verbatim: subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        HStack(spacing: 12) {
+            if let logo = fixture.leagueLogoURL {
+                LeagueCrest(url: logo, size: 36)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                if let kind = fixture.sessionKind {
+                    Text(kind.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Text(verbatim: fixture.eventTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                } else {
+                    Text(verbatim: fixture.eventTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    if let subtitle = fixture.eventSubtitle {
+                        Text(verbatim: subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
                 }
             }
         }
