@@ -315,7 +315,7 @@ struct SettingsView: View {
                         TraktIntegrationView()
                     } label: {
                         HStack {
-                            Label("Trakt", systemImage: "rectangle.stack.badge.play")
+                            Label("Trakt", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
                             Spacer()
                             if trakt.isConnected {
                                 Text(trakt.username.map { "@\($0)" } ?? "Connected")
@@ -331,7 +331,7 @@ struct SettingsView: View {
                         SimklIntegrationView()
                     } label: {
                         HStack {
-                            Label("Simkl", systemImage: "rectangle.stack.badge.checkmark")
+                            Label("Simkl", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
                             Spacer()
                             if simkl.isConnected {
                                 Text(simkl.username.map { "@\($0)" } ?? "Connected")
