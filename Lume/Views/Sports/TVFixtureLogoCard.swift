@@ -65,17 +65,22 @@
         let fixture: SportsFixture
         @Environment(\.isFocused) private var isFocused
 
+        /// The header line pins to the top on every card so a row of mixed team
+        /// and event cards lines up; the crests centre in the space below it.
         var body: some View {
-            VStack(spacing: 18) {
+            VStack(spacing: 0) {
                 topLine
                 if let home = fixture.home, let away = fixture.away {
+                    Spacer(minLength: 0)
                     HStack(spacing: 0) {
                         TeamCrest(team: home.team, size: 88).frame(maxWidth: .infinity)
                         centre.frame(width: 120)
                         TeamCrest(team: away.team, size: 88).frame(maxWidth: .infinity)
                     }
+                    Spacer(minLength: 0)
                 } else {
                     eventLine
+                        .padding(.top, 14)
                 }
             }
             .padding(.horizontal, 22)
@@ -132,38 +137,42 @@
             }
         }
 
-        /// Competitor-less events: a session card names the session over the
-        /// Grand Prix; a fight night or an unexpanded weekend shows its name; then
-        /// the time.
+        /// Competitor-less events, left-aligned so the card reads top-down: the
+        /// session (or the event's short name) as the title, the Grand Prix as a
+        /// quiet second line, then the time. Sizes are fixed rather than text
+        /// styles — tvOS's `title3` alone would spill a three-line stack out of a
+        /// 200pt card.
         private var eventLine: some View {
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 if let kind = fixture.sessionKind {
                     Text(kind.displayName)
-                        .font(.title3.weight(.semibold))
+                        .font(.system(size: 26, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                     Text(verbatim: fixture.eventShortTitle)
-                        .font(.callout)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white.opacity(0.65))
                         .lineLimit(1)
                 } else {
                     Text(verbatim: fixture.eventShortTitle)
-                        .font(.title3.weight(.semibold))
+                        .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(2)
-                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.85)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                Spacer(minLength: 0)
                 Text(
                     fixture.headlineDate,
                     format: fixture.headlineIsOnAnotherDay
                         ? .dateTime.weekday(.abbreviated).hour().minute()
                         : .dateTime.hour().minute()
                 )
-                .font(.title3.weight(.semibold))
+                .font(.system(size: 26, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(.white.opacity(0.85))
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 #endif
