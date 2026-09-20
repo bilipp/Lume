@@ -224,6 +224,10 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
     /// before the field existed.
     let name: String?
     let shortName: String?
+    /// Set on a card that stands for one session of a race weekend (see
+    /// `expandedBySession`); `nil` on the weekend itself and on every other
+    /// fixture.
+    let sessionKind: SportsSessionKind?
 
     init(
         id: String,
@@ -238,7 +242,8 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         broadcasters: [String] = [],
         sessions: [SportsSession] = [],
         name: String? = nil,
-        shortName: String? = nil
+        shortName: String? = nil,
+        sessionKind: SportsSessionKind? = nil
     ) {
         self.id = id
         self.leagueId = leagueId
@@ -253,10 +258,56 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         self.sessions = sessions
         self.name = name
         self.shortName = shortName
+        self.sessionKind = sessionKind
     }
 }
 
 nonisolated extension SportsFixture {
+    /// The provider's event id. A session card's `id` carries a "#Race"-style
+    /// suffix so the cards of one weekend stay distinct; detail fetches need the
+    /// bare id.
+    var eventId: String {
+        id.split(separator: "#", maxSplits: 1).first.map(String.init) ?? id
+    }
+
+    /// A race weekend as one card per session — each dated at its own start,
+    /// with a status read off the clock, since the provider's status covers the
+    /// whole weekend. Every other fixture passes through unchanged.
+    func expandedBySession(now: Date) -> [SportsFixture] {
+        guard sessions.count > 1 else { return [self] }
+        return sessions.map { session in
+            SportsFixture(
+                id: "\(id)#\(session.kind.rawValue)",
+                leagueId: leagueId,
+                leagueName: leagueName,
+                leagueAbbreviation: leagueAbbreviation,
+                startDate: session.date,
+                status: sessionStatus(session, now: now),
+                venue: venue,
+                broadcasters: broadcasters,
+                sessions: sessions,
+                name: name,
+                shortName: shortName,
+                sessionKind: session.kind
+            )
+        }
+    }
+
+    /// A finished or postponed weekend marks every session the same; otherwise
+    /// a session is live from its start until a generous running time has
+    /// passed, then finished.
+    private func sessionStatus(_ session: SportsSession, now: Date) -> SportsFixtureStatus {
+        switch status.state {
+        case .final, .postponed:
+            return SportsFixtureStatus(state: status.state)
+        case .scheduled, .inProgress:
+            let runningTime: TimeInterval = session.kind == .race ? 2.5 * 3600 : 1.25 * 3600
+            if now < session.date { return SportsFixtureStatus(state: .scheduled) }
+            if now < session.date.addingTimeInterval(runningTime) { return SportsFixtureStatus(state: .inProgress) }
+            return SportsFixtureStatus(state: .final)
+        }
+    }
+
     /// Whether the event is named by two teams (a match) rather than by itself
     /// (a race weekend, a fight night).
     var hasTeams: Bool {
@@ -286,11 +337,12 @@ nonisolated extension SportsFixture {
         sessions.first { $0.kind == .race } ?? sessions.last
     }
 
-    /// The moment a card headlines: the race for a weekend with sessions
-    /// (`startDate` is the first practice, which is not what anyone tunes in
-    /// for), else the fixture's own start.
+    /// The moment a card headlines: a session card's own start; the race for an
+    /// unexpanded weekend (`startDate` is the first practice, which is not what
+    /// anyone tunes in for); else the fixture's own start.
     var headlineDate: Date {
-        raceSession?.date ?? startDate
+        if sessionKind != nil { return startDate }
+        return raceSession?.date ?? startDate
     }
 
     /// Whether the headline falls on a different day than the fixture's start,

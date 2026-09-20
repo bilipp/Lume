@@ -42,7 +42,9 @@ enum SportsRailPlanner {
         for leagueId in displayLeagueIds(for: follows) {
             guard let snapshot = store.snapshot(for: leagueId) else { continue }
             let leagueFollowed = followedLeagueKeys.contains(leagueId)
-            for fixture in snapshot.fixtures where isInWindow(fixture, start: start, end: end) {
+            for fixture in snapshot.fixtures.flatMap({ $0.expandedBySession(now: now) })
+                where isInWindow(fixture, start: start, end: end)
+            {
                 if involvesFollowedTeam(fixture, followedTeamKeys: followedTeamKeys) {
                     if seen.insert(fixture.id).inserted { teamFixtures.append(fixture) }
                 } else if leagueFollowed {
@@ -83,7 +85,9 @@ enum SportsRailPlanner {
         for leagueId in displayLeagueIds(for: follows) {
             guard let snapshot = store.snapshot(for: leagueId) else { continue }
             let leagueFollowed = followedLeagueKeys.contains(leagueId)
-            for fixture in snapshot.fixtures where isInWindow(fixture, start: start, end: end) {
+            for fixture in snapshot.fixtures.flatMap({ $0.expandedBySession(now: now) })
+                where isInWindow(fixture, start: start, end: end)
+            {
                 if leagueFollowed || involvesFollowedTeam(fixture, followedTeamKeys: followedTeamKeys) {
                     return true
                 }

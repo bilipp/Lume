@@ -61,7 +61,11 @@ struct SportsHubGrouping {
         for leagueId in displayLeagueIds {
             guard let snapshot = store.snapshot(for: leagueId) else { continue }
             let leagueFollowed = scopeIsLeague || followedLeagueKeys.contains(leagueId)
-            for fixture in snapshot.fixtures where range.contains(fixture.startDate) {
+            // A race weekend becomes one card per session before the day filter,
+            // so Saturday's race shows under Saturday, not under Thursday's practice.
+            for fixture in snapshot.fixtures.flatMap({ $0.expandedBySession(now: now) })
+                where range.contains(fixture.startDate)
+            {
                 if leagueFollowed || involvesFollowedTeam(fixture) {
                     byID[fixture.id] = fixture
                 }

@@ -441,7 +441,7 @@
             if store.snapshot(for: fixture.leagueId)?.standings.isEmpty ?? true, fetchedStandings.isEmpty {
                 fetchedStandings = await (try? provider.standings(league: league)) ?? []
             }
-            eventDetail = try? await provider.eventDetail(league: league, eventId: fixture.id)
+            eventDetail = try? await provider.eventDetail(league: league, eventId: fixture.eventId)
         }
 
         // MARK: - Derived

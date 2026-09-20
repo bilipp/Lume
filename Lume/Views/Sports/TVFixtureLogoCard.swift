@@ -37,6 +37,7 @@
             if let home = home?.team, let away = away?.team {
                 parts.append(String(localized: "\(home.name) versus \(away.name)"))
             } else {
+                if let sessionKind { parts.append(String(localized: sessionKind.displayName)) }
                 parts.append(eventTitle)
             }
             let score = String(localized: "\(home?.score ?? 0) to \(away?.score ?? 0)")
@@ -131,15 +132,27 @@
             }
         }
 
-        /// Competitor-less events (a race weekend, a fight night): the event name
-        /// and its time.
+        /// Competitor-less events: a session card names the session over the
+        /// Grand Prix; a fight night or an unexpanded weekend shows its name; then
+        /// the time.
         private var eventLine: some View {
-            VStack(spacing: 10) {
-                Text(verbatim: fixture.eventShortTitle)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                if let kind = fixture.sessionKind {
+                    Text(kind.displayName)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text(verbatim: fixture.eventShortTitle)
+                        .font(.callout)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                } else {
+                    Text(verbatim: fixture.eventShortTitle)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
                 Text(
                     fixture.headlineDate,
                     format: fixture.headlineIsOnAnotherDay
