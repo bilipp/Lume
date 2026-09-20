@@ -164,7 +164,8 @@ struct FixtureCard: View {
 
     private var trailing: some View {
         HStack(spacing: 10) {
-            if fixture.status.state == .inProgress || fixture.status.state == .final {
+            // A race or a fight night has no two-sided score to show.
+            if fixture.hasTeams, fixture.status.state == .inProgress || fixture.status.state == .final {
                 VStack(alignment: .trailing, spacing: 8) {
                     Text(verbatim: "\(fixture.home?.score ?? 0)")
                         .fontWeight(rowWeight(fixture.home ?? SportsCompetitor(team: placeholderTeam)))
@@ -215,11 +216,11 @@ struct FixtureCard: View {
             parts.append(fixture.startDate.formatted(date: .omitted, time: .shortened))
         case .inProgress:
             parts.append(String(localized: "Live"))
-            parts.append(scoreSpokenLine)
+            if fixture.hasTeams { parts.append(scoreSpokenLine) }
             if !fixture.status.shortDetail.isEmpty { parts.append(fixture.status.shortDetail) }
         case .final:
             parts.append(String(localized: "Final"))
-            parts.append(scoreSpokenLine)
+            if fixture.hasTeams { parts.append(scoreSpokenLine) }
         case .postponed:
             parts.append(String(localized: "Postponed"))
         }

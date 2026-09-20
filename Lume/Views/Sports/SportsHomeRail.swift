@@ -248,16 +248,17 @@ struct SportsHomeRail: View {
             SportsSyncService.shared.syncIfDue()
         }
 
-        /// Re-runs when the fixture set changes or an EPG refresh finishes (fresh
-        /// sub-titles sharpen matching); folds in `isSyncBusy` so it retries once a
-        /// sync settles, and stays idle while locked or busy.
+        /// Re-runs when the fixture set changes or an EPG/catalog sync finishes
+        /// (fresh listings sharpen matching). It never waits for a sync to end: a
+        /// long playlist import used to leave every Home card without a channel
+        /// while the hub, which never waited, showed them.
         private func resolveKey(_ fixtures: [SportsFixture]) -> String {
-            guard premium.isPremium, !isSyncBusy else { return "idle" }
-            return fixtures.map(\.id).joined(separator: ",") + "|" + String(epg.isSyncing)
+            guard premium.isPremium else { return "idle" }
+            return fixtures.map(\.id).joined(separator: ",") + "|" + String(epg.isSyncing) + "|" + String(isSyncBusy)
         }
 
         private func runResolve(_ fixtures: [SportsFixture]) async {
-            guard premium.isPremium, !isSyncBusy else { return }
+            guard premium.isPremium else { return }
             guard !fixtures.isEmpty else {
                 resolved = [:]
                 return

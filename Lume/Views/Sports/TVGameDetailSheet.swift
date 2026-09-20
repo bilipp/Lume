@@ -22,21 +22,31 @@
 
 #if os(tvOS)
 
+    import SwiftData
     import SwiftUI
 
     struct TVGameDetailSheet: View {
         let fixture: SportsFixture
+        /// The presenter's resolved channels; when empty the sheet resolves this
+        /// one fixture itself (see `GameDetailSheet`).
         let resolved: [ResolvedChannel]
         var onWatch: (ResolvedChannel) -> Void
         var provider: any SportsDataProvider = ESPNClient.shared
 
         @Environment(\.dismiss) private var dismiss
+        @Environment(\.modelContext) private var modelContext
+        @Environment(\.contentRestriction) private var restriction
         @State private var follows = SportsFollowService.shared
         @State private var store = SportsStore.shared
         @State private var eventDetail: SportsEventDetail?
         @State private var isLoadingDetail = false
         @State private var fetchedStandings: [SportsStandingRow] = []
         @State private var tab: GameDetailTab = .timeline
+        @State private var selfResolved: [ResolvedChannel] = []
+
+        private var channels: [ResolvedChannel] {
+            resolved.isEmpty ? selfResolved : resolved
+        }
 
         var body: some View {
             ScrollView {
@@ -191,11 +201,14 @@
             }
         }
 
+        @ViewBuilder
         private var scoreText: some View {
-            Text(verbatim: "\(fixture.home?.score ?? 0) – \(fixture.away?.score ?? 0)")
-                .font(.system(size: 80, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
+            if fixture.hasTeams {
+                Text(verbatim: "\(fixture.home?.score ?? 0) – \(fixture.away?.score ?? 0)")
+                    .font(.system(size: 80, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            }
         }
 
         private func followButton(_ team: SportsTeam) -> some View {
@@ -224,14 +237,14 @@
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                switch resolved.count {
+                switch channels.count {
                 case 0:
                     emptyChannels
                 case 1:
-                    singleChannel(resolved[0])
+                    singleChannel(channels[0])
                 default:
                     VStack(spacing: 16) {
-                        ForEach(resolved) { channelRow($0) }
+                        ForEach(channels) { channelRow($0) }
                     }
                 }
             }
@@ -387,6 +400,14 @@
             if expectsDetail { isLoadingDetail = true }
             defer { isLoadingDetail = false }
 
+            if resolved.isEmpty, fixture.status.state != .final {
+                selfResolved = await SportsChannelResolver.resolve(
+                    container: modelContext.container,
+                    fixtures: [fixture],
+                    now: Date(),
+                    restriction: restriction
+                )[fixture.id] ?? []
+            }
             if store.snapshot(for: fixture.leagueId)?.standings.isEmpty ?? true, fetchedStandings.isEmpty {
                 fetchedStandings = await (try? provider.standings(league: league)) ?? []
             }

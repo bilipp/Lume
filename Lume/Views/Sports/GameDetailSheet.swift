@@ -12,21 +12,32 @@
 //  fixture that has nothing to show.
 //
 
+import SwiftData
 import SwiftUI
 
 struct GameDetailSheet: View {
     let fixture: SportsFixture
+    /// The presenter's resolved channels. When it hands over none — its own
+    /// resolve pass still running, or never run — the sheet resolves this one
+    /// fixture itself.
     let resolved: [ResolvedChannel]
     var onWatch: (ResolvedChannel) -> Void
     var provider: any SportsDataProvider = ESPNClient.shared
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
     @State private var follows = SportsFollowService.shared
     @State private var store = SportsStore.shared
     @State private var eventDetail: SportsEventDetail?
     @State private var isLoadingDetail = false
     @State private var fetchedStandings: [SportsStandingRow] = []
+    @State private var selfResolved: [ResolvedChannel] = []
+
+    private var channels: [ResolvedChannel] {
+        resolved.isEmpty ? selfResolved : resolved
+    }
 
     var body: some View {
         NavigationStack {
@@ -184,10 +195,15 @@ struct GameDetailSheet: View {
         }
     }
 
+    /// The two-sided score; a race or fight night has none, so its header keeps
+    /// just the status line.
+    @ViewBuilder
     private var scoreText: some View {
-        Text(verbatim: "\(fixture.home?.score ?? 0) – \(fixture.away?.score ?? 0)")
-            .font(.system(size: 44, weight: .bold, design: .rounded))
-            .monospacedDigit()
+        if fixture.hasTeams {
+            Text(verbatim: "\(fixture.home?.score ?? 0) – \(fixture.away?.score ?? 0)")
+                .font(.system(size: 44, weight: .bold, design: .rounded))
+                .monospacedDigit()
+        }
     }
 
     @ViewBuilder
@@ -213,13 +229,13 @@ struct GameDetailSheet: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            switch resolved.count {
+            switch channels.count {
             case 0:
                 emptyChannels
             case 1:
-                singleChannel(resolved[0])
+                singleChannel(channels[0])
             default:
-                ForEach(resolved) { channelRow($0) }
+                ForEach(channels) { channelRow($0) }
             }
         }
         .padding()
@@ -314,6 +330,14 @@ struct GameDetailSheet: View {
         if expectsDetail { isLoadingDetail = true }
         defer { isLoadingDetail = false }
 
+        if resolved.isEmpty, fixture.status.state != .final {
+            selfResolved = await SportsChannelResolver.resolve(
+                container: modelContext.container,
+                fixtures: [fixture],
+                now: Date(),
+                restriction: restriction
+            )[fixture.id] ?? []
+        }
         if store.snapshot(for: fixture.leagueId)?.standings.isEmpty ?? true, fetchedStandings.isEmpty {
             fetchedStandings = await (try? provider.standings(league: league)) ?? []
         }

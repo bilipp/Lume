@@ -45,11 +45,11 @@
                 parts.append(startDate.formatted(date: .omitted, time: .shortened))
             case .inProgress:
                 parts.append(String(localized: "Live"))
-                parts.append(score)
+                if hasTeams { parts.append(score) }
                 if !status.shortDetail.isEmpty { parts.append(status.shortDetail) }
             case .final:
                 parts.append(String(localized: "Final"))
-                parts.append(score)
+                if hasTeams { parts.append(score) }
             case .postponed:
                 parts.append(String(localized: "Postponed"))
             }
