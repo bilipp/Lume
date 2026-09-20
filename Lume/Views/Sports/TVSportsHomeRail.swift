@@ -67,16 +67,16 @@ import SwiftUI
         }
 
         private var railRow: some View {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 header
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 20) {
+                    LazyHStack(spacing: PosterCardMetrics.railSpacing) {
                         ForEach(railFixtures) { fixture in
                             TVFixtureLogoCard(fixture: fixture) { selectedFixture = fixture }
                         }
                     }
-                    .padding(.horizontal, 60)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal)
+                    .padding(.vertical, PosterCardMetrics.railVerticalPadding)
                 }
                 .scrollClipDisabled()
             }
@@ -85,7 +85,7 @@ import SwiftUI
         }
 
         private var lockedRow: some View {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 header
                 Button {
                     showPaywall = true
@@ -117,13 +117,13 @@ import SwiftUI
                     )
                 }
                 .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
-                .padding(.horizontal, 60)
+                .padding(.horizontal)
             }
             .focusSection()
         }
 
         private var onboardingRow: some View {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 header
                 Button {
                     showManageTeams = true
@@ -155,16 +155,19 @@ import SwiftUI
                     )
                 }
                 .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
-                .padding(.horizontal, 60)
+                .padding(.horizontal)
             }
             .focusSection()
         }
 
+        /// Same heading style and inset as `HomeRow`, so the Sports row lines up
+        /// with every other row on the tvOS Home.
         private var header: some View {
             Text("Sports")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 60)
+                .font(.subheadline)
+                .fontWeight(.bold)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
         }
 
         // MARK: - Lifecycle
