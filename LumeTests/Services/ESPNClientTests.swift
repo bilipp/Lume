@@ -366,6 +366,63 @@ struct ESPNClientTests {
         #expect(row.points == 76)
     }
 
+    @Test func `several standings groups keep their names and split into tables`() async throws {
+        let body = """
+        {"children": [
+          {"name": "Driver Standings", "standings": {"entries": [
+            {"athlete": {"id": "1", "displayName": "Max Verstappen"}, "stats": [
+              {"name": "rank", "value": 1}, {"name": "championshipPts", "value": 300}]},
+            {"athlete": {"id": "2", "displayName": "Lando Norris"}, "stats": [
+              {"name": "rank", "value": 2}, {"name": "championshipPts", "value": 280}]}
+          ]}},
+          {"name": "Constructor Standings", "standings": {"entries": [
+            {"team": {"id": "10", "displayName": "McLaren"}, "stats": [
+              {"name": "rank", "value": 1}, {"name": "points", "value": 500}]}
+          ]}}
+        ]}
+        """
+        StubURLProtocol.register(host: webHost, pathSuffix: "/racing/f1/standings", response: .init(body: body))
+        let client = ESPNClient(session: StubURLProtocol.makeSession())
+
+        let rows = try await client.standings(league: f1League())
+        let groups = SportsStandingRow.grouped(rows)
+
+        #expect(rows.count == 3)
+        #expect(rows.map(\.group) == ["Driver Standings", "Driver Standings", "Constructor Standings"])
+        #expect(groups.count == 2)
+        #expect(groups[0].kind == .driver)
+        #expect(groups[0].rows.map(\.rank) == [1, 2])
+        #expect(groups[1].kind == .constructor)
+        #expect(groups[1].name == "Constructor Standings")
+        #expect(groups[1].rows.first?.rank == 1)
+    }
+
+    @Test func `a single standings group carries no group name`() async throws {
+        let body = """
+        {"children": [{"name": "Bundesliga", "standings": {"entries": [
+          {"team": {"id": "132", "displayName": "Bayern Munich"}, "stats": [{"name": "rank", "value": 1}]}
+        ]}}]}
+        """
+        StubURLProtocol.register(host: webHost, pathSuffix: "/soccer/eng.1/standings", response: .init(body: body))
+        let client = ESPNClient(session: StubURLProtocol.makeSession())
+
+        let rows = try await client.standings(league: league(sport: "soccer", slug: "eng.1"))
+
+        #expect(rows.first?.group == nil)
+        #expect(SportsStandingRow.grouped(rows).count == 1)
+    }
+
+    @Test func `grouping an ungrouped cache still separates drivers from constructors`() {
+        let rows = [
+            SportsStandingRow(id: "d1", kind: .driver, name: "Driver A", rank: 1, points: 10),
+            SportsStandingRow(id: "d2", kind: .driver, name: "Driver B", rank: 2, points: 8),
+            SportsStandingRow(id: "c1", kind: .constructor, name: "Team A", rank: 1, points: 18)
+        ]
+        let groups = SportsStandingRow.grouped(rows)
+        #expect(groups.map(\.kind) == [.driver, .constructor])
+        #expect(groups.map(\.rows.count) == [2, 1])
+    }
+
     @Test func `rugby stat names map to the shared columns`() async throws {
         let body = """
         {"children": [{"name": "Top 14", "standings": {"entries": [

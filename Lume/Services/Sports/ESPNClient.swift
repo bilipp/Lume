@@ -337,9 +337,10 @@ nonisolated extension ESPNClient {
         var rows: [SportsStandingRow] = []
         for group in groups {
             let kind = standingKind(childName: group.name)
+            let groupName = groups.count > 1 ? group.name : nil
             for (index, entry) in group.entries.enumerated() {
                 let resolvedKind = kind == .team && entry.team == nil && entry.athlete != nil ? .driver : kind
-                if let row = mapStandingEntry(entry, kind: resolvedKind, fallbackRank: index + 1) {
+                if let row = mapStandingEntry(entry, kind: resolvedKind, fallbackRank: index + 1, group: groupName) {
                     rows.append(row)
                 }
             }
@@ -413,7 +414,8 @@ nonisolated extension ESPNClient {
     private static func mapStandingEntry(
         _ entry: ESPNStandingsEntry,
         kind: SportsStandingKind,
-        fallbackRank: Int
+        fallbackRank: Int,
+        group: String?
     ) -> SportsStandingRow? {
         let stats = StandingStatLookup(entry: entry)
 
@@ -432,7 +434,8 @@ nonisolated extension ESPNClient {
                 losses: stats.intStat(anyOf: ["losses", "gamesLost"]),
                 goalDifference: stats.intStat(anyOf: ["pointDifferential", "pointsDifference"]),
                 points: stats.pointsStat(),
-                extra: stats.extra
+                extra: stats.extra,
+                group: group
             )
         case .driver:
             guard let athlete = entry.athlete else { return nil }
@@ -444,7 +447,8 @@ nonisolated extension ESPNClient {
                 name: athlete.displayName ?? id,
                 rank: stats.rankStat() ?? fallbackRank,
                 points: stats.pointsStat(),
-                extra: stats.extra
+                extra: stats.extra,
+                group: group
             )
         case .constructor:
             let id = entry.team?.id ?? entry.team?.displayName ?? UUID().uuidString
@@ -455,7 +459,8 @@ nonisolated extension ESPNClient {
                 name: entry.team?.displayName ?? entry.team?.shortDisplayName ?? id,
                 rank: stats.rankStat() ?? fallbackRank,
                 points: stats.pointsStat(),
-                extra: stats.extra
+                extra: stats.extra,
+                group: group
             )
         }
     }

@@ -173,31 +173,10 @@ struct LeagueDetailView: View {
 
     @ViewBuilder
     private var standingsSection: some View {
-        if isF1 {
-            f1Standings
-        } else {
-            let rows = teamStandings
-            if !rows.isEmpty {
-                card("Standings") {
-                    StandingsTable(rows: rows, followedTeamIds: follows.followedKeys)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var f1Standings: some View {
         let rows = teamStandings
-        let drivers = rows.filter { $0.kind == .driver }
-        let constructors = rows.filter { $0.kind == .constructor }
-        if !drivers.isEmpty {
-            card("Drivers") {
-                F1StandingsList(rows: drivers, followedTeamIds: follows.followedKeys)
-            }
-        }
-        if !constructors.isEmpty {
-            card("Constructors") {
-                F1StandingsList(rows: constructors, followedTeamIds: follows.followedKeys)
+        if !rows.isEmpty {
+            card("Standings") {
+                GroupedStandingsTable(rows: rows, followedTeamIds: follows.followedKeys)
             }
         }
     }
@@ -347,90 +326,6 @@ struct LeagueDetailView: View {
 }
 
 // MARK: - F1 standings
-
-/// A compact rank / name / points table for Formula 1 driver and constructor
-/// standings, where the GP W D L GD columns of `StandingsTable` do not apply.
-private struct F1StandingsList: View {
-    let rows: [SportsStandingRow]
-    let followedTeamIds: Set<String>
-
-    var body: some View {
-        Grid(alignment: .center, horizontalSpacing: 0, verticalSpacing: 0) {
-            GridRow {
-                headerCell("RK").gridColumnAlignment(.trailing)
-                headerCell("", alignment: .leading).gridColumnAlignment(.leading)
-                headerCell("PTS").gridColumnAlignment(.trailing)
-            }
-            .accessibilityHidden(true)
-            Divider()
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                if index > 0 {
-                    Divider().opacity(0.35)
-                }
-                dataRow(row)
-            }
-        }
-        .font(.subheadline)
-        .accessibilityElement(children: .contain)
-    }
-
-    private func headerCell(_ title: String, alignment: Alignment = .trailing) -> some View {
-        Text(verbatim: title)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.vertical, 6)
-            .padding(.horizontal, 8)
-            .frame(maxWidth: alignment == .leading ? .infinity : nil, alignment: alignment)
-    }
-
-    @ViewBuilder
-    private func dataRow(_ row: SportsStandingRow) -> some View {
-        let followed = followedTeamIds.containsFollowedTeam(for: row)
-        GridRow {
-            Text(verbatim: "\(row.rank)")
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 8)
-                .background(standingsRowHighlight(followed))
-                .accessibilityHidden(true)
-            HStack(spacing: 5) {
-                if followed {
-                    Image(systemName: "star.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.yellow)
-                }
-                Text(verbatim: row.name)
-                    .fontWeight(followed ? .semibold : .regular)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 8)
-            .background(standingsRowHighlight(followed))
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(rowLabel(row, followed: followed))
-            Text(verbatim: row.points.map { "\($0)" } ?? "–")
-                .monospacedDigit()
-                .fontWeight(.semibold)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 8)
-                .background(standingsRowHighlight(followed))
-                .accessibilityHidden(true)
-        }
-    }
-
-    private func rowLabel(_ row: SportsStandingRow, followed: Bool) -> Text {
-        var value = String(localized: "\(row.name), rank \(row.rank)")
-        if let points = row.points {
-            value += ", " + String(localized: "\(points) points")
-        }
-        if followed {
-            value = String(localized: "Following") + ", " + value
-        }
-        return Text(verbatim: value)
-    }
-}
 
 private extension View {
     /// The full-screen player cover, iOS/visionOS only, kept in one `#if` so

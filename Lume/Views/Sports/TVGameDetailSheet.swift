@@ -348,16 +348,25 @@
                     Text("Table")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.white)
-                    // Focus, not touch, scrolls a tvOS ScrollView: a 32-row table
-                    // as one focusable block would leave its tail unreachable, so
-                    // it is dealt out in screen-sized focusable chunks.
-                    VStack(spacing: 4) {
-                        ForEach(Array(rows.chunked(into: Self.standingsChunk).enumerated()), id: \.offset) { index, chunk in
-                            StandingsTable(rows: chunk, followedTeamIds: follows.followedKeys, showsHeader: index == 0)
-                                .tvFocusBlock()
+                    let groups = SportsStandingRow.grouped(rows)
+                    ForEach(groups) { group in
+                        if groups.count > 1, let title = group.title {
+                            title
+                                .font(.system(size: 26, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .padding(.horizontal, 12)
                         }
+                        // Focus, not touch, scrolls a tvOS ScrollView: a 32-row table
+                        // as one focusable block would leave its tail unreachable, so
+                        // it is dealt out in screen-sized focusable chunks.
+                        VStack(spacing: 4) {
+                            ForEach(Array(group.rows.chunked(into: Self.standingsChunk).enumerated()), id: \.offset) { index, chunk in
+                                StandingsTable(rows: chunk, followedTeamIds: follows.followedKeys, showsHeader: index == 0)
+                                    .tvFocusBlock()
+                            }
+                        }
+                        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(.white.opacity(0.06)))
                     }
-                    .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(.white.opacity(0.06)))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

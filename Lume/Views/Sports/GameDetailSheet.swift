@@ -290,7 +290,7 @@ struct GameDetailSheet: View {
                 Text("Table")
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                StandingsTable(rows: rows, followedTeamIds: follows.followedKeys, onSelectLeague: selectLeague)
+                GroupedStandingsTable(rows: rows, followedTeamIds: follows.followedKeys, onSelectLeague: selectLeague)
             }
             .padding()
             .frame(maxWidth: .infinity)

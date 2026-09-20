@@ -290,6 +290,11 @@ nonisolated struct SportsStandingRow: Identifiable, Codable, Hashable {
     let points: Int?
     /// Sport-specific extras keyed by stat name (e.g. NBA "streak", MLB "gb").
     let extra: [String: String]
+    /// The provider's table this row belongs to when a league has several —
+    /// "American Football Conference", "Driver Standings" — so the rows render
+    /// as separate tables instead of one list whose ranks restart. `nil` for a
+    /// single-table league and in snapshots written before the field existed.
+    let group: String?
 
     init(
         id: String,
@@ -303,7 +308,8 @@ nonisolated struct SportsStandingRow: Identifiable, Codable, Hashable {
         losses: Int? = nil,
         goalDifference: Int? = nil,
         points: Int? = nil,
-        extra: [String: String] = [:]
+        extra: [String: String] = [:],
+        group: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -317,6 +323,38 @@ nonisolated struct SportsStandingRow: Identifiable, Codable, Hashable {
         self.goalDifference = goalDifference
         self.points = points
         self.extra = extra
+        self.group = group
+    }
+}
+
+/// One table of a league's standings: a conference, a division, F1's drivers
+/// or constructors — or the whole league when it has just one.
+nonisolated struct SportsStandingGroup: Identifiable, Hashable {
+    let id: String
+    let name: String?
+    let kind: SportsStandingKind
+    let rows: [SportsStandingRow]
+}
+
+nonisolated extension SportsStandingRow {
+    /// Splits a flat standings list into its tables, in first-appearance order.
+    /// Rows split on the provider's group name and, for snapshots written before
+    /// groups were recorded, on kind — so an old F1 cache still separates
+    /// drivers from constructors.
+    static func grouped(_ rows: [SportsStandingRow]) -> [SportsStandingGroup] {
+        var order: [String] = []
+        var buckets: [String: (name: String?, kind: SportsStandingKind, rows: [SportsStandingRow])] = [:]
+        for row in rows {
+            let key = "\(row.group ?? "")|\(row.kind.rawValue)"
+            if buckets[key] == nil {
+                order.append(key)
+                buckets[key] = (row.group, row.kind, [])
+            }
+            buckets[key]?.rows.append(row)
+        }
+        return order.compactMap { key in
+            buckets[key].map { SportsStandingGroup(id: key, name: $0.name, kind: $0.kind, rows: $0.rows) }
+        }
     }
 }
 

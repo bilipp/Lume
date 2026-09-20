@@ -188,6 +188,44 @@ struct StandingsTable: View {
     }
 }
 
+/// A league's standings as one table per group — a conference, a division,
+/// F1's drivers and constructors — each under its own caption when there is
+/// more than one, so ranks never appear to restart mid-list.
+struct GroupedStandingsTable: View {
+    let rows: [SportsStandingRow]
+    let followedTeamIds: Set<String>
+    var onSelectLeague: (() -> Void)?
+
+    var body: some View {
+        let groups = SportsStandingRow.grouped(rows)
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(groups) { group in
+                VStack(alignment: .leading, spacing: 6) {
+                    if groups.count > 1, let title = group.title {
+                        title
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                    }
+                    StandingsTable(rows: group.rows, followedTeamIds: followedTeamIds, onSelectLeague: onSelectLeague)
+                }
+            }
+        }
+    }
+}
+
+extension SportsStandingGroup {
+    /// The caption over one table: "Drivers" / "Constructors" for motorsport,
+    /// else the provider's own group name ("American Football Conference").
+    var title: Text? {
+        switch kind {
+        case .driver: Text("Drivers")
+        case .constructor: Text("Constructors")
+        case .team: name.map { Text(verbatim: $0) }
+        }
+    }
+}
+
 nonisolated extension Set<String> {
     /// True when these full follow keys cover `row` — its full id, or a
     /// colon-anchored suffix match on its raw provider team id.
