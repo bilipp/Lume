@@ -91,8 +91,10 @@ passes, each cheaper than the last only once the earlier ones have narrowed it:
    with hidden channels and parental-/user-restricted categories excluded in
    SQLite (not in Swift).
 2. **Guide window.** One `EPGListing` fetch bounded by the union kickoff window
-   *and* the candidate channel ids, with the wide `listingDescription` column
-   left out — never the unscoped time-only scan that once froze the guide.
+   *and* the candidate channel ids — never the unscoped time-only scan that once
+   froze the guide. It is the one guide fetch that reads `listingDescription`:
+   a conference programme ("Sonntags-Konferenz, 6. Spieltag") names its games
+   only in the body, so the first 400 characters are searched too.
 3. **Matching.** The pure `SportsMatcher` token logic in Swift, plus the viewer's
    remembered picks and a channel-name fallback.
 
@@ -107,7 +109,8 @@ match `score`, then on proximity to kickoff:
 | 0 | `userPick` | The viewer pinned this channel for this competition (`SportsChannelPicks`). |
 | 1 | `epgTitleSubtitle` | The EPG programme names **both** teams together in one field (title *or* sub-title) — the fixture line itself. |
 | 2 | `epgSingleField` | The EPG programme names both teams, but split across the title and sub-title. |
-| 3 | `channelName` | No EPG match; the channel's own name names both teams (`"DAZN 5 | Bayern vs Dortmund"`). |
+| 3 | `epgDescription` | Both teams appear only in the programme's description — a multi-game conference whose title says nothing about this fixture. |
+| 4 | `channelName` | No EPG match; the channel's own name names both teams (`"DAZN 5 | Bayern vs Dortmund"`). |
 
 A team is "present" when any distinctive token from `SportsMatcher.tokens(for:)`
 (aliases from the bundled `SportsTeamAliases.json`) appears as a whole word in a

@@ -36,6 +36,10 @@ nonisolated enum ResolvedChannelSource: String, Codable, Hashable {
     /// The EPG programme names both teams, but split across the title and
     /// sub-title rather than together in one field.
     case epgSingleField
+    /// The programme's description names both teams — a multi-game
+    /// conference ("Sonntags-Konferenz, 6. Spieltag") whose title says nothing
+    /// about this fixture but whose body lists it among the games carried.
+    case epgDescription
     /// No EPG match; the channel's own name names both teams
     /// ("DAZN 5 | Bayern vs Dortmund").
     case channelName
@@ -45,7 +49,8 @@ nonisolated enum ResolvedChannelSource: String, Codable, Hashable {
         case .userPick: 0
         case .epgTitleSubtitle: 1
         case .epgSingleField: 2
-        case .channelName: 3
+        case .epgDescription: 3
+        case .channelName: 4
         }
     }
 }
@@ -93,9 +98,9 @@ nonisolated enum SportsChannelResolver {
     }
 
     /// The `EPGListing` fetch shape, exposed for the query-shape contract test.
-    /// Bounded by the kickoff window *and* the candidate channel ids, and — like
-    /// the guide loaders — it never fetches `listingDescription`, the widest
-    /// column, which nothing here reads.
+    /// Bounded by the kickoff window *and* the candidate channel ids. Unlike the
+    /// guide loaders it does fetch `listingDescription`: a conference programme
+    /// only names its games there, and the window keeps the row count small.
     nonisolated static func epgCandidateDescriptor(
         channelIds: [String],
         windowStart: Date,
@@ -107,7 +112,9 @@ nonisolated enum SportsChannelResolver {
             },
             sortBy: [SortDescriptor(\.channelId), SortDescriptor(\.start)]
         )
-        descriptor.propertiesToFetch = [\.channelId, \.title, \.subtitle, \.category, \.start, \.end]
+        descriptor.propertiesToFetch = [
+            \.channelId, \.title, \.subtitle, \.category, \.listingDescription, \.start, \.end
+        ]
         return descriptor
     }
 
@@ -207,15 +214,21 @@ nonisolated enum SportsChannelResolver {
         return (channels, channelIds)
     }
 
-    /// An EPG candidate with its title and subtitle normalized once at guide-build
-    /// time, so `bestEPGHit` reuses them across every fixture sharing the channel
-    /// rather than re-normalizing the same candidate per fixture.
+    /// An EPG candidate with its title, subtitle and the head of its description
+    /// normalized once at guide-build time, so `bestEPGHit` reuses them across
+    /// every fixture sharing the channel rather than re-normalizing per fixture.
     private struct NormalizedCandidate {
         let title: String
         let normalizedTitle: String
         let normalizedSubtitle: String
+        let normalizedDescription: String
         let start: Date
     }
+
+    /// How much of a description is searched. A conference body lists its games
+    /// up front ("Der 6. Spieltag mit Hannover 96 - VfL Bochum, …"); the tail is
+    /// commentators and filler.
+    private static let descriptionScanLength = 400
 
     /// Runs the bounded EPG fetch and groups the listings by channel id, folding
     /// each listing's title and subtitle once.
@@ -235,6 +248,9 @@ nonisolated enum SportsChannelResolver {
                 title: listing.title,
                 normalizedTitle: SportsMatcher.normalize(listing.title),
                 normalizedSubtitle: SportsMatcher.normalize(listing.subtitle ?? ""),
+                normalizedDescription: SportsMatcher.normalize(
+                    String(listing.listingDescription.prefix(descriptionScanLength))
+                ),
                 start: listing.start
             ))
         }
@@ -247,6 +263,8 @@ nonisolated enum SportsChannelResolver {
     private struct EPGHit {
         let score: Int
         let inOneField: Bool
+        /// Both teams were found only in the description — a conference.
+        let descriptionOnly: Bool
         let title: String
         let start: Date
     }
@@ -328,7 +346,7 @@ nonisolated enum SportsChannelResolver {
             source = .userPick
             score = pickScoreBase + (epg?.score ?? 0)
         } else if let epg {
-            source = epg.inOneField ? .epgTitleSubtitle : .epgSingleField
+            source = epg.descriptionOnly ? .epgDescription : (epg.inOneField ? .epgTitleSubtitle : .epgSingleField)
             score = epg.score
         } else if nameMatched {
             source = .channelName
@@ -350,7 +368,9 @@ nonisolated enum SportsChannelResolver {
 
     /// The best-scoring EPG programme for a channel within the kickoff window,
     /// or `nil` when none names both teams. `inOneField` is set when both teams
-    /// appear together in a single field (the fixture line), the stronger tier.
+    /// appear together in the title or the sub-title (the fixture line), the
+    /// stronger tier; a programme that names them only in its description — a
+    /// conference — still qualifies, as the weakest EPG tier.
     private static func bestEPGHit(
         in candidates: [NormalizedCandidate],
         homeTokens: Set<String>,
@@ -365,17 +385,30 @@ nonisolated enum SportsChannelResolver {
             guard candidate.start >= windowStart, candidate.start <= windowEnd else { continue }
             let title = candidate.normalizedTitle
             let subtitle = candidate.normalizedSubtitle
+            let description = candidate.normalizedDescription
 
             let homeInTitle = teamPresent(homeTokens, in: title)
             let homeInSub = teamPresent(homeTokens, in: subtitle)
             let awayInTitle = teamPresent(awayTokens, in: title)
             let awayInSub = teamPresent(awayTokens, in: subtitle)
-            guard homeInTitle || homeInSub, awayInTitle || awayInSub else { continue }
+            let homeInHeadline = homeInTitle || homeInSub
+            let awayInHeadline = awayInTitle || awayInSub
+            let homeInBody = homeInHeadline || teamPresent(homeTokens, in: description)
+            let awayInBody = awayInHeadline || teamPresent(awayTokens, in: description)
+            guard homeInBody, awayInBody else { continue }
 
             let inOneField = (homeInTitle && awayInTitle) || (homeInSub && awayInSub)
+            let descriptionOnly = !(homeInHeadline && awayInHeadline)
             let score = (homeInSub ? subtitleWeight : 0) + (awayInSub ? subtitleWeight : 0)
                 + (homeInTitle ? titleWeight : 0) + (awayInTitle ? titleWeight : 0)
-            let hit = EPGHit(score: score, inOneField: inOneField, title: candidate.title, start: candidate.start)
+                + (descriptionOnly ? descriptionWeight : 0)
+            let hit = EPGHit(
+                score: score,
+                inOneField: inOneField,
+                descriptionOnly: descriptionOnly,
+                title: candidate.title,
+                start: candidate.start
+            )
 
             if isBetterHit(hit, than: best, kickoff: kickoff) { best = hit }
         }
@@ -384,6 +417,7 @@ nonisolated enum SportsChannelResolver {
 
     private static func isBetterHit(_ lhs: EPGHit, than rhs: EPGHit?, kickoff: Date) -> Bool {
         guard let rhs else { return true }
+        if lhs.descriptionOnly != rhs.descriptionOnly { return !lhs.descriptionOnly }
         if lhs.inOneField != rhs.inOneField { return lhs.inOneField }
         if lhs.score != rhs.score { return lhs.score > rhs.score }
         return abs(lhs.start.timeIntervalSince(kickoff)) < abs(rhs.start.timeIntervalSince(kickoff))
@@ -405,6 +439,7 @@ nonisolated enum SportsChannelResolver {
     // a channel-name-only hit is the weakest positive signal.
     private static let subtitleWeight = 3
     private static let titleWeight = 2
+    private static let descriptionWeight = 1
     private static let pickScoreBase = 1000
     private static let nameMatchScore = 1
 }

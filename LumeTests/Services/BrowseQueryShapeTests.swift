@@ -344,22 +344,24 @@ struct BrowseQueryShapeTests {
 
     // MARK: - The sports resolver's EPG fetch stays scoped
 
-    /// The fixture→channel resolver's guide fetch must stay the scoped,
-    /// partial fetch it was written as: bounded by a `#Predicate` (the kickoff
-    /// window *and* the candidate channel ids) and — like the guide loaders —
-    /// never dragging in `listingDescription`, the widest column, which no part
-    /// of matching reads. Dropping the predicate turns it into the unscoped
-    /// time-only guide scan the loaders exist to avoid; adding
-    /// `listingDescription` back doubles the row width for nothing.
-    @Test func `sports resolver EPG fetch is scoped and omits the description`() {
+    /// The sports resolver's EPG fetch must be bounded by channel ids and the
+    /// kickoff window so it never turns into the time-only guide scan the
+    /// loaders exist to avoid. It is the one guide fetch that reads
+    /// `listingDescription`, because conference programmes list their games
+    /// only in the body.
+    @Test func `sports resolver EPG fetch is scoped and includes the description`() {
         let descriptor = SportsChannelResolver.epgCandidateDescriptor(
             channelIds: ["ch1", "ch2"], windowStart: .now, windowEnd: .now.addingTimeInterval(3600)
         )
         #expect(descriptor.predicate != nil, "the guide fetch must be bounded, not a full scan")
         let props = descriptor.propertiesToFetch
         #expect(!props.isEmpty, "a partial fetch, not the whole row")
-        #expect(!props.contains(\EPGListing.listingDescription), "the widest column must stay out")
-        for kept: PartialKeyPath<EPGListing> in [\.channelId, \.title, \.subtitle, \.category, \.start, \.end] {
+        // Unlike the guide loaders, this fetch needs the description: a
+        // conference programme names its games only there. The kickoff window
+        // and channel-id bound keep the row count small enough to afford it.
+        for kept: PartialKeyPath<EPGListing> in [
+            \.channelId, \.title, \.subtitle, \.category, \.listingDescription, \.start, \.end
+        ] {
             #expect(props.contains(kept))
         }
     }

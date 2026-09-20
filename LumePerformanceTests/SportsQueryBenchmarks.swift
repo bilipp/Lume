@@ -107,7 +107,7 @@ final class SportsQueryBenchmarks: XCTestCase {
                     id: "\(channelID)-listing",
                     channelId: channelID,
                     title: "Bundesliga",
-                    listingDescription: "A synthetic description that must stay out of the fetch.",
+                    listingDescription: "A synthetic description; the resolver reads its head for conference games.",
                     start: kickoff,
                     end: kickoff.addingTimeInterval(2 * 3600),
                     subtitle: "Bayern vs Dortmund",

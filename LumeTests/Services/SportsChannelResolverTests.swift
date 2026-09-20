@@ -70,12 +70,19 @@ struct SportsChannelResolverTests {
         return stream
     }
 
-    private func listing(channelId: String, title: String, subtitle: String, start: Date, hours: Double = 2) -> EPGListing {
+    private func listing(
+        channelId: String,
+        title: String,
+        subtitle: String,
+        start: Date,
+        hours: Double = 2,
+        description: String = ""
+    ) -> EPGListing {
         EPGListing(
             id: "\(channelId)-\(Int(start.timeIntervalSince1970))",
             channelId: channelId,
             title: title,
-            listingDescription: "",
+            listingDescription: description,
             start: start,
             end: start.addingTimeInterval(hours * 3600),
             subtitle: subtitle,
@@ -102,6 +109,69 @@ struct SportsChannelResolverTests {
         #expect(channels[0].isConfident)
         #expect(channels[0].playlistID == playlistID)
         #expect(channels[0].matchedTitle == "Bundesliga")
+    }
+
+    @Test func `a conference naming both teams in its description is suggested`() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        context.insert(stream("1", name: "Sky Bundesliga HDraw", epgChannelId: "sky.konf"))
+        let kickoff = Date()
+        context.insert(listing(
+            channelId: "sky.konf",
+            title: "Live BL: Sonntags-Konferenz, 6. Spieltag",
+            subtitle: "",
+            start: kickoff,
+            description: "Der 6. Spieltag mit FC Bayern München - Borussia Dortmund, Hannover 96 - VfL Bochum "
+                + "und Energie Cottbus - FC St. Pauli. Moderation: Yannick Erkenbrecher."
+        ))
+        try context.save()
+
+        let fixture = bayernVsDortmund(kickoff: kickoff)
+        let result = await SportsChannelResolver.resolve(container: container, fixtures: [fixture], now: kickoff)
+
+        let channels = try #require(result[fixture.id])
+        #expect(channels.count == 1)
+        #expect(channels[0].source == .epgDescription)
+        #expect(channels[0].matchedTitle == "Live BL: Sonntags-Konferenz, 6. Spieltag")
+    }
+
+    @Test func `a dedicated broadcast ranks above the conference`() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        context.insert(stream("1", name: "Sky Bundesliga HDraw", epgChannelId: "sky.konf"))
+        context.insert(stream("2", name: "Sky Bundesliga 2", epgChannelId: "sky.2"))
+        let kickoff = Date()
+        context.insert(listing(
+            channelId: "sky.konf", title: "Live BL: Konferenz", subtitle: "", start: kickoff,
+            description: "Mit Bayern München - Borussia Dortmund und Hannover 96 - VfL Bochum."
+        ))
+        context.insert(listing(channelId: "sky.2", title: "Live BL", subtitle: "Bayern München - Borussia Dortmund", start: kickoff))
+        try context.save()
+
+        let fixture = bayernVsDortmund(kickoff: kickoff)
+        let result = await SportsChannelResolver.resolve(container: container, fixtures: [fixture], now: kickoff)
+
+        let channels = try #require(result[fixture.id])
+        #expect(channels.map(\.source) == [.epgTitleSubtitle, .epgDescription])
+        #expect(channels[0].stream.name == "Sky Bundesliga 2")
+        #expect(channels[0].isConfident, "the dedicated broadcast alone holds the strongest tier")
+    }
+
+    @Test func `a description naming only one team is not a match`() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        context.insert(stream("1", name: "Sky Bundesliga HDraw", epgChannelId: "sky.konf"))
+        let kickoff = Date()
+        context.insert(listing(
+            channelId: "sky.konf", title: "Live BL: Konferenz", subtitle: "", start: kickoff,
+            description: "Mit Bayern München - VfL Bochum und Hannover 96 - FC St. Pauli."
+        ))
+        try context.save()
+
+        let fixture = bayernVsDortmund(kickoff: kickoff)
+        let result = await SportsChannelResolver.resolve(container: container, fixtures: [fixture], now: kickoff)
+
+        #expect((result[fixture.id] ?? []).isEmpty)
     }
 
     @Test func `two matching channels are ambiguous, neither confident`() async throws {
