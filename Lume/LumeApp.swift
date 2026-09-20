@@ -251,6 +251,10 @@ struct LumeApp: App {
                     // from launch.
                     await TraktService.shared.restore()
 
+                    // Same for Simkl (a second tracker integration, AUTH V2
+                    // device flow): refresh stale tokens, restore the username.
+                    await SimklService.shared.restore()
+
                     // Restore the OpenSubtitles session (a keychain read, no
                     // network) so the in-player subtitle search can download
                     // without sending the viewer to Settings first.
