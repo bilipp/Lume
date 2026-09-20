@@ -43,6 +43,8 @@
         @State private var showManageTeams = false
         @State private var showPaywall = false
         @State private var playingMedia: PlayableMedia?
+        /// Playback queued behind the dismissing detail cover; see `watch`.
+        @State private var pendingMedia: PlayableMedia?
 
         @FocusState private var focus: TVSportsFocus?
 
@@ -55,7 +57,7 @@
                 }
             }
             .sheet(isPresented: $showManageTeams) { TVManageTeamsPane() }
-            .fullScreenCover(item: $selectedFixture) { fixture in
+            .fullScreenCover(item: $selectedFixture, onDismiss: presentPendingMedia) { fixture in
                 TVGameDetailSheet(fixture: fixture, resolved: resolved[fixture.id] ?? [], onWatch: watch)
             }
             .fullScreenCover(item: $playingMedia) { media in
@@ -371,16 +373,22 @@
         private func watch(_ channel: ResolvedChannel) {
             guard let media = SportsPlayback.media(for: channel, in: modelContext) else { return }
 
-            let hadSheet = selectedFixture != nil
-            selectedFixture = nil
-            if hadSheet {
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(350))
-                    playingMedia = media
-                }
+            if selectedFixture != nil {
+                // Presented from the detail cover's `onDismiss`: a cover put up
+                // while another is still animating out is torn down and
+                // re-presented, opening the stream twice and tripping the
+                // provider's connection cap. See `presentPendingMedia`.
+                pendingMedia = media
+                selectedFixture = nil
             } else {
                 playingMedia = media
             }
+        }
+
+        private func presentPendingMedia() {
+            guard let media = pendingMedia else { return }
+            pendingMedia = nil
+            playingMedia = media
         }
     }
 

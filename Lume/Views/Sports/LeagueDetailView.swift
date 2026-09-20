@@ -44,6 +44,8 @@ struct LeagueDetailView: View {
     /// Unused on macOS (playback opens a window), but declared on every platform
     /// so the shared `leagueDetailPlayer(media:)` chrome has a binding to take.
     @State private var playingMedia: PlayableMedia?
+    /// Playback queued behind a dismissing sheet; see `present(_:afterSheet:)`.
+    @State private var pendingMedia: PlayableMedia?
 
     private var isF1: Bool {
         league.sport == "racing"
@@ -64,10 +66,10 @@ struct LeagueDetailView: View {
         .task(id: resolveKey) { await runResolve() }
         .onAppear { SportsSyncService.shared.beginLivePolling() }
         .onDisappear { SportsSyncService.shared.endLivePolling() }
-        .sheet(item: $selectedFixture) { fixture in
+        .sheet(item: $selectedFixture, onDismiss: presentPendingMedia) { fixture in
             GameDetailSheet(fixture: fixture, resolved: resolved[fixture.id] ?? [], onWatch: watch)
         }
-        .sheet(item: $pickerFixture) { fixture in
+        .sheet(item: $pickerFixture, onDismiss: presentPendingMedia) { fixture in
             ChannelPickerSheet(fixture: fixture, resolved: resolved[fixture.id] ?? [], onWatch: watch)
         }
         .leagueDetailPlayer(media: $playingMedia)
@@ -310,18 +312,29 @@ struct LeagueDetailView: View {
         present(media, afterSheet: hadSheet)
     }
 
+    /// A sheet's dismissal is not done when its binding drops to `nil`, and a
+    /// `fullScreenCover` presented while it is still animating out is torn down
+    /// and re-presented by UIKit once the sheet has gone — two player instances,
+    /// two stream opens, and the second one trips the provider's connection cap
+    /// (LumeEngine fails, KSPlayer gets HTTP 429). So when a sheet was open the
+    /// media waits here and the sheet's `onDismiss` presents it.
     private func present(_ media: PlayableMedia, afterSheet: Bool) {
         #if os(macOS)
             MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #elseif os(iOS) || os(visionOS)
             if afterSheet {
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(350))
-                    playingMedia = media
-                }
+                pendingMedia = media
             } else {
                 playingMedia = media
             }
+        #endif
+    }
+
+    private func presentPendingMedia() {
+        #if os(iOS) || os(visionOS)
+            guard let media = pendingMedia else { return }
+            pendingMedia = nil
+            playingMedia = media
         #endif
     }
 }
