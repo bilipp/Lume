@@ -3,12 +3,15 @@
 //  Lume
 //
 //  The tvOS Sports Hub. The phone hub's segmented control and toolbar do not
-//  read on a remote, so this is a purpose-built 10-foot screen: a focusable pill
-//  filter (Yesterday / Today / Upcoming) beside a scope Menu and a Manage Teams
-//  button, then full-width horizontal rails of `TVFixtureLogoCard`s, one focus
-//  section per day. It shares the hub's data plumbing — `SportsStore` snapshots,
-//  `SportsFollowService` follows, off-main `SportsChannelResolver` — and reuses
-//  `SportsHubView`'s static date/assembly helpers so the two hubs stay in step.
+//  read on a remote, so this is a purpose-built 10-foot screen: one scrolling
+//  page whose header is the scope menu drawn as the page title, a compact
+//  Yesterday / Today / Upcoming switch and an icon-only Manage Teams button,
+//  then full-width horizontal rails of `TVFixtureLogoCard`s, one focus section
+//  per group. The header scrolls with the page — a pinned bar over an unclipped
+//  scroll view had the cards sliding underneath it. It shares the hub's data
+//  plumbing — `SportsStore` snapshots, `SportsFollowService` follows, off-main
+//  `SportsChannelResolver` — and reuses `SportsHubView`'s static date/assembly
+//  helpers so the two hubs stay in step.
 //
 
 #if os(tvOS)
@@ -70,67 +73,69 @@
             if follows.follows.isEmpty {
                 onboardingState
             } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    filterBar
-                    content
-                }
+                content
             }
         }
 
-        /// One row of three controls in one pill chrome: the scope menu (which
-        /// reads as the screen's title, Strand-style), the day filter and Manage
-        /// Teams — same height, same corner radius, same rest wash.
-        private var filterBar: some View {
-            HStack(spacing: 24) {
-                scopeMenu
-                segmentedControl
-                Spacer(minLength: 24)
-                manageButton
+        /// The whole hub is one scrolling page so the header can never sit over
+        /// the cards: title-style scope menu on the left, the day switch and the
+        /// Manage Teams button on the right, then the rails.
+        private var content: some View {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 36) {
+                    header
+                    if groups.isEmpty {
+                        noGamesState
+                    } else {
+                        ForEach(groups) { group in
+                            section(for: group)
+                        }
+                    }
+                }
+                .padding(.top, 20)
+                .padding(.bottom, 40)
+            }
+            .scrollClipDisabled()
+            .defaultFocus($focus, firstCardFocus)
+            .onExitCommand { returnFocusToFilter() }
+            .task(id: resolveKey) { await runResolve() }
+        }
+
+        // MARK: - Header
+
+        /// The scope menu reads as the page title; the controls to its right
+        /// stay quiet at rest — only the active day carries a fill — so the row
+        /// reads as a heading, not a toolbar. Status hints sit under the title.
+        private var header: some View {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 24) {
+                    scopeMenu
+                    Spacer(minLength: 24)
+                    segmentedControl
+                    manageButton
+                }
+                if epg.isSyncing {
+                    hintRow("Updating guide…", icon: "arrow.triangle.2.circlepath")
+                }
+                if store.refreshError {
+                    hintRow("Scores unavailable — showing your saved data.", icon: "wifi.slash")
+                }
             }
             .padding(.horizontal, 60)
-            .padding(.top, 28)
-            .padding(.bottom, 28)
             .focusSection()
-        }
-
-        private var content: some View {
-            Group {
-                if groups.isEmpty {
-                    noGamesState
-                } else {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 40) {
-                            if epg.isSyncing {
-                                hintRow("Updating guide…", icon: "arrow.triangle.2.circlepath")
-                            }
-                            if store.refreshError {
-                                hintRow("Scores unavailable — showing your saved data.", icon: "wifi.slash")
-                            }
-                            ForEach(groups) { group in
-                                section(for: group)
-                            }
-                        }
-                        .padding(.vertical, 20)
-                    }
-                    .scrollClipDisabled()
-                    .defaultFocus($focus, firstCardFocus)
-                    .onExitCommand { returnFocusToFilter() }
-                }
-            }
-            .task(id: resolveKey) { await runResolve() }
         }
 
         // MARK: - Filter controls
 
         private var segmentedControl: some View {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 ForEach(SportsHubSegment.allCases) { segment in
                     segmentButton(segment)
                 }
             }
-            .padding(6)
+            .padding(4)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous).fill(.white.opacity(0.08))
+                RoundedRectangle(cornerRadius: 16, style: .continuous).fill(.white.opacity(0.08))
             )
         }
 
@@ -142,15 +147,15 @@
             } label: {
                 TVSportsPillLabel(
                     title: value.title,
-                    font: .headline,
+                    font: .callout.weight(.semibold),
                     isFocused: isItemFocused,
                     isActive: isActive,
-                    horizontalPadding: 28,
-                    verticalPadding: 14,
+                    horizontalPadding: 22,
+                    verticalPadding: 12,
                     cornerRadius: 12
                 )
             }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.03))
             .focused($focus, equals: .segment(value))
             .animation(.easeOut(duration: 0.18), value: isItemFocused)
         }
@@ -164,27 +169,33 @@
                     }
                 }
             } label: {
-                TVSportsPillChrome {
-                    HStack(spacing: 10) {
-                        Text(verbatim: scopeTitle).font(.headline)
-                        Image(systemName: "chevron.down").font(.callout.weight(.bold))
+                TVSportsTitleChrome {
+                    HStack(alignment: .firstTextBaseline, spacing: 14) {
+                        Text(verbatim: scopeTitle)
+                            .font(.system(size: 44, weight: .bold))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.55))
                     }
                 }
             }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.02))
+            .accessibilityLabel(Text(verbatim: scopeTitle))
         }
 
         private var manageButton: some View {
             Button {
                 showManageTeams = true
             } label: {
-                TVSportsPillChrome {
-                    Label("Manage Teams", systemImage: "person.2.badge.plus")
-                        .font(.headline)
+                TVSportsCircleChrome {
+                    Image(systemName: "person.2.badge.plus")
+                        .font(.system(size: 26, weight: .semibold))
                 }
             }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
+            .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
             .focused($focus, equals: .manage)
+            .accessibilityLabel(Text("Manage Teams"))
         }
 
         // MARK: - Sections
@@ -262,6 +273,9 @@
 
         private var noGamesState: some View {
             VStack(spacing: 24) {
+                Image(systemName: "sportscourt")
+                    .font(.system(size: 64))
+                    .foregroundStyle(.white.opacity(0.35))
                 Text("No games")
                     .font(.title.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.6))
@@ -278,7 +292,7 @@
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 560)
         }
 
         private func fullScreenState(
@@ -306,8 +320,7 @@
         private func hintRow(_ text: LocalizedStringKey, icon: String) -> some View {
             Label(text, systemImage: icon)
                 .font(.callout)
-                .foregroundStyle(.white.opacity(0.6))
-                .padding(.horizontal, 60)
+                .foregroundStyle(.white.opacity(0.55))
         }
 
         // MARK: - Focus
@@ -404,4 +417,39 @@
             grouping.scopeTitle
         }
     }
+
+    /// The page-title chrome for the scope menu: bare white text at rest, a soft
+    /// wash when focused. A solid white fill here would turn the heading into a
+    /// button and shout over the cards.
+    private struct TVSportsTitleChrome<Content: View>: View {
+        @ViewBuilder var content: () -> Content
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            content()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.white.opacity(isFocused ? 0.16 : 0))
+                )
+                .animation(.easeOut(duration: 0.15), value: isFocused)
+        }
+    }
+
+    /// A round icon-only control that shares the pills' rest wash and white
+    /// focus fill, for actions that need no label at rest.
+    private struct TVSportsCircleChrome<Content: View>: View {
+        @ViewBuilder var content: () -> Content
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            content()
+                .foregroundStyle(isFocused ? .black : .white)
+                .frame(width: 64, height: 64)
+                .background(Circle().fill(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.white.opacity(0.1))))
+        }
+    }
+
 #endif
