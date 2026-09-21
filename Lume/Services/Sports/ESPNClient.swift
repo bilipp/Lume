@@ -249,25 +249,32 @@ nonisolated extension ESPNClient {
         return text
     }
 
+    /// The coarse state comes from ESPN's `state` ("pre"/"in"/"post"), except
+    /// that a stoppage named by the status (`STATUS_POSTPONED`, `STATUS_CANCELED`,
+    /// `STATUS_ABANDONED` — or, lacking a name, said by the English detail) is
+    /// `.postponed` whatever the state says. The machine fields ride along for
+    /// `SportsLabels` to phrase in the user's language.
     static func mapStatus(_ status: ESPNStatus?) -> SportsFixtureStatus {
         let type = status?.type
         let detail = type?.detail ?? ""
         let shortDetail = type?.shortDetail ?? ""
-        let state: SportsFixtureState
-        let lowerDetail = detail.lowercased()
-        if lowerDetail.contains("postpone") || lowerDetail.contains("cancel") || lowerDetail.contains("abandon") {
-            state = .postponed
-        } else {
-            switch type?.state {
-            case "in":
-                state = .inProgress
-            case "post":
-                state = (type?.completed == true) ? .final : .postponed
-            default:
-                state = .scheduled
-            }
+        let coarseState: SportsFixtureState = switch type?.state {
+        case "in":
+            .inProgress
+        case "post":
+            (type?.completed == true) ? .final : .postponed
+        default:
+            .scheduled
         }
-        return SportsFixtureStatus(state: state, detail: detail, shortDetail: shortDetail)
+        let phase = SportsStatusPhase(typeName: type?.name, state: coarseState, detail: detail)
+        return SportsFixtureStatus(
+            state: phase.isStoppage ? .postponed : coarseState,
+            detail: detail,
+            shortDetail: shortDetail,
+            typeName: type?.name,
+            period: status?.period,
+            clock: nonEmpty(status?.displayClock)
+        )
     }
 
     private static func mapCompetitor(_ competitor: ESPNCompetitor, leagueId: String) -> SportsCompetitor? {
@@ -498,6 +505,7 @@ nonisolated extension ESPNClient {
         return SportsKeyEvent(
             clock: event.clock?.displayValue ?? "",
             type: typeText,
+            typeId: event.type?.id,
             teamId: event.team?.id,
             participants: participants,
             isGoal: isGoal,
@@ -524,6 +532,7 @@ nonisolated extension ESPNClient {
             result.append(
                 SportsTeamStat(
                     name: stat.label ?? name,
+                    key: name,
                     homeValue: stat.value ?? stat.displayValue.flatMap { Double($0) },
                     awayValue: away?.value ?? away?.displayValue.flatMap { Double($0) },
                     homeDisplay: stat.displayValue ?? "",

@@ -54,7 +54,8 @@ struct ESPNClientTests {
         "id": "401773",
         "date": "2026-09-18T18:30Z",
         "name": "Bayern vs Dortmund",
-        "status": {"type": {"state": "in", "completed": false, "detail": "45'", "shortDetail": "45'"}},
+        "status": {"period": 1, "displayClock": "45'",
+                   "type": {"id": "25", "name": "STATUS_FIRST_HALF", "state": "in", "completed": false, "detail": "45'", "shortDetail": "45'"}},
         "competitions": [{
           "id": "401773",
           "date": "2026-09-18T18:30Z",
@@ -94,6 +95,10 @@ struct ESPNClientTests {
         #expect(fixture.leagueLogoURL?.absoluteString == "https://a.espncdn.com/i/leaguelogos/soccer/500/10.png")
         #expect(fixture.status.state == .inProgress)
         #expect(fixture.status.detail == "45'")
+        #expect(fixture.status.typeName == "STATUS_FIRST_HALF")
+        #expect(fixture.status.period == 1)
+        #expect(fixture.status.clock == "45'")
+        #expect(fixture.status.phase == .inProgress)
         #expect(fixture.venue == "Allianz Arena")
         #expect(fixture.broadcasters == ["Sky Sport"])
         #expect(fixture.startDate != .distantPast)
@@ -238,7 +243,7 @@ struct ESPNClientTests {
             ]}
           ],
           "keyEvents": [
-            {"type": {"text": "Goal"}, "clock": {"displayValue": "23'"}, "team": {"id": "132"},
+            {"type": {"id": "70", "text": "Goal"}, "clock": {"displayValue": "23'"}, "team": {"id": "132"},
              "scoringPlay": true, "athletesInvolved": [{"displayName": "Harry Kane"}]},
             {"type": {"text": "Start Delay"}, "clock": {"displayValue": "29'"}, "text": "Delay in match because of an injury."},
             {"type": {"text": "End Delay"}, "clock": {"displayValue": "30'"}, "text": "Delay over."},
@@ -256,6 +261,7 @@ struct ESPNClientTests {
         #expect(detail.keyEvents.count == 2)
         let goal = try #require(detail.keyEvents.first)
         #expect(goal.isGoal == true)
+        #expect(goal.typeId == "70")
         #expect(goal.clock == "23'")
         #expect(goal.participants == ["Harry Kane"])
         #expect(goal.teamId == "132")
@@ -264,6 +270,7 @@ struct ESPNClientTests {
         #expect(detail.teamStats.count == 1)
         let stat = try #require(detail.teamStats.first)
         #expect(stat.name == "Possession")
+        #expect(stat.key == "possessionPct")
         #expect(stat.homeValue == 60)
         #expect(stat.awayValue == 40)
         #expect(stat.homeDisplay == "60%")

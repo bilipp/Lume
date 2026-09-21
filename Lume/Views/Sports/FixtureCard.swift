@@ -82,15 +82,15 @@ struct FixtureCard: View {
             switch fixture.status.state {
             case .inProgress:
                 LiveBadge(fontSize: 10)
-                if !fixture.status.shortDetail.isEmpty {
-                    Text(fixture.status.shortDetail)
+                if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) {
+                    Text(verbatim: line)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             case .final:
                 EndedBadge(fontSize: 10)
             case .postponed:
-                Text(fixture.status.shortDetail.isEmpty ? "PP" : fixture.status.shortDetail)
+                Text(verbatim: fixture.status.localizedStoppage)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.secondary)
             case .scheduled:
@@ -251,12 +251,13 @@ struct FixtureCard: View {
         case .inProgress:
             parts.append(String(localized: "Live"))
             if fixture.hasTeams { parts.append(scoreSpokenLine) }
-            if !fixture.status.shortDetail.isEmpty { parts.append(fixture.status.shortDetail) }
+            if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) { parts.append(line) }
         case .final:
             parts.append(String(localized: "Final"))
             if fixture.hasTeams { parts.append(scoreSpokenLine) }
+            if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) { parts.append(qualifier) }
         case .postponed:
-            parts.append(String(localized: "Postponed"))
+            parts.append(fixture.status.localizedStoppage)
         }
         parts.append(fixture.leagueName)
         return Text(verbatim: parts.joined(separator: ", "))

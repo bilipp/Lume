@@ -215,13 +215,17 @@
                 VStack(spacing: 10) {
                     scoreText
                     EndedBadge(fontSize: 22)
+                    if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) {
+                        Text(verbatim: qualifier)
+                            .font(.system(size: 26)).foregroundStyle(.white.opacity(0.7))
+                    }
                 }
             case .inProgress:
                 VStack(spacing: 10) {
                     scoreText
                     LiveBadge(fontSize: 22)
-                    if !fixture.status.shortDetail.isEmpty {
-                        Text(verbatim: fixture.status.shortDetail)
+                    if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) {
+                        Text(verbatim: line)
                             .font(.system(size: 26)).foregroundStyle(.white.opacity(0.7))
                     }
                 }

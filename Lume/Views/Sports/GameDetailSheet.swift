@@ -212,13 +212,18 @@ struct GameDetailSheet: View {
             VStack(spacing: 6) {
                 scoreText
                 EndedBadge(fontSize: 12)
+                if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) {
+                    Text(verbatim: qualifier)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         case .inProgress:
             VStack(spacing: 6) {
                 scoreText
                 LiveBadge(fontSize: 12)
-                if !fixture.status.shortDetail.isEmpty {
-                    Text(verbatim: fixture.status.shortDetail)
+                if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) {
+                    Text(verbatim: line)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

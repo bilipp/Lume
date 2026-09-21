@@ -89,9 +89,18 @@ nonisolated struct ESPNEvent: Codable, Hashable {
 
 nonisolated struct ESPNStatus: Codable, Hashable {
     let type: ESPNStatusType?
+    /// The current period: half, quarter, inning or (hockey) period number.
+    let period: Int?
+    /// The game clock as ESPN renders it: "68'", "45'+4'", "7:30".
+    let displayClock: String?
 }
 
 nonisolated struct ESPNStatusType: Codable, Hashable {
+    let id: String?
+    /// ESPN's machine name: `STATUS_FIRST_HALF`, `STATUS_HALFTIME`,
+    /// `STATUS_FULL_TIME`, `STATUS_FINAL_PEN`, `STATUS_POSTPONED`… What the app
+    /// localises from, since `detail`/`shortDetail` are English prose.
+    let name: String?
     let state: String?
     let completed: Bool?
     let detail: String?
@@ -110,6 +119,9 @@ nonisolated struct ESPNCompetition: Codable, Hashable {
 }
 
 nonisolated struct ESPNCompetitionType: Codable, Hashable {
+    /// A key event's stable type id ("70" goal, "76" substitution, "94" yellow
+    /// card); absent on a race session's competition type.
+    let id: String?
     let abbreviation: String?
     let text: String?
 }

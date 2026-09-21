@@ -155,7 +155,7 @@ private struct TimelineSection: View {
             icon(event).frame(width: 18)
             crest(for: event.teamId)
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: event.type)
+                Text(verbatim: event.localizedTitle)
                     .font(.subheadline.weight(.medium))
                 if !event.participants.isEmpty {
                     Text(verbatim: event.participants.joined(separator: ", "))
@@ -181,10 +181,9 @@ private struct TimelineSection: View {
         }
     }
 
-    /// The card colour, read from the verbatim provider text ("Yellow Card" /
-    /// "Red Card"); a bare "card" the model could not classify shows red.
+    /// The card colour; a card the model could not classify as yellow shows red.
     private func cardColor(_ event: SportsKeyEvent) -> Color {
-        event.type.localizedCaseInsensitiveContains("yellow") ? .yellow : .red
+        event.isYellowCard ? .yellow : .red
     }
 
     private func crest(for teamId: String?) -> some View {
@@ -209,7 +208,7 @@ private struct StatsSection: View {
 
     private func statRow(_ stat: SportsTeamStat) -> some View {
         VStack(spacing: 6) {
-            Text(verbatim: stat.name)
+            Text(verbatim: stat.localizedName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack(spacing: 10) {
@@ -223,7 +222,7 @@ private struct StatsSection: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: stat.name))
+        .accessibilityLabel(Text(verbatim: stat.localizedName))
         .accessibilityValue(Text(String(localized: "\(stat.homeDisplay) versus \(stat.awayDisplay)")))
     }
 

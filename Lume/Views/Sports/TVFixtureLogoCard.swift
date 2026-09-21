@@ -52,12 +52,13 @@
             case .inProgress:
                 parts.append(String(localized: "Live"))
                 if hasTeams { parts.append(score) }
-                if !status.shortDetail.isEmpty { parts.append(status.shortDetail) }
+                if let line = status.localizedLiveDetail(family: periodFamily) { parts.append(line) }
             case .final:
                 parts.append(String(localized: "Final"))
                 if hasTeams { parts.append(score) }
+                if let qualifier = status.localizedEndingQualifier(family: periodFamily) { parts.append(qualifier) }
             case .postponed:
-                parts.append(String(localized: "Postponed"))
+                parts.append(status.localizedStoppage)
             }
             parts.append(leagueName)
             return parts.joined(separator: ", ")

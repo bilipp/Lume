@@ -137,13 +137,33 @@ nonisolated enum SportsFixtureState: String, Codable, Hashable {
 nonisolated struct SportsFixtureStatus: Codable, Hashable {
     let state: SportsFixtureState
     /// The provider's long form, e.g. "FT", "45'", "HT", or a kickoff date line.
+    /// English prose — only ever shown when the machine fields below are missing.
     let detail: String
     let shortDetail: String
+    /// The provider's machine status name (`STATUS_HALFTIME`, `STATUS_FINAL_PEN`…);
+    /// what `phase` and the localised status lines derive from. `nil` on
+    /// app-derived statuses (race sessions) and in snapshots written before the
+    /// field existed.
+    let typeName: String?
+    /// The current half / quarter / period / inning number.
+    let period: Int?
+    /// The game clock as the provider renders it: "68'", "45'+4'", "7:30".
+    let clock: String?
 
-    init(state: SportsFixtureState, detail: String = "", shortDetail: String = "") {
+    init(
+        state: SportsFixtureState,
+        detail: String = "",
+        shortDetail: String = "",
+        typeName: String? = nil,
+        period: Int? = nil,
+        clock: String? = nil
+    ) {
         self.state = state
         self.detail = detail
         self.shortDetail = shortDetail
+        self.typeName = typeName
+        self.period = period
+        self.clock = clock
     }
 }
 
@@ -343,6 +363,13 @@ nonisolated extension SportsFixture {
         sessions.first { $0.kind == .race } ?? sessions.last
     }
 
+    /// The sport of the fixture's competition, read off the "espn:{sport}/{slug}"
+    /// league id — what period and status labels are phrased for.
+    var sport: String {
+        let afterPrefix = leagueId.split(separator: ":", maxSplits: 1).last ?? Substring(leagueId)
+        return String(afterPrefix.split(separator: "/", maxSplits: 1).first ?? afterPrefix)
+    }
+
     /// The moment a card headlines: a session card's own start; the race for an
     /// unexpanded weekend (`startDate` is the first practice, which is not what
     /// anyone tunes in for); else the fixture's own start.
@@ -456,8 +483,11 @@ nonisolated extension SportsStandingRow {
 nonisolated struct SportsKeyEvent: Codable, Hashable {
     /// Match clock display, e.g. "45'+2" or "12:03".
     let clock: String
-    /// Provider event text, e.g. "Goal", "Yellow Card".
+    /// Provider event text, e.g. "Goal", "Yellow Card" — English, the fallback
+    /// when `typeId` is unknown to `localizedTitle`.
     let type: String
+    /// The provider's stable event type id ("70" goal, "94" yellow card).
+    let typeId: String?
     let teamId: String?
     let participants: [String]
     let isGoal: Bool
@@ -467,6 +497,7 @@ nonisolated struct SportsKeyEvent: Codable, Hashable {
     init(
         clock: String,
         type: String,
+        typeId: String? = nil,
         teamId: String? = nil,
         participants: [String] = [],
         isGoal: Bool = false,
@@ -475,6 +506,7 @@ nonisolated struct SportsKeyEvent: Codable, Hashable {
     ) {
         self.clock = clock
         self.type = type
+        self.typeId = typeId
         self.teamId = teamId
         self.participants = participants
         self.isGoal = isGoal
@@ -484,12 +516,25 @@ nonisolated struct SportsKeyEvent: Codable, Hashable {
 }
 
 nonisolated struct SportsTeamStat: Codable, Hashable {
+    /// The provider's English label ("Corner Kicks"); shown only when `key` has
+    /// no localised label.
     let name: String
+    /// The provider's stable stat key ("wonCorners", "possessionPct").
+    let key: String?
     /// Numeric value for drawing the per-team bar; `nil` when non-numeric.
     let homeValue: Double?
     let awayValue: Double?
     let homeDisplay: String
     let awayDisplay: String
+
+    init(name: String, key: String? = nil, homeValue: Double?, awayValue: Double?, homeDisplay: String, awayDisplay: String) {
+        self.name = name
+        self.key = key
+        self.homeValue = homeValue
+        self.awayValue = awayValue
+        self.homeDisplay = homeDisplay
+        self.awayDisplay = awayDisplay
+    }
 }
 
 nonisolated struct SportsLineupPlayer: Codable, Hashable {
