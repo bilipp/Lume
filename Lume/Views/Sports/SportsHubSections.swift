@@ -24,6 +24,9 @@ struct SportsFixtureGroup: Identifiable {
     /// already names, so the cards drop their own league crest as noise. The
     /// "My Teams" band and the Upcoming days mix leagues and keep it.
     var isSingleLeague = false
+    /// True for a group under a day header (Today / Tomorrow / "Saturday, 27 Sep"),
+    /// where the cards drop their own date line as noise.
+    var isGroupedByDay = false
 
     /// Groups fixtures by calendar day, newest header first, for the Upcoming
     /// list. Each group's title is Today / Tomorrow / a "weekday, d MMM" line.
@@ -35,7 +38,8 @@ struct SportsFixtureGroup: Identifiable {
                 title: Self.dayLabel(day, calendar: calendar),
                 logoURL: nil,
                 leagueId: nil,
-                fixtures: (grouped[day] ?? []).sorted(by: SportsFixture.displayOrder)
+                fixtures: (grouped[day] ?? []).sorted(by: SportsFixture.displayOrder),
+                isGroupedByDay: true
             )
         }
     }
@@ -90,6 +94,7 @@ struct SportsSectionsView: View {
             resolved: resolved[fixture.id] ?? [],
             isFollowed: isFollowed,
             showsLeagueMark: !group.isSingleLeague,
+            showsDate: !group.isGroupedByDay,
             onOpenDetail: { onOpenDetail(fixture) },
             onWatch: onWatch,
             onFollowToggle: onFollowToggle,

@@ -383,6 +383,12 @@ nonisolated extension SportsFixture {
     var headlineIsOnAnotherDay: Bool {
         !Calendar.current.isDate(headlineDate, inSameDayAs: startDate)
     }
+
+    /// Whether the headline falls on today's calendar day. A card names the date
+    /// otherwise, so a Saturday kickoff in Monday's rail is not read as today's.
+    var headlineIsToday: Bool {
+        Calendar.current.isDateInToday(headlineDate)
+    }
 }
 
 // MARK: - Standings

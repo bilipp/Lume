@@ -22,15 +22,32 @@ struct FixtureCard: View {
     /// Today, a league-scoped hub, a league's own screen), where the crest
     /// would only repeat the header.
     var showsLeagueMark = true
+    /// Off under a day header (the hub's Upcoming list, a league's fixtures),
+    /// where the date would only repeat it. A headline that falls on a different
+    /// day than the fixture's start — a race weekend's Sunday race — names its
+    /// day regardless.
+    var showsDate = true
     var onOpenDetail: () -> Void
     var onWatch: (ResolvedChannel) -> Void
     var onFollowToggle: (SportsTeam) -> Void
     var onPickChannel: () -> Void
 
+    /// Two crest rows — the tallest thing a card's middle can hold — so an event
+    /// card (a race, a fight night) with its two text lines stands as tall as a
+    /// two-team card beside it in the Home rail.
+    @ScaledMetric(relativeTo: .subheadline) private var contentMinHeight: CGFloat = 52
+
     /// The lone confident channel a live card offers one-tap playback for.
     private var confidentChannel: ResolvedChannel? {
         guard fixture.isInProgress else { return nil }
         return resolved.first { $0.isConfident }
+    }
+
+    /// Whether the status column names the day: whenever the headline is not
+    /// today (unless the surrounding section already says so), and always when
+    /// the headline falls on a different day than the fixture's own start.
+    private var showsDateLine: Bool {
+        fixture.headlineIsOnAnotherDay || (showsDate && !fixture.headlineIsToday)
     }
 
     var body: some View {
@@ -63,9 +80,9 @@ struct FixtureCard: View {
 
             trailing
         }
+        .frame(maxWidth: .infinity, minHeight: contentMinHeight)
         .padding(.vertical, 12)
         .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity)
         .background(gradient, in: RoundedRectangle(cornerRadius: 16))
         .glassEffectCompat(.regular, in: RoundedRectangle(cornerRadius: 16))
         .contentShape(RoundedRectangle(cornerRadius: 16))
@@ -89,15 +106,16 @@ struct FixtureCard: View {
                 }
             case .final:
                 EndedBadge(fontSize: 10)
+                if showsDateLine {
+                    dateLine
+                }
             case .postponed:
                 Text(verbatim: fixture.status.localizedStoppage)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.secondary)
             case .scheduled:
-                if fixture.headlineIsOnAnotherDay {
-                    Text(fixture.headlineDate, format: .dateTime.weekday(.abbreviated))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                if showsDateLine {
+                    dateLine
                 }
                 Text(fixture.headlineDate, format: .dateTime.hour().minute())
                     .font(.subheadline.weight(.semibold))
@@ -107,6 +125,15 @@ struct FixtureCard: View {
                 leagueMark
             }
         }
+    }
+
+    /// "Sat 27 Sep" — the day a fixture that is not today's belongs to.
+    private var dateLine: some View {
+        Text(fixture.headlineDate, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
     }
 
     /// The competition's crest; its abbreviation only when no crest is known.
@@ -246,7 +273,7 @@ struct FixtureCard: View {
         switch fixture.status.state {
         case .scheduled:
             parts.append(fixture.headlineDate.formatted(
-                date: fixture.headlineIsOnAnotherDay ? .abbreviated : .omitted, time: .shortened
+                date: showsDateLine ? .abbreviated : .omitted, time: .shortened
             ))
         case .inProgress:
             parts.append(String(localized: "Live"))
@@ -254,6 +281,7 @@ struct FixtureCard: View {
             if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) { parts.append(line) }
         case .final:
             parts.append(String(localized: "Final"))
+            if showsDateLine { parts.append(fixture.headlineDate.formatted(date: .abbreviated, time: .omitted)) }
             if fixture.hasTeams { parts.append(scoreSpokenLine) }
             if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) { parts.append(qualifier) }
         case .postponed:

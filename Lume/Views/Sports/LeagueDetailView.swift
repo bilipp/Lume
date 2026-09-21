@@ -111,12 +111,15 @@ struct LeagueDetailView: View {
         }
     }
 
-    private func fixtureCard(_ fixture: SportsFixture) -> some View {
+    /// `showsDate` is off under a day header, where the card's date would only
+    /// repeat it; the Results list keeps it, since it mixes days without one.
+    private func fixtureCard(_ fixture: SportsFixture, showsDate: Bool = true) -> some View {
         FixtureCard(
             fixture: fixture,
             resolved: resolved[fixture.id] ?? [],
             isFollowed: { follows.isFollowing($0.id) },
             showsLeagueMark: false,
+            showsDate: showsDate,
             onOpenDetail: { selectedFixture = fixture },
             onWatch: watch,
             onFollowToggle: toggleFollow,
@@ -131,7 +134,7 @@ struct LeagueDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(alignment: .bottom) { Divider().offset(y: 6) }
                 .padding(.bottom, 6)
-            ForEach(group.fixtures) { fixtureCard($0) }
+            ForEach(group.fixtures) { fixtureCard($0, showsDate: false) }
         }
     }
 

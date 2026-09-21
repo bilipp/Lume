@@ -47,7 +47,7 @@
             switch status.state {
             case .scheduled:
                 parts.append(headlineDate.formatted(
-                    date: headlineIsOnAnotherDay ? .abbreviated : .omitted, time: .shortened
+                    date: headlineIsOnAnotherDay || !headlineIsToday ? .abbreviated : .omitted, time: .shortened
                 ))
             case .inProgress:
                 parts.append(String(localized: "Live"))
@@ -181,7 +181,7 @@
                 Spacer(minLength: 0)
                 Text(
                     fixture.headlineDate,
-                    format: fixture.headlineIsOnAnotherDay
+                    format: fixture.headlineIsOnAnotherDay || !fixture.headlineIsToday
                         ? .dateTime.weekday(.abbreviated).hour().minute()
                         : .dateTime.hour().minute()
                 )
