@@ -24,6 +24,7 @@ struct SearchView: View {
     @State private var debouncedSearchText = ""
     @State private var selectedFilter: ContentFilter = .all
     @State private var results: [SearchResult] = []
+    @State private var completedSearchKey: SearchKey?
     @State private var playingMedia: PlayableMedia?
 
     /// Max matches fetched per content type. Keeps the result set bounded so the
@@ -32,6 +33,31 @@ struct SearchView: View {
 
     private var trimmedQuery: String {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Everything that changes which rows a settled query is allowed to show.
+    /// Keeping this separate from the raw input debounce also lets the UI hide
+    /// results from the previous provider or viewer immediately.
+    private var currentSearchKey: SearchKey {
+        SearchKey(
+            text: debouncedSearchText,
+            filter: selectedFilter,
+            allPlaylists: searchAllPlaylists,
+            playlistScopeToken: playlistScopeToken,
+            visibilityToken: restriction.visibilityToken
+        )
+    }
+
+    private var playlistScopeToken: String {
+        if searchAllPlaylists {
+            return playlists.map(\.id.uuidString).sorted().joined(separator: "\n")
+        }
+        return activePlaylist?.id.uuidString ?? ""
+    }
+
+    private var isSearchPending: Bool {
+        !trimmedQuery.isEmpty
+            && (trimmedQuery != debouncedSearchText || completedSearchKey != currentSearchKey)
     }
 
     var body: some View {
@@ -56,7 +82,14 @@ struct SearchView: View {
 
                     // Results — only show "No Results" once a query has actually
                     // been run, so it doesn't flash while the input is debouncing.
-                    if results.isEmpty {
+                    if isSearchPending {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                        .listRowBackground(Color.clear)
+                    } else if results.isEmpty {
                         if !debouncedSearchText.isEmpty {
                             ContentUnavailableView.search
                         }
@@ -131,9 +164,10 @@ struct SearchView: View {
                     guard !Task.isCancelled else { return }
                     debouncedSearchText = trimmed
                 }
-                .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter, allPlaylists: searchAllPlaylists)) {
-                    // Re-run whenever the settled query or the filter changes.
-                    // Filter changes are instant (no debounce on the segmented control).
+                .task(id: currentSearchKey) {
+                    // Re-run whenever the settled query, filter, provider or
+                    // viewer visibility changes. Filter and scope changes are
+                    // instant; only text input is debounced.
                     await updateResults()
                 }
         }
@@ -186,9 +220,11 @@ struct SearchView: View {
     /// thread. A Stalker portal's movies/series aren't synced, so they come
     /// from the portal's dedicated search API instead (see `searchStalker`).
     private func updateResults() async {
+        let key = currentSearchKey
         let query = debouncedSearchText
         guard !query.isEmpty else {
             results = []
+            completedSearchKey = key
             return
         }
 
@@ -216,7 +252,9 @@ struct SearchView: View {
         )
         guard !Task.isCancelled else { return }
 
+        guard currentSearchKey == key else { return }
         results = assembleResults(portal: portal, localHits: localHits)
+        completedSearchKey = key
     }
 
     /// Portal search hits (element ids) from every Stalker playlist in scope.
@@ -368,12 +406,14 @@ struct SearchView: View {
 
 // MARK: - Search Key
 
-/// Identity for the fetch task: re-run when the settled query text, the active
-/// content filter, or the cross-playlist search preference changes.
+/// Identity for the fetch task: re-run whenever the query or its permitted
+/// provider/content scope changes.
 private struct SearchKey: Equatable {
     let text: String
     let filter: ContentFilter
     let allPlaylists: Bool
+    let playlistScopeToken: String
+    let visibilityToken: String
 }
 
 // MARK: - Search Settings
@@ -437,142 +477,6 @@ enum SearchResult: Identifiable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
-    }
-}
-
-// MARK: - Search Result Row
-
-struct SearchResultRow: View {
-    let result: SearchResult
-    /// Which playlist this row came from, or `nil` to leave the badge off.
-    var playlistName: String?
-
-    var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnail
-            CachedAsyncImage(url: thumbnailURL, maxPixelSize: 90) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .overlay {
-                            ProgressView()
-                        }
-                case let .success(image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .overlay {
-                            Image(systemName: iconName)
-                                .foregroundStyle(.secondary)
-                        }
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .frame(width: 60, height: 90)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .lineLimit(2)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: categoryIcon)
-                        Text(LocalizedStringKey(categoryName))
-                    }
-                    .foregroundStyle(.blue)
-                    // Only present while searching across playlists, where the
-                    // category alone doesn't say which provider a row is from.
-                    if let playlistName {
-                        HStack(spacing: 4) {
-                            Image(systemName: "rectangle.stack")
-                            Text(playlistName)
-                        }
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    }
-                }
-                .font(.caption2)
-            }
-
-            Spacer()
-        }
-    }
-
-    private var thumbnailURL: URL? {
-        switch result {
-        case let .movie(movie):
-            URL(string: movie.streamIcon ?? "")
-        case let .series(series):
-            URL(string: series.cover ?? "")
-        case let .liveStream(stream):
-            URL(string: stream.streamIcon ?? "")
-        }
-    }
-
-    private var title: String {
-        switch result {
-        case let .movie(movie):
-            movie.name
-        case let .series(series):
-            series.name
-        case let .liveStream(stream):
-            stream.name
-        }
-    }
-
-    private var subtitle: String {
-        switch result {
-        case let .movie(movie):
-            movie.genre ?? movie.releaseDate ?? ""
-        case let .series(series):
-            series.genre ?? series.releaseDate ?? ""
-        case .liveStream:
-            "Live"
-        }
-    }
-
-    private var categoryName: String {
-        switch result {
-        case .movie:
-            "Movie"
-        case .series:
-            "Series"
-        case .liveStream:
-            "Live TV"
-        }
-    }
-
-    private var categoryIcon: String {
-        switch result {
-        case .movie:
-            "film"
-        case .series:
-            "tv"
-        case .liveStream:
-            "antenna.radiowaves.left.and.right"
-        }
-    }
-
-    private var iconName: String {
-        switch result {
-        case .movie:
-            "film"
-        case .series:
-            "tv"
-        case .liveStream:
-            "antenna.radiowaves.left.and.right"
-        }
     }
 }
 
