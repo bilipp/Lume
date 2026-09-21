@@ -33,13 +33,23 @@ final class Playlist {
     /// `00:1A:79:xx:xx:xx`). `nil` for Xtream / m3u sources.
     var macAddress: String?
 
-    /// Jellyfin session, filled at login and refreshed on every sync. The
+    /// Jellyfin/Emby session, filled at login and refreshed on every sync. The
     /// access token authenticates stream and image requests; the user id scopes
     /// library queries. Both are device-local (a sibling device re-authenticates
     /// with the mirrored username/password on its next sync), so neither is
     /// mirrored to CloudKit. `nil` for every other source type.
+    ///
+    /// Named for Jellyfin because that source type shipped first; Emby speaks
+    /// the same API and reuses the columns rather than growing a parallel pair.
     var jellyfinAccessToken: String?
     var jellyfinUserId: String?
+
+    /// Plex server token, filled at login and refreshed on every sync. Unlike
+    /// the Jellyfin pair this can legitimately stay `nil`: a server with
+    /// "allow unauthenticated access on the local network" answers every
+    /// request without one. Device-local for the same reason, so it is not
+    /// mirrored to CloudKit. `nil` for every other source type.
+    var plexAccessToken: String?
 
     var serverTimezone: String?
     var serverVersion: String?
@@ -90,15 +100,34 @@ final class Playlist {
         sourceTypeRaw = PlaylistSourceType.webdav.rawValue
     }
 
-    /// Creates a Jellyfin server playlist. `serverURL` holds the server base
-    /// URL (e.g. `http://192.168.1.10:8096`); `accessToken`/`userId` are the
-    /// session from the login handshake. Stored alongside the password so a
-    /// rotated or revoked token can be re-issued on the next sync.
-    convenience init(name: String, jellyfinURL: String, username: String, password: String, accessToken: String, userId: String) {
-        self.init(name: name, serverURL: jellyfinURL, username: username, password: password)
-        sourceTypeRaw = PlaylistSourceType.jellyfin.rawValue
+    /// Creates a Jellyfin or Emby server playlist. `serverURL` holds the
+    /// server base URL (e.g. `http://192.168.1.10:8096`);
+    /// `accessToken`/`userId` are the session from the login handshake. Stored
+    /// alongside the password so a rotated or revoked token can be re-issued
+    /// on the next sync.
+    convenience init(
+        name: String,
+        mediaServerURL: String,
+        flavor: MediaServerFlavor,
+        username: String,
+        password: String,
+        accessToken: String,
+        userId: String
+    ) {
+        self.init(name: name, serverURL: mediaServerURL, username: username, password: password)
+        sourceTypeRaw = flavor.sourceType.rawValue
         jellyfinAccessToken = accessToken
         jellyfinUserId = userId
+    }
+
+    /// Creates a Plex server playlist. `serverURL` holds the server base URL
+    /// (e.g. `http://192.168.1.10:32400`); `accessToken` is the `X-Plex-Token`
+    /// the login handshake resolved, or `nil` for a server that allows
+    /// unauthenticated access on the local network.
+    convenience init(name: String, plexURL: String, username: String = "", accessToken: String?) {
+        self.init(name: name, serverURL: plexURL, username: username, password: "")
+        sourceTypeRaw = PlaylistSourceType.plex.rawValue
+        plexAccessToken = accessToken
     }
 }
 
@@ -111,6 +140,30 @@ enum PlaylistSourceType: String, Codable {
     /// only a convention — new cases always append here.)
     case webdav
     case jellyfin
+    case plex
+    case emby
+
+    /// Whether this source is a personal media server — a library of movies
+    /// and series that a server application indexes and streams, as opposed
+    /// to an IPTV provider or a bare file share. Written as an exhaustive
+    /// switch so a future source type cannot inherit a default.
+    var isMediaServer: Bool {
+        switch self {
+        case .jellyfin, .emby, .plex: true
+        case .xtream, .m3u, .stalker, .webdav: false
+        }
+    }
+
+    /// Whether a playlist of this source can ever carry live channels. A file
+    /// share has none by definition, and the media servers' Live TV tuner
+    /// APIs are not synced — so the generic "sync to load channels" empty
+    /// state would send the user into an endless re-sync loop.
+    var canCarryLiveChannels: Bool {
+        switch self {
+        case .xtream, .m3u, .stalker: true
+        case .webdav, .jellyfin, .emby, .plex: false
+        }
+    }
 }
 
 /// The container a playlist's live streams are requested in.
@@ -228,9 +281,9 @@ extension Playlist {
         // A WebDAV file is a plain byte range — there is no HLS/MPEG-TS choice
         // to make.
         case .webdav: false
-        // A Jellyfin direct stream is a plain byte range too — transcoding
-        // profiles are a later change.
-        case .jellyfin: false
+        // A Jellyfin/Emby direct stream is a plain byte range too, and so is
+        // a Plex part — transcoding profiles are a later change.
+        case .jellyfin, .emby, .plex: false
         }
     }
 
@@ -247,14 +300,15 @@ extension Playlist {
         // auth challenge after the app is relaunched.
         case .webdav: false
         // Deferred to a later change: downloads need the session token as a
-        // header the background session cannot re-issue after relaunch.
-        case .jellyfin: false
+        // header the background session cannot re-issue after relaunch. The
+        // same holds for Plex's `X-Plex-Token`.
+        case .jellyfin, .emby, .plex: false
         }
     }
 
-    /// Whether a series' episodes are fetched from the provider on demand. m3u
-    /// and WebDAV import every episode during sync, so there is nothing to
-    /// fetch lazily.
+    /// Whether a series' episodes are fetched from the provider on demand. The
+    /// m3u, WebDAV and media-server pipelines import every episode during sync,
+    /// so there is nothing to fetch lazily.
     var supportsPerSeriesEpisodeFetch: Bool {
         sourceType == .xtream || sourceType == .stalker
     }

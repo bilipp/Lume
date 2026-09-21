@@ -141,7 +141,7 @@ struct LiveTVView: View {
                         systemImage: "antenna.radiowaves.left.and.right",
                         description: Text("Add a playlist in Settings to start watching live TV")
                     )
-                } else if categories.isEmpty || webdavHasNoLiveChannels {
+                } else if categories.isEmpty || sourceHasNoLiveChannels {
                     VStack(spacing: 20) {
                         LiveTVEmptyState(sourceType: activePlaylist?.knownSourceType)
                     }
@@ -299,10 +299,10 @@ struct LiveTVView: View {
 
     /// A WebDAV share carries no live channels, so its rail stays empty even
     /// when another playlist has live categories — the unscoped `categories`
-    /// query cannot see that on its own. Same for Jellyfin, whose Live TV
-    /// tuner API is not synced.
-    private var webdavHasNoLiveChannels: Bool {
-        (activePlaylist?.knownSourceType == .webdav || activePlaylist?.knownSourceType == .jellyfin) && categorySections.isEmpty
+    /// query cannot see that on its own. Same for the media servers, whose
+    /// Live TV tuner APIs are not synced.
+    private var sourceHasNoLiveChannels: Bool {
+        activePlaylist?.knownSourceType.map { !$0.canCarryLiveChannels } == true && categorySections.isEmpty
     }
 
     /// The id prefix every Category / LiveStream of the active playlist shares.

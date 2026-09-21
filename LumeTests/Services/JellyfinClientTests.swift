@@ -171,17 +171,40 @@ struct JellyfinClientTests {
         {"ProductName": "Jellyfin Server", "Version": "10.11.0"}
         """))
 
-        try await makeClient().probe(server: server(host))
+        #expect(try await makeClient().probe(server: server(host)) == .jellyfin)
     }
 
-    @Test func `probe rejects a non-Jellyfin host`() async {
+    /// Emby sends no `ProductName` at all — the server identity it does send
+    /// is what tells it apart from an unrelated JSON endpoint.
+    @Test func `probe recognizes Emby by its server identity`() async throws {
+        let host = "embyprobeok.test"
+        JellyfinStubProtocol.register(host: host, path: "/System/Info/Public", stub: .init(status: 200, body: """
+        {"ServerName": "3ebc5c5eeb03", "Version": "4.9.5.0", "Id": "2f56ec98046d457392faaed24a274c2e"}
+        """))
+
+        #expect(try await makeClient().probe(server: server(host)) == .emby)
+    }
+
+    @Test func `probe rejects a host that is neither`() async {
         let host = "jfprobebad.test"
         JellyfinStubProtocol.register(host: host, path: "/System/Info/Public", stub: .init(status: 200, body: """
         {"ProductName": "Something Else"}
         """))
 
-        let result = await failure { try await makeClient().probe(server: server(host)) }
-        #expect(result == JellyfinError.notAJellyfinServer.logDescription)
+        let result = await failure { _ = try await makeClient().probe(server: server(host)) }
+        #expect(result == JellyfinError.notAMediaServer.logDescription)
+    }
+
+    /// A 200 with unrelated JSON must not read as Emby just because
+    /// `ProductName` is missing.
+    @Test func `probe rejects an unrelated JSON endpoint`() async {
+        let host = "jfprobejson.test"
+        JellyfinStubProtocol.register(host: host, path: "/System/Info/Public", stub: .init(status: 200, body: """
+        {"status": "ok"}
+        """))
+
+        let result = await failure { _ = try await makeClient().probe(server: server(host)) }
+        #expect(result == JellyfinError.notAMediaServer.logDescription)
     }
 
     // MARK: - Libraries & items
@@ -270,7 +293,7 @@ struct JellyfinClientTests {
 
     @Test func `a jellyfin movie plays through the token-free stream URL with a header`() throws {
         let playlist = Playlist(
-            name: "JF", jellyfinURL: "http://jellyfin.test:8096",
+            name: "JF", mediaServerURL: "http://jellyfin.test:8096", flavor: .jellyfin,
             username: "bilipp", password: "test", accessToken: "tok", userId: "user1"
         )
         let movie = Movie(id: "p-jellyfin-abc", streamId: 1, name: "Arrival")
@@ -283,7 +306,7 @@ struct JellyfinClientTests {
 
     @Test func `a jellyfin episode takes the direct-source path`() throws {
         let playlist = Playlist(
-            name: "JF", jellyfinURL: "http://jellyfin.test:8096",
+            name: "JF", mediaServerURL: "http://jellyfin.test:8096", flavor: .jellyfin,
             username: "bilipp", password: "test", accessToken: "tok", userId: "user1"
         )
         let episode = Episode(
@@ -320,9 +343,9 @@ struct JellyfinClientTests {
     }
 
     @Test func `the jellyfin id hash is stable and positive`() {
-        let first = ContentSyncManager.jellyfinHash("814993f8d3f97a7b8a40e2ca4dbd3187")
-        #expect(first == ContentSyncManager.jellyfinHash("814993f8d3f97a7b8a40e2ca4dbd3187"))
+        let first = ContentSyncManager.mediaServerHash("814993f8d3f97a7b8a40e2ca4dbd3187")
+        #expect(first == ContentSyncManager.mediaServerHash("814993f8d3f97a7b8a40e2ca4dbd3187"))
         #expect(first > 0)
-        #expect(ContentSyncManager.jellyfinHash("other-id") != first)
+        #expect(ContentSyncManager.mediaServerHash("other-id") != first)
     }
 }

@@ -124,19 +124,28 @@ extension PlayableMedia {
         return ["Authorization": "Basic \(token)"]
     }
 
-    /// The session-token header a Jellyfin server needs at playback time. The
-    /// stored stream URLs are token-free on purpose (see the property comment),
-    /// so the session authenticates the request instead. `nil` before the
-    /// playlist's first sync, which is what issues the session.
+    /// The session-token header a Jellyfin or Emby server needs at playback
+    /// time. The stored stream URLs are token-free on purpose (see the
+    /// property comment), so the session authenticates the request instead.
+    /// `nil` before the playlist's first sync, which is what issues the
+    /// session.
     private static func jellyfinHeaders(for playlist: Playlist) -> [String: String]? {
-        guard playlist.sourceType == .jellyfin else { return nil }
+        guard playlist.sourceType == .jellyfin || playlist.sourceType == .emby else { return nil }
         return JellyfinClient.playbackHeaders(token: playlist.jellyfinAccessToken)
+    }
+
+    /// The `X-Plex-Token` header a Plex server needs at playback time. `nil`
+    /// for a server that allows unauthenticated access on the local network,
+    /// which stores no token at all.
+    private static func plexHeaders(for playlist: Playlist) -> [String: String]? {
+        guard playlist.sourceType == .plex else { return nil }
+        return PlexClient.playbackHeaders(token: playlist.plexAccessToken)
     }
 
     /// The auth headers for the playlist's source, if it authenticates per
     /// request rather than per URL. `nil` for the URL-credential sources.
     private static func authHeaders(for playlist: Playlist) -> [String: String]? {
-        webdavHeaders(for: playlist) ?? jellyfinHeaders(for: playlist)
+        webdavHeaders(for: playlist) ?? jellyfinHeaders(for: playlist) ?? plexHeaders(for: playlist)
     }
 
     static func from(movie: Movie, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
@@ -180,9 +189,10 @@ extension PlayableMedia {
             guard let cmd = directURL else { return nil }
             return StalkerLink.placeholder(type: .vod, cmd: cmd)
         }
-        // WebDAV and Jellyfin deliberately take the direct-URL path: the walk
-        // stored the resolved file URL (WebDAV) or the sync stored the
-        // token-free stream URL (Jellyfin), and there is nothing to build.
+        // WebDAV and the media servers deliberately take the direct-URL path:
+        // the walk stored the resolved file URL (WebDAV) or the sync stored the
+        // token-free stream URL (Jellyfin/Emby/Plex), and there is nothing to
+        // build.
         return directURL.flatMap(URL.init(string:)) ?? build()
     }
 
@@ -209,7 +219,7 @@ extension PlayableMedia {
         case .stalker:
             guard let cmd = episode.directSource, let placeholder = StalkerLink.placeholder(type: .vod, cmd: cmd) else { return nil }
             url = placeholder
-        case .m3u, .webdav, .jellyfin:
+        case .m3u, .webdav, .jellyfin, .emby, .plex:
             guard let resolved = episode.directSource.flatMap(URL.init(string:)) else { return nil }
             url = resolved
         case .xtream:
@@ -245,8 +255,9 @@ extension PlayableMedia {
             guard let cmd = stream.directURL, let placeholder = StalkerLink.placeholder(type: .itv, cmd: cmd) else { return nil }
             url = placeholder
         } else {
-            // WebDAV and Jellyfin deliberately take this direct-URL path too,
-            // though neither playlist kind has live channels to reach it with.
+            // WebDAV and the media servers deliberately take this direct-URL
+            // path too, though none of those playlist kinds has live channels
+            // to reach it with.
             // An m3u channel plays at the URL the playlist listed; the chosen
             // container rewrites it only when the provider used one of the two
             // interchangeable live endpoints. Xtream URLs are built with it.

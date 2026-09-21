@@ -18,6 +18,7 @@ actor ContentSyncManager {
     let xtreamClient: XtreamClient
     let webdavClient: WebDAVClient
     let jellyfinClient: JellyfinClient
+    let plexClient: PlexClient
     private var activeSyncPlaylistIDs: Set<UUID> = []
 
     /// Number of items to process before saving and resetting the context.
@@ -29,12 +30,14 @@ actor ContentSyncManager {
         modelContainer: ModelContainer,
         xtreamClient: XtreamClient = XtreamClient(),
         webdavClient: WebDAVClient = WebDAVClient(),
-        jellyfinClient: JellyfinClient = JellyfinClient()
+        jellyfinClient: JellyfinClient = JellyfinClient(),
+        plexClient: PlexClient = PlexClient()
     ) {
         self.modelContainer = modelContainer
         self.xtreamClient = xtreamClient
         self.webdavClient = webdavClient
         self.jellyfinClient = jellyfinClient
+        self.plexClient = plexClient
     }
 
     // MARK: - Playlist Sync
@@ -100,8 +103,12 @@ actor ContentSyncManager {
             try await performStalkerSync(playlist: playlist, playlistId: playlistId, progress: progress, full: full)
         case .webdav:
             try await performWebDAVSync(playlist: playlist, playlistId: playlistId, progress: progress)
-        case .jellyfin:
-            try await performJellyfinSync(playlist: playlist, playlistId: playlistId, progress: progress)
+        case .jellyfin, .emby:
+            // Both speak the same API; the flavour only tags the rows.
+            let flavor = MediaServerFlavor(sourceType: playlist.sourceType) ?? .jellyfin
+            try await performMediaServerSync(playlist: playlist, playlistId: playlistId, flavor: flavor, progress: progress)
+        case .plex:
+            try await performPlexSync(playlist: playlist, playlistId: playlistId, progress: progress)
         }
 
         // Every source writes the same unread history rows (see the method).
@@ -403,9 +410,9 @@ actor ContentSyncManager {
             // WebDAV episodes are imported alongside the rest of the catalog
             // during sync, so there is nothing to fetch lazily here.
             []
-        case .jellyfin:
-            // Jellyfin episodes are imported alongside the rest of the catalog
-            // during sync, so there is nothing to fetch lazily here.
+        case .jellyfin, .emby, .plex:
+            // Media-server episodes are imported alongside the rest of the
+            // catalog during sync, so there is nothing to fetch lazily here.
             []
         }
     }

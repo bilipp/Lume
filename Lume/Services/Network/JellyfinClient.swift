@@ -2,9 +2,11 @@
 //  JellyfinClient.swift
 //  Lume
 //
-//  Talks to a Jellyfin server's REST API: password login, library views and
-//  recursive item queries. Playback and artwork URLs are derived from the item
-//  ids the sync stores — the catalog rows never carry the session token (see
+//  Talks to a Jellyfin *or Emby* server's REST API: password login, library
+//  views and recursive item queries. The two are wire-compatible (see
+//  `MediaServerFlavor`), so one client serves both and only `probe` tells them
+//  apart. Playback and artwork URLs are derived from the item ids the sync
+//  stores — the catalog rows never carry the session token (see
 //  `PlayableMedia`), it travels in `httpHeaders` instead.
 //
 
@@ -21,7 +23,7 @@ nonisolated enum JellyfinError: LocalizedError {
     case invalidURL
     case networkError(Error)
     case unauthorized
-    case notAJellyfinServer
+    case notAMediaServer
     case serverError(Int)
     case invalidResponse
 
@@ -33,8 +35,8 @@ nonisolated enum JellyfinError: LocalizedError {
             String(localized: "Network error: \(error.localizedDescription)")
         case .unauthorized:
             String(localized: "The server rejected these credentials.")
-        case .notAJellyfinServer:
-            String(localized: "This URL does not point to a Jellyfin server. Enter the server's base address, e.g. http://192.168.1.10:8096.")
+        case .notAMediaServer:
+            String(localized: "This URL does not point to a Jellyfin or Emby server. Enter the server's base address, e.g. http://192.168.1.10:8096.")
         case let .serverError(code):
             String(localized: "Server error (HTTP \(code)).")
         case .invalidResponse:
@@ -52,8 +54,8 @@ nonisolated enum JellyfinError: LocalizedError {
             "network error (\((error as NSError).domain) \((error as NSError).code))"
         case .unauthorized:
             "HTTP 401 unauthorized"
-        case .notAJellyfinServer:
-            "not a Jellyfin server"
+        case .notAMediaServer:
+            "not a Jellyfin or Emby server"
         case let .serverError(code):
             "HTTP \(code)"
         case .invalidResponse:
@@ -167,11 +169,18 @@ private nonisolated struct JellyfinAuthUser: Decodable {
     }
 }
 
+/// `GET /System/Info/Public` on both products. Jellyfin names itself in
+/// `ProductName`; Emby omits that key entirely and is recognized by the
+/// server identity it does send.
 private nonisolated struct JellyfinPublicInfo: Decodable {
     let productName: String?
+    let id: String?
+    let version: String?
 
     enum CodingKeys: String, CodingKey {
         case productName = "ProductName"
+        case id = "Id"
+        case version = "Version"
     }
 }
 
@@ -222,7 +231,7 @@ final nonisolated class JellyfinClient: Sendable {
         case 401, 403:
             throw JellyfinError.unauthorized
         case 404:
-            throw JellyfinError.notAJellyfinServer
+            throw JellyfinError.notAMediaServer
         default:
             throw JellyfinError.serverError(response.statusCode)
         }
@@ -236,19 +245,28 @@ final nonisolated class JellyfinClient: Sendable {
 
     // MARK: - Libraries & items
 
-    /// The unauthenticated probe for the add-playlist connection test. Answers
-    /// on every Jellyfin server without credentials and 404s anywhere else.
-    func probe(server: URL) async throws {
+    /// The unauthenticated probe for the add-playlist connection test, which
+    /// doubles as the Jellyfin/Emby discriminator. Answers on both products
+    /// without credentials and 404s anywhere else.
+    func probe(server: URL) async throws -> MediaServerFlavor {
         let url = server.appendingPathComponent("System/Info/Public")
         let (data, response) = try await send(URLRequest(url: url))
         guard response.statusCode == 200 else {
             throw JellyfinError.serverError(response.statusCode)
         }
-        guard let info = try? JSONDecoder().decode(JellyfinPublicInfo.self, from: data),
-              info.productName == "Jellyfin Server"
-        else {
-            throw JellyfinError.notAJellyfinServer
+        guard let info = try? JSONDecoder().decode(JellyfinPublicInfo.self, from: data) else {
+            throw JellyfinError.notAMediaServer
         }
+        if info.productName == "Jellyfin Server" {
+            return .jellyfin
+        }
+        // Emby sends no `ProductName`. Requiring both an id and a version
+        // keeps an unrelated JSON endpoint that happens to answer 200 here
+        // from being taken for a media server.
+        guard info.id?.isEmpty == false, info.version?.isEmpty == false else {
+            throw JellyfinError.notAMediaServer
+        }
+        return .emby
     }
 
     func views(server: URL, session: JellyfinSession) async throws -> [JellyfinLibrary] {
@@ -402,7 +420,7 @@ final nonisolated class JellyfinClient: Sendable {
 
 // MARK: - Playback auth for the header-less engine
 
-/// VLCKit exposes no arbitrary-header API, so the Jellyfin session token a
+/// VLCKit exposes no arbitrary-header API, so the Jellyfin/Emby session token a
 /// `PlayableMedia` carries as `Authorization: MediaBrowser Token="…"` is
 /// converted back into a transient `api_key` query item at the handoff — the
 /// same contract as `HTTPBasicCredentials`: built at the point of use, never

@@ -65,7 +65,7 @@
             ScrollView {
                 LazyVStack(spacing: 14) {
                     if channels.isEmpty {
-                        if sourceType == .webdav {
+                        if sourceType.map({ !$0.canCarryLiveChannels }) == true {
                             LiveTVEmptyState(sourceType: sourceType)
                                 .padding(.top, 80)
                         } else {

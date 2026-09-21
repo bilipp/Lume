@@ -61,9 +61,14 @@ import SwiftUI
                         } else if isWebDAV {
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        } else if isJellyfin {
+                        } else if isMediaServer {
                             TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                        } else if isPlex {
+                            // A Plex playlist can be credential-free, so both
+                            // rows stay optional here too.
+                            TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
+                            TVSettingsField(title: "Password or token (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
                         } else {
                             TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
@@ -97,9 +102,16 @@ import SwiftUI
                             if !playlist.password.isEmpty {
                                 TVSettingsValueRow("Password") { Text("••••••••") }
                             }
-                        } else if isJellyfin {
+                        } else if isMediaServer {
                             TVSettingsValueRow("Username", value: playlist.username)
                             TVSettingsValueRow("Password") { Text("••••••••") }
+                        } else if isPlex {
+                            if !playlist.username.isEmpty {
+                                TVSettingsValueRow("Username", value: playlist.username)
+                            }
+                            if playlist.plexAccessToken?.isEmpty == false {
+                                TVSettingsValueRow("Token") { Text("••••••••") }
+                            }
                         } else {
                             TVSettingsValueRow("Username", value: playlist.username)
                             TVSettingsValueRow("Password") { Text("••••••••") }

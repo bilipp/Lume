@@ -21,7 +21,9 @@ struct WebDAVLocalizationTests {
         "e.g. My Media Server",
         "e.g. http://192.168.1.10:8080/Movies/",
         "Enter the full URL of the folder that holds your media — a server's root address usually isn't browsable.",
-        "Leave the username and password empty for an anonymous share.",
+        // Shared with the other media-server kinds, so the WebDAV sentence
+        // now carries the Plex clause too.
+        "Leave the username and password empty for an anonymous share. For Plex, enter your Plex account — or paste an X-Plex-Token in the password field.",
         "The first connection asks permission to find devices on your local network. If you decline it, only the system Settings app can allow it again.",
         "Enter the full folder URL — a server's root address isn't browsable. Username and password are optional. A declined local network prompt can only be allowed again in Settings."
     ]

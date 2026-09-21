@@ -3,9 +3,9 @@
 //  Lume
 //
 //  The Media Server half of the add-playlist form: one URL field whose server
-//  kind — Jellyfin, WebDAV, and later Plex/Emby — is detected, not picked.
-//  Detection lives here; the per-kind connection tests stay in
-//  `WebDAVAddCheck` / `JellyfinAddCheck`, which this delegates to.
+//  kind — Jellyfin, Emby, Plex or WebDAV — is detected, not picked. Detection
+//  lives here; the per-kind connection tests stay in `WebDAVAddCheck` /
+//  `JellyfinAddCheck` / `PlexAddCheck`, which this delegates to.
 //
 
 import SwiftUI
@@ -48,9 +48,9 @@ import SwiftUI
                 Text("Media Server")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Enter your server address — Lume recognizes Jellyfin servers and WebDAV shares automatically.")
+                    Text("Enter your server address — Lume recognizes Jellyfin, Emby and Plex servers and WebDAV shares automatically.")
                     Text("For a WebDAV share, enter the full path of the folder that holds your media — a server's root address usually isn't browsable.")
-                    Text("Leave the username and password empty for an anonymous share.")
+                    Text("Leave the username and password empty for an anonymous share. For Plex, enter your Plex account — or paste an X-Plex-Token in the password field.")
                     Text("The first connection asks permission to find devices on your local network. If you decline it, only the system Settings app can allow it again.")
                 }
             }
@@ -89,14 +89,26 @@ extension LoginView {
             do {
                 try await withConnectionTimeout {
                     switch try await MediaServerAddCheck.verify(input) {
-                    case let .jellyfin(serverURL, session):
+                    case let .mediaServer(serverURL, flavor, session):
                         insertAndFinish(Playlist(
                             name: playlistName,
-                            jellyfinURL: serverURL,
+                            mediaServerURL: serverURL,
+                            flavor: flavor,
                             username: user,
                             password: password,
                             accessToken: session.accessToken,
                             userId: session.userId
+                        ))
+                    case let .plex(serverURL, token):
+                        // Only the resolved token is stored: the plex.tv
+                        // password bought it and has no further use, and a
+                        // server that answers unauthenticated stores nothing
+                        // at all.
+                        insertAndFinish(Playlist(
+                            name: playlistName,
+                            plexURL: serverURL,
+                            username: user,
+                            accessToken: token
                         ))
                     case let .webdav(url):
                         // An anonymous share stores no password: a stray one
@@ -120,18 +132,21 @@ extension LoginView {
 
 // MARK: - Detection & connection test
 
-/// The server kinds the media-server entry point detects. New kinds (Plex,
-/// Emby, …) add a case here, a probe in `detect`, and a branch in `verify` —
-/// the form, the playlist construction and the message mapping follow.
-enum MediaServerType {
-    case jellyfin
+/// The server kinds the media-server entry point detects. A new kind adds a
+/// case here, a probe in `detect`, and a branch in `verify` — the form, the
+/// playlist construction and the message mapping follow.
+enum MediaServerType: Equatable {
+    /// Jellyfin and Emby, which share one API and one connection test; the
+    /// flavour only decides which product the copy and the rows name.
+    case mediaServer(MediaServerFlavor)
+    case plex
     case webdav
 }
 
 enum MediaServerError: Error, Equatable {
-    /// Neither probe recognized the address.
+    /// No probe recognized the address.
     case unsupported
-    /// A Jellyfin server was detected but no username was entered.
+    /// A Jellyfin or Emby server was detected but no username was entered.
     case missingCredentials
 }
 
@@ -144,7 +159,10 @@ enum MediaServerAddCheck {
 
     /// What to store on success, per detected kind.
     enum Verified {
-        case jellyfin(serverURL: String, session: JellyfinSession)
+        case mediaServer(serverURL: String, flavor: MediaServerFlavor, session: JellyfinSession)
+        /// `token` is `nil` for a server that allows unauthenticated access
+        /// on the local network.
+        case plex(serverURL: String, token: String?)
         case webdav(url: String)
     }
 
@@ -161,13 +179,20 @@ enum MediaServerAddCheck {
             throw JellyfinError.invalidURL
         }
         switch try await detect(server: url, urlSession: urlSession) {
-        case .jellyfin:
+        case .mediaServer:
             let user = input.username.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !user.isEmpty else {
                 throw MediaServerError.missingCredentials
             }
             let verified = try await JellyfinAddCheck.verify(.init(url: input.url, username: user, password: input.password), urlSession: urlSession)
-            return .jellyfin(serverURL: verified.serverURL, session: verified.session)
+            return .mediaServer(serverURL: verified.serverURL, flavor: verified.flavor, session: verified.session)
+        case .plex:
+            // Plex needs no username: the token can come from a pasted value
+            // or from a server that allows unauthenticated local access, so
+            // there is nothing to require up front.
+            let user = input.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            let verified = try await PlexAddCheck.verify(.init(url: input.url, username: user, password: input.password), urlSession: urlSession)
+            return .plex(serverURL: verified.serverURL, token: verified.token)
         case .webdav:
             let user = input.username.trimmingCharacters(in: .whitespacesAndNewlines)
             let url = try await WebDAVAddCheck.verify(.init(url: input.url, username: user, password: input.password), urlSession: urlSession)
@@ -175,28 +200,39 @@ enum MediaServerAddCheck {
         }
     }
 
-    /// Runs the two probes in order: Jellyfin's public endpoint answers
-    /// without credentials, so a Jellyfin server is recognized before any
-    /// login attempt. A `401` to the WebDAV probe still means WebDAV — a
-    /// share demanding credentials.
+    /// Runs the probes in order, cheapest and most specific first: the
+    /// Jellyfin/Emby public endpoint and Plex's `/identity` both answer
+    /// without credentials, so either is recognized before any login attempt,
+    /// and WebDAV — the one kind with no identifying endpoint — is left last.
+    /// A `401` to the WebDAV probe still means WebDAV: a share demanding
+    /// credentials.
     ///
-    /// Network errors pass through untouched (a dead host fails both probes,
+    /// Network errors pass through untouched (a dead host fails every probe,
     /// and the address deserves the local-network copy, not "unsupported").
-    /// Anything else that rules out both kinds surfaces as `unsupported`.
+    /// Anything else that rules out every kind surfaces as `unsupported`.
     static func detect(server: URL, urlSession: URLSession? = nil) async throws -> MediaServerType {
+        // Remembered only to prefer it in the WebDAV arm below: a host that is
+        // simply unreachable should report that, not "unsupported".
+        var networkError: Error?
         do {
-            try await JellyfinClient(urlSession: urlSession).probe(server: server)
-            return .jellyfin
+            return try await .mediaServer(JellyfinClient(urlSession: urlSession).probe(server: server))
         } catch let error as JellyfinError {
             if case .networkError = error {
-                // Remembered only to prefer it below: see WebDAV arm.
-                return try await detectWebDAV(server: server, urlSession: urlSession, jellyfinNetworkError: error)
+                networkError = error
             }
         }
-        return try await detectWebDAV(server: server, urlSession: urlSession, jellyfinNetworkError: nil)
+        do {
+            try await PlexClient(urlSession: urlSession).probe(server: server)
+            return .plex
+        } catch let error as PlexError {
+            if case .networkError = error, networkError == nil {
+                networkError = error
+            }
+        }
+        return try await detectWebDAV(server: server, urlSession: urlSession, earlierNetworkError: networkError)
     }
 
-    private static func detectWebDAV(server: URL, urlSession: URLSession?, jellyfinNetworkError: JellyfinError?) async throws -> MediaServerType {
+    private static func detectWebDAV(server: URL, urlSession: URLSession?, earlierNetworkError: Error?) async throws -> MediaServerType {
         do {
             try await WebDAVClient(urlSession: urlSession).probe(server, credentials: nil)
             return .webdav
@@ -204,7 +240,7 @@ enum MediaServerAddCheck {
             return .webdav
         } catch let error as WebDAVError {
             if case .networkError = error {
-                throw jellyfinNetworkError ?? error
+                throw earlierNetworkError ?? error
             }
             throw MediaServerError.unsupported
         }
@@ -222,6 +258,13 @@ enum MediaServerAddCheck {
                 timedOut: false
             )
         }
+        if error is PlexError {
+            return PlexAddCheck.message(
+                for: error,
+                input: .init(url: input.url, username: input.username, password: input.password),
+                timedOut: false
+            )
+        }
         if error is WebDAVError || error is WebDAVAddCheck.AddError {
             return WebDAVAddCheck.message(
                 for: error,
@@ -234,23 +277,23 @@ enum MediaServerAddCheck {
         }
         switch serverError {
         case .unsupported:
-            return String(localized: "Lume couldn't recognize a media server at that address. Enter your Jellyfin server's base address, or the full path of a WebDAV folder.")
+            return String(localized: "Lume couldn't recognize a media server at that address. Enter your Jellyfin, Emby or Plex server's base address, or the full path of a WebDAV folder.")
         case .missingCredentials:
-            return String(localized: "This Jellyfin server needs a username and password. Enter them and try again.")
+            return String(localized: "This server needs a username and password. Enter them and try again.")
         }
     }
 
     /// tvOS hint copy. One line, because the tvOS form shows a single hint
     /// under the fields.
     static var hint: LocalizedStringKey {
-        "Enter your server address — Jellyfin and WebDAV are detected automatically. A declined local network prompt can only be allowed again in Settings."
+        "Enter your server address — Jellyfin, Emby, Plex and WebDAV are detected automatically. A declined local network prompt can only be allowed again in Settings."
     }
 }
 
 // MARK: - Shared address copy
 
 /// The local-network explanation and the private-address classifier, shared by
-/// all three add-playlist connection tests so the copy and the ranges stay
+/// every add-playlist connection test so the copy and the ranges stay
 /// identical wherever a URL is entered.
 enum ServerAddressHelp {
     /// A declined local-network prompt is indistinguishable from an unreachable

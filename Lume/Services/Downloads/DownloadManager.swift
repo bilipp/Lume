@@ -180,11 +180,13 @@ final class DownloadManager: NSObject {
         guard activeDownloads[id] == nil, !pendingIDs.contains(id) else { return }
         guard episode.downloadStatus != .completed else { return }
 
-        // m3u and Jellyfin episodes carry their playback URL on the row; the
-        // Xtream/Stalker builders have nothing to build from.
-        let directURL = playlist.sourceType == .m3u || playlist.sourceType == .jellyfin
-            ? episode.directSource.flatMap(URL.init(string:))
-            : nil
+        // m3u and media-server episodes carry their playback URL on the row;
+        // the Xtream/Stalker builders have nothing to build from.
+        let carriesDirectURL = switch playlist.sourceType {
+        case .m3u, .jellyfin, .emby, .plex: true
+        case .xtream, .stalker, .webdav: false
+        }
+        let directURL = carriesDirectURL ? episode.directSource.flatMap(URL.init(string:)) : nil
         guard let url = directURL ?? XtreamClient().buildEpisodeURL(for: episode, playlist: playlist) else { return }
 
         let ext = episode.containerExtension

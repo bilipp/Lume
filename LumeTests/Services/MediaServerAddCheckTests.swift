@@ -2,8 +2,8 @@
 //  MediaServerAddCheckTests.swift
 //  LumeTests
 //
-//  The media-server entry point: URL auto-detection (Jellyfin vs. WebDAV) and
-//  the failure copy. Detection probes are stubbed per host; which failure gets
+//  The media-server entry point: URL auto-detection (Jellyfin, Emby, Plex and
+//  WebDAV) and the failure copy. Detection probes are stubbed per host; which failure gets
 //  which copy is asserted through `MediaServerAddCheck.message`, which
 //  delegates to the per-kind checks for everything they already distinguish.
 //
@@ -21,7 +21,8 @@ private final nonisolated class MediaServerStubProtocol: URLProtocol {
     struct Reply {
         var status: Int
         var body: String
-        /// When true, an anonymous request gets a 401 instead of the reply.
+        /// When true, a request carrying neither an `Authorization` header
+        /// nor an `X-Plex-Token` gets a 401 instead of the reply.
         var requiresAuth: Bool = false
     }
 
@@ -66,7 +67,9 @@ private final nonisolated class MediaServerStubProtocol: URLProtocol {
             client?.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost))
             return
         }
-        if reply.requiresAuth, request.value(forHTTPHeaderField: "Authorization") == nil {
+        let credentialed = request.value(forHTTPHeaderField: "Authorization") != nil
+            || request.value(forHTTPHeaderField: "X-Plex-Token") != nil
+        if reply.requiresAuth, !credentialed {
             guard let denied = HTTPURLResponse(url: url, statusCode: 401, httpVersion: nil, headerFields: nil) else { return }
             client?.urlProtocol(self, didReceive: denied, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: Data())
@@ -132,14 +135,146 @@ struct MediaServerAddCheckTests {
         ])
 
         let verified = try await MediaServerAddCheck.verify(input(url: "http://\(testHost):8096/"), urlSession: stubSession())
-        guard case let .jellyfin(serverURL, session) = verified else {
-            Issue.record("Expected .jellyfin, got \(verified)")
+        guard case let .mediaServer(serverURL, flavor, session) = verified else {
+            Issue.record("Expected .mediaServer, got \(verified)")
             return
         }
+        #expect(flavor == .jellyfin)
         // Stored without the trailing slash, so path building never doubles one.
         #expect(serverURL == "http://\(testHost):8096")
         #expect(session.accessToken == "tok")
         #expect(session.userId == "user1")
+    }
+
+    /// Emby answers the same public endpoint without a `ProductName`, so the
+    /// same probe has to route it to the same login flow under its own
+    /// flavour.
+    @Test func `an Emby server is detected and logged into`() async throws {
+        let testHost = host("emby")
+        defer { MediaServerStubProtocol.remove(host: testHost) }
+        MediaServerStubProtocol.install(host: testHost, replies: [
+            "GET /System/Info/Public": .init(status: 200, body: """
+            {"ServerName": "media", "Version": "4.9.5.0", "Id": "2f56ec98046d"}
+            """),
+            "POST /Users/AuthenticateByName": .init(status: 200, body: """
+            {"AccessToken": "tok", "User": {"Id": "user1"}}
+            """)
+        ])
+
+        let verified = try await MediaServerAddCheck.verify(input(url: "http://\(testHost):8096/"), urlSession: stubSession())
+        guard case let .mediaServer(serverURL, flavor, session) = verified else {
+            Issue.record("Expected .mediaServer, got \(verified)")
+            return
+        }
+        #expect(flavor == .emby)
+        #expect(serverURL == "http://\(testHost):8096")
+        #expect(session.accessToken == "tok")
+    }
+
+    @Test func `a Plex server is detected and signed into`() async throws {
+        let testHost = host("plex")
+        defer { MediaServerStubProtocol.remove(host: testHost) }
+        MediaServerStubProtocol.install(host: testHost, replies: [
+            // Not a Jellyfin/Emby server, so that probe has to fall through.
+            "GET /System/Info/Public": .init(status: 404, body: ""),
+            "GET /identity": .init(status: 200, body: """
+            {"MediaContainer": {"size": 0, "machineIdentifier": "05392f7b"}}
+            """),
+            "GET /library/sections": .init(status: 200, body: """
+            {"MediaContainer": {"size": 1, "Directory": [{"key": "1", "title": "Movies", "type": "movie"}]}}
+            """)
+        ])
+
+        let verified = try await MediaServerAddCheck.verify(
+            input(url: "http://\(testHost):32400/", username: "", password: ""),
+            urlSession: stubSession()
+        )
+        guard case let .plex(serverURL, token) = verified else {
+            Issue.record("Expected .plex, got \(verified)")
+            return
+        }
+        #expect(serverURL == "http://\(testHost):32400")
+        // A server that answers unauthenticated stores no credential at all.
+        #expect(token == nil)
+    }
+
+    /// The password field doubles as an `X-Plex-Token` when no username is
+    /// entered, so a user who has a token never needs a plex.tv round trip.
+    /// It is used only once the unauthenticated attempt has been refused —
+    /// see `PlexAddCheck.resolveToken` for why that order matters.
+    @Test func `a password-only Plex entry is treated as a token`() async throws {
+        let testHost = host("plextoken")
+        defer { MediaServerStubProtocol.remove(host: testHost) }
+        MediaServerStubProtocol.install(host: testHost, replies: [
+            "GET /System/Info/Public": .init(status: 404, body: ""),
+            "GET /identity": .init(status: 200, body: """
+            {"MediaContainer": {"machineIdentifier": "05392f7b"}}
+            """),
+            "GET /library/sections": .init(status: 200, body: """
+            {"MediaContainer": {"Directory": [{"key": "1", "title": "Movies", "type": "movie"}]}}
+            """, requiresAuth: true)
+        ])
+
+        let verified = try await MediaServerAddCheck.verify(
+            input(url: "http://\(testHost):32400", username: "", password: "plex-token-123"),
+            urlSession: stubSession()
+        )
+        guard case let .plex(_, token) = verified else {
+            Issue.record("Expected .plex, got \(verified)")
+            return
+        }
+        #expect(token == "plex-token-123")
+    }
+
+    /// A server with unauthenticated local access answers metadata for any
+    /// token value, including a wrong one, but 503s the media itself. Storing
+    /// a token it never needed would browse fine and play nothing, so a
+    /// pasted token must lose to the unauthenticated attempt.
+    @Test func `a pasted token is dropped when the server needs none`() async throws {
+        let testHost = host("plexopen")
+        defer { MediaServerStubProtocol.remove(host: testHost) }
+        MediaServerStubProtocol.install(host: testHost, replies: [
+            "GET /System/Info/Public": .init(status: 404, body: ""),
+            "GET /identity": .init(status: 200, body: """
+            {"MediaContainer": {"machineIdentifier": "05392f7b"}}
+            """),
+            // Answers with or without a token, like a real open server.
+            "GET /library/sections": .init(status: 200, body: """
+            {"MediaContainer": {"Directory": [{"key": "1", "title": "Movies", "type": "movie"}]}}
+            """)
+        ])
+
+        let verified = try await MediaServerAddCheck.verify(
+            input(url: "http://\(testHost):32400", username: "", password: "a-token-it-does-not-need"),
+            urlSession: stubSession()
+        )
+        guard case let .plex(_, token) = verified else {
+            Issue.record("Expected .plex, got \(verified)")
+            return
+        }
+        #expect(token == nil)
+    }
+
+    /// A Plex server that needs a token must not be stored token-free: the
+    /// playlist would sync to nothing on every run.
+    @Test func `a Plex server that refuses an anonymous listing reports unauthorized`() async throws {
+        let testHost = host("plexlocked")
+        defer { MediaServerStubProtocol.remove(host: testHost) }
+        MediaServerStubProtocol.install(host: testHost, replies: [
+            "GET /System/Info/Public": .init(status: 404, body: ""),
+            "GET /identity": .init(status: 200, body: """
+            {"MediaContainer": {"machineIdentifier": "05392f7b"}}
+            """),
+            "GET /library/sections": .init(status: 401, body: "")
+        ])
+
+        let error = await #expect(throws: PlexError.self) {
+            _ = try await MediaServerAddCheck.verify(
+                input(url: "http://\(testHost):32400", username: "", password: ""),
+                urlSession: stubSession()
+            )
+        }
+        #expect(error?.logDescription == PlexError.unauthorized.logDescription)
     }
 
     @Test func `a WebDAV share is detected and listed`() async throws {
@@ -181,6 +316,7 @@ struct MediaServerAddCheckTests {
         defer { MediaServerStubProtocol.remove(host: testHost) }
         MediaServerStubProtocol.install(host: testHost, replies: [
             "GET /System/Info/Public": .init(status: 404, body: "<html>Index</html>"),
+            "GET /identity": .init(status: 404, body: "<html>Index</html>"),
             "PROPFIND /": .init(status: 404, body: "")
         ])
 
@@ -195,10 +331,11 @@ struct MediaServerAddCheckTests {
         defer { MediaServerStubProtocol.remove(host: testHost) }
         MediaServerStubProtocol.install(host: testHost, replies: [
             "GET /System/Info/Public": .init(status: -1, body: ""),
+            "GET /identity": .init(status: -1, body: ""),
             "PROPFIND /": .init(status: -1, body: "")
         ])
 
-        // Both probes die in transport, so detection passes the Jellyfin
+        // Every probe dies in transport, so detection passes the first
         // network error through instead of relabeling it "unsupported".
         let error = await #expect(throws: JellyfinError.self) {
             _ = try await MediaServerAddCheck.verify(input(url: "http://\(testHost)/"), urlSession: stubSession())
@@ -226,10 +363,36 @@ struct MediaServerAddCheckTests {
 
     // MARK: - Copy
 
-    @Test func `unsupported names both server kinds`() {
+    @Test func `unsupported names every server kind`() {
         let copy = MediaServerAddCheck.message(for: MediaServerError.unsupported, input: input(url: "http://example.com/"), timedOut: false)
-        #expect(copy.localizedCaseInsensitiveContains("Jellyfin"))
-        #expect(copy.localizedCaseInsensitiveContains("WebDAV"))
+        for kind in ["Jellyfin", "Emby", "Plex", "WebDAV"] {
+            #expect(copy.localizedCaseInsensitiveContains(kind), "copy should name \(kind): \(copy)")
+        }
+    }
+
+    /// A 401 means something different for each Plex token source, so each
+    /// one has to tell the user what to do next.
+    @Test func `the Plex failure copy matches the credential the user entered`() {
+        let account = PlexAddCheck.message(
+            for: PlexError.unauthorized,
+            input: .init(url: "http://nas:32400", username: "bilipp", password: "test"),
+            timedOut: false
+        )
+        #expect(account.localizedCaseInsensitiveContains("two-factor"))
+
+        let token = PlexAddCheck.message(
+            for: PlexError.unauthorized,
+            input: .init(url: "http://nas:32400", username: "", password: "tok"),
+            timedOut: false
+        )
+        #expect(token.localizedCaseInsensitiveContains("X-Plex-Token"))
+
+        let anonymous = PlexAddCheck.message(
+            for: PlexError.unauthorized,
+            input: .init(url: "http://nas:32400", username: "", password: ""),
+            timedOut: false
+        )
+        #expect(anonymous.localizedCaseInsensitiveContains("sign-in"))
     }
 
     @Test func `missing credentials ask for a username and password`() {

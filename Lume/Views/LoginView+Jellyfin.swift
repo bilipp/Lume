@@ -2,20 +2,21 @@
 //  LoginView+Jellyfin.swift
 //  Lume
 //
-//  The Jellyfin connection test and the copy that tells its failure modes
+//  The Jellyfin/Emby connection test and the copy that tells its failure modes
 //  apart: probe the public endpoint first (wrong address vs. wrong credentials
-//  need different actions from the user), then log in. The form fields moved
-//  to `MediaServerLoginSection` / `MediaServerLoginFields`
-//  (LoginView+MediaServer.swift), which detects Jellyfin vs. WebDAV from the
-//  URL and delegates here.
+//  need different actions from the user), then log in. The two products are
+//  wire-compatible, so one check serves both and the probe decides which it
+//  is. The form fields moved to `MediaServerLoginSection` /
+//  `MediaServerLoginFields` (LoginView+MediaServer.swift), which detects the
+//  server kind from the URL and delegates here.
 //
 
 import Foundation
 
 // MARK: - Connection test
 
-/// The add-playlist connection test for a Jellyfin server and the copy for its
-/// failures: probe the public endpoint first (wrong address vs. wrong
+/// The add-playlist connection test for a Jellyfin or Emby server and the copy
+/// for its failures: probe the public endpoint first (wrong address vs. wrong
 /// credentials need different actions from the user), then log in.
 enum JellyfinAddCheck {
     struct Input: Hashable {
@@ -27,6 +28,7 @@ enum JellyfinAddCheck {
     struct Verified {
         /// The base URL to store, without a trailing slash.
         var serverURL: String
+        var flavor: MediaServerFlavor
         var session: JellyfinSession
     }
 
@@ -40,11 +42,12 @@ enum JellyfinAddCheck {
         let server = JellyfinClient.normalizedServerURL(url)
         let client = JellyfinClient(urlSession: urlSession)
         // Probe first: it answers without credentials, so a wrong host fails
-        // here instead of surfacing as a login error.
-        try await client.probe(server: server)
+        // here instead of surfacing as a login error. It also decides whether
+        // this is Jellyfin or Emby.
+        let flavor = try await client.probe(server: server)
         let user = input.username.trimmingCharacters(in: .whitespacesAndNewlines)
         let session = try await client.authenticate(server: server, username: user, password: input.password)
-        return Verified(serverURL: server.absoluteString, session: session)
+        return Verified(serverURL: server.absoluteString, flavor: flavor, session: session)
     }
 
     static func message(for error: Error, input: Input, timedOut: Bool) -> String {
@@ -56,8 +59,8 @@ enum JellyfinAddCheck {
         switch jellyfinError {
         case .unauthorized:
             return String(localized: "The server rejected this username and password.")
-        case .notAJellyfinServer:
-            return String(localized: "That URL doesn't answer as a Jellyfin server. Enter the server's base address, e.g. http://192.168.1.10:8096.")
+        case .notAMediaServer:
+            return String(localized: "That URL doesn't answer as a Jellyfin or Emby server. Enter the server's base address, e.g. http://192.168.1.10:8096.")
         case let .networkError(underlying) where ServerAddressHelp.isLocalHost(host) && ServerAddressHelp.isUnreachable(underlying):
             return ServerAddressHelp.localNetworkMessage
         default:

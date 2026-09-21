@@ -172,7 +172,11 @@ adapted per size class
 - Manage multiple playlists — **Xtream Codes**, **M3U/M3U8**, **Stalker portals**, and **media servers** (add / edit / delete / switch)
 - M3U support: URL-based playlists, local file import, URL-tvg EPG auto-detection
 - Stalker portal support: MAC-address authentication (with a generated default MAC), with short-lived stream URLs resolved on demand at playback time
-- Media-server support: enter one URL and Lume auto-detects the kind — **Jellyfin** (movie and TV-show libraries with artwork, ratings and plot; session-token auth) or **WebDAV** (recursive folder walk, filenames parsed into movies and series; Basic auth, anonymous shares welcome). Neither carries live TV yet, and neither downloads yet.
+- Media-server support: enter one URL and Lume auto-detects the kind —
+  - **Jellyfin** and **Emby**: movie and TV-show libraries with artwork, ratings and plot; username + password, session-token auth
+  - **Plex**: movie and TV-show sections with artwork, ratings and plot; sign in with your Plex account, paste an `X-Plex-Token`, or connect token-free to a server that allows unauthenticated local access
+  - **WebDAV**: recursive folder walk, filenames parsed into movies and series; Basic auth, anonymous shares welcome
+  - None of them carries live TV yet, and none downloads yet
 - Server info at a glance: status, active connections, expiry
 - Background **content sync** with step-by-step progress, which **prunes stale titles** the provider has dropped so the local catalog stays in step
 - Scheduled **auto-sync** (every 6 hours, daily, every 3 days, or weekly)
@@ -247,7 +251,8 @@ Lume follows a clean, layered SwiftUI architecture:
 │    ├─ M3UClient/Parser    M3U/M3U8 playlist import       │
 │    ├─ StalkerClient       Stalker portal (MAC auth)       │
 │    ├─ WebDAVClient        WebDAV share walk (PROPFIND)    │
-│    ├─ JellyfinClient      Jellyfin libraries + sessions   │
+│    ├─ JellyfinClient      Jellyfin/Emby libraries         │
+│    ├─ PlexClient          Plex sections + X-Plex-Token    │
 │    ├─ TMDBClient          metadata / artwork enrichment   │
 │    ├─ MDBListClient       aggregator ratings (IMDb, RT, …)│
 │    ├─ TraktService        OAuth device flow + scrobbling  │
@@ -317,7 +322,7 @@ The easiest way to use Lume is to [**download it from the App Store**](https://a
 ### Requirements
 
 - **Xcode 26.4** or later
-- An **Xtream Codes** account (server URL, username, password), an **M3U/M3U8 playlist URL**, a **Stalker portal** (portal URL + MAC address), or a **media server** (Jellyfin base URL with username + password, or a WebDAV folder URL with optional credentials)
+- An **Xtream Codes** account (server URL, username, password), an **M3U/M3U8 playlist URL**, a **Stalker portal** (portal URL + MAC address), or a **media server** (a Jellyfin, Emby or Plex base URL, or a WebDAV folder URL — credentials depend on the server)
 - *(Optional)* a [TMDB](https://www.themoviedb.org/settings/api) API access token for metadata enrichment
 - *(Optional)* a [Trakt](https://trakt.tv/oauth/applications) application for scrobbling
 - *(Optional)* an [MDBList](https://mdblist.com/preferences/) API key for IMDb / Rotten Tomatoes / Metacritic / Trakt / Letterboxd ratings
