@@ -6,6 +6,15 @@
 //  `EPGSyncService`/`SyncFrequency`: `configure` once, `syncIfDue()` from launch
 //  and foreground, `syncNow()` for a manual pull.
 //
+//  Three refresh shapes, cheapest last:
+//  - the scheduled refresh (`syncIfDue`): whole months plus teams and standings,
+//    at most once per `SyncFrequency` interval;
+//  - the catch-up (`catchUpIfStale`): today and yesterday by day, whenever the
+//    newest snapshot is older than `catchUpStaleness` — how a rail opened in the
+//    evening stops showing the morning's "15:30" on a game long over;
+//  - the live poll (`beginLivePolling`): the days of every live or overdue
+//    fixture, every 60 s while a sports surface is on screen.
+//
 //  A refresh hits ESPN (not the provider host), so the one-connection account cap
 //  that gates `EPGSyncService` does not apply here — the two never compete. The
 //  fetching runs on a utility Task; only the finished, `Sendable` snapshots cross
@@ -56,13 +65,20 @@ final class SportsSyncService {
     private let defaults: UserDefaults
     private var task: Task<Void, Never>?
     private var missingTask: Task<Void, Never>?
+    private var catchUpTask: Task<Void, Never>?
     /// Leagues `refreshMissing()` already tried this launch, so an off-season
     /// league with genuinely no fixtures is not re-fetched on every appearance.
     private var attemptedMissing: Set<String> = []
 
     /// Whether the app is foregrounded, updated from the scene-phase hook. Live
-    /// polling pauses while the app is not active.
-    var isForeground = true
+    /// polling pauses while the app is not active; coming back to the foreground
+    /// catches the snapshots up, so hours in the background never leave a game
+    /// "live" on the rail.
+    var isForeground = true {
+        didSet {
+            if isForeground, !oldValue { catchUpIfStale() }
+        }
+    }
 
     private var liveTask: Task<Void, Never>?
     private var liveClients = 0
@@ -92,6 +108,13 @@ final class SportsSyncService {
     private static let teamCacheLifetime: TimeInterval = 7 * 24 * 60 * 60
     /// How often live scores re-poll while a sports surface is visible.
     static let livePollInterval: TimeInterval = 60
+    /// How old the newest snapshot may be before a surface appearing (or the app
+    /// foregrounding) re-fetches today and yesterday by day.
+    static let catchUpStaleness: TimeInterval = 15 * 60
+    /// How far back a fixture still called "scheduled" or "live" past its kickoff
+    /// keeps the poll going. Beyond this the scheduled month refresh owns it; the
+    /// bound keeps a fixture the provider dropped from polling forever.
+    static let overdueLookback: TimeInterval = 3 * 24 * 60 * 60
     /// How many leagues refresh at once — ESPN, not the capped provider host.
     private static let maxConcurrentLeagueRefreshes = 4
 
@@ -149,6 +172,36 @@ final class SportsSyncService {
             missingTask = nil
             isSyncing = task != nil
         }
+    }
+
+    /// Surface-appear / foreground trigger: re-fetches today and yesterday by day
+    /// for every followed league when the newest snapshot is older than
+    /// `catchUpStaleness`. Independent of the `SyncFrequency` schedule, which
+    /// only says how often the whole month is re-pulled — and a daily pull done
+    /// at 09:00 leaves every kickoff after it stale until tomorrow.
+    func catchUpIfStale() {
+        // A scheduled refresh in flight is about to bring the whole month; a day
+        // fetch on top of it would only duplicate the requests.
+        guard provider != nil, catchUpTask == nil, task == nil else { return }
+        let ids = leaguesToRefresh()
+        guard !ids.isEmpty else { return }
+        store.loadCached(leagueIds: ids)
+        guard Self.needsCatchUp(newestFetch: store.newestFetch(for: ids), now: Date()) else { return }
+        catchUpTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            await catchUp()
+            catchUpTask = nil
+        }
+    }
+
+    /// One catch-up pass over the followed leagues. Awaitable so tests can
+    /// sequence on it; `catchUpIfStale()` wraps it with the staleness check.
+    func catchUp() async {
+        let ids = leaguesToRefresh()
+        guard !ids.isEmpty else { return }
+        let now = Date()
+        let days = Self.catchUpDays(fixtures: store.fixtures(inLeagues: ids), now: now)
+        await refreshDays(leagueIds: ids, days: days)
     }
 
     private var isDue: Bool {
@@ -215,11 +268,12 @@ final class SportsSyncService {
         liveTask = Task(priority: .utility) { [weak self] in
             while !Task.isCancelled {
                 guard let self, liveClients > 0 else { break }
-                if isForeground,
-                   !ContentIndexingService.shared.isPlaybackActive,
-                   hasLiveOrOverdueFixture
-                {
-                    await refreshLiveScores(leagueIds: leaguesToRefresh())
+                if isForeground, !ContentIndexingService.shared.isPlaybackActive {
+                    let ids = leaguesToRefresh()
+                    let days = Self.pollDays(fixtures: store.fixtures(inLeagues: ids), now: Date())
+                    if !days.isEmpty {
+                        await refreshDays(leagueIds: ids, days: days)
+                    }
                 }
                 try? await Task.sleep(for: .seconds(Self.livePollInterval))
             }
@@ -227,21 +281,47 @@ final class SportsSyncService {
         }
     }
 
-    /// A game is worth polling while it is live — or while the snapshot still
-    /// calls it "scheduled" for a kickoff that has passed, which is what a stale
-    /// daily snapshot looks like once the day's games have started. Without the
-    /// second case a never-refreshed hub keeps showing 15:30 all evening.
-    private var hasLiveOrOverdueFixture: Bool {
-        let now = Date()
-        let overdueWindow: TimeInterval = 6 * 60 * 60
-        return store.snapshots.values.contains { snapshot in
-            snapshot.fixtures.contains { fixture in
-                fixture.isInProgress
-                    || (fixture.status.state == .scheduled
-                        && fixture.startDate <= now
-                        && fixture.startDate > now.addingTimeInterval(-overdueWindow))
-            }
+    /// A game is worth polling while the snapshot calls it live — or still
+    /// "scheduled" for a kickoff that has passed, which is what a stale snapshot
+    /// looks like once the day's games have started. Both are bounded by
+    /// `overdueLookback`: a game "live" since last night is polled (and its own
+    /// day fetched) until the provider closes it out; one from last week is
+    /// left to the scheduled refresh.
+    nonisolated static func isOverdue(_ fixture: SportsFixture, now: Date) -> Bool {
+        switch fixture.status.state {
+        case .inProgress, .scheduled:
+            fixture.startDate <= now && fixture.startDate > now.addingTimeInterval(-overdueLookback)
+        case .final, .postponed:
+            false
         }
+    }
+
+    /// Whether a catch-up is worth a request: no snapshot yet, or the newest one
+    /// is older than `catchUpStaleness`.
+    nonisolated static func needsCatchUp(newestFetch: Date?, now: Date) -> Bool {
+        guard let newestFetch else { return true }
+        return now.timeIntervalSince(newestFetch) > catchUpStaleness
+    }
+
+    /// The calendar days the live poll fetches: the day of every overdue fixture.
+    /// Empty when nothing is live or overdue, so an idle hub costs no requests.
+    /// Sorted and unique so a day is never fetched twice per pass.
+    nonisolated static func pollDays(fixtures: [SportsFixture], now: Date, calendar: Calendar = .current) -> [Date] {
+        let overdue = fixtures.lazy.filter { isOverdue($0, now: now) }.map { calendar.startOfDay(for: $0.startDate) }
+        return Array(Set(overdue)).sorted()
+    }
+
+    /// The calendar days a catch-up fetches: today, yesterday (late games ending
+    /// after midnight, and time zones where the provider's day differs from the
+    /// viewer's) and the day of every overdue fixture.
+    nonisolated static func catchUpDays(fixtures: [SportsFixture], now: Date, calendar: Calendar = .current) -> [Date] {
+        let today = calendar.startOfDay(for: now)
+        var days: Set<Date> = [today]
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: today) {
+            days.insert(yesterday)
+        }
+        days.formUnion(pollDays(fixtures: fixtures, now: now, calendar: calendar))
+        return days.sorted()
     }
 
     // MARK: - Refresh
@@ -362,21 +442,24 @@ final class SportsSyncService {
         }
     }
 
-    /// Re-fetches today's fixtures by day and merges the fresh scores into each
-    /// league's snapshot, leaving the rest of the month intact.
-    private func refreshLiveScores(leagueIds: [String]) async {
-        guard let provider else { return }
-        let today = Date()
+    /// Re-fetches the given days by day for every league and merges the fresh
+    /// fixtures into each league's snapshot, leaving the rest of the month intact.
+    /// Shared by the live poll and the catch-up; a league whose every day came
+    /// back empty is left untouched (that is what a failed request looks like).
+    private func refreshDays(leagueIds: [String], days: [Date]) async {
+        guard let provider, !days.isEmpty else { return }
         let leagues = leagueIds.compactMap { SportsCatalog.league(id: $0) }
         let fetchedByLeague = await withTaskGroup(of: (String, [SportsFixture]).self) { group in
             for league in leagues {
-                group.addTask {
-                    await (league.id, (try? provider.fixtures(league: league, day: today)) ?? [])
+                for day in days {
+                    group.addTask {
+                        await (league.id, (try? provider.fixtures(league: league, day: day)) ?? [])
+                    }
                 }
             }
-            var out: [(String, [SportsFixture])] = []
-            for await result in group {
-                out.append(result)
+            var out: [String: [SportsFixture]] = [:]
+            for await (leagueId, fixtures) in group {
+                out[leagueId, default: []].append(contentsOf: fixtures)
             }
             return out
         }

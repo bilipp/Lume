@@ -85,6 +85,7 @@ struct SportsHomeRail: View {
                 #endif
                     .task(id: resolveKey(fixtures)) { await runResolve(fixtures) }
                     .onAppear(perform: warm)
+                    .onDisappear { SportsSyncService.shared.endLivePolling() }
             }
         }
 
@@ -246,12 +247,18 @@ struct SportsHomeRail: View {
 
         /// Loads the cached snapshots, then fetches any followed league that has
         /// none — the system may purge `Caches/` between launches, and the daily
-        /// refresh alone would leave the rail empty until it next fell due.
+        /// refresh alone would leave the rail empty until it next fell due. Then
+        /// catches a stale snapshot up by day and joins the live poll, so the
+        /// rail closes out finished games and moves scores like the hub does.
+        /// The poll is reference counted and paired with `onDisappear`, so it is
+        /// begun outside the premium guard; with nothing followed it is idle.
         private func warm() {
+            SportsSyncService.shared.beginLivePolling()
             guard premium.isPremium else { return }
             store.loadCached(leagueIds: displayLeagueIds)
             SportsSyncService.shared.syncIfDue()
             SportsSyncService.shared.refreshMissing()
+            SportsSyncService.shared.catchUpIfStale()
         }
 
         /// Re-runs when the fixture set changes or an EPG/catalog sync finishes

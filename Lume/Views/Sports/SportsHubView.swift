@@ -211,6 +211,7 @@ struct SportsHubView: View {
         store.loadCached(leagueIds: displayLeagueIds)
         SportsSyncService.shared.syncIfDue()
         SportsSyncService.shared.refreshMissing()
+        SportsSyncService.shared.catchUpIfStale()
         SportsSyncService.shared.beginLivePolling()
         Task { await EPGSyncService.shared.refreshIfMissingSubtitles() }
     }

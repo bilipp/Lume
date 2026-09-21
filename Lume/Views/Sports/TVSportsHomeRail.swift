@@ -47,6 +47,7 @@ import SwiftUI
             }
             .paywall(isPresented: $showPaywall, highlight: .sportsHub)
             .onAppear(perform: warm)
+            .onDisappear { SportsSyncService.shared.endLivePolling() }
         }
 
         /// Premium-gated (the hub is a Lume Pro feature). Free users still see a
@@ -175,12 +176,15 @@ import SwiftUI
         // MARK: - Lifecycle
 
         /// Loads the cached snapshots, then fetches any followed league that has
-        /// none (see `PhoneSportsHomeRail.warm`).
+        /// none, catches a stale snapshot up and joins the live poll (see
+        /// `PhoneSportsHomeRail.warm`).
         private func warm() {
+            SportsSyncService.shared.beginLivePolling()
             guard premium.isPremium else { return }
             store.loadCached(leagueIds: displayLeagueIds)
             SportsSyncService.shared.syncIfDue()
             SportsSyncService.shared.refreshMissing()
+            SportsSyncService.shared.catchUpIfStale()
         }
 
         private var resolveKey: String {

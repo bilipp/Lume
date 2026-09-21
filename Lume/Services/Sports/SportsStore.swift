@@ -91,6 +91,19 @@ final class SportsStore {
         snapshots[leagueId]
     }
 
+    /// Every cached fixture of the given leagues, in no particular order — the
+    /// input to the sync service's overdue and catch-up day calculations.
+    func fixtures(inLeagues leagueIds: [String]) -> [SportsFixture] {
+        leagueIds.flatMap { snapshots[$0]?.fixtures ?? [] }
+    }
+
+    /// When the most recently fetched of the given leagues' snapshots was
+    /// written; `nil` when none of them is loaded. What the catch-up compares
+    /// against `SportsSyncService.catchUpStaleness`.
+    func newestFetch(for leagueIds: [String]) -> Date? {
+        leagueIds.compactMap { snapshots[$0]?.fetchedAt }.max()
+    }
+
     /// Every cached fixture that kicks off on the given calendar day, across all
     /// loaded leagues, sorted by start time.
     func fixtures(for day: Date, calendar: Calendar = .current) -> [SportsFixture] {
