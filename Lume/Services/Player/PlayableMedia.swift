@@ -28,6 +28,14 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     /// list — Home, Search, recall — in which case the player surfs the
     /// channel's own category. See `LiveChannelNavigator.adjacentMedia`.
     let channelScope: LiveChannelScope?
+    /// Per-request HTTP headers the engine must send to open `url` — today only
+    /// WebDAV's `Authorization: Basic`. `nil` for every other source type: a
+    /// blanket value would change the open path for every IPTV stream.
+    /// This value is `Codable` and so reaches macOS window-restoration state,
+    /// which is exactly why the credential lives here and not in `url`: `url`
+    /// and `id` stay clean, and a restored window carries no credential-bearing
+    /// MRL into a deep link, a Cast payload or a download task description.
+    let httpHeaders: [String: String]?
 
     nonisolated init(
         id: String,
@@ -38,7 +46,8 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
         kind: Kind,
         startTime: TimeInterval,
         contentRef: ContentRef,
-        channelScope: LiveChannelScope? = nil
+        channelScope: LiveChannelScope? = nil,
+        httpHeaders: [String: String]? = nil
     ) {
         self.id = id
         self.url = url
@@ -49,6 +58,7 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
         self.startTime = startTime
         self.contentRef = contentRef
         self.channelScope = channelScope
+        self.httpHeaders = httpHeaders
     }
 
     var isLive: Bool {
@@ -59,6 +69,8 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     /// so it's the same title for progress/NextUp — used when handing the stream
     /// to a different engine mid-playback (e.g. switching to AVPlayer to route
     /// full-screen video over AirPlay). See `FullScreenPlayerView`.
+    /// Rebuilds the value field by field, so a field missed here is silently
+    /// dropped exactly on the AirPlay engine swap.
     func resuming(at position: TimeInterval) -> PlayableMedia {
         PlayableMedia(
             id: id,
@@ -69,14 +81,17 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             kind: kind,
             startTime: position,
             contentRef: contentRef,
-            channelScope: channelScope
+            channelScope: channelScope,
+            httpHeaders: httpHeaders
         )
     }
 
     /// Returns a copy with the playback URL replaced. Used by
     /// `StalkerStreamResolver` to swap a deferred `lumestalker://` placeholder for
     /// the real, freshly resolved stream URL while keeping the same identity.
-    /// `nonisolated` so the resolver can call it off the main actor.
+    /// `nonisolated` so the resolver can call it off the main actor. Rebuilds the
+    /// value field by field, so a field missed here is silently dropped exactly
+    /// on the Stalker URL replacement.
     nonisolated func replacingURL(_ newURL: URL) -> PlayableMedia {
         PlayableMedia(
             id: id,
@@ -87,7 +102,8 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             kind: kind,
             startTime: startTime,
             contentRef: contentRef,
-            channelScope: channelScope
+            channelScope: channelScope,
+            httpHeaders: httpHeaders
         )
     }
 }
@@ -97,6 +113,40 @@ extension PlayableMedia {
     // `directSource`); Xtream content builds one from credentials + stream id.
     // When a local file is available (downloaded for offline viewing), it takes
     // priority over the remote URL.
+
+    /// The Basic-auth header a WebDAV share needs at playback time. WebDAV
+    /// catalog rows store a credential-free URL, so the credential has to
+    /// travel alongside it rather than inside `directURL` / `directSource`.
+    /// `nil` for every other source type, and `nil` for an anonymous share.
+    private static func webdavHeaders(for playlist: Playlist) -> [String: String]? {
+        guard playlist.sourceType == .webdav, !playlist.username.isEmpty else { return nil }
+        let token = Data("\(playlist.username):\(playlist.password)".utf8).base64EncodedString()
+        return ["Authorization": "Basic \(token)"]
+    }
+
+    /// The session-token header a Jellyfin or Emby server needs at playback
+    /// time. The stored stream URLs are token-free on purpose (see the
+    /// property comment), so the session authenticates the request instead.
+    /// `nil` before the playlist's first sync, which is what issues the
+    /// session.
+    private static func jellyfinHeaders(for playlist: Playlist) -> [String: String]? {
+        guard playlist.sourceType == .jellyfin || playlist.sourceType == .emby else { return nil }
+        return JellyfinClient.playbackHeaders(token: playlist.jellyfinAccessToken)
+    }
+
+    /// The `X-Plex-Token` header a Plex server needs at playback time. `nil`
+    /// for a server that allows unauthenticated access on the local network,
+    /// which stores no token at all.
+    private static func plexHeaders(for playlist: Playlist) -> [String: String]? {
+        guard playlist.sourceType == .plex else { return nil }
+        return PlexClient.playbackHeaders(token: playlist.plexAccessToken)
+    }
+
+    /// The auth headers for the playlist's source, if it authenticates per
+    /// request rather than per URL. `nil` for the URL-credential sources.
+    private static func authHeaders(for playlist: Playlist) -> [String: String]? {
+        webdavHeaders(for: playlist) ?? jellyfinHeaders(for: playlist) ?? plexHeaders(for: playlist)
+    }
 
     static func from(movie: Movie, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
         // Prefer local file for offline/downloaded playback
@@ -125,7 +175,8 @@ extension PlayableMedia {
             posterURL: URL(string: movie.streamIcon ?? ""),
             kind: .vod,
             startTime: movie.watchProgress,
-            contentRef: .movie(movie.id)
+            contentRef: .movie(movie.id),
+            httpHeaders: authHeaders(for: playlist)
         )
     }
 
@@ -138,6 +189,10 @@ extension PlayableMedia {
             guard let cmd = directURL else { return nil }
             return StalkerLink.placeholder(type: .vod, cmd: cmd)
         }
+        // WebDAV and the media servers deliberately take the direct-URL path:
+        // the walk stored the resolved file URL (WebDAV) or the sync stored the
+        // token-free stream URL (Jellyfin/Emby/Plex), and there is nothing to
+        // build.
         return directURL.flatMap(URL.init(string:)) ?? build()
     }
 
@@ -164,7 +219,7 @@ extension PlayableMedia {
         case .stalker:
             guard let cmd = episode.directSource, let placeholder = StalkerLink.placeholder(type: .vod, cmd: cmd) else { return nil }
             url = placeholder
-        case .m3u:
+        case .m3u, .webdav, .jellyfin, .emby, .plex:
             guard let resolved = episode.directSource.flatMap(URL.init(string:)) else { return nil }
             url = resolved
         case .xtream:
@@ -181,7 +236,8 @@ extension PlayableMedia {
             posterURL: URL(string: episode.movieImage ?? ""),
             kind: .vod,
             startTime: episode.watchProgress,
-            contentRef: .episode(episode.id)
+            contentRef: .episode(episode.id),
+            httpHeaders: authHeaders(for: playlist)
         )
     }
 
@@ -199,6 +255,9 @@ extension PlayableMedia {
             guard let cmd = stream.directURL, let placeholder = StalkerLink.placeholder(type: .itv, cmd: cmd) else { return nil }
             url = placeholder
         } else {
+            // WebDAV and the media servers deliberately take this direct-URL
+            // path too, though none of those playlist kinds has live channels
+            // to reach it with.
             // An m3u channel plays at the URL the playlist listed; the chosen
             // container rewrites it only when the provider used one of the two
             // interchangeable live endpoints. Xtream URLs are built with it.
@@ -215,7 +274,8 @@ extension PlayableMedia {
             kind: .live,
             startTime: 0,
             contentRef: .live(stream.id),
-            channelScope: scope
+            channelScope: scope,
+            httpHeaders: authHeaders(for: playlist)
         )
     }
 

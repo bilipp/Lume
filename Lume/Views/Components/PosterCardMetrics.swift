@@ -62,10 +62,23 @@ extension View {
     ///
     /// tvOS keeps the fixed size in both places: `gridMinimum` already equals
     /// `posterWidth` there, so its cells never squeeze a card.
+    ///
+    /// Every branch ends in `.contentShape(Rectangle())`, and that is
+    /// load-bearing rather than cosmetic. Card artwork is drawn with
+    /// `.aspectRatio(contentMode: .fill)`, so a source image that is not
+    /// poster-shaped overflows this frame — a 16:9 still in a 120×180 box
+    /// lays out 320 wide. Clipping (the caller's `clipShape`, or `.clipped()`)
+    /// hides that overhang but leaves the *hit region* at the full 320, so the
+    /// wide card sits invisibly on top of its neighbour and swallows its taps:
+    /// tapping one poster opens the other. Only an explicit content shape
+    /// pins the tap target to the frame. Media servers make this routine —
+    /// Jellyfin, Emby and Plex all serve a generated widescreen thumbnail
+    /// when a title has no real poster.
     @ViewBuilder
     func posterArtworkFrame(fillsWidth: Bool) -> some View {
         #if os(tvOS)
             frame(width: PosterCardMetrics.posterWidth, height: PosterCardMetrics.posterHeight)
+                .contentShape(Rectangle())
         #else
             if fillsWidth {
                 // A grid cell proposes a definite width and no height, which
@@ -75,8 +88,10 @@ extension View {
                 Color.clear
                     .aspectRatio(PosterCardMetrics.posterAspectRatio, contentMode: .fit)
                     .overlay { self }
+                    .contentShape(Rectangle())
             } else {
                 frame(width: PosterCardMetrics.posterWidth, height: PosterCardMetrics.posterHeight)
+                    .contentShape(Rectangle())
             }
         #endif
     }

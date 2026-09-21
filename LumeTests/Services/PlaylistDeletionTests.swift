@@ -109,6 +109,31 @@ struct PlaylistDeletionTests {
         #expect(movie.id.hasPrefix(keptPrefix))
     }
 
+    @Test func `deleting a playlist clears its device-local sync fingerprints`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let playlist = Playlist(name: "Doomed", webdavURL: "http://a.test/Share/", username: "u", password: "p")
+        seed(playlist, channelId: "ch.a", in: context)
+        try context.save()
+        let playlistId = playlist.id
+        defer {
+            WebDAVDigestStore.remove(playlistId: playlistId)
+            M3UDigestStore.remove(playlistId: playlistId)
+        }
+
+        WebDAVDigestStore.store("deadbeef", playlistId: playlistId)
+        M3UDigestStore.store("cafebabe", playlistId: playlistId)
+
+        PlaylistDeletion.delete(playlist, in: context)
+        try context.save()
+
+        // Nothing else ever collects these: they sit in UserDefaults, outside
+        // every SwiftData cascade, and would leak for the life of the install.
+        #expect(WebDAVDigestStore.digest(playlistId: playlistId) == nil)
+        #expect(M3UDigestStore.digest(playlistId: playlistId) == nil)
+    }
+
     @Test func `a channel shared with another playlist keeps its EPG`() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

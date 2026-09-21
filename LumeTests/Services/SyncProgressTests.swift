@@ -101,6 +101,14 @@ struct SyncProgressTests {
         }
     }
 
+    @Test func `webdav steps are the directory walk and the import`() {
+        #expect(SyncStep.steps(for: .webdav) == [.directoryWalk, .playlistImport])
+    }
+
+    @Test func `webdav steps ignore the full flag`() {
+        #expect(SyncStep.steps(for: .webdav, full: true) == SyncStep.steps(for: .webdav, full: false))
+    }
+
     @Test func `step order is correct`() {
         let ordered = SyncStep.allCases
         #expect(ordered[0] == .authenticating)

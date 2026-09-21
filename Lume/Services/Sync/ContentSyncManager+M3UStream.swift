@@ -268,7 +268,11 @@ extension ContentSyncManager {
     /// Drains the channel, writing every batch on this actor. Never throws:
     /// both stop conditions are recorded on `state` so the caller can decide
     /// between rethrowing a cancellation and wrapping a store failure.
-    private func consumeM3UBatches(
+    ///
+    /// Shared with the WebDAV walk, which produces the same batches from a
+    /// PROPFIND tree instead of a file; `totalBytes: 0` means the producer has
+    /// no denominator and the fraction stays indeterminate.
+    func consumeM3UBatches(
         from channel: M3UBatchChannel,
         playlistId: UUID,
         state: M3UImportState,

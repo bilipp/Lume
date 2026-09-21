@@ -24,6 +24,8 @@ enum SyncStep: Int, CaseIterable, Identifiable {
     // m3u-only steps
     case playlistDownload
     case playlistImport
+    /// WebDAV-only: the recursive PROPFIND walk of the share.
+    case directoryWalk
 
     var id: Int {
         rawValue
@@ -45,6 +47,16 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         .authenticating, .movieCategories, .seriesCategories, .liveCategories, .liveStreams
     ]
 
+    /// The steps a WebDAV sync walks through, in order. The recursive PROPFIND
+    /// walk replaces the single m3u download phase.
+    static let webdavSteps: [SyncStep] = [.directoryWalk, .playlistImport]
+
+    /// The steps a media-server sync walks through, in order: login, then the
+    /// two library kinds. There are no live channels and no categories to
+    /// fetch — a category per library is created inline. Shared by Jellyfin,
+    /// Emby and Plex, whose pipelines have the same shape.
+    static let mediaServerSteps: [SyncStep] = [.authenticating, .movies, .series]
+
     static func steps(for sourceType: PlaylistSourceType, full: Bool = false) -> [SyncStep] {
         switch sourceType {
         case .xtream: xtreamSteps
@@ -53,6 +65,8 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         // sync skips the movie/series content walk (loaded on demand); only a
         // full-catalog download walks everything.
         case .stalker: full ? xtreamSteps : stalkerDynamicSteps
+        case .webdav: webdavSteps
+        case .jellyfin, .emby, .plex: mediaServerSteps
         }
     }
 
@@ -67,6 +81,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         case .liveStreams: "Live TV channels"
         case .playlistDownload: "Downloading playlist"
         case .playlistImport: "Importing content"
+        case .directoryWalk: "Scanning folders"
         }
     }
 
@@ -81,6 +96,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         case .liveStreams: "antenna.radiowaves.left.and.right"
         case .playlistDownload: "arrow.down.circle"
         case .playlistImport: "square.and.arrow.down.on.square"
+        case .directoryWalk: "folder.badge.gearshape"
         }
     }
 }

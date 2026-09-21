@@ -128,6 +128,12 @@ enum KSPlayerOptionsFactory {
         options.autoSelectEmbedSubtitle = settings.autoSelectSubtitle
         options.maxBufferDuration = Double(settings.maxBuffer)
         options.preferredForwardBufferDuration = Double(media.isLive ? settings.liveBuffer : settings.vodBuffer)
+        // Conditional: `appendHeader` writes both FFmpeg's `headers` format
+        // option and `AVURLAssetHTTPHeaderFieldsKey`, so calling it
+        // unconditionally would change the open path for every IPTV stream.
+        if let headers = media.httpHeaders, !headers.isEmpty {
+            options.appendHeader(headers)
+        }
         if !media.isLive, media.startTime > 1 {
             options.startPlayTime = media.startTime
         }

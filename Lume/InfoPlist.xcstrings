@@ -1,0 +1,78 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Lume"
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Permission prompt shown when Lume first reaches a media server or WebDAV share on the local network.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume benötigt Zugriff auf dein lokales Netzwerk, um darin laufende Medienserver und WebDAV-Freigaben zu erreichen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume needs access to your local network to reach media servers and WebDAV shares running on it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume necesita acceso a tu red local para conectarse a los servidores multimedia y recursos compartidos WebDAV que se ejecutan en ella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume a besoin d’accéder à votre réseau local pour atteindre les serveurs multimédias et les partages WebDAV qui s’y trouvent."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume ha bisogno di accedere alla rete locale per raggiungere i server multimediali e le condivisioni WebDAV presenti su di essa."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume は、ローカルネットワーク上のメディアサーバーや WebDAV 共有に接続するためにアクセス権が必要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume가 로컬 네트워크에서 실행 중인 미디어 서버 및 WebDAV 공유에 연결하려면 접근 권한이 필요합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Lume precisa de acesso à sua rede local para alcançar servidores de mídia e compartilhamentos WebDAV em execução nela."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 需要访问您的本地网络，以连接其中运行的媒体服务器和 WebDAV 共享。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

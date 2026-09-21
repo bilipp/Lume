@@ -314,6 +314,7 @@ private extension CloudSyncEngine {
         into result: inout CloudSyncReconcileResult
     ) {
         let key = id.uuidString
+        guard canAdoptLocally(verdict, id: id) else { return }
         switch verdict {
         case .noChange:
             break
@@ -331,6 +332,27 @@ private extension CloudSyncEngine {
             result.playlistsPushed += 1
             shadow.setPlaylistShadow(key, value)
         }
+    }
+
+    /// Whether a verdict that writes the local catalog carries a source type
+    /// this build understands.
+    ///
+    /// A newer app version can introduce a source type this one has never heard
+    /// of. Adopting it would resolve through `sourceType`'s `?? .xtream`
+    /// fallback, point the Xtream pipeline at whatever server the record names,
+    /// and then push that wrong raw value back to CloudKit for every other
+    /// device. The record is skipped whole and its shadow left untouched, so it
+    /// is picked up unchanged once this device runs a build that knows the type.
+    func canAdoptLocally(_ verdict: MergeVerdict<PlaylistConfigValues>, id: UUID) -> Bool {
+        let incoming: PlaylistConfigValues? = switch verdict {
+        case let .pullToLocal(value): value
+        case let .writeBoth(value): value
+        case .noChange, .pushToCloud: nil
+        }
+        guard let incoming, PlaylistSourceType(rawValue: incoming.sourceTypeRaw) == nil else { return true }
+        let raw = incoming.sourceTypeRaw
+        Logger.sync.error("Skipping playlist \(id.uuidString, privacy: .public): unknown source type \(raw, privacy: .public)")
+        return false
     }
 
     func applyEPGSourceVerdict(

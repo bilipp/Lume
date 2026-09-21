@@ -371,6 +371,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             // on AVFoundation.
             configuration.autoEnableForcedSubtitlesForForeignAudio = true
         }
+        if let headers = media.httpHeaders, !headers.isEmpty {
+            configuration.demuxer.httpHeaders = headers
+        }
         configuration.demuxer.enableReconnect = options.httpReconnect
         configuration.demuxer.ioTimeout = options.ioTimeout
         // The open timeout stays tied to the engine-fallback budget rather than

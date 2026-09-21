@@ -116,6 +116,7 @@ struct LiveTVView: View {
                 scope: section.scope,
                 playlistPrefix: playlistPrefix,
                 sort: contentSort,
+                sourceType: activePlaylist?.knownSourceType,
                 onStartMultiView: { startMultiView(with: $0) },
                 onPlay: { playChannel($0, scope: section.scope) }
             )
@@ -140,13 +141,9 @@ struct LiveTVView: View {
                         systemImage: "antenna.radiowaves.left.and.right",
                         description: Text("Add a playlist in Settings to start watching live TV")
                     )
-                } else if categories.isEmpty {
+                } else if categories.isEmpty || sourceHasNoLiveChannels {
                     VStack(spacing: 20) {
-                        ContentUnavailableView(
-                            "No Channels",
-                            systemImage: "antenna.radiowaves.left.and.right",
-                            description: Text("Sync your playlist to load live TV channels")
-                        )
+                        LiveTVEmptyState(sourceType: activePlaylist?.knownSourceType)
                     }
                 } else {
                     // The rail resolves in a child view: gating the two virtual
@@ -288,7 +285,8 @@ struct LiveTVView: View {
                 onPlayCatchup: { playCatchup($0, cell: $1) },
                 onOpenMultiView: { openMultiView() },
                 onStartMultiView: { startMultiView(with: $0) },
-                playlistPrefix: playlistPrefix
+                playlistPrefix: playlistPrefix,
+                sourceType: activePlaylist?.knownSourceType
             )
         }
     #endif
@@ -297,6 +295,14 @@ struct LiveTVView: View {
     /// selection. Falls back to the first playlist until the user picks one.
     private var activePlaylist: Playlist? {
         playlists.active(for: selectedPlaylistID)
+    }
+
+    /// A WebDAV share carries no live channels, so its rail stays empty even
+    /// when another playlist has live categories — the unscoped `categories`
+    /// query cannot see that on its own. Same for the media servers, whose
+    /// Live TV tuner APIs are not synced.
+    private var sourceHasNoLiveChannels: Bool {
+        activePlaylist?.knownSourceType.map { !$0.canCarryLiveChannels } == true && categorySections.isEmpty
     }
 
     /// The id prefix every Category / LiveStream of the active playlist shares.

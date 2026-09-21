@@ -74,8 +74,10 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     private var didConfigure = false
 
     /// Snapshot of the user's VLCKit options, refreshed from `UserDefaults` each
-    /// time a stream is configured or reloaded.
-    private var options = VLCPlayerOptions.load()
+    /// time a stream is configured or reloaded. Internal so `installMedia()`
+    /// can live in the +Media file, which exists to keep this one under the
+    /// project's 600-line cap.
+    var options = VLCPlayerOptions.load()
 
     /// Snapshot of the viewer's preferred track languages, refreshed each time
     /// a stream is configured or reloaded — never mid-session, so a change in
@@ -110,7 +112,11 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// `handleRetry`).
     private let retry = PlaybackRetryController()
     /// Current stream URL, kept so a reconnect can rebuild the `VLCMedia`.
+    /// Always credential-free — `installMedia` adds userinfo transiently.
     private var mediaURL: URL?
+    /// Auth headers for the current stream (WebDAV only). VLCKit has no header
+    /// API, so `installMedia` folds these into a userinfo MRL at handoff.
+    var httpHeaders: [String: String]?
     /// Last playback position reported to the UI — a reconnect resumes VOD here
     /// rather than restarting from the top.
     private var lastKnownTime: TimeInterval = 0
@@ -155,6 +161,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         options = VLCPlayerOptions.load()
         languageOptions = PlayerLanguageOptions.load()
         mediaURL = media.url
+        httpHeaders = media.httpHeaders
         retry.reset()
         hasStartedPlayback = false
         didReportFailure = false
@@ -170,37 +177,6 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         applyDeinterlace()
         isPlaying = true
         startStatsLogging()
-    }
-
-    /// Every rebuild path goes through here: a fresh `VLCMedia` invalidates the
-    /// track list, so the preferred-language latch must reset with it.
-    private func installMedia(_ url: URL, isLive: Bool) {
-        let media = VLCMedia(url: url)
-        applyMediaOptions(to: media, isLive: isLive)
-        mediaPlayer.media = media
-        didApplyPreferredLanguages = false
-    }
-
-    private func applyMediaOptions(to media: VLCMedia?, isLive: Bool) {
-        guard let media else { return }
-
-        media.addOption(options.hardwareDecode ? ":avcodec-hw=videotoolbox" : ":avcodec-hw=none")
-        media.addOption(":avcodec-threads=\(options.decodeThreads)")
-        media.addOption(options.skipFrames ? ":skip-frames=1" : ":skip-frames=0")
-        media.addOption(options.dropLateFrames ? ":drop-late-frames=1" : ":drop-late-frames=0")
-        if options.httpReconnect { media.addOption(":http-reconnect=1") }
-
-        media.addOption(options.deinterlace ? ":deinterlace=1" : ":deinterlace=0")
-        if options.deinterlace { media.addOption(":deinterlace-mode=\(options.deinterlaceMode)") }
-
-        // The original code set network-caching alongside the live/file caching
-        // to the same value; the live and on-demand buffers keep that pairing.
-        let buffer = isLive ? options.liveBuffer : options.vodBuffer
-        media.addOption(":network-caching=\(buffer)")
-        media.addOption(isLive ? ":live-caching=\(buffer)" : ":file-caching=\(buffer)")
-
-        if let jitter = options.clockJitter { media.addOption(":clock-jitter=\(jitter)") }
-        if let synchro = options.clockSynchro { media.addOption(":clock-synchro=\(synchro)") }
     }
 
     /// Internal so `logStateChange()` (in +Diagnostics) can re-assert it.
@@ -226,6 +202,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         languageOptions = PlayerLanguageOptions.load()
         if media.url != mediaURL { hasManualTrackSelection = false }
         mediaURL = media.url
+        httpHeaders = media.httpHeaders
         lastKnownTime = 0
         retry.reset()
         hasStartedPlayback = false
