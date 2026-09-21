@@ -19,6 +19,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     case playbackControls
     case recommendations
     case multiView
+    case sportsHub
 
     var id: String {
         rawValue
@@ -34,6 +35,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .playbackControls: "Smart Playback"
         case .recommendations: "For You Recommendations"
         case .multiView: "Multi-View"
+        case .sportsHub: "Sports Hub"
         }
     }
 
@@ -47,6 +49,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .playbackControls: "Autoplay the next episode, skip intros, and jump ahead with one tap."
         case .recommendations: "Get an on-device \"For You\" row tuned to your taste from your library and what you watch."
         case .multiView: "Watch up to four live channels side by side — across playlists, so a single-connection provider is no obstacle."
+        case .sportsHub: "Follow your leagues and teams — fixtures, live scores, standings and one tap to the channel that's carrying the game."
         }
     }
 
@@ -60,6 +63,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .playbackControls: "forward.end.alt"
         case .recommendations: "sparkles"
         case .multiView: "rectangle.split.2x2"
+        case .sportsHub: "sportscourt"
         }
     }
 }

@@ -30,6 +30,8 @@ final nonisolated class StubURLProtocol: URLProtocol {
         let host: String
         let queryName: String
         let queryValue: String
+        /// When set, the route matches on the URL path instead of a query item.
+        var pathSuffix: String?
     }
 
     private static let lock = NSLock()
@@ -39,6 +41,13 @@ final nonisolated class StubURLProtocol: URLProtocol {
     /// how tests sharing a host stay isolated from each other.
     static func register(host: String, query: (name: String, value: String), response: Response) {
         let key = RouteKey(host: host, queryName: query.name, queryValue: query.value)
+        lock.withLock { routes[key] = response }
+    }
+
+    /// Registers `response` for requests to `host` whose path ends in
+    /// `pathSuffix`, for endpoints that carry no query item to discriminate on.
+    static func register(host: String, pathSuffix: String, response: Response) {
+        let key = RouteKey(host: host, queryName: "", queryValue: "", pathSuffix: pathSuffix)
         lock.withLock { routes[key] = response }
     }
 
@@ -72,7 +81,9 @@ final nonisolated class StubURLProtocol: URLProtocol {
 
         let match = Self.lock.withLock {
             Self.routes.first { key, _ in
-                key.host == host && items.contains { $0.name == key.queryName && $0.value == key.queryValue }
+                guard key.host == host else { return false }
+                if let suffix = key.pathSuffix { return components.path.hasSuffix(suffix) }
+                return items.contains { $0.name == key.queryName && $0.value == key.queryValue }
             }?.value
         }
 

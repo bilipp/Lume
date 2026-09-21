@@ -15,6 +15,7 @@ final class DeepLinkRouter {
     var selectedTab: AppTab = .home
     var moviesPath = NavigationPath()
     var seriesPath = NavigationPath()
+    var sportsPath = NavigationPath()
     #if os(tvOS)
         /// Whether Multi-View is covering the app. It is presented from
         /// `MainTabView` — above the tab bar — as a plain overlay rather than a

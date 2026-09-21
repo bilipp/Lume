@@ -11,7 +11,9 @@ import Foundation
 struct ParsedProgramme {
     let channelId: String
     let title: String
+    let subtitle: String?
     let description: String
+    let categories: [String]
     let start: Date
     let end: Date
 }
@@ -27,7 +29,9 @@ final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
     private var currentStop: String?
     private var currentChannel: String?
     private var currentTitle: String?
+    private var currentSubtitle: String?
     private var currentDesc: String?
+    private var currentCategories: [String] = []
     private var currentText: String = ""
 
     init(batchSize: Int = 2000, onBatch: @escaping ([ParsedProgramme]) -> Void) {
@@ -55,7 +59,9 @@ final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
             currentStop = attributeDict["stop"]
             currentChannel = attributeDict["channel"]
             currentTitle = nil
+            currentSubtitle = nil
             currentDesc = nil
+            currentCategories = []
         }
     }
 
@@ -73,7 +79,9 @@ final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
                 batch.append(ParsedProgramme(
                     channelId: channel,
                     title: title,
+                    subtitle: currentSubtitle,
                     description: currentDesc ?? "",
+                    categories: currentCategories,
                     start: startDate,
                     end: endDate
                 ))
@@ -88,11 +96,20 @@ final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
             currentStop = nil
             currentChannel = nil
             currentTitle = nil
+            currentSubtitle = nil
             currentDesc = nil
+            currentCategories = []
         } else if elementName == "title" {
             currentTitle = (currentTitle ?? "") + currentText
+        } else if elementName == "sub-title" {
+            currentSubtitle = (currentSubtitle ?? "") + currentText
         } else if elementName == "desc" {
             currentDesc = (currentDesc ?? "") + currentText
+        } else if elementName == "category" {
+            let category = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !category.isEmpty {
+                currentCategories.append(category)
+            }
         }
     }
 }

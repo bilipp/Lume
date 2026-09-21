@@ -129,6 +129,15 @@ adapted per size class
 - **In-player channel browser** on tvOS (left-press overlay with category/channel grid)
 - Favorite channels and per-channel management
 
+#### 🏅 Sports Hub
+- Follow your **leagues and teams** and get a Sports tab and Home rail of their fixtures — yesterday's results, today's games, and what's upcoming
+- **150+ competitions** across football (every major European, American, Asian and African league, cups and national teams), the NFL, NBA, MLB and NHL, college sports, rugby union and league, AFL, lacrosse, Formula 1, IndyCar, NASCAR and the UFC
+- **Live scores, standings, and full game detail** — timeline, team-stat bars, lineups, and F1 sessions with driver/constructor standings — from **ESPN**
+- **EPG-based channel matching** resolves each fixture to a channel already in *your* playlists, so one tap starts playback; when several channels carry a match you get a picker, and your pick is remembered
+- Clean, Apple Sports / Strand-style cards tinted with each team's colours
+- Followed teams and leagues **sync across your devices** via iCloud, per profile
+- A **Lume Pro** feature; available on every platform and hideable from Settings
+
 #### 🎬 Movies & Series
 - Category-based browsing with poster grids and horizontal rails
 - Rich detail views: plot, rating, cast, director, genre, runtime, release date

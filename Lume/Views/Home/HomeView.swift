@@ -66,6 +66,9 @@ struct HomeView: View {
     // the device is busy syncing — and retries automatically once it isn't.
     @State private var indexing = ContentIndexingService.shared
     @State private var epgSync = EPGSyncService.shared
+    /// Observed for the Home empty-state check, which mirrors the Sports rail.
+    @State private var sportsFollows = SportsFollowService.shared
+    @State private var sportsStore = SportsStore.shared
     @State private var playingMedia: PlayableMedia?
     @State private var showingSync = false
     @State private var showingSettings = false
@@ -269,6 +272,8 @@ struct HomeView: View {
                 rail("Trending Series", trendingSeries)
             case .traktWatchlist:
                 rail("From Your Trakt Watchlist", watchlist)
+            case .sports:
+                SportsHomeRail(isSyncBusy: isSyncBusy)
             }
         }
     }
@@ -385,7 +390,22 @@ struct HomeView: View {
             && trendingMovies.isEmpty
             && trendingSeries.isEmpty
             && watchlist.isEmpty
+            && !sportsRailHasContent
             && trendingState.isSettled
+    }
+
+    /// Whether the Sports rail would render anything — the same rule the rail
+    /// itself applies (`SportsRailPlanner`), so a viewer whose only Home content
+    /// is followed-team fixtures (or the onboarding card) never sees the empty state.
+    private var sportsRailHasContent: Bool {
+        let lockedRowShown = true
+        guard isSectionEnabled(.sports) else { return false }
+        return SportsRailPlanner.hasContent(
+            isPremium: premium.isPremium,
+            follows: sportsFollows.follows,
+            store: sportsStore,
+            lockedRowShown: lockedRowShown
+        )
     }
 
     // MARK: - Recently watched
