@@ -6,7 +6,7 @@
 //  and the copy that tells its four failure modes apart.
 //
 
-import SwiftUI
+import Foundation
 
 // The form fields moved to `MediaServerLoginSection` / `MediaServerLoginFields`
 // (LoginView+MediaServer.swift): the form no longer asks for the server kind
@@ -69,13 +69,6 @@ enum WebDAVAddCheck {
         default:
             return webdavError.localizedDescription
         }
-    }
-
-    /// tvOS hint copy. One line, because the tvOS form shows a single hint
-    /// under the fields — and it is the only place a tvOS user is told about
-    /// the local-network permission, which nothing in the app can re-request.
-    static var hint: LocalizedStringKey {
-        "Enter the full folder URL — a server's root address isn't browsable. Username and password are optional. A declined local network prompt can only be allowed again in Settings."
     }
 
     private static var emptyShareMessage: String {

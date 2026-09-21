@@ -10,7 +10,7 @@
 //  URL and delegates here.
 //
 
-import SwiftUI
+import Foundation
 
 // MARK: - Connection test
 
@@ -63,12 +63,6 @@ enum JellyfinAddCheck {
         default:
             return jellyfinError.localizedDescription
         }
-    }
-
-    /// tvOS hint copy. One line, because the tvOS form shows a single hint
-    /// under the fields.
-    static var hint: LocalizedStringKey {
-        "Enter the server's base address — the URL you open in a browser. A declined local network prompt can only be allowed again in Settings."
     }
 
     // The local-network copy and the private-address classifier live in

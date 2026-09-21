@@ -15,12 +15,17 @@ enum LoginSourceType: String, CaseIterable {
     case stalker
     case mediaServer
 
+    /// The segmented picker's label. Deliberately one short word for the
+    /// media-server case: four segments have to share an iPhone's width, and
+    /// "Media Server" — "Medienserver", "Serveur multimédia" — truncates to
+    /// an ellipsis there. The section header and footer below the picker name
+    /// the kind in full, so nothing is lost.
     var title: LocalizedStringKey {
         switch self {
         case .xtream: "Xtream"
         case .m3u: "M3U"
         case .stalker: "Stalker"
-        case .mediaServer: "Media Server"
+        case .mediaServer: "Server"
         }
     }
 }
