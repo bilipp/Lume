@@ -138,6 +138,7 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
     private let maxAge: TimeInterval
     private let now: @Sendable () -> Date
     private let automaticallyMaintains: Bool
+    private let initialMaintenanceDelay: Duration
 
     /// Maintenance is intentionally detached from image delivery. These fields
     /// coalesce a burst of writes into one sweep, while `estimatedByteCount`
@@ -154,6 +155,7 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
         byteLimit: Int64 = ImageDiskCache.defaultByteLimit,
         maxAge: TimeInterval = ImageDiskCache.defaultMaxAge,
         automaticallyMaintains: Bool = true,
+        initialMaintenanceDelay: Duration = .seconds(5),
         now: @escaping @Sendable () -> Date = { .now }
     ) {
         precondition(byteLimit > 0)
@@ -163,9 +165,10 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
         self.byteLimit = byteLimit
         self.maxAge = maxAge
         self.automaticallyMaintains = automaticallyMaintains
+        self.initialMaintenanceDelay = initialMaintenanceDelay
         self.now = now
         try? fileManager.createDirectory(at: self.directory, withIntermediateDirectories: true)
-        requestMaintenance()
+        scheduleInitialMaintenance()
     }
 
     /// The on-disk cache directory, exposed so the Storage screen can sum its size.
@@ -326,9 +329,10 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
             self.estimatedByteCount = max(0, estimatedByteCount - previousByteCount + byteCount)
         }
         writesSinceReconciliation += 1
-        let shouldMaintain = maintenanceRunning
-            || estimatedByteCount == nil
-            || estimatedByteCount ?? 0 > byteLimit
+        // An unknown estimate is expected until the deferred launch sweep. Do
+        // not turn every cold-start image write into another directory walk:
+        // that competes directly with the poster reads the user is waiting for.
+        let shouldMaintain = (estimatedByteCount ?? 0) > byteLimit
             || writesSinceReconciliation >= reconciliationWriteInterval
         maintenanceLock.unlock()
         if shouldMaintain { requestMaintenance() }
@@ -355,6 +359,18 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
 
         Task.detached(priority: .utility) { [weak self] in
             self?.runMaintenanceLoop()
+        }
+    }
+
+    /// A launch can request dozens of posters at once. Give that user-visible
+    /// work a short head start before enumerating the entire cache directory.
+    private func scheduleInitialMaintenance() {
+        guard automaticallyMaintains else { return }
+        let delay = initialMaintenanceDelay
+        Task.detached(priority: .background) { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            self?.requestMaintenance()
         }
     }
 
