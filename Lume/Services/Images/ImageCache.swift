@@ -109,13 +109,63 @@ final nonisolated class ImageMemoryCache: @unchecked Sendable {
 final nonisolated class ImageDiskCache: @unchecked Sendable {
     static let shared = ImageDiskCache()
 
+    /// Original artwork is useful across launches, but it must not grow in
+    /// proportion to a provider's entire catalog. 512 MB keeps thousands of
+    /// posters (or hundreds of backdrops) warm without becoming an unbounded
+    /// second media library.
+    static let defaultByteLimit: Int64 = 512 * 1024 * 1024
+    /// Image URLs occasionally keep serving different bytes. A hard lifetime
+    /// guarantees that even frequently viewed artwork is eventually refreshed.
+    static let defaultMaxAge: TimeInterval = 30 * 24 * 60 * 60
+
+    private struct Entry {
+        let url: URL
+        let byteCount: Int64
+        let createdAt: Date
+        let lastAccessedAt: Date
+    }
+
+    struct MaintenanceResult: Equatable {
+        let bytesBefore: Int64
+        let bytesAfter: Int64
+        let expiredFiles: Int
+        let evictedFiles: Int
+    }
+
     private let directory: URL
     private let fileManager = FileManager.default
+    private let byteLimit: Int64
+    private let maxAge: TimeInterval
+    private let now: @Sendable () -> Date
+    private let automaticallyMaintains: Bool
 
-    private init() {
+    /// Maintenance is intentionally detached from image delivery. These fields
+    /// coalesce a burst of writes into one sweep, while `estimatedByteCount`
+    /// lets later writes avoid another directory walk until it is warranted.
+    private let maintenanceLock = NSLock()
+    private var estimatedByteCount: Int64?
+    private var writesSinceReconciliation = 0
+    private var maintenanceRunning = false
+    private var maintenanceRequested = false
+    private let reconciliationWriteInterval = 128
+
+    init(
+        directory: URL? = nil,
+        byteLimit: Int64 = ImageDiskCache.defaultByteLimit,
+        maxAge: TimeInterval = ImageDiskCache.defaultMaxAge,
+        automaticallyMaintains: Bool = true,
+        now: @escaping @Sendable () -> Date = { .now }
+    ) {
+        precondition(byteLimit > 0)
+        precondition(maxAge > 0)
         let base = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        directory = base.appendingPathComponent("LumeImageCache", isDirectory: true)
-        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        self.directory = directory ?? base.appendingPathComponent("LumeImageCache", isDirectory: true)
+        self.byteLimit = byteLimit
+        self.maxAge = maxAge
+        self.automaticallyMaintains = automaticallyMaintains
+        self.now = now
+        try? fileManager.createDirectory(at: self.directory, withIntermediateDirectories: true)
+        requestMaintenance()
     }
 
     /// The on-disk cache directory, exposed so the Storage screen can sum its size.
@@ -124,23 +174,209 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
     }
 
     func data(for key: String) -> Data? {
-        try? Data(contentsOf: fileURL(for: key))
+        let url = fileURL(for: key)
+        guard let entry = entry(for: url) else { return nil }
+        guard now().timeIntervalSince(entry.createdAt) <= maxAge else {
+            if remove(entry) { recordRemoval(byteCount: entry.byteCount) }
+            return nil
+        }
+        guard let data = try? Data(contentsOf: url) else { return nil }
+
+        // Memory hits never reach disk, so touching once per process/use is far
+        // less write-heavy than it appears and gives eviction a useful LRU order.
+        try? fileManager.setAttributes([.modificationDate: now()], ofItemAtPath: url.path)
+        return data
     }
 
     func store(_ data: Data, for key: String) {
-        try? data.write(to: fileURL(for: key), options: .atomic)
+        guard !data.isEmpty, Int64(data.count) <= byteLimit else { return }
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = fileURL(for: key)
+        let previousByteCount = entry(for: url)?.byteCount ?? 0
+        do {
+            try data.write(to: url, options: .atomic)
+            let timestamp = now()
+            try? fileManager.setAttributes(
+                [.creationDate: timestamp, .modificationDate: timestamp],
+                ofItemAtPath: url.path
+            )
+            recordStore(previousByteCount: previousByteCount, byteCount: Int64(data.count))
+        } catch {
+            Logger.memory.error("Image disk cache write failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func removeAll() {
         try? fileManager.removeItem(at: directory)
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        maintenanceLock.lock()
+        estimatedByteCount = 0
+        writesSinceReconciliation = 0
+        if maintenanceRunning { maintenanceRequested = true }
+        maintenanceLock.unlock()
     }
 
-    private func fileURL(for key: String) -> URL {
+    /// Runs the same bounded maintenance used in production. Internal so tests
+    /// can verify eviction synchronously without racing an unstructured task.
+    @discardableResult
+    func performMaintenance() -> MaintenanceResult {
+        let entries = cacheEntries()
+        let bytesBefore = entries.reduce(into: Int64(0)) { $0 += $1.byteCount }
+        var bytesAfter = bytesBefore
+        var expiredFiles = 0
+        var evictedFiles = 0
+        let expirationDate = now().addingTimeInterval(-maxAge)
+
+        var liveEntries: [Entry] = []
+        liveEntries.reserveCapacity(entries.count)
+        for entry in entries {
+            if entry.createdAt < expirationDate, remove(entry) {
+                bytesAfter -= entry.byteCount
+                expiredFiles += 1
+            } else {
+                liveEntries.append(entry)
+            }
+        }
+
+        if bytesAfter > byteLimit {
+            // Trim below the ceiling so the next handful of downloads do not
+            // immediately trigger another full directory enumeration.
+            let targetByteCount = byteLimit * 9 / 10
+            for entry in liveEntries.sorted(by: { $0.lastAccessedAt < $1.lastAccessedAt }) {
+                guard bytesAfter > targetByteCount else { break }
+                if remove(entry) {
+                    bytesAfter -= entry.byteCount
+                    evictedFiles += 1
+                }
+            }
+        }
+
+        maintenanceLock.lock()
+        estimatedByteCount = max(0, bytesAfter)
+        writesSinceReconciliation = 0
+        maintenanceLock.unlock()
+
+        return MaintenanceResult(
+            bytesBefore: bytesBefore,
+            bytesAfter: max(0, bytesAfter),
+            expiredFiles: expiredFiles,
+            evictedFiles: evictedFiles
+        )
+    }
+
+    func fileURL(for key: String) -> URL {
         let hashed = SHA256.hash(data: Data(key.utf8))
             .map { String(format: "%02x", $0) }
             .joined()
         return directory.appendingPathComponent(hashed)
+    }
+
+    private func entry(for url: URL) -> Entry? {
+        let keys: Set<URLResourceKey> = [
+            .contentModificationDateKey,
+            .creationDateKey,
+            .fileSizeKey,
+            .isRegularFileKey
+        ]
+        guard let values = try? url.resourceValues(forKeys: keys),
+              values.isRegularFile == true,
+              let byteCount = values.fileSize else { return nil }
+        let createdAt = values.creationDate ?? values.contentModificationDate ?? .distantPast
+        return Entry(
+            url: url,
+            byteCount: Int64(byteCount),
+            createdAt: createdAt,
+            lastAccessedAt: values.contentModificationDate ?? createdAt
+        )
+    }
+
+    private func cacheEntries() -> [Entry] {
+        guard let urls = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [
+                .contentModificationDateKey,
+                .creationDateKey,
+                .fileSizeKey,
+                .isRegularFileKey
+            ],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        return urls.compactMap(entry(for:))
+    }
+
+    /// Only removes the file observed by the maintenance snapshot. A cache hit
+    /// touches its modification date, and a replacement changes its creation or
+    /// size; either means the candidate became useful while the sweep was running.
+    private func remove(_ entry: Entry) -> Bool {
+        guard let current = self.entry(for: entry.url),
+              current.byteCount == entry.byteCount,
+              current.createdAt == entry.createdAt,
+              current.lastAccessedAt == entry.lastAccessedAt else { return false }
+        do {
+            try fileManager.removeItem(at: entry.url)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func recordStore(previousByteCount: Int64, byteCount: Int64) {
+        maintenanceLock.lock()
+        if let estimatedByteCount {
+            self.estimatedByteCount = max(0, estimatedByteCount - previousByteCount + byteCount)
+        }
+        writesSinceReconciliation += 1
+        let shouldMaintain = maintenanceRunning
+            || estimatedByteCount == nil
+            || estimatedByteCount ?? 0 > byteLimit
+            || writesSinceReconciliation >= reconciliationWriteInterval
+        maintenanceLock.unlock()
+        if shouldMaintain { requestMaintenance() }
+    }
+
+    private func recordRemoval(byteCount: Int64) {
+        maintenanceLock.lock()
+        if let estimatedByteCount {
+            self.estimatedByteCount = max(0, estimatedByteCount - byteCount)
+        }
+        maintenanceLock.unlock()
+    }
+
+    private func requestMaintenance() {
+        guard automaticallyMaintains else { return }
+        maintenanceLock.lock()
+        if maintenanceRunning {
+            maintenanceRequested = true
+            maintenanceLock.unlock()
+            return
+        }
+        maintenanceRunning = true
+        maintenanceLock.unlock()
+
+        Task.detached(priority: .utility) { [weak self] in
+            self?.runMaintenanceLoop()
+        }
+    }
+
+    private func runMaintenanceLoop() {
+        while true {
+            let result = performMaintenance()
+            if result.expiredFiles + result.evictedFiles > 0 {
+                Logger.memory.info(
+                    "Image disk cache removed \(result.expiredFiles) expired and \(result.evictedFiles) LRU file(s)"
+                )
+            }
+
+            maintenanceLock.lock()
+            if maintenanceRequested {
+                maintenanceRequested = false
+                maintenanceLock.unlock()
+            } else {
+                maintenanceRunning = false
+                maintenanceLock.unlock()
+                return
+            }
+        }
     }
 }
 
