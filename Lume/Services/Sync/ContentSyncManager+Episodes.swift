@@ -64,10 +64,11 @@ extension Series {
             context.insert(episode)
             episodes.append(episode)
         }
-        // A Trakt import can only mark episodes that exist, so anything it
+        // A tracker import can only mark episodes that exist, so anything
         // parked for this series is applied here — the one place episodes ever
         // materialize for Xtream and Stalker.
         TraktWatchedImporter.applyPending(to: self)
+        SimklWatchedImporter.applyPending(to: self)
         episodesFetchedAt = Date()
         episodesFetchedLastModified = lastModified
         try? context.save()

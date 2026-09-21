@@ -32,13 +32,24 @@ final class EPGListing {
     var start: Date
     var end: Date
 
+    /// XMLTV `<sub-title>` — episode title for series, or the fixture line for a
+    /// sports broadcast. Optional/defaulted so adding it is a lightweight
+    /// migration; deliberately kept out of the guide loaders' `propertiesToFetch`
+    /// so the hot now/next and guide-window fetches don't pay for it.
+    var subtitle: String?
+    /// XMLTV `<category>` values joined with ", " — the signal the Sports Hub
+    /// uses to spot sports broadcasts.
+    var category: String?
+
     init(
         id: String,
         channelId: String,
         title: String,
         listingDescription: String,
         start: Date,
-        end: Date
+        end: Date,
+        subtitle: String? = nil,
+        category: String? = nil
     ) {
         self.id = id
         self.channelId = channelId
@@ -46,5 +57,7 @@ final class EPGListing {
         self.listingDescription = listingDescription
         self.start = start
         self.end = end
+        self.subtitle = subtitle
+        self.category = category
     }
 }

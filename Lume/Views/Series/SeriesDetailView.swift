@@ -545,6 +545,7 @@ private extension SeriesDetailView {
     func toggleWatched(_ episode: Episode) {
         episode.setWatched(!episode.isWatched)
         TraktService.shared.syncWatched(episode: episode, watched: episode.isWatched)
+        SimklService.shared.syncWatched(episode: episode, watched: episode.isWatched)
         #if !os(tvOS)
             if episode.isWatched {
                 downloads.checkAutoDelete(id: episode.id)

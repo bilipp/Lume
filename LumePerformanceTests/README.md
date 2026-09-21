@@ -34,6 +34,7 @@ Release would change what ships. Debug, Release and Sideload are untouched.
 |---|---|---|
 | Microbenchmarks | `ParsingBenchmarks`, `PersistenceBenchmarks`, `M3UPersistenceBenchmarks` | Parser / import regressions |
 | Browse read path | `BrowseQueryBenchmarks`, `EPGQueryBenchmarks` | A browse fetch going back to scanning |
+| Sports resolve | `SportsQueryBenchmarks` | The fixture→channel resolve going back to an unbounded guide scan |
 | Player navigation | `BrowseQueryBenchmarks+Navigation` | A previous/next lookup going back to reading the whole list |
 | End-to-end import | `M3UColdImportBenchmarks` | The whole production cold import, phase by phase |
 | Attribution harnesses | `M3UEpisodeRelationshipBenchmarks`, `M3UExistingRowFetchBenchmarks` | Which part of an import loop the time is actually in |
@@ -152,6 +153,70 @@ episode's own id, the owning playlist via `PlaylistOwner`) are seeks, and what i
 left is faulting the series' whole `episodes` inverse — ~28 ms for 480 episodes,
 and linear in the show's length. A long-running show is where to look if a season
 change ever feels slow.
+
+## The Sports Hub resolve is bounded, and this is the guard
+
+`SportsChannelResolver.resolve` answers "which channels in my playlists carry
+this fixture?" — the query behind every Sports card's play glyph and channel
+picker. It has the same failure mode as the browse path: an unbounded
+`EPGListing` scan (the shape that once froze the Guide) or a
+per-channel-per-fixture blow-up would not change a single rendered row, only the
+time. `SportsQueryBenchmarks.testSportsResolveOver400Channels` is the tripwire.
+
+It seeds a 400-channel playlist whose guide names the one fixture on **every**
+channel — the pessimistic upper bound, where the matcher's full token check runs
+for all 400 and all 400 come back as candidates — then measures only the resolve:
+the two bounded catalog fetches (candidate `LiveStream`s across all playlists,
+then one `EPGListing` fetch scoped by the kickoff window *and* the candidate
+channel ids, `listingDescription` left out) plus the in-Swift match. It runs on a
+detached utility task off a `PerfStore.makeOnDiskContainer()` and returns
+`Sendable` snapshots, so it measures the same code path the hub runs, not an
+in-memory shortcut.
+
+iPhone 17 Pro simulator (iOS 26.4), Benchmark configuration:
+
+| Benchmark | Clock | Peak RSS |
+|---|---|---|
+| `testSportsResolveOver400Channels` (400 channels, all matching) | 0.043 s | 51,737 kB |
+
+43 ms is the *worst* case — every channel a candidate and every channel EPG-named
+for the fixture. A realistic playlist matches a handful, not all 400, and resolves
+in a fraction of that. What this number guards is the shape: if it jumps by an
+order of magnitude, pass 2's scope has come off the `EPGListing` fetch (a
+time-only scan of the whole guide) or pass 3 has started re-folding channel names
+per fixture instead of once in pass 1. `LumeTests/Services/BrowseQueryShapeTests.swift`
+holds the matching cheap contract — that `epgCandidateDescriptor` is bounded by
+both the window and the channel ids and omits `listingDescription`, and that
+`candidateStreamDescriptor` excludes hidden and restricted channels in SQL — so a
+regression fails a normal-suite test even when nobody runs this benchmark.
+
+## The parser microbenchmarks, and the offset-less XMLTV win
+
+`ParsingBenchmarks` is the cheap microbenchmark layer — no store, just the parser
+and DTO code over generated input. The Sports Hub touched exactly one line of it:
+XMLTV timestamps that omit a UTC offset now parse on the hand-rolled fast path
+(as UTC, per the DTD) instead of falling through to the `DateFormatter`.
+
+iPhone 17 Pro simulator (iOS 26.4), Benchmark configuration:
+
+| Benchmark | Clock | Peak RSS | Iterations |
+|---|---|---|---|
+| `testXMLTVDateFastPathParsing` (offset-bearing) | 0.010 s | — | 100,000 |
+| `testXMLTVDateOffsetLessFastPathParsing` (**new**) | 0.010 s | — | 100,000 |
+| `testXMLTVDateFallbackParsing` (nil, ICU still runs) | 0.145 s | — | 2,000 |
+| `testM3UParse120kEntries` | 0.747 s | 53,073 kB | 120k entries |
+| `testM3UClassification` | 0.225 s | — | 120k entries |
+| `testM3UExtInfAttributeScan` | 0.136 s | — | — |
+| `testXMLTVParse120kProgrammes` | 0.464 s | 57,491 kB | 120k programmes |
+| `testXtreamVODStreamDecoding` | 0.478 s | 116,594 kB | 50k movies |
+
+The two date rows are the point. An offset-less stamp costs the same **0.010 s
+over 100,000 parses** (~0.1 µs each) as a canonical one — versus the fallback's
+**0.145 s over 2,000** (~73 µs each). That is the ~600–700× the offset-less path
+used to pay, twice per programme, *and* it got `nil` back and dropped the
+programme silently. Providers whose XMLTV omits offsets are common enough that the
+Sports Hub's EPG matching depends on those programmes existing at all, which is
+why the fast path was widened before any sports code shipped.
 
 ## Signposts are the load-bearing part
 

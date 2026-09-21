@@ -12,6 +12,11 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
     var contentPulled = 0
     var epgSourcesPushed = 0
     var epgSourcesPulled = 0
+    /// Sports-follow mirror rows kept and duplicate rows collapsed this pass.
+    /// The follows have no local counterpart (they're read straight off the
+    /// cloud context), so this step only dedupes — it never pushes or pulls.
+    var sportsFollowsKept = 0
+    var sportsFollowsDeduped = 0
     /// Parental-control records (the PIN and category restrictions) moved this
     /// pass. Counted together — they are one feature and one reconcile step.
     var parentalPushed = 0
@@ -135,6 +140,9 @@ actor CloudSyncEngine {
             // appears on every device that has the playlist.
             try reconcileEPGSources(into: &result)
             regenerateLinkedEPGSources()
+            // Followed sports leagues/teams: a pure cloud-side dedupe (no local
+            // counterpart), collapsing duplicate rows for one (key, profile).
+            try reconcileSportsFollows(into: &result)
             // Two stores → two saves (`saveStores`, catalog first). Persist the
             // shadow only after both succeed, so a half-applied pass is never
             // baselined: if either save throws we fall to the catch, leave the
@@ -142,7 +150,7 @@ actor CloudSyncEngine {
             // 3-way merge is idempotent).
             try saveStores()
             shadow.persist()
-            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled) par +\(result.parentalPushed)/\(result.parentalPulled) pend \(result.parentalPending)") // swiftlint:disable:this line_length
+            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled) par +\(result.parentalPushed)/\(result.parentalPulled) pend \(result.parentalPending) sports \(result.sportsFollowsKept)-\(result.sportsFollowsDeduped)") // swiftlint:disable:this line_length
         } catch {
             Logger.sync.error("Reconcile failed: \(error.localizedDescription)")
         }
