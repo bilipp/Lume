@@ -246,6 +246,31 @@ struct LumeApp: App {
                         in: catalogContainer.mainContext
                     )
 
+                    // Resolve the active profile and claim any pre-profiles
+                    // content state before the first sync, so the catalog the
+                    // reconciler reads is already scoped to a profile.
+                    await profileManager.bootstrap()
+
+                    // Wire the Sports Hub as soon as the profile is known, ahead
+                    // of the tracker restores and iCloud below: those are network
+                    // calls that can take a stalled minute apiece, and everything
+                    // after them waits. Sports is the one launch step whose delay
+                    // is visible as an empty Home row, and none of this blocks —
+                    // `configure` warms the store from disk and the two triggers
+                    // hand off to their own utility Tasks.
+                    SportsFollowService.shared.configure(container: cloudContainer, profileManager: profileManager)
+                    SportsSyncService.shared.configure(followSource: SportsFollowService.shared)
+                    // Refreshes fixtures / standings on their own schedule. Hits
+                    // ESPN, not the provider host, so it never competes with a
+                    // playlist sync for the account's one connection.
+                    SportsSyncService.shared.syncIfDue()
+                    // Fetches any followed league with no cached fixtures, so the
+                    // Home rail has data on first render even after the system
+                    // purged Caches/. `HomeView.warmSports` asks again whenever
+                    // the entitlement or the followed set changes — a rail with
+                    // nothing to show renders nothing, so it cannot ask itself.
+                    SportsSyncService.shared.refreshMissing()
+
                     // Restore a previously connected Trakt session (refreshing
                     // the token if stale) so watched-sync and the watchlist work
                     // from launch.
@@ -259,11 +284,6 @@ struct LumeApp: App {
                     // network) so the in-player subtitle search can download
                     // without sending the viewer to Settings first.
                     OpenSubtitlesService.shared.restore()
-
-                    // Resolve the active profile and claim any pre-profiles
-                    // content state before the first sync, so the catalog the
-                    // reconciler reads is already scoped to a profile.
-                    await profileManager.bootstrap()
 
                     // Kick off iCloud sync: check account reachability, then run
                     // a first reconcile between the local catalog and the cloud
@@ -283,18 +303,6 @@ struct LumeApp: App {
                     // the refresh instead once the sync queue drains.
                     EPGSyncService.shared.configure(container: catalogContainer)
                     EPGSyncService.shared.syncIfDue()
-
-                    // Refresh sports fixtures / standings on their own schedule.
-                    // Hits ESPN, not the provider host, so it never competes with
-                    // a playlist sync for the account's one connection.
-                    SportsFollowService.shared.configure(container: cloudContainer, profileManager: profileManager)
-                    SportsSyncService.shared.configure(followSource: SportsFollowService.shared)
-                    SportsSyncService.shared.syncIfDue()
-                    // Loads the cached snapshots and fetches any followed league
-                    // that has none, so the Home rail has data on first render even
-                    // after the system purged Caches/ — a hidden rail never appears
-                    // and so could never warm itself.
-                    SportsSyncService.shared.refreshMissing()
                 }
                 .onChange(of: cloudSync.status.lastReconcile) {
                     // A reconcile may have pulled a PIN this device didn't have

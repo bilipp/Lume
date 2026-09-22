@@ -66,8 +66,10 @@ final class SportsSyncService {
     private var task: Task<Void, Never>?
     private var missingTask: Task<Void, Never>?
     private var catchUpTask: Task<Void, Never>?
-    /// Leagues `refreshMissing()` already tried this launch, so an off-season
-    /// league with genuinely no fixtures is not re-fetched on every appearance.
+    /// Leagues `refreshMissing()` already filled this launch — only the ones the
+    /// provider actually answered for, so an off-season league with genuinely no
+    /// fixtures is not re-fetched on every appearance while a league that failed
+    /// stays eligible for the next try.
     private var attemptedMissing: Set<String> = []
 
     /// Whether the app is foregrounded, updated from the scene-phase hook. Live
@@ -158,19 +160,42 @@ final class SportsSyncService {
     /// moment ago must not wait for the next scheduled refresh to show up.
     func refreshMissing() {
         guard provider != nil, missingTask == nil else { return }
-        let ids = leaguesToRefresh()
-        store.loadCached(leagueIds: ids)
-        let missing = ids.filter { id in
-            !attemptedMissing.contains(id) && (store.snapshot(for: id)?.fixtures.isEmpty ?? true)
-        }
-        guard !missing.isEmpty else { return }
-        attemptedMissing.formUnion(missing)
+        guard !missingLeagueIds().isEmpty else { return }
         isSyncing = true
         missingTask = Task(priority: .utility) { [weak self] in
             guard let self else { return }
-            await performRefresh(leagueIds: missing, months: Self.monthsToFetch(for: Date()))
+            await fillMissing()
             missingTask = nil
             isSyncing = task != nil
+        }
+    }
+
+    /// One pass over the followed leagues that have nothing cached. Awaitable so
+    /// tests can sequence on it; `refreshMissing()` wraps it in the
+    /// fire-and-forget Task.
+    func fillMissing() async {
+        let missing = missingLeagueIds()
+        guard !missing.isEmpty else { return }
+        let refreshed = await performRefresh(leagueIds: missing, months: Self.monthsToFetch(for: Date()))
+        // Only a league the provider actually answered for is struck off. An
+        // off-season league with genuinely no fixtures still answers (its teams
+        // and standings arrive), so it is not re-fetched on every appearance;
+        // a league that answered nothing was a failure — one offline launch
+        // must not leave the Home rail empty for the rest of the session.
+        // A league the catalogue doesn't know can never answer, so it is struck
+        // off too rather than retried forever.
+        attemptedMissing.formUnion(refreshed)
+        attemptedMissing.formUnion(missing.filter { SportsCatalog.league(id: $0) == nil })
+    }
+
+    /// Followed leagues with no cached fixtures that this launch has not already
+    /// filled. Warms the store from disk first, so a league whose snapshot is
+    /// merely not loaded yet is never re-fetched.
+    private func missingLeagueIds() -> [String] {
+        let ids = leaguesToRefresh()
+        store.loadCached(leagueIds: ids)
+        return ids.filter { id in
+            !attemptedMissing.contains(id) && (store.snapshot(for: id)?.fixtures.isEmpty ?? true)
         }
     }
 
@@ -326,28 +351,33 @@ final class SportsSyncService {
 
     // MARK: - Refresh
 
-    private func performRefresh(leagueIds: [String], months: [DateComponents]) async {
+    /// Refreshes the given leagues and returns the ids that actually came back
+    /// with something — the caller's evidence of which fetches succeeded, as
+    /// opposed to which were merely attempted.
+    @discardableResult
+    private func performRefresh(leagueIds: [String], months: [DateComponents]) async -> Set<String> {
         let leagues = leagueIds.compactMap { SportsCatalog.league(id: $0) }
-        let anySuccess = await withTaskGroup(of: Bool.self) { group in
+        let refreshed = await withTaskGroup(of: (String, Bool).self) { group in
             var iterator = leagues.makeIterator()
             for _ in 0 ..< Self.maxConcurrentLeagueRefreshes {
                 guard let league = iterator.next() else { break }
-                group.addTask { await self.refreshLeague(league, months: months) }
+                group.addTask { await (league.id, self.refreshLeague(league, months: months)) }
             }
-            var any = false
-            while let success = await group.next() {
-                if success { any = true }
+            var succeeded: Set<String> = []
+            while let (leagueId, success) = await group.next() {
+                if success { succeeded.insert(leagueId) }
                 if let league = iterator.next() {
-                    group.addTask { await self.refreshLeague(league, months: months) }
+                    group.addTask { await (league.id, self.refreshLeague(league, months: months)) }
                 }
             }
-            return any
+            return succeeded
         }
-        if anySuccess {
-            lastRefreshDate = Date()
-        } else {
+        if refreshed.isEmpty {
             store.markRefreshFailed()
+        } else {
+            lastRefreshDate = Date()
         }
+        return refreshed
     }
 
     /// Fetches one league's months, teams (reusing the weekly roster cache) and

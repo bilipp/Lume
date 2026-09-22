@@ -42,6 +42,25 @@ private final nonisolated class DayRequestLog: @unchecked Sendable {
     }
 }
 
+/// Counts month requests, so "did this league get fetched again?" can be asked
+/// of the provider rather than inferred from the store.
+private final nonisolated class RequestCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    func increment() {
+        lock.lock()
+        value += 1
+        lock.unlock()
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
 /// A provider that returns whatever it is seeded with. `empty` models a total
 /// ESPN failure (everything degrades to `[]`). Day fetches return the seeded
 /// fixtures that fall on the requested day, so a catch-up over several days
@@ -52,9 +71,11 @@ private nonisolated struct StubProvider: SportsDataProvider {
     var teamList: [SportsTeam] = []
     var standingRows: [SportsStandingRow] = []
     var dayLog: DayRequestLog?
+    var monthCalls: RequestCounter?
 
     func fixtures(league _: SportsLeague, month _: DateComponents) async throws -> [SportsFixture] {
-        monthFixtures
+        monthCalls?.increment()
+        return monthFixtures
     }
 
     func fixtures(league _: SportsLeague, day: Date) async throws -> [SportsFixture] {
@@ -420,5 +441,97 @@ struct SportsSyncCatchUpTests {
 
         #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
         #expect(store.snapshot(for: leagueId)?.fixtures.first?.status.state == .scheduled)
+    }
+}
+
+// MARK: - Filling leagues with nothing cached
+
+/// `refreshMissing` is what puts fixtures on the Home rail when the schedule says
+/// nothing is due — a followed league with an empty (or purged) cache. Its retry
+/// rule is the part that matters: a pass the provider never answered must stay
+/// eligible, or one offline launch leaves the rail blank until the viewer finds
+/// Settings › Sports › Refresh Now.
+@MainActor
+struct SportsFillMissingTests {
+    private let leagueId = "espn:soccer/ger.1"
+
+    private func tempStore() -> SportsStore {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        return SportsStore(cache: SportsCacheStore(directory: dir))
+    }
+
+    private func isolatedDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "sports.test." + UUID().uuidString)!
+    }
+
+    private func service(store: SportsStore) -> SportsSyncService {
+        SportsSyncService(
+            store: store,
+            followSource: StubFollowSource(leagues: [leagueId]),
+            defaults: isolatedDefaults()
+        )
+    }
+
+    @Test func `a followed league with nothing cached is filled`() async {
+        let store = tempStore()
+        let sync = service(store: store)
+        sync.configure(provider: StubProvider(
+            monthFixtures: [makeFixture(id: "1", leagueId: leagueId, start: Date(), state: .scheduled)]
+        ))
+
+        await sync.fillMissing()
+
+        #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
+    }
+
+    @Test func `a league that answered is not fetched twice, even with no fixtures`() async {
+        let store = tempStore()
+        let counter = RequestCounter()
+        let sync = service(store: store)
+        // Off-season: no fixtures, but the provider is reachable and answers with
+        // standings — that is a successful pass, not a failed one.
+        sync.configure(provider: StubProvider(
+            standingRows: [SportsStandingRow(id: "132", teamId: "132", name: "Bayern", rank: 1, points: 10)],
+            monthCalls: counter
+        ))
+
+        await sync.fillMissing()
+        await sync.fillMissing()
+
+        #expect(counter.count == 1)
+    }
+
+    @Test func `a fill the provider never answered is retried`() async {
+        let store = tempStore()
+        let sync = service(store: store)
+        // First pass: ESPN unreachable, everything degrades to empty.
+        sync.configure(provider: StubProvider())
+        await sync.fillMissing()
+        #expect(store.snapshot(for: leagueId)?.fixtures.isEmpty ?? true)
+        #expect(store.refreshError == true)
+
+        // Second pass, provider back: the league must not have been struck off.
+        sync.configure(provider: StubProvider(
+            monthFixtures: [makeFixture(id: "1", leagueId: leagueId, start: Date(), state: .scheduled)]
+        ))
+        await sync.fillMissing()
+
+        #expect(store.snapshot(for: leagueId)?.fixtures.count == 1)
+        #expect(store.refreshError == false)
+    }
+
+    @Test func `a league already holding fixtures is left alone`() async {
+        let store = tempStore()
+        let counter = RequestCounter()
+        store.update(
+            SportsLeagueSnapshot(fixtures: [makeFixture(id: "cached", leagueId: leagueId, start: Date(), state: .scheduled)]),
+            for: leagueId
+        )
+        let sync = service(store: store)
+        sync.configure(provider: StubProvider(monthCalls: counter))
+
+        await sync.fillMissing()
+
+        #expect(counter.count == 0)
     }
 }

@@ -117,8 +117,8 @@ final class SportsFollowService {
             sortOrder: nextOrder
         ))
         try? context.save()
+        // `reload()` fetches the newly followed league — see its comment.
         reload()
-        SportsSyncService.shared.refreshMissing()
     }
 
     /// Follow when not yet followed, unfollow when it already is.
@@ -189,8 +189,16 @@ final class SportsFollowService {
                 sortOrder: $0.sortOrder
             )
         }
+        let gained = Set(loaded.map(\.key)).subtracting(follows.map(\.key))
         follows = loaded
         publishSnapshot(loaded)
+        // Follows that arrived from elsewhere — an iCloud reconcile landing
+        // another device's teams, a profile switch, the first-run pre-follows —
+        // need their leagues fetched now. The Home rail hides itself while it
+        // has no fixtures, so it can never ask for them on its own.
+        if !gained.isEmpty {
+            SportsSyncService.shared.refreshMissing()
+        }
     }
 
     private func fetchRows() -> [SyncedSportsFollow] {
