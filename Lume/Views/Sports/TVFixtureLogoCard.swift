@@ -43,7 +43,7 @@
                 if let sessionKind { parts.append(String(localized: sessionKind.displayName)) }
                 parts.append(eventTitle)
             }
-            let score = String(localized: "\(home?.score ?? 0) to \(away?.score ?? 0)")
+            let score = String(localized: "\(home?.displayScore ?? "0") to \(away?.displayScore ?? "0")")
             switch status.state {
             case .scheduled:
                 parts.append(headlineDate.formatted(
@@ -140,8 +140,8 @@
         private var centre: some View {
             switch fixture.status.state {
             case .inProgress, .final:
-                Text(verbatim: "\(fixture.home?.score ?? 0) – \(fixture.away?.score ?? 0)")
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                Text(verbatim: fixture.scoreLine)
+                    .font(.system(size: fixture.hasTextScores ? 26 : 38, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
                     .lineLimit(1)

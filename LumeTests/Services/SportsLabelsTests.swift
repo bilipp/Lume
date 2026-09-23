@@ -158,6 +158,24 @@ struct SportsLabelsTests {
         #expect(!SportsKeyEvent(clock: "", type: "Red Card", typeId: "93").isYellowCard)
     }
 
+    @Test func `cricket's live line and result are the provider's summary`() {
+        let live = SportsFixtureStatus(state: .inProgress, shortDetail: "Live", clock: "0'", summary: "RR need 40 runs from 20 balls")
+        #expect(live.localizedLiveDetail(family: .cricket) == "RR need 40 runs from 20 balls")
+        #expect(live.localizedEndingQualifier(family: .cricket) == nil)
+        #expect(SportsFixtureStatus(state: .inProgress, shortDetail: "Live").localizedLiveDetail(family: .cricket) == "Live")
+        let result = SportsFixtureStatus(state: .final, summary: "Yorkshire won by 185 runs")
+        #expect(result.localizedEndingQualifier(family: .cricket) == "Yorkshire won by 185 runs")
+        #expect(fixture(leagueId: "espn:cricket/8048").periodFamily == .cricket)
+    }
+
+    @Test func `a text score drops its overs parenthetical on cards`() {
+        let team = SportsTeam(leagueId: "espn:cricket/8052", teamId: "1", name: "", shortName: "", abbreviation: "")
+        #expect(SportsCompetitor(team: team, scoreText: "244 & 335/5 (91 ov, target 334)").displayScore == "244 & 335/5")
+        #expect(SportsCompetitor(team: team, scoreText: "212 & 275").displayScore == "212 & 275")
+        #expect(SportsCompetitor(team: team, score: 3).displayScore == "3")
+        #expect(SportsCompetitor(team: team).displayScore == "0")
+    }
+
     @Test func `stat rows are captioned by key, or by the provider label for an unknown key`() {
         #expect(stat("Corner Kicks", key: "wonCorners").localizedName == "Corner kicks")
         #expect(stat("ON GOAL", key: "shotsOnTarget").localizedName == "Shots on target")

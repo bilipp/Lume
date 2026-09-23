@@ -242,8 +242,8 @@ struct GameDetailSheet: View {
     @ViewBuilder
     private var scoreText: some View {
         if fixture.hasTeams {
-            Text(verbatim: "\(fixture.home?.score ?? 0) – \(fixture.away?.score ?? 0)")
-                .font(.system(size: 44, weight: .bold, design: .rounded))
+            Text(verbatim: fixture.scoreLine)
+                .font(.system(size: fixture.hasTextScores ? 26 : 44, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)

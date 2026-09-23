@@ -19,7 +19,7 @@ Services/Sports/
 ├── ESPNClient.swift          v1 provider — ESPN's keyless site/web API
 ├── ESPNDTOs.swift            All-optional Codable DTOs for the ESPN JSON
 ├── SportsCatalog.swift       League lookups, browse order, per-region defaults
-├── SportsCatalog+Leagues.swift  The curated table itself (~150 leagues, 22 sections)
+├── SportsCatalog+Leagues.swift  The curated table itself (~160 leagues, 23 sections)
 ├── SportsCacheStore.swift    On-disk JSON snapshot per league (below)
 ├── SportsStore.swift         @MainActor @Observable — what the UI reads
 ├── SportsSyncService.swift   Schedules refreshes + the live-score poll

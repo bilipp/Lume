@@ -56,7 +56,8 @@ nonisolated enum SportsCatalog {
             "DE": [.germany], "AT": [.germany, .europe], "CH": [.germany, .europe],
             "GB": [.ukAndIreland], "IE": [.ukAndIreland],
             "ES": [.spain], "IT": [.italy], "FR": [.france], "NL": [.netherlands], "PT": [.portugal],
-            "AU": [.australianFootball, .rugby, .restOfWorld, .basketball],
+            "AU": [.australianFootball, .rugby, .cricket, .restOfWorld, .basketball],
+            "IN": [.cricket, .restOfWorld], "PK": [.cricket], "LK": [.cricket], "BD": [.cricket],
             "NZ": [.rugby, .restOfWorld],
             "ZA": [.rugby, .restOfWorld]
         ]
@@ -66,7 +67,7 @@ nonisolated enum SportsCatalog {
         for code in ["MX", "BR", "AR", "CL", "CO", "PE", "UY", "PY", "EC", "BO", "VE"] {
             map[code] = [.americas]
         }
-        for code in ["JP", "CN", "KR", "SA", "IN", "AE", "QA", "SG", "TH", "MY", "ID", "HK", "TW"] {
+        for code in ["JP", "CN", "KR", "SA", "AE", "QA", "SG", "TH", "MY", "ID", "HK", "TW"] {
             map[code] = [.restOfWorld]
         }
         return map
@@ -91,9 +92,14 @@ nonisolated enum SportsCatalog {
         SportsLeague.makeID(sport: "soccer", slug: slug)
     }
 
+    private static func cricketID(_ slug: String) -> String {
+        SportsLeague.makeID(sport: "cricket", slug: slug)
+    }
+
     /// ISO region → the league ids it starts with. A domestic top flight plus the
     /// continent's club cup; the four big leagues in the US; football codes in
-    /// Australia and the rugby nations.
+    /// Australia and the rugby nations; the IPL and the T20 World Cup in the
+    /// cricket nations with no other default.
     private static let preFollowsByRegion: [String: [String]] = {
         let ucl = soccerID("uefa.champions")
         let epl = soccerID("eng.1")
@@ -111,6 +117,8 @@ nonisolated enum SportsCatalog {
                 SportsLeague.makeID(sport: "baseball", slug: "mlb"), nhl
             ],
             "CA": [nhl, nba],
+            "IN": [cricketID("8048"), cricketID("8604")],
+            "PK": [cricketID("8604")], "LK": [cricketID("8604")], "BD": [cricketID("8604")],
             "AU": [
                 SportsLeague.makeID(sport: "australian-football", slug: "afl"),
                 SportsLeague.makeID(sport: "rugby-league", slug: "3"),

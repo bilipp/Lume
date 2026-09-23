@@ -225,13 +225,14 @@ struct FixtureCard: View {
             // A race or a fight night has no two-sided score to show.
             if fixture.hasTeams, fixture.status.state == .inProgress || fixture.status.state == .final {
                 VStack(alignment: .trailing, spacing: 8) {
-                    Text(verbatim: "\(fixture.home?.score ?? 0)")
+                    Text(verbatim: fixture.home?.displayScore ?? "0")
                         .fontWeight(rowWeight(fixture.home ?? SportsCompetitor(team: placeholderTeam)))
-                    Text(verbatim: "\(fixture.away?.score ?? 0)")
+                    Text(verbatim: fixture.away?.displayScore ?? "0")
                         .fontWeight(rowWeight(fixture.away ?? SportsCompetitor(team: placeholderTeam)))
                 }
-                .font(.title3)
+                .font(fixture.hasTextScores ? .subheadline : .title3)
                 .monospacedDigit()
+                .lineLimit(1)
             }
 
             if let confidentChannel {
@@ -292,7 +293,7 @@ struct FixtureCard: View {
     }
 
     private var scoreSpokenLine: String {
-        String(localized: "\(fixture.home?.score ?? 0) to \(fixture.away?.score ?? 0)")
+        String(localized: "\(fixture.home?.displayScore ?? "0") to \(fixture.away?.displayScore ?? "0")")
     }
 
     // MARK: - Context menu

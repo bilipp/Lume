@@ -6,10 +6,11 @@
 //  API (scoreboard, standings, teams) on 2026-09-20; slugs ESPN lists but no
 //  longer feeds (Swiss Super League, Cypriot First Division, the Indian, Thai,
 //  Malaysian and Indonesian top flights, CFL, Bellator, EuroLeague …) are left
-//  out on purpose, as are sports the fixture model can't show — golf, tennis and
-//  cricket have no two-sided scoreboard. Names and abbreviations are ours, not
-//  the response's, so a card reads "NRL", not "Rugby League". Rugby slugs are
-//  ESPN's numeric competition ids.
+//  out on purpose, as are sports the fixture model can't show — golf and tennis
+//  have no two-sided scoreboard. Names and abbreviations are ours, not the
+//  response's, so a card reads "NRL", not "Rugby League". Rugby and cricket slugs
+//  are ESPN's numeric competition ids; cricket was re-probed on 2026-09-23 (its
+//  scoreboards are two-sided with text scores, and bilateral tours have no feed).
 //
 
 import Foundation
@@ -18,7 +19,7 @@ nonisolated extension SportsCatalog {
     /// The full curated league table, in browse order (grouped by `region`).
     static let leagues: [SportsLeague] = germany + ukAndIreland + spain + italy + france + netherlands + portugal
         + europe + clubCompetitions + nationalTeams + womensFootball + americas + restOfWorld
-        + americanFootball + basketball + iceHockey + baseball + rugby + australianFootball + lacrosse
+        + americanFootball + basketball + iceHockey + baseball + rugby + australianFootball + cricket + lacrosse
         + motorsport + combat
 
     private static func soccer(_ slug: String, _ name: String, _ abbreviation: String, _ region: SportsRegion) -> SportsLeague {
@@ -221,6 +222,16 @@ nonisolated extension SportsCatalog {
 
     private static let australianFootball: [SportsLeague] = [
         SportsLeague(sport: "australian-football", slug: "afl", name: "AFL", abbreviation: "AFL", region: .australianFootball)
+    ]
+
+    private static let cricket: [SportsLeague] = [
+        SportsLeague(sport: "cricket", slug: "8048", name: "Indian Premier League", abbreviation: "IPL", region: .cricket),
+        SportsLeague(sport: "cricket", slug: "8604", name: "ICC Men's T20 World Cup", abbreviation: "T20 WC", region: .cricket),
+        SportsLeague(sport: "cricket", slug: "8044", name: "Big Bash League", abbreviation: "BBL", region: .cricket),
+        SportsLeague(sport: "cricket", slug: "8043", name: "Sheffield Shield", abbreviation: "SHIELD", region: .cricket),
+        SportsLeague(sport: "cricket", slug: "8052", name: "County Championship", abbreviation: "COUNTY", region: .cricket),
+        SportsLeague(sport: "cricket", slug: "8053", name: "T20 Blast", abbreviation: "BLAST", region: .cricket),
+        SportsLeague(sport: "cricket", slug: "8050", name: "Ranji Trophy", abbreviation: "RANJI", region: .cricket)
     ]
 
     private static let lacrosse: [SportsLeague] = [
