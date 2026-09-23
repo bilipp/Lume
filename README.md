@@ -178,6 +178,7 @@ adapted per size class
 - Switch profiles from the top-left of Home (iOS / macOS), on tvOS with the Siri Remote's **Play/Pause** button, which opens a quick-switch overlay for playlists and profiles, or from Settings on visionOS — Settings stays the place to add, edit and delete them
 - Profiles and their state **sync across your devices** via iCloud
 - **Parental controls**: mark profiles as child profiles, restrict categories (hidden from browsing and search), and protect them with a PIN required to leave a child profile or open Content Management
+- **Per-profile PIN**: optionally require a PIN to switch into any individual profile, independent of the child-profile escape gate above
 
 #### ⚙️ Library management
 - Manage multiple playlists — **Xtream Codes**, **M3U/M3U8**, **Stalker portals**, and **media servers** (add / edit / delete / switch)
