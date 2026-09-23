@@ -408,7 +408,7 @@ struct SearchView: View {
 
 /// Identity for the fetch task: re-run whenever the query or its permitted
 /// provider/content scope changes.
-private struct SearchKey: Equatable {
+struct SearchKey: Equatable {
     let text: String
     let filter: ContentFilter
     let allPlaylists: Bool
