@@ -79,6 +79,32 @@ struct ImageDiskCacheTests {
 
         #expect(fixture.cache.data(for: "oversized") == nil)
     }
+
+    @Test func `launch maintenance waits before sweeping the cache`() async throws {
+        let clock = TestClock()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ImageDiskCacheLaunchTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = ImageDiskCache(
+            directory: directory,
+            byteLimit: 1024,
+            maxAge: 60,
+            initialMaintenanceDelay: .milliseconds(250),
+            now: clock.now
+        )
+        cache.store(Data(repeating: 0xA4, count: 32), for: "expired-after-launch")
+        clock.advance(by: 61)
+
+        // The entry is already expired according to the cache clock, but launch
+        // maintenance must give foreground poster delivery a head start.
+        try await Task.sleep(for: .milliseconds(100))
+        let cachedFile = cache.fileURL(for: "expired-after-launch")
+        #expect(FileManager.default.fileExists(atPath: cachedFile.path))
+
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(!FileManager.default.fileExists(atPath: cachedFile.path))
+    }
 }
 
 private extension ImageDiskCacheTests {
