@@ -68,6 +68,13 @@ struct SportsMatcherTests {
         #expect(!tokens.contains("fc"))
     }
 
+    @Test func `a tennis player is matched on the surname alone`() {
+        let player = SportsTeam(
+            leagueId: "espn:tennis/wta", teamId: "10501", name: "Maria Timofeeva", shortName: "M. Timofeeva", abbreviation: ""
+        )
+        #expect(SportsMatcher.tokens(for: player, aliases: noAliases) == ["timofeeva"])
+    }
+
     @Test func `tokens keep distinguishing words for same-city clubs`() {
         let real = SportsMatcher.tokens(for: team("Real Madrid"), aliases: noAliases)
         let atletico = SportsMatcher.tokens(for: team("Atlético Madrid"), aliases: noAliases)

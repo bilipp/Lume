@@ -14,9 +14,12 @@ of the existing catalog: it never adds channels, and playback only ever targets 
 ```
 Services/Sports/
 ├── SportsModels.swift        Value types: SportsFixture / Competitor / Team /
-│                             League / StandingRow / EventDetail / F1 sessions
+│                             League / StandingRow / F1 sessions
+├── SportsEventDetail.swift   Game-detail value types: key events, stats, lineups
+├── SportsTennis.swift        Set scores, the tour's singles draw, round labels
 ├── SportsDataProvider.swift  The source-agnostic protocol (below)
 ├── ESPNClient.swift          v1 provider — ESPN's keyless site/web API
+├── ESPNClient+Tennis.swift   Tennis's tournament/draw shape and the rankings
 ├── ESPNDTOs.swift            All-optional Codable DTOs for the ESPN JSON
 ├── SportsCatalog.swift       League lookups, browse order, per-region defaults
 ├── SportsCatalog+Leagues.swift  The curated table itself (~160 leagues, 23 sections)
@@ -79,6 +82,26 @@ the single source every sports view reads. `SportsSyncService` fills it: a
 scheduled refresh (`SyncFrequency`, key `sports.syncFrequency`) plus a 60 s
 live-score poll that runs only while the hub is visible and is paused during
 playback.
+
+## Tennis
+
+ESPN has two tennis leagues, `tennis/atp` and `tennis/wta`, and neither looks
+like a team sport. A scoreboard event is a whole tournament; its matches sit in
+`groupings[]` per draw (men's singles, women's doubles…), not in `competitions`.
+`ESPNClient+Tennis` makes each match its own two-sided fixture, and keeps only
+the tour's own main-draw singles: the WTA feed carries a combined event's men's
+draw too, and qualifying, doubles and TBD slots would add hundreds of cards a
+month. `name` is the tournament and `round` its stage, which the card and the
+detail sheets show as "China Open · Quarterfinal". A match not yet on an order
+of play has `timeValid: false` and a placeholder start, so it shows "TBD".
+
+A player stands in for a team: the athlete id is the team id, the country flag
+is the crest (headshots exist only for the top players), and `sets` carries the
+games per set while `score` is the sets won. `/teams` and `/standings` come back
+empty, so the world ranking (`/rankings`, top 150) supplies both the followable
+players and the table (`SportsStandingKind.player`). `/summary` is an HTTP 400
+for every id, so a match has no timeline or stats. The channel matcher uses a
+player's surname only, since a first name alone would match every namesake.
 
 ## Team colours and the crest fallback
 

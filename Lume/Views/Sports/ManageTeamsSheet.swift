@@ -300,6 +300,7 @@ nonisolated extension SportsRegion {
         case .rugby: "Rugby"
         case .australianFootball: "Australian Football"
         case .cricket: "Cricket"
+        case .tennis: "Tennis"
         case .lacrosse: "Lacrosse"
         case .motorsport: "Motorsport"
         case .combat: "Combat Sports"

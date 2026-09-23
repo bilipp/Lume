@@ -77,6 +77,7 @@ nonisolated enum SportsRegion: String, Codable, Hashable, CaseIterable {
     case rugby
     case australianFootball
     case cricket
+    case tennis
     case lacrosse
     case motorsport
     case combat
@@ -194,6 +195,8 @@ nonisolated struct SportsCompetitor: Codable, Hashable {
     let form: String?
     /// Season record summary, e.g. "12-3-4".
     let record: String?
+    /// A tennis player's games per set (`score` is then the sets won); `nil` elsewhere.
+    let sets: [SportsSetScore]?
 
     init(
         team: SportsTeam,
@@ -201,7 +204,8 @@ nonisolated struct SportsCompetitor: Codable, Hashable {
         scoreText: String? = nil,
         isWinner: Bool = false,
         form: String? = nil,
-        record: String? = nil
+        record: String? = nil,
+        sets: [SportsSetScore]? = nil
     ) {
         self.team = team
         self.score = score
@@ -209,6 +213,7 @@ nonisolated struct SportsCompetitor: Codable, Hashable {
         self.isWinner = isWinner
         self.form = form
         self.record = record
+        self.sets = sets
     }
 }
 
@@ -270,6 +275,10 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
     /// The competition's crest as the provider served it with this fixture — the
     /// curated catalogue carries none, so this is where headers get theirs.
     let leagueLogoURL: URL?
+    /// A tennis match's stage as the provider names it ("Quarterfinal", "Round 2").
+    let round: String?
+    /// `startDate` is only the day: a tennis match not yet on an order of play.
+    let startTimeIsTentative: Bool?
 
     init(
         id: String,
@@ -286,7 +295,9 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         name: String? = nil,
         shortName: String? = nil,
         sessionKind: SportsSessionKind? = nil,
-        leagueLogoURL: URL? = nil
+        leagueLogoURL: URL? = nil,
+        round: String? = nil,
+        startTimeIsTentative: Bool? = nil
     ) {
         self.id = id
         self.leagueId = leagueId
@@ -303,6 +314,8 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         self.shortName = shortName
         self.sessionKind = sessionKind
         self.leagueLogoURL = leagueLogoURL
+        self.round = round
+        self.startTimeIsTentative = startTimeIsTentative
     }
 }
 
@@ -416,6 +429,8 @@ nonisolated enum SportsStandingKind: String, Codable, Hashable {
     case team
     case driver
     case constructor
+    /// A tennis tour's world ranking: a player per row, ranked on points.
+    case player
 }
 
 nonisolated struct SportsStandingRow: Identifiable, Codable, Hashable {
@@ -500,88 +515,5 @@ nonisolated extension SportsStandingRow {
         return order.compactMap { key in
             buckets[key].map { SportsStandingGroup(id: key, name: $0.name, kind: $0.kind, rows: $0.rows) }
         }
-    }
-}
-
-// MARK: - Event detail
-
-nonisolated struct SportsKeyEvent: Codable, Hashable {
-    /// Match clock display, e.g. "45'+2" or "12:03".
-    let clock: String
-    /// Provider event text, e.g. "Goal", "Yellow Card" — English, the fallback
-    /// when `typeId` is unknown to `localizedTitle`.
-    let type: String
-    /// The provider's stable event type id ("70" goal, "94" yellow card).
-    let typeId: String?
-    let teamId: String?
-    let participants: [String]
-    let isGoal: Bool
-    let isCard: Bool
-    let isSubstitution: Bool
-
-    init(
-        clock: String,
-        type: String,
-        typeId: String? = nil,
-        teamId: String? = nil,
-        participants: [String] = [],
-        isGoal: Bool = false,
-        isCard: Bool = false,
-        isSubstitution: Bool = false
-    ) {
-        self.clock = clock
-        self.type = type
-        self.typeId = typeId
-        self.teamId = teamId
-        self.participants = participants
-        self.isGoal = isGoal
-        self.isCard = isCard
-        self.isSubstitution = isSubstitution
-    }
-}
-
-nonisolated struct SportsTeamStat: Codable, Hashable {
-    /// The provider's English label ("Corner Kicks"); shown only when `key` has
-    /// no localised label.
-    let name: String
-    /// The provider's stable stat key ("wonCorners", "possessionPct").
-    let key: String?
-    /// Numeric value for drawing the per-team bar; `nil` when non-numeric.
-    let homeValue: Double?
-    let awayValue: Double?
-    let homeDisplay: String
-    let awayDisplay: String
-
-    init(name: String, key: String? = nil, homeValue: Double?, awayValue: Double?, homeDisplay: String, awayDisplay: String) {
-        self.name = name
-        self.key = key
-        self.homeValue = homeValue
-        self.awayValue = awayValue
-        self.homeDisplay = homeDisplay
-        self.awayDisplay = awayDisplay
-    }
-}
-
-nonisolated struct SportsLineupPlayer: Codable, Hashable {
-    let name: String
-    let jersey: String?
-    let position: String?
-}
-
-nonisolated struct SportsLineup: Codable, Hashable {
-    let teamId: String
-    let formation: String?
-    let starters: [SportsLineupPlayer]
-}
-
-nonisolated struct SportsEventDetail: Codable, Hashable {
-    let keyEvents: [SportsKeyEvent]
-    let teamStats: [SportsTeamStat]
-    let lineups: [SportsLineup]
-
-    init(keyEvents: [SportsKeyEvent] = [], teamStats: [SportsTeamStat] = [], lineups: [SportsLineup] = []) {
-        self.keyEvents = keyEvents
-        self.teamStats = teamStats
-        self.lineups = lineups
     }
 }

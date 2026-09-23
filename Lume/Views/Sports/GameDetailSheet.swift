@@ -88,6 +88,19 @@ struct GameDetailSheet: View {
     }
 
     private var leagueLine: some View {
+        VStack(spacing: 4) {
+            leagueNameLine
+            if let tournament = fixture.tournamentLine {
+                Text(verbatim: tournament)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+    }
+
+    private var leagueNameLine: some View {
         HStack(spacing: 8) {
             if let logo = leagueLogoURL {
                 CachedAsyncImage(url: logo, maxPixelSize: 40) { phase in
@@ -211,6 +224,7 @@ struct GameDetailSheet: View {
         case .final:
             VStack(spacing: 6) {
                 scoreText
+                setsText
                 EndedBadge(fontSize: 12)
                 if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) {
                     Text(verbatim: qualifier)
@@ -221,6 +235,7 @@ struct GameDetailSheet: View {
         case .inProgress:
             VStack(spacing: 6) {
                 scoreText
+                setsText
                 LiveBadge(fontSize: 12)
                 if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) {
                     Text(verbatim: line)
@@ -229,9 +244,26 @@ struct GameDetailSheet: View {
                 }
             }
         case .scheduled, .postponed:
-            Text(fixture.startDate, format: .dateTime.hour().minute())
+            Text(fixture.startDate, format: fixture.startTimeIsTentative == true
+                ? .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+                : .dateTime.hour().minute())
                 .font(.system(size: 34, weight: .semibold, design: .rounded))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+    }
+
+    /// A tennis match set by set, under the sets-won score.
+    @ViewBuilder
+    private var setsText: some View {
+        if let sets = fixture.setsLine {
+            Text(verbatim: sets)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
     }
 

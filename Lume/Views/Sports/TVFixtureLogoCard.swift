@@ -60,7 +60,7 @@
             case .postponed:
                 parts.append(status.localizedStoppage)
             }
-            parts.append(leagueName)
+            parts.append(tournamentLine ?? leagueName)
             return parts.joined(separator: ", ")
         }
     }
@@ -78,9 +78,9 @@
                 if let home = fixture.home, let away = fixture.away {
                     Spacer(minLength: 0)
                     HStack(spacing: 0) {
-                        TeamCrest(team: home.team, size: 88).frame(maxWidth: .infinity)
+                        side(home).frame(maxWidth: .infinity)
                         centre.frame(width: 120)
-                        TeamCrest(team: away.team, size: 88).frame(maxWidth: .infinity)
+                        side(away).frame(maxWidth: .infinity)
                     }
                     Spacer(minLength: 0)
                 } else {
@@ -135,6 +135,24 @@
             .frame(minHeight: 26)
         }
 
+        /// A team's crest; a tennis player's flag with their name under it, since
+        /// two players from one country would otherwise look alike.
+        @ViewBuilder
+        private func side(_ competitor: SportsCompetitor) -> some View {
+            if fixture.hasSetScores {
+                VStack(spacing: 8) {
+                    TeamCrest(team: competitor.team, size: 60)
+                    Text(verbatim: competitor.team.shortName)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+            } else {
+                TeamCrest(team: competitor.team, size: 88)
+            }
+        }
+
         /// Kickoff time before the game; the score once it is live or over.
         @ViewBuilder
         private var centre: some View {
@@ -147,10 +165,16 @@
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             case .scheduled, .postponed:
-                Text(fixture.startDate, format: .dateTime.hour().minute())
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
+                if fixture.startTimeIsTentative == true {
+                    Text("TBD")
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.7))
+                } else {
+                    Text(fixture.startDate, format: .dateTime.hour().minute())
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                }
             }
         }
 

@@ -148,4 +148,21 @@ struct SportsCrestTintTests {
         #expect(tinted.teams.map(\.colorHex) == ["B3181E", nil])
         #expect(tinted.crestsNeedingTint.isEmpty)
     }
+
+    @Test func `tinting a tennis match keeps its sets, round and tentative time`() throws {
+        let flag = try #require(URL(string: "https://a/ita.png"))
+        let fixture = SportsFixture(
+            id: "1", leagueId: "espn:tennis/atp", leagueName: "", leagueAbbreviation: "",
+            startDate: Date(), status: SportsFixtureStatus(state: .final),
+            home: SportsCompetitor(team: team("1", color: nil, logo: flag.absoluteString), score: 1, sets: [SportsSetScore(games: 6)]),
+            away: SportsCompetitor(team: team("2", color: nil, logo: nil), score: 0, sets: [SportsSetScore(games: 3)]),
+            name: "China Open", round: "Final", startTimeIsTentative: true
+        )
+        let tinted = SportsLeagueSnapshot(fixtures: [fixture]).withCrestTints(from: [flag: "009246"])
+        let match = try #require(tinted.fixtures.first)
+        #expect(match.home?.team.colorHex == "009246")
+        #expect(match.home?.sets == [SportsSetScore(games: 6)])
+        #expect(match.round == "Final")
+        #expect(match.startTimeIsTentative == true)
+    }
 }

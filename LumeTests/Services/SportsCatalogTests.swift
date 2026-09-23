@@ -95,7 +95,7 @@ struct SportsCatalogTests {
         let sports = Set(SportsCatalog.leagues.map(\.sport))
         let expected = [
             "soccer", "football", "basketball", "hockey", "baseball", "rugby", "rugby-league",
-            "australian-football", "cricket", "lacrosse", "racing", "mma"
+            "australian-football", "cricket", "tennis", "lacrosse", "racing", "mma"
         ]
         for sport in expected {
             #expect(sports.contains(sport), "\(sport)")

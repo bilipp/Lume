@@ -168,6 +168,24 @@ struct SportsLabelsTests {
         #expect(fixture(leagueId: "espn:cricket/8048").periodFamily == .cricket)
     }
 
+    @Test func `tennis names the set in play and how a match ended short`() {
+        let live = SportsFixtureStatus(state: .inProgress, shortDetail: "2nd", typeName: "STATUS_IN_PROGRESS", period: 2)
+        #expect(live.localizedLiveDetail(family: .sets) == "2nd Set")
+        let retired = SportsFixtureStatus(state: .final, typeName: "STATUS_RETIRED", period: 3)
+        #expect(retired.phase == .retired)
+        #expect(retired.localizedEndingQualifier(family: .sets) == "Retired")
+        let walkover = SportsFixtureStatus(state: .final, typeName: "STATUS_WALKOVER")
+        #expect(walkover.localizedEndingQualifier(family: .sets) == "Walkover")
+        #expect(SportsFixtureStatus(state: .final, typeName: "STATUS_FINAL").localizedEndingQualifier(family: .sets) == nil)
+        #expect(fixture(leagueId: "espn:tennis/atp").periodFamily == .sets)
+    }
+
+    @Test func `tennis rounds are localised and unknown ones pass through`() {
+        #expect(SportsRoundLabel.localized("Quarterfinal") == "Quarterfinal")
+        #expect(SportsRoundLabel.localized("Round 3") == "Round 3")
+        #expect(SportsRoundLabel.localized("Round Robin") == "Round Robin")
+    }
+
     @Test func `a text score drops its overs parenthetical on cards`() {
         let team = SportsTeam(leagueId: "espn:cricket/8052", teamId: "1", name: "", shortName: "", abbreviation: "")
         #expect(SportsCompetitor(team: team, scoreText: "244 & 335/5 (91 ov, target 334)").displayScore == "244 & 335/5")

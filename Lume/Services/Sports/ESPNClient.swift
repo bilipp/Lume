@@ -52,6 +52,9 @@ nonisolated struct ESPNClient: SportsDataProvider {
     }
 
     func teams(league: SportsLeague) async throws -> [SportsTeam] {
+        if league.isTennis {
+            return await rankings(league: league).map(\.team)
+        }
         let url = Self.siteAPIBase
             .appending(path: "\(league.sport)/\(league.slug)/teams")
             .appending(queryItems: [URLQueryItem(name: "limit", value: "1000")])
@@ -61,6 +64,9 @@ nonisolated struct ESPNClient: SportsDataProvider {
     }
 
     func standings(league: SportsLeague) async throws -> [SportsStandingRow] {
+        if league.isTennis {
+            return await rankings(league: league).map(\.row)
+        }
         let url = Self.webAPIBase
             .appending(path: "\(league.sport)/\(league.slug)/standings")
         guard let response: ESPNStandingsResponse = await fetch(url) else { return [] }
@@ -68,6 +74,8 @@ nonisolated struct ESPNClient: SportsDataProvider {
     }
 
     func eventDetail(league: SportsLeague, eventId: String) async throws -> SportsEventDetail? {
+        // A tennis summary is an HTTP 400 for any id: the match has no feed.
+        guard !league.isTennis else { return nil }
         let url = Self.siteAPIBase
             .appending(path: "\(league.sport)/\(league.slug)/summary")
             .appending(queryItems: [URLQueryItem(name: "event", value: eventId)])
@@ -83,6 +91,14 @@ nonisolated struct ESPNClient: SportsDataProvider {
             .appending(queryItems: [URLQueryItem(name: "dates", value: dates)])
         guard let response: ESPNScoreboard = await fetch(url) else { return [] }
         return Self.mapScoreboard(response, league: league)
+    }
+
+    /// A tennis tour has no teams and no table: its players come from the world
+    /// ranking, which doubles as the standings.
+    private func rankings(league: SportsLeague) async -> [(team: SportsTeam, row: SportsStandingRow)] {
+        let url = Self.siteAPIBase.appending(path: "\(league.sport)/\(league.slug)/rankings")
+        guard let response: ESPNRankingsResponse = await fetch(url) else { return [] }
+        return Self.mapRankings(response, leagueId: league.id)
     }
 
     // MARK: - Networking
@@ -136,7 +152,7 @@ nonisolated struct ESPNClient: SportsDataProvider {
 
     /// ESPN emits ISO-8601 instants that are usually `…:ssZ` but sometimes drop
     /// the seconds (`…:mmZ`). Both are UTC.
-    private static func parseDate(_ string: String?) -> Date? {
+    static func parseDate(_ string: String?) -> Date? {
         guard let string, !string.isEmpty else { return nil }
         if let date = isoWithSeconds.date(from: string) { return date }
         if let date = isoFractional.date(from: string) { return date }
@@ -179,12 +195,15 @@ nonisolated extension ESPNClient {
             leagueLogoURL: logo(info?.logos, dark: false),
             isRacing: league.sport == "racing"
         )
+        if league.isTennis {
+            return (scoreboard.events ?? []).flatMap { mapTennisEvent($0, context: context) }
+        }
         return (scoreboard.events ?? []).compactMap { mapEvent($0, context: context) }
     }
 
     /// What every event of one scoreboard response shares: the competition's
     /// labels and crest, and whether its events are race weekends.
-    private struct ScoreboardContext {
+    struct ScoreboardContext {
         let league: SportsLeague
         let leagueName: String
         let leagueAbbreviation: String
@@ -244,7 +263,7 @@ nonisolated extension ESPNClient {
         )
     }
 
-    private static func nonEmpty(_ text: String?) -> String? {
+    static func nonEmpty(_ text: String?) -> String? {
         guard let text, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         return text
     }
@@ -465,6 +484,8 @@ nonisolated extension ESPNClient {
                 extra: stats.extra,
                 group: group
             )
+        case .player:
+            return nil
         case .constructor:
             let id = entry.team?.id ?? entry.team?.displayName ?? UUID().uuidString
             return SportsStandingRow(

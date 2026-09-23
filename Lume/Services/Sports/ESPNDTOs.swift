@@ -77,6 +77,8 @@ nonisolated struct ESPNAthlete: Codable, Hashable {
     let id: String?
     let displayName: String?
     let shortName: String?
+    /// A tennis player's country flag — the only picture every player has.
+    let flag: ESPNLogo?
 }
 
 // MARK: - Scoreboard
@@ -102,6 +104,20 @@ nonisolated struct ESPNEvent: Codable, Hashable {
     let competitions: [ESPNCompetition]?
     /// Racing events carry their track here instead of a competition venue.
     let circuit: ESPNVenue?
+    /// A tennis tournament's draws (men's singles, women's doubles…), each with
+    /// its matches; tennis events carry no `competitions` of their own.
+    let groupings: [ESPNGrouping]?
+    let venue: ESPNVenue?
+}
+
+nonisolated struct ESPNGrouping: Codable, Hashable {
+    let grouping: ESPNGroupingInfo?
+    let competitions: [ESPNCompetition]?
+}
+
+nonisolated struct ESPNGroupingInfo: Codable, Hashable {
+    /// "mens-singles", "womens-doubles", "mixed-doubles".
+    let slug: String?
 }
 
 nonisolated struct ESPNStatus: Codable, Hashable {
@@ -136,6 +152,14 @@ nonisolated struct ESPNCompetition: Codable, Hashable {
     let status: ESPNStatus?
     /// Carries the session abbreviation (FP1/FP2/FP3/Qual/Race) for F1 weekends.
     let type: ESPNCompetitionType?
+    /// A tennis match's stage: "Round 2", "Quarterfinal", "Qualifying Final".
+    let round: ESPNRound?
+    /// `false` when `date` is a placeholder day, not a scheduled start (tennis).
+    let timeValid: Bool?
+}
+
+nonisolated struct ESPNRound: Codable, Hashable {
+    let displayName: String?
 }
 
 nonisolated struct ESPNCompetitionType: Codable, Hashable {
@@ -148,6 +172,8 @@ nonisolated struct ESPNCompetitionType: Codable, Hashable {
 
 nonisolated struct ESPNVenue: Codable, Hashable {
     let fullName: String?
+    /// Tennis events name their city here ("Chengdu, China PR").
+    let displayName: String?
 }
 
 nonisolated struct ESPNBroadcast: Codable, Hashable {
@@ -162,6 +188,17 @@ nonisolated struct ESPNCompetitor: Codable, Hashable {
     let form: String?
     let records: [ESPNRecord]?
     let team: ESPNTeam?
+    /// A tennis singles player, in place of `team`.
+    let athlete: ESPNAthlete?
+    /// A tennis player's games per set.
+    let linescores: [ESPNLinescore]?
+}
+
+nonisolated struct ESPNLinescore: Codable, Hashable {
+    let value: Double?
+    let tiebreak: Int?
+    /// Set once the set is over; absent on the set in play.
+    let winner: Bool?
 }
 
 nonisolated struct ESPNRecord: Codable, Hashable {
@@ -216,6 +253,32 @@ nonisolated struct ESPNStat: Codable, Hashable {
     let abbreviation: String?
     let displayValue: String?
     let value: Double?
+}
+
+// MARK: - Rankings (tennis)
+
+nonisolated struct ESPNRankingsResponse: Codable, Hashable {
+    let rankings: [ESPNRanking]?
+}
+
+nonisolated struct ESPNRanking: Codable, Hashable {
+    let ranks: [ESPNRank]?
+}
+
+nonisolated struct ESPNRank: Codable, Hashable {
+    let current: Int?
+    let previous: Int?
+    let points: Double?
+    let athlete: ESPNRankedAthlete?
+}
+
+/// The rankings feed spells the short name `shortname`, unlike the scoreboard.
+nonisolated struct ESPNRankedAthlete: Codable, Hashable {
+    let id: String?
+    let displayName: String?
+    let shortname: String?
+    let flag: String?
+    let flagAltText: String?
 }
 
 // MARK: - Summary (event detail)
