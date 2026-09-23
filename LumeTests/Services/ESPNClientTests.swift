@@ -333,6 +333,81 @@ struct ESPNClientTests {
         #expect(rows.isEmpty)
     }
 
+    // MARK: - Cricket
+
+    /// Shaped like ESPN's IPL scoreboard: string `winner` flags, text scores, no
+    /// `completed` flag and the result only in `status.summary`.
+    private static let cricketScoreboardJSON = """
+    {"events": [{"id": "1529286", "date": "2026-05-01T14:00Z", "name": "Rajasthan Royals v Delhi Capitals",
+      "status": {"clock": 0, "displayClock": "0'", "period": 2, "summary": "DC won by 7 wkts (5b rem)",
+                 "type": {"id": "1", "description": "Result", "detail": "Final", "shortDetail": "Final", "state": "post"}},
+      "competitions": [{"competitors": [
+        {"homeAway": "home", "winner": "false", "score": "225/6",
+         "team": {"id": "335977", "displayName": "Rajasthan Royals", "abbreviation": "RR", "color": "#c511e8"}},
+        {"homeAway": "away", "winner": "true", "score": "226/3 (19.1/20 ov, target 226)",
+         "team": {"id": "335975", "displayName": "Delhi Capitals", "abbreviation": "DC", "color": "#2561AE"}}
+      ]}]}]}
+    """
+
+    @Test func `a cricket scoreboard decodes with text scores, string winners and its result line`() throws {
+        let scoreboard = try JSONDecoder().decode(ESPNScoreboard.self, from: Data(Self.cricketScoreboardJSON.utf8))
+        let fixtures = ESPNClient.mapScoreboard(scoreboard, league: league(sport: "cricket", slug: "8048"))
+
+        let fixture = try #require(fixtures.first)
+        #expect(fixture.status.state == .final)
+        #expect(fixture.status.summary == "DC won by 7 wkts (5b rem)")
+        #expect(fixture.home?.score == nil)
+        #expect(fixture.home?.scoreText == "225/6")
+        #expect(fixture.away?.scoreText == "226/3 (19.1/20 ov, target 226)")
+        #expect(fixture.away?.isWinner == true)
+        #expect(fixture.home?.isWinner == false)
+        #expect(fixture.home?.team.colorHex == "c511e8")
+        #expect(fixture.scoreLine == "225/6 – 226/3")
+        #expect(fixture.periodFamily == .cricket)
+        #expect(fixture.status.localizedEndingQualifier(family: fixture.periodFamily) == "DC won by 7 wkts (5b rem)")
+    }
+
+    @Test func `a scheduled cricket match's empty score strings stay empty`() throws {
+        let body = """
+        {"events": [{"id": "9", "date": "2026-09-24T09:30Z",
+          "status": {"type": {"state": "pre", "detail": "Starts at 10:30 local time"}},
+          "competitions": [{"competitors": [
+            {"homeAway": "home", "winner": "false", "score": "", "team": {"id": "1", "displayName": "Hampshire"}},
+            {"homeAway": "away", "winner": "false", "score": "", "team": {"id": "2", "displayName": "Sussex"}}
+          ]}]}]}
+        """
+        let scoreboard = try JSONDecoder().decode(ESPNScoreboard.self, from: Data(body.utf8))
+        let fixture = try #require(ESPNClient.mapScoreboard(scoreboard, league: league(sport: "cricket", slug: "8052")).first)
+        #expect(fixture.status.state == .scheduled)
+        #expect(fixture.home?.scoreText == nil)
+        #expect(!fixture.hasTextScores)
+    }
+
+    @Test func `cricket standings read matches played, won, lost and match points`() throws {
+        let body = """
+        {"children": [{"name": "", "standings": {"entries": [
+          {"team": {"id": "335975", "displayName": "Delhi Capitals"}, "stats": [
+            {"name": "rank", "abbreviation": "R", "displayValue": "1", "value": 1},
+            {"name": "matchesPlayed", "abbreviation": "M", "displayValue": "14", "value": 14},
+            {"name": "matchesWon", "abbreviation": "W", "displayValue": "9", "value": 9},
+            {"name": "matchesLost", "abbreviation": "L", "displayValue": "5", "value": 5},
+            {"name": "noresult", "abbreviation": "N/R", "displayValue": "0", "value": 0},
+            {"name": "matchPoints", "abbreviation": "PT", "displayValue": "18", "value": 18},
+            {"name": "netrr", "abbreviation": "NRR", "displayValue": "0.783", "value": 0.783}
+          ]}
+        ]}}]}
+        """
+        let response = try JSONDecoder().decode(ESPNStandingsResponse.self, from: Data(body.utf8))
+        let row = try #require(ESPNClient.mapStandings(response).first)
+        #expect(row.rank == 1)
+        #expect(row.played == 14)
+        #expect(row.wins == 9)
+        #expect(row.losses == 5)
+        #expect(row.points == 18)
+        #expect(row.extra["netrr"] == "0.783")
+        #expect(row.group == nil)
+    }
+
     @Test func `always configured`() {
         #expect(ESPNClient().isConfigured == true)
     }

@@ -131,7 +131,7 @@ adapted per size class
 
 #### 🏅 Sports Hub
 - Follow your **leagues and teams** and get a Sports tab and Home rail of their fixtures — yesterday's results, today's games, and what's upcoming
-- **150+ competitions** across football (every major European, American, Asian and African league, cups and national teams), the NFL, NBA, MLB and NHL, college sports, rugby union and league, AFL, lacrosse, Formula 1, IndyCar, NASCAR and the UFC
+- **150+ competitions** across football (every major European, American, Asian and African league, cups and national teams), the NFL, NBA, MLB and NHL, college sports, rugby union and league, AFL, cricket (IPL, T20 World Cup, Big Bash, County Championship and more), lacrosse, Formula 1, IndyCar, NASCAR and the UFC
 - **Live scores, standings, and full game detail** — timeline, team-stat bars, lineups, and F1 sessions with driver/constructor standings — from **ESPN**
 - **EPG-based channel matching** resolves each fixture to a channel already in *your* playlists, so one tap starts playback; when several channels carry a match you get a picker, and your pick is remembered
 - Clean, Apple Sports / Strand-style cards tinted with each team's colours

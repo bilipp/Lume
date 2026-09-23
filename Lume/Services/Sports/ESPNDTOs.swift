@@ -36,6 +36,23 @@ nonisolated struct ESPNFlexibleValue: Codable, Hashable {
     }
 }
 
+/// A flag ESPN renders as a JSON bool in most sports and as the string
+/// `"true"`/`"false"` in cricket; anything else decodes to `nil`.
+nonisolated struct ESPNFlexibleBool: Codable, Hashable {
+    let boolValue: Bool?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let bool = try? container.decode(Bool.self) {
+            boolValue = bool
+        } else if let string = try? container.decode(String.self) {
+            boolValue = Bool(string.lowercased())
+        } else {
+            boolValue = nil
+        }
+    }
+}
+
 nonisolated struct ESPNLogo: Codable, Hashable {
     let href: String?
     let rel: [String]?
@@ -93,6 +110,9 @@ nonisolated struct ESPNStatus: Codable, Hashable {
     let period: Int?
     /// The game clock as ESPN renders it: "68'", "45'+4'", "7:30".
     let displayClock: String?
+    /// Cricket's state-of-play line: "DC won by 7 wkts (5b rem)", "RR need 40
+    /// runs from 20 balls". English prose with no machine equivalent.
+    let summary: String?
 }
 
 nonisolated struct ESPNStatusType: Codable, Hashable {
@@ -138,7 +158,7 @@ nonisolated struct ESPNCompetitor: Codable, Hashable {
     let id: String?
     let homeAway: String?
     let score: ESPNFlexibleValue?
-    let winner: Bool?
+    let winner: ESPNFlexibleBool?
     let form: String?
     let records: [ESPNRecord]?
     let team: ESPNTeam?

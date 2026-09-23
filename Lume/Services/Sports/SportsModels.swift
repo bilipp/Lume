@@ -76,6 +76,7 @@ nonisolated enum SportsRegion: String, Codable, Hashable, CaseIterable {
     case baseball
     case rugby
     case australianFootball
+    case cricket
     case lacrosse
     case motorsport
     case combat
@@ -149,6 +150,11 @@ nonisolated struct SportsFixtureStatus: Codable, Hashable {
     let period: Int?
     /// The game clock as the provider renders it: "68'", "45'+4'", "7:30".
     let clock: String?
+    /// The provider's state-of-play sentence, which cricket uses for both the
+    /// live chase ("RR need 40 runs from 20 balls") and the result ("DC won by 7
+    /// wkts"). English prose, shown verbatim because nothing machine-readable
+    /// says the same.
+    let summary: String?
 
     init(
         state: SportsFixtureState,
@@ -156,7 +162,8 @@ nonisolated struct SportsFixtureStatus: Codable, Hashable {
         shortDetail: String = "",
         typeName: String? = nil,
         period: Int? = nil,
-        clock: String? = nil
+        clock: String? = nil,
+        summary: String? = nil
     ) {
         self.state = state
         self.detail = detail
@@ -164,6 +171,7 @@ nonisolated struct SportsFixtureStatus: Codable, Hashable {
         self.typeName = typeName
         self.period = period
         self.clock = clock
+        self.summary = summary
     }
 }
 
@@ -178,15 +186,26 @@ nonisolated extension SportsFixtureStatus {
 nonisolated struct SportsCompetitor: Codable, Hashable {
     let team: SportsTeam
     let score: Int?
+    /// The provider's score when it is not a plain number — cricket's "225/6",
+    /// "134 & 189/4 (25.3 ov, target 133)". Shown verbatim, never compared.
+    let scoreText: String?
     let isWinner: Bool
     /// Recent-form string, e.g. "WWDWW".
     let form: String?
     /// Season record summary, e.g. "12-3-4".
     let record: String?
 
-    init(team: SportsTeam, score: Int? = nil, isWinner: Bool = false, form: String? = nil, record: String? = nil) {
+    init(
+        team: SportsTeam,
+        score: Int? = nil,
+        scoreText: String? = nil,
+        isWinner: Bool = false,
+        form: String? = nil,
+        record: String? = nil
+    ) {
         self.team = team
         self.score = score
+        self.scoreText = scoreText
         self.isWinner = isWinner
         self.form = form
         self.record = record

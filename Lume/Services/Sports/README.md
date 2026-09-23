@@ -19,8 +19,9 @@ Services/Sports/
 ├── ESPNClient.swift          v1 provider — ESPN's keyless site/web API
 ├── ESPNDTOs.swift            All-optional Codable DTOs for the ESPN JSON
 ├── SportsCatalog.swift       League lookups, browse order, per-region defaults
-├── SportsCatalog+Leagues.swift  The curated table itself (~150 leagues, 22 sections)
+├── SportsCatalog+Leagues.swift  The curated table itself (~160 leagues, 23 sections)
 ├── SportsCacheStore.swift    On-disk JSON snapshot per league (below)
+├── SportsCrestTint.swift     Fallback team colour read off the crest (below)
 ├── SportsStore.swift         @MainActor @Observable — what the UI reads
 ├── SportsSyncService.swift   Schedules refreshes + the live-score poll
 ├── SportsFollowService.swift Follows (per profile, ordered) + region pre-follows
@@ -78,6 +79,24 @@ the single source every sports view reads. `SportsSyncService` fills it: a
 scheduled refresh (`SyncFrequency`, key `sports.syncFrequency`) plus a 60 s
 live-score poll that runs only while the hub is visible and is paused during
 playback.
+
+## Team colours and the crest fallback
+
+Card washes, detail headers and stat bars tint from each team's `colorHex`,
+through `TeamPalette`'s contrast floor. ESPN leaves many teams without a usable
+colour — no County Championship or T20 Blast club has one, `/teams` 404s for
+cricket, and plenty of clubs are `ffffff`/`000000`. For those, the refresh reads
+the colour off the crest: `SportsCrestTint.dominantHex` takes the most common
+saturated colour in a 96 px thumbnail that clears the same contrast floor,
+skipping a colour's own dark anti-aliased edge. Monochrome or pale crests (Spurs,
+Juventus, Dortmund) yield nothing and keep the neutral tint.
+
+`SportsSyncService.publish` stamps the result into the snapshot's teams before
+storing it, so views need no change. Known tints go in immediately; crests never
+seen are fetched (in parallel, through `ImagePipeline`) after the snapshot is
+already showing, then merged in. `SportsCrestTintCache` keeps every answer,
+misses included, in `Caches/Sports/crest-tints-v1.json` — bump the version when
+the extraction changes so old misses don't stick.
 
 ## `SportsChannelResolver` — fixture → channel
 

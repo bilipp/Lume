@@ -77,6 +77,12 @@ struct SportsCatalogTests {
         #expect(follows.contains(id("rugby-league", "3")))
     }
 
+    @Test func `regionPreFollows India leads with the IPL`() {
+        let follows = SportsCatalog.regionPreFollows(for: Locale.Region("IN"))
+        #expect(follows == [id("cricket", "8048"), id("cricket", "8604")])
+        #expect(SportsCatalog.browseRegions(for: Locale.Region("IN")).first == .cricket)
+    }
+
     // MARK: - Catalogue shape
 
     @Test func `every region section has at least one league`() {
@@ -89,7 +95,7 @@ struct SportsCatalogTests {
         let sports = Set(SportsCatalog.leagues.map(\.sport))
         let expected = [
             "soccer", "football", "basketball", "hockey", "baseball", "rugby", "rugby-league",
-            "australian-football", "lacrosse", "racing", "mma"
+            "australian-football", "cricket", "lacrosse", "racing", "mma"
         ]
         for sport in expected {
             #expect(sports.contains(sport), "\(sport)")

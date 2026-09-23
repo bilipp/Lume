@@ -62,6 +62,7 @@ final class SportsSyncService {
     private var provider: (any SportsDataProvider)?
     private var followSource: any SportsFollowSource
     private let store: SportsStore
+    private let crestTints: SportsCrestTintCache
     private let defaults: UserDefaults
     private var task: Task<Void, Never>?
     private var missingTask: Task<Void, Never>?
@@ -123,11 +124,13 @@ final class SportsSyncService {
     init(
         store: SportsStore = .shared,
         followSource: any SportsFollowSource = EmptySportsFollowSource(),
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        crestTints: SportsCrestTintCache = .shared
     ) {
         self.store = store
         self.followSource = followSource
         self.defaults = defaults
+        self.crestTints = crestTints
     }
 
     /// Wires the data source and the follow service. Warms the store from disk
@@ -432,8 +435,23 @@ final class SportsSyncService {
             teams: teams,
             teamsFetchedAt: teamsFetchedAt
         )
-        store.update(snapshot, for: league.id)
+        await publish(snapshot, for: league.id)
         return true
+    }
+
+    /// Stores a snapshot with every colourless team tinted from its crest. Tints
+    /// already known go in at once; crests never analysed are fetched after the
+    /// snapshot is on screen, then merged into whatever the store holds by then.
+    private func publish(_ snapshot: SportsLeagueSnapshot, for leagueId: String) async {
+        let crests = snapshot.crestsNeedingTint
+        let known = await crestTints.cachedTints(for: crests)
+        store.update(snapshot.withCrestTints(from: known), for: leagueId)
+
+        let unseen = await crestTints.unseen(crests)
+        guard !unseen.isEmpty else { return }
+        let learned = await crestTints.learnTints(for: unseen)
+        guard !learned.isEmpty, let current = store.snapshot(for: leagueId) else { return }
+        store.update(current.withCrestTints(from: learned), for: leagueId)
     }
 
     /// Whether the cached roster is present and still within its week-long life.
@@ -504,7 +522,7 @@ final class SportsSyncService {
             }
             snapshot.fixtures = Array(byId.values)
             snapshot.fetchedAt = Date()
-            store.update(snapshot, for: leagueId)
+            await publish(snapshot, for: leagueId)
             updated = true
         }
         if updated { store.noteLiveScoreUpdate() }

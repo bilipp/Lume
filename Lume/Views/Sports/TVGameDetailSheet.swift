@@ -240,8 +240,8 @@
         @ViewBuilder
         private var scoreText: some View {
             if fixture.hasTeams {
-                Text(verbatim: "\(fixture.home?.score ?? 0) – \(fixture.away?.score ?? 0)")
-                    .font(.system(size: 80, weight: .bold, design: .rounded))
+                Text(verbatim: fixture.scoreLine)
+                    .font(.system(size: fixture.hasTextScores ? 48 : 80, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
                     .lineLimit(1)

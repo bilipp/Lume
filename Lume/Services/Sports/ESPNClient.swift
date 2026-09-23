@@ -262,7 +262,9 @@ nonisolated extension ESPNClient {
         case "in":
             .inProgress
         case "post":
-            (type?.completed == true) ? .final : .postponed
+            // Cricket results carry no `completed` flag at all; only an explicit
+            // `false` marks a game that ended without being played out.
+            (type?.completed == false) ? .postponed : .final
         default:
             .scheduled
         }
@@ -273,19 +275,22 @@ nonisolated extension ESPNClient {
             shortDetail: shortDetail,
             typeName: type?.name,
             period: status?.period,
-            clock: nonEmpty(status?.displayClock)
+            clock: nonEmpty(status?.displayClock),
+            summary: nonEmpty(status?.summary)
         )
     }
 
     private static func mapCompetitor(_ competitor: ESPNCompetitor, leagueId: String) -> SportsCompetitor? {
         guard let team = mapTeam(competitor.team, leagueId: leagueId) else { return nil }
-        let score = competitor.score?.stringValue.flatMap { Int($0) }
+        let rawScore = competitor.score?.stringValue.flatMap(nonEmpty)
+        let score = rawScore.flatMap { Int($0) }
         let record = competitor.records?.first(where: { $0.type == "total" })?.summary
             ?? competitor.records?.first?.summary
         return SportsCompetitor(
             team: team,
             score: score,
-            isWinner: competitor.winner ?? false,
+            scoreText: score == nil ? rawScore : nil,
+            isWinner: competitor.winner?.boolValue ?? false,
             form: competitor.form,
             record: record
         )
@@ -394,7 +399,8 @@ nonisolated extension ESPNClient {
         }
 
         /// The first of several provider spellings for one figure — rugby and
-        /// the NRL say `gamesWon`/`gamesLost`/`gamesDrawn`/`pointsDifference`
+        /// the NRL say `gamesWon`/`gamesLost`/`gamesDrawn`/`pointsDifference`,
+        /// cricket `matchesPlayed`/`matchesWon`/`matchesLost`/`matchPoints`,
         /// where every other sport says `wins`/`losses`/`ties`/`pointDifferential`.
         func intStat(anyOf names: [String]) -> Int? {
             for name in names {
@@ -412,7 +418,7 @@ nonisolated extension ESPNClient {
         }
 
         func pointsStat() -> Int? {
-            if let points = intStat(anyOf: ["points", "championshipPts"]) { return points }
+            if let points = intStat(anyOf: ["points", "championshipPts", "matchPoints"]) { return points }
             if let stat = byAbbreviation["PTS"], let value = stat.value ?? stat.displayValue.flatMap({ Double($0) }) {
                 return Int(value)
             }
@@ -437,10 +443,10 @@ nonisolated extension ESPNClient {
                 teamId: teamId,
                 name: team.displayName ?? team.shortDisplayName ?? teamId,
                 rank: stats.rankStat() ?? fallbackRank,
-                played: stats.intStat("gamesPlayed"),
-                wins: stats.intStat(anyOf: ["wins", "gamesWon"]),
-                draws: stats.intStat(anyOf: ["ties", "gamesDrawn"]),
-                losses: stats.intStat(anyOf: ["losses", "gamesLost"]),
+                played: stats.intStat(anyOf: ["gamesPlayed", "matchesPlayed"]),
+                wins: stats.intStat(anyOf: ["wins", "gamesWon", "matchesWon"]),
+                draws: stats.intStat(anyOf: ["ties", "gamesDrawn", "matchesDrawn"]),
+                losses: stats.intStat(anyOf: ["losses", "gamesLost", "matchesLost"]),
                 goalDifference: stats.intStat(anyOf: ["pointDifferential", "pointsDifference"]),
                 points: stats.pointsStat(),
                 extra: stats.extra,

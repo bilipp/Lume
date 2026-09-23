@@ -102,6 +102,9 @@ nonisolated enum SportsPeriodFamily: Hashable {
     /// Ice hockey's three periods.
     case periods
     case innings
+    /// Cricket: innings and overs, which the provider spells out only in its
+    /// state-of-play sentence ("RR need 40 runs from 20 balls").
+    case cricket
     /// Race weekends, tennis, golf, fights: no period structure to label.
     case none
 
@@ -117,7 +120,9 @@ nonisolated enum SportsPeriodFamily: Hashable {
             self = .periods
         case "baseball":
             self = .innings
-        case "soccer", "rugby", "rugby-league", "australian-football", "lacrosse", "volleyball", "cricket", "field-hockey":
+        case "cricket":
+            self = .cricket
+        case "soccer", "rugby", "rugby-league", "australian-football", "lacrosse", "volleyball", "field-hockey":
             self = .clockOnly
         default:
             self = .none
@@ -131,7 +136,7 @@ nonisolated enum SportsPeriodFamily: Hashable {
         case .halves: 2
         case .periods: 3
         case .innings: 9
-        case .clockOnly, .none: nil
+        case .clockOnly, .cricket, .none: nil
         }
     }
 }
@@ -165,7 +170,7 @@ nonisolated enum SportsPeriodLabel {
         case .halves: return String(localized: "\(ordinal) Half")
         case .periods: return String(localized: "\(ordinal) Period")
         case .innings: return String(localized: "\(ordinal) Inning")
-        case .clockOnly, .none: return nil
+        case .clockOnly, .cricket, .none: return nil
         }
     }
 
@@ -240,6 +245,8 @@ nonisolated extension SportsFixtureStatus {
             Self.join(runningClock, SportsPeriodLabel.label(family: family, period: period)) ?? fallbackDetail
         case .innings:
             SportsPeriodLabel.inningLabel(period: period, detail: detail) ?? fallbackDetail
+        case .cricket:
+            summary ?? fallbackDetail
         case .none:
             fallbackDetail
         }
@@ -256,8 +263,10 @@ nonisolated extension SportsFixtureStatus {
     }
 
     /// How a finished game went past regulation — "After extra time", "After
-    /// penalties", "After overtime" — or `nil` when it did not.
+    /// penalties", "After overtime" — or `nil` when it did not. A cricket result
+    /// is its margin ("DC won by 7 wkts"), which only the provider's sentence has.
     func localizedEndingQualifier(family: SportsPeriodFamily) -> String? {
+        if family == .cricket { return state == .final ? summary : nil }
         switch phase {
         case .finalAfterExtraTime:
             return String(localized: "After extra time")
@@ -296,6 +305,34 @@ nonisolated extension SportsFixtureStatus {
         case let (nil, label?): label
         case (nil, nil): nil
         }
+    }
+}
+
+// MARK: - Scores
+
+nonisolated extension SportsCompetitor {
+    /// The score as a card shows it: the number, or a text score without its
+    /// overs-and-target parenthetical ("226/3 (19.1/20 ov, target 226)" reads
+    /// "226/3"); the full text is what `scoreText` keeps.
+    var displayScore: String {
+        guard let scoreText else { return String(score ?? 0) }
+        let compact = scoreText.split(separator: "(", maxSplits: 1).first.map {
+            $0.trimmingCharacters(in: .whitespaces)
+        }
+        return compact.flatMap { $0.isEmpty ? nil : $0 } ?? scoreText
+    }
+}
+
+nonisolated extension SportsFixture {
+    /// "2 – 1", or "225/6 – 226/3" for a cricket match.
+    var scoreLine: String {
+        "\(home?.displayScore ?? "0") – \(away?.displayScore ?? "0")"
+    }
+
+    /// Whether either side's score is text ("225/6") rather than a number, which
+    /// the score views set smaller so it fits.
+    var hasTextScores: Bool {
+        home?.scoreText != nil || away?.scoreText != nil
     }
 }
 
