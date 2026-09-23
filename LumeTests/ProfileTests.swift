@@ -41,6 +41,49 @@ struct ProfileEngineTests {
         #expect(!ParentalControlsStore.verify(pin: "1234", against: profile.pinHash))
     }
 
+    @Test func `an inactive profile PIN gates its switch and rejects a wrong PIN`() {
+        let activeProfileID = UUID()
+        let protected = UserProfile(
+            id: UUID(), name: "Protected", pinHash: ParentalControlsStore.hash("1234")
+        )
+
+        #expect(ProfileSwitchPINPolicy.requiresPIN(
+            toSwitchTo: protected,
+            activeProfileID: activeProfileID,
+            activeProfileIsChild: false,
+            isGlobalPINSet: false
+        ))
+        #expect(!ProfileSwitchPINPolicy.verify("0000", toSwitchTo: protected, verifyGlobalPIN: { _ in true }))
+        #expect(ProfileSwitchPINPolicy.verify("1234", toSwitchTo: protected, verifyGlobalPIN: { _ in false }))
+    }
+
+    @Test func `the active protected profile never prompts for its own PIN`() {
+        let profileID = UUID()
+        let protected = UserProfile(
+            id: profileID, name: "Protected", pinHash: ParentalControlsStore.hash("1234")
+        )
+
+        #expect(!ProfileSwitchPINPolicy.requiresPIN(
+            toSwitchTo: protected,
+            activeProfileID: profileID,
+            activeProfileIsChild: false,
+            isGlobalPINSet: true
+        ))
+    }
+
+    @Test func `the existing child-profile escape gate still uses the global PIN`() {
+        let target = UserProfile(id: UUID(), name: "Adults")
+
+        #expect(ProfileSwitchPINPolicy.requiresPIN(
+            toSwitchTo: target,
+            activeProfileID: UUID(),
+            activeProfileIsChild: true,
+            isGlobalPINSet: true
+        ))
+        #expect(ProfileSwitchPINPolicy.verify("1234", toSwitchTo: target, verifyGlobalPIN: { $0 == "1234" }))
+        #expect(!ProfileSwitchPINPolicy.verify("0000", toSwitchTo: target, verifyGlobalPIN: { $0 == "1234" }))
+    }
+
     @Test func `bootstrap creates a default profile and claims legacy records`() async throws {
         let container = try makeProfileTestContainer()
         let ctx = container.mainContext

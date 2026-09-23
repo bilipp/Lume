@@ -66,20 +66,19 @@ final class ParentalControls {
     /// takes precedence; otherwise this is the existing child-profile escape
     /// gate and uses the global parental PIN.
     func verify(_ pin: String, toSwitchTo target: UserProfile) -> Bool {
-        if target.isPINProtected {
-            return ParentalControlsStore.verify(pin: pin, against: target.pinHash)
-        }
-        return verify(pin)
+        ProfileSwitchPINPolicy.verify(pin, toSwitchTo: target, verifyGlobalPIN: { self.verify($0) })
     }
 
     /// A PIN is required when the inactive target opted into profile protection,
     /// or when the existing parental gate protects leaving a child profile for
     /// an unrestricted one. Profiles remain unprotected by default.
     func requiresPIN(toSwitchTo target: UserProfile) -> Bool {
-        guard target.id != profileManager.activeProfileID else { return false }
-        if target.isPINProtected { return true }
-        guard isPINSet, profileManager.activeProfile?.isChild == true else { return false }
-        return !target.isChild
+        ProfileSwitchPINPolicy.requiresPIN(
+            toSwitchTo: target,
+            activeProfileID: profileManager.activeProfileID,
+            activeProfileIsChild: profileManager.activeProfile?.isChild == true,
+            isGlobalPINSet: isPINSet
+        )
     }
 
     /// Whether the child-restricted settings surfaces — Content Management and
@@ -90,5 +89,32 @@ final class ParentalControls {
     /// verify, and a child could edit their own profile to remove the flag.
     var restrictedSurfacesLocked: Bool {
         isPINSet && profileManager.activeProfile?.isChild == true
+    }
+}
+
+/// Pure policy behind the profile switch PIN prompt. Keeping it independent of
+/// the view lets every switcher use the same optional-profile-PIN semantics.
+@MainActor
+enum ProfileSwitchPINPolicy {
+    static func requiresPIN(
+        toSwitchTo target: UserProfile,
+        activeProfileID: UUID,
+        activeProfileIsChild: Bool,
+        isGlobalPINSet: Bool
+    ) -> Bool {
+        guard target.id != activeProfileID else { return false }
+        if target.isPINProtected { return true }
+        return isGlobalPINSet && activeProfileIsChild && !target.isChild
+    }
+
+    static func verify(
+        _ pin: String,
+        toSwitchTo target: UserProfile,
+        verifyGlobalPIN: (String) -> Bool
+    ) -> Bool {
+        if target.isPINProtected {
+            return ParentalControlsStore.verify(pin: pin, against: target.pinHash)
+        }
+        return verifyGlobalPIN(pin)
     }
 }
