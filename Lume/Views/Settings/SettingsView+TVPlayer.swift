@@ -208,8 +208,8 @@ import SwiftUI
 
         // MARK: - Preferred languages
 
-        /// The stored list, most-preferred first. Empty is the shipped default
-        /// and means "no preference".
+        /// The stored list, most-preferred first. Empty is Automatic and uses
+        /// the device's preferred languages.
         private var preferredLanguageCodes: [String] {
             PreferredLanguageList.decode(preferredAudioLanguagesRaw)
         }

@@ -5,8 +5,8 @@
 //  The preferred audio language list (iOS, macOS, visionOS). Split out of
 //  SettingsView, which is already at the file-length limit.
 //
-//  The list ships EMPTY, which means "no preference" and behaves exactly as
-//  Lume did before the setting existed.
+//  The list ships EMPTY, which means Automatic: use the device's preferred
+//  languages when the stream offers a matching audio track.
 //
 
 import SwiftUI
@@ -52,8 +52,7 @@ import SwiftUI
     // MARK: - Ordered list
 
     /// Drag-to-reorder list of preferred audio languages, most-preferred first.
-    /// Empty is the shipped default and means Lume leaves the stream's own
-    /// track selection alone.
+    /// Empty is the shipped default and uses the device's preferred languages.
     struct PreferredLanguageListView: View {
         @AppStorage(PlayerSettings.Language.preferredAudioLanguagesKey)
         private var raw = PlayerSettings.Language.preferredAudioLanguagesDefault

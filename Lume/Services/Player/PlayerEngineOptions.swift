@@ -475,8 +475,8 @@ struct LumeEngineOptions {
 
 /// A point-in-time read of the engine-independent preferred audio languages,
 /// taken when a stream is configured (the preference is deliberately not
-/// re-read mid-session). An empty list means no preference, and every engine
-/// then leaves track selection exactly as the container asks for it.
+/// re-read mid-session). When the viewer has not chosen languages, the device's
+/// preferred system languages provide the initial-play default.
 nonisolated struct PlayerLanguageOptions {
     /// Bare `de`-style codes, normalized on load: `AVMediaSelectionGroup`'s
     /// preferred-language filter and LumeEngine's `PlayerConfiguration` both
@@ -485,13 +485,17 @@ nonisolated struct PlayerLanguageOptions {
     /// name no single language are dropped.
     var preferredAudioLanguages: [String]
 
-    static func load(from defaults: UserDefaults = .standard) -> PlayerLanguageOptions {
+    static func load(
+        from defaults: UserDefaults = .standard,
+        systemLanguages: [String] = Locale.preferredLanguages
+    ) -> PlayerLanguageOptions {
         let stored = PreferredLanguageList.decode(
             defaults.string(forKey: PlayerSettings.Language.preferredAudioLanguagesKey)
                 ?? PlayerSettings.Language.preferredAudioLanguagesDefault
         )
+        let preferred = stored.isEmpty ? systemLanguages : stored
         return PlayerLanguageOptions(
-            preferredAudioLanguages: PreferredLanguageList.normalized(stored.compactMap(TrackLanguageMatcher.normalize))
+            preferredAudioLanguages: PreferredLanguageList.normalized(preferred.compactMap(TrackLanguageMatcher.normalize))
         )
     }
 }
