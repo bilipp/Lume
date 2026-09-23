@@ -128,6 +128,58 @@ struct ProfileEngineTests {
         #expect(projected?.watchProgress == 500)
     }
 
+    @Test func `switching profiles preserves state for catalog items not imported on this device`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let profileA = UUID()
+        let profileB = UUID()
+        let missingEpisodeID = "pl-episode-not-imported"
+        ctx.insert(UserContentState(
+            contentId: missingEpisodeID,
+            kind: .episode,
+            profileID: profileA,
+            watchProgress: 900,
+            isWatched: true
+        ))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        defer { ActiveProfileStore.current = saved }
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        try await engine.switchProfile(from: profileA, to: profileB)
+
+        let states = try ctx.fetch(FetchDescriptor<UserContentState>())
+        let preserved = states.first { $0.profileID == profileA && $0.contentId == missingEpisodeID }
+        #expect(preserved?.watchProgress == 900)
+        #expect(preserved?.isWatched == true)
+    }
+
+    @Test func `switching profiles deletes cleared state when the catalog item exists`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let profileA = UUID()
+        let profileB = UUID()
+        let movieID = "pl-movie-cleared"
+        ctx.insert(Movie(id: movieID, streamId: 1, name: "Film"))
+        ctx.insert(UserContentState(
+            contentId: movieID,
+            kind: .movie,
+            profileID: profileA,
+            isFavorite: true
+        ))
+        try ctx.save()
+
+        let saved = ActiveProfileStore.current
+        defer { ActiveProfileStore.current = saved }
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        try await engine.switchProfile(from: profileA, to: profileB)
+
+        let states = try ctx.fetch(FetchDescriptor<UserContentState>())
+        #expect(!states.contains { $0.profileID == profileA && $0.contentId == movieID })
+    }
+
     @Test func `reconcile only projects the active profile's mirrors`() async throws {
         let container = try makeProfileTestContainer()
         let ctx = container.mainContext
