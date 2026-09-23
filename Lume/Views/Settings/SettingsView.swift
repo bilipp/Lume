@@ -11,9 +11,12 @@ struct SettingsView: View {
     @Query var playlists: [Playlist]
     /// Not `private`: read by the SettingsView+Playlists extension (separate file).
     @State var showingAddPlaylist = false
-    @State private var trakt = TraktService.shared
-    @State private var simkl = SimklService.shared
-    @State private var openSubtitles = OpenSubtitlesService.shared
+    /// Not `private`: read by the SettingsView+TVDetail extension (separate file).
+    @State var trakt = TraktService.shared
+    /// Not `private`: read by the SettingsView+TVDetail extension (separate file).
+    @State var simkl = SimklService.shared
+    /// Not `private`: read by the SettingsView+TVDetail extension (separate file).
+    @State var openSubtitles = OpenSubtitlesService.shared
     /// Premium entitlement + paywall presentation. Not `private`: read by the
     /// SettingsView+Playlists / +TVComponents extensions (separate files).
     @State var premium = PremiumManager.shared
@@ -60,8 +63,9 @@ struct SettingsView: View {
     #endif
     @AppStorage(PlayerSettings.StreamInfo.detailLevelKey)
     var streamInfoDetailLevelRaw = PlayerSettings.StreamInfo.detailLevelDefault.rawValue
+    /// Not `private`: read by the SettingsView+TVDetail extension (separate file).
     @AppStorage(SearchSettings.searchAllPlaylistsKey)
-    private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
+    var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     #if !os(tvOS)
         /// The app-wide appearance override (System / Dark / Light), applied at
         /// the scene root in `LumeApp`. Not offered on tvOS — the TV UI is
@@ -89,7 +93,8 @@ struct SettingsView: View {
         /// The category whose content is shown in the right pane. Follows focus
         /// in the sidebar (Apple TV Settings behaviour) and persists once focus
         /// moves into the detail pane.
-        @State private var selectedCategory: SettingsCategory = .premium
+        /// Not `private`: read by the SettingsView+TVDetail extension (separate file).
+        @State var selectedCategory: SettingsCategory = .premium
         @FocusState private var focusedCategory: SettingsCategory?
         /// The playlist drilled into within the Playlists category. When set, its
         /// settings replace the playlist list *in the detail pane* rather than
@@ -457,7 +462,19 @@ struct SettingsView: View {
                 .tvSettingsBackground()
                 .paywall(isPresented: $showPaywall, highlight: paywallHighlight)
                 .defaultFocus($focusedCategory, .premium)
-                .onChange(of: focusedCategory) { _, newValue in
+                .onChange(of: focusedCategory) { oldValue, newValue in
+                    // Backstop for the `defaultFocus` above: if the engine
+                    // lands on the geometrically nearest row anyway, correct it
+                    // rather than treat it as a choice, which would switch
+                    // category and throw away any drill-in on the way past.
+                    // Moving *within* the sidebar (`oldValue != nil`) is a real
+                    // choice and stands.
+                    if oldValue == nil, let newValue, newValue != selectedCategory,
+                       availableCategories.contains(selectedCategory)
+                    {
+                        Task { focusedCategory = selectedCategory }
+                        return
+                    }
                     // Follow focus so the detail pane mirrors the highlighted
                     // category. Ignore nil (focus moved into the detail pane),
                     // which keeps the current selection visible.
@@ -504,6 +521,11 @@ struct SettingsView: View {
             .padding(.trailing, 24)
             .padding(.vertical, 72)
             .focusSection()
+            // Where focus goes when it enters the sidebar. Stating it means the
+            // engine picks the selected row *instead of* the geometrically
+            // nearest one, rather than landing on that one and being corrected
+            // afterwards — which is visible as the highlight jumping.
+            .defaultFocus($focusedCategory, selectedCategory, priority: .userInitiated)
         }
 
         /// The sidebar categories. Integrations is hidden unless the build has
@@ -511,86 +533,6 @@ struct SettingsView: View {
         private var availableCategories: [SettingsCategory] {
             SettingsCategory.allCases.filter {
                 $0 != .integrations || trakt.isConfigured || simkl.isConfigured || openSubtitles.isConfigured
-            }
-        }
-
-        /// Content Management brings its own scroll/background, so it replaces the
-        /// detail pane wholesale rather than nesting inside the scrolling detail.
-        @ViewBuilder
-        private var tvDetailContainer: some View {
-            switch selectedCategory {
-            case .content:
-                ParentalGateView { ContentManagementView() }
-                    .focusSection()
-            default:
-                tvDetail
-            }
-        }
-
-        private var tvDetail: some View {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 36) {
-                    switch selectedCategory {
-                    case .premium:
-                        tvPremiumDetail
-                    case .playlists:
-                        if let selectedPlaylist {
-                            PlaylistDetailView(playlist: selectedPlaylist) {
-                                self.selectedPlaylist = nil
-                            }
-                        } else {
-                            tvPlaylistsDetail
-                        }
-                    case .profiles: TVProfilesSettingsView()
-                    case .home: tvHomeLayoutDetail
-                    case .sports: TVSportsSettingsPane()
-                    case .epg: EPGSettingsView()
-                    case .search: tvSearchDetail
-                    case .storage: StorageManagementView()
-                    case .integrations: tvIntegrationsDetail
-                    case .player:
-                        if let selectedEngineOptions {
-                            tvEngineOptionsDetail(for: selectedEngineOptions)
-                        } else if let preferredLanguagePane {
-                            tvPreferredLanguageDetail(preferredLanguagePane)
-                        } else {
-                            tvPlayerDetail
-                        }
-                    case .about: tvAboutDetail
-                    case .content: EmptyView() // handled by tvDetailContainer
-                    }
-                }
-                .frame(maxWidth: TVSettingsMetrics.detailMaxWidth, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 48)
-                .padding(.vertical, 72)
-            }
-            .focusSection()
-        }
-
-        private var tvIntegrationsDetail: some View {
-            VStack(alignment: .leading, spacing: 36) {
-                if trakt.isConfigured {
-                    TVTraktIntegrationView()
-                }
-                if simkl.isConfigured {
-                    TVSimklIntegrationView()
-                }
-                if openSubtitles.isConfigured {
-                    TVOpenSubtitlesIntegrationView()
-                }
-            }
-        }
-
-        private var tvSearchDetail: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                TVSettingsSectionLabel("Search")
-                TVOptionToggleRow(title: "Search All Playlists", isOn: $searchAllPlaylists)
-                Text("When off, search only finds content in the active playlist. Turn this on to search across all your playlists.")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                    .padding(.top, 6)
             }
         }
     }

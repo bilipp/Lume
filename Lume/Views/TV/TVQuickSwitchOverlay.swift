@@ -194,12 +194,7 @@
         /// overwritten. Released first — two assertions in flight leave the engine
         /// on the incumbent.
         private func landInitialFocus(_ target: FocusTarget?) {
-            guard let target else { return }
-            Task { @MainActor in
-                focus = nil
-                try? await Task.sleep(for: .milliseconds(150))
-                focus = target
-            }
+            Task { @MainActor in await landTVFocus($focus, on: target) }
         }
 
         // MARK: - Switching
