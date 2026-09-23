@@ -61,30 +61,39 @@ extension CloudSyncEngine {
     /// reconcile (which re-reads the active profile from `ActiveProfileStore`)
     /// re-baselines against the newly projected state.
     func switchProfile(from: UUID, to toID: UUID) throws {
-        // Gather the catalog's current user-state once and reuse it for both the
-        // export into the outgoing profile's mirrors and the catalog reset — these
-        // each used to re-run the four catalog fetches, tripling the work per
-        // switch.
-        let localValues = try fetchLocalContentValues()
-        try exportCatalogState(toProfile: from, localValues: localValues)
-        resetCatalogUserState(localValues: localValues)
-        try importProfileState(toID)
-        shadow.resetContent()
-        try saveStores()
-        shadow.persist()
-        // Flip the active-profile pointer *inside* this actor-isolated critical
-        // section, atomically with the projection swap and shadow reset — not
-        // afterwards on the main actor. `reconcile()` reads the active profile
-        // from `ActiveProfileStore` at the start of every pass, and reconciles
-        // are fired constantly by CloudKit remote-change / scene-phase / content-
-        // sync observers. If one is serialized on this actor between the swap and
-        // a later store update, it would observe the freshly-projected catalog
-        // while the pointer still names the old profile — merging the new
-        // catalog into the old profile's mirrors (and the old profile's state
-        // back onto the new catalog). Committing it here closes that window:
-        // every reconcile now sees a catalog and an active-profile pointer that
-        // agree, because both change in the same critical section.
-        ActiveProfileStore.current = toID
+        do {
+            // Gather the catalog's current user-state once and reuse it for both
+            // the export into the outgoing profile's mirrors and the catalog
+            // reset — these each used to re-run the four catalog fetches,
+            // tripling the work per switch.
+            let localValues = try fetchLocalContentValues()
+            try exportCatalogState(toProfile: from, localValues: localValues)
+            resetCatalogUserState(localValues: localValues)
+            try importProfileState(toID)
+            try saveProfileSwitchStores()
+
+            // Nothing below can throw: only after both stores are durable may
+            // the previous profile's reconcile baseline stop describing the
+            // catalog or the active-profile pointer name the new projection.
+            shadow.resetContent()
+            shadow.persist()
+            // Flip the active-profile pointer *inside* this actor-isolated
+            // critical section, atomically with the projection swap and shadow
+            // reset — not afterwards on the main actor. `reconcile()` reads the
+            // active profile from `ActiveProfileStore` at the start of every
+            // pass, and reconciles are fired constantly by CloudKit remote-change
+            // / scene-phase / content-sync observers. If one is serialized on
+            // this actor between the swap and a later store update, it would
+            // observe the freshly-projected catalog while the pointer still names
+            // the old profile.
+            ActiveProfileStore.current = toID
+        } catch {
+            catalogContext.rollback()
+            if cloudContext !== catalogContext {
+                cloudContext.rollback()
+            }
+            throw error
+        }
     }
 
     /// Collapse duplicate profiles that CloudKit surfaced from another device.
