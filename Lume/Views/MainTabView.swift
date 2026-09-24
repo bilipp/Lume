@@ -66,7 +66,8 @@ struct MainTabView: View {
 
     /// The playlist the content tabs are showing, resolved rather than read raw:
     /// the stored id can name a deleted playlist, in which case the app falls
-    /// back to the first one and auto-sync has to follow it there.
+    /// back to the same playlist every other surface does, and auto-sync has to
+    /// follow it there.
     private var activePlaylistID: String {
         playlists.activeID(for: selectedPlaylistID)
     }
@@ -145,7 +146,7 @@ struct MainTabView: View {
             .task(id: playlists.count) {
                 // On launch (and whenever a playlist is added) sync the active
                 // playlist if it is due, plus any playlist that has never synced.
-                enqueueDueSyncs(playlists, activeID: activePlaylistID)
+                enqueueDueSyncs(playlists)
             }
             .onChange(of: selectedPlaylistID) {
                 // On playlist switch, sync the newly selected one if it's due —
@@ -154,19 +155,28 @@ struct MainTabView: View {
                 // on screen gets its turn.
                 guard playlistSwitch?.consumeDeferredDueSync() != true else { return }
                 if let playlist = playlists.active(for: selectedPlaylistID) {
-                    enqueueDueSyncs([playlist], activeID: playlist.id.uuidString)
+                    enqueueDueSyncs([playlist])
                 }
             }
             .onChange(of: scenePhase) { _, phase in
                 // Returning to the foreground re-checks staleness — for a long-lived
                 // app this is the practical equivalent of "on launch".
                 if phase == .active {
-                    enqueueDueSyncs(playlists, activeID: activePlaylistID)
+                    enqueueDueSyncs(playlists)
                     SportsSyncService.shared.syncIfDue()
                 }
                 SportsSyncService.shared.isForeground = phase == .active
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
+            .onChange(of: isAutoSyncBusy, initial: true) { _, busy in
+                EPGSyncService.shared.setAutoSyncQueued(busy)
+            }
+            .onDisappear {
+                // The queue goes with this view (deleting the last playlist
+                // swaps the root back to onboarding); don't leave the guide
+                // waiting on it.
+                EPGSyncService.shared.setAutoSyncQueued(false)
+            }
             .downloadsSheet(isPresented: $showsDownloads)
             .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
             // The one fire point for the rating sheet. Here rather than at the
@@ -403,35 +413,33 @@ struct MainTabView: View {
     // MARK: - Automatic sync
 
     /// Enqueues every due playlist for a blocking, progress-visible sync and
-    /// presents the first one. Covers the never-synced first launch (where
-    /// `lastSyncDate == nil` makes a playlist due) as well as periodic refreshes.
-    ///
-    /// `activeID` scopes the periodic half of that to the playlist on screen —
-    /// see `AutoSync.shouldSync`. Passed in rather than read from
-    /// `selectedPlaylistID` here so the playlist-switch trigger can name the
-    /// playlist it is switching to directly, instead of depending on the
-    /// `@AppStorage` write having already been observed.
-    private func enqueueDueSyncs(_ candidates: [Playlist], activeID: String) {
+    /// presents the first one — the playlist on screen, plus any the viewer
+    /// just added (see `AutoSync.shouldSync`). Covers the never-synced first
+    /// launch (where `lastSyncDate == nil` makes a playlist due) as well as
+    /// periodic refreshes.
+    private func enqueueDueSyncs(_ candidates: [Playlist]) {
         guard !isUITesting else { return }
 
-        for playlist in candidates where shouldAutoSync(playlist, activeID: activeID) {
+        for playlist in candidates where shouldAutoSync(playlist) {
             autoSyncAttempted.insert(playlist.id)
             syncQueue.append(playlist)
         }
         promoteNextIfIdle()
     }
 
-    private func shouldAutoSync(_ playlist: Playlist, activeID: String) -> Bool {
+    private func shouldAutoSync(_ playlist: Playlist) -> Bool {
         AutoSync.shouldSync(
-            AutoSync.Candidate(
-                syncEnabled: playlist.syncEnabled,
-                status: playlist.syncStatus,
-                lastSyncDate: playlist.lastSyncDate,
-                isActive: playlist.id.uuidString == activeID
-            ),
+            playlist.autoSyncCandidate(activeID: activePlaylistID),
             frequency: syncFrequency,
             alreadyStarted: autoSyncAttempted.contains(playlist.id)
         )
+    }
+
+    /// Whether the auto-sync queue holds anything, including the playlist in
+    /// the cover. Reported to `EPGSyncService` so the guide refresh reads the
+    /// queue itself instead of predicting it.
+    private var isAutoSyncBusy: Bool {
+        activeSyncPlaylist != nil || !syncQueue.isEmpty
     }
 
     /// Presents the next queued playlist's sync cover when none is showing. The
