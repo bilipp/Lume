@@ -117,9 +117,17 @@ struct FixtureCard: View {
                 if showsDateLine {
                     dateLine
                 }
-                Text(fixture.headlineDate, format: .dateTime.hour().minute())
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
+                if fixture.startTimeIsTentative == true {
+                    Text("TBD")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                } else {
+                    Text(fixture.headlineDate, format: .dateTime.hour().minute())
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                }
             }
             if showsLeagueMark {
                 leagueMark
@@ -157,6 +165,12 @@ struct FixtureCard: View {
 
     private var teamRows: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let tournament = fixture.tournamentLine {
+                Text(verbatim: tournament)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             if let home = fixture.home {
                 teamRow(home)
             }
@@ -225,12 +239,17 @@ struct FixtureCard: View {
             // A race or a fight night has no two-sided score to show.
             if fixture.hasTeams, fixture.status.state == .inProgress || fixture.status.state == .final {
                 VStack(alignment: .trailing, spacing: 8) {
+                    // Holds the tournament caption's line so the scores stay
+                    // level with the player rows beside them.
+                    if fixture.tournamentLine != nil {
+                        Text(verbatim: " ").font(.caption2).hidden()
+                    }
                     Text(verbatim: fixture.home?.displayScore ?? "0")
                         .fontWeight(rowWeight(fixture.home ?? SportsCompetitor(team: placeholderTeam)))
                     Text(verbatim: fixture.away?.displayScore ?? "0")
                         .fontWeight(rowWeight(fixture.away ?? SportsCompetitor(team: placeholderTeam)))
                 }
-                .font(fixture.hasTextScores ? .subheadline : .title3)
+                .font(fixture.hasTextScores || fixture.hasSetScores ? .subheadline : .title3)
                 .monospacedDigit()
                 .lineLimit(1)
             }
@@ -273,9 +292,14 @@ struct FixtureCard: View {
         }
         switch fixture.status.state {
         case .scheduled:
-            parts.append(fixture.headlineDate.formatted(
-                date: showsDateLine ? .abbreviated : .omitted, time: .shortened
-            ))
+            if fixture.startTimeIsTentative == true {
+                if showsDateLine { parts.append(fixture.headlineDate.formatted(date: .abbreviated, time: .omitted)) }
+                parts.append(String(localized: "Time to be decided"))
+            } else {
+                parts.append(fixture.headlineDate.formatted(
+                    date: showsDateLine ? .abbreviated : .omitted, time: .shortened
+                ))
+            }
         case .inProgress:
             parts.append(String(localized: "Live"))
             if fixture.hasTeams { parts.append(scoreSpokenLine) }
@@ -288,12 +312,12 @@ struct FixtureCard: View {
         case .postponed:
             parts.append(fixture.status.localizedStoppage)
         }
-        parts.append(fixture.leagueName)
+        parts.append(fixture.tournamentLine ?? fixture.leagueName)
         return Text(verbatim: parts.joined(separator: ", "))
     }
 
     private var scoreSpokenLine: String {
-        String(localized: "\(fixture.home?.displayScore ?? "0") to \(fixture.away?.displayScore ?? "0")")
+        fixture.setsLine ?? String(localized: "\(fixture.home?.displayScore ?? "0") to \(fixture.away?.displayScore ?? "0")")
     }
 
     // MARK: - Context menu

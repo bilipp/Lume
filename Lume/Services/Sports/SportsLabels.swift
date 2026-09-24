@@ -30,6 +30,9 @@ nonisolated enum SportsStatusPhase: Hashable {
     case final
     case finalAfterExtraTime
     case finalAfterPenalties
+    /// Tennis: a player quit mid-match, or never took the court.
+    case retired
+    case walkover
     case postponed
     case canceled
     case abandoned
@@ -55,6 +58,7 @@ nonisolated enum SportsStatusPhase: Hashable {
     /// win over `FINAL`, `SUSPENDED` over the `PEN` inside it, `HALF_TIME` over
     /// `EXTRA`, and the bare `HALF` of `FIRST_HALF` comes last.
     private static let namePatterns: [(needle: String, phase: SportsStatusPhase)] = [
+        ("RETIRED", .retired), ("WALKOVER", .walkover),
         ("POSTPONE", .postponed), ("CANCEL", .canceled), ("ABANDON", .abandoned),
         ("SUSPEND", .suspended), ("DELAY", .delayed),
         ("HALFTIME", .halftime), ("HALF_TIME", .halftime),
@@ -105,7 +109,9 @@ nonisolated enum SportsPeriodFamily: Hashable {
     /// Cricket: innings and overs, which the provider spells out only in its
     /// state-of-play sentence ("RR need 40 runs from 20 balls").
     case cricket
-    /// Race weekends, tennis, golf, fights: no period structure to label.
+    /// Tennis: "2nd Set".
+    case sets
+    /// Race weekends, golf, fights: no period structure to label.
     case none
 
     /// Sport slug plus league slug, since college basketball plays halves where
@@ -122,6 +128,8 @@ nonisolated enum SportsPeriodFamily: Hashable {
             self = .innings
         case "cricket":
             self = .cricket
+        case "tennis":
+            self = .sets
         case "soccer", "rugby", "rugby-league", "australian-football", "lacrosse", "volleyball", "field-hockey":
             self = .clockOnly
         default:
@@ -136,7 +144,7 @@ nonisolated enum SportsPeriodFamily: Hashable {
         case .halves: 2
         case .periods: 3
         case .innings: 9
-        case .clockOnly, .cricket, .none: nil
+        case .clockOnly, .cricket, .sets, .none: nil
         }
     }
 }
@@ -170,7 +178,7 @@ nonisolated enum SportsPeriodLabel {
         case .halves: return String(localized: "\(ordinal) Half")
         case .periods: return String(localized: "\(ordinal) Period")
         case .innings: return String(localized: "\(ordinal) Inning")
-        case .clockOnly, .cricket, .none: return nil
+        case .clockOnly, .cricket, .sets, .none: return nil
         }
     }
 
@@ -247,6 +255,8 @@ nonisolated extension SportsFixtureStatus {
             SportsPeriodLabel.inningLabel(period: period, detail: detail) ?? fallbackDetail
         case .cricket:
             summary ?? fallbackDetail
+        case .sets:
+            period.flatMap { $0 > 0 ? String(localized: "\(SportsPeriodLabel.ordinal($0)) Set") : nil } ?? fallbackDetail
         case .none:
             fallbackDetail
         }
@@ -267,6 +277,7 @@ nonisolated extension SportsFixtureStatus {
     /// is its margin ("DC won by 7 wkts"), which only the provider's sentence has.
     func localizedEndingQualifier(family: SportsPeriodFamily) -> String? {
         if family == .cricket { return state == .final ? summary : nil }
+        if let label = Self.shortEndings[phase] { return String(localized: label) }
         switch phase {
         case .finalAfterExtraTime:
             return String(localized: "After extra time")
@@ -286,6 +297,12 @@ nonisolated extension SportsFixtureStatus {
             return nil
         }
     }
+
+    /// Tennis matches that ended before the last point was played.
+    private static let shortEndings: [SportsStatusPhase: LocalizedStringResource] = [
+        .retired: "Retired",
+        .walkover: "Walkover"
+    ]
 
     /// The clock when it is running; a stopped "0:00" / "0'" says nothing.
     private var runningClock: String? {
@@ -315,6 +332,9 @@ nonisolated extension SportsCompetitor {
     /// overs-and-target parenthetical ("226/3 (19.1/20 ov, target 226)" reads
     /// "226/3"); the full text is what `scoreText` keeps.
     var displayScore: String {
+        if let sets {
+            return sets.isEmpty ? "–" : sets.map { String($0.games) }.joined(separator: " ")
+        }
         guard let scoreText else { return String(score ?? 0) }
         let compact = scoreText.split(separator: "(", maxSplits: 1).first.map {
             $0.trimmingCharacters(in: .whitespaces)
@@ -324,15 +344,26 @@ nonisolated extension SportsCompetitor {
 }
 
 nonisolated extension SportsFixture {
-    /// "2 – 1", or "225/6 – 226/3" for a cricket match.
+    /// "2 – 1", "225/6 – 226/3" for a cricket match, the sets won ("2 – 1") for
+    /// a tennis match — or a bare dash for one decided without a ball struck.
     var scoreLine: String {
-        "\(home?.displayScore ?? "0") – \(away?.displayScore ?? "0")"
+        if let homeSets = home?.sets, let awaySets = away?.sets {
+            guard !homeSets.isEmpty || !awaySets.isEmpty else { return "–" }
+            return "\(home?.score ?? 0) – \(away?.score ?? 0)"
+        }
+        return "\(home?.displayScore ?? "0") – \(away?.displayScore ?? "0")"
     }
 
     /// Whether either side's score is text ("225/6") rather than a number, which
     /// the score views set smaller so it fits.
     var hasTextScores: Bool {
         home?.scoreText != nil || away?.scoreText != nil
+    }
+
+    /// Whether the card rows show a tennis player's games per set ("6 4 7")
+    /// rather than one number.
+    var hasSetScores: Bool {
+        home?.sets != nil || away?.sets != nil
     }
 }
 

@@ -290,7 +290,8 @@ nonisolated extension SportsCompetitor {
             scoreText: scoreText,
             isWinner: isWinner,
             form: form,
-            record: record
+            record: record,
+            sets: sets
         )
     }
 }
@@ -313,7 +314,9 @@ nonisolated extension SportsFixture {
             name: name,
             shortName: shortName,
             sessionKind: sessionKind,
-            leagueLogoURL: leagueLogoURL
+            leagueLogoURL: leagueLogoURL,
+            round: round,
+            startTimeIsTentative: startTimeIsTentative
         )
     }
 }

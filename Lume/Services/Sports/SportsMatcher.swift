@@ -159,7 +159,8 @@ nonisolated enum SportsMatcher {
         "rugby", "afl",
         "lacrosse",
         "motorsport", "racing", "formel", "formula", "formule", "nascar", "indycar",
-        "mma", "ufc", "kampfsport", "boxing", "boxen"
+        "mma", "ufc", "kampfsport", "boxing", "boxen",
+        "tennis", "tenis", "atp", "wta"
     ]
 
     /// How many of a team's distinctive tokens appear in the normalized text.
@@ -178,8 +179,13 @@ nonisolated enum SportsMatcher {
 
     /// Distinctive tokens for a fixture team: its ESPN display name, short name,
     /// its abbreviation (only when ≥3 letters, so "FC"/"AC" don't add noise) and
-    /// its aliases, each tokenized and folded, unioned into one set.
+    /// its aliases, each tokenized and folded, unioned into one set. A tennis
+    /// player is matched on the surname their short name keeps ("J. Sinner"):
+    /// a first name — Maria, Alexander — would find every namesake in the guide.
     static func tokens(for team: SportsTeam, aliases: SportsTeamAliases = .bundled) -> Set<String> {
+        if team.leagueId.hasPrefix(SportsLeague.makeID(sport: "tennis", slug: "")) {
+            return tokens(forName: team.shortName)
+        }
         var names = [team.name, team.shortName]
         if team.abbreviation.count >= 3 { names.append(team.abbreviation) }
         names.append(contentsOf: aliases.aliases(for: [team.name, team.shortName]))

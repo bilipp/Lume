@@ -221,6 +221,7 @@ extension SportsStandingGroup {
         switch kind {
         case .driver: Text("Drivers")
         case .constructor: Text("Constructors")
+        case .player: Text("Rankings")
         case .team: name.map { Text(verbatim: $0) }
         }
     }

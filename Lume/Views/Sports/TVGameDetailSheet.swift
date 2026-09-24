@@ -94,6 +94,17 @@
         }
 
         private var leagueLine: some View {
+            VStack(spacing: 8) {
+                leagueNameLine
+                if let tournament = fixture.tournamentLine {
+                    Text(verbatim: tournament)
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+        }
+
+        private var leagueNameLine: some View {
             HStack(spacing: 12) {
                 if let logo = leagueLogoURL {
                     CachedAsyncImage(url: logo, maxPixelSize: 56) { phase in
@@ -214,6 +225,7 @@
             case .final:
                 VStack(spacing: 10) {
                     scoreText
+                    TVSetsLine(fixture: fixture)
                     EndedBadge(fontSize: 22)
                     if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) {
                         Text(verbatim: qualifier)
@@ -223,6 +235,7 @@
             case .inProgress:
                 VStack(spacing: 10) {
                     scoreText
+                    TVSetsLine(fixture: fixture)
                     LiveBadge(fontSize: 22)
                     if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) {
                         Text(verbatim: line)
@@ -230,10 +243,14 @@
                     }
                 }
             case .scheduled, .postponed:
-                Text(fixture.startDate, format: .dateTime.hour().minute())
+                Text(fixture.startDate, format: fixture.startTimeIsTentative == true
+                    ? .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+                    : .dateTime.hour().minute())
                     .font(.system(size: 60, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
         }
 
@@ -457,6 +474,22 @@
 
         private var leagueLogoURL: URL? {
             fixture.leagueLogoURL ?? SportsCatalog.league(id: fixture.leagueId)?.logoURL
+        }
+    }
+
+    /// A tennis match set by set, under the sets-won score.
+    private struct TVSetsLine: View {
+        let fixture: SportsFixture
+
+        var body: some View {
+            if let sets = fixture.setsLine {
+                Text(verbatim: sets)
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
         }
     }
 #endif

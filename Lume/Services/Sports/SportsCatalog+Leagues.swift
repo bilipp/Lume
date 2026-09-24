@@ -6,8 +6,9 @@
 //  API (scoreboard, standings, teams) on 2026-09-20; slugs ESPN lists but no
 //  longer feeds (Swiss Super League, Cypriot First Division, the Indian, Thai,
 //  Malaysian and Indonesian top flights, CFL, Bellator, EuroLeague …) are left
-//  out on purpose, as are sports the fixture model can't show — golf and tennis
-//  have no two-sided scoreboard. Names and abbreviations are ours, not the
+//  out on purpose, as is golf, whose 130-player fields have no two-sided
+//  scoreboard. Tennis (probed 2026-09-23) has only the two tours; each match of
+//  a tournament's singles draw is its own two-sided fixture. Names and abbreviations are ours, not the
 //  response's, so a card reads "NRL", not "Rugby League". Rugby and cricket slugs
 //  are ESPN's numeric competition ids; cricket was re-probed on 2026-09-23 (its
 //  scoreboards are two-sided with text scores, and bilateral tours have no feed).
@@ -19,7 +20,7 @@ nonisolated extension SportsCatalog {
     /// The full curated league table, in browse order (grouped by `region`).
     static let leagues: [SportsLeague] = germany + ukAndIreland + spain + italy + france + netherlands + portugal
         + europe + clubCompetitions + nationalTeams + womensFootball + americas + restOfWorld
-        + americanFootball + basketball + iceHockey + baseball + rugby + australianFootball + cricket + lacrosse
+        + americanFootball + basketball + iceHockey + baseball + rugby + australianFootball + cricket + tennis + lacrosse
         + motorsport + combat
 
     private static func soccer(_ slug: String, _ name: String, _ abbreviation: String, _ region: SportsRegion) -> SportsLeague {
@@ -237,6 +238,11 @@ nonisolated extension SportsCatalog {
     private static let lacrosse: [SportsLeague] = [
         SportsLeague(sport: "lacrosse", slug: "pll", name: "Premier Lacrosse League", abbreviation: "PLL", region: .lacrosse),
         SportsLeague(sport: "lacrosse", slug: "nll", name: "National Lacrosse League", abbreviation: "NLL", region: .lacrosse)
+    ]
+
+    private static let tennis: [SportsLeague] = [
+        SportsLeague(sport: "tennis", slug: "atp", name: "ATP Tour", abbreviation: "ATP", region: .tennis),
+        SportsLeague(sport: "tennis", slug: "wta", name: "WTA Tour", abbreviation: "WTA", region: .tennis)
     ]
 
     private static let motorsport: [SportsLeague] = [
