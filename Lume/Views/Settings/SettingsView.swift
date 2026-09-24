@@ -76,13 +76,13 @@ struct SettingsView: View {
         @AppStorage(DownloadManager.autoDeleteKey) private var autoDeleteAfterWatching = false
     #endif
 
+    /// The globally-selected playlist, shared with the content tabs; the rows'
+    /// sync state reads it. On tvOS (no toolbar switcher) this pane is also where
+    /// it is chosen, the Play/Pause quick-switch overlay the fast path. Not
+    /// `private`: read by the SettingsView+Playlists extension (separate file).
+    @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
+
     #if os(tvOS)
-        /// The globally-selected playlist, shared with the content tabs. tvOS has
-        /// no toolbar switcher: this pane is the management surface where the
-        /// active playlist is chosen, and the Play/Pause quick-switch overlay the
-        /// fast path that writes the same key. Not `private`: read by the
-        /// SettingsView+Playlists extension (separate file).
-        @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
         /// Routes the switch through the blocking overlay (see PlaylistSwitchModel).
         /// Not `private`: read by the SettingsView+Playlists extension.
         @Environment(PlaylistSwitchModel.self) var playlistSwitch: PlaylistSwitchModel?
@@ -225,7 +225,9 @@ struct SettingsView: View {
                                 }
 
                                 Spacer(minLength: 0)
-                                PlaylistSyncAccessory(state: playlist.syncState)
+                                PlaylistSyncAccessory(state: playlist.syncState(
+                                    isActive: playlist.id.uuidString == playlists.activeID(for: selectedPlaylistID)
+                                ))
                             }
                             .padding(.vertical, 1)
                         }

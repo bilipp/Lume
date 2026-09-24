@@ -20,9 +20,12 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct QuickSwitchResolverTests {
+    /// Added in the order given, a second apart — the fallback orders by
+    /// `addedAt`, and back-to-back `Date()`s could tie.
     private func makePlaylists(_ names: [String], in context: ModelContext) throws -> [Playlist] {
         let playlists = names.map { Playlist(name: $0, serverURL: "http://\($0)", username: "u", password: "p") }
-        for playlist in playlists {
+        for (offset, playlist) in playlists.enumerated() {
+            playlist.addedAt = Date(timeIntervalSince1970: 1_700_000_000 + Double(offset))
             context.insert(playlist)
         }
         try context.save()
@@ -67,18 +70,28 @@ struct QuickSwitchResolverTests {
 
     // MARK: - active(for:)
 
-    @Test func `an empty stored selection resolves to the first playlist`() throws {
+    @Test func `an empty stored selection resolves to the oldest playlist`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
 
         #expect(playlists.active(for: "")?.id == playlists[0].id)
     }
 
-    @Test func `a stored selection naming a deleted playlist falls back to the first`() throws {
+    @Test func `a stored selection naming a deleted playlist falls back to the oldest`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
 
         #expect(playlists.active(for: UUID().uuidString)?.id == playlists[0].id)
+    }
+
+    @Test func `the fallback is the oldest playlist whatever order the fetch returned`() throws {
+        // Every caller resolves against its own unsorted `@Query` or fetch; they
+        // must still agree on the fallback.
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second", "Third"], in: container.mainContext)
+
+        #expect(Array(playlists.reversed()).active(for: "")?.id == playlists[0].id)
+        #expect([playlists[1], playlists[0], playlists[2]].activeID(for: UUID().uuidString) == playlists[0].id.uuidString)
     }
 
     @Test func `a valid stored selection resolves to that playlist`() throws {

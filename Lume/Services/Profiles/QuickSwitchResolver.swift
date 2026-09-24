@@ -28,11 +28,17 @@ struct QuickSwitchRow<Item>: Identifiable {
 
 extension [Playlist] {
     /// Resolves the stored selection (the raw `PlaylistSelectionStore.key` value)
-    /// to a concrete playlist, falling back to the first available playlist when
-    /// the stored id is empty or no longer exists (e.g. the selected playlist was
+    /// to a concrete playlist, falling back to the oldest playlist when the
+    /// stored id is empty or no longer exists (e.g. the selected playlist was
     /// deleted).
+    ///
+    /// The fallback is ordered rather than `first`: callers resolve against
+    /// their own unsorted `@Query` or fetch, whose order SQLite doesn't promise
+    /// to repeat, and the content tabs, the switchers and auto-sync all have to
+    /// land on the same playlist.
     func active(for storedID: String) -> Playlist? {
-        first(where: { $0.id.uuidString == storedID }) ?? first
+        first(where: { $0.id.uuidString == storedID })
+            ?? self.min { ($0.addedAt, $0.id.uuidString) < ($1.addedAt, $1.id.uuidString) }
     }
 
     /// The playlist that synced a piece of content. Every catalog id is
