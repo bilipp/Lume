@@ -43,6 +43,10 @@ nonisolated enum ResolvedChannelSource: String, Codable, Hashable {
     /// No EPG match; the channel's own name names both teams
     /// ("DAZN 5 | Bayern vs Dortmund").
     case channelName
+    /// An umbrella programme for the whole tour, on air at the start, that
+    /// names no match ("Live ATP & WTA: Die Topspiele des Tages"). It may or
+    /// may not show this one, so it is offered but never one-tap.
+    case epgCompetition
 
     var rank: Int {
         switch self {
@@ -51,6 +55,7 @@ nonisolated enum ResolvedChannelSource: String, Codable, Hashable {
         case .epgSingleField: 2
         case .epgDescription: 3
         case .channelName: 4
+        case .epgCompetition: 5
         }
     }
 }
@@ -290,7 +295,8 @@ nonisolated enum SportsChannelResolver {
             competitionKey: fixture.leagueId,
             homeTokens: homeTokens,
             awayTokens: awayTokens,
-            kickoff: fixture.startDate
+            kickoff: fixture.startDate,
+            fixture: fixture
         )
 
         var resolved: [ResolvedChannel] = []
@@ -311,7 +317,8 @@ nonisolated enum SportsChannelResolver {
             if lhs.score != rhs.score { return lhs.score > rhs.score }
             return gap(lhs, kickoff) < gap(rhs, kickoff)
         }
-        if let bestRank = resolved.first?.source.rank {
+        if let best = resolved.first, best.source != .epgCompetition {
+            let bestRank = best.source.rank
             let atBest = resolved.prefix { $0.source.rank == bestRank }.count
             if atBest == 1 { resolved[0].isConfident = true }
         }
@@ -325,6 +332,7 @@ nonisolated enum SportsChannelResolver {
         let homeTokens: Set<String>
         let awayTokens: Set<String>
         let kickoff: Date
+        let fixture: SportsFixture
     }
 
     /// Scores one channel against a fixture, returning the resolved channel or
@@ -361,6 +369,19 @@ nonisolated enum SportsChannelResolver {
         } else if nameMatched {
             source = .channelName
             score = nameMatchScore
+        } else if let umbrella = channel.summary.epgChannelId
+            .flatMap({ guide[$0] })
+            .flatMap({ competitionHit(in: $0, fixture: context.fixture) })
+        {
+            return ResolvedChannel(
+                stream: channel.summary,
+                playlistID: channel.playlistID,
+                matchedTitle: umbrella.title,
+                matchedStart: umbrella.start,
+                score: umbrella.score,
+                source: .epgCompetition,
+                isConfident: false
+            )
         } else {
             return nil
         }

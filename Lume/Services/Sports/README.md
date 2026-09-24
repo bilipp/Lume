@@ -31,6 +31,7 @@ Services/Sports/
 ├── SportsMatcher.swift       Pure team-token matching (+ SportsTeamAliases.json)
 ├── SportsChannelResolver.swift  Fixture → channel resolve (below)
 ├── SportsChannelResolver+Racing.swift  Race sessions: series + session words
+├── SportsChannelResolver+Competition.swift  Tour-wide blocks (tennis)
 └── SportsChannelPicks.swift  Device-local remembered channel picks
 ```
 
@@ -103,6 +104,10 @@ empty, so the world ranking (`/rankings`, top 150) supplies both the followable
 players and the table (`SportsStandingKind.player`). `/summary` is an HTTP 400
 for every id, so a match has no timeline or stats. The channel matcher uses a
 player's surname only, since a first name alone would match every namesake.
+Tennis channels mostly air a tour-wide block for hours ("Live ATP & WTA: Die
+Topspiele des Tages"), so a match with a real time slot also picks up any
+programme naming its tour that is on air at its start, as the lowest tier
+(`epgCompetition`), ranked by the tournament name ("Chengdu") in the headline.
 
 ## Team colours and the crest fallback
 
@@ -154,6 +159,7 @@ match `score`, then on proximity to kickoff:
 | 2 | `epgSingleField` | The EPG programme names both teams, but split across the title and sub-title. |
 | 3 | `epgDescription` | Both teams appear only in the programme's description — a multi-game conference whose title says nothing about this fixture. |
 | 4 | `channelName` | No EPG match; the channel's own name names both teams (`"DAZN 5 | Bayern vs Dortmund"`). |
+| 5 | `epgCompetition` | A tour-wide block on air at the start that names no match (`"Live ATP & WTA: Die Topspiele des Tages"`) — tennis only, see `SportsChannelResolver+Competition`. Never confident: the block may not show this match. |
 
 A team is "present" when any distinctive token from `SportsMatcher.tokens(for:)`
 (aliases from the bundled `SportsTeamAliases.json`) appears as a whole word in a
