@@ -58,6 +58,17 @@ import SwiftUI
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $editMacAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                        } else if isWebDAV {
+                            TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
+                            TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                        } else if isMediaServer {
+                            TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
+                            TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                        } else if isPlex {
+                            // A Plex playlist can be credential-free, so both
+                            // rows stay optional here too.
+                            TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
+                            TVSettingsField(title: "Password or token (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
                         } else {
                             TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
@@ -66,8 +77,8 @@ import SwiftUI
                 } else {
                     VStack(spacing: 2) {
                         TVSettingsValueRow("Name", value: playlist.name)
-                        TVSettingsValueRow(isStalker ? "Portal URL" : "URL") {
-                            Text(playlist.serverURL)
+                        TVSettingsValueRow(serverURLFieldTitle) {
+                            Text(playlist.displayURL)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
@@ -81,6 +92,25 @@ import SwiftUI
                             TVSettingsValueRow("MAC Address", value: playlist.macAddress ?? "")
                             if !playlist.username.isEmpty {
                                 TVSettingsValueRow("Username", value: playlist.username)
+                            }
+                        } else if isWebDAV {
+                            // A WebDAV share can be anonymous, so each credential
+                            // row only appears when there is something to show.
+                            if !playlist.username.isEmpty {
+                                TVSettingsValueRow("Username", value: playlist.username)
+                            }
+                            if !playlist.password.isEmpty {
+                                TVSettingsValueRow("Password") { Text("••••••••") }
+                            }
+                        } else if isMediaServer {
+                            TVSettingsValueRow("Username", value: playlist.username)
+                            TVSettingsValueRow("Password") { Text("••••••••") }
+                        } else if isPlex {
+                            if !playlist.username.isEmpty {
+                                TVSettingsValueRow("Username", value: playlist.username)
+                            }
+                            if playlist.plexAccessToken?.isEmpty == false {
+                                TVSettingsValueRow("Token") { Text("••••••••") }
                             }
                         } else {
                             TVSettingsValueRow("Username", value: playlist.username)

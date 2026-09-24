@@ -39,6 +39,12 @@ import SwiftUI
             }
             var disabled = HomeLayoutSettings.decodeDisabled(homeDisabledSectionsRaw)
             if disabled.contains(section) {
+                // "Sports" is a Lume Pro feature — gate turning it on behind the
+                // paywall (disabling it is always allowed).
+                if section == .sports, !premium.isPremium {
+                    presentPaywall(.sportsHub)
+                    return
+                }
                 disabled.remove(section)
             } else {
                 disabled.insert(section)
@@ -96,9 +102,10 @@ import SwiftUI
                         .font(.system(size: TVSettingsMetrics.rowFontSize))
                         .foregroundStyle(enabled ? .primary : .secondary)
 
-                    // "For You" is a Lume Pro feature; badge it for free users
-                    // (Sideload/owned builds are always premium, so this never shows).
-                    if section == .forYou, !premium.isPremium {
+                    // "For You" and "Sports" are Lume Pro features; badge them for
+                    // free users (Sideload/owned builds are always premium, so this
+                    // never shows).
+                    if section == .forYou || section == .sports, !premium.isPremium {
                         Image(systemName: "crown.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(.tint)

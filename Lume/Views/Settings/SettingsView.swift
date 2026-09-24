@@ -12,6 +12,7 @@ struct SettingsView: View {
     /// Not `private`: read by the SettingsView+Playlists extension (separate file).
     @State var showingAddPlaylist = false
     @State private var trakt = TraktService.shared
+    @State private var simkl = SimklService.shared
     @State private var openSubtitles = OpenSubtitlesService.shared
     /// Premium entitlement + paywall presentation. Not `private`: read by the
     /// SettingsView+Playlists / +TVComponents extensions (separate files).
@@ -149,8 +150,9 @@ struct SettingsView: View {
                     searchSection
                     autoSyncSection
                     epgSection
+                    sportsSection
                     CloudSyncSection()
-                    if trakt.isConfigured {
+                    if trakt.isConfigured || simkl.isConfigured {
                         integrationsSection
                     }
                     playbackSection
@@ -215,7 +217,7 @@ struct SettingsView: View {
 
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(playlist.name)
-                                    Text(playlist.serverURL)
+                                    Text(playlist.displayURL)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)
@@ -309,16 +311,34 @@ struct SettingsView: View {
 
         private var integrationsSection: some View {
             Section {
-                NavigationLink {
-                    TraktIntegrationView()
-                } label: {
-                    HStack {
-                        Label("Trakt", systemImage: "rectangle.stack.badge.play")
-                        Spacer()
-                        if trakt.isConnected {
-                            Text(trakt.username.map { "@\($0)" } ?? "Connected")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                if trakt.isConfigured {
+                    NavigationLink {
+                        TraktIntegrationView()
+                    } label: {
+                        HStack {
+                            Label("Trakt", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
+                            Spacer()
+                            if trakt.isConnected {
+                                Text(trakt.username.map { "@\($0)" } ?? "Connected")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                if simkl.isConfigured {
+                    NavigationLink {
+                        SimklIntegrationView()
+                    } label: {
+                        HStack {
+                            Label("Simkl", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
+                            Spacer()
+                            if simkl.isConnected {
+                                Text(simkl.username.map { "@\($0)" } ?? "Connected")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -490,7 +510,7 @@ struct SettingsView: View {
         /// credentials for at least one of them.
         private var availableCategories: [SettingsCategory] {
             SettingsCategory.allCases.filter {
-                $0 != .integrations || trakt.isConfigured || openSubtitles.isConfigured
+                $0 != .integrations || trakt.isConfigured || simkl.isConfigured || openSubtitles.isConfigured
             }
         }
 
@@ -523,6 +543,7 @@ struct SettingsView: View {
                         }
                     case .profiles: TVProfilesSettingsView()
                     case .home: tvHomeLayoutDetail
+                    case .sports: TVSportsSettingsPane()
                     case .epg: EPGSettingsView()
                     case .search: tvSearchDetail
                     case .storage: StorageManagementView()
@@ -551,6 +572,9 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 36) {
                 if trakt.isConfigured {
                     TVTraktIntegrationView()
+                }
+                if simkl.isConfigured {
+                    TVSimklIntegrationView()
                 }
                 if openSubtitles.isConfigured {
                     TVOpenSubtitlesIntegrationView()

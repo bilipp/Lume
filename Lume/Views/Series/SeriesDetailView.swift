@@ -437,12 +437,13 @@ struct SeriesDetailView: View {
     /// this is silent unless something actually changed. The empty case is the
     /// blocking `loadEpisodesIfNeeded` path's job.
     ///
-    /// m3u is skipped: it imports and prunes episodes alongside the rest of the
-    /// catalog on every sync, so there is nothing to pull per-series there.
+    /// m3u and WebDAV are skipped: they import and prune episodes alongside the
+    /// rest of the catalog on every sync, so there is nothing to pull
+    /// per-series there.
     private func refreshEpisodesIfStale() async {
         guard !series.episodes.isEmpty,
               let playlist = seriesPlaylist,
-              playlist.sourceType != .m3u,
+              playlist.supportsPerSeriesEpisodeFetch,
               series.episodesAreStale(lastSyncedAt: playlist.lastSyncDate)
         else { return }
         await loadEpisodes()
@@ -544,6 +545,7 @@ private extension SeriesDetailView {
     func toggleWatched(_ episode: Episode) {
         episode.setWatched(!episode.isWatched)
         TraktService.shared.syncWatched(episode: episode, watched: episode.isWatched)
+        SimklService.shared.syncWatched(episode: episode, watched: episode.isWatched)
         #if !os(tvOS)
             if episode.isWatched {
                 downloads.checkAutoDelete(id: episode.id)

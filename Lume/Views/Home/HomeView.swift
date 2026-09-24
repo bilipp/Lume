@@ -61,11 +61,14 @@ struct HomeView: View {
     @State var trakt = TraktService.shared
     /// "For You" is a Lume Pro feature; observed so the row appears/disappears
     /// when entitlement changes.
-    @State private var premium = PremiumManager.shared
+    @State var premium = PremiumManager.shared
     // Observed so the For You row defers its (potentially heavy) recompute while
     // the device is busy syncing — and retries automatically once it isn't.
     @State private var indexing = ContentIndexingService.shared
     @State private var epgSync = EPGSyncService.shared
+    /// Observed for the Home empty-state check, which mirrors the Sports rail.
+    @State var sportsFollows = SportsFollowService.shared
+    @State var sportsStore = SportsStore.shared
     @State private var playingMedia: PlayableMedia?
     @State private var showingSync = false
     @State private var showingSettings = false
@@ -223,6 +226,9 @@ struct HomeView: View {
             .task(id: seriesResumeKey) {
                 await loadSeriesResume()
             }
+            .task(id: sportsWarmKey) {
+                warmSports()
+            }
             #if os(iOS) || os(tvOS)
             .fullScreenCover(item: $playingMedia) { media in
                 FullScreenPlayerView(media: media)
@@ -269,6 +275,8 @@ struct HomeView: View {
                 rail("Trending Series", trendingSeries)
             case .traktWatchlist:
                 rail("From Your Trakt Watchlist", watchlist)
+            case .sports:
+                SportsHomeRail(isSyncBusy: isSyncBusy)
             }
         }
     }
@@ -276,7 +284,7 @@ struct HomeView: View {
     /// Whether `section` should render. "For You" follows the recommendations
     /// opt-in (which also gates its recompute); the rest follow the user's
     /// per-section switches.
-    private func isSectionEnabled(_ section: HomeSection) -> Bool {
+    func isSectionEnabled(_ section: HomeSection) -> Bool {
         section == .forYou
             ? (recommendationsEnabled && premium.isPremium)
             : HomeLayoutSettings.isEnabled(section, disabledRaw: disabledSectionsRaw)
@@ -385,6 +393,7 @@ struct HomeView: View {
             && trendingMovies.isEmpty
             && trendingSeries.isEmpty
             && watchlist.isEmpty
+            && !sportsRailHasContent
             && trendingState.isSettled
     }
 

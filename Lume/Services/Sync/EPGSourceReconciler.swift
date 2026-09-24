@@ -75,6 +75,16 @@ nonisolated enum EPGSourceReconciler {
             // in EPG settings) — or, if one was set, the playlist's `epgURL`.
             guard let epgURL = playlist.epgURL, !epgURL.isEmpty else { return nil }
             return epgURL
+        case .webdav:
+            // A WebDAV file share carries no XMLTV guide, so no EPGSource must
+            // ever be created for one — an orphan source would be retried by
+            // the EPG scheduler forever.
+            return nil
+        case .jellyfin, .emby, .plex:
+            // A Jellyfin, Emby or Plex server exposes no XMLTV guide URL
+            // either (their Live TV guides, if any, are not synced), so the
+            // same applies here.
+            return nil
         }
     }
 

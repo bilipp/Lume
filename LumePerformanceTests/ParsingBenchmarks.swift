@@ -208,23 +208,43 @@ final class ParsingBenchmarks: XCTestCase {
         }
     }
 
-    /// The fallback path: a stamp with no UTC offset. `XMLTVDate` rejects it in
-    /// the fast path and `DateFormatter` (`yyyyMMddHHmmss Z`) can't parse it
-    /// either, so the result is nil — but the ICU attempt still costs, and a
-    /// provider that omits offsets pays it twice per programme.
+    /// Offset-less stamps on the fast path: `YYYYMMDDHHMMSS` (14 digits) and
+    /// `YYYYMMDDHHMM` (12 digits), parsed as UTC per the XMLTV DTD. A provider
+    /// that omits offsets used to pay the ~600× slower `DateFormatter` fallback
+    /// twice per programme (and got nil back, silently dropping the programme);
+    /// this asserts they now stay on the hand-rolled path.
+    func testXMLTVDateOffsetLessFastPathParsing() {
+        let stamps = [
+            "20260730120000", // 14-digit
+            "20260730123000",
+            "202607301330" // 12-digit
+        ]
+
+        measure(metrics: [XCTClockMetric()]) {
+            var checksum = 0.0
+            for index in 0 ..< 100_000 {
+                checksum += XMLTVDate.parse(stamps[index % stamps.count])?.timeIntervalSince1970 ?? 0
+            }
+            XCTAssertGreaterThan(checksum, 0, "every offset-less stamp should parse")
+        }
+    }
+
+    /// The genuine fallback path: a shape neither the fast path nor
+    /// `DateFormatter` (`yyyyMMddHHmmss Z`) accepts, so the result is nil — but
+    /// the ICU attempt still costs. A width other than 12/14/20 (here a 15-digit
+    /// stamp) is the shape that reaches the formatter after the offset-less
+    /// widening.
     ///
-    /// Fewer iterations because this path is orders of magnitude slower. If this
-    /// number ever matters in the field, the fix is to widen `XMLTVDate`, not to
-    /// speed up ICU.
+    /// Fewer iterations because this path is orders of magnitude slower.
     func testXMLTVDateFallbackParsing() {
         measure(metrics: [XCTClockMetric()]) {
             var nilCount = 0
             for index in 0 ..< 2000
-                where XMLTVDate.parse("2026073013\(String(format: "%04d", index % 6000))") == nil
+                where XMLTVDate.parse("202607301300\(String(format: "%03d", index % 900))") == nil
             {
                 nilCount += 1
             }
-            XCTAssertEqual(nilCount, 2000, "offset-less stamps are expected to fail to parse")
+            XCTAssertEqual(nilCount, 2000, "15-digit stamps are expected to fail to parse")
         }
     }
 

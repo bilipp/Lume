@@ -62,7 +62,8 @@ in beta.
 It is built entirely in **SwiftUI** with a single, platform-adaptive codebase that
 runs on iPhone, iPad, Mac, Apple TV, and Apple Vision Pro. Content is enriched with
 artwork, cast, trailers, and ratings from **TMDB** and **MDBList** (IMDb, Rotten Tomatoes,
-Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to **Trakt**.
+Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to
+**Trakt** and **Simkl**.
 
 > **Note** — Lume is a player only. It ships with **no channels, streams, or content**
 > of its own. You bring your own Xtream Codes credentials or M3U playlist from a
@@ -128,6 +129,15 @@ adapted per size class
 - **In-player channel browser** on tvOS (left-press overlay with category/channel grid)
 - Favorite channels and per-channel management
 
+#### 🏅 Sports Hub
+- Follow your **leagues and teams** and get a Sports tab and Home rail of their fixtures — yesterday's results, today's games, and what's upcoming
+- **150+ competitions** across football (every major European, American, Asian and African league, cups and national teams), the NFL, NBA, MLB and NHL, college sports, rugby union and league, AFL, cricket (IPL, T20 World Cup, Big Bash, County Championship and more), ATP and WTA tennis, lacrosse, Formula 1, IndyCar, NASCAR and the UFC
+- **Live scores, standings, and full game detail** — timeline, team-stat bars, lineups, and F1 sessions with driver/constructor standings — from **ESPN**
+- **EPG-based channel matching** resolves each fixture to a channel already in *your* playlists, so one tap starts playback; when several channels carry a match you get a picker, and your pick is remembered
+- Clean, Apple Sports / Strand-style cards tinted with each team's colours
+- Followed teams and leagues **sync across your devices** via iCloud, per profile
+- A **Lume Pro** feature; available on every platform and hideable from Settings
+
 #### 🎬 Movies & Series
 - Category-based browsing with poster grids and horizontal rails
 - Rich detail views: plot, rating, cast, director, genre, runtime, release date
@@ -158,6 +168,7 @@ adapted per size class
 - **Skip Intro / Recap** overlay during playback, powered by IntroDB skip windows
 - **OpenSubtitles** search from the player's subtitle menu — find and load an external subtitle track for any movie or episode whose stream ships without one
 - Optional **Trakt** scrobbling — plus one-tap import of your existing Trakt watched history — and **TMDB** metadata enrichment
+- Optional **Simkl** scrobbling via the OAuth 2.0 device flow, with watched-history import on connect and the manual re-import for later
 - **Clear watch history** from Settings to reset progress, watched markers, and last-watched dates across all content
 - **Now Playing integration** — lock-screen / Control Center metadata, artwork, and remote controls on every engine; playback on Apple TV surfaces on your iPhone's Apple TV remote
 - **Live Activity + Dynamic Island** (iOS) — glanceable now & next programme with live progress on the Lock Screen; tap to jump straight back into playback. **Background downloads** get one too: progress, speed and ETA for the file closest to finishing plus how many are behind it, updated while Lume is closed; tap to open the downloads list
@@ -169,9 +180,14 @@ adapted per size class
 - **Parental controls**: mark profiles as child profiles, restrict categories (hidden from browsing and search), and protect them with a PIN required to leave a child profile or open Content Management
 
 #### ⚙️ Library management
-- Manage multiple playlists — **Xtream Codes**, **M3U/M3U8**, and **Stalker portals** (add / edit / delete / switch)
+- Manage multiple playlists — **Xtream Codes**, **M3U/M3U8**, **Stalker portals**, and **media servers** (add / edit / delete / switch)
 - M3U support: URL-based playlists, local file import, URL-tvg EPG auto-detection
 - Stalker portal support: MAC-address authentication (with a generated default MAC), with short-lived stream URLs resolved on demand at playback time
+- Media-server support: enter one URL and Lume auto-detects the kind —
+  - **Jellyfin** and **Emby**: movie and TV-show libraries with artwork, ratings and plot; username + password, session-token auth
+  - **Plex**: movie and TV-show sections with artwork, ratings and plot; sign in with your Plex account, paste an `X-Plex-Token`, or connect token-free to a server that allows unauthenticated local access
+  - **WebDAV**: recursive folder walk, filenames parsed into movies and series; Basic auth, anonymous shares welcome
+  - None of them carries live TV yet, and none downloads yet
 - Server info at a glance: status, active connections, expiry
 - Background **content sync** with step-by-step progress, which **prunes stale titles** the provider has dropped so the local catalog stays in step
 - Scheduled **auto-sync** (every 6 hours, daily, every 3 days, or weekly)
@@ -245,9 +261,13 @@ Lume follows a clean, layered SwiftUI architecture:
 │    ├─ XtreamClient        Xtream Codes API + DTOs         │
 │    ├─ M3UClient/Parser    M3U/M3U8 playlist import       │
 │    ├─ StalkerClient       Stalker portal (MAC auth)       │
+│    ├─ WebDAVClient        WebDAV share walk (PROPFIND)    │
+│    ├─ JellyfinClient      Jellyfin/Emby libraries         │
+│    ├─ PlexClient          Plex sections + X-Plex-Token    │
 │    ├─ TMDBClient          metadata / artwork enrichment   │
 │    ├─ MDBListClient       aggregator ratings (IMDb, RT, …)│
 │    ├─ TraktService        OAuth device flow + scrobbling  │
+│    ├─ SimklService        OAuth device flow + scrobbling  │
 │    ├─ OpenSubtitlesClient external subtitle search        │
 │    ├─ ContentSyncManager  background catalog indexing     │
 │    └─ ImagePipeline        cached async image loading     │
@@ -264,7 +284,7 @@ Lume follows a clean, layered SwiftUI architecture:
 - **Persistence** — SwiftData (8 model types, local catalog index)
 - **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer · LumeEngine (FFmpeg 9, beta)
 - **Networking** — `URLSession` with typed endpoints, retry/backoff, and error classification
-- **Integrations** — TMDB (metadata), MDBList (ratings), Trakt (device OAuth + scrobbling), OpenSubtitles (external subtitle tracks)
+- **Integrations** — TMDB (metadata), MDBList (ratings), Trakt & Simkl (device OAuth + scrobbling), OpenSubtitles (external subtitle tracks)
 - **Localization** — 9 languages via String Catalogs (English, German, French, Spanish, Italian, Portuguese, Japanese, Korean, Simplified Chinese)
 
 **Dependencies** (Swift Package Manager)
@@ -286,7 +306,7 @@ Lume/
 ├── ContentView.swift        Root view / login gate
 ├── Models/                  SwiftData models & sort options
 ├── Services/
-│   ├── Network/             Xtream, M3U, TMDB, MDBList, Trakt, OpenSubtitles clients
+│   ├── Network/             Xtream, M3U, TMDB, MDBList, Trakt, Simkl, OpenSubtitles clients
 │   ├── Sync/                Content sync manager & progress
 │   ├── Player/              Playable media, settings, history, NextUp
 │   └── Images/              Image cache & pipeline
@@ -296,7 +316,7 @@ Lume/
 │   ├── Movies/ · Series/    Browse & detail views
 │   ├── Player/              AVPlayer / KSPlayer / VLC engines, overlays, channel browser
 │   ├── TV/                  tvOS-specific detail screens
-│   ├── Settings/            Playlists, sync, Trakt, player engine options, content mgmt
+│   ├── Settings/            Playlists, sync, Trakt & Simkl, player engine options, content mgmt
 │   └── Components/          Reusable cards, toolbars, grids, ratings chips
 └── Assets.xcassets/         App icon & tvOS brand assets
 
@@ -314,9 +334,10 @@ The easiest way to use Lume is to [**download it from the App Store**](https://a
 ### Requirements
 
 - **Xcode 26.4** or later
-- An **Xtream Codes** account (server URL, username, password), an **M3U/M3U8 playlist URL**, or a **Stalker portal** (portal URL + MAC address)
+- An **Xtream Codes** account (server URL, username, password), an **M3U/M3U8 playlist URL**, a **Stalker portal** (portal URL + MAC address), or a **media server** (a Jellyfin, Emby or Plex base URL, or a WebDAV folder URL — credentials depend on the server)
 - *(Optional)* a [TMDB](https://www.themoviedb.org/settings/api) API access token for metadata enrichment
 - *(Optional)* a [Trakt](https://trakt.tv/oauth/applications) application for scrobbling
+- *(Optional)* a [Simkl](https://simkl.com/settings/developer/new/) application for scrobbling (OAuth V2 — "TV, devices & command line" registration needs only the client id)
 - *(Optional)* an [MDBList](https://mdblist.com/preferences/) API key for IMDb / Rotten Tomatoes / Metacritic / Trakt / Letterboxd ratings
 - *(Optional)* an [IntroDB](https://introdb.app) API key for intro / recap skip windows
 - *(Optional)* an [OpenSubtitles](https://www.opensubtitles.com/consumers) consumer API key for in-player subtitle search
@@ -389,12 +410,22 @@ OPENSUBTITLES_API_KEY=your_opensubtitles_api_key
 # Trakt — watch scrobbling (device OAuth flow)
 TRAKT_CLIENT_ID=your_trakt_client_id
 TRAKT_CLIENT_SECRET=your_trakt_client_secret
+
+# Simkl — watch scrobbling (OAuth 2.0 device flow, AUTH V2)
+SIMKL_CLIENT_ID=your_simkl_client_id
+SIMKL_CLIENT_SECRET=
 ```
 
 Every key is optional — Lume builds and runs fine with an empty `.env` or none at all.
 
 Trakt uses the **device OAuth flow** (no embedded web view), which works on tvOS as
 well as iOS/macOS. Tokens are stored securely in the Keychain.
+
+Simkl uses the **OAuth 2.0 device flow** (AUTH V2, RFC 8628) — likewise no web view,
+so it works on every platform including tvOS, and access tokens are refreshed
+automatically. A "TV, devices & command line" registration has no secret; the secret
+line is only for a "Server apps & services" registration. Tokens are stored in the
+Keychain as well.
 
 OpenSubtitles needs both halves: the API key above identifies the build, while
 *downloading* a subtitle needs a free [opensubtitles.com](https://www.opensubtitles.com)
@@ -411,7 +442,7 @@ and UI automation (**XCTest**).
 
 | Target | Framework | Coverage |
 |---|---|---|
-| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt token store, content organizing, **M3U parser/classifier/sync**, **MDBList client**, **OpenSubtitles client & subtitle-search query**, **Next Episode resolver**, **Gzip file streaming** |
+| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt & Simkl token stores + watched importers + Simkl client, content organizing, **M3U parser/classifier/sync**, **MDBList client**, **OpenSubtitles client & subtitle-search query**, **Next Episode resolver**, **Gzip file streaming** |
 | `LumeUITests` | XCTest | App launch & performance, login flow, tab navigation, playlist detail, settings, **M3U playlist import flow** |
 
 Run the full suite:

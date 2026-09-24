@@ -23,6 +23,9 @@ struct MainTabView: View {
 
     @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+    /// Whether the Sports tab appears in the tab bar (Settings toggle). When off,
+    /// the hub is still reachable from the Home rail header.
+    @AppStorage(SportsSyncService.tabEnabledKey) private var sportsTabEnabled = SportsSyncService.tabEnabledDefault
 
     /// Selected tab and the Movies/Series navigation stacks, shared so an
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
@@ -159,7 +162,9 @@ struct MainTabView: View {
                 // app this is the practical equivalent of "on launch".
                 if phase == .active {
                     enqueueDueSyncs(playlists, activeID: activePlaylistID)
+                    SportsSyncService.shared.syncIfDue()
                 }
+                SportsSyncService.shared.isForeground = phase == .active
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
             .downloadsSheet(isPresented: $showsDownloads)
@@ -234,6 +239,14 @@ struct MainTabView: View {
                     Text("Live TV")
                 }
 
+                if sportsTabEnabled {
+                    Tab(value: AppTab.sports) {
+                        activeOnly(.sports, selection: selection.wrappedValue) { TVSportsHubScreen() }
+                    } label: {
+                        Text("Sports")
+                    }
+                }
+
                 Tab(value: AppTab.settings) {
                     activeOnly(.settings, selection: selection.wrappedValue) { SettingsView() }
                 } label: {
@@ -298,6 +311,12 @@ struct MainTabView: View {
 
                 Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.liveTV) {
                     LiveTVView()
+                }
+
+                if sportsTabEnabled {
+                    Tab("Sports", systemImage: "sportscourt", value: AppTab.sports) {
+                        SportsHubView()
+                    }
                 }
 
                 // macOS 15's tab bar drops a `role: .search` tab entirely — even

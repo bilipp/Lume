@@ -128,7 +128,10 @@ struct LumeApp: App {
             SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
             // Parental controls. Not profile-scoped, unlike `UserContentState` —
             // see `CloudSyncEngine+Parental` for why that distinction matters.
-            SyncedParentalPIN.self, SyncedCategoryRestriction.self
+            SyncedParentalPIN.self, SyncedCategoryRestriction.self,
+            // Followed sports leagues/teams — per-profile, ordered, no local
+            // counterpart (read through `SportsFollowService`).
+            SyncedSportsFollow.self
         ])
         let cloudConfiguration = ModelConfiguration(
             ContentSyncManager.cloudMirrorConfigurationName,
@@ -243,20 +246,44 @@ struct LumeApp: App {
                         in: catalogContainer.mainContext
                     )
 
+                    // Resolve the active profile and claim any pre-profiles
+                    // content state before the first sync, so the catalog the
+                    // reconciler reads is already scoped to a profile.
+                    await profileManager.bootstrap()
+
+                    // Wire the Sports Hub as soon as the profile is known, ahead
+                    // of the tracker restores and iCloud below: those are network
+                    // calls that can take a stalled minute apiece, and everything
+                    // after them waits. Sports is the one launch step whose delay
+                    // is visible as an empty Home row, and none of this blocks —
+                    // `configure` warms the store from disk and the two triggers
+                    // hand off to their own utility Tasks.
+                    SportsFollowService.shared.configure(container: cloudContainer, profileManager: profileManager)
+                    SportsSyncService.shared.configure(followSource: SportsFollowService.shared)
+                    // Refreshes fixtures / standings on their own schedule. Hits
+                    // ESPN, not the provider host, so it never competes with a
+                    // playlist sync for the account's one connection.
+                    SportsSyncService.shared.syncIfDue()
+                    // Fetches any followed league with no cached fixtures, so the
+                    // Home rail has data on first render even after the system
+                    // purged Caches/. `HomeView.warmSports` asks again whenever
+                    // the entitlement or the followed set changes — a rail with
+                    // nothing to show renders nothing, so it cannot ask itself.
+                    SportsSyncService.shared.refreshMissing()
+
                     // Restore a previously connected Trakt session (refreshing
                     // the token if stale) so watched-sync and the watchlist work
                     // from launch.
                     await TraktService.shared.restore()
 
+                    // Same for Simkl (a second tracker integration, AUTH V2
+                    // device flow): refresh stale tokens, restore the username.
+                    await SimklService.shared.restore()
+
                     // Restore the OpenSubtitles session (a keychain read, no
                     // network) so the in-player subtitle search can download
                     // without sending the viewer to Settings first.
                     OpenSubtitlesService.shared.restore()
-
-                    // Resolve the active profile and claim any pre-profiles
-                    // content state before the first sync, so the catalog the
-                    // reconciler reads is already scoped to a profile.
-                    await profileManager.bootstrap()
 
                     // Kick off iCloud sync: check account reachability, then run
                     // a first reconcile between the local catalog and the cloud
@@ -283,6 +310,9 @@ struct LumeApp: App {
                     // caches that as `isPINSet`, so it has to be told to re-read
                     // or the gates stay wrong until the next launch.
                     parentalControls.refreshFromStore()
+                    // A reconcile may have pulled or deduped this profile's sports
+                    // follows; re-read them so the hub reflects the merged set.
+                    SportsFollowService.shared.reload()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     cloudSync.handleScenePhaseChange(to: phase)

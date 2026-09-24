@@ -7,6 +7,10 @@ struct PlayableMediaTests {
         Playlist(name: "Test", serverURL: "http://example.com:8080", username: "user", password: "pass")
     }
 
+    private func makeWebDAVPlaylist(username: String = "bilipp", password: String = "test") -> Playlist {
+        Playlist(name: "NAS", webdavURL: "http://192.168.0.2:30035/Movies/", username: username, password: password)
+    }
+
     // MARK: - from(movie:playlist:client:)
 
     @Test func `from movie creates media`() throws {
@@ -243,6 +247,91 @@ struct PlayableMediaTests {
         let other = try #require(URL(string: "http://example.com/other.m3u8"))
         #expect(media.resuming(at: 30).channelScope == .favorites)
         #expect(media.replacingURL(other).channelScope == .favorites)
+    }
+
+    // MARK: - httpHeaders (WebDAV Basic auth)
+
+    @Test func `webdav movie carries a basic auth header and a clean url`() throws {
+        let playlist = makeWebDAVPlaylist()
+        let movie = Movie(id: "w-1", streamId: 0, name: "The Godfather", containerExtension: "mkv")
+        movie.directURL = "http://192.168.0.2:30035/Movies/The.Godfather.mkv"
+
+        let media = try #require(PlayableMedia.from(movie: movie, playlist: playlist))
+        #expect(media.url.absoluteString == "http://192.168.0.2:30035/Movies/The.Godfather.mkv")
+        #expect(media.url.user == nil)
+        #expect(media.url.password == nil)
+        #expect(media.httpHeaders == ["Authorization": "Basic YmlsaXBwOnRlc3Q="])
+    }
+
+    @Test func `webdav episode carries a basic auth header`() throws {
+        let playlist = makeWebDAVPlaylist()
+        let episode = Episode(id: "w-2", episodeId: "1", title: "Pilot", containerExtension: "mkv",
+                              seasonNum: 1, episodeNum: 1)
+        episode.directSource = "http://192.168.0.2:30035/Movies/Show.S01E01.mkv"
+
+        let media = try #require(PlayableMedia.from(episode: episode, playlist: playlist))
+        #expect(media.httpHeaders == ["Authorization": "Basic YmlsaXBwOnRlc3Q="])
+    }
+
+    @Test func `non webdav playlist yields no headers`() throws {
+        let playlist = makePlaylist()
+        let movie = Movie(id: "p-3", streamId: 102, name: "Xtream Movie", containerExtension: "mp4")
+        #expect(try #require(PlayableMedia.from(movie: movie, playlist: playlist)).httpHeaders == nil)
+
+        let stream = LiveStream(id: "l-11", streamId: 202, name: "Channel")
+        #expect(try #require(PlayableMedia.from(stream: stream, playlist: playlist)).httpHeaders == nil)
+    }
+
+    @Test func `anonymous webdav share yields no headers`() throws {
+        let playlist = makeWebDAVPlaylist(username: "", password: "")
+        let movie = Movie(id: "w-3", streamId: 0, name: "Open Share", containerExtension: "mkv")
+        movie.directURL = "http://192.168.0.2:30035/Movies/Open.Share.mkv"
+
+        #expect(try #require(PlayableMedia.from(movie: movie, playlist: playlist)).httpHeaders == nil)
+    }
+
+    @Test func `headers survive resuming and url replacement`() throws {
+        let playlist = makeWebDAVPlaylist()
+        let movie = Movie(id: "w-4", streamId: 0, name: "Heat", containerExtension: "mkv")
+        movie.directURL = "http://192.168.0.2:30035/Movies/Heat.mkv"
+        let media = try #require(PlayableMedia.from(movie: movie, playlist: playlist))
+
+        let resumed = media.resuming(at: 90)
+        #expect(resumed.httpHeaders == media.httpHeaders)
+        #expect(resumed.id == media.id)
+        #expect(resumed.url == media.url)
+        #expect(resumed.title == media.title)
+        #expect(resumed.subtitle == media.subtitle)
+        #expect(resumed.posterURL == media.posterURL)
+        #expect(resumed.kind == media.kind)
+        #expect(resumed.startTime == 90)
+        #expect(resumed.contentRef == media.contentRef)
+        #expect(resumed.channelScope == media.channelScope)
+
+        let other = try #require(URL(string: "http://192.168.0.2:30035/Movies/Heat.remux.mkv"))
+        let replaced = media.replacingURL(other)
+        #expect(replaced.httpHeaders == media.httpHeaders)
+        #expect(replaced.id == media.id)
+        #expect(replaced.url == other)
+        #expect(replaced.title == media.title)
+        #expect(replaced.subtitle == media.subtitle)
+        #expect(replaced.posterURL == media.posterURL)
+        #expect(replaced.kind == media.kind)
+        #expect(replaced.startTime == media.startTime)
+        #expect(replaced.contentRef == media.contentRef)
+        #expect(replaced.channelScope == media.channelScope)
+    }
+
+    @Test func `headers survive a codable round trip and stay out of identity`() throws {
+        let playlist = makeWebDAVPlaylist()
+        let movie = Movie(id: "w-5", streamId: 0, name: "Dune", containerExtension: "mkv")
+        movie.directURL = "http://192.168.0.2:30035/Movies/Dune.mkv"
+        let media = try #require(PlayableMedia.from(movie: movie, playlist: playlist))
+
+        let decoded = try JSONDecoder().decode(PlayableMedia.self, from: JSONEncoder().encode(media))
+        #expect(decoded == media)
+        #expect(decoded.httpHeaders == media.httpHeaders)
+        #expect(!media.id.contains("Basic"))
     }
 
     // MARK: - Hashable

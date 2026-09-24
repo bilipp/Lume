@@ -118,6 +118,9 @@ extension CloudSyncEngine {
         for mirror in try cloudContext.fetch(descriptor) {
             cloudContext.delete(mirror)
         }
+        // Followed sports leagues/teams are per-profile too — drop this
+        // profile's along with its content state.
+        try purgeSportsFollows(forProfile: profileID)
         try saveStores()
     }
 }

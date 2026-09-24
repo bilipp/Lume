@@ -12,6 +12,11 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
     var contentPulled = 0
     var epgSourcesPushed = 0
     var epgSourcesPulled = 0
+    /// Sports-follow mirror rows kept and duplicate rows collapsed this pass.
+    /// The follows have no local counterpart (they're read straight off the
+    /// cloud context), so this step only dedupes — it never pushes or pulls.
+    var sportsFollowsKept = 0
+    var sportsFollowsDeduped = 0
     /// Parental-control records (the PIN and category restrictions) moved this
     /// pass. Counted together — they are one feature and one reconcile step.
     var parentalPushed = 0
@@ -135,6 +140,9 @@ actor CloudSyncEngine {
             // appears on every device that has the playlist.
             try reconcileEPGSources(into: &result)
             regenerateLinkedEPGSources()
+            // Followed sports leagues/teams: a pure cloud-side dedupe (no local
+            // counterpart), collapsing duplicate rows for one (key, profile).
+            try reconcileSportsFollows(into: &result)
             // Two stores → two saves (`saveStores`, catalog first). Persist the
             // shadow only after both succeed, so a half-applied pass is never
             // baselined: if either save throws we fall to the catch, leave the
@@ -142,7 +150,7 @@ actor CloudSyncEngine {
             // 3-way merge is idempotent).
             try saveStores()
             shadow.persist()
-            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled) par +\(result.parentalPushed)/\(result.parentalPulled) pend \(result.parentalPending)") // swiftlint:disable:this line_length
+            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled) par +\(result.parentalPushed)/\(result.parentalPulled) pend \(result.parentalPending) sports \(result.sportsFollowsKept)-\(result.sportsFollowsDeduped)") // swiftlint:disable:this line_length
         } catch {
             Logger.sync.error("Reconcile failed: \(error.localizedDescription)")
         }
@@ -306,6 +314,7 @@ private extension CloudSyncEngine {
         into result: inout CloudSyncReconcileResult
     ) {
         let key = id.uuidString
+        guard canAdoptLocally(verdict, id: id) else { return }
         switch verdict {
         case .noChange:
             break
@@ -323,6 +332,27 @@ private extension CloudSyncEngine {
             result.playlistsPushed += 1
             shadow.setPlaylistShadow(key, value)
         }
+    }
+
+    /// Whether a verdict that writes the local catalog carries a source type
+    /// this build understands.
+    ///
+    /// A newer app version can introduce a source type this one has never heard
+    /// of. Adopting it would resolve through `sourceType`'s `?? .xtream`
+    /// fallback, point the Xtream pipeline at whatever server the record names,
+    /// and then push that wrong raw value back to CloudKit for every other
+    /// device. The record is skipped whole and its shadow left untouched, so it
+    /// is picked up unchanged once this device runs a build that knows the type.
+    func canAdoptLocally(_ verdict: MergeVerdict<PlaylistConfigValues>, id: UUID) -> Bool {
+        let incoming: PlaylistConfigValues? = switch verdict {
+        case let .pullToLocal(value): value
+        case let .writeBoth(value): value
+        case .noChange, .pushToCloud: nil
+        }
+        guard let incoming, PlaylistSourceType(rawValue: incoming.sourceTypeRaw) == nil else { return true }
+        let raw = incoming.sourceTypeRaw
+        Logger.sync.error("Skipping playlist \(id.uuidString, privacy: .public): unknown source type \(raw, privacy: .public)")
+        return false
     }
 
     func applyEPGSourceVerdict(

@@ -1,6 +1,7 @@
 import Foundation
 @testable import Lume
 import SwiftData
+import Testing
 
 func makeTestContainer() throws -> ModelContainer {
     let schema = Schema([
@@ -56,7 +57,7 @@ func makeProfileTestContainer() throws -> ModelContainer {
     ]
     let cloudModels: [any PersistentModel.Type] = [
         SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
-        SyncedParentalPIN.self, SyncedCategoryRestriction.self
+        SyncedParentalPIN.self, SyncedCategoryRestriction.self, SyncedSportsFollow.self
     ]
     let localConfig = ModelConfiguration(
         "local",
@@ -83,6 +84,12 @@ struct StringCatalog {
     let sourceLanguage: String
     private let strings: [String: Any]
 
+    /// The catalog entry for `key`, so an extension can read fields that
+    /// `localizations(for:)` deliberately flattens away.
+    private func rawEntry(for key: String) -> [String: Any]? {
+        strings[key] as? [String: Any]
+    }
+
     static func localizable(filePath: String = #filePath) throws -> Self {
         let url = repoRootURL(filePath: filePath).appendingPathComponent("Lume/Localizable.xcstrings")
         let root = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
@@ -106,6 +113,47 @@ struct StringCatalog {
     }
 }
 
+/// The locales Lume ships. `en` is the catalog's source language and carries no
+/// `stringUnit` of its own for all but a handful of entries, so its value is the
+/// key itself.
+let shippingLocales: Set<String> = ["en", "de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
+
+extension StringCatalog {
+    /// The languages whose translation of `key` is present, non-empty *and* in
+    /// the `translated` state, plus the source language when the key exists at
+    /// all. State is part of the answer: a `new` or `needs_review` unit still
+    /// reaches the user as English, so a value alone does not mean translated.
+    ///
+    /// Returns `nil` when the key is absent from the catalog entirely.
+    func translatedLanguages(for key: String) -> Set<String>? {
+        guard let entry = rawEntry(for: key) else { return nil }
+        let localizations = entry["localizations"] as? [String: Any] ?? [:]
+        var languages: Set<String> = [sourceLanguage]
+        for (language, value) in localizations {
+            guard let unit = (value as? [String: Any])?["stringUnit"] as? [String: Any],
+                  unit["state"] as? String == "translated",
+                  let text = unit["value"] as? String, !text.isEmpty
+            else { continue }
+            languages.insert(language)
+        }
+        return languages
+    }
+}
+
+/// Asserts `key` ships a usable value in every locale in `shippingLocales`.
+func expectTranslatedEverywhere(
+    _ key: String,
+    in catalog: StringCatalog,
+    sourceLocation: SourceLocation = #_sourceLocation
+) {
+    guard let languages = catalog.translatedLanguages(for: key) else {
+        Issue.record("\(key) is not in the string catalog", sourceLocation: sourceLocation)
+        return
+    }
+    let missing = shippingLocales.subtracting(languages).sorted()
+    #expect(missing.isEmpty, "\(key) is untranslated in \(missing)", sourceLocation: sourceLocation)
+}
+
 /// Clears every `sync.m3uDigest.*` key from the test host's defaults.
 ///
 /// The m3u skip-if-unchanged fingerprint is device-local `UserDefaults` state,
@@ -118,6 +166,17 @@ struct StringCatalog {
 func clearM3UDigests() {
     let defaults = UserDefaults.standard
     for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("sync.m3uDigest.") {
+        defaults.removeObject(forKey: key)
+    }
+}
+
+/// Clears every `sync.webdavDigest.*` key from the test host's defaults, for
+/// the same reason `clearM3UDigests()` exists: the WebDAV listing fingerprint
+/// is device-local `UserDefaults` state that outlives a test, and a suite that
+/// wants the real import path has to start from a known-clean slate.
+func clearWebDAVDigests() {
+    let defaults = UserDefaults.standard
+    for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("sync.webdavDigest.") {
         defaults.removeObject(forKey: key)
     }
 }

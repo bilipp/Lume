@@ -4,6 +4,32 @@ import SwiftUI
     import UniformTypeIdentifiers
 #endif
 
+/// The add-playlist form's source picker. Xtream / m3u / Stalker map 1:1 onto
+/// `PlaylistSourceType`; the media-server entry covers every server kind the
+/// URL auto-detection knows (Jellyfin, WebDAV, later Plex/Emby) instead of
+/// asking upfront. A form-level enum — `PlaylistSourceType` persists one
+/// detected kind per playlist and must not gain a "maybe either" case.
+enum LoginSourceType: String, CaseIterable {
+    case xtream
+    case m3u
+    case stalker
+    case mediaServer
+
+    /// The segmented picker's label. Deliberately one short word for the
+    /// media-server case: four segments have to share an iPhone's width, and
+    /// "Media Server" — "Medienserver", "Serveur multimédia" — truncates to
+    /// an ellipsis there. The section header and footer below the picker name
+    /// the kind in full, so nothing is lost.
+    var title: LocalizedStringKey {
+        switch self {
+        case .xtream: "Xtream"
+        case .m3u: "M3U"
+        case .stalker: "Stalker"
+        case .mediaServer: "Server"
+        }
+    }
+}
+
 struct LoginView: View {
     /// Whether this view is presented modally (the Settings "Add Playlist"
     /// sheet / cover) and should therefore offer a Cancel button and dismiss
@@ -21,12 +47,12 @@ struct LoginView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @State private var sourceType: PlaylistSourceType = .xtream
+    @State private var sourceType: LoginSourceType = .xtream
 
     @State private var name = ""
     @State private var serverURL = ""
-    @State private var username = ""
-    @State private var password = ""
+    @State var username = ""
+    @State var password = ""
 
     // m3u fields
     @State private var m3uURL = ""
@@ -40,8 +66,14 @@ struct LoginView: View {
     @State private var portalURL = ""
     @State private var macAddress = StalkerMAC.generate()
 
-    @State private var isLoading = false
-    @State private var errorMessage: String?
+    /// The media-server address: a Jellyfin base URL
+    /// (`http://192.168.1.10:8096`) or the full path of a WebDAV folder. The
+    /// kind is detected from the URL — unlike a fixed per-kind field, this one
+    /// cannot silently list nothing because of a wrong assumption.
+    @State var mediaServerURL = ""
+
+    @State var isLoading = false
+    @State var errorMessage: String?
 
     private var isFormValid: Bool {
         switch sourceType {
@@ -54,6 +86,11 @@ struct LoginView: View {
         case .stalker:
             !portalURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && StalkerMAC.isValid(macAddress.trimmingCharacters(in: .whitespacesAndNewlines))
+        case .mediaServer:
+            // Credentials stay optional here: an anonymous WebDAV share needs
+            // none, and a Jellyfin server without them gets a dedicated
+            // "enter your username and password" error from the check itself.
+            !mediaServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 
@@ -81,17 +118,26 @@ struct LoginView: View {
                 Form {
                     Section {
                         Picker("Playlist Type", selection: $sourceType) {
-                            Text("Xtream").tag(PlaylistSourceType.xtream)
-                            Text("M3U").tag(PlaylistSourceType.m3u)
-                            Text("Stalker").tag(PlaylistSourceType.stalker)
+                            ForEach(LoginSourceType.allCases, id: \.self) { type in
+                                Text(type.title).tag(type)
+                            }
                         }
                         .pickerStyle(.segmented)
                     }
 
                     switch sourceType {
-                    case .xtream: xtreamSection
-                    case .m3u: m3uSection
-                    case .stalker: stalkerSection
+                    case .xtream:
+                        XtreamLoginSection(name: $name, serverURL: $serverURL, username: $username, password: $password)
+                    case .m3u:
+                        M3ULoginSection(
+                            name: $name, m3uURL: $m3uURL, epgURL: $epgURL,
+                            showFileImporter: $showFileImporter, xtreamHint: xtreamHint,
+                            isLoading: isLoading, onAddAsXtream: addAsXtream
+                        )
+                    case .stalker:
+                        StalkerLoginSection(name: $name, portalURL: $portalURL, macAddress: $macAddress, username: $username, password: $password)
+                    case .mediaServer:
+                        MediaServerLoginSection(name: $name, serverURL: $mediaServerURL, username: $username, password: $password)
                     }
 
                     if let errorMessage {
@@ -144,113 +190,9 @@ struct LoginView: View {
             }
         }
 
-        private var xtreamSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com:8080", text: $serverURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                TextField("Username", text: $username)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.username)
-
-                SecureField("Password", text: $password)
-                    .textContentType(.password)
-            } header: {
-                Text("Server Connection")
-            } footer: {
-                Text("Your credentials are stored locally on this device.")
-            }
-        }
-
-        @ViewBuilder private var m3uSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com/playlist.m3u", text: $m3uURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                Button("Choose Local File…") { showFileImporter = true }
-
-                TextField("EPG URL (optional)", text: $epgURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-            } header: {
-                Text("M3U Playlist")
-            } footer: {
-                Text("Enter the playlist URL or choose a local m3u/m3u8 file. The EPG URL is read from the playlist when left empty.")
-            }
-
-            if let xtreamHint {
-                Section {
-                    XtreamLoginHint(isLoading: isLoading) { addAsXtream(xtreamHint) }
-                }
-            }
-        }
-
-        private var stalkerSection: some View {
-            Section {
-                TextField("e.g. My IPTV", text: $name)
-                    .textContentType(.name)
-
-                TextField("e.g. http://example.com:8080/c/", text: $portalURL)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.URL)
-
-                HStack {
-                    TextField("MAC Address", text: $macAddress)
-                    #if os(iOS)
-                        .textInputAutocapitalization(.characters)
-                    #endif
-                        .autocorrectionDisabled()
-                    Button {
-                        macAddress = StalkerMAC.generate()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Generate a new MAC address")
-                }
-
-                TextField("Username (optional)", text: $username)
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
-                    .autocorrectionDisabled()
-                    .textContentType(.username)
-
-                SecureField("Password (optional)", text: $password)
-                    .textContentType(.password)
-            } header: {
-                Text("Stalker Portal")
-            } footer: {
-                Text("Enter the portal URL and the MAC address your provider authorized. Most portals need only the portal URL and MAC.")
-            }
-        }
+        // The iOS/macOS source sections live in LoginView+SourceSections.swift
+        // (and LoginView+WebDAV.swift / LoginView+Jellyfin.swift) so this type
+        // stays within the body-length limit.
     #endif
 
     #if os(tvOS)
@@ -259,6 +201,7 @@ struct LoginView: View {
             case .xtream: "Your credentials are stored locally on this device."
             case .m3u: "The EPG URL is read from the playlist when left empty."
             case .stalker: "Enter the portal URL and the MAC address your provider authorized."
+            case .mediaServer: MediaServerAddCheck.hint
             }
         }
 
@@ -275,9 +218,9 @@ struct LoginView: View {
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
                     Picker("Playlist Type", selection: $sourceType) {
-                        Text("Xtream").tag(PlaylistSourceType.xtream)
-                        Text("M3U").tag(PlaylistSourceType.m3u)
-                        Text("Stalker").tag(PlaylistSourceType.stalker)
+                        ForEach(LoginSourceType.allCases, id: \.self) { type in
+                            Text(type.title).tag(type)
+                        }
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -297,6 +240,8 @@ struct LoginView: View {
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $macAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $username, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $password, isSecure: true, contentType: .password)
+                        case .mediaServer:
+                            MediaServerLoginFields(serverURL: $mediaServerURL, username: $username, password: $password)
                         }
                     }
 
@@ -360,6 +305,7 @@ struct LoginView: View {
             )
         case .m3u: addM3UPlaylist()
         case .stalker: addStalkerPlaylist()
+        case .mediaServer: addMediaServerPlaylist()
         }
     }
 
@@ -375,7 +321,7 @@ struct LoginView: View {
         loginXtream(serverURL: hint.baseURL, username: hint.username, password: hint.password)
     }
 
-    private var trimmedName: String {
+    var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -471,7 +417,7 @@ struct LoginView: View {
         }
     }
 
-    private func insertAndFinish(_ playlist: Playlist) {
+    func insertAndFinish(_ playlist: Playlist) {
         modelContext.insert(playlist)
         // Set up the playlist's EPG source so the guide refreshes on its own
         // schedule — EPG is no longer part of the content sync.
@@ -490,38 +436,6 @@ struct LoginView: View {
         // ContentView's @Query.
         if isModal {
             dismiss()
-        }
-    }
-}
-
-// MARK: - Connection-test timeout
-
-private extension LoginView {
-    struct ConnectionTimeoutError: LocalizedError {
-        var errorDescription: String? {
-            String(localized: "The connection timed out. Check the URL and your network, then try again.")
-        }
-    }
-
-    /// Runs an add-playlist connection test under an overall deadline, cancelling
-    /// the in-flight request and surfacing a timeout when it's exceeded.
-    ///
-    /// Each client has its own per-request timeout and (for Xtream) retry/backoff
-    /// tuned for *sync*, where retries matter; left unbounded, a wrong URL or
-    /// dead host can hang the add sheet for ~30–90s on a spinner with no way out.
-    /// This caps the test (default 20s) without weakening the sync path.
-    func withConnectionTimeout(_ seconds: Double = 20, _ operation: @escaping () async throws -> Void) async throws {
-        let work = Task { try await operation() }
-        let watchdog = Task {
-            try? await Task.sleep(for: .seconds(seconds))
-            work.cancel()
-        }
-        defer { watchdog.cancel() }
-        do {
-            try await work.value
-        } catch {
-            if work.isCancelled { throw ConnectionTimeoutError() }
-            throw error
         }
     }
 }
@@ -547,7 +461,9 @@ private extension LoginView {
             case let .success(pickedURL):
                 let accessing = pickedURL.startAccessingSecurityScopedResource()
                 defer {
-                    if accessing { pickedURL.stopAccessingSecurityScopedResource() }
+                    if accessing {
+                        pickedURL.stopAccessingSecurityScopedResource()
+                    }
                 }
                 do {
                     let directory = try FileManager.default
