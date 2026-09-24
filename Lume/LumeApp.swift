@@ -298,9 +298,9 @@ struct LumeApp: App {
                     ContentIndexingService.shared.kick()
 
                     // Refresh the TV guide on its own schedule. No-ops when no
-                    // guide is due yet, and stands aside when a playlist sync
-                    // is running or about to start — the post-sync hook kicks
-                    // the refresh instead once the sync queue drains.
+                    // guide is due yet, and stands aside while a playlist sync
+                    // is queued or running — the deferred refresh runs once
+                    // nothing is pending (see `EPGRefreshGate`).
                     EPGSyncService.shared.configure(container: catalogContainer)
                     EPGSyncService.shared.syncIfDue()
                 }

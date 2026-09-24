@@ -64,6 +64,14 @@ struct MainTabView: View {
         SyncFrequency.resolve(syncFrequencyRaw)
     }
 
+    /// The playlist the content tabs are showing, resolved rather than read raw:
+    /// the stored id can name a deleted playlist, in which case the app falls
+    /// back to the same playlist every other surface does, and auto-sync has to
+    /// follow it there.
+    private var activePlaylistID: String {
+        playlists.activeID(for: selectedPlaylistID)
+    }
+
     /// UI tests seed a fake playlist; auto-sync would present a blocking cover
     /// that can never succeed against the stub server, so skip it there.
     private var isUITesting: Bool {
@@ -136,13 +144,15 @@ struct MainTabView: View {
             }
         #endif
             .task(id: playlists.count) {
-                // On launch (and whenever a playlist is added) sync any playlist that
-                // is due per the configured frequency.
+                // On launch (and whenever a playlist is added) sync the active
+                // playlist if it is due, plus any playlist that has never synced.
                 enqueueDueSyncs(playlists)
             }
             .onChange(of: selectedPlaylistID) {
                 // On playlist switch, sync the newly selected one if it's due —
                 // unless the switch asked to land in the cached catalog instead.
+                // This is also where a playlist deferred at launch for not being
+                // on screen gets its turn.
                 guard playlistSwitch?.consumeDeferredDueSync() != true else { return }
                 if let playlist = playlists.active(for: selectedPlaylistID) {
                     enqueueDueSyncs([playlist])
@@ -158,6 +168,15 @@ struct MainTabView: View {
                 SportsSyncService.shared.isForeground = phase == .active
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
+            .onChange(of: isAutoSyncBusy, initial: true) { _, busy in
+                EPGSyncService.shared.setAutoSyncQueued(busy)
+            }
+            .onDisappear {
+                // The queue goes with this view (deleting the last playlist
+                // swaps the root back to onboarding); don't leave the guide
+                // waiting on it.
+                EPGSyncService.shared.setAutoSyncQueued(false)
+            }
             .downloadsSheet(isPresented: $showsDownloads)
             .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
             // The one fire point for the rating sheet. Here rather than at the
@@ -394,8 +413,10 @@ struct MainTabView: View {
     // MARK: - Automatic sync
 
     /// Enqueues every due playlist for a blocking, progress-visible sync and
-    /// presents the first one. Covers the never-synced first launch (where
-    /// `lastSyncDate == nil` makes a playlist due) as well as periodic refreshes.
+    /// presents the first one — the playlist on screen, plus any the viewer
+    /// just added (see `AutoSync.shouldSync`). Covers the never-synced first
+    /// launch (where `lastSyncDate == nil` makes a playlist due) as well as
+    /// periodic refreshes.
     private func enqueueDueSyncs(_ candidates: [Playlist]) {
         guard !isUITesting else { return }
 
@@ -408,12 +429,17 @@ struct MainTabView: View {
 
     private func shouldAutoSync(_ playlist: Playlist) -> Bool {
         AutoSync.shouldSync(
-            syncEnabled: playlist.syncEnabled,
-            status: playlist.syncStatus,
-            lastSyncDate: playlist.lastSyncDate,
+            playlist.autoSyncCandidate(activeID: activePlaylistID),
             frequency: syncFrequency,
             alreadyStarted: autoSyncAttempted.contains(playlist.id)
         )
+    }
+
+    /// Whether the auto-sync queue holds anything, including the playlist in
+    /// the cover. Reported to `EPGSyncService` so the guide refresh reads the
+    /// queue itself instead of predicting it.
+    private var isAutoSyncBusy: Bool {
+        activeSyncPlaylist != nil || !syncQueue.isEmpty
     }
 
     /// Presents the next queued playlist's sync cover when none is showing. The

@@ -32,9 +32,13 @@ enum PlaylistSyncState: Equatable {
     /// Never finished a sync. Distinct from `failed` because it is also the
     /// ordinary state of a playlist added a moment ago.
     case never
-    /// Synced before, but longer ago than the frequency allows — so it is due
-    /// and will start on the next launch, playlist switch or foreground.
+    /// Synced before, but longer ago than the frequency allows — so it is due,
+    /// and as the selected playlist it syncs on the next launch or foreground.
     case overdue(lastSyncDate: Date)
+    /// Due like `overdue`, but not the selected playlist: auto-sync only
+    /// refreshes the playlist on screen (see `AutoSync.shouldSync`), so this
+    /// one waits until the viewer switches to it or taps Sync Now.
+    case awaitingSelection(lastSyncDate: Date)
     /// Synced within the interval. Nothing to say.
     case synced(lastSyncDate: Date)
     /// The playlist opted out of automatic syncing, so staleness is expected
@@ -44,10 +48,14 @@ enum PlaylistSyncState: Equatable {
     /// Resolve the state from a playlist's own fields. Takes them loose rather
     /// than taking `Playlist` so it stays testable without a `ModelContext`,
     /// and `now` is injectable for the same reason.
+    ///
+    /// - Parameter isActive: whether this is the selected playlist, which
+    ///   decides between `overdue` and `awaitingSelection`.
     static func resolve(
         syncEnabled: Bool,
         status: SyncStatus,
         lastSyncDate: Date?,
+        isActive: Bool,
         frequency: SyncFrequency,
         now: Date = Date()
     ) -> PlaylistSyncState {
@@ -59,7 +67,9 @@ enum PlaylistSyncState: Equatable {
         if status == .error { return .failed }
         guard let lastSyncDate else { return .never }
         if frequency.isDue(lastSyncDate: lastSyncDate, now: now) {
-            return .overdue(lastSyncDate: lastSyncDate)
+            return isActive
+                ? .overdue(lastSyncDate: lastSyncDate)
+                : .awaitingSelection(lastSyncDate: lastSyncDate)
         }
         return .synced(lastSyncDate: lastSyncDate)
     }
@@ -67,7 +77,7 @@ enum PlaylistSyncState: Equatable {
     /// The date to show as "Last Synced", when there is one.
     var lastSyncDate: Date? {
         switch self {
-        case let .overdue(date), let .synced(date): date
+        case let .overdue(date), let .awaitingSelection(date), let .synced(date): date
         case let .disabled(date): date
         case .syncing, .failed, .never: nil
         }
@@ -81,7 +91,7 @@ enum PlaylistSyncState: Equatable {
     var deservesRowAccessory: Bool {
         switch self {
         case .syncing, .failed, .never: true
-        case .overdue, .synced, .disabled: false
+        case .overdue, .awaitingSelection, .synced, .disabled: false
         }
     }
 
@@ -91,7 +101,7 @@ enum PlaylistSyncState: Equatable {
         switch self {
         case .failed: "exclamationmark.triangle.fill"
         case .never: "clock.badge.questionmark"
-        case .syncing, .overdue, .synced, .disabled: nil
+        case .syncing, .overdue, .awaitingSelection, .synced, .disabled: nil
         }
     }
 
@@ -102,7 +112,7 @@ enum PlaylistSyncState: Equatable {
     var tint: Color {
         switch self {
         case .failed: .orange
-        case .syncing, .never, .overdue, .synced, .disabled: .secondary
+        case .syncing, .never, .overdue, .awaitingSelection, .synced, .disabled: .secondary
         }
     }
 
@@ -114,6 +124,7 @@ enum PlaylistSyncState: Equatable {
         case .failed: "Last sync failed"
         case .never: "Never synced"
         case .overdue: "Sync due"
+        case .awaitingSelection: "Syncs when selected"
         case .synced: "Up to date"
         case .disabled: "Sync off"
         }
@@ -121,14 +132,15 @@ enum PlaylistSyncState: Equatable {
 }
 
 extension Playlist {
-    /// This playlist's sync state under the stored global frequency. The
-    /// convenience the views actually call; `PlaylistSyncState.resolve` stays
-    /// the testable seam beneath it.
-    var syncState: PlaylistSyncState {
+    /// This playlist's sync state under the stored global frequency, given
+    /// whether it is the selected playlist. The convenience the views actually
+    /// call; `PlaylistSyncState.resolve` stays the testable seam beneath it.
+    func syncState(isActive: Bool) -> PlaylistSyncState {
         PlaylistSyncState.resolve(
             syncEnabled: syncEnabled,
             status: syncStatus,
             lastSyncDate: lastSyncDate,
+            isActive: isActive,
             frequency: SyncFrequency.resolve(
                 UserDefaults.standard.string(forKey: SyncFrequency.storageKey) ?? ""
             )

@@ -11,6 +11,10 @@
 //  which the launch / playlist-switch / foreground triggers in `MainTabView`
 //  call through.
 //
+//  Being due is necessary but not sufficient: a due playlist that is not the
+//  one on screen waits for the viewer to switch to it. See `AutoSync.shouldSync`
+//  for why.
+//
 
 import Foundation
 import SwiftUI
@@ -127,51 +131,74 @@ enum EPGSyncSchedule {
 /// The full gate for "should this playlist auto-sync right now". Pure so it can
 /// be unit-tested without SwiftUI / SwiftData state.
 enum AutoSync {
-    /// - Parameters:
-    ///   - syncEnabled: the playlist's own opt-in flag.
-    ///   - status: its current sync status (skip if already syncing).
-    ///   - lastSyncDate: when it last finished a successful sync.
-    ///   - frequency: the global frequency setting.
-    ///   - alreadyStarted: whether this session has already kicked off a sync for
-    ///     it that hasn't finished yet (avoids double-triggering from rapid view
-    ///     updates before `status` flips to `.syncing`).
+    /// A playlist as the auto-sync gate sees it. Grouped because these fields
+    /// always travel together, and taken loose rather than as a `Playlist` so
+    /// the gate stays testable without a `ModelContext` — the same reason
+    /// `PlaylistSyncState.resolve` next door takes its fields loose.
+    struct Candidate {
+        /// The playlist's own opt-in flag.
+        let syncEnabled: Bool
+        /// Its current sync status (skip if already syncing).
+        let status: SyncStatus
+        /// When it last finished a successful sync.
+        let lastSyncDate: Date?
+        /// Whether this is the playlist the content tabs are showing.
+        let isActive: Bool
+        /// Whether the viewer added it on this device since launch — see
+        /// `addedThisSession`.
+        let wasAddedThisSession: Bool
+    }
+
+    /// Playlists the viewer added on this device since launch, recorded by the
+    /// add flow. Session-scoped on purpose: it separates "just added, expected
+    /// to fill in" from the other ways a playlist ends up never-synced — one
+    /// that arrived from iCloud on a new device, or whose first import was
+    /// interrupted — which wait for the viewer like any other stale playlist.
+    static var addedThisSession: Set<UUID> = []
+
+    /// Auto-sync hands the screen to a blocking progress cover, so with several
+    /// playlists configured, launching used to mean sitting through one cover
+    /// per playlist — on a large catalog, minutes each.
+    ///
+    /// Only the active playlist earns that. Every content surface scopes to
+    /// `playlists.active(for:)`, so a stale *other* playlist changes nothing the
+    /// viewer can see; it syncs when they switch to it, which is the moment its
+    /// freshness starts to matter and which `MainTabView` already triggers on.
+    ///
+    /// The exception is a playlist just added from Settings, which syncs
+    /// wherever it is: the add doesn't select it, and the viewer adding one
+    /// expects it to be ready when they go looking for it. The exception is
+    /// keyed on the add rather than on `lastSyncDate == nil`, which would also
+    /// catch every playlist iCloud brings to a new device and put one cover per
+    /// playlist right back.
+    ///
+    /// - Parameter alreadyStarted: whether this session has already kicked off a
+    ///   sync for it that hasn't finished yet (avoids double-triggering from
+    ///   rapid view updates before `status` flips to `.syncing`).
     static func shouldSync(
-        syncEnabled: Bool,
-        status: SyncStatus,
-        lastSyncDate: Date?,
+        _ candidate: Candidate,
         frequency: SyncFrequency,
         alreadyStarted: Bool,
         now: Date = Date()
     ) -> Bool {
-        syncEnabled
-            && status != .syncing
+        candidate.syncEnabled
+            && candidate.status != .syncing
             && !alreadyStarted
-            && frequency.isDue(lastSyncDate: lastSyncDate, now: now)
+            && (candidate.isActive || candidate.wasAddedThisSession)
+            && frequency.isDue(lastSyncDate: candidate.lastSyncDate, now: now)
     }
+}
 
-    /// Whether a background EPG refresh must stand aside for this playlist:
-    /// its content sync is either running right now or due to start.
-    ///
-    /// Both downloads hit the same provider account, and Xtream panels
-    /// commonly cap an account at one concurrent connection — a guide
-    /// download racing the catalog sync gets one of the two rejected (and can
-    /// leave the account briefly blocked, failing the sync's next requests
-    /// too). Deferring costs nothing: the post-sync hook re-kicks the refresh
-    /// as soon as the content sync queue drains.
-    static func blocksEPGRefresh(
-        syncEnabled: Bool,
-        status: SyncStatus,
-        lastSyncDate: Date?,
-        frequency: SyncFrequency,
-        now: Date = Date()
-    ) -> Bool {
-        status == .syncing || shouldSync(
+extension Playlist {
+    /// This playlist as `AutoSync.shouldSync` sees it, given the id of the
+    /// playlist on screen (`[Playlist].activeID(for:)`).
+    func autoSyncCandidate(activeID: String) -> AutoSync.Candidate {
+        AutoSync.Candidate(
             syncEnabled: syncEnabled,
-            status: status,
+            status: syncStatus,
             lastSyncDate: lastSyncDate,
-            frequency: frequency,
-            alreadyStarted: false,
-            now: now
+            isActive: id.uuidString == activeID,
+            wasAddedThisSession: AutoSync.addedThisSession.contains(id)
         )
     }
 }
