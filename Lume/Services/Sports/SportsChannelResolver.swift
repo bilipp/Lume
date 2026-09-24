@@ -91,7 +91,7 @@ nonisolated enum SportsChannelResolver {
     /// A visible channel plus the pre-normalised name the channel-name fallback
     /// matches against — built once in pass 1 so a wide fixture batch doesn't
     /// re-fold the same names per fixture.
-    private struct Channel {
+    struct Channel {
         let summary: ResolvedStreamSummary
         let playlistID: UUID
         let nameHaystack: String
@@ -217,12 +217,13 @@ nonisolated enum SportsChannelResolver {
     /// An EPG candidate with its title, subtitle and the head of its description
     /// normalized once at guide-build time, so `bestEPGHit` reuses them across
     /// every fixture sharing the channel rather than re-normalizing per fixture.
-    private struct NormalizedCandidate {
+    struct NormalizedCandidate {
         let title: String
         let normalizedTitle: String
         let normalizedSubtitle: String
         let normalizedDescription: String
         let start: Date
+        let end: Date
     }
 
     /// How much of a description is searched. A conference body lists its games
@@ -251,7 +252,8 @@ nonisolated enum SportsChannelResolver {
                 normalizedDescription: SportsMatcher.normalize(
                     String(listing.listingDescription.prefix(descriptionScanLength))
                 ),
-                start: listing.start
+                start: listing.start,
+                end: listing.end
             ))
         }
         return guide
@@ -275,7 +277,11 @@ nonisolated enum SportsChannelResolver {
         guide: [String: [NormalizedCandidate]],
         pickIndex: [String: String]
     ) -> [ResolvedChannel] {
-        guard let home = fixture.home?.team, let away = fixture.away?.team else { return [] }
+        guard let home = fixture.home?.team, let away = fixture.away?.team else {
+            // A race session has no two teams; it matches on series and session.
+            let race = resolveRace(fixture: fixture, channels: channels, guide: guide, pickIndex: pickIndex)
+            return ranked(race, kickoff: fixture.startDate)
+        }
         let homeTokens = SportsMatcher.tokens(for: home)
         let awayTokens = SportsMatcher.tokens(for: away)
         guard !homeTokens.isEmpty, !awayTokens.isEmpty else { return [] }
@@ -294,13 +300,17 @@ nonisolated enum SportsChannelResolver {
             }
         }
 
-        resolved.sort { lhs, rhs in
+        return ranked(resolved, kickoff: context.kickoff)
+    }
+
+    /// Orders channels by tier, then score, then proximity to kickoff, and marks
+    /// the leader confident only when it holds the strongest tier alone.
+    private static func ranked(_ channels: [ResolvedChannel], kickoff: Date) -> [ResolvedChannel] {
+        var resolved = channels.sorted { lhs, rhs in
             if lhs.source.rank != rhs.source.rank { return lhs.source.rank < rhs.source.rank }
             if lhs.score != rhs.score { return lhs.score > rhs.score }
-            return gap(lhs, context.kickoff) < gap(rhs, context.kickoff)
+            return gap(lhs, kickoff) < gap(rhs, kickoff)
         }
-
-        // Confident only when a single channel holds the strongest tier alone.
         if let bestRank = resolved.first?.source.rank {
             let atBest = resolved.prefix { $0.source.rank == bestRank }.count
             if atBest == 1 { resolved[0].isConfident = true }
@@ -437,9 +447,9 @@ nonisolated enum SportsChannelResolver {
     // Mirror `SportsMatcher`'s field weights so the EPG tier ordering agrees
     // with the matcher's own scoring; a user pick outscores any EPG match, and
     // a channel-name-only hit is the weakest positive signal.
-    private static let subtitleWeight = 3
-    private static let titleWeight = 2
-    private static let descriptionWeight = 1
-    private static let pickScoreBase = 1000
-    private static let nameMatchScore = 1
+    static let subtitleWeight = 3
+    static let titleWeight = 2
+    static let descriptionWeight = 1
+    static let pickScoreBase = 1000
+    static let nameMatchScore = 1
 }

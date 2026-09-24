@@ -30,6 +30,7 @@ Services/Sports/
 ├── SportsFollowService.swift Follows (per profile, ordered) + region pre-follows
 ├── SportsMatcher.swift       Pure team-token matching (+ SportsTeamAliases.json)
 ├── SportsChannelResolver.swift  Fixture → channel resolve (below)
+├── SportsChannelResolver+Racing.swift  Race sessions: series + session words
 └── SportsChannelPicks.swift  Device-local remembered channel picks
 ```
 
@@ -157,6 +158,25 @@ match `score`, then on proximity to kickoff:
 A team is "present" when any distinctive token from `SportsMatcher.tokens(for:)`
 (aliases from the bundled `SportsTeamAliases.json`) appears as a whole word in a
 `SportsMatcher.normalize`d haystack.
+
+### Race sessions
+
+A race session (an F1 weekend card per session, see `expandedBySession`) has no
+two teams, so `SportsChannelResolver+Racing` matches it on the **series**
+(`SportsRaceMatcher.seriesPhrases`: "F1", "Formel 1", "Formula 1"…) and the
+**session** named in the guide ("1. Freies Training", "Practice Two", "Quali",
+"Das Rennen"…, in the app's languages). The same tiers apply:
+
+| Tier | Race signal |
+|---|---|
+| `epgTitleSubtitle` | Series and this session together in one field — or the session on a series-named channel ("Sky Sports F1" · "1. Freies Training"). |
+| `epgSingleField` | The series in the headline, the session split off or not named at all ("Formel 1 - Grand Prix von Aserbaidschan"); the kickoff window decides. |
+| `epgDescription` | The series only in the description. |
+| `channelName` | A series-named channel with nothing in its guide at the session's start. |
+
+A programme naming a **different** session of the weekend, or a support series
+(F2, F3, F1 Academy, Supercup), is never offered. The series phrase is cut before
+session words are read, so the "1" of "Formel 1 Training" isn't practice 1.
 
 ### The `isConfident` rule
 
