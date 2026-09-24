@@ -99,7 +99,7 @@ struct LeagueDetailView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
         } else if fixtures.isEmpty {
-            SportsNoGamesView(chips: [])
+            SportsNoGamesView()
         } else if isF1 {
             ForEach(fixtures) { weekendCard($0) }
         } else if segment == .upcoming {

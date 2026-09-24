@@ -63,7 +63,6 @@ private extension ISO8601DateFormatter {
 struct SportsSectionsView: View {
     let groups: [SportsFixtureGroup]
     let resolved: [String: [ResolvedChannel]]
-    let emptyChips: [String]
     let isFollowed: (SportsTeam) -> Bool
     var onOpenDetail: (SportsFixture) -> Void
     var onWatch: (ResolvedChannel) -> Void
@@ -73,7 +72,7 @@ struct SportsSectionsView: View {
 
     var body: some View {
         if groups.isEmpty {
-            SportsNoGamesView(chips: emptyChips)
+            SportsNoGamesView()
         } else {
             ForEach(groups) { group in
                 section(for: group)
@@ -150,29 +149,12 @@ struct SportsSectionsView: View {
 // MARK: - No games
 
 struct SportsNoGamesView: View {
-    let chips: [String]
-
     var body: some View {
-        VStack(spacing: 16) {
-            Text("No games")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            if !chips.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(chips, id: \.self) { chip in
-                            Text(chip)
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .glassEffectCompat(.regular, in: Capsule())
-                        }
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        Text("No games")
+            .font(.headline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
     }
 }
 

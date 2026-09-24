@@ -286,18 +286,6 @@
                 Text("No games")
                     .font(.title.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.6))
-                if !emptyChips.isEmpty {
-                    HStack(spacing: 14) {
-                        ForEach(emptyChips, id: \.self) { chip in
-                            Text(verbatim: chip)
-                                .font(.headline)
-                                .padding(.horizontal, 22)
-                                .padding(.vertical, 12)
-                                .background(Capsule().fill(.white.opacity(0.1)))
-                                .foregroundStyle(.white)
-                        }
-                    }
-                }
             }
             .frame(maxWidth: .infinity, minHeight: 560)
         }
@@ -421,10 +409,6 @@
 
         private var groups: [SportsFixtureGroup] {
             grouping.groups
-        }
-
-        private var emptyChips: [String] {
-            grouping.emptyChips
         }
 
         private var scopeTitle: String {

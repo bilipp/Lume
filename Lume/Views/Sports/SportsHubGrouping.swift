@@ -127,19 +127,6 @@ struct SportsHubGrouping {
         return groups
     }
 
-    /// Followed-team (or, failing that, followed-league) names for the "no games"
-    /// state's chips.
-    var emptyChips: [String] {
-        let teams = follows
-            .filter { $0.kind == .team }
-            .compactMap { follow -> String? in
-                let team = store.team(by: follow.key)
-                return team?.shortName ?? team?.name
-            }
-        if !teams.isEmpty { return teams }
-        return followedLeagues.map(\.name)
-    }
-
     var scopeTitle: String {
         switch scope {
         case .myTeams:
