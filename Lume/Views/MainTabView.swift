@@ -64,6 +64,13 @@ struct MainTabView: View {
         SyncFrequency.resolve(syncFrequencyRaw)
     }
 
+    /// The playlist the content tabs are showing, resolved rather than read raw:
+    /// the stored id can name a deleted playlist, in which case the app falls
+    /// back to the first one and auto-sync has to follow it there.
+    private var activePlaylistID: String {
+        playlists.activeID(for: selectedPlaylistID)
+    }
+
     /// UI tests seed a fake playlist; auto-sync would present a blocking cover
     /// that can never succeed against the stub server, so skip it there.
     private var isUITesting: Bool {
@@ -136,23 +143,25 @@ struct MainTabView: View {
             }
         #endif
             .task(id: playlists.count) {
-                // On launch (and whenever a playlist is added) sync any playlist that
-                // is due per the configured frequency.
-                enqueueDueSyncs(playlists)
+                // On launch (and whenever a playlist is added) sync the active
+                // playlist if it is due, plus any playlist that has never synced.
+                enqueueDueSyncs(playlists, activeID: activePlaylistID)
             }
             .onChange(of: selectedPlaylistID) {
                 // On playlist switch, sync the newly selected one if it's due —
                 // unless the switch asked to land in the cached catalog instead.
+                // This is also where a playlist deferred at launch for not being
+                // on screen gets its turn.
                 guard playlistSwitch?.consumeDeferredDueSync() != true else { return }
                 if let playlist = playlists.active(for: selectedPlaylistID) {
-                    enqueueDueSyncs([playlist])
+                    enqueueDueSyncs([playlist], activeID: playlist.id.uuidString)
                 }
             }
             .onChange(of: scenePhase) { _, phase in
                 // Returning to the foreground re-checks staleness — for a long-lived
                 // app this is the practical equivalent of "on launch".
                 if phase == .active {
-                    enqueueDueSyncs(playlists)
+                    enqueueDueSyncs(playlists, activeID: activePlaylistID)
                     SportsSyncService.shared.syncIfDue()
                 }
                 SportsSyncService.shared.isForeground = phase == .active
@@ -396,21 +405,30 @@ struct MainTabView: View {
     /// Enqueues every due playlist for a blocking, progress-visible sync and
     /// presents the first one. Covers the never-synced first launch (where
     /// `lastSyncDate == nil` makes a playlist due) as well as periodic refreshes.
-    private func enqueueDueSyncs(_ candidates: [Playlist]) {
+    ///
+    /// `activeID` scopes the periodic half of that to the playlist on screen —
+    /// see `AutoSync.shouldSync`. Passed in rather than read from
+    /// `selectedPlaylistID` here so the playlist-switch trigger can name the
+    /// playlist it is switching to directly, instead of depending on the
+    /// `@AppStorage` write having already been observed.
+    private func enqueueDueSyncs(_ candidates: [Playlist], activeID: String) {
         guard !isUITesting else { return }
 
-        for playlist in candidates where shouldAutoSync(playlist) {
+        for playlist in candidates where shouldAutoSync(playlist, activeID: activeID) {
             autoSyncAttempted.insert(playlist.id)
             syncQueue.append(playlist)
         }
         promoteNextIfIdle()
     }
 
-    private func shouldAutoSync(_ playlist: Playlist) -> Bool {
+    private func shouldAutoSync(_ playlist: Playlist, activeID: String) -> Bool {
         AutoSync.shouldSync(
-            syncEnabled: playlist.syncEnabled,
-            status: playlist.syncStatus,
-            lastSyncDate: playlist.lastSyncDate,
+            AutoSync.Candidate(
+                syncEnabled: playlist.syncEnabled,
+                status: playlist.syncStatus,
+                lastSyncDate: playlist.lastSyncDate,
+                isActive: playlist.id.uuidString == activeID
+            ),
             frequency: syncFrequency,
             alreadyStarted: autoSyncAttempted.contains(playlist.id)
         )
