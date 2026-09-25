@@ -17,6 +17,8 @@ struct PINUnlockView: View {
     var subtitle: LocalizedStringKey?
     let onUnlock: () -> Void
     var onCancel: (() -> Void)?
+    /// Overrides global parental-PIN verification for profile-specific gates.
+    var verifier: ((String) -> Bool)?
 
     @Environment(ParentalControls.self) private var parental: ParentalControls?
     @State private var entry = ""
@@ -32,7 +34,8 @@ struct PINUnlockView: View {
         }
         .onChange(of: entry) { _, value in
             guard value.count == ParentalControls.pinLength else { return }
-            if parental?.verify(value) == true {
+            let isValid = verifier?(value) ?? (parental?.verify(value) == true)
+            if isValid {
                 entry = ""
                 onUnlock()
             } else {
@@ -90,6 +93,7 @@ struct PINCreateView: View {
 struct ChangePINFlow: View {
     let onComplete: (String) -> Void
     var onCancel: (() -> Void)?
+    var verifier: ((String) -> Bool)?
 
     @State private var verified = false
 
@@ -101,9 +105,61 @@ struct ChangePINFlow: View {
                 title: "Enter Current PIN",
                 subtitle: "Enter your current PIN to change it.",
                 onUnlock: { verified = true },
-                onCancel: onCancel
+                onCancel: onCancel,
+                verifier: verifier
             )
         }
+    }
+}
+
+/// Which operation the profile editor performs on one profile's PIN.
+enum ProfilePINFlow: String, Identifiable {
+    case set, change, remove
+
+    var id: String {
+        rawValue
+    }
+}
+
+/// Reuses the standard PIN entry flows while verifying against one profile's
+/// synced hash instead of the global parental-control keychain item.
+struct ProfilePINFlowView: View {
+    let flow: ProfilePINFlow
+    let existingHash: String
+    let onUpdate: (String) -> Void
+    let onFinish: () -> Void
+
+    var body: some View {
+        switch flow {
+        case .set:
+            PINCreateView(onComplete: save, onCancel: onFinish)
+        case .change:
+            ChangePINFlow(
+                onComplete: save,
+                onCancel: onFinish,
+                verifier: verify
+            )
+        case .remove:
+            PINUnlockView(
+                title: "Turn Off PIN",
+                subtitle: "Enter your current PIN to turn it off.",
+                onUnlock: {
+                    onUpdate("")
+                    onFinish()
+                },
+                onCancel: onFinish,
+                verifier: verify
+            )
+        }
+    }
+
+    private func save(_ pin: String) {
+        onUpdate(ParentalControlsStore.hash(pin))
+        onFinish()
+    }
+
+    private func verify(_ pin: String) -> Bool {
+        ParentalControlsStore.verify(pin: pin, against: existingHash)
     }
 }
 

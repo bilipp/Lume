@@ -25,6 +25,9 @@ final class UserProfile {
     /// A child profile: restricted categories (and their content) are hidden, and
     /// leaving it for a non-child profile requires the parental-control PIN.
     var isChild: Bool = false
+    /// Salted hash of the optional PIN required to switch into this profile.
+    /// The PIN itself is never persisted or synced.
+    var pinHash: String = ""
 
     init(
         id: UUID = UUID(),
@@ -33,6 +36,7 @@ final class UserProfile {
         colorRaw: String = ProfileColor.blue.rawValue,
         sortOrder: Int = 0,
         isChild: Bool = false,
+        pinHash: String = "",
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -42,6 +46,7 @@ final class UserProfile {
         self.colorRaw = colorRaw
         self.sortOrder = sortOrder
         self.isChild = isChild
+        self.pinHash = pinHash
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -62,6 +67,10 @@ extension UserProfile {
 
     var tint: Color {
         color.color
+    }
+
+    var isPINProtected: Bool {
+        !pinHash.isEmpty
     }
 }
 

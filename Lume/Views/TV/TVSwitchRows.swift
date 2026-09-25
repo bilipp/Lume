@@ -56,6 +56,10 @@
                     ProfileAvatarView(profile: profile, size: 44)
                     Text(profile.name)
                     Spacer(minLength: 0)
+                    if profile.isPINProtected {
+                        Image(systemName: "lock.fill")
+                            .accessibilityHidden(true)
+                    }
                     if isActive {
                         TVSwitchRowCheckmark()
                     }

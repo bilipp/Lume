@@ -7,8 +7,8 @@
 //  through; otherwise the PIN pad is shown until the correct PIN is entered, for
 //  the lifetime of this presentation.
 //
-//  Also provides `pinPrompt`, the modifier the profile switchers use to require
-//  the PIN before leaving a child profile.
+//  Also provides `pinPrompt`, the modifier the profile switchers use for both
+//  optional profile PINs and the existing child-profile escape gate.
 //
 
 import SwiftUI
@@ -35,8 +35,8 @@ struct ParentalGateView<Content: View>: View {
 
 extension View {
     /// Presents the PIN pad when `target` is set, switching to that profile only
-    /// once the correct PIN is entered. Used by the profile switchers to gate
-    /// leaving a child profile. Cancelling clears `target` and stays put.
+    /// once the correct PIN is entered. Used for optional profile PINs and the
+    /// child-profile escape gate. Cancelling clears `target` and stays put.
     func pinPrompt(target: Binding<UserProfile?>, onVerified: @escaping (UserProfile) -> Void) -> some View {
         modifier(PINPromptModifier(target: target, onVerified: onVerified))
     }
@@ -45,6 +45,7 @@ extension View {
 private struct PINPromptModifier: ViewModifier {
     @Binding var target: UserProfile?
     let onVerified: (UserProfile) -> Void
+    @Environment(ParentalControls.self) private var parental: ParentalControls?
 
     func body(content: Content) -> some View {
         #if os(tvOS)
@@ -62,7 +63,8 @@ private struct PINPromptModifier: ViewModifier {
                 target = nil
                 onVerified(profile)
             },
-            onCancel: { target = nil }
+            onCancel: { target = nil },
+            verifier: { parental?.verify($0, toSwitchTo: profile) == true }
         )
     }
 }
