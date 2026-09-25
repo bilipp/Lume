@@ -168,6 +168,14 @@ struct SportsLabelsTests {
         #expect(fixture(leagueId: "espn:cricket/8048").periodFamily == .cricket)
     }
 
+    @Test func `a card with scores hidden drops cricket's state of play but keeps other live lines`() {
+        let cricket = SportsFixtureStatus(state: .inProgress, shortDetail: "Live", summary: "Warwickshire lead by 56 runs")
+        #expect(cricket.cardLiveDetail(family: .cricket, hidingScores: true) == nil)
+        #expect(cricket.cardLiveDetail(family: .cricket, hidingScores: false) == "Warwickshire lead by 56 runs")
+        let soccer = status("STATUS_FIRST_HALF", short: "63'", period: 1, clock: "63'")
+        #expect(soccer.cardLiveDetail(family: .clockOnly, hidingScores: true) == "63'")
+    }
+
     @Test func `tennis names the set in play and how a match ended short`() {
         let live = SportsFixtureStatus(state: .inProgress, shortDetail: "2nd", typeName: "STATUS_IN_PROGRESS", period: 2)
         #expect(live.localizedLiveDetail(family: .sets) == "2nd Set")

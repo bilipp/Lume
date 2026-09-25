@@ -19,14 +19,15 @@
         /// would only repeat the rail's heading.
         var showsLeagueMark = true
         var onSelect: () -> Void
+        @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
 
         var body: some View {
             Button(action: onSelect) {
-                TVFixtureLogoCardContent(fixture: fixture, showsLeagueMark: showsLeagueMark)
+                TVFixtureLogoCardContent(fixture: fixture, showsLeagueMark: showsLeagueMark, showsScore: !hidesScores)
             }
             .buttonStyle(TVCardButtonStyle(focusScale: 1.06))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: fixture.tvSpokenSummary))
+            .accessibilityLabel(Text(verbatim: fixture.tvSpokenSummary(showsScore: !hidesScores)))
         }
     }
 
@@ -35,7 +36,7 @@
         /// score for a live or finished game) and the competition. Team and league
         /// names come from the provider verbatim. Shared by the hub card and the
         /// Home rail's crest card.
-        var tvSpokenSummary: String {
+        func tvSpokenSummary(showsScore: Bool) -> String {
             var parts: [String] = []
             if let home = home?.team, let away = away?.team {
                 parts.append(String(localized: "\(home.name) versus \(away.name)"))
@@ -51,12 +52,14 @@
                 ))
             case .inProgress:
                 parts.append(String(localized: "Live"))
-                if hasTeams { parts.append(score) }
-                if let line = status.localizedLiveDetail(family: periodFamily) { parts.append(line) }
+                if hasTeams, showsScore { parts.append(score) }
+                if let line = status.cardLiveDetail(family: periodFamily, hidingScores: !showsScore) { parts.append(line) }
             case .final:
                 parts.append(String(localized: "Final"))
-                if hasTeams { parts.append(score) }
-                if let qualifier = status.localizedEndingQualifier(family: periodFamily) { parts.append(qualifier) }
+                if hasTeams, showsScore {
+                    parts.append(score)
+                    if let qualifier = status.localizedEndingQualifier(family: periodFamily) { parts.append(qualifier) }
+                }
             case .postponed:
                 parts.append(status.localizedStoppage)
             }
@@ -68,6 +71,7 @@
     private struct TVFixtureLogoCardContent: View {
         let fixture: SportsFixture
         let showsLeagueMark: Bool
+        let showsScore: Bool
         @Environment(\.isFocused) private var isFocused
 
         /// The header line pins to the top on every card so a row of mixed team
@@ -153,17 +157,24 @@
             }
         }
 
-        /// Kickoff time before the game; the score once it is live or over.
+        /// Kickoff time before the game; the score once it is live or over, or
+        /// a plain "vs" while scores are hidden.
         @ViewBuilder
         private var centre: some View {
             switch fixture.status.state {
             case .inProgress, .final:
-                Text(verbatim: fixture.scoreLine)
-                    .font(.system(size: fixture.hasTextScores ? 26 : 38, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                if showsScore {
+                    Text(verbatim: fixture.scoreLine)
+                        .font(.system(size: fixture.hasTextScores ? 26 : 38, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                } else {
+                    Text("vs")
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
             case .scheduled, .postponed:
                 if fixture.startTimeIsTentative == true {
                     Text("TBD")

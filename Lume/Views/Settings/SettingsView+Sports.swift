@@ -33,6 +33,7 @@ import SwiftUI
 
     struct SportsSettingsView: View {
         @AppStorage(SportsSyncService.tabEnabledKey) private var tabEnabled = SportsSyncService.tabEnabledDefault
+        @AppStorage(SportsSyncService.hideScoresKey) private var hideScores = false
         @AppStorage(SportsSyncService.syncFrequencyKey)
         private var freqRaw = SportsSyncService.defaultFrequency.rawValue
         @State private var sync = SportsSyncService.shared
@@ -49,6 +50,7 @@ import SwiftUI
             Form {
                 teamsSection
                 tabSection
+                scoresSection
                 refreshSection
             }
             #if os(macOS)
@@ -80,6 +82,14 @@ import SwiftUI
                 Toggle("Show Sports Tab", isOn: $tabEnabled)
             } footer: {
                 Text("Show the Sports tab. The fixtures rail on Home follows your Home layout settings.")
+            }
+        }
+
+        private var scoresSection: some View {
+            Section {
+                Toggle("Hide Scores", isOn: $hideScores)
+            } footer: {
+                Text("Fixture cards leave out scores and don't highlight the winner. Opening a game still shows its score.")
             }
         }
 
