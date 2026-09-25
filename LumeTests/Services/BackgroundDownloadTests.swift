@@ -105,6 +105,28 @@ struct DownloadRecoveryTests {
     }
 
     @Test
+    func `a stranded download with an empty file is marked failed`() async throws {
+        let container = try makeContainer()
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let file = directory.appendingPathComponent("empty.mp4")
+        try Data().write(to: file)
+        let context = ModelContext(container)
+        context.insert(makeMovie(id: "empty", status: .downloading))
+        try context.save()
+
+        await DownloadManager.recoverInterruptedDownloads(
+            liveIDs: [], directory: directory, container: container
+        )
+
+        let movie = try #require(try ModelContext(container).fetch(FetchDescriptor<Movie>()).first)
+        #expect(movie.downloadStatus == .failed)
+        #expect(movie.localFileURL == nil)
+        #expect(movie.downloadedAt == nil)
+    }
+
+    @Test
     func `downloads the restored session is still running are left alone`() async throws {
         let container = try makeContainer()
         let directory = try makeDirectory()

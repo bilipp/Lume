@@ -425,7 +425,12 @@ extension DownloadManager: URLSessionDownloadDelegate {
         // in a process that was relaunched purely to receive it, where those maps
         // are still empty.
         guard let info = DownloadTaskInfo(taskDescription: downloadTask.taskDescription) else {
-            finishWithoutTaskInfo(taskID: taskID, location: location, ext: ext)
+            finishWithoutTaskInfo(
+                taskID: taskID,
+                location: location,
+                response: downloadTask.response,
+                ext: ext
+            )
             return
         }
 
@@ -434,9 +439,10 @@ extension DownloadManager: URLSessionDownloadDelegate {
         // file has to reach its *final* home synchronously, right here.
         let destination = downloadsDirectory.appendingPathComponent(info.filename)
         do {
+            try DownloadValidator.validate(fileAt: location, response: downloadTask.response)
             try moveIntoDownloads(from: location, to: destination)
         } catch {
-            Logger.downloads.error("Failed to save download for \(info.id): \(error)")
+            Logger.downloads.error("Rejected or failed to save download for \(info.id): \(error)")
             Task { @MainActor in
                 self.handleFailure(taskID: taskID, id: info.id)
                 self.promoteIfNeeded()
@@ -471,12 +477,18 @@ extension DownloadManager: URLSessionDownloadDelegate {
     /// not something to drop on an "impossible" branch. Stages the file out of
     /// `location` (which URLSession deletes on return) so the content id can be
     /// resolved from `taskMap` on the main actor.
-    private nonisolated func finishWithoutTaskInfo(taskID: Int, location: URL, ext: String) {
+    private nonisolated func finishWithoutTaskInfo(
+        taskID: Int,
+        location: URL,
+        response: URLResponse?,
+        ext: String
+    ) {
         let interim = FileManager.default.temporaryDirectory
             .appendingPathComponent("lume-dl", isDirectory: true)
             .appendingPathComponent("\(taskID).\(ext)")
         var staged = true
         do {
+            try DownloadValidator.validate(fileAt: location, response: response)
             try FileManager.default.createDirectory(
                 at: interim.deletingLastPathComponent(), withIntermediateDirectories: true
             )
@@ -488,6 +500,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
             Logger.downloads.error("Failed to stage download for task \(taskID): \(error)")
             staged = false
         }
+        let wasStaged = staged
         Task { @MainActor in
             guard let id = self.taskMap[taskID] else {
                 try? FileManager.default.removeItem(at: interim)
@@ -497,7 +510,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
             self.idToFilename[id] = filename
             let destination = self.downloadsDirectory.appendingPathComponent(filename)
             do {
-                guard staged else { throw CocoaError(.fileNoSuchFile) }
+                guard wasStaged else { throw CocoaError(.fileNoSuchFile) }
                 try self.moveIntoDownloads(from: interim, to: destination)
             } catch {
                 Logger.downloads.error("Failed to save download for \(id): \(error)")
