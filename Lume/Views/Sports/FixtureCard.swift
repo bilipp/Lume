@@ -36,6 +36,7 @@ struct FixtureCard: View {
     /// card (a race, a fight night) with its two text lines stands as tall as a
     /// two-team card beside it in the Home rail.
     @ScaledMetric(relativeTo: .subheadline) private var contentMinHeight: CGFloat = 52
+    @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
 
     /// The lone confident channel a live card offers one-tap playback for.
     private var confidentChannel: ResolvedChannel? {
@@ -99,7 +100,7 @@ struct FixtureCard: View {
             switch fixture.status.state {
             case .inProgress:
                 LiveBadge(fontSize: 10)
-                if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) {
+                if let line = fixture.status.liveDetail(family: fixture.periodFamily, hidingScores: hidesScores) {
                     Text(verbatim: line)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -219,14 +220,14 @@ struct FixtureCard: View {
     }
 
     /// A finished game bolds the winner and dims the loser; a live or scheduled
-    /// game keeps both level.
+    /// game keeps both level, and so does any game while scores are hidden.
     private func rowWeight(_ competitor: SportsCompetitor) -> Font.Weight {
-        guard fixture.status.state == .final else { return .regular }
+        guard fixture.status.state == .final, !hidesScores else { return .regular }
         return competitor.isWinner ? .bold : .regular
     }
 
     private func rowColor(_ competitor: SportsCompetitor) -> Color {
-        guard fixture.status.state == .final, !competitor.isWinner,
+        guard fixture.status.state == .final, !hidesScores, !competitor.isWinner,
               fixture.home?.isWinner == true || fixture.away?.isWinner == true
         else { return .primary }
         return .secondary
@@ -237,7 +238,7 @@ struct FixtureCard: View {
     private var trailing: some View {
         HStack(spacing: 10) {
             // A race or a fight night has no two-sided score to show.
-            if fixture.hasTeams, fixture.status.state == .inProgress || fixture.status.state == .final {
+            if fixture.hasTeams, !hidesScores, fixture.status.state == .inProgress || fixture.status.state == .final {
                 VStack(alignment: .trailing, spacing: 8) {
                     // Holds the tournament caption's line so the scores stay
                     // level with the player rows beside them.
@@ -302,13 +303,17 @@ struct FixtureCard: View {
             }
         case .inProgress:
             parts.append(String(localized: "Live"))
-            if fixture.hasTeams { parts.append(scoreSpokenLine) }
-            if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) { parts.append(line) }
+            if fixture.hasTeams, !hidesScores { parts.append(scoreSpokenLine) }
+            if let line = fixture.status.liveDetail(family: fixture.periodFamily, hidingScores: hidesScores) {
+                parts.append(line)
+            }
         case .final:
             parts.append(String(localized: "Final"))
             if showsDateLine { parts.append(fixture.headlineDate.formatted(date: .abbreviated, time: .omitted)) }
-            if fixture.hasTeams { parts.append(scoreSpokenLine) }
-            if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) { parts.append(qualifier) }
+            if fixture.hasTeams, !hidesScores {
+                parts.append(scoreSpokenLine)
+                if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) { parts.append(qualifier) }
+            }
         case .postponed:
             parts.append(fixture.status.localizedStoppage)
         }

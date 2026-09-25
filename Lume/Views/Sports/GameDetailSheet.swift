@@ -34,6 +34,7 @@ struct GameDetailSheet: View {
     @State private var isLoadingDetail = false
     @State private var fetchedStandings: [SportsStandingRow] = []
     @State private var selfResolved: [ResolvedChannel] = []
+    @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
 
     private var channels: [ResolvedChannel] {
         resolved.isEmpty ? selfResolved : resolved
@@ -203,15 +204,17 @@ struct GameDetailSheet: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-            if let record = competitor.record, !record.isEmpty {
-                Text(verbatim: record)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if let form = competitor.form, !form.isEmpty {
-                Text(verbatim: form)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+            if showsRecordAndForm {
+                if let record = competitor.record, !record.isEmpty {
+                    Text(verbatim: record)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let form = competitor.form, !form.isEmpty {
+                    Text(verbatim: form)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
             }
             followButton(competitor.team)
         }
@@ -226,7 +229,7 @@ struct GameDetailSheet: View {
                 scoreText
                 setsText
                 EndedBadge(fontSize: 12)
-                if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) {
+                if !hidesScores, let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) {
                     Text(verbatim: qualifier)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -237,7 +240,7 @@ struct GameDetailSheet: View {
                 scoreText
                 setsText
                 LiveBadge(fontSize: 12)
-                if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) {
+                if let line = fixture.status.liveDetail(family: fixture.periodFamily, hidingScores: hidesScores) {
                     Text(verbatim: line)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -257,7 +260,7 @@ struct GameDetailSheet: View {
     /// A tennis match set by set, under the sets-won score.
     @ViewBuilder
     private var setsText: some View {
-        if let sets = fixture.setsLine {
+        if !hidesScores, let sets = fixture.setsLine {
             Text(verbatim: sets)
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
@@ -273,7 +276,7 @@ struct GameDetailSheet: View {
     /// truncates to "19…" — and shrinks rather than clips if even that is tight.
     @ViewBuilder
     private var scoreText: some View {
-        if fixture.hasTeams {
+        if fixture.hasTeams, !hidesScores {
             Text(verbatim: fixture.scoreLine)
                 .font(.system(size: fixture.hasTextScores ? 26 : 44, weight: .bold, design: .rounded))
                 .monospacedDigit()
@@ -363,12 +366,13 @@ struct GameDetailSheet: View {
 
     @ViewBuilder
     private var detailTabsSection: some View {
-        if let eventDetail, eventDetail.hasTabContent {
+        if let eventDetail, eventDetail.hasTabContent(hidingScores: hidesScores) {
             GameDetailTabs(
                 detail: eventDetail,
                 fixture: fixture,
                 homePalette: fixture.homePalette,
-                awayPalette: fixture.awayPalette
+                awayPalette: fixture.awayPalette,
+                hidesScores: hidesScores
             )
         } else if isLoadingDetail {
             GameDetailTabsSkeleton()
@@ -428,6 +432,11 @@ struct GameDetailSheet: View {
     }
 
     // MARK: - Derived
+
+    /// A finished game's record and form already count its result.
+    private var showsRecordAndForm: Bool {
+        !hidesScores || fixture.status.state != .final
+    }
 
     private var leagueLogoURL: URL? {
         fixture.leagueLogoURL ?? SportsCatalog.league(id: fixture.leagueId)?.logoURL
