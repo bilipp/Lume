@@ -98,9 +98,13 @@ struct SyncFrequencyTests {
 
     @Test func `auto sync returns true when all conditions met`() {
         #expect(AutoSync.shouldSync(
-            syncEnabled: true,
-            status: .idle,
-            lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: false
         ))
@@ -108,9 +112,13 @@ struct SyncFrequencyTests {
 
     @Test func `auto sync returns false when sync disabled`() {
         #expect(!AutoSync.shouldSync(
-            syncEnabled: false,
-            status: .idle,
-            lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+            AutoSync.Candidate(
+                syncEnabled: false,
+                status: .idle,
+                lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: false
         ))
@@ -118,9 +126,13 @@ struct SyncFrequencyTests {
 
     @Test func `auto sync returns false when already syncing`() {
         #expect(!AutoSync.shouldSync(
-            syncEnabled: true,
-            status: .syncing,
-            lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .syncing,
+                lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: false
         ))
@@ -128,9 +140,13 @@ struct SyncFrequencyTests {
 
     @Test func `auto sync returns false when already started`() {
         #expect(!AutoSync.shouldSync(
-            syncEnabled: true,
-            status: .idle,
-            lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: true
         ))
@@ -138,9 +154,13 @@ struct SyncFrequencyTests {
 
     @Test func `auto sync returns false when not due`() {
         #expect(!AutoSync.shouldSync(
-            syncEnabled: true,
-            status: .idle,
-            lastSyncDate: Date().addingTimeInterval(-12 * 60 * 60),
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: Date().addingTimeInterval(-12 * 60 * 60),
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: false
         ))
@@ -148,9 +168,13 @@ struct SyncFrequencyTests {
 
     @Test func `auto sync triggers after error when due`() {
         #expect(AutoSync.shouldSync(
-            syncEnabled: true,
-            status: .error,
-            lastSyncDate: nil,
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .error,
+                lastSyncDate: nil,
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: false
         ))
@@ -158,9 +182,13 @@ struct SyncFrequencyTests {
 
     @Test func `auto sync returns true when never synced`() {
         #expect(AutoSync.shouldSync(
-            syncEnabled: true,
-            status: .idle,
-            lastSyncDate: nil,
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: nil,
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: false
         ))
@@ -169,70 +197,217 @@ struct SyncFrequencyTests {
     @Test func `auto sync uses custom now date`() {
         let now = Date()
         #expect(AutoSync.shouldSync(
-            syncEnabled: true,
-            status: .idle,
-            lastSyncDate: now.addingTimeInterval(-48 * 60 * 60),
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: now.addingTimeInterval(-48 * 60 * 60),
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: false,
             now: now
         ))
         #expect(!AutoSync.shouldSync(
-            syncEnabled: true,
-            status: .idle,
-            lastSyncDate: now.addingTimeInterval(-12 * 60 * 60),
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: now.addingTimeInterval(-12 * 60 * 60),
+                isActive: true,
+                wasAddedThisSession: false
+            ),
             frequency: .daily,
             alreadyStarted: false,
             now: now
         ))
     }
 
-    // MARK: - blocksEPGRefresh
+    // MARK: - AutoSync scoping
 
-    @Test func `epg refresh blocked while a sync is running`() {
-        // A manual sync in flight blocks even when the playlist isn't due.
-        #expect(AutoSync.blocksEPGRefresh(
-            syncEnabled: true,
-            status: .syncing,
-            lastSyncDate: Date(),
-            frequency: .daily
+    @Test func `auto sync defers a due playlist that is not on screen`() {
+        // The whole point: with several playlists configured, launching should
+        // not queue a blocking cover for each of them in turn.
+        #expect(!AutoSync.shouldSync(
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+                isActive: false,
+                wasAddedThisSession: false
+            ),
+            frequency: .daily,
+            alreadyStarted: false
         ))
     }
 
-    @Test func `epg refresh blocked while a sync is due`() {
-        #expect(AutoSync.blocksEPGRefresh(
-            syncEnabled: true,
-            status: .idle,
-            lastSyncDate: nil,
-            frequency: .daily
+    @Test func `auto sync runs a playlist just added that is not on screen`() {
+        // Adding a playlist from Settings doesn't select it, and the viewer
+        // expects it ready when they go looking for it.
+        #expect(AutoSync.shouldSync(
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: nil,
+                isActive: false,
+                wasAddedThisSession: true
+            ),
+            frequency: .daily,
+            alreadyStarted: false
         ))
     }
 
-    @Test func `epg refresh blocked while a failed sync is still due`() {
-        #expect(AutoSync.blocksEPGRefresh(
-            syncEnabled: true,
-            status: .error,
-            lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
-            frequency: .daily
+    @Test func `auto sync defers a never-synced playlist it did not just add`() {
+        // iCloud brings every playlist to a new device never-synced; syncing
+        // each wherever it stands would put one cover per playlist back.
+        #expect(!AutoSync.shouldSync(
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: nil,
+                isActive: false,
+                wasAddedThisSession: false
+            ),
+            frequency: .daily,
+            alreadyStarted: false
         ))
     }
 
-    @Test func `epg refresh not blocked by a recently synced playlist`() {
-        #expect(!AutoSync.blocksEPGRefresh(
-            syncEnabled: true,
-            status: .idle,
-            lastSyncDate: Date().addingTimeInterval(-60),
-            frequency: .daily
+    @Test func `auto sync runs a deferred playlist once it becomes active`() {
+        // The playlist-switch trigger is what picks up whatever launch skipped,
+        // so the same playlist must flip to eligible on nothing but `isActive`.
+        let stale = Date().addingTimeInterval(-48 * 60 * 60)
+        #expect(!AutoSync.shouldSync(
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: stale,
+                isActive: false,
+                wasAddedThisSession: false
+            ),
+            frequency: .daily,
+            alreadyStarted: false
+        ))
+        #expect(AutoSync.shouldSync(
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .idle,
+                lastSyncDate: stale,
+                isActive: true,
+                wasAddedThisSession: false
+            ),
+            frequency: .daily,
+            alreadyStarted: false
         ))
     }
 
-    @Test func `epg refresh not blocked by a sync-disabled playlist`() {
-        // Auto-sync will never run for it, so there is nothing to defer for.
-        #expect(!AutoSync.blocksEPGRefresh(
-            syncEnabled: false,
-            status: .idle,
-            lastSyncDate: nil,
-            frequency: .daily
+    @Test func `auto sync defers a failed playlist that is not on screen`() {
+        // An error still leaves a cached catalog behind, so a retry can wait for
+        // the viewer to go there — unlike the never-synced case above.
+        #expect(!AutoSync.shouldSync(
+            AutoSync.Candidate(
+                syncEnabled: true,
+                status: .error,
+                lastSyncDate: Date().addingTimeInterval(-48 * 60 * 60),
+                isActive: false,
+                wasAddedThisSession: false
+            ),
+            frequency: .daily,
+            alreadyStarted: false
         ))
+    }
+
+    // MARK: - EPGRefreshGate
+
+    @Test func `epg refresh runs when no content sync is pending`() {
+        var gate = EPGRefreshGate()
+        let allowed1 = gate.request()
+        #expect(allowed1)
+        #expect(!gate.isRefreshOwed)
+    }
+
+    @Test func `epg refresh waits for the auto-sync queue and runs once it drains`() {
+        var gate = EPGRefreshGate()
+        gate.isAutoSyncQueued = true
+        let allowed1 = gate.request()
+        #expect(!allowed1)
+        let owedRuns2 = gate.takeOwedRefresh()
+        #expect(!owedRuns2)
+
+        gate.isAutoSyncQueued = false
+        let owedRuns3 = gate.takeOwedRefresh()
+        #expect(owedRuns3)
+        let owedRuns4 = gate.takeOwedRefresh()
+        #expect(!owedRuns4)
+    }
+
+    @Test func `epg refresh waits for a running sync outside the queue`() {
+        // A manual "Sync Now" from Settings, on any playlist.
+        var gate = EPGRefreshGate()
+        gate.contentSyncStarted()
+        let allowed1 = gate.request()
+        #expect(!allowed1)
+
+        gate.contentSyncFinished(succeeded: false)
+        let owedRuns2 = gate.takeOwedRefresh()
+        #expect(owedRuns2)
+    }
+
+    @Test func `a successful sync owes a refresh even when nothing asked for one`() {
+        // A freshly synced playlist's channels shouldn't wait for the schedule.
+        var gate = EPGRefreshGate()
+        gate.isAutoSyncQueued = true
+        gate.contentSyncStarted()
+        gate.contentSyncFinished(succeeded: true)
+        let owedRuns1 = gate.takeOwedRefresh()
+        #expect(!owedRuns1)
+
+        gate.isAutoSyncQueued = false
+        let owedRuns2 = gate.takeOwedRefresh()
+        #expect(owedRuns2)
+    }
+
+    @Test func `an aborted or failed sync owes nothing of its own`() {
+        var gate = EPGRefreshGate()
+        gate.contentSyncStarted()
+        gate.contentSyncFinished(succeeded: false)
+        let owedRuns1 = gate.takeOwedRefresh()
+        #expect(!owedRuns1)
+    }
+
+    @Test func `a stale playlist nobody is syncing never holds the guide back`() {
+        // The tvOS quick switch lands on a stale playlist without syncing it:
+        // nothing is queued or running, so the guide is free to go.
+        var gate = EPGRefreshGate()
+        gate.isAutoSyncQueued = false
+        let allowed1 = gate.request()
+        #expect(allowed1)
+    }
+
+    @Test func `a refresh cut short for a content sync runs after it`() {
+        var gate = EPGRefreshGate()
+        let allowed1 = gate.request()
+        #expect(allowed1)
+        gate.contentSyncStarted()
+        gate.owe()
+        let owedRuns2 = gate.takeOwedRefresh()
+        #expect(!owedRuns2)
+
+        gate.contentSyncFinished(succeeded: false)
+        let owedRuns3 = gate.takeOwedRefresh()
+        #expect(owedRuns3)
+    }
+
+    @Test func `overlapping syncs hold the guide until the last one finishes`() {
+        var gate = EPGRefreshGate()
+        gate.contentSyncStarted()
+        gate.contentSyncStarted()
+        gate.contentSyncFinished(succeeded: true)
+        let owedRuns1 = gate.takeOwedRefresh()
+        #expect(!owedRuns1)
+
+        gate.contentSyncFinished(succeeded: true)
+        let owedRuns2 = gate.takeOwedRefresh()
+        #expect(owedRuns2)
     }
 
     // MARK: - label

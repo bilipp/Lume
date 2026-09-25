@@ -25,13 +25,14 @@
                 HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(playlist.name)
-                        Text(playlist.serverURL)
+                        Text(playlist.displayURL)
                             .font(.system(size: TVSettingsMetrics.secondaryFontSize))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
                     Spacer(minLength: 0)
+                    PlaylistSyncAccessory(state: playlist.syncState(isActive: isActive), size: 26)
                     if isActive {
                         TVSwitchRowCheckmark()
                     }

@@ -47,21 +47,47 @@ final class ParsingBenchmarks: XCTestCase {
         assertFixtureIsSubstantial(fixture, minimumBytes: 5_000_000)
 
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
-            var count = 0
-            var urlBytes = 0
+            let outcome = parseSynchronously(fileURL: fixture, batchSize: 2000)
+            if let error = outcome.error {
+                XCTFail("m3u parse threw: \(error)")
+            }
+            XCTAssertEqual(outcome.count, 120_000)
+            XCTAssertGreaterThan(outcome.urlBytes, 0)
+        }
+    }
+
+    /// Carries the parse's results back across the `Task.detached` hand-off;
+    /// `var`s captured by a concurrently-executing closure cannot. Read only
+    /// after the expectation has been fulfilled.
+    private final class ParseOutcome: @unchecked Sendable {
+        var count = 0
+        var urlBytes = 0
+        var error: Error?
+    }
+
+    /// `parseStreaming` is the driver the import runs and it is async, while
+    /// `measure`'s block is not — so the parse is driven from a task and waited
+    /// on by spinning the run loop, exactly as `syncPlaylistSynchronously` does.
+    private func parseSynchronously(fileURL: URL, batchSize: Int) -> ParseOutcome {
+        let outcome = ParseOutcome()
+        let finished = expectation(description: "m3u parse")
+        Task.detached {
             do {
-                count = try M3UParser.parse(fileURL: fixture, batchSize: 2000) { batch in
+                outcome.count = try await M3UParser.parseStreaming(
+                    fileURL: fileURL, batchSize: batchSize
+                ) { batch, _ in
                     // Touch every entry so the optimizer can't discard the parse.
                     for entry in batch {
-                        urlBytes += entry.url.utf8.count
+                        outcome.urlBytes += entry.url.utf8.count
                     }
                 }
             } catch {
-                XCTFail("m3u parse threw: \(error)")
+                outcome.error = error
             }
-            XCTAssertEqual(count, 120_000)
-            XCTAssertGreaterThan(urlBytes, 0)
+            finished.fulfill()
         }
+        wait(for: [finished], timeout: 600)
+        return outcome
     }
 
     /// `#EXTINF` attribute scanning in isolation. It runs once per playlist line,
@@ -83,28 +109,59 @@ final class ParsingBenchmarks: XCTestCase {
 
     /// Classification is the other per-entry cost of an m3u import — it decides
     /// live vs movie vs episode for every single line.
-    func testM3UClassification() {
-        let names = [
-            "Channel 12 HD",
-            "Movie Title 2019 (2019)",
-            "Show Name S03E11",
-            "Some Show 1x04 Pilot"
-        ]
-        let entries = (0 ..< 4000).map { index in
-            M3UEntry(
-                name: names[index % names.count],
-                url: "https://example.invalid/stream/\(index).ts",
-                tvgId: index.isMultiple(of: 2) ? "ch\(index)" : nil,
-                logo: nil,
-                group: "Group \(index % 100)",
-                type: nil
-            )
+    ///
+    /// Measured over provider-shaped entries rather than synthetic ones: 86% of
+    /// a real export carries a season/episode token, so this is the benchmark
+    /// that actually exercises `M3UClassifier`'s ICU matching. The four-name,
+    /// `/stream/`-URL version this replaced classified a mix that does not occur
+    /// in provider files, so it could not gate that work at all.
+    ///
+    /// The parse happens outside `measure` — this is the classifier in
+    /// isolation, the way `testM3UExtInfAttributeScan` isolates attribute
+    /// scanning.
+    func testM3UClassification() async throws {
+        let entryCount = 60000
+        let fixture = try PerfFixtures.writeM3UProviderShape(
+            entryCount: entryCount, showCount: 1400, to: scratch
+        )
+        assertFixtureIsSubstantial(fixture, minimumBytes: 12_000_000)
+
+        var entries: [M3UEntry] = []
+        entries.reserveCapacity(entryCount)
+        try await M3UParser.parseStreaming(fileURL: fixture, batchSize: 4000) { batch, _ in
+            entries.append(contentsOf: batch)
         }
 
-        measure(metrics: [XCTClockMetric()]) {
-            for entry in entries {
-                _ = M3UClassifier.classify(entry)
+        let expectedLive = entryCount * PerfFixtures.providerLiveShare / 100
+        let expectedMovies = entryCount * PerfFixtures.providerMovieShare / 100
+        let expectedEpisodes = entryCount - expectedLive - expectedMovies
+
+        // Fixture fidelity, checked once and outside `measure`: a generator that
+        // stopped emitting episode-shaped names would make this benchmark look
+        // several times faster instead of failing.
+        var live = 0
+        var movies = 0
+        var episodes = 0
+        for entry in entries {
+            switch M3UClassifier.classify(entry) {
+            case .live: live += 1
+            case .movie: movies += 1
+            case .episode: episodes += 1
             }
+        }
+        XCTAssertEqual(entries.count, entryCount)
+        XCTAssertEqual(live, expectedLive)
+        XCTAssertEqual(movies, expectedMovies)
+        XCTAssertEqual(episodes, expectedEpisodes)
+
+        // Assertion outside the inner loop: a per-entry XCTAssert would dominate
+        // the number being measured.
+        measure(metrics: [XCTClockMetric()]) {
+            var vod = 0
+            for entry in entries where M3UClassifier.classify(entry) != .live {
+                vod += 1
+            }
+            XCTAssertEqual(vod, expectedMovies + expectedEpisodes)
         }
     }
 
@@ -151,23 +208,43 @@ final class ParsingBenchmarks: XCTestCase {
         }
     }
 
-    /// The fallback path: a stamp with no UTC offset. `XMLTVDate` rejects it in
-    /// the fast path and `DateFormatter` (`yyyyMMddHHmmss Z`) can't parse it
-    /// either, so the result is nil — but the ICU attempt still costs, and a
-    /// provider that omits offsets pays it twice per programme.
+    /// Offset-less stamps on the fast path: `YYYYMMDDHHMMSS` (14 digits) and
+    /// `YYYYMMDDHHMM` (12 digits), parsed as UTC per the XMLTV DTD. A provider
+    /// that omits offsets used to pay the ~600× slower `DateFormatter` fallback
+    /// twice per programme (and got nil back, silently dropping the programme);
+    /// this asserts they now stay on the hand-rolled path.
+    func testXMLTVDateOffsetLessFastPathParsing() {
+        let stamps = [
+            "20260730120000", // 14-digit
+            "20260730123000",
+            "202607301330" // 12-digit
+        ]
+
+        measure(metrics: [XCTClockMetric()]) {
+            var checksum = 0.0
+            for index in 0 ..< 100_000 {
+                checksum += XMLTVDate.parse(stamps[index % stamps.count])?.timeIntervalSince1970 ?? 0
+            }
+            XCTAssertGreaterThan(checksum, 0, "every offset-less stamp should parse")
+        }
+    }
+
+    /// The genuine fallback path: a shape neither the fast path nor
+    /// `DateFormatter` (`yyyyMMddHHmmss Z`) accepts, so the result is nil — but
+    /// the ICU attempt still costs. A width other than 12/14/20 (here a 15-digit
+    /// stamp) is the shape that reaches the formatter after the offset-less
+    /// widening.
     ///
-    /// Fewer iterations because this path is orders of magnitude slower. If this
-    /// number ever matters in the field, the fix is to widen `XMLTVDate`, not to
-    /// speed up ICU.
+    /// Fewer iterations because this path is orders of magnitude slower.
     func testXMLTVDateFallbackParsing() {
         measure(metrics: [XCTClockMetric()]) {
             var nilCount = 0
             for index in 0 ..< 2000
-                where XMLTVDate.parse("2026073013\(String(format: "%04d", index % 6000))") == nil
+                where XMLTVDate.parse("202607301300\(String(format: "%03d", index % 900))") == nil
             {
                 nilCount += 1
             }
-            XCTAssertEqual(nilCount, 2000, "offset-less stamps are expected to fail to parse")
+            XCTAssertEqual(nilCount, 2000, "15-digit stamps are expected to fail to parse")
         }
     }
 

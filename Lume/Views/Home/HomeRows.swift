@@ -15,6 +15,9 @@ import SwiftUI
 struct HomeRow: View {
     let title: LocalizedStringKey
     let items: [HomeMediaItem]
+    /// Resume fractions keyed by series id, resolved once for the whole screen
+    /// (`SeriesResumeLoader`) rather than per card — see `HomeMediaItem`.
+    let seriesResume: [String: Double]
     let onPlayLive: (LiveStream) -> Void
     /// When set, each card gains a "Remove from Recently Watched" context menu.
     /// Only the Recently Watched row passes this; the others leave it nil.
@@ -39,6 +42,7 @@ struct HomeRow: View {
                     ForEach(items) { item in
                         HomeItemCell(
                             item: item,
+                            seriesResume: seriesResume,
                             onPlayLive: onPlayLive,
                             onRemove: onRemove,
                             onVote: onVote,
@@ -58,6 +62,7 @@ struct HomeRow: View {
 
 private struct HomeItemCell: View {
     let item: HomeMediaItem
+    let seriesResume: [String: Double]
     let onPlayLive: (LiveStream) -> Void
     var onRemove: ((HomeMediaItem) -> Void)?
     var onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
@@ -69,13 +74,13 @@ private struct HomeItemCell: View {
             switch item {
             case let .movie(movie):
                 NavigationLink(value: movie) {
-                    HomePosterCard(title: item.title, imageURL: item.imageURL, progress: item.progress)
+                    HomePosterCard(title: item.title, imageURL: item.imageURL, progress: progress)
                         .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
                 }
                 .posterCardButtonStyle()
             case let .series(series):
                 NavigationLink(value: series) {
-                    HomePosterCard(title: item.title, imageURL: item.imageURL, progress: item.progress)
+                    HomePosterCard(title: item.title, imageURL: item.imageURL, progress: progress)
                         .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
                 }
                 .posterCardButtonStyle()
@@ -94,6 +99,10 @@ private struct HomeItemCell: View {
             onVote: onVote,
             onStartMultiView: onStartMultiView
         ))
+    }
+
+    private var progress: Double? {
+        item.progress(seriesResume: seriesResume)
     }
 }
 
@@ -141,6 +150,7 @@ private struct HomeItemMenu: ViewModifier {
 /// nudges the user toward the actions that seed recommendations.
 struct ForYouRow: View {
     let items: [HomeMediaItem]
+    let seriesResume: [String: Double]
     let isLoading: Bool
     let onPlayLive: (LiveStream) -> Void
     let onVote: (HomeMediaItem, RecommendationVote) -> Void
@@ -158,7 +168,14 @@ struct ForYouRow: View {
                     .padding(.horizontal)
             }
         } else {
-            HomeRow(title: "For You", items: items, onPlayLive: onPlayLive, onVote: onVote, animationNamespace: animationNamespace)
+            HomeRow(
+                title: "For You",
+                items: items,
+                seriesResume: seriesResume,
+                onPlayLive: onPlayLive,
+                onVote: onVote,
+                animationNamespace: animationNamespace
+            )
         }
     }
 

@@ -28,10 +28,26 @@ struct ContentManagementView: View {
 
     @State private var showHideAllConfirmation = false
 
-    /// Every category across all playlists; scoped and sorted in-memory. Category
-    /// counts are small (tens–low hundreds per playlist), so an in-memory pass is
-    /// simpler than re-parameterising a `@Query` on the picker selection.
+    /// Every category across all playlists; scoped and sorted in-memory because
+    /// SwiftData can't parameterise a `@Query` on view state (the picker's type,
+    /// the active playlist). That pass is anything but small — a real provider
+    /// ships 1,700+ categories in a single playlist, 916 of them live — so it is
+    /// resolved once per input change into `categories` below.
     @Query private var allCategories: [Category]
+
+    /// Categories of the selected type for the active playlist, in effective
+    /// order (user order if set, else the synced playlist order). Cached rather
+    /// than computed: `body` reads the group three or four times per evaluation
+    /// (the emptiness checks, the bulk actions, `listedCategories`), so the
+    /// filter plus the tuple sort ran that many times over ~1,900 rows on every
+    /// render — including on a plain hide toggle, which changes neither the
+    /// membership nor the order.
+    @State private var categories: [Category] = []
+
+    /// What the screen is actually showing, and therefore what the bulk hide /
+    /// show actions apply to. Identical to `categories` unless a search narrows
+    /// it, which is what makes "hide all, search, show all matches" work.
+    @State private var listedCategories: [Category] = []
 
     #if !os(tvOS)
         /// Drives the drill-in to channel management. Owned here (not by a List
@@ -53,6 +69,12 @@ struct ContentManagementView: View {
                     description: Text("Add a playlist to manage its content.")
                 )
             }
+        }
+        .onChange(of: scopeKey, initial: true) { _, _ in
+            refreshCategories()
+        }
+        .onChange(of: searchKey) { _, _ in
+            refreshListedCategories()
         }
         .hideAllConfirmation("Hide All Categories?", isPresented: $showHideAllConfirmation) {
             ContentOrganizer.hideAll(listedCategories)
@@ -87,34 +109,76 @@ struct ContentManagementView: View {
         playlists.active(for: selectedPlaylistID)
     }
 
-    /// Categories of the selected type for the active playlist, in effective
-    /// order (user order if set, else the synced playlist order).
-    private var categories: [Category] {
-        guard let playlistId = activePlaylist?.id else { return [] }
-        let prefix = "\(playlistId.uuidString)-"
-        return allCategories
+    /// The id prefix every Category of the active playlist shares. Empty only
+    /// when there is no playlist at all, and then there is nothing to scope.
+    private var playlistPrefix: String {
+        activePlaylist.map { "\($0.id.uuidString)-" } ?? ""
+    }
+
+    /// Everything the scoped group depends on, folded into one comparable value.
+    /// `allCategories.count` is what keeps the group in step with a sync adding
+    /// or removing categories; the actions that rewrite `customOrder` (reorder,
+    /// reset) leave the count alone and so refresh the group themselves.
+    private var scopeKey: String {
+        "\(playlistPrefix)|\(selectedType.rawValue)|\(allCategories.count)"
+    }
+
+    /// The live search term — always empty on tvOS, which has no search field.
+    /// Folded into one property so `body`'s modifier chain needs no second `#if`
+    /// (SwiftFormat reindents adjacent ones in a chain).
+    private var searchKey: String {
+        #if os(tvOS)
+            ""
+        #else
+            searchText
+        #endif
+    }
+
+    /// Rebuilds the scoped group, and the listed subset with it. Called from the
+    /// `.onChange` hooks in `body` and from the actions that rewrite the order —
+    /// never from `body` itself, which is the whole point of caching it.
+    private func refreshCategories() {
+        let prefix = playlistPrefix
+        guard !prefix.isEmpty else {
+            categories = []
+            listedCategories = []
+            return
+        }
+        categories = allCategories
             .filter { $0.typeRaw == selectedType.rawValue && $0.id.hasPrefix(prefix) }
             .sorted { lhs, rhs in
                 (lhs.customOrder ?? lhs.sortOrder, lhs.name) < (rhs.customOrder ?? rhs.sortOrder, rhs.name)
             }
+        refreshListedCategories()
     }
 
-    /// What the screen is actually showing, and therefore what the bulk hide /
-    /// show actions apply to. Identical to `categories` unless a search narrows
-    /// it, which is what makes "hide all, search, show all matches" work.
-    private var listedCategories: [Category] {
-        #if os(tvOS)
-            categories
-        #else
-            guard !searchText.isEmpty else { return categories }
-            return categories.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-        #endif
+    /// Narrows the scoped group by the search field. Split out of
+    /// `refreshCategories` so a keystroke re-filters without re-sorting.
+    private func refreshListedCategories() {
+        let search = searchKey
+        guard !search.isEmpty else {
+            listedCategories = categories
+            return
+        }
+        listedCategories = categories.filter { $0.name.localizedCaseInsensitiveContains(search) }
     }
 
     // MARK: - Mutations
 
     private func move(from source: IndexSet, to destination: Int) {
         ContentOrganizer.reorder(categories, from: source, to: destination)
+        // The stamp rewrites `customOrder` without changing how many categories
+        // exist, so `scopeKey` doesn't move. Refresh by hand or the list snaps
+        // straight back to the pre-move order.
+        refreshCategories()
+    }
+
+    /// Persists a tvOS pick-up/place drop. Same story as `move`: the drop only
+    /// stamps `customOrder`, so the cached group has to be re-sorted or the list
+    /// falls back to the order it had before the lift.
+    private func commitReorder(_ arranged: [Category]) {
+        ContentOrganizer.commitOrder(arranged)
+        refreshCategories()
     }
 
     #if !os(tvOS)
@@ -132,6 +196,9 @@ struct ContentManagementView: View {
     private func resetCurrentType() {
         ContentOrganizer.resetOrder(categories)
         ContentOrganizer.showAll(categories)
+        // Clearing `customOrder` reverts the group to the playlist's own order,
+        // which the cached list has to be rebuilt to show.
+        refreshCategories()
     }
 
     /// Drill-in provider for the reorderable list: only live categories expose a
@@ -235,7 +302,7 @@ struct ContentManagementView: View {
                     isHidden: { $0.isHidden },
                     drillValue: categoryDrill,
                     onToggleHidden: { $0.isHidden.toggle() },
-                    onCommitOrder: { ContentOrganizer.commitOrder($0) },
+                    onCommitOrder: commitReorder,
                     isReordering: $isReordering,
                     scrollProxy: proxy,
                     isRestricted: { $0.isRestricted },

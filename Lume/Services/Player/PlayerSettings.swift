@@ -1,11 +1,11 @@
 import Foundation
 import SwiftUI
 
-enum PlayerEngineKind: String, CaseIterable, Identifiable {
+nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
     case vlcKit
     case ksPlayer
     case avPlayer
-    /// Lume's own FFmpeg 8 engine — in beta. Declared last so it appends to the
+    /// Lume's own FFmpeg 9 engine — in beta. Declared last so it appends to the
     /// END of existing priority lists (`PlayerEnginePriority.normalized`):
     /// available to opt into, never silently promoted while KSPlayer is default.
     case lumeEngine
@@ -28,7 +28,7 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
         case .vlcKit: "VLCKit 4 is VLC's native engine. Plays virtually any format and codec, with hardware-accelerated 4K HDR, Picture in Picture, and the broadest IPTV compatibility."
         case .ksPlayer: "KSPlayer is a powerful third-party player that supports a wide range of formats, including those commonly used in IPTV streams."
         case .avPlayer: "Native Apple player. Best for HLS and MP4. But does not support many formats used in IPTV streams."
-        case .lumeEngine: "Lume's own FFmpeg 8 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
+        case .lumeEngine: "Lume's own FFmpeg 9 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
         }
     }
 
@@ -54,6 +54,33 @@ enum PlayerEngineKind: String, CaseIterable, Identifiable {
         #else
             return .avPlayer
         #endif
+    }
+}
+
+/// How much the in-player stream-information caption spells out. A two-level
+/// preset rather than per-element toggles: Simple carries programme context
+/// (playlist, EPG), Advanced adds the technical
+/// readout (quality, codec, frame rate, engine).
+nonisolated enum StreamInfoDetailLevel: String, CaseIterable, Identifiable {
+    case simple
+    case advanced
+
+    var id: String {
+        rawValue
+    }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .simple: "Simple"
+        case .advanced: "Advanced"
+        }
+    }
+
+    var footer: LocalizedStringResource {
+        switch self {
+        case .simple: "Shows the playlist and what's on now."
+        case .advanced: "Adds the technical readout: quality, codec, frame rate, and playback engine."
+        }
     }
 }
 
@@ -149,6 +176,29 @@ enum PlayerSettings {
     /// `ExternalPlayerScope.default`.
     static let externalPlayerScopeKey = "player.externalPlayerScope"
 
+    /// Raw value of the `LiveSurfMode` up and down on the remote follow while a
+    /// live channel is playing. Unset (or unrecognised) means the channel
+    /// rocker; see `LiveSurfMode.default`.
+    static let liveSurfModeKey = "player.liveSurfMode"
+
+    /// Whether swipes across the Siri Remote's touch surface drive the player's
+    /// directional actions — channel surfing, the channel browser, the last
+    /// channel, and summoning the controls. On by default, which is how the
+    /// player has always behaved and how tvOS reads everywhere else; off leaves
+    /// those actions to a click on the remote's direction buttons, for viewers
+    /// who change channel by brushing the surface. tvOS only — see
+    /// `RemoteDirectionGate` for how the two are told apart.
+    static let tvRemoteSwipesKey = "player.tvRemoteSwipes"
+
+    static let tvRemoteSwipesDefault = true
+
+    /// Whether swipe input is honoured, read off `UserDefaults` directly (so the
+    /// player host needn't hold an `@AppStorage` that would re-render the whole
+    /// player tree when toggled).
+    static var tvRemoteSwipesEnabled: Bool {
+        UserDefaults.standard.bool(tvRemoteSwipesKey, default: tvRemoteSwipesDefault)
+    }
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default
@@ -182,6 +232,49 @@ enum PlayerSettings {
         /// directly for the same reason as `showSkipIntroButton`.
         static var showNextEpisodeButton: Bool {
             UserDefaults.standard.bool(showNextEpisodeButtonKey, default: showNextEpisodeButtonDefault)
+        }
+    }
+
+    // MARK: - Stream information
+
+    /// The in-player stream-information caption. On by default off tvOS, where
+    /// it rides the controls overlay and so is only visible while they are; on
+    /// tvOS the caption is part of the always-on player chrome and `enabled` is
+    /// never consulted.
+    enum StreamInfo {
+        static let enabledKey = "player.streamInfo.enabled"
+        static let detailLevelKey = "player.streamInfo.detailLevel"
+
+        /// On: the caption only appears with the controls, which are already a
+        /// deliberate tap away, so it costs nothing to a viewer who never wants
+        /// it and needs no discovery from one who does. tvOS ignores this.
+        static let enabledDefault = true
+
+        /// Advanced on tvOS so the existing technical caption (`4K · H264 ·
+        /// 24 fps`) keeps rendering exactly as it does today; Simple elsewhere,
+        /// where the caption is new and shares space with the transport controls.
+        static var detailLevelDefault: StreamInfoDetailLevel {
+            #if os(tvOS)
+                .advanced
+            #else
+                .simple
+            #endif
+        }
+
+        /// Whether the caption is shown, read off `UserDefaults` directly (so the
+        /// player host needn't hold an `@AppStorage` that would re-render the
+        /// whole player tree when toggled).
+        static var isEnabled: Bool {
+            UserDefaults.standard.bool(enabledKey, default: enabledDefault)
+        }
+
+        /// How much the caption spells out, read off `UserDefaults` directly for
+        /// the same reason as `isEnabled`.
+        static var detailLevel: StreamInfoDetailLevel {
+            guard let raw = UserDefaults.standard.string(forKey: detailLevelKey) else {
+                return detailLevelDefault
+            }
+            return StreamInfoDetailLevel(rawValue: raw) ?? detailLevelDefault
         }
     }
 

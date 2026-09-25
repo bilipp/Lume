@@ -1,0 +1,395 @@
+//
+//  BrowseQueryShapeTests.swift
+//  LumeTests
+//
+//  The browse fetches have performance contracts that no visible row depends on:
+//  a `fetchLimit` that bounds a rail, a probe with no `sortBy`, a playlist scope
+//  that runs in SQLite instead of in Swift, and a lexical comparator that is the
+//  only reason an index can serve the "Recently Added" sort.
+//
+//  Each of those is one token. Remove it and the app still shows exactly the
+//  right rows — just after scanning the whole table — so the change survives
+//  review, the rest of this suite, and every screenshot. On the measured 284k-row
+//  catalog those same tokens were worth 1,904 -> 774 ms on launch and
+//  1,158 -> 145 ms on a single favorite tap.
+//
+//  `LumePerformanceTests/BrowseQueryBenchmarks.swift` measures what they cost.
+//  These tests just assert they are still there, in the normal suite, on every
+//  commit — which is the half that runs in CI.
+//
+
+import Foundation
+@testable import Lume
+import SwiftData
+import Testing
+
+@MainActor
+struct BrowseQueryShapeTests {
+    private let prefix = "\(UUID().uuidString)-"
+
+    // MARK: - Collection rails are bounded
+
+    /// A preview row renders 20 items. It must never fetch the whole table to
+    /// find them: this was the rail that went from 0.85 ms to 59 ms once a user
+    /// had a few thousand watched titles, re-running on every catalog write.
+    @Test func `every preview row is bounded`() {
+        for kind in [LibraryCollection.Kind.recentlyWatched, .favorites, .recentlyAdded] {
+            #expect(MovieCollectionQuery.rowDescriptor(for: kind, playlistPrefix: prefix).fetchLimit == collectionRowFetchLimit)
+            #expect(SeriesCollectionQuery.rowDescriptor(for: kind, playlistPrefix: prefix).fetchLimit == collectionRowFetchLimit)
+        }
+        #expect(collectionRowFetchLimit > collectionPreviewLimit, "the cap has to leave room for `hasMore`")
+    }
+
+    /// "Show All" is the one surface that legitimately shows everything, so
+    /// Recently Watched and Favorites are unbounded there on purpose. Recently
+    /// Added keeps its cap because its predicate matches the whole catalog —
+    /// every title has an `added` stamp.
+    @Test func `show-all grids are unbounded except recently added`() {
+        #expect(MovieCollectionQuery.gridDescriptor(for: .favorites, playlistPrefix: prefix).fetchLimit == nil)
+        #expect(MovieCollectionQuery.gridDescriptor(for: .recentlyWatched, playlistPrefix: prefix).fetchLimit == nil)
+        #expect(MovieCollectionQuery.gridDescriptor(for: .recentlyAdded, playlistPrefix: prefix).fetchLimit == recentlyAddedFetchLimit)
+    }
+
+    // MARK: - Live TV gates stay probes
+
+    /// Both rail gates answer "is there at least one". They must stay `LIMIT 1`
+    /// with no sort: a `sortBy` makes SQLite find and order every match before
+    /// the limit can apply, which is exactly the work the probe exists to avoid.
+    /// The unbounded version cost 7.6 ms a call, 18-25 times per cold launch, on
+    /// a tab the viewer may never open.
+    @Test func `live tv section gates are limit-one probes with no sort`() {
+        for descriptor in [
+            LiveChannelQuery.favoritesProbe(playlistPrefix: prefix, restriction: ContentRestriction()),
+            LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: prefix, restriction: ContentRestriction())
+        ] {
+            #expect(descriptor.fetchLimit == 1)
+            #expect(descriptor.sortBy.isEmpty)
+        }
+    }
+
+    // MARK: - The lexical comparator
+
+    /// `added` and `lastModified` hold Unix seconds as strings. `SortDescriptor`
+    /// defaults to `.localizedStandard` for String key paths, which compares
+    /// them *numerically* — so this test passes either way on equal-width
+    /// values, and the fixtures below are deliberately unequal in width to tell
+    /// the two comparators apart.
+    ///
+    /// `.lexical` is what matters: it is the only comparator a binary `#Index`
+    /// can serve, and the localized one emits `COLLATE NSCollateFinderlike`,
+    /// which turns the "Recently Added" rail back into `SCAN ZMOVIE` plus a full
+    /// temp B-tree sort — 222 ms per run on a 179k-title catalog.
+    ///
+    /// Real provider data is always ten digits wide, so lexical and numeric
+    /// order agree in production; this asserts which one is configured.
+    @Test func `newest-first sorts movies lexically, not numerically`() {
+        let movies = [
+            Movie(id: "a", streamId: 1, name: "A", added: "100"),
+            Movie(id: "b", streamId: 2, name: "B", added: "50")
+        ]
+        let sorted = movies.sorted(using: ContentSortOption.newest.movieDescriptors)
+        // Lexically "50" > "100"; numerically it is the other way round.
+        #expect(sorted.map(\.id) == ["b", "a"])
+    }
+
+    @Test func `newest-first sorts series lexically, not numerically`() {
+        let shows = [
+            Series(id: "a", seriesId: 1, name: "A", lastModified: "100"),
+            Series(id: "b", seriesId: 2, name: "B", lastModified: "50")
+        ]
+        let sorted = shows.sorted(using: ContentSortOption.newest.seriesDescriptors)
+        #expect(sorted.map(\.id) == ["b", "a"])
+    }
+
+    @Test func `newest-first sorts channels lexically, not numerically`() {
+        let channels = [
+            LiveStream(id: "a", streamId: 1, name: "A", added: "100"),
+            LiveStream(id: "b", streamId: 2, name: "B", added: "50")
+        ]
+        let sorted = channels.sorted(using: ContentSortOption.newest.liveStreamDescriptors)
+        #expect(sorted.map(\.id) == ["b", "a"])
+    }
+
+    // MARK: - The playlist scope runs in SQLite
+
+    /// The rails used to fetch every installed playlist's rows and filter with
+    /// `id.hasPrefix` in Swift afterwards, so a user who added a big playlist
+    /// permanently slowed down their small one. The scope is a predicate now.
+    ///
+    /// Needs an on-disk store: an in-memory one evaluates predicates without
+    /// generating SQL, so a `starts(with:)` that CoreData cannot render would
+    /// pass here and trap on device (see `SearchPredicateTests`).
+    @Test func `collection rails only fetch the active playlist`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let mine = "\(UUID().uuidString)-"
+        let theirs = "\(UUID().uuidString)-"
+
+        for (scope, count) in [(mine, 3), (theirs, 5)] {
+            for index in 0 ..< count {
+                let movie = Movie(
+                    id: "\(scope)vod-\(index)",
+                    streamId: index,
+                    name: "Feature \(index)",
+                    added: String(1_700_000_000 + index)
+                )
+                movie.isFavorite = true
+                movie.lastWatchedDate = Date()
+                context.insert(movie)
+            }
+        }
+        try context.save()
+
+        for kind in [LibraryCollection.Kind.favorites, .recentlyWatched, .recentlyAdded] {
+            let rows = try context.fetch(MovieCollectionQuery.rowDescriptor(for: kind, playlistPrefix: mine))
+            #expect(rows.count == 3, "\(kind) leaked rows from another playlist")
+            #expect(rows.allSatisfy { $0.id.hasPrefix(mine) })
+        }
+    }
+
+    /// The same property for the Live TV gates: a favorite in *another* playlist
+    /// must not light up this playlist's Favorites row.
+    @Test func `live tv gates only see the active playlist`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let mine = "\(UUID().uuidString)-"
+        let theirs = "\(UUID().uuidString)-"
+
+        let other = LiveStream(id: "\(theirs)live-1", streamId: 1, name: "Theirs")
+        other.isFavorite = true
+        other.lastWatchedDate = Date()
+        context.insert(other)
+        try context.save()
+
+        let restriction = ContentRestriction()
+        #expect(try context.fetch(LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: restriction)).isEmpty)
+        #expect(try context.fetch(LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: mine, restriction: restriction)).isEmpty)
+
+        let ours = LiveStream(id: "\(mine)live-1", streamId: 2, name: "Ours")
+        ours.isFavorite = true
+        ours.lastWatchedDate = Date()
+        context.insert(ours)
+        try context.save()
+
+        #expect(try context.fetch(LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: restriction)).count == 1)
+        #expect(try context.fetch(LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: mine, restriction: restriction)).count == 1)
+    }
+
+    /// A hidden channel is the only favorite: the gate must report empty, or the
+    /// rail offers a section whose list then renders nothing.
+    @Test func `live tv gates respect channel visibility`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let mine = "\(UUID().uuidString)-"
+
+        let hidden = LiveStream(id: "\(mine)live-1", streamId: 1, name: "Hidden")
+        hidden.isFavorite = true
+        hidden.isHidden = true
+        context.insert(hidden)
+        try context.save()
+
+        let probe = LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: ContentRestriction())
+        #expect(try context.fetch(probe).isEmpty)
+    }
+
+    /// The restriction has to be *in* the predicate. With `fetchLimit = 1` and a
+    /// Swift-side check, a single restricted row coming back would call the
+    /// whole collection empty and drop a section full of visible channels.
+    @Test func `a restricted-only favorite does not light up the rail`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let mine = "\(UUID().uuidString)-"
+        let locked = "\(mine)live-locked"
+
+        let stream = LiveStream(id: "\(mine)live-1", streamId: 1, name: "Locked", categoryId: locked)
+        stream.isFavorite = true
+        context.insert(stream)
+        try context.save()
+
+        let restriction = ContentRestriction(isActive: true, restrictedCategoryIDs: [locked])
+        let probe = LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: restriction)
+        #expect(try context.fetch(probe).isEmpty)
+
+        // …and is offered again to a viewer the lock does not apply to.
+        let parent = LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: ContentRestriction())
+        #expect(try context.fetch(parent).count == 1)
+    }
+
+    // MARK: - In-player channel surfing is bounded
+
+    /// Surfing used to materialize the whole list to find the playing channel's
+    /// index and then wrap on the array — thousands of faulted rows on the main
+    /// actor for two ids. Positions are read one row at a time now, so the read
+    /// that resolves a neighbour has to stay a `LIMIT 1`.
+    @Test func `channel surfing reads one position at a time`() {
+        let scope = LiveChannelNavigator.scopeDescriptor(
+            scope: .category("cat-a"),
+            sort: .playlist,
+            playlistPrefix: prefix,
+            restriction: ContentRestriction(),
+            admittingHidden: nil
+        )
+        let position = LiveChannelNavigator.positionDescriptor(scope, at: 4000)
+        #expect(position.fetchLimit == 1)
+        #expect(position.fetchOffset == 4000)
+        #expect(position.sortBy == scope.sortBy)
+    }
+
+    /// The playlist scope has to be in the predicate, not applied to fetched
+    /// rows. Reading a list by position makes that a correctness property rather
+    /// than a speed one: the row at position `n` must be the row the viewer sees
+    /// at position `n`, so a neighbour from another playlist isn't slow, it's
+    /// wrong.
+    ///
+    /// On disk for the usual reason — an in-memory store evaluates predicates
+    /// without generating SQL, so a `starts(with:)` CoreData cannot render would
+    /// pass here and trap on device.
+    @Test func `channel surfing only walks the active playlist`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let (mine, theirs) = (makePlaylist(in: context), makePlaylist(in: context))
+
+        // The same category id in both playlists: without the prefix in the
+        // predicate the two lineups merge into one ring.
+        let ours = [1, 2].map { insertChannel(number: $0, playlist: mine, category: "shared", in: context) }
+        _ = insertChannel(number: 3, playlist: theirs, category: "shared", in: context)
+        try context.save()
+
+        let first = try #require(PlayableMedia.from(stream: ours[0], playlist: mine, scope: nil))
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: first, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(next?.contentRef == .live(ours[1].id))
+
+        // …and the ring wraps inside this playlist rather than running on into
+        // the other one's channels.
+        let second = try #require(PlayableMedia.from(stream: ours[1], playlist: mine, scope: nil))
+        let wrapped = LiveChannelNavigator.adjacentMedia(
+            for: second, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(wrapped?.contentRef == .live(ours[0].id))
+    }
+
+    /// Favorites and Recently Watched span every installed playlist, so they are
+    /// where the Swift-side prefix filter actually leaked.
+    @Test func `favorites surfing only walks the active playlist`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let (mine, theirs) = (makePlaylist(in: context), makePlaylist(in: context))
+
+        let ours = [1, 2].map { number -> LiveStream in
+            let channel = insertChannel(number: number, playlist: mine, category: "mine", in: context)
+            channel.isFavorite = true
+            return channel
+        }
+        insertChannel(number: 3, playlist: theirs, category: "theirs", in: context).isFavorite = true
+        try context.save()
+
+        let first = try #require(PlayableMedia.from(stream: ours[0], playlist: mine, scope: .favorites))
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: first, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(next?.contentRef == .live(ours[1].id))
+
+        let second = try #require(PlayableMedia.from(stream: ours[1], playlist: mine, scope: .favorites))
+        let wrapped = LiveChannelNavigator.adjacentMedia(
+            for: second, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(wrapped?.contentRef == .live(ours[0].id))
+    }
+
+    /// Episode and channel neighbours both resolve the owning playlist from the
+    /// row's id prefix. That used to fetch every installed playlist and match in
+    /// Swift; it is an indexed lookup now, and the fallback that keeps a legacy
+    /// id playable has to survive it.
+    @Test func `the owning playlist is found by id, with the fallback intact`() throws {
+        let container = try makeSQLiteContainer()
+        let context = ModelContext(container)
+        let ids = [makePlaylist(in: context), makePlaylist(in: context)].map(\.id)
+        try context.save()
+
+        let owner = try #require(ids.last)
+        #expect(PlaylistOwner.playlist(forPrefixedID: "\(owner.uuidString)-live-1", in: context)?.id == owner)
+        // Which playlist an id that names none falls back to is unspecified —
+        // an unsorted fetch has no order to promise — but it must still be one,
+        // or a legacy id stops resolving a stream URL at all.
+        let fallback = try #require(PlaylistOwner.playlist(forPrefixedID: "legacy-live-1", in: context))
+        #expect(ids.contains(fallback.id))
+    }
+
+    // MARK: - Helpers
+
+    private func makePlaylist(in context: ModelContext) -> Playlist {
+        let playlist = Playlist(
+            name: "Test", serverURL: "http://example.com:8080", username: "user", password: "pass"
+        )
+        context.insert(playlist)
+        return playlist
+    }
+
+    @discardableResult
+    private func insertChannel(
+        number: Int, playlist: Playlist, category: String, in context: ModelContext
+    ) -> LiveStream {
+        let stream = LiveStream(
+            id: "\(playlist.id.uuidString)-live-\(number)",
+            streamId: number,
+            name: "Channel \(number)",
+            num: number,
+            categoryId: category
+        )
+        context.insert(stream)
+        return stream
+    }
+
+    // MARK: - The sports resolver's EPG fetch stays scoped
+
+    /// The sports resolver's EPG fetch must be bounded by channel ids and the
+    /// kickoff window so it never turns into the time-only guide scan the
+    /// loaders exist to avoid. It is the one guide fetch that reads
+    /// `listingDescription`, because conference programmes list their games
+    /// only in the body.
+    @Test func `sports resolver EPG fetch is scoped and includes the description`() {
+        let descriptor = SportsChannelResolver.epgCandidateDescriptor(
+            channelIds: ["ch1", "ch2"], windowStart: .now, windowEnd: .now.addingTimeInterval(3600)
+        )
+        #expect(descriptor.predicate != nil, "the guide fetch must be bounded, not a full scan")
+        let props = descriptor.propertiesToFetch
+        #expect(!props.isEmpty, "a partial fetch, not the whole row")
+        // Unlike the guide loaders, this fetch needs the description: a
+        // conference programme names its games only there. The kickoff window
+        // and channel-id bound keep the row count small enough to afford it.
+        for kept: PartialKeyPath<EPGListing> in [
+            \.channelId, \.title, \.subtitle, \.category, \.listingDescription, \.start, \.end
+        ] {
+            #expect(props.contains(kept))
+        }
+    }
+
+    /// The candidate-channel fetch must run its exclusion (hidden channels and
+    /// restricted categories) as a `#Predicate` in SQLite, not by fetching every
+    /// channel and filtering in Swift afterwards.
+    @Test func `sports resolver channel fetch filters in SQLite`() {
+        let descriptor = SportsChannelResolver.candidateStreamDescriptor(
+            restriction: ContentRestriction(hiddenCategoryIDs: ["hidden-cat"])
+        )
+        #expect(descriptor.predicate != nil)
+    }
+
+    /// The container must be held for the test's duration — see
+    /// `SearchPredicateTests` for what happens when it is not.
+    private func makeSQLiteContainer() throws -> ModelContainer {
+        let schema = Schema([
+            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
+            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
+        ])
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("catalog.store")
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [config])
+    }
+}

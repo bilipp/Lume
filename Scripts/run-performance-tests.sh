@@ -16,6 +16,11 @@
 #   LUME_PERF_SIM   simulator name or UDID (default: newest available iPhone
 #                   running iOS 26.4 or later — 26.2 fails the deployment target)
 #   LUME_PERF_DD    derived data path (default: /tmp/lume-perf-dd)
+#   LUME_PERF_SPM   shared SwiftPM clone dir (default:
+#                   ~/Library/Developer/Lume-SharedSPM). A private
+#                   -derivedDataPath without one re-clones the whole package
+#                   graph — KSPlayer's FFmpeg xcframeworks plus VLCKit's 865 MB
+#                   xcframework, 6.4 GB per build dir.
 #
 # NOTE ON NUMBERS: results are only comparable against runs on the *same*
 # machine, at the same thermal state, with nothing else building. Committed
@@ -70,6 +75,7 @@ xcodebuild test \
     -scheme LumePerformance \
     -destination "$DESTINATION" \
     -derivedDataPath "$DERIVED_DATA" \
+    -clonedSourcePackagesDirPath "${LUME_PERF_SPM:-$HOME/Library/Developer/Lume-SharedSPM}" \
     ${FILTER_ARGS[@]+"${FILTER_ARGS[@]}"} \
     >"$LOG_FILE" 2>&1
 STATUS=$?

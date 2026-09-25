@@ -42,30 +42,20 @@
             Task { @MainActor in catcherFocused = true }
         }
 
-        /// Change the live channel from the Siri Remote: up/down surf to the
-        /// adjacent channel (a TV remote's channel rocker), while right recalls
-        /// the channel watched just before this one (the remote's "last"
-        /// button). Falls back to summoning the controls when there's nothing
-        /// to jump to.
+        /// Change the live channel from the Siri Remote — up/down surf the way
+        /// the viewer's `LiveSurfMode` maps the press, right recalls the channel
+        /// watched just before this one. The swap itself is
+        /// `PlayerMediaSwapper`'s, shared with the other three engines and with
+        /// the on-screen transport controls.
         func switchLiveChannel(_ direction: MoveCommandDirection) {
-            guard media.isLive else { return }
-            let target: PlayableMedia?
-            switch direction {
-            case .up, .down:
-                let sort = ContentSortOption(rawValue: liveContentSortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
-                    for: media, offset: direction == .up ? 1 : -1, sort: sort, restriction: restriction, in: modelContext
-                )
-            case .right:
-                target = LiveChannelHistory.recallMedia(
-                    in: modelContext, scope: media.channelScope, restriction: restriction
-                )
-            default:
-                return
-            }
-            guard let target else { showControls(); return }
-            onSelectMedia?(target)
-            showControls()
+            mediaSwapper.surf(
+                direction, from: media,
+                through: .init(
+                    sortRaw: liveContentSortRaw, restriction: restriction, context: modelContext
+                ),
+                select: { onSelectMedia?($0) },
+                showControls: showControls
+            )
         }
     }
 

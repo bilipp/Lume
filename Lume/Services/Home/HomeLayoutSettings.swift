@@ -19,6 +19,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
     case trendingMovies
     case trendingSeries
     case traktWatchlist
+    case sports
 
     var id: String {
         rawValue
@@ -34,6 +35,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .trendingMovies: "Trending Movies"
         case .trendingSeries: "Trending Series"
         case .traktWatchlist: "Trakt Watchlist"
+        case .sports: "Sports"
         }
     }
 
@@ -48,6 +50,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .trendingMovies: String(localized: "Trending Movies")
         case .trendingSeries: String(localized: "Trending Series")
         case .traktWatchlist: String(localized: "Trakt Watchlist")
+        case .sports: String(localized: "Sports")
         }
     }
 
@@ -59,6 +62,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .trendingMovies: "film"
         case .trendingSeries: "tv"
         case .traktWatchlist: "rectangle.stack.badge.play"
+        case .sports: "sportscourt"
         }
     }
 }

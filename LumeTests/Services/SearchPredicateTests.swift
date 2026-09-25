@@ -115,12 +115,20 @@ struct SearchPredicateTests {
     @Test func `playlist scoping still applies alongside the exclusion`() throws {
         let container = try makeSQLiteContainer()
         let context = container.mainContext
-        let mine = Movie(id: "m1", streamId: 1, name: "The Matrix")
+        // The scope matches the row's own playlist-prefixed id
+        // (`"<playlist uuid>-<kind>-<provider id>"`), which is indexed, rather
+        // than substring-searching `categoryId` for the playlist's uuid.
+        let mine = Movie(id: "PL-A-movie-1", streamId: 1, name: "The Matrix")
         mine.categoryId = "PL-A-vod-1"
-        let other = Movie(id: "m2", streamId: 2, name: "The Matrix")
+        let other = Movie(id: "PL-B-movie-2", streamId: 2, name: "The Matrix")
         other.categoryId = "PL-B-vod-1"
-        context.insert(mine)
-        context.insert(other)
+        // A playlist whose id merely starts with the scoped one must not leak
+        // in — the separator is part of the prefix.
+        let lookalike = Movie(id: "PL-AB-movie-3", streamId: 3, name: "The Matrix")
+        lookalike.categoryId = "PL-AB-vod-1"
+        for movie in [mine, other, lookalike] {
+            context.insert(movie)
+        }
         try context.save()
 
         let fetched = try context.fetch(
@@ -128,6 +136,29 @@ struct SearchPredicateTests {
                 query: "matrix", playlistID: "PL-A", restrictToPlaylist: true, excluded: ["nl"]
             )))
         )
-        #expect(fetched.map(\.id) == ["m1"])
+        #expect(fetched.map(\.id) == ["PL-A-movie-1"])
+    }
+
+    @Test func `playlist scoping keeps the playlist's uncategorised titles`() throws {
+        let container = try makeSQLiteContainer()
+        let context = container.mainContext
+        // m3u sources don't always supply a group, so a title can carry no
+        // category at all. Scoping on the row's id rather than on its
+        // `categoryId` is what makes those titles findable while the search is
+        // restricted to one playlist; the old `categoryId` substring test
+        // dropped every one of them.
+        let orphan = Movie(id: "PL-A-movie-1", streamId: 1, name: "The Matrix")
+        let other = Movie(id: "PL-B-movie-2", streamId: 2, name: "The Matrix")
+        other.categoryId = "PL-B-vod-1"
+        context.insert(orphan)
+        context.insert(other)
+        try context.save()
+
+        let fetched = try context.fetch(
+            FetchDescriptor<Movie>(predicate: searchMoviePredicate(scope: SearchScope(
+                query: "matrix", playlistID: "PL-A", restrictToPlaylist: true, excluded: []
+            )))
+        )
+        #expect(fetched.map(\.id) == ["PL-A-movie-1"])
     }
 }

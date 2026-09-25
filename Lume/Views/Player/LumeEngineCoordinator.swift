@@ -79,8 +79,30 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     /// Silences this player without pausing it — Multi-View mutes every tile
     /// except the one carrying the audio.
+    ///
+    /// For a Multi-View tile this gives the audio lane up entirely rather than
+    /// turning the volume down: a muted renderer keeps pulling frames and keeps
+    /// its claim on the audio output route, and on tvOS a second claimant never
+    /// becomes ready — which stalls the synchronizer that tile's video shares,
+    /// freezing it on its first frame. The full-screen player is the only
+    /// session playing, so a volume mute is right there and spares it a lane
+    /// rebuild on every toggle.
     var isMuted = false {
-        didSet { session?.renderer.isMuted = isMuted }
+        didSet {
+            guard isMuted != oldValue else { return }
+            applyMute()
+        }
+    }
+
+    private func applyMute() {
+        guard let session else { return }
+        // Volume first in both directions: unmuting before the lane is built
+        // means the first frames are already audible, and muting before it is
+        // torn down means nothing leaks out during teardown.
+        session.renderer.isMuted = isMuted
+        guard isEmbedded else { return }
+        let enabled = !isMuted
+        Task { await session.setAudioEnabled(enabled) }
     }
 
     /// Set before `configure` for a Multi-View tile: with several tiles playing
@@ -334,6 +356,15 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         configuration.bufferTarget = Double(media.isLive ? options.liveBuffer : options.vodBuffer) / 1000
         configuration.videoQueueDepth = options.videoQueueDepth
         configuration.audioQueueDepth = options.audioQueueDepth
+        // A Multi-View tile opens with an audio lane only if it is the audible
+        // one. A muted tile that decodes audio anyway still claims the audio
+        // output route, and on tvOS a second claimant never becomes ready —
+        // which stalls the synchronizer its video lane shares, freezing the tile
+        // on its first frame with no failure event. It also spares an Apple TV
+        // three audio decoders it would throw away. `isMuted` moves the lane
+        // afterwards (see `applyMute`); this is only the opening state.
+        configuration.enableAudio = !(isEmbedded && isMuted)
+        configuration.muted = isMuted
         configuration.stallThreshold = Double(options.stallThreshold)
         // Resolved engine-side while the pipeline is built, before the demuxer
         // streams a byte: selecting after `open()` would route through a seek
@@ -356,6 +387,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         // is idempotent, so this and the player view's own call cannot race —
         // whichever runs first negotiates, the other reuses the result.
         configuration.maxOutputChannels = PlaybackAudioRoute.activateForPlayback()
+        if let headers = media.httpHeaders, !headers.isEmpty {
+            configuration.demuxer.httpHeaders = headers
+        }
         configuration.demuxer.enableReconnect = options.httpReconnect
         configuration.demuxer.ioTimeout = options.ioTimeout
         // The open timeout stays tied to the engine-fallback budget rather than

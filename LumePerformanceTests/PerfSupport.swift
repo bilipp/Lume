@@ -126,6 +126,40 @@ enum PerfFixtures {
         return url
     }
 
+    /// Writes a playlist with the measured provider's shape: ~3% live on bare
+    /// extension-less URLs, ~11% `/movie/….mkv`, ~86% `/series/….mkv` episodes
+    /// clustered into `showCount` shows with the real long-tailed episode
+    /// distribution, and the superscript decoration real names carry.
+    ///
+    /// Deliberately separate from `writeM3U`: that generator's 45/35/20 mix is
+    /// the accepted baseline input of `testM3UParse120kEntries`, so re-shaping
+    /// it in place would silently re-baseline that benchmark instead of adding
+    /// a second one.
+    ///
+    /// The long-tailed draw averages ~37 episodes per show, so pass a
+    /// `showCount` near `entryCount / 43` for every show to be used exactly
+    /// once; a larger one leaves the surplus shows unemitted rather than
+    /// shortening the blocks.
+    @discardableResult
+    static func writeM3UProviderShape(entryCount: Int, showCount: Int, to directory: URL) throws -> URL {
+        var generator = SeededGenerator()
+        let url = directory.appendingPathComponent("provider.m3u")
+        let writer = try M3UFixtureWriter(fileURL: url)
+        defer { writer.close() }
+
+        let liveCount = entryCount * providerLiveShare / 100
+        let movieCount = entryCount * providerMovieShare / 100
+        writeProviderLiveEntries(count: liveCount, to: writer, using: &generator)
+        writeProviderVODEntries(
+            movieCount: movieCount,
+            episodeCount: max(0, entryCount - liveCount - movieCount),
+            showCount: showCount,
+            to: writer,
+            using: &generator
+        )
+        return url
+    }
+
     /// Writes an XMLTV guide with `channelCount` channels × `programmesPerChannel`
     /// programmes. Timestamps use the `+0000` offset form, which is the shape
     /// `XMLTVDate` has to parse fastest.
@@ -176,7 +210,7 @@ enum PerfFixtures {
     // that emits a minimal subset of the keys understates decode by ~3x and
     // makes a sync benchmark measure something the app never does.
 
-    private static func pick<Element>(_ values: [Element], using generator: inout SeededGenerator) -> Element {
+    static func pick<Element>(_ values: [Element], using generator: inout SeededGenerator) -> Element {
         values[Int.random(in: 0 ..< values.count, using: &generator)]
     }
 
@@ -366,13 +400,14 @@ enum PerfFixtures {
 
 // MARK: - Xtream fixture vocabulary
 
-/// Deterministic word pools for the Xtream generators.
+/// Deterministic word pools for the fixture generators — the Xtream ones, and
+/// the title halves the provider-shaped m3u generator shares with them.
 ///
 /// Real catalog rows carry multi-byte characters in titles and plots — curly
 /// apostrophes, em dashes, superscript channel tags — and that UTF-8 is a real
 /// share of what a 135 MB sync spends in `JSONDecoder`, so the pools carry them
 /// too rather than staying ASCII.
-private enum XtreamVocabulary {
+enum XtreamVocabulary {
     static let adjectives = [
         "Shadow", "Crimson", "Midnight", "Eternal", "Silent", "Broken", "Northern", "Last",
         "Golden", "Winter", "Distant", "Hollow", "Rising", "Iron", "Velvet", "Quiet",
@@ -464,5 +499,73 @@ extension XCTestCase {
             "fixture is \(Int(actual)) B/row; the provider sends \(expected) B/row (±\(Int(tolerance * 100))%)",
             file: file, line: line
         )
+    }
+}
+
+// MARK: - m3u sync harness
+
+/// Carries a sync's error back across the `Task.detached` hand-off; a `var`
+/// captured by a concurrently-executing closure cannot. Read only after the
+/// expectation has been fulfilled.
+final class PerfSyncOutcome: @unchecked Sendable {
+    var error: Error?
+}
+
+extension XCTestCase {
+    /// A playlist row pointing at `fileURL`, saved on its own context.
+    func seedM3UPlaylist(fileURL: URL, container: ModelContainer) throws -> UUID {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let playlist = Playlist(name: "Perf provider", m3uURL: fileURL.absoluteString, epgURL: nil)
+        context.insert(playlist)
+        try context.save()
+        return playlist.id
+    }
+
+    /// Both are device-local `UserDefaults` state that outlives an iteration: a
+    /// matching digest makes `m3uImportIsRedundant` short-circuit the whole
+    /// import, and a held-back sweep counter changes what the sweeps do.
+    func clearM3UDeviceLocalState(playlistId: UUID) {
+        M3UDigestStore.remove(playlistId: playlistId)
+        SweepSkipDefaults.removeAll(playlistId: playlistId)
+    }
+
+    /// `ContentSyncManager` is an actor, so the sync has to be driven from a
+    /// task and waited on synchronously — `measure`'s block is not async.
+    ///
+    /// The wait is an `XCTestExpectation`, not the `DispatchSemaphore` other
+    /// suites use: a semaphore parks the thread `measure` invokes the block on,
+    /// and `syncPlaylist` needs that thread's main queue to make progress, so
+    /// the pair deadlocks after the first iteration. Waiting on an expectation
+    /// spins the run loop instead. The bulk of the work still runs on the
+    /// actor's executor, off this thread.
+    ///
+    /// The default timeout is generous on purpose: at 600k entries a cold
+    /// import is minutes, and a tripped timeout would report a hang as a
+    /// measurement.
+    func syncPlaylistSynchronously(
+        manager: ContentSyncManager,
+        playlistId: UUID,
+        container: ModelContainer,
+        timeout: TimeInterval = 3600
+    ) -> PerfSyncOutcome {
+        let outcome = PerfSyncOutcome()
+        let finished = expectation(description: "m3u sync")
+        Task.detached {
+            do {
+                let context = ModelContext(container)
+                guard let playlist = try context.fetch(
+                    FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
+                ).first else {
+                    throw M3UError.fileNotFound
+                }
+                try await manager.syncPlaylist(playlist)
+            } catch {
+                outcome.error = error
+            }
+            finished.fulfill()
+        }
+        wait(for: [finished], timeout: timeout)
+        return outcome
     }
 }

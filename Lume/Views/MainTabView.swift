@@ -23,6 +23,9 @@ struct MainTabView: View {
 
     @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+    /// Whether the Sports tab appears in the tab bar (Settings toggle). When off,
+    /// the hub is still reachable from the Home rail header.
+    @AppStorage(SportsSyncService.tabEnabledKey) private var sportsTabEnabled = SportsSyncService.tabEnabledDefault
 
     /// Selected tab and the Movies/Series navigation stacks, shared so an
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
@@ -54,8 +57,19 @@ struct MainTabView: View {
     /// that's already been handled.
     @State private var autoSyncAttempted: Set<UUID> = []
 
+    /// Memo behind `contentRestriction` — see `ContentRestrictionMemo`.
+    @State private var restrictionMemo = ContentRestrictionMemo()
+
     private var syncFrequency: SyncFrequency {
         SyncFrequency.resolve(syncFrequencyRaw)
+    }
+
+    /// The playlist the content tabs are showing, resolved rather than read raw:
+    /// the stored id can name a deleted playlist, in which case the app falls
+    /// back to the same playlist every other surface does, and auto-sync has to
+    /// follow it there.
+    private var activePlaylistID: String {
+        playlists.activeID(for: selectedPlaylistID)
     }
 
     /// UI tests seed a fake playlist; auto-sync would present a blocking cover
@@ -64,14 +78,33 @@ struct MainTabView: View {
         CommandLine.arguments.contains("-ui-testing")
     }
 
+    /// Whether the browse UI is covered, or the user is somewhere a rating
+    /// sheet has no business appearing — the sync cover, the downloads sheet, or
+    /// a playlist / profile switch. Players, paywalls and Settings are not
+    /// listed: every one of them reports itself, and `appStoreReviewPrompt`
+    /// already holds the fire while any is on screen. Settings has to, because
+    /// on every platform that shows the prompt it is a sheet on the library
+    /// toolbar rather than a tab, and so invisible to this root.
+    private var hasBlockingPresentation: Bool {
+        activeSyncPlaylist != nil
+            || showsDownloads
+            || playlistSwitch?.isSwitching == true
+            || profileManager?.isSwitching == true
+    }
+
     /// Hides categories (and their content) from every browse, Home and Search
     /// surface: the ones hidden in Content Management always, the restricted
     /// ones while a child profile is active.
+    ///
+    /// Routed through a memo: this root's body re-evaluates whenever any catalog
+    /// write moves one of its `@Query`s, and constructing a `ContentRestriction`
+    /// digests every excluded id — 433 of them on a real hidden-category set.
+    /// The two id sets are cheap to rebuild and compare; the digest is not.
     private var contentRestriction: ContentRestriction {
-        ContentRestriction(
+        restrictionMemo.restriction(
             isActive: profileManager?.activeProfileIsChild ?? false,
-            restrictedCategoryIDs: Set(restrictedCategories.map(\.id)),
-            hiddenCategoryIDs: Set(hiddenCategories.map(\.id))
+            restricted: Set(restrictedCategories.map(\.id)),
+            hidden: Set(hiddenCategories.map(\.id))
         )
     }
 
@@ -93,6 +126,12 @@ struct MainTabView: View {
         #endif
             .environment(router)
             .environment(\.contentRestriction, contentRestriction)
+            // A tab switch is the one browse interaction that has no scroll
+            // view of its own to stamp from, and it is the moment a merge is
+            // most expensive — the incoming tab is re-running its queries.
+            .onChange(of: router.selectedTab) {
+                ContentIndexingService.shared.noteUserInteraction()
+            }
         #if os(iOS)
             .tabBarMinimizeOnScrollDownIfAvailable()
         #endif
@@ -105,13 +144,15 @@ struct MainTabView: View {
             }
         #endif
             .task(id: playlists.count) {
-                // On launch (and whenever a playlist is added) sync any playlist that
-                // is due per the configured frequency.
+                // On launch (and whenever a playlist is added) sync the active
+                // playlist if it is due, plus any playlist that has never synced.
                 enqueueDueSyncs(playlists)
             }
             .onChange(of: selectedPlaylistID) {
                 // On playlist switch, sync the newly selected one if it's due —
                 // unless the switch asked to land in the cached catalog instead.
+                // This is also where a playlist deferred at launch for not being
+                // on screen gets its turn.
                 guard playlistSwitch?.consumeDeferredDueSync() != true else { return }
                 if let playlist = playlists.active(for: selectedPlaylistID) {
                     enqueueDueSyncs([playlist])
@@ -122,11 +163,26 @@ struct MainTabView: View {
                 // app this is the practical equivalent of "on launch".
                 if phase == .active {
                     enqueueDueSyncs(playlists)
+                    SportsSyncService.shared.syncIfDue()
                 }
+                SportsSyncService.shared.isForeground = phase == .active
             }
             .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
+            .onChange(of: isAutoSyncBusy, initial: true) { _, busy in
+                EPGSyncService.shared.setAutoSyncQueued(busy)
+            }
+            .onDisappear {
+                // The queue goes with this view (deleting the last playlist
+                // swaps the root back to onboarding); don't leave the guide
+                // waiting on it.
+                EPGSyncService.shared.setAutoSyncQueued(false)
+            }
             .downloadsSheet(isPresented: $showsDownloads)
             .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
+            // The one fire point for the rating sheet. Here rather than at the
+            // eleven player presentation sites: this view is the browse root,
+            // so reaching it *is* the "player gone, nothing over it" condition.
+            .appStoreReviewPrompt(isBlocked: hasBlockingPresentation)
         #if os(tvOS)
             .overlay { tvOverlays }
         #endif
@@ -191,6 +247,14 @@ struct MainTabView: View {
                     activeOnly(.liveTV, selection: selection.wrappedValue) { LiveTVView() }
                 } label: {
                     Text("Live TV")
+                }
+
+                if sportsTabEnabled {
+                    Tab(value: AppTab.sports) {
+                        activeOnly(.sports, selection: selection.wrappedValue) { TVSportsHubScreen() }
+                    } label: {
+                        Text("Sports")
+                    }
                 }
 
                 Tab(value: AppTab.settings) {
@@ -259,6 +323,12 @@ struct MainTabView: View {
                     LiveTVView()
                 }
 
+                if sportsTabEnabled {
+                    Tab("Sports", systemImage: "sportscourt", value: AppTab.sports) {
+                        SportsHubView()
+                    }
+                }
+
                 // macOS 15's tab bar drops a `role: .search` tab entirely — even
                 // with an explicit label (the previous workaround), the search tab
                 // never renders, leaving no way to reach Search there. macOS 26
@@ -306,7 +376,7 @@ struct MainTabView: View {
             guard NowPlayingService.shared.currentMedia == nil,
                   let media = PlaybackResumeStore.load() else { return }
             #if os(macOS)
-                openWindow(id: "player", value: media)
+                MacPlayerWindowRouter.shared.play(media, using: openWindow)
             #else
                 resumeMedia = media
             #endif
@@ -343,8 +413,10 @@ struct MainTabView: View {
     // MARK: - Automatic sync
 
     /// Enqueues every due playlist for a blocking, progress-visible sync and
-    /// presents the first one. Covers the never-synced first launch (where
-    /// `lastSyncDate == nil` makes a playlist due) as well as periodic refreshes.
+    /// presents the first one — the playlist on screen, plus any the viewer
+    /// just added (see `AutoSync.shouldSync`). Covers the never-synced first
+    /// launch (where `lastSyncDate == nil` makes a playlist due) as well as
+    /// periodic refreshes.
     private func enqueueDueSyncs(_ candidates: [Playlist]) {
         guard !isUITesting else { return }
 
@@ -357,12 +429,17 @@ struct MainTabView: View {
 
     private func shouldAutoSync(_ playlist: Playlist) -> Bool {
         AutoSync.shouldSync(
-            syncEnabled: playlist.syncEnabled,
-            status: playlist.syncStatus,
-            lastSyncDate: playlist.lastSyncDate,
+            playlist.autoSyncCandidate(activeID: activePlaylistID),
             frequency: syncFrequency,
             alreadyStarted: autoSyncAttempted.contains(playlist.id)
         )
+    }
+
+    /// Whether the auto-sync queue holds anything, including the playlist in
+    /// the cover. Reported to `EPGSyncService` so the guide refresh reads the
+    /// queue itself instead of predicting it.
+    private var isAutoSyncBusy: Bool {
+        activeSyncPlaylist != nil || !syncQueue.isEmpty
     }
 
     /// Presents the next queued playlist's sync cover when none is showing. The

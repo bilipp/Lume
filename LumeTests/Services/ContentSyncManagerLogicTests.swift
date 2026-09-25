@@ -1,5 +1,6 @@
 import Foundation
 @testable import Lume
+import SwiftData
 import Testing
 
 struct ContentSyncManagerLogicTests {
@@ -110,6 +111,37 @@ struct ContentSyncManagerLogicTests {
             now: now
         )
         #expect(remaining == .zero)
+    }
+
+    // MARK: - historyPurgeIsSafe
+
+    @Test func `history purge refuses the CloudKit mirror configuration`() throws {
+        let schema = Schema([
+            SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
+            SyncedParentalPIN.self, SyncedCategoryRestriction.self
+        ])
+        let mirror = ModelConfiguration(
+            ContentSyncManager.cloudMirrorConfigurationName,
+            schema: schema,
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
+        )
+        let container = try ModelContainer(for: schema, configurations: mirror)
+        #expect(ContentSyncManager.historyPurgeIsSafe(for: container.configurations) == false)
+    }
+
+    @Test func `history purge allows the local catalog configuration`() throws {
+        let schema = Schema([
+            Playlist.self, Lume.Category.self, LiveStream.self, Movie.self,
+            Series.self, Episode.self, CastMember.self, EPGListing.self, EPGSource.self
+        ])
+        let catalog = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
+        )
+        let container = try ModelContainer(for: schema, configurations: catalog)
+        #expect(ContentSyncManager.historyPurgeIsSafe(for: container.configurations))
     }
 
     // MARK: - SyncStatus

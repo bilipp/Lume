@@ -11,6 +11,12 @@
 //  Home, Search and the "For You" engine) reads it so a hidden or restricted
 //  category — and any title in it — disappears everywhere alike.
 //
+//  Everything derived is derived once, in `init`. The union and the digest used
+//  to be computed properties, and the readers are hot: `excludingRestricted`
+//  asks for the union once per rail, and Home folds the digest into three
+//  `.task(id:)` keys — so a single Home body pass hashed all 433 hidden
+//  category ids two to three times over, on the main thread, while scrolling.
+//
 
 import CryptoKit
 import SwiftUI
@@ -18,25 +24,32 @@ import SwiftUI
 nonisolated struct ContentRestriction: Equatable {
     /// True when the active profile is a child: `restrictedCategoryIDs` applies
     /// only to kids.
-    var isActive = false
+    let isActive: Bool
     /// Ids of the categories marked restricted.
-    var restrictedCategoryIDs: Set<String> = []
+    let restrictedCategoryIDs: Set<String>
     /// Ids of the categories the user hid in Content Management. Unlike
     /// restricted ones these apply to every profile.
-    var hiddenCategoryIDs: Set<String> = []
-
+    let hiddenCategoryIDs: Set<String>
     /// Every category id excluded for the current viewer.
-    var excludedCategoryIDs: Set<String> {
-        isActive ? hiddenCategoryIDs.union(restrictedCategoryIDs) : hiddenCategoryIDs
-    }
-
+    let excludedCategoryIDs: Set<String>
     /// A stable digest of `excludedCategoryIDs`, for cache keys that must not
     /// outlive a visibility change (Home's trending memo, the "For You" list).
     /// Hashed rather than joined verbatim: a user who hides most of a large
     /// catalog would otherwise put tens of kilobytes in a key. `hashValue` is
     /// seeded per process and would differ every launch, so it can't be used.
-    var visibilityToken: String {
-        Self.visibilityToken(for: excludedCategoryIDs)
+    let visibilityToken: String
+
+    init(
+        isActive: Bool = false,
+        restrictedCategoryIDs: Set<String> = [],
+        hiddenCategoryIDs: Set<String> = []
+    ) {
+        let excluded = isActive ? hiddenCategoryIDs.union(restrictedCategoryIDs) : hiddenCategoryIDs
+        self.isActive = isActive
+        self.restrictedCategoryIDs = restrictedCategoryIDs
+        self.hiddenCategoryIDs = hiddenCategoryIDs
+        excludedCategoryIDs = excluded
+        visibilityToken = Self.visibilityToken(for: excluded)
     }
 
     static func visibilityToken(for excludedCategoryIDs: Set<String>) -> String {
@@ -44,11 +57,18 @@ nonisolated struct ContentRestriction: Equatable {
         return SHA256.hash(data: Data(joined.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Compared by digest alone. The excluded set is the only thing any caller
+    /// reads, and the digest is derived from exactly that — so this is the same
+    /// comparison the synthesized `==` would make, minus rehashing hundreds of
+    /// category ids every time SwiftUI checks whether the environment moved.
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.visibilityToken == rhs.visibilityToken
+    }
+
     /// Whether content in `categoryID` should be hidden from the current viewer.
     func hides(categoryID: String?) -> Bool {
         guard let categoryID else { return false }
-        if hiddenCategoryIDs.contains(categoryID) { return true }
-        return isActive && restrictedCategoryIDs.contains(categoryID)
+        return excludedCategoryIDs.contains(categoryID)
     }
 }
 
@@ -74,5 +94,39 @@ extension Sequence where Element: CategorizedContent {
         let excluded = restriction.excludedCategoryIDs
         guard !excluded.isEmpty else { return Array(self) }
         return filter { !excluded.contains($0.categoryId ?? "") }
+    }
+}
+
+// MARK: - Restriction memo
+
+/// Hands back the previous `ContentRestriction` whenever the ids behind it
+/// haven't moved.
+///
+/// The restriction context is rebuilt from its host's `@Query` results on every
+/// body pass, and building one runs SHA-256 over every excluded category id
+/// (`ContentRestriction.visibilityToken`) plus 32 `String(format:)` calls —
+/// ~100 µs with 433 hidden categories, for a value that changes only when the
+/// user hides a category or switches to a child profile. Comparing the two id
+/// sets costs a fraction of that.
+///
+/// A plain reference held in `@State`: nothing on it is observed, so reading and
+/// updating it from `body` can't invalidate the view the way writing `@State`
+/// would.
+final class ContentRestrictionMemo {
+    private var cached = ContentRestriction()
+
+    func restriction(isActive: Bool, restricted: Set<String>, hidden: Set<String>) -> ContentRestriction {
+        if cached.isActive == isActive,
+           cached.restrictedCategoryIDs == restricted,
+           cached.hiddenCategoryIDs == hidden
+        {
+            return cached
+        }
+        cached = ContentRestriction(
+            isActive: isActive,
+            restrictedCategoryIDs: restricted,
+            hiddenCategoryIDs: hidden
+        )
+        return cached
     }
 }

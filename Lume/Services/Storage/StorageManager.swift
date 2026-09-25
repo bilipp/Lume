@@ -121,7 +121,7 @@ enum StorageManager {
         movie.tagline = nil
         movie.contentRating = nil
         movie.tmdbEnrichedAt = nil
-        movie.similarTMDBIds = []
+        movie.similarTMDBIds = nil
         movie.trailersData = nil
         movie.imdbId = nil
         movie.externalRatingsData = nil
@@ -141,7 +141,7 @@ enum StorageManager {
         show.tagline = nil
         show.contentRating = nil
         show.tmdbEnrichedAt = nil
-        show.similarTMDBIds = []
+        show.similarTMDBIds = nil
         show.trailersData = nil
         show.imdbId = nil
         show.externalRatingsData = nil

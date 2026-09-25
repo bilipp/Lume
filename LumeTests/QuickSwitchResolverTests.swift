@@ -4,7 +4,9 @@
 //
 //  Covers the shared quick-switch seam every switch surface reads its "which
 //  row is current" answer from: the stored-selection fallbacks of
-//  `[Playlist].active(for:)`, row ordering, and the `isCurrent` tag.
+//  `[Playlist].active(for:)`, row ordering, and the `isCurrent` tag. Also
+//  `owner(ofContentID:)`, which answers the other question — not which
+//  playlist is current, but which one a given row came from.
 //
 
 import Foundation
@@ -18,9 +20,12 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct QuickSwitchResolverTests {
+    /// Added in the order given, a second apart — the fallback orders by
+    /// `addedAt`, and back-to-back `Date()`s could tie.
     private func makePlaylists(_ names: [String], in context: ModelContext) throws -> [Playlist] {
         let playlists = names.map { Playlist(name: $0, serverURL: "http://\($0)", username: "u", password: "p") }
-        for playlist in playlists {
+        for (offset, playlist) in playlists.enumerated() {
+            playlist.addedAt = Date(timeIntervalSince1970: 1_700_000_000 + Double(offset))
             context.insert(playlist)
         }
         try context.save()
@@ -36,20 +41,57 @@ struct QuickSwitchResolverTests {
         return profiles
     }
 
+    // MARK: - owner(ofContentID:)
+
+    @Test func `content resolves to the playlist whose prefix it carries`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
+        let id = "\(playlists[1].id.uuidString)-live-4021"
+
+        #expect(playlists.owner(ofContentID: id)?.id == playlists[1].id)
+    }
+
+    @Test func `content from a playlist that is gone owns nothing`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
+
+        #expect(playlists.owner(ofContentID: "\(UUID().uuidString)-live-4021") == nil)
+    }
+
+    @Test func `the owner is independent of which playlist is active`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
+        let id = "\(playlists[1].id.uuidString)-movie-77"
+
+        // The active playlist is First; the row is still Second's to play.
+        #expect(playlists.active(for: playlists[0].id.uuidString)?.id == playlists[0].id)
+        #expect(playlists.owner(ofContentID: id)?.id == playlists[1].id)
+    }
+
     // MARK: - active(for:)
 
-    @Test func `an empty stored selection resolves to the first playlist`() throws {
+    @Test func `an empty stored selection resolves to the oldest playlist`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
 
         #expect(playlists.active(for: "")?.id == playlists[0].id)
     }
 
-    @Test func `a stored selection naming a deleted playlist falls back to the first`() throws {
+    @Test func `a stored selection naming a deleted playlist falls back to the oldest`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
 
         #expect(playlists.active(for: UUID().uuidString)?.id == playlists[0].id)
+    }
+
+    @Test func `the fallback is the oldest playlist whatever order the fetch returned`() throws {
+        // Every caller resolves against its own unsorted `@Query` or fetch; they
+        // must still agree on the fallback.
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second", "Third"], in: container.mainContext)
+
+        #expect(Array(playlists.reversed()).active(for: "")?.id == playlists[0].id)
+        #expect([playlists[1], playlists[0], playlists[2]].activeID(for: UUID().uuidString) == playlists[0].id.uuidString)
     }
 
     @Test func `a valid stored selection resolves to that playlist`() throws {

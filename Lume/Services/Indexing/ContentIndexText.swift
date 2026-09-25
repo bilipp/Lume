@@ -21,6 +21,13 @@ nonisolated enum ContentIndexText {
     static func searchQuery(for rawName: String) -> (title: String, year: Int?) {
         var name = rawName
 
+        // Dot-separated scene names ("The.Godfather.1972.1080p.x264-GRP") reach
+        // the indexer from WebDAV shares; every heuristic below assumes spaces.
+        // Only a name that is unambiguously scene-shaped is rewritten.
+        if let scene = MediaFilenameParser.sceneNormalizedName(rawName) {
+            name = scene
+        }
+
         // Bracketed groups are always tags, never part of the title.
         name = name.replacingOccurrences(of: #"\[[^\]]*\]"#, with: " ", options: .regularExpression)
 
@@ -100,6 +107,30 @@ nonisolated enum ContentIndexText {
         }
         if let cast = facts.cast, !cast.isEmpty {
             parts.append("Starring \(cast).")
+        }
+
+        return parts.joined(separator: " ")
+    }
+
+    /// The short form of the embedding document: just the title, year and
+    /// genre.
+    ///
+    /// For the coarse `NLEmbedding` sentence backend (tvOS), which the long
+    /// document defeats — the tagline, plot and cast dilute the few words that
+    /// actually distinguish one title from another until every pair of titles
+    /// sits at the same cosine. See `TextEmbedder.prefersShortDocuments` for
+    /// the measured margins.
+    static func shortDocument(for facts: TitleFacts) -> String {
+        var parts: [String] = []
+
+        var title = facts.name
+        if let year = facts.year {
+            title += " (\(year))"
+        }
+        parts.append(title + ".")
+
+        if let genre = facts.genre, !genre.isEmpty {
+            parts.append(genre + ".")
         }
 
         return parts.joined(separator: " ")

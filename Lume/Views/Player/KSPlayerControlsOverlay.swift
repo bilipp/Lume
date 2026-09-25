@@ -36,6 +36,17 @@ import SwiftUI
         /// Raises the OpenSubtitles browser. `nil` when the search isn't
         /// available for this stream, which also drops the menu entry.
         var onSearchSubtitles: (() -> Void)?
+        /// Video-track snapshot for the Advanced stream-info caption. `nil`
+        /// until the first frame reports usable dimensions.
+        var videoInfo: PlayerVideoInfo?
+        /// Previous/next stream for the transport pair, resolved once per stream
+        /// by the player host. Never derived here — this body must not read the
+        /// clock, and neither may the buttons.
+        var itemNeighbours = PlayerItemNavigation.Neighbours.none
+        /// Plays the neighbour on that side. Routed back through the host's
+        /// swapper so two presses can't stack a second decoder teardown on the
+        /// first.
+        var onStepItem: ((PlayerMediaSwapper.Step) -> Void)?
 
         @Environment(\.modelContext) private var modelContext
         /// Mirrors the backing model's favorite flag; refreshed when the media
@@ -122,8 +133,27 @@ import SwiftUI
 
         // MARK: - Center Transport
 
+        /// The episode pair turns this into a five-circle row, which is wider
+        /// than a phone in portrait at the spacing the three-button row used.
+        /// Close the gaps rather than let the outer buttons clip off-screen.
         private var centerTransport: some View {
-            HStack(spacing: 32) {
+            ViewThatFits(in: .horizontal) {
+                transportRow(spacing: 32)
+                transportRow(spacing: 12)
+            }
+        }
+
+        private func transportRow(spacing: CGFloat) -> some View {
+            HStack(spacing: spacing) {
+                if itemNeighbours.axis != nil {
+                    PlayerItemNavButton(
+                        step: .previous,
+                        neighbours: itemNeighbours,
+                        onStep: { onStepItem?($0) },
+                        onResetHideTimer: onResetHideTimer
+                    )
+                }
+
                 if !media.isLive {
                     Button {
                         coordinator.skip(interval: -15)
@@ -155,6 +185,15 @@ import SwiftUI
                     .buttonStyle(.plain)
                     .accessibilityLabel("Skip forward 15 seconds")
                 }
+
+                if itemNeighbours.axis != nil {
+                    PlayerItemNavButton(
+                        step: .next,
+                        neighbours: itemNeighbours,
+                        onStep: { onStepItem?($0) },
+                        onResetHideTimer: onResetHideTimer
+                    )
+                }
             }
         }
 
@@ -185,6 +224,11 @@ import SwiftUI
 
         private var titleBlock: some View {
             VStack(alignment: .leading, spacing: 2) {
+                StreamInfoCaption(
+                    media: media,
+                    videoInfo: videoInfo,
+                    engine: .ksPlayer
+                )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)

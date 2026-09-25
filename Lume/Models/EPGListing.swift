@@ -8,11 +8,18 @@ final class EPGListing {
     // rows). Every now/next lookup and the guide window query filter by
     // `channelId` and the `start`/`end` time bounds, so index them — without
     // these, each channel card and guide open scans the whole guide table.
+    // The in-player lookups (now/next, the channel's upcoming list, the guide
+    // window) all bound on `end > now` rather than on `start`, so the
+    // `channelId + start` pair above can only seek to the channel and then walk
+    // every listing it ever had. `channelId + end` is the pair those predicates
+    // actually ask for — `TVPlayerContent.guideListings` has claimed this index
+    // in a comment since it was written, without it ever existing.
     #Index<EPGListing>(
         [\.channelId],
         [\.start],
         [\.end],
-        [\.channelId, \.start]
+        [\.channelId, \.start],
+        [\.channelId, \.end]
     )
 
     @Attribute(.unique) var id: String
@@ -25,13 +32,24 @@ final class EPGListing {
     var start: Date
     var end: Date
 
+    /// XMLTV `<sub-title>` — episode title for series, or the fixture line for a
+    /// sports broadcast. Optional/defaulted so adding it is a lightweight
+    /// migration; deliberately kept out of the guide loaders' `propertiesToFetch`
+    /// so the hot now/next and guide-window fetches don't pay for it.
+    var subtitle: String?
+    /// XMLTV `<category>` values joined with ", " — the signal the Sports Hub
+    /// uses to spot sports broadcasts.
+    var category: String?
+
     init(
         id: String,
         channelId: String,
         title: String,
         listingDescription: String,
         start: Date,
-        end: Date
+        end: Date,
+        subtitle: String? = nil,
+        category: String? = nil
     ) {
         self.id = id
         self.channelId = channelId
@@ -39,5 +57,7 @@ final class EPGListing {
         self.listingDescription = listingDescription
         self.start = start
         self.end = end
+        self.subtitle = subtitle
+        self.category = category
     }
 }

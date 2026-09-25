@@ -416,3 +416,74 @@ struct ModelTests {
         #expect(DownloadStatus.failed.rawValue == "failed")
     }
 }
+
+// MARK: - Similar-title ids
+
+/// `similarTMDBIds` is optional on `Movie` and `Series` so a never-enriched row
+/// stores nothing at all — a non-optional `[Int] = []` archives a real BLOB on
+/// every row, which at provider scale is tens of MB written during the cold
+/// import. Its own suite rather than more of `ModelTests`, which is against
+/// SwiftLint's type-body limit.
+struct SimilarTitleIdsTests {
+    @Test func `a never-enriched title stores no similar ids`() throws {
+        let container = try makeTestContainer()
+        let context = ModelContext(container)
+        context.insert(Movie(id: "m-sim-1", streamId: 1, name: "Fresh Movie"))
+        context.insert(Series(id: "s-sim-1", seriesId: 1, name: "Fresh Series"))
+        try context.save()
+
+        let verify = ModelContext(container)
+        let movie = try #require(
+            try verify.fetch(FetchDescriptor<Movie>(predicate: #Predicate { $0.id == "m-sim-1" })).first
+        )
+        let series = try #require(
+            try verify.fetch(FetchDescriptor<Series>(predicate: #Predicate { $0.id == "s-sim-1" })).first
+        )
+        #expect(movie.similarTMDBIds == nil)
+        #expect(series.similarTMDBIds == nil)
+        // How every reader has to treat it: nil and empty are the same answer.
+        #expect((movie.similarTMDBIds ?? []).isEmpty)
+        #expect((series.similarTMDBIds ?? []).isEmpty)
+    }
+
+    @Test func `enriched ids round-trip in TMDB's order`() throws {
+        let container = try makeTestContainer()
+        let context = ModelContext(container)
+        let movie = Movie(id: "m-sim-2", streamId: 2, name: "Enriched Movie")
+        movie.similarTMDBIds = [604, 605, 603]
+        context.insert(movie)
+        let series = Series(id: "s-sim-2", seriesId: 2, name: "Enriched Series")
+        series.similarTMDBIds = [1399, 1397]
+        context.insert(series)
+        try context.save()
+
+        let verify = ModelContext(container)
+        let storedMovie = try #require(
+            try verify.fetch(FetchDescriptor<Movie>(predicate: #Predicate { $0.id == "m-sim-2" })).first
+        )
+        let storedSeries = try #require(
+            try verify.fetch(FetchDescriptor<Series>(predicate: #Predicate { $0.id == "s-sim-2" })).first
+        )
+        #expect(storedMovie.similarTMDBIds == [604, 605, 603])
+        #expect(storedSeries.similarTMDBIds == [1399, 1397])
+    }
+
+    /// A row written by the previous schema comes back holding its archived
+    /// empty array rather than nil, so an explicitly stored `[]` has to remain a
+    /// legal value — nothing may read `nil` as a "never enriched" sentinel.
+    @Test func `an explicitly stored empty array survives a round trip`() throws {
+        let container = try makeTestContainer()
+        let context = ModelContext(container)
+        let movie = Movie(id: "m-sim-3", streamId: 3, name: "Empty Movie")
+        movie.similarTMDBIds = []
+        context.insert(movie)
+        try context.save()
+
+        let verify = ModelContext(container)
+        let stored = try #require(
+            try verify.fetch(FetchDescriptor<Movie>(predicate: #Predicate { $0.id == "m-sim-3" })).first
+        )
+        #expect(stored.similarTMDBIds == [])
+        #expect((stored.similarTMDBIds ?? []).isEmpty)
+    }
+}

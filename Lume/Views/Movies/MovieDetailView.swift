@@ -303,7 +303,7 @@ struct MovieDetailView: View {
     }
 
     private func resolveSimilar() {
-        let ids = movie.similarTMDBIds
+        let ids = movie.similarTitleIds
         guard !ids.isEmpty else { similar = []; return }
 
         // Scope to the same playlist this movie belongs to.
@@ -376,7 +376,7 @@ struct MovieDetailView: View {
               let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
-            openWindow(id: "player", value: media)
+            MacPlayerWindowRouter.shared.play(media, using: openWindow)
         #else
             playingMedia = media
         #endif
@@ -404,6 +404,7 @@ struct MovieDetailView: View {
             #endif
         }
         TraktService.shared.syncWatched(movie: movie, watched: movie.isWatched)
+        SimklService.shared.syncWatched(movie: movie, watched: movie.isWatched)
     }
 }
 

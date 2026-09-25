@@ -6,6 +6,29 @@ struct PlaylistDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
     @Bindable var playlist: Playlist
+    /// Held here rather than read inside `playlist.syncState` so changing the
+    /// frequency in Settings re-renders the Status row (it decides `.overdue`).
+    @AppStorage(SyncFrequency.storageKey)
+    private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
+    /// Whether this is the selected playlist decides between "Sync due" and
+    /// "Syncs when selected" — auto-sync only refreshes the one on screen.
+    @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+    @Query private var playlists: [Playlist]
+
+    /// This playlist's sync condition, shared by the Status row and the
+    /// `Last Synced` line below it so the two can never disagree.
+    ///
+    /// Not `private`: the tvOS pane in PlaylistDetailView+TV (separate file)
+    /// renders the same two rows from it.
+    var syncState: PlaylistSyncState {
+        PlaylistSyncState.resolve(
+            syncEnabled: playlist.syncEnabled,
+            status: playlist.syncStatus,
+            lastSyncDate: playlist.lastSyncDate,
+            isActive: playlist.id.uuidString == playlists.activeID(for: selectedPlaylistID),
+            frequency: SyncFrequency.resolve(syncFrequencyRaw)
+        )
+    }
 
     /// tvOS: called to leave this detail when it is shown inline in the Settings
     /// detail pane (e.g. after deleting the playlist, whose object then becomes
@@ -34,12 +57,29 @@ struct PlaylistDetailView: View {
         playlist.sourceType == .stalker
     }
 
+    var isWebDAV: Bool {
+        playlist.sourceType == .webdav
+    }
+
+    /// Jellyfin and Emby: one login form, one stored session.
+    var isMediaServer: Bool {
+        playlist.sourceType == .jellyfin || playlist.sourceType == .emby
+    }
+
+    var isPlex: Bool {
+        playlist.sourceType == .plex
+    }
+
     /// The localized section heading for the connection fields.
     var connectionSectionTitle: LocalizedStringKey {
         switch playlist.sourceType {
         case .xtream: "Server"
         case .m3u: "M3U Playlist"
         case .stalker: "Stalker Portal"
+        case .webdav: "WebDAV Share"
+        case .jellyfin: "Jellyfin Server"
+        case .emby: "Emby Server"
+        case .plex: "Plex Server"
         }
     }
 
@@ -133,8 +173,8 @@ struct PlaylistDetailView: View {
         private var readOnlySection: some View {
             Section(connectionSectionTitle) {
                 LabeledContent("Name", value: playlist.name)
-                LabeledContent(isStalker ? "Portal URL" : "URL") {
-                    Text(playlist.serverURL)
+                LabeledContent(serverURLFieldTitle) {
+                    Text(playlist.displayURL)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .foregroundStyle(.secondary)
@@ -150,6 +190,18 @@ struct PlaylistDetailView: View {
                     LabeledContent("MAC Address", value: playlist.macAddress ?? "")
                     if !playlist.username.isEmpty {
                         LabeledContent("Username", value: playlist.username)
+                    }
+                } else if isWebDAV {
+                    // A WebDAV share can be anonymous, so each credential row
+                    // only appears when there is something to show.
+                    if !playlist.username.isEmpty {
+                        LabeledContent("Username", value: playlist.username)
+                    }
+                    if !playlist.password.isEmpty {
+                        LabeledContent("Password") {
+                            Text("\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     LabeledContent("Username", value: playlist.username)
@@ -199,6 +251,15 @@ struct PlaylistDetailView: View {
                         .textContentType(.username)
                     SecureField("Password (optional)", text: $editPassword)
                         .textContentType(.password)
+                } else if isWebDAV {
+                    TextField("Username (optional)", text: $editUsername)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                    #endif
+                        .autocorrectionDisabled()
+                        .textContentType(.username)
+                    SecureField("Password (optional)", text: $editPassword)
+                        .textContentType(.password)
                 } else {
                     TextField("Username", text: $editUsername)
                     #if os(iOS)
@@ -234,20 +295,21 @@ struct PlaylistDetailView: View {
             Section {
                 Toggle("Sync Enabled", isOn: $playlist.syncEnabled)
 
-                if playlist.syncStatus == .syncing {
-                    HStack {
-                        Text("Status")
-                        Spacer()
-                        HStack(spacing: 6) {
+                // Unconditional: "never synced" and "last sync failed" are the
+                // two states most worth reading here, and both used to render
+                // as no row at all.
+                LabeledContent("Status") {
+                    HStack(spacing: 6) {
+                        if syncState == .syncing {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("Syncing")
-                                .foregroundStyle(.secondary)
                         }
+                        Text(syncState.statusLabel)
+                            .foregroundStyle(syncState.tint)
                     }
                 }
 
-                if let lastSync = playlist.lastSyncDate {
+                if let lastSync = syncState.lastSyncDate {
                     LabeledContent("Last Synced") {
                         Text(lastSync, style: .relative)
                             .foregroundStyle(.secondary)
@@ -297,6 +359,8 @@ struct PlaylistDetailView: View {
         case .xtream: "Server URL"
         case .m3u: "Playlist URL"
         case .stalker: "Portal URL"
+        case .webdav: "Share URL"
+        case .jellyfin, .emby, .plex: "Server URL"
         }
     }
 }
@@ -328,6 +392,23 @@ extension PlaylistDetailView {
             playlist.macAddress = editMacAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword
+        } else if isWebDAV {
+            playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            playlist.password = editPassword
+        } else if isMediaServer {
+            playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            playlist.password = editPassword
+            // The stored session belongs to the previous address/credentials:
+            // drop it and let the next sync log in again.
+            playlist.jellyfinAccessToken = nil
+            playlist.jellyfinUserId = nil
+        } else if isPlex {
+            playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            playlist.password = editPassword
+            // Same reasoning as above — and a Plex playlist may legitimately
+            // have no token, so the next sync re-resolves one only if the
+            // credentials it now holds call for it.
+            playlist.plexAccessToken = nil
         } else {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword

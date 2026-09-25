@@ -68,6 +68,45 @@ import SwiftUI
                     }
                 }
 
+                // Viewer-facing too, so it belongs up here with Languages
+                // rather than among the engine sections — and it is
+                // engine-independent: all four hosts route their up/down
+                // presses through LiveChannelNavigator.
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Live TV")
+
+                    TVOptionCycleRow(
+                        title: "Up & Down",
+                        valueLabel: LiveSurfMode.resolve(liveSurfModeRaw).displayName
+                    ) {
+                        liveSurfModeRaw = nextLiveSurfModeRaw(after: liveSurfModeRaw)
+                    }
+
+                    Text("Up and down move to the next and previous channel, like a TV remote. List Order moves the way the channel list reads on screen instead — up goes to the row above.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
+                // Its own section rather than a row under Live TV: it governs
+                // every direction the player reads, VOD scrubbing included,
+                // and it is about the remote rather than about channels.
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Siri Remote")
+
+                    TVOptionToggleRow(title: "Swipe Gestures", isOn: $tvRemoteSwipes)
+
+                    // swiftlint:disable:next line_length
+                    Text("Swipes across the remote's touch surface control the player: up and down change channels, left opens the channel browser and right returns to the last channel. Turn this off to leave those to a click on the remote's direction buttons, so a brush across the surface changes nothing.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
+                tvStreamInfoSection
+
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Engine Priority")
 

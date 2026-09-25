@@ -12,8 +12,18 @@ import SwiftUI
 
 extension View {
     func paywall(isPresented: Binding<Bool>, highlight: PremiumFeature? = nil) -> some View {
-        sheet(isPresented: isPresented) {
-            PaywallView(highlight: highlight)
-        }
+        // The single central presentation point, so it is also the one place
+        // that can tell the review prompt to keep its distance from a paywall
+        // the user just closed.
+        sheet(
+            isPresented: isPresented,
+            onDismiss: { AppStoreReviewPrompt.shared.notePaywallDismissed() },
+            content: {
+                PaywallView(highlight: highlight)
+                    // Paired with `onDismiss` above so the review prompt knows
+                    // a paywall is on screen, not merely that one has closed.
+                    .onAppear { AppStoreReviewPrompt.shared.notePaywallAppeared() }
+            }
+        )
     }
 }

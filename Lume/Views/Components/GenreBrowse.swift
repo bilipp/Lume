@@ -76,8 +76,12 @@ nonisolated protocol GenreCarrying {
     var categoryId: String? { get }
 }
 
-extension Movie: GenreCarrying {}
-extension Series: GenreCarrying {}
+// The conformances are `nonisolated` too, not just the protocol: under
+// SWIFT_DEFAULT_ACTOR_ISOLATION=MainActor a bare `extension Movie: GenreCarrying`
+// declares a main-actor-isolated conformance, which cannot satisfy the
+// `Sendable` requirement `scan`'s generic parameter carries.
+nonisolated extension Movie: GenreCarrying {}
+nonisolated extension Series: GenreCarrying {}
 
 // MARK: - Browse-by-genre section
 
@@ -115,11 +119,152 @@ struct GenreGridSection: View {
     }
 }
 
+// MARK: - Off-main genre page fetch
+
+/// How many source rows one page load may walk before handing control back to
+/// the caller. The re-checks below can empty a whole source page, and each
+/// retry is another scan, so a genre whose next few hundred rows are all
+/// near-misses would otherwise chain scans until it found something. Five
+/// source pages is the bound; the caller resumes from the returned cursor.
+private let genreScanBudget = 500
+
+/// What one page of a genre grid is fetched for. Plain value type so the
+/// off-main fetch takes a single `Sendable` value, mirroring `SearchRequest`.
+nonisolated struct GenrePageRequest {
+    let genre: String
+    /// `"<playlistUUID>-"` — the id prefix every title in the active playlist
+    /// shares, matched in SQLite rather than after materialization.
+    let playlistPrefix: String
+    let excludedCategoryIDs: Set<String>
+    /// Where in the source rows to resume; see `GenrePage.scanned`.
+    let offset: Int
+    let pageSize: Int
+}
+
+/// A page's displayable rows — identifiers only, never managed objects, which
+/// can't cross actor boundaries — plus the cursor state the view carries
+/// forward.
+nonisolated struct GenrePage {
+    var ids: [PersistentIdentifier] = []
+    /// Source rows consumed, which is what the next `fetchOffset` must advance
+    /// by: the re-checks drop rows the substring fetch returned, so the
+    /// displayed count and the source offset diverge.
+    var scanned = 0
+    /// The source is exhausted — no further page can exist.
+    var reachedEnd = false
+}
+
+/// Runs a genre page fetch on a background `ModelContext`, mirroring
+/// `SearchFetcher`.
+///
+/// This used to be a synchronous `fetch` on the *main* context, fired from a
+/// grid cell's `onAppear` mid-scroll. `localizedStandardContains` can't use the
+/// `genre` index, so every page scanned the table — hundreds of milliseconds
+/// per page on a 179k-title playlist, and the retry loop could chain several of
+/// those into one frame, which is a watchdog hazard rather than a hitch.
+nonisolated enum GenrePageFetcher {
+    static func movies(
+        container: ModelContainer,
+        request: GenrePageRequest,
+        sortBy: [SortDescriptor<Movie>]
+    ) -> GenrePage {
+        let context = ModelContext(container)
+        var descriptor = FetchDescriptor<Movie>(predicate: moviePredicate(request: request), sortBy: sortBy)
+        descriptor.fetchLimit = request.pageSize
+        // Only `genre` (the exact-token re-check) and `categoryId` (viewer
+        // visibility) are read off the fetched rows, so leave the rest
+        // unhydrated — the same trade the genre derivation above makes, and it
+        // keeps a page of wide rows (plot, cast, artwork paths) out of memory.
+        descriptor.propertiesToFetch = [\.genre, \.categoryId]
+        return scan(request: request) { (offset: Int) -> [Movie] in
+            descriptor.fetchOffset = offset
+            return (try? context.fetch(descriptor)) ?? []
+        }
+    }
+
+    static func series(
+        container: ModelContainer,
+        request: GenrePageRequest,
+        sortBy: [SortDescriptor<Series>]
+    ) -> GenrePage {
+        let context = ModelContext(container)
+        var descriptor = FetchDescriptor<Series>(predicate: seriesPredicate(request: request), sortBy: sortBy)
+        descriptor.fetchLimit = request.pageSize
+        descriptor.propertiesToFetch = [\.genre, \.categoryId]
+        return scan(request: request) { (offset: Int) -> [Series] in
+            descriptor.fetchOffset = offset
+            return (try? context.fetch(descriptor)) ?? []
+        }
+    }
+
+    /// The playlist scope and the hidden-category exclusion run in SQLite, in
+    /// the shape `searchMoviePredicate` established, so a page isn't spent on
+    /// rows the viewer will never see — the offset used to walk every
+    /// playlist's titles and then throw all but one playlist's away.
+    /// `starts(with:)` compiles to a range seek on the unique `id` index, which
+    /// is the only part of this predicate an index can serve: the genre match
+    /// has to stay a substring test because the column holds several free-text
+    /// genres per title.
+    private static func moviePredicate(request: GenrePageRequest) -> Predicate<Movie> {
+        let (genre, prefix) = (request.genre, request.playlistPrefix)
+        let excluded = Set(request.excludedCategoryIDs.map(String?.some))
+        let filtersCategories = !excluded.isEmpty
+        return #Predicate { movie in
+            movie.id.starts(with: prefix)
+                && (movie.genre?.localizedStandardContains(genre) ?? false)
+                && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
+        }
+    }
+
+    private static func seriesPredicate(request: GenrePageRequest) -> Predicate<Series> {
+        let (genre, prefix) = (request.genre, request.playlistPrefix)
+        let excluded = Set(request.excludedCategoryIDs.map(String?.some))
+        let filtersCategories = !excluded.isEmpty
+        return #Predicate { series in
+            series.id.starts(with: prefix)
+                && (series.genre?.localizedStandardContains(genre) ?? false)
+                && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
+        }
+    }
+
+    /// Walks source pages from `request.offset` until one yields a displayable
+    /// row, the source runs out, or `genreScanBudget` is spent.
+    ///
+    /// The loop is needed because the in-memory re-checks can empty a whole
+    /// source page — `GenreParser` keeps `&` intact, so a tile for "Action"
+    /// fetches every "Action & Adventure" title and then drops it again — and
+    /// without new trailing items the grid never fires `onLoadMore` again,
+    /// stalling pagination. The budget is what bounds it: the caller resumes
+    /// from the returned cursor instead of the loop running until it finds
+    /// something.
+    private static func scan(
+        request: GenrePageRequest,
+        fetch: (Int) -> [some PersistentModel & GenreCarrying]
+    ) -> GenrePage {
+        let excluded = request.excludedCategoryIDs
+        var page = GenrePage()
+        while page.ids.isEmpty, !page.reachedEnd, page.scanned < genreScanBudget {
+            let rows = fetch(request.offset + page.scanned)
+            page.scanned += rows.count
+            if rows.count < request.pageSize { page.reachedEnd = true }
+            // The exact-token re-check keeps a substring hit out, and the
+            // `excludingRestricted` filter is inlined so this stays
+            // `nonisolated` — the same trade `GenreDerivation.derive` makes.
+            page.ids = rows
+                .filter { GenreParser.contains($0.genre, genre: request.genre) && !excluded.contains($0.categoryId ?? "") }
+                .map(\.persistentModelID)
+        }
+        return page
+    }
+}
+
 // MARK: - Genre detail grids
 
 /// The full grid of movies in a genre, reachable from a genre tile. The fetch
 /// narrows to candidate rows in SQLite with `localizedStandardContains`, then
-/// re-filters to exact-token matches in memory so substrings can't sneak in.
+/// re-filters to exact-token matches so substrings can't sneak in — all of it
+/// on a background context (`GenrePageFetcher`), because the grid asks for the
+/// next page from a cell's `onAppear`, mid-scroll.
 struct MovieGenreView: View {
     let genre: String
     let playlistPrefix: String
@@ -131,15 +276,19 @@ struct MovieGenreView: View {
     @State private var movies: [Movie] = []
     @State private var canLoadMore = true
     @State private var isLoadingPage = false
-    /// SQLite cursor position, distinct from `movies.count`. The in-memory
-    /// genre/prefix/restriction filter below drops rows the substring fetch
-    /// returned, so the displayed count and the source offset diverge — the
-    /// offset must track rows pulled from SQLite, not rows shown.
+    /// SQLite cursor position, distinct from `movies.count`. The exact-token and
+    /// visibility re-checks drop rows the substring fetch returned, so the
+    /// displayed count and the source offset diverge — the offset must track
+    /// rows pulled from SQLite, not rows shown.
     @State private var fetchedCount = 0
     /// The sort the current pages were loaded for. Pushing a detail cancels and
     /// (on pop) re-runs `.task`; reloading page one there would discard the
     /// loaded pages and reset the scroll position. Reload only when this differs.
     @State private var loadedSort: String?
+    /// Bumped whenever the loaded pages are thrown away. A page fetch already in
+    /// flight resolves against the old cursor, so its rows have to be dropped
+    /// rather than appended to the fresh list.
+    @State private var loadGeneration = 0
 
     /// A popular genre in a large IPTV playlist can span thousands of titles;
     /// fetch a page at a time and load the next as the grid nears the end,
@@ -166,6 +315,11 @@ struct MovieGenreView: View {
         .task(id: contentSortRaw) {
             guard loadedSort != contentSortRaw else { return }
             loadedSort = contentSortRaw
+            // A page fetched against the previous sort's cursor is now
+            // meaningless: bump the generation so it's discarded on arrival, and
+            // release the in-flight guard here, since that load no longer will.
+            loadGeneration += 1
+            isLoadingPage = false
             movies = []
             fetchedCount = 0
             canLoadMore = true
@@ -176,34 +330,41 @@ struct MovieGenreView: View {
     private func loadNextPage() {
         guard canLoadMore, !isLoadingPage else { return }
         isLoadingPage = true
-        defer { isLoadingPage = false }
-        let token = genre
-        let prefix = playlistPrefix
-        // Keep pulling raw pages until a batch surfaces at least one displayable
-        // title or the source is exhausted: the in-memory filter can drop an
-        // entire SQLite page, and without new trailing items the grid would
-        // never fire `onLoadMore` again, stalling pagination.
-        var added = 0
-        while canLoadMore, added == 0 {
-            var descriptor = FetchDescriptor<Movie>(
-                predicate: #Predicate { ($0.genre?.localizedStandardContains(token)) ?? false },
-                sortBy: contentSort.movieDescriptors
-            )
-            descriptor.fetchOffset = fetchedCount
-            descriptor.fetchLimit = pageSize
-            let rawPage = (try? modelContext.fetch(descriptor)) ?? []
-            fetchedCount += rawPage.count
-            if rawPage.count < pageSize { canLoadMore = false }
-            let filtered = rawPage
-                .filter { $0.id.hasPrefix(prefix) && GenreParser.contains($0.genre, genre: token) }
-                .excludingRestricted(restriction)
-            movies.append(contentsOf: filtered)
-            added += filtered.count
+        let generation = loadGeneration
+        let request = GenrePageRequest(
+            genre: genre,
+            playlistPrefix: playlistPrefix,
+            excludedCategoryIDs: restriction.excludedCategoryIDs,
+            offset: fetchedCount,
+            pageSize: pageSize
+        )
+        let sortBy = contentSort.movieDescriptors
+        let container = modelContext.container
+        Task {
+            let page = await Task.detached(priority: .userInitiated) {
+                GenrePageFetcher.movies(container: container, request: request, sortBy: sortBy)
+            }.value
+            guard generation == loadGeneration else { return }
+            apply(page)
         }
+    }
+
+    /// Hydrates the fetched identifiers in the view context and advances the
+    /// cursor. An empty page with the source not yet exhausted means the scan
+    /// budget ran out before anything displayable turned up; resume from the new
+    /// offset, because the grid can't ask again — nothing new appeared for it to
+    /// fire `onLoadMore` from.
+    private func apply(_ page: GenrePage) {
+        isLoadingPage = false
+        fetchedCount += page.scanned
+        if page.reachedEnd { canLoadMore = false }
+        movies.append(contentsOf: page.ids.compactMap { modelContext.model(for: $0) as? Movie })
+        if page.ids.isEmpty, canLoadMore { loadNextPage() }
     }
 }
 
-/// The full grid of series in a genre.
+/// The full grid of series in a genre; paged off the main actor exactly as
+/// `MovieGenreView` is.
 struct SeriesGenreView: View {
     let genre: String
     let playlistPrefix: String
@@ -220,6 +381,9 @@ struct SeriesGenreView: View {
     /// Sort the current pages were loaded for; reload only on change — see
     /// `MovieGenreView`, which explains why reappearance must not reset.
     @State private var loadedSort: String?
+    /// Discards a page fetched against a cursor that has since been reset — see
+    /// `MovieGenreView`.
+    @State private var loadGeneration = 0
 
     /// Page a genre at a time rather than hydrating it whole; see `MovieGenreView`.
     private let pageSize = 100
@@ -243,6 +407,8 @@ struct SeriesGenreView: View {
         .task(id: contentSortRaw) {
             guard loadedSort != contentSortRaw else { return }
             loadedSort = contentSortRaw
+            loadGeneration += 1
+            isLoadingPage = false
             series = []
             fetchedCount = 0
             canLoadMore = true
@@ -253,28 +419,32 @@ struct SeriesGenreView: View {
     private func loadNextPage() {
         guard canLoadMore, !isLoadingPage else { return }
         isLoadingPage = true
-        defer { isLoadingPage = false }
-        let token = genre
-        let prefix = playlistPrefix
-        // Keep pulling until a batch yields displayable titles or the source is
-        // exhausted — the in-memory filter can empty a whole page; see
-        // `MovieGenreView.loadNextPage`.
-        var added = 0
-        while canLoadMore, added == 0 {
-            var descriptor = FetchDescriptor<Series>(
-                predicate: #Predicate { ($0.genre?.localizedStandardContains(token)) ?? false },
-                sortBy: contentSort.seriesDescriptors
-            )
-            descriptor.fetchOffset = fetchedCount
-            descriptor.fetchLimit = pageSize
-            let rawPage = (try? modelContext.fetch(descriptor)) ?? []
-            fetchedCount += rawPage.count
-            if rawPage.count < pageSize { canLoadMore = false }
-            let filtered = rawPage
-                .filter { $0.id.hasPrefix(prefix) && GenreParser.contains($0.genre, genre: token) }
-                .excludingRestricted(restriction)
-            series.append(contentsOf: filtered)
-            added += filtered.count
+        let generation = loadGeneration
+        let request = GenrePageRequest(
+            genre: genre,
+            playlistPrefix: playlistPrefix,
+            excludedCategoryIDs: restriction.excludedCategoryIDs,
+            offset: fetchedCount,
+            pageSize: pageSize
+        )
+        let sortBy = contentSort.seriesDescriptors
+        let container = modelContext.container
+        Task {
+            let page = await Task.detached(priority: .userInitiated) {
+                GenrePageFetcher.series(container: container, request: request, sortBy: sortBy)
+            }.value
+            guard generation == loadGeneration else { return }
+            apply(page)
         }
+    }
+
+    /// Hydrates and advances the cursor, resuming when the scan budget ran out
+    /// empty — see `MovieGenreView.apply`.
+    private func apply(_ page: GenrePage) {
+        isLoadingPage = false
+        fetchedCount += page.scanned
+        if page.reachedEnd { canLoadMore = false }
+        series.append(contentsOf: page.ids.compactMap { modelContext.model(for: $0) as? Series })
+        if page.ids.isEmpty, canLoadMore { loadNextPage() }
     }
 }

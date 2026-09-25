@@ -78,46 +78,6 @@ class StalkerClient {
         "\(configuration.portalURL)|\(configuration.macAddress)"
     }
 
-    // MARK: - Endpoint resolution
-
-    /// Candidate middleware endpoints derived from the user-supplied portal URL.
-    /// Portals expose the API at either `…/portal.php` or
-    /// `…/server/load.php`, sometimes under a `/stalker_portal/` or `/c/` path.
-    /// The handshake tries these in order and the working one is pinned for the
-    /// session.
-    private func candidateEndpoints() -> [URL] {
-        let raw = configuration.portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var components = URLComponents(string: raw), components.host != nil else { return [] }
-        // Reduce to scheme://host:port — the path the user pasted (`/c/`,
-        // `/stalker_portal/`, a trailing slash) is just a hint at the variant.
-        let pastedPath = components.path.lowercased()
-        components.query = nil
-        components.fragment = nil
-
-        let paths: [String] = if pastedPath.contains("stalker_portal") {
-            ["/stalker_portal/server/load.php", "/portal.php", "/server/load.php"]
-        } else {
-            ["/portal.php", "/server/load.php", "/stalker_portal/server/load.php"]
-        }
-
-        return paths.compactMap { path in
-            var copy = components
-            copy.path = path
-            return copy.url
-        }
-    }
-
-    /// scheme://host:port of the portal, used for the `Referer` header.
-    private var portalOrigin: String {
-        guard var components = URLComponents(string: configuration.portalURL) else {
-            return configuration.portalURL
-        }
-        components.path = "/c/"
-        components.query = nil
-        components.fragment = nil
-        return components.url?.absoluteString ?? configuration.portalURL
-    }
-
     // MARK: - Session / handshake
 
     /// Returns a valid session (bearer token + pinned endpoint), handshaking if
@@ -136,12 +96,33 @@ class StalkerClient {
 
     /// Performs the Stalker handshake against each candidate endpoint until one
     /// returns a token, then primes the session with `get_profile` (some portals
-    /// only activate the token once the profile is fetched).
+    /// only activate the token once the profile is fetched). When every
+    /// candidate fails, follows the pasted URL's redirects and retries against
+    /// wherever it lands — providers hand out a stable redirector domain whose
+    /// 301s drop the path (`/server/load.php?…` → `https://other-host/`), so the
+    /// real portal is only reachable by loading the page like a browser would.
     private func handshake() async throws -> StalkerSessionStore.Session {
-        let endpoints = candidateEndpoints()
+        let endpoints = Self.candidateEndpoints(for: configuration.portalURL)
         guard !endpoints.isEmpty else { throw StalkerError.invalidURL }
 
         var lastError: Error = StalkerError.handshakeFailed
+        if let session = try await handshake(trying: endpoints, lastError: &lastError) {
+            return session
+        }
+        guard let discovered = await redirectedPortalURL() else { throw lastError }
+        let retry = Self.candidateEndpoints(for: discovered.absoluteString).filter { !endpoints.contains($0) }
+        guard !retry.isEmpty else { throw lastError }
+        Logger.network.info("Stalker portal redirected to \(discovered.host ?? "?", privacy: .public); retrying handshake there")
+        if let session = try await handshake(trying: retry, lastError: &lastError) {
+            return session
+        }
+        throw lastError
+    }
+
+    private func handshake(
+        trying endpoints: [URL],
+        lastError: inout Error
+    ) async throws -> StalkerSessionStore.Session? {
         for endpoint in endpoints {
             // Bail immediately if a caller deadline (e.g. the add-playlist
             // connection-test timeout) cancelled us, rather than racing through
@@ -169,7 +150,7 @@ class StalkerClient {
                 continue
             }
         }
-        throw lastError
+        return nil
     }
 
     // MARK: - Request plumbing
@@ -226,7 +207,7 @@ class StalkerClient {
         var urlRequest = URLRequest(url: url)
         urlRequest.setValue(stalkerUserAgent, forHTTPHeaderField: "User-Agent")
         urlRequest.setValue("Model: MAG250; Link: WiFi", forHTTPHeaderField: "X-User-Agent")
-        urlRequest.setValue(portalOrigin, forHTTPHeaderField: "Referer")
+        urlRequest.setValue(Self.referer(for: url), forHTTPHeaderField: "Referer")
         urlRequest.setValue(
             "mac=\(configuration.macAddress); stb_lang=en; timezone=Europe/London",
             forHTTPHeaderField: "Cookie"
@@ -445,7 +426,9 @@ class StalkerClient {
         } catch {
             // Cancellation must abort the sync, not masquerade as a
             // partially-walked catalog.
-            if error is CancellationError || Task.isCancelled { throw CancellationError() }
+            if error is CancellationError || Task.isCancelled {
+                throw CancellationError()
+            }
             let count = fetched
             let type = target.type
             Logger.network.warning("Stalker: \(type) list page failed mid-walk; keeping \(count) items")
@@ -516,5 +499,63 @@ class StalkerClient {
             throw StalkerError.noStreamURL
         }
         return url
+    }
+}
+
+// MARK: - Endpoint resolution
+
+extension StalkerClient {
+    /// Candidate middleware endpoints derived from a portal URL.
+    /// Portals expose the API at either `…/portal.php` or
+    /// `…/server/load.php`, sometimes under a `/stalker_portal/` or `/c/` path.
+    /// The handshake tries these in order and the working one is pinned for the
+    /// session.
+    nonisolated static func candidateEndpoints(for portalURL: String) -> [URL] {
+        let raw = portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var components = URLComponents(string: raw), components.host != nil else { return [] }
+        // Reduce to scheme://host:port — the path the user pasted (`/c/`,
+        // `/stalker_portal/`, a trailing slash) is just a hint at the variant.
+        let pastedPath = components.path.lowercased()
+        components.query = nil
+        components.fragment = nil
+
+        let paths: [String] = if pastedPath.contains("stalker_portal") {
+            ["/stalker_portal/server/load.php", "/portal.php", "/server/load.php"]
+        } else {
+            ["/portal.php", "/server/load.php", "/stalker_portal/server/load.php"]
+        }
+
+        return paths.compactMap { path in
+            var copy = components
+            copy.path = path
+            return copy.url
+        }
+    }
+
+    /// The portal's `/c/` page on the host actually being called, used for the
+    /// `Referer` header — after a redirect-discovered handshake that is not the
+    /// host the user pasted.
+    private nonisolated static func referer(for url: URL) -> String {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url.absoluteString
+        }
+        components.path = components.path.contains("/stalker_portal/") ? "/stalker_portal/c/" : "/c/"
+        components.query = nil
+        components.fragment = nil
+        return components.url?.absoluteString ?? url.absoluteString
+    }
+
+    /// Loads the pasted portal URL with redirects followed and returns where it
+    /// ended up, or `nil` when it didn't redirect anywhere new.
+    private func redirectedPortalURL() async -> URL? {
+        let raw = configuration.portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let pasted = URL(string: raw) else { return nil }
+        var request = URLRequest(url: pasted)
+        request.setValue(stalkerUserAgent, forHTTPHeaderField: "User-Agent")
+        guard let (_, response) = try? await session.data(for: request),
+              let final = response.url,
+              final.host != pasted.host || final.path != pasted.path
+        else { return nil }
+        return final
     }
 }

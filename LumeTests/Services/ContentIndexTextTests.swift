@@ -58,6 +58,20 @@ struct ContentIndexTextTests {
         #expect(query.title == "Up - The Movie")
     }
 
+    @Test func `dot-separated scene filename is normalized`() {
+        let query = ContentIndexText.searchQuery(for: "The.Godfather.1972.1080p.BluRay.x264-GROUP")
+        #expect(query.title == "The Godfather")
+        #expect(query.year == 1972)
+    }
+
+    /// Only unambiguously scene-shaped names are rewritten — a provider name
+    /// that merely contains a dot keeps today's behaviour.
+    @Test func `dotted provider name with spaces is untouched`() {
+        let query = ContentIndexText.searchQuery(for: "Mr. Robot")
+        #expect(query.title == "Mr. Robot")
+        #expect(query.year == nil)
+    }
+
     @Test func `empty result falls back to the raw name`() {
         let query = ContentIndexText.searchQuery(for: "4K")
         #expect(query.title == "4K")
@@ -98,6 +112,45 @@ struct ContentIndexTextTests {
         #expect(ContentIndexText.year(fromReleaseDate: "1972") == 1972)
         #expect(ContentIndexText.year(fromReleaseDate: nil) == nil)
         #expect(ContentIndexText.year(fromReleaseDate: "unknown") == nil)
+    }
+
+    // MARK: - shortDocument
+
+    @Test func `short document keeps only title, year and genre`() {
+        let document = ContentIndexText.shortDocument(for: .init(
+            name: "Inception",
+            year: 2010,
+            genre: "Action, Science Fiction",
+            tagline: "Your mind is the scene of the crime.",
+            plot: "A thief who steals corporate secrets through dream-sharing technology.",
+            cast: "Leonardo DiCaprio, Joseph Gordon-Levitt"
+        ))
+        #expect(document == "Inception (2010). Action, Science Fiction.")
+    }
+
+    @Test func `short document skips empty parts`() {
+        let document = ContentIndexText.shortDocument(for: .init(
+            name: "Inception",
+            year: nil,
+            genre: "",
+            tagline: nil,
+            plot: nil,
+            cast: nil
+        ))
+        #expect(document == "Inception.")
+    }
+
+    @Test func `short document is a prefix of the full document`() {
+        let facts = ContentIndexText.TitleFacts(
+            name: "Inception",
+            year: 2010,
+            genre: "Action",
+            tagline: "Your mind is the scene of the crime.",
+            plot: "A thief who steals corporate secrets.",
+            cast: "Leonardo DiCaprio"
+        )
+        #expect(ContentIndexText.document(for: facts)
+            .hasPrefix(ContentIndexText.shortDocument(for: facts)))
     }
 
     // MARK: - Embedding blob coding

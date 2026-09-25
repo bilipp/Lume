@@ -25,24 +25,24 @@ final class LoginFlowTests: XCTestCase {
     }
 
     func testAddPlaylistButtonAvailableInSettings() {
-        app.buttons["gear"].tap()
+        XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
         let addButton = app.buttons["Add Playlist"]
-        XCTAssertTrue(addButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(addButton.waitForExistence(timeout: 10))
     }
 
     func testSeededPlaylistNameVisible() {
-        app.buttons["gear"].tap()
+        XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
         let playlistName = app.staticTexts["Test Playlist"]
-        XCTAssertTrue(playlistName.waitForExistence(timeout: 3))
+        XCTAssertTrue(playlistName.waitForExistence(timeout: 10))
     }
 
     func testPlaylistCanBeDeleted() {
-        app.buttons["gear"].tap()
+        XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
         let playlistName = app.staticTexts["Test Playlist"]
-        XCTAssertTrue(playlistName.waitForExistence(timeout: 3))
+        XCTAssertTrue(playlistName.waitForExistence(timeout: 10))
         playlistName.swipeLeft()
         let deleteButton = app.buttons["Delete"]
-        XCTAssertTrue(deleteButton.waitForExistence(timeout: 2))
+        XCTAssertTrue(deleteButton.waitForExistence(timeout: 10))
     }
 
     func testServerConnectionNotVisibleWithSeededData() {

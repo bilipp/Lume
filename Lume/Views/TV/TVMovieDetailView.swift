@@ -291,7 +291,7 @@
         }
 
         private func resolveSimilar() {
-            let ids = movie.similarTMDBIds
+            let ids = movie.similarTitleIds
             guard !ids.isEmpty else { similar = []; return }
 
             let playlistPrefix = movie.id.components(separatedBy: "-movie-").first
@@ -375,6 +375,7 @@
                 movie.watchProgress = Double(movie.durationSecs ?? 0)
             }
             TraktService.shared.syncWatched(movie: movie, watched: movie.isWatched)
+            SimklService.shared.syncWatched(movie: movie, watched: movie.isWatched)
         }
     }
 
