@@ -42,6 +42,41 @@ struct DebugLogExporterTests {
         #expect(DebugLogExporter.signpostLabel(for: .undefined) == "signpost")
     }
 
+    @Test func `app subsystem entries keep the bare category`() {
+        let label = DebugLogExporter.categoryLabel(
+            subsystem: "com.bilipp.lume",
+            category: "player",
+            appSubsystem: "com.bilipp.lume"
+        )
+        #expect(label == "player")
+    }
+
+    @Test func `engine entries are qualified by their subsystem`() {
+        let label = DebugLogExporter.categoryLabel(
+            subsystem: DebugLogExporter.engineSubsystem,
+            category: DebugLogExporter.engineDiagnosticsCategory,
+            appSubsystem: "com.bilipp.lume"
+        )
+        #expect(label == "engine.lume/diagnostics")
+    }
+
+    @Test func `category labels are never empty`() {
+        #expect(!DebugLogExporter.categoryLabel(subsystem: "", category: "", appSubsystem: "com.bilipp.lume").isEmpty)
+        #expect(!DebugLogExporter.categoryLabel(subsystem: "engine.lume", category: "", appSubsystem: "com.bilipp.lume").isEmpty)
+        #expect(!DebugLogExporter.categoryLabel(subsystem: "com.bilipp.lume", category: "sync", appSubsystem: nil).isEmpty)
+    }
+
+    @Test func `the entry predicate matches the app and the engine diagnostics channel`() {
+        let format = DebugLogExporter.entryPredicate().predicateFormat
+        #expect(format.contains("engine.lume"))
+        #expect(format.contains("diagnostics"))
+        // The raw FFmpeg bridge is per-frame on some streams; it stays out.
+        #expect(!format.contains("ffmpeg"))
+        if let app = Bundle.main.bundleIdentifier {
+            #expect(format.contains(app))
+        }
+    }
+
     @Test func `device model is never empty`() {
         #expect(!DebugLogExporter.deviceModel.isEmpty)
     }

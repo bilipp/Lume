@@ -59,6 +59,9 @@ struct KSPlayerEngineView: View {
     /// host and handed to `NowPlayingService` with this engine's transport.
     /// `nil` on tvOS, where the Siri Remote already owns stream changes.
     var onRemoteAdvance: ((PlayerMediaSwapper.Step) -> Bool)?
+    /// The stream's Dolby Vision base layer is IPT (profile 5 / 20 / 10.0),
+    /// which KSPlayer shows pink/green. The host swaps to LumeEngine.
+    var onDolbyVisionIPTDetected: (() -> Void)?
 
     @StateObject var coordinator = KSVideoPlayer.Coordinator()
     /// Drives bounded backoff reconnects when the stream drops (see

@@ -66,6 +66,11 @@ struct FullScreenPlayerView: View {
     /// well handle what this one couldn't.
     @State private var airPlayVideoUnsupported: Set<String> = []
 
+    /// Streams routed to LumeEngine because their Dolby Vision base layer is
+    /// IPT, and those it then failed on. See `FullScreenPlayerView+DolbyVision`.
+    @State var dolbyVisionIPTStreams: Set<String> = []
+    @State var dolbyVisionRouteFailed: Set<String> = []
+
     /// The only high-frequency playback state. An `@Observable` the host owns
     /// but never reads in its own body, so playback ticks invalidate just the
     /// scrubber/time labels rather than re-rendering the whole player tree. See
@@ -147,7 +152,7 @@ struct FullScreenPlayerView: View {
 
     /// The engine the user's priority list selects for the current attempt,
     /// before any AirPlay override.
-    private var priorityEngine: PlayerEngineKind {
+    var priorityEngine: PlayerEngineKind {
         guard enginePriority.indices.contains(engineAttempt) else { return .defaultValue }
         return enginePriority[engineAttempt]
     }
@@ -156,14 +161,15 @@ struct FullScreenPlayerView: View {
     /// active, this forces `.avPlayer` — the only engine that can hand full-screen
     /// video to an AirPlay receiver (see `castService`).
     private var engine: PlayerEngineKind {
-        isAirPlayOverride ? .avPlayer : priorityEngine
+        if isAirPlayOverride { return .avPlayer }
+        return isDolbyVisionRoute ? .lumeEngine : priorityEngine
     }
 
     /// True when AirPlay is active and the user's engine isn't already AVPlayer,
     /// so the stream is being force-routed through AVPlayer for the cast. Drops
     /// back to the user's engine once AVPlayer has proven it can't play the
     /// current stream (`airPlayVideoUnsupported`).
-    private var isAirPlayOverride: Bool {
+    var isAirPlayOverride: Bool {
         castService.isAirPlayActive
             && priorityEngine != .avPlayer
             && !airPlayVideoUnsupported.contains(activeMedia.id)
@@ -182,7 +188,7 @@ struct FullScreenPlayerView: View {
     /// against the new engine. When the list is exhausted this is never called
     /// (the last engine shows its own error overlay instead), so there's nothing
     /// to do here in that case.
-    private func fallBackToNextEngine() {
+    func fallBackToNextEngine() {
         guard hasFallbackEngine else { return }
         let failed = engine
         engineAttempt += 1
@@ -391,9 +397,9 @@ struct FullScreenPlayerView: View {
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
                 nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
-                reportsStartupFailure: hasFallbackEngine,
+                reportsStartupFailure: hasFallbackEngine || isDolbyVisionRoute,
                 usesQuickStartupTimeout: hasFallbackEngine,
-                onPlaybackFailed: fallBackToNextEngine,
+                onPlaybackFailed: handleLumeEngineFailure,
                 onSelectMedia: switchMedia,
                 onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler
             )
@@ -425,7 +431,7 @@ struct FullScreenPlayerView: View {
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia,
-                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler
+                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler, onDolbyVisionIPTDetected: routeToLumeEngineForDolbyVision
             )
             .id(engineAttempt)
         case .vlcKit:
