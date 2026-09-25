@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import KSPlayer
 import OSLog
@@ -109,6 +110,7 @@ extension KSPlayerEngineView {
         case .readyToPlay:
             hasSeenReadyToPlay = true
             reconnector.reset()
+            reportDolbyVisionIPTIfPresent()
         case .bufferFinished:
             // Guard: KSPlayerLayer.play() immediately sets state = .bufferFinished
             // if the previous session's loadState is still .playable (it isn't reset
@@ -385,3 +387,21 @@ extension KSPlayerEngineView {
         }
     }
 #endif
+
+extension KSPlayerEngineView {
+    /// Tracks are known by `.readyToPlay`; the DV record is the container's
+    /// (`dvcC` / `dvvC` / DOVI descriptor), so this costs nothing per frame.
+    func reportDolbyVisionIPTIfPresent() {
+        guard let onDolbyVisionIPTDetected,
+              let tracks = coordinator.playerLayer?.player.tracks(mediaType: .video)
+        else { return }
+        let isIPT = tracks.contains { track in
+            guard let dovi = track.dovi else { return false }
+            return DolbyVisionBaseLayer.isIPT(
+                profile: Int(dovi.dv_profile),
+                compatibilityID: Int(dovi.dv_bl_signal_compatibility_id)
+            )
+        }
+        if isIPT { onDolbyVisionIPTDetected() }
+    }
+}
