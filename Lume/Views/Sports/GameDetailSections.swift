@@ -17,18 +17,21 @@ import SwiftUI
 nonisolated extension SportsEventDetail {
     /// Whether there is anything to show in the tabs; the sheet hides the whole
     /// block (and never flashes a skeleton) for a pre-match fixture with none.
-    var hasTabContent: Bool {
-        !keyEvents.isEmpty || !teamStats.isEmpty || !lineups.isEmpty
+    func hasTabContent(hidingScores: Bool) -> Bool {
+        if hidingScores { return !lineups.isEmpty }
+        return !keyEvents.isEmpty || !teamStats.isEmpty || !lineups.isEmpty
     }
 }
 
 extension SportsEventDetail {
     /// The tabs that carry content, in fixed Timeline / Stats / Lineup order.
     /// Drives both game-detail sheets so their pill selectors stay in step.
-    var availableTabs: [GameDetailTab] {
+    /// While scores are hidden only the lineups remain: the timeline lists every
+    /// goal and the stats count them.
+    func availableTabs(hidingScores: Bool) -> [GameDetailTab] {
         var tabs: [GameDetailTab] = []
-        if !keyEvents.isEmpty { tabs.append(.timeline) }
-        if !teamStats.isEmpty { tabs.append(.stats) }
+        if !hidingScores, !keyEvents.isEmpty { tabs.append(.timeline) }
+        if !hidingScores, !teamStats.isEmpty { tabs.append(.stats) }
         if !lineups.isEmpty { tabs.append(.lineup) }
         return tabs
     }
@@ -59,11 +62,12 @@ struct GameDetailTabs: View {
     let fixture: SportsFixture
     let homePalette: TeamPalette
     let awayPalette: TeamPalette
+    let hidesScores: Bool
 
     @State private var tab: GameDetailTab = .timeline
 
     var body: some View {
-        let tabs = detail.availableTabs
+        let tabs = detail.availableTabs(hidingScores: hidesScores)
         VStack(spacing: 16) {
             Picker(selection: $tab) {
                 ForEach(tabs) { Text($0.title).tag($0) }
@@ -85,13 +89,16 @@ struct GameDetailTabs: View {
 
     @ViewBuilder
     private var selectedSection: some View {
-        switch tab {
+        let tabs = detail.availableTabs(hidingScores: hidesScores)
+        switch tabs.contains(tab) ? tab : tabs.first {
         case .timeline:
             TimelineSection(events: detail.keyEvents, fixture: fixture)
         case .stats:
             StatsSection(stats: detail.teamStats, homePalette: homePalette, awayPalette: awayPalette)
         case .lineup:
             LineupSection(lineups: detail.lineups, fixture: fixture)
+        case nil:
+            EmptyView()
         }
     }
 }

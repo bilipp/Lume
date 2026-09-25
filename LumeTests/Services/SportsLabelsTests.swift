@@ -170,10 +170,24 @@ struct SportsLabelsTests {
 
     @Test func `a card with scores hidden drops cricket's state of play but keeps other live lines`() {
         let cricket = SportsFixtureStatus(state: .inProgress, shortDetail: "Live", summary: "Warwickshire lead by 56 runs")
-        #expect(cricket.cardLiveDetail(family: .cricket, hidingScores: true) == nil)
-        #expect(cricket.cardLiveDetail(family: .cricket, hidingScores: false) == "Warwickshire lead by 56 runs")
+        #expect(cricket.liveDetail(family: .cricket, hidingScores: true) == nil)
+        #expect(cricket.liveDetail(family: .cricket, hidingScores: false) == "Warwickshire lead by 56 runs")
         let soccer = status("STATUS_FIRST_HALF", short: "63'", period: 1, clock: "63'")
-        #expect(soccer.cardLiveDetail(family: .clockOnly, hidingScores: true) == "63'")
+        #expect(soccer.liveDetail(family: .clockOnly, hidingScores: true) == "63'")
+    }
+
+    @Test func `game detail with scores hidden offers only the lineup tab`() {
+        let lineup = SportsLineup(teamId: "1", formation: nil, starters: [])
+        let full = SportsEventDetail(
+            keyEvents: [SportsKeyEvent(clock: "12'", type: "Goal", teamId: "1", isGoal: true)],
+            teamStats: [stat("Shots", key: "totalShots")],
+            lineups: [lineup]
+        )
+        #expect(full.availableTabs(hidingScores: false) == [.timeline, .stats, .lineup])
+        #expect(full.availableTabs(hidingScores: true) == [.lineup])
+        let noLineups = SportsEventDetail(keyEvents: full.keyEvents, teamStats: full.teamStats)
+        #expect(noLineups.hasTabContent(hidingScores: false))
+        #expect(!noLineups.hasTabContent(hidingScores: true))
     }
 
     @Test func `tennis names the set in play and how a match ended short`() {

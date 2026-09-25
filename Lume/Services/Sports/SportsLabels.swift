@@ -232,10 +232,10 @@ nonisolated extension SportsFixtureStatus {
         }
     }
 
-    /// The live line a fixture card shows. Cricket's is the provider's
+    /// The live line under the LIVE badge. Cricket's is the provider's
     /// state-of-play sentence ("Warwickshire lead by 56 runs"), which gives the
-    /// score away, so a card with scores hidden leaves it out.
-    func cardLiveDetail(family: SportsPeriodFamily, hidingScores: Bool) -> String? {
+    /// score away, so it is left out while scores are hidden.
+    func liveDetail(family: SportsPeriodFamily, hidingScores: Bool) -> String? {
         if hidingScores, family == .cricket { return nil }
         return localizedLiveDetail(family: family)
     }

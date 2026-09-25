@@ -17414,54 +17414,54 @@
         }
       }
     },
-    "Fixture cards leave out scores and don't highlight the winner. Opening a game still shows its score." : {
+    "Fixture cards and game details leave out scores and results, along with the match timeline and stats." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spielkarten zeigen keine Ergebnisse und heben den Sieger nicht hervor. In der Spielansicht ist das Ergebnis weiterhin sichtbar."
+            "value" : "Spielkarten und Spieldetails zeigen keine Ergebnisse, auch keinen Spielverlauf und keine Statistiken."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Las tarjetas de partidos no muestran marcadores ni destacan al ganador. Al abrir un partido se sigue viendo su marcador."
+            "value" : "Las tarjetas y los detalles de los partidos no muestran marcadores ni resultados, ni tampoco la cronología ni las estadísticas."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les cartes de match n'affichent pas les scores et ne mettent pas le vainqueur en avant. Le score reste visible en ouvrant un match."
+            "value" : "Les cartes et les détails des matchs n'affichent ni scores ni résultats, ni le déroulé du match ni les statistiques."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le schede delle partite non mostrano i risultati né evidenziano il vincitore. Aprendo una partita il risultato resta visibile."
+            "value" : "Le schede e i dettagli delle partite non mostrano risultati, né la cronaca della partita né le statistiche."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "試合カードにスコアを表示せず、勝者も強調しません。試合を開くとスコアを確認できます。"
+            "value" : "試合カードと試合の詳細に、スコアや結果、試合経過、スタッツを表示しません。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "경기 카드에 점수를 표시하지 않고 승자도 강조하지 않습니다. 경기를 열면 점수를 볼 수 있습니다."
+            "value" : "경기 카드와 경기 상세 정보에 점수와 결과, 경기 타임라인, 통계를 표시하지 않습니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Os cartões de jogos não mostram placares nem destacam o vencedor. Ao abrir um jogo, o placar continua visível."
+            "value" : "Os cartões e os detalhes dos jogos não mostram placares nem resultados, nem a cronologia e as estatísticas da partida."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "比赛卡片不显示比分，也不突出显示获胜方。打开比赛后仍可查看比分。"
+            "value" : "比赛卡片和比赛详情不显示比分和结果，也不显示比赛进程和统计数据。"
           }
         }
       }

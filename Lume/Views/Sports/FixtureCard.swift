@@ -100,7 +100,7 @@ struct FixtureCard: View {
             switch fixture.status.state {
             case .inProgress:
                 LiveBadge(fontSize: 10)
-                if let line = fixture.status.cardLiveDetail(family: fixture.periodFamily, hidingScores: hidesScores) {
+                if let line = fixture.status.liveDetail(family: fixture.periodFamily, hidingScores: hidesScores) {
                     Text(verbatim: line)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -304,7 +304,7 @@ struct FixtureCard: View {
         case .inProgress:
             parts.append(String(localized: "Live"))
             if fixture.hasTeams, !hidesScores { parts.append(scoreSpokenLine) }
-            if let line = fixture.status.cardLiveDetail(family: fixture.periodFamily, hidingScores: hidesScores) {
+            if let line = fixture.status.liveDetail(family: fixture.periodFamily, hidingScores: hidesScores) {
                 parts.append(line)
             }
         case .final:

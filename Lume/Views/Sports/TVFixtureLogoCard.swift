@@ -53,7 +53,7 @@
             case .inProgress:
                 parts.append(String(localized: "Live"))
                 if hasTeams, showsScore { parts.append(score) }
-                if let line = status.cardLiveDetail(family: periodFamily, hidingScores: !showsScore) { parts.append(line) }
+                if let line = status.liveDetail(family: periodFamily, hidingScores: !showsScore) { parts.append(line) }
             case .final:
                 parts.append(String(localized: "Final"))
                 if hasTeams, showsScore {

@@ -89,7 +89,7 @@ import SwiftUI
             Section {
                 Toggle("Hide Scores", isOn: $hideScores)
             } footer: {
-                Text("Fixture cards leave out scores and don't highlight the winner. Opening a game still shows its score.")
+                Text("Fixture cards and game details leave out scores and results, along with the match timeline and stats.")
             }
         }
 
