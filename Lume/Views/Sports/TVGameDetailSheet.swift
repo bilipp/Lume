@@ -43,6 +43,7 @@
         @State private var fetchedStandings: [SportsStandingRow] = []
         @State private var tab: GameDetailTab = .timeline
         @State private var selfResolved: [ResolvedChannel] = []
+        @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
 
         private var channels: [ResolvedChannel] {
             resolved.isEmpty ? selfResolved : resolved
@@ -195,39 +196,17 @@
             .padding(.top, 8)
         }
 
-        private func teamColumn(_ competitor: SportsCompetitor) -> some View {
-            VStack(spacing: 14) {
-                TeamCrest(team: competitor.team, size: 130)
-                    .accessibilityHidden(true)
-                Text(verbatim: competitor.team.name)
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                if let record = competitor.record, !record.isEmpty {
-                    Text(verbatim: record)
-                        .font(.system(size: 24))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                if let form = competitor.form, !form.isEmpty {
-                    Text(verbatim: form)
-                        .font(.system(size: 24, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                followButton(competitor.team)
-            }
-            .frame(maxWidth: .infinity, alignment: .top)
-        }
-
         @ViewBuilder
         private var centerStatus: some View {
             switch fixture.status.state {
             case .final:
                 VStack(spacing: 10) {
                     scoreText
-                    TVSetsLine(fixture: fixture)
+                    if !hidesScores {
+                        TVSetsLine(fixture: fixture)
+                    }
                     EndedBadge(fontSize: 22)
-                    if let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) {
+                    if !hidesScores, let qualifier = fixture.status.localizedEndingQualifier(family: fixture.periodFamily) {
                         Text(verbatim: qualifier)
                             .font(.system(size: 26)).foregroundStyle(.white.opacity(0.7))
                     }
@@ -235,9 +214,11 @@
             case .inProgress:
                 VStack(spacing: 10) {
                     scoreText
-                    TVSetsLine(fixture: fixture)
+                    if !hidesScores {
+                        TVSetsLine(fixture: fixture)
+                    }
                     LiveBadge(fontSize: 22)
-                    if let line = fixture.status.localizedLiveDetail(family: fixture.periodFamily) {
+                    if let line = fixture.status.liveDetail(family: fixture.periodFamily, hidingScores: hidesScores) {
                         Text(verbatim: line)
                             .font(.system(size: 26)).foregroundStyle(.white.opacity(0.7))
                     }
@@ -256,7 +237,7 @@
 
         @ViewBuilder
         private var scoreText: some View {
-            if fixture.hasTeams {
+            if fixture.hasTeams, !hidesScores {
                 Text(verbatim: fixture.scoreLine)
                     .font(.system(size: fixture.hasTextScores ? 48 : 80, weight: .bold, design: .rounded))
                     .monospacedDigit()
@@ -366,7 +347,7 @@
 
         @ViewBuilder
         private var detailTabsSection: some View {
-            if let eventDetail, eventDetail.hasTabContent {
+            if let eventDetail, eventDetail.hasTabContent(hidingScores: hidesScores) {
                 VStack(spacing: 28) {
                     tabPills(for: eventDetail)
                     tabContent(eventDetail)
@@ -381,7 +362,7 @@
         }
 
         private func tabPills(for detail: SportsEventDetail) -> some View {
-            let tabs = detail.availableTabs
+            let tabs = detail.availableTabs(hidingScores: hidesScores)
             return HStack(spacing: 12) {
                 ForEach(tabs) { value in
                     TVTabPill(title: value.title, isActive: tab == value) { tab = value }
@@ -391,19 +372,24 @@
             .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(.white.opacity(0.08)))
             .focusSection()
             .onAppear {
-                if !tabs.contains(tab), let first = tabs.first { tab = first }
+                if !tabs.contains(tab), let first = tabs.first {
+                    tab = first
+                }
             }
         }
 
         @ViewBuilder
         private func tabContent(_ detail: SportsEventDetail) -> some View {
-            switch tab {
+            let tabs = detail.availableTabs(hidingScores: hidesScores)
+            switch tabs.contains(tab) ? tab : tabs.first {
             case .timeline:
                 TVTimelineSection(events: detail.keyEvents, fixture: fixture)
             case .stats:
                 TVStatsSection(stats: detail.teamStats, homePalette: fixture.homePalette, awayPalette: fixture.awayPalette)
             case .lineup:
                 TVLineupSection(lineups: detail.lineups, fixture: fixture)
+            case nil:
+                EmptyView()
             }
         }
 
@@ -453,7 +439,9 @@
         private func loadDetail() async {
             guard let league = SportsCatalog.league(id: fixture.leagueId) else { return }
             let expectsDetail = fixture.status.state == .inProgress || fixture.status.state == .final
-            if expectsDetail { isLoadingDetail = true }
+            if expectsDetail {
+                isLoadingDetail = true
+            }
             defer { isLoadingDetail = false }
 
             if resolved.isEmpty, fixture.status.state != .final {
@@ -474,6 +462,40 @@
 
         private var leagueLogoURL: URL? {
             fixture.leagueLogoURL ?? SportsCatalog.league(id: fixture.leagueId)?.logoURL
+        }
+    }
+
+    /// The header's per-team column, kept out of the struct body for length.
+    extension TVGameDetailSheet {
+        /// A finished game's record and form already count its result.
+        private var showsRecordAndForm: Bool {
+            !hidesScores || fixture.status.state != .final
+        }
+
+        private func teamColumn(_ competitor: SportsCompetitor) -> some View {
+            VStack(spacing: 14) {
+                TeamCrest(team: competitor.team, size: 130)
+                    .accessibilityHidden(true)
+                Text(verbatim: competitor.team.name)
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                if showsRecordAndForm {
+                    if let record = competitor.record, !record.isEmpty {
+                        Text(verbatim: record)
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    if let form = competitor.form, !form.isEmpty {
+                        Text(verbatim: form)
+                            .font(.system(size: 24, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                }
+                followButton(competitor.team)
+            }
+            .frame(maxWidth: .infinity, alignment: .top)
         }
     }
 

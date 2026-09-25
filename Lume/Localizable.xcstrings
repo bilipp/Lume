@@ -17414,6 +17414,58 @@
         }
       }
     },
+    "Fixture cards and game details leave out scores and results, along with the match timeline and stats." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spielkarten und Spieldetails zeigen keine Ergebnisse, auch keinen Spielverlauf und keine Statistiken."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las tarjetas y los detalles de los partidos no muestran marcadores ni resultados, ni tampoco la cronología ni las estadísticas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les cartes et les détails des matchs n'affichent ni scores ni résultats, ni le déroulé du match ni les statistiques."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le schede e i dettagli delle partite non mostrano risultati, né la cronaca della partita né le statistiche."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試合カードと試合の詳細に、スコアや結果、試合経過、スタッツを表示しません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "경기 카드와 경기 상세 정보에 점수와 결과, 경기 타임라인, 통계를 표시하지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os cartões e os detalhes dos jogos não mostram placares nem resultados, nem a cronologia e as estatísticas da partida."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比赛卡片和比赛详情不显示比分和结果，也不显示比赛进程和统计数据。"
+          }
+        }
+      }
+    },
     "Fixtures, live scores and standings refresh automatically in the background at this interval." : {
       "localizations" : {
         "de" : {
@@ -20554,6 +20606,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "隐藏频道以将其从此类别中移除，或拖动以重新排列。"
+          }
+        }
+      }
+    },
+    "Hide Scores" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ergebnisse ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar marcadores"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer les scores"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi risultati"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スコアを非表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "점수 숨기기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar placares"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏比分"
           }
         }
       }
@@ -54063,6 +54167,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "VLCKit选项"
+          }
+        }
+      }
+    },
+    "vs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vs."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vs."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vs"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vs"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vs"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "x"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vs"
           }
         }
       }

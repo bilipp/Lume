@@ -232,6 +232,14 @@ nonisolated extension SportsFixtureStatus {
         }
     }
 
+    /// The live line under the LIVE badge. Cricket's is the provider's
+    /// state-of-play sentence ("Warwickshire lead by 56 runs"), which gives the
+    /// score away, so it is left out while scores are hidden.
+    func liveDetail(family: SportsPeriodFamily, hidingScores: Bool) -> String? {
+        if hidingScores, family == .cricket { return nil }
+        return localizedLiveDetail(family: family)
+    }
+
     /// Live phases that are a fixed word rather than a clock reading.
     private static let phaseLabels: [SportsStatusPhase: LocalizedStringResource] = [
         .halftime: "Half-time",
