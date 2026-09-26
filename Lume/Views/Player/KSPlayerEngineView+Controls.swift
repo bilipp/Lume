@@ -26,6 +26,7 @@ import SwiftUI
                 hideTask: $hideTask,
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
+                onTogglePip: { togglePip() },
                 onResetHideTimer: { resetHideTimer() },
                 onScheduleHide: { scheduleHide() },
                 onSearchSubtitles: subtitleSearchAction,

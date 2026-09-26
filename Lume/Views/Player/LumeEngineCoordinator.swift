@@ -294,8 +294,19 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     }
 
     func togglePictureInPicture() {
+        #if os(macOS)
+            let isStarting = pipBridge?.isActive == false
+        #endif
         pipBridge?.toggle()
         isPipActive = pipBridge?.isActive ?? false
+        #if os(macOS)
+            // Sample-buffer PiP comes out cropped on macOS without this.
+            if isStarting {
+                MacPictureInPictureScaler.shared.pictureInPictureDidStart()
+            } else {
+                MacPictureInPictureScaler.shared.pictureInPictureDidStop()
+            }
+        #endif
     }
 
     // MARK: Tracks
