@@ -64,6 +64,24 @@ struct SportsSessionExpansionTests {
         #expect(weekend(state: .postponed).expandedBySession(now: now).allSatisfy { $0.status.state == .postponed })
     }
 
+    @Test func `a provider session state beats the weekend's and the clock`() {
+        let race = fp1.addingTimeInterval(50 * 3600)
+        let weekend = SportsFixture(
+            id: "600", leagueId: "espn:racing/f1", leagueName: "Formula 1", leagueAbbreviation: "F1",
+            startDate: fp1, status: SportsFixtureStatus(state: .final),
+            sessions: [
+                SportsSession(kind: .fp1, date: fp1, state: .final),
+                SportsSession(kind: .qualifying, date: fp1.addingTimeInterval(28 * 3600), state: .scheduled),
+                SportsSession(kind: .race, date: race, state: .inProgress)
+            ]
+        )
+        let cards = weekend.expandedBySession(now: race.addingTimeInterval(600))
+        // A stale "scheduled" falls back to the clock, not to the weekend's final.
+        #expect(cards.map(\.status.state) == [.final, .final, .inProgress])
+        let beforeQualifying = weekend.expandedBySession(now: fp1.addingTimeInterval(3600))
+        #expect(beforeQualifying[1].status.state == .scheduled)
+    }
+
     @Test func `fixtures without sessions pass through unchanged`() {
         let match = SportsFixture(
             id: "401", leagueId: "espn:soccer/ger.1", leagueName: "Bundesliga", leagueAbbreviation: "BL",

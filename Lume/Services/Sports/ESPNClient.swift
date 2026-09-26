@@ -217,7 +217,7 @@ nonisolated extension ESPNClient {
         guard let id = event.id else { return nil }
         let competition = event.competitions?.first
         let startDate = parseDate(event.date) ?? competition.flatMap { parseDate($0.date) } ?? Date.distantPast
-        let status = mapStatus(event.status)
+        let status = isRacing ? weekendStatus(event) : mapStatus(event.status)
 
         var home: SportsCompetitor?
         var away: SportsCompetitor?
@@ -241,7 +241,7 @@ nonisolated extension ESPNClient {
                       let kind = SportsSessionKind(rawValue: raw),
                       let date = parseDate(comp.date)
                 else { return nil }
-                return SportsSession(kind: kind, date: date)
+                return SportsSession(kind: kind, date: date, state: comp.status.map { mapStatus($0).state })
             }
         }
 
@@ -261,6 +261,20 @@ nonisolated extension ESPNClient {
             shortName: nonEmpty(event.shortName),
             leagueLogoURL: context.leagueLogoURL
         )
+    }
+
+    /// A race weekend's own status mirrors its first session: ESPN calls the
+    /// whole weekend "Final" once FP1 is over, with the race still to come or
+    /// under way. The weekend is live while any session is, else wherever the
+    /// race stands; the event's status only when no session reports one.
+    static func weekendStatus(_ event: ESPNEvent) -> SportsFixtureStatus {
+        let competitions = event.competitions ?? []
+        let sessionStatuses = competitions.compactMap(\.status).map(mapStatus)
+        if let live = sessionStatuses.first(where: { $0.state == .inProgress }) {
+            return live
+        }
+        let race = competitions.last { $0.type?.abbreviation == SportsSessionKind.race.rawValue } ?? competitions.last
+        return race?.status.map(mapStatus) ?? mapStatus(event.status)
     }
 
     static func nonEmpty(_ text: String?) -> String? {

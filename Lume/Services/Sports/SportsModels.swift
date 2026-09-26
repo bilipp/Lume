@@ -246,6 +246,17 @@ nonisolated enum SportsSessionKind: String, Codable, Hashable {
 nonisolated struct SportsSession: Codable, Hashable {
     let kind: SportsSessionKind
     let date: Date
+    /// The session's own state as the provider reported it — the only status
+    /// that describes one session, since the weekend's covers all of them.
+    /// `nil` when the provider sent none and in snapshots written before the
+    /// field existed.
+    let state: SportsFixtureState?
+
+    init(kind: SportsSessionKind, date: Date, state: SportsFixtureState? = nil) {
+        self.kind = kind
+        self.date = date
+        self.state = state
+    }
 }
 
 nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
@@ -351,19 +362,22 @@ nonisolated extension SportsFixture {
         }
     }
 
-    /// A finished or postponed weekend marks every session the same; otherwise
-    /// a session is live from its start until a generous running time has
+    /// A session the provider calls live, finished or postponed is exactly that.
+    /// Otherwise — no state of its own, or a "scheduled" a cached snapshot may
+    /// have outlived — a finished or postponed weekend marks it the same, and
+    /// failing that it is live from its start until a generous running time has
     /// passed, then finished.
     private func sessionStatus(_ session: SportsSession, now: Date) -> SportsFixtureStatus {
-        switch status.state {
-        case .final, .postponed:
-            return SportsFixtureStatus(state: status.state)
-        case .scheduled, .inProgress:
-            let runningTime: TimeInterval = session.kind == .race ? 2.5 * 3600 : 1.25 * 3600
-            if now < session.date { return SportsFixtureStatus(state: .scheduled) }
-            if now < session.date.addingTimeInterval(runningTime) { return SportsFixtureStatus(state: .inProgress) }
-            return SportsFixtureStatus(state: .final)
+        if let state = session.state, state != .scheduled {
+            return SportsFixtureStatus(state: state)
         }
+        if session.state == nil, status.state == .final || status.state == .postponed {
+            return SportsFixtureStatus(state: status.state)
+        }
+        let runningTime: TimeInterval = session.kind == .race ? 2.5 * 3600 : 1.25 * 3600
+        if now < session.date { return SportsFixtureStatus(state: .scheduled) }
+        if now < session.date.addingTimeInterval(runningTime) { return SportsFixtureStatus(state: .inProgress) }
+        return SportsFixtureStatus(state: .final)
     }
 
     /// Whether the event is named by two teams (a match) rather than by itself

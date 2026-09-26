@@ -91,6 +91,35 @@ struct ESPNClientRacingTests {
         #expect(weekend.sessions.map(\.kind) == [.fp1, .sprintQualifying, .sprint, .qualifying, .race])
     }
 
+    /// ESPN's own shape mid-race (Baku, 2026-09-26): the event status mirrors
+    /// FP1 and says Final while the race competition is in progress.
+    @Test func `a weekend whose race is live is live though the event says final`() async throws {
+        let final = #"{"type": {"name": "STATUS_FINAL", "state": "post", "completed": true}}"#
+        let body = """
+        {"leagues": [{"name": "Formula 1", "abbreviation": "F1"}],
+         "events": [{"id": "602", "date": "2026-09-24T08:30Z", "name": "Azerbaijan Grand Prix",
+           "status": \(final),
+           "competitions": [
+             {"type": {"abbreviation": "FP1"}, "date": "2026-09-24T08:30Z", "status": \(final)},
+             {"type": {"abbreviation": "Qual"}, "date": "2026-09-25T12:00Z", "status": \(final)},
+             {"type": {"abbreviation": "Race"}, "date": "2026-09-26T11:00Z",
+              "status": {"type": {"name": "STATUS_IN_PROGRESS", "state": "in", "completed": false}}}
+           ]}]}
+        """
+        StubURLProtocol.register(host: siteHost, query: (name: "dates", value: "202609"), response: .init(body: body))
+        let client = ESPNClient(session: StubURLProtocol.makeSession())
+
+        let fixtures = try await client.fixtures(league: f1League(), month: DateComponents(year: 2026, month: 9))
+
+        let weekend = try #require(fixtures.first)
+        #expect(weekend.status.state == .inProgress)
+        #expect(weekend.sessions.map(\.state) == [.final, .final, .inProgress])
+        // Cards are expanded long after the race's clock-based running time: the
+        // provider's live state still wins.
+        let cards = weekend.expandedBySession(now: weekend.sessions[2].date.addingTimeInterval(5 * 3600))
+        #expect(cards.map(\.status.state) == [.final, .final, .inProgress])
+    }
+
     // MARK: - Standings across sports
 
     @Test func `athlete entries under a generic standings group map to driver rows`() async throws {
