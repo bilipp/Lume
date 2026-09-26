@@ -352,6 +352,9 @@ struct LumeApp: App {
             .environment(profileManager)
             .windowStyle(.hiddenTitleBar)
             .windowResizability(.contentMinSize)
+            // First-ever size only: after that SwiftUI's frame autosave reopens
+            // the window wherever the viewer last left it.
+            .defaultSize(width: 1280, height: 720)
 
             // A single window rather than a `WindowGroup` per grid: Multi-View
             // owns its own channel picker, so there is nothing to open it "for",

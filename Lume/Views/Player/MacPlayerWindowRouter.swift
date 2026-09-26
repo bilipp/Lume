@@ -130,11 +130,11 @@ import SwiftUI
         func body(content: Content) -> some View {
             content
                 .background(PlayerWindowAccessor { window in
-                    // Adopt this player's own window, then take it full screen.
+                    // Adopt this player's own window. It opens as a window, the
+                    // way a Mac app should — going full screen is the viewer's
+                    // call — and SwiftUI's frame autosave brings it back at the
+                    // size and position it was last left at.
                     router.adopt(window, title: activeMedia.title)
-                    if !window.styleMask.contains(.fullScreen) {
-                        window.toggleFullScreen(nil)
-                    }
                 })
                 .onAppear { router.playerDidOpen(with: launchMedia) }
                 .onDisappear { router.playerDidClose() }
