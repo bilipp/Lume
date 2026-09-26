@@ -90,19 +90,26 @@ struct ImageDiskCacheTests {
             directory: directory,
             byteLimit: 1024,
             maxAge: 60,
-            initialMaintenanceDelay: .milliseconds(250),
+            initialMaintenanceDelay: .seconds(1),
             now: clock.now
         )
         cache.store(Data(repeating: 0xA4, count: 32), for: "expired-after-launch")
         clock.advance(by: 61)
 
         // The entry is already expired according to the cache clock, but launch
-        // maintenance must give foreground poster delivery a head start.
+        // maintenance must give foreground poster delivery a head start. The
+        // delay is generous next to this 100 ms check: in a loaded parallel run
+        // the test's own wake-up can slip by hundreds of milliseconds.
         try await Task.sleep(for: .milliseconds(100))
         let cachedFile = cache.fileURL(for: "expired-after-launch")
         #expect(FileManager.default.fileExists(atPath: cachedFile.path))
 
-        try await Task.sleep(for: .milliseconds(300))
+        // The sweep runs at `.background` priority, so poll for it rather than
+        // betting on one fixed sleep.
+        let deadline = ContinuousClock.now + .seconds(10)
+        while FileManager.default.fileExists(atPath: cachedFile.path), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
         #expect(!FileManager.default.fileExists(atPath: cachedFile.path))
     }
 }
