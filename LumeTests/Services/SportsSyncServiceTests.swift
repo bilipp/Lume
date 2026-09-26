@@ -496,9 +496,13 @@ struct SportsFillMissingTests {
         ))
 
         await sync.fillMissing()
+        // Within a week of a month's end the pass also fetches the next month,
+        // so the first fill's request count depends on today's date.
+        let firstFill = counter.count
         await sync.fillMissing()
 
-        #expect(counter.count == 1)
+        #expect(firstFill == SportsSyncService.monthsToFetch(for: Date()).count)
+        #expect(counter.count == firstFill)
     }
 
     @Test func `a fill the provider never answered is retried`() async {
