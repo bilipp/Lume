@@ -106,9 +106,7 @@ import SwiftUI
                     // free users (Sideload/owned builds are always premium, so this
                     // never shows).
                     if section == .forYou || section == .sports, !premium.isPremium {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.tint)
+                        PremiumBadge()
                     }
                 }
             )

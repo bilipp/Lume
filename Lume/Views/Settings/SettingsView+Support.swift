@@ -2,9 +2,10 @@
 //  SettingsView+Support.swift
 //  Lume
 //
-//  The "Support" links (website, email, Discord), split out of SettingsView to
-//  keep that type's body within the file-size limit. On iOS / macOS these are
-//  tappable rows that open Safari / Mail / Discord; on tvOS — where the system
+//  Help & Feedback and About. On iOS / macOS they are the last two groups of
+//  the root list: the support links (website, email, Discord) are tappable
+//  rows that open Safari / Mail / Discord, next to the diagnostic report; on
+//  tvOS they are sidebar panes, and — where the system
 //  can't open a URL — the website and Discord are shown as QR codes to scan with
 //  a phone (the same pattern as the Trakt device flow), with email as a
 //  read-only row. Links live in SupportInfo so both surfaces stay in sync.
@@ -12,10 +13,12 @@
 
 import SwiftUI
 
-extension SettingsView {
-    #if !os(tvOS)
-        /// iOS / macOS grouped-list section of tappable support links.
-        var supportSection: some View {
+#if !os(tvOS)
+
+    /// The root list's Help & Feedback group: the support links, then the
+    /// diagnostic report.
+    struct HelpFeedbackSection: View {
+        var body: some View {
             Section {
                 if let url = SupportInfo.websiteURL {
                     Link(destination: url) {
@@ -37,16 +40,21 @@ extension SettingsView {
                         Label("Rate Lume", systemImage: "star")
                     }
                 }
+                NavigationLink {
+                    DebugSettingsView()
+                } label: {
+                    Label("Send Diagnostic Report", systemImage: "stethoscope")
+                }
             } header: {
-                Text("Support")
-            } footer: {
-                Text("Get help, request a feature, or report a problem.")
+                Text("Help & Feedback")
             }
         }
+    }
 
-        /// iOS / macOS About section: app identity plus a link to the credits /
-        /// licenses screen.
-        var aboutSection: some View {
+    /// The root list's About group: app identity plus a link to the credits /
+    /// licenses screen.
+    struct AboutSection: View {
+        var body: some View {
             Section {
                 HStack(spacing: 12) {
                     Image(systemName: "play.tv.fill")
@@ -70,10 +78,17 @@ extension SettingsView {
                 } label: {
                     Label("Acknowledgements", systemImage: "doc.text.magnifyingglass")
                 }
+            } header: {
+                Text("About")
             }
         }
-    #else
-        /// tvOS About-pane section. Apple TV can't open a URL, so the website and
+    }
+
+#endif
+
+extension SettingsView {
+    #if os(tvOS)
+        /// tvOS Help & Feedback section. Apple TV can't open a URL, so the website and
         /// Discord are scannable QR codes and the support address is a read-only row.
         var tvSupportSection: some View {
             VStack(alignment: .leading, spacing: 16) {

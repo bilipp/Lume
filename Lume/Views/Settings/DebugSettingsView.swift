@@ -57,27 +57,6 @@ enum DiagnosticsReport {
     }
 }
 
-// MARK: - Settings entry points
-
-extension SettingsView {
-    #if !os(tvOS)
-        /// iOS / macOS grouped-list section linking to the diagnostics screen.
-        var diagnosticsSection: some View {
-            Section {
-                NavigationLink {
-                    DebugSettingsView()
-                } label: {
-                    Label("Diagnostics", systemImage: "stethoscope")
-                }
-            } header: {
-                Text("Troubleshooting")
-            } footer: {
-                Text("Something not working? Send a diagnostic report to the developer.")
-            }
-        }
-    #endif
-}
-
 #if !os(tvOS)
 
     // MARK: - Standalone sheet

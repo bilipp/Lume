@@ -57,9 +57,7 @@
                 Label {
                     HStack(spacing: 6) {
                         Text(section.title)
-                        Image(systemName: "crown.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.tint)
+                        PremiumBadge()
                     }
                 } icon: {
                     Image(systemName: section.systemImage)

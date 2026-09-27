@@ -2,8 +2,8 @@
 //  SettingsView+Language.swift
 //  Lume
 //
-//  The preferred audio language list (iOS, macOS, visionOS). Split out of
-//  SettingsView, which is already at the file-length limit.
+//  The preferred audio language list (iOS, macOS, visionOS), behind Player ›
+//  Audio Languages.
 //
 //  The list ships EMPTY, which means "no preference" and behaves exactly as
 //  Lume did before the setting existed.
@@ -12,42 +12,6 @@
 import SwiftUI
 
 #if !os(tvOS)
-
-    // MARK: - Settings row
-
-    extension SettingsView {
-        var preferredAudioLanguageRow: some View {
-            NavigationLink {
-                PreferredLanguageListView()
-            } label: {
-                PreferredLanguageRowLabel(codes: PreferredLanguageList.decode(preferredAudioLanguagesRaw))
-            }
-        }
-    }
-
-    // MARK: - Row label
-
-    private struct PreferredLanguageRowLabel: View {
-        let codes: [String]
-
-        var body: some View {
-            HStack {
-                Text("Audio Languages")
-                Spacer()
-                Group {
-                    if codes.isEmpty {
-                        Text("Automatic")
-                    } else {
-                        Text(verbatim: codes.map { TrackLanguageMatcher.displayName(for: $0) }.joined(separator: ", "))
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            }
-        }
-    }
 
     // MARK: - Ordered list
 

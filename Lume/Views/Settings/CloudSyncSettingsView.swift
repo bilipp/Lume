@@ -3,7 +3,7 @@
 //  Lume
 //
 //  Settings UI for iCloud sync status. Two presentations share one source of
-//  truth (`CloudSyncCoordinator` in the environment): a grouped-list `Section`
+//  truth (`CloudSyncCoordinator` in the environment): a grouped-list page
 //  on iOS / macOS and a tvOS detail block matching the Apple TV Settings style.
 //
 //  The coordinator is looked up optionally so SwiftUI previews (which don't
@@ -53,6 +53,20 @@ enum CloudSyncStatusText {
         }
     }
 
+    /// One word for the root Settings row: "Synced", or what's in the way.
+    static func summary(_ status: CloudSyncStatus) -> LocalizedStringKey {
+        if status.isSyncing {
+            return "Syncing…"
+        }
+        if status.lastError != nil, status.account.canSync {
+            return "Error"
+        }
+        if status.account == .available, status.lastReconcile != nil {
+            return "Synced"
+        }
+        return accountDescription(status.account)
+    }
+
     static var footer: LocalizedStringKey {
         "Your playlists, watch progress, favorites and watchlist sync across your devices through your private iCloud account. The video catalog itself is fetched on each device and isn’t uploaded."
     }
@@ -61,28 +75,30 @@ enum CloudSyncStatusText {
 // MARK: - iOS / macOS
 
 #if !os(tvOS)
-    struct CloudSyncSection: View {
+    /// The page behind the root iCloud row.
+    struct CloudSyncSettingsView: View {
         @Environment(CloudSyncCoordinator.self) private var coordinator: CloudSyncCoordinator?
 
         var body: some View {
-            if let coordinator {
-                let status = coordinator.status
-                Section {
-                    HStack {
-                        Label("iCloud Sync", systemImage: iconName(for: status))
-                        Spacer()
-                        Text(CloudSyncStatusText.accountDescription(status.account))
+            List {
+                if let coordinator {
+                    let status = coordinator.status
+                    Section {
+                        HStack {
+                            Label("iCloud Sync", systemImage: iconName(for: status))
+                            Spacer()
+                            Text(CloudSyncStatusText.accountDescription(status.account))
+                                .foregroundStyle(.secondary)
+                        }
+                        CloudSyncStatusText.detail(for: status)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
+                    } footer: {
+                        Text(CloudSyncStatusText.footer)
                     }
-                    CloudSyncStatusText.detail(for: status)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("iCloud")
-                } footer: {
-                    Text(CloudSyncStatusText.footer)
                 }
             }
+            .platformNavigationTitle("iCloud")
         }
 
         private func iconName(for status: CloudSyncStatus) -> String {

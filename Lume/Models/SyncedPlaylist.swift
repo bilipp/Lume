@@ -37,6 +37,7 @@ final class SyncedPlaylist {
     var sourceTypeRaw: String = PlaylistSourceType.xtream.rawValue
     var epgURL: String?
     var syncEnabled: Bool = true
+    var hiddenTabsRaw: String = ""
 
     /// Last time this record's config fields changed. Informational (surfaced in
     /// diagnostics / "last write wins" tie-breaks); the reconciler's correctness
@@ -53,6 +54,7 @@ final class SyncedPlaylist {
         sourceTypeRaw: String,
         epgURL: String?,
         syncEnabled: Bool,
+        hiddenTabsRaw: String = "",
         updatedAt: Date = Date()
     ) {
         self.id = id
@@ -64,6 +66,7 @@ final class SyncedPlaylist {
         self.sourceTypeRaw = sourceTypeRaw
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled
+        self.hiddenTabsRaw = hiddenTabsRaw
         self.updatedAt = updatedAt
     }
 }

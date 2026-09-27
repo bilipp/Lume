@@ -101,6 +101,7 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
     var sourceTypeRaw: String
     var epgURL: String?
     var syncEnabled: Bool
+    var hiddenTabsRaw: String
 
     init(
         name: String,
@@ -110,7 +111,8 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         macAddress: String = "",
         sourceTypeRaw: String,
         epgURL: String?,
-        syncEnabled: Bool
+        syncEnabled: Bool,
+        hiddenTabsRaw: String = ""
     ) {
         self.name = name
         self.serverURL = serverURL
@@ -120,12 +122,13 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         self.sourceTypeRaw = sourceTypeRaw
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled
+        self.hiddenTabsRaw = hiddenTabsRaw
     }
 
     /// Hand-rolled decode so a shadow baseline persisted before Stalker support
-    /// (no `macAddress` key) still decodes — the field falls back to "" rather
-    /// than failing the whole baseline, which would discard the shadow and risk
-    /// a spurious mass reconcile.
+    /// (no `macAddress` key) or before hidden tabs (no `hiddenTabsRaw`) still
+    /// decodes — the field falls back to "" rather than failing the whole
+    /// baseline, which would discard the shadow and risk a spurious mass reconcile.
     nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
@@ -136,6 +139,7 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         sourceTypeRaw = try container.decode(String.self, forKey: .sourceTypeRaw)
         epgURL = try container.decodeIfPresent(String.self, forKey: .epgURL)
         syncEnabled = try container.decode(Bool.self, forKey: .syncEnabled)
+        hiddenTabsRaw = try container.decodeIfPresent(String.self, forKey: .hiddenTabsRaw) ?? ""
     }
 
     /// Conflict policy: cloud wins. Deterministic and adequate for config.

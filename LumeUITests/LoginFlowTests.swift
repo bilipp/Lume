@@ -25,19 +25,19 @@ final class LoginFlowTests: XCTestCase {
     }
 
     func testAddPlaylistButtonAvailableInSettings() {
-        XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
+        XCTAssertTrue(app.openSettingsPlaylists(), "Settings › Playlists did not open")
         let addButton = app.buttons["Add Playlist"]
         XCTAssertTrue(addButton.waitForExistence(timeout: 10))
     }
 
     func testSeededPlaylistNameVisible() {
-        XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
+        XCTAssertTrue(app.openSettingsPlaylists(), "Settings › Playlists did not open")
         let playlistName = app.staticTexts["Test Playlist"]
         XCTAssertTrue(playlistName.waitForExistence(timeout: 10))
     }
 
     func testPlaylistCanBeDeleted() {
-        XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
+        XCTAssertTrue(app.openSettingsPlaylists(), "Settings › Playlists did not open")
         let playlistName = app.staticTexts["Test Playlist"]
         XCTAssertTrue(playlistName.waitForExistence(timeout: 10))
         playlistName.swipeLeft()

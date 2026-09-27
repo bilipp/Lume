@@ -39,6 +39,7 @@ final class StalkerPortalFlowTests: XCTestCase {
         // Fresh install shows the login form as root; otherwise add via Settings.
         if app.tabBars.firstMatch.waitForExistence(timeout: 5) {
             app.settingsToolbarButton.tap()
+            XCTAssertTrue(app.openPlaylistsFromSettingsRoot(), "Settings › Playlists did not open")
             let addButton = app.buttons["Add Playlist"]
             XCTAssertTrue(addButton.waitForExistence(timeout: 3))
             addButton.tap()
@@ -76,7 +77,7 @@ final class StalkerPortalFlowTests: XCTestCase {
     private func dismissSettingsToTabBar(_ app: XCUIApplication) {
         // iOS Settings is a sheet with no Done button (Done is macOS-only), so
         // dismiss it by dragging its navigation bar down to the bottom edge.
-        let settingsNav = app.navigationBars["Settings"]
+        let settingsNav = app.navigationBars["Playlists"]
         if settingsNav.waitForExistence(timeout: 10) {
             let from = settingsNav.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             let target = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.0))

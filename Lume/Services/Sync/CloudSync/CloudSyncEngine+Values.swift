@@ -19,7 +19,8 @@ extension CloudSyncEngine {
             macAddress: playlist.macAddress ?? "",
             sourceTypeRaw: playlist.sourceTypeRaw,
             epgURL: playlist.epgURL,
-            syncEnabled: playlist.syncEnabled
+            syncEnabled: playlist.syncEnabled,
+            hiddenTabsRaw: playlist.hiddenTabsRaw
         )
     }
 
@@ -32,7 +33,8 @@ extension CloudSyncEngine {
             macAddress: mirror.macAddress,
             sourceTypeRaw: mirror.sourceTypeRaw,
             epgURL: mirror.epgURL,
-            syncEnabled: mirror.syncEnabled
+            syncEnabled: mirror.syncEnabled,
+            hiddenTabsRaw: mirror.hiddenTabsRaw
         )
     }
 

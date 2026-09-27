@@ -72,6 +72,17 @@ struct MainTabView: View {
         playlists.activeID(for: selectedPlaylistID)
     }
 
+    /// Whether `tab` is in the tab bar: the active playlist can hide Movies,
+    /// Series and Live TV (Settings › Library › Tabs).
+    private func showsTab(_ tab: AppTab) -> Bool {
+        playlists.active(for: selectedPlaylistID).showsTab(tab)
+    }
+
+    /// The tabs the active playlist hides, as a value `onChange` can watch.
+    private var hiddenTabsRaw: String {
+        playlists.active(for: selectedPlaylistID)?.hiddenTabsRaw ?? ""
+    }
+
     /// UI tests seed a fake playlist; auto-sync would present a blocking cover
     /// that can never succeed against the stub server, so skip it there.
     private var isUITesting: Bool {
@@ -131,6 +142,13 @@ struct MainTabView: View {
             // most expensive — the incoming tab is re-running its queries.
             .onChange(of: router.selectedTab) {
                 ContentIndexingService.shared.noteUserInteraction()
+            }
+            // Hiding the tab on screen, or switching to a playlist that hides
+            // it, would leave the selection pointing at nothing.
+            .onChange(of: hiddenTabsRaw, initial: true) {
+                if !showsTab(router.selectedTab) {
+                    router.selectedTab = .home
+                }
             }
         #if os(iOS)
             .tabBarMinimizeOnScrollDownIfAvailable()
@@ -231,22 +249,28 @@ struct MainTabView: View {
                     Text("Home")
                 }
 
-                Tab(value: AppTab.movies) {
-                    activeOnly(.movies, selection: selection.wrappedValue) { MoviesView() }
-                } label: {
-                    Text("Movies")
+                if showsTab(.movies) {
+                    Tab(value: AppTab.movies) {
+                        activeOnly(.movies, selection: selection.wrappedValue) { MoviesView() }
+                    } label: {
+                        Text("Movies")
+                    }
                 }
 
-                Tab(value: AppTab.series) {
-                    activeOnly(.series, selection: selection.wrappedValue) { SeriesView() }
-                } label: {
-                    Text("Series")
+                if showsTab(.series) {
+                    Tab(value: AppTab.series) {
+                        activeOnly(.series, selection: selection.wrappedValue) { SeriesView() }
+                    } label: {
+                        Text("Series")
+                    }
                 }
 
-                Tab(value: AppTab.liveTV) {
-                    activeOnly(.liveTV, selection: selection.wrappedValue) { LiveTVView() }
-                } label: {
-                    Text("Live TV")
+                if showsTab(.liveTV) {
+                    Tab(value: AppTab.liveTV) {
+                        activeOnly(.liveTV, selection: selection.wrappedValue) { LiveTVView() }
+                    } label: {
+                        Text("Live TV")
+                    }
                 }
 
                 if sportsTabEnabled {
@@ -311,16 +335,22 @@ struct MainTabView: View {
                     HomeView()
                 }
 
-                Tab("Movies", systemImage: "film", value: AppTab.movies) {
-                    MoviesView()
+                if showsTab(.movies) {
+                    Tab("Movies", systemImage: "film", value: AppTab.movies) {
+                        MoviesView()
+                    }
                 }
 
-                Tab("Series", systemImage: "tv", value: AppTab.series) {
-                    SeriesView()
+                if showsTab(.series) {
+                    Tab("Series", systemImage: "tv", value: AppTab.series) {
+                        SeriesView()
+                    }
                 }
 
-                Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.liveTV) {
-                    LiveTVView()
+                if showsTab(.liveTV) {
+                    Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.liveTV) {
+                        LiveTVView()
+                    }
                 }
 
                 if sportsTabEnabled {
@@ -360,12 +390,12 @@ struct MainTabView: View {
         guard let link = DeepLink(url: url) else { return }
         switch link {
         case let .movie(tmdbId):
-            guard let movie = resolveMovie(tmdbId: tmdbId) else { return }
+            guard showsTab(.movies), let movie = resolveMovie(tmdbId: tmdbId) else { return }
             router.selectedTab = .movies
             router.moviesPath = NavigationPath()
             router.moviesPath.append(movie)
         case let .series(tmdbId):
-            guard let series = resolveSeries(tmdbId: tmdbId) else { return }
+            guard showsTab(.series), let series = resolveSeries(tmdbId: tmdbId) else { return }
             router.selectedTab = .series
             router.seriesPath = NavigationPath()
             router.seriesPath.append(series)

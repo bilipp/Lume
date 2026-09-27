@@ -2,9 +2,10 @@
 //  SettingsView+TVPlayer.swift
 //  Lume
 //
-//  The tvOS Player settings pane: the premium-gated playback toggles, the engine
-//  priority list with reordering, the external-player cycle, and per-engine option
-//  drill-ins. Split out of SettingsView to keep that file within the project's
+//  The tvOS Player settings pane: the premium-gated playback toggles, audio
+//  languages, live-TV surfing, the stream caption, and under Advanced the
+//  Engines drill-in (priority list with reordering, per-engine options) and the
+//  external-player cycle. Split out of SettingsView to keep that file within the project's
 //  line-count cap.
 //
 
@@ -30,53 +31,60 @@ import SwiftUI
             engineRaw = normalized.first?.rawValue ?? PlayerEngineKind.defaultValue.rawValue
         }
 
+        /// A Lume Pro switch: free users see it off with a crown, and Select
+        /// opens the paywall instead of changing the setting.
+        private func tvPremiumToggleRow(_ title: LocalizedStringKey, isOn value: Binding<Bool>) -> some View {
+            TVOptionToggleRow(
+                title: title,
+                isOn: Binding(
+                    get: { premium.isPremium && value.wrappedValue },
+                    set: { newValue in
+                        if premium.isPremium {
+                            value.wrappedValue = newValue
+                        } else {
+                            presentPaywall(.playbackControls)
+                        }
+                    }
+                ),
+                showsPremiumBadge: !premium.isPremium
+            )
+        }
+
         var tvPlayerDetail: some View {
             VStack(alignment: .leading, spacing: 28) {
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Playback")
-                    TVOptionToggleRow(title: "Autoplay Next Episode", isOn: $autoPlayNext)
-                        .disabled(!premium.isPremium)
-                    TVOptionToggleRow(title: "Show Next Episode Button", isOn: $showNextEpisodeButton)
-                        .disabled(!premium.isPremium)
-                    TVOptionToggleRow(title: "Show Skip Intro Button", isOn: $showSkipIntroButton)
-                        .disabled(!premium.isPremium)
-                    if !premium.isPremium {
-                        Button {
-                            presentPaywall(.playbackControls)
-                        } label: {
-                            HStack(spacing: 16) {
-                                Image(systemName: "crown")
-                                    .font(.system(size: 22, weight: .medium))
-                                Text("Unlock with Premium")
-                                Spacer(minLength: 0)
-                            }
-                        }
-                        .buttonStyle(TVSettingsRowButtonStyle())
-                    }
+                    tvPremiumToggleRow("Autoplay Next Episode", isOn: $autoPlayNext)
+                    tvPremiumToggleRow("Show Next Episode Button", isOn: $showNextEpisodeButton)
+                    tvPremiumToggleRow("Show Skip Intro Button", isOn: $showSkipIntroButton)
                 }
 
                 // Second in the pane, right under Playback: this is a
                 // viewer-facing playback preference (and the one that otherwise
-                // costs a menu trip on every zap), where everything below —
-                // engine order, hand-off, per-engine options — is technical
-                // setup touched once.
+                // costs a menu trip on every zap), where everything under
+                // Advanced — engine order, hand-off, per-engine options — is
+                // technical setup touched once.
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Languages")
+                    tvDrillInRow("Audio Languages") { preferredLanguagePane = .list }
+                }
 
-                    VStack(spacing: 2) {
-                        tvPreferredLanguageRow()
+                if OpenSubtitlesService.shared.isConfigured {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TVSettingsSectionLabel("Subtitles")
+                        tvDrillInRow(label: Text(verbatim: "OpenSubtitles")) { showingOpenSubtitles = true }
                     }
                 }
 
                 // Viewer-facing too, so it belongs up here with Languages
-                // rather than among the engine sections — and it is
-                // engine-independent: all four hosts route their up/down
-                // presses through LiveChannelNavigator.
+                // rather than under Advanced — and it is engine-independent:
+                // all four hosts route their up/down presses through
+                // LiveChannelNavigator.
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Live TV")
 
                     TVOptionCycleRow(
-                        title: "Up & Down",
+                        title: "Channel Surfing",
                         valueLabel: LiveSurfMode.resolve(liveSurfModeRaw).displayName
                     ) {
                         liveSurfModeRaw = nextLiveSurfModeRaw(after: liveSurfModeRaw)
@@ -108,23 +116,9 @@ import SwiftUI
                 tvStreamInfoSection
 
                 VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Engine Priority")
+                    TVSettingsSectionLabel("Advanced")
 
-                    VStack(spacing: 2) {
-                        ForEach(Array(enginePriority.enumerated()), id: \.element) { index, kind in
-                            tvEnginePriorityRow(kind: kind, index: index)
-                        }
-                    }
-
-                    Text(primaryEngine.subtitle)
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 6)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("External Player")
+                    tvDrillInRow("Engines") { showingEngines = true }
 
                     TVOptionCycleRow(
                         title: "External Player",
@@ -153,29 +147,60 @@ import SwiftUI
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                         .padding(.top, 6)
                 }
-
-                // Each engine's options live behind a dedicated row, so they're
-                // all reachable regardless of the priority order. AVPlayer has no
-                // configurable options, so it isn't listed.
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Engine Options")
-                    VStack(spacing: 2) {
-                        tvEngineOptionsRow(.vlcKit)
-                        tvEngineOptionsRow(.ksPlayer)
-                        tvEngineOptionsRow(.lumeEngine)
-                    }
-                }
             }
         }
 
-        /// A drill-in row that replaces the player detail with the given engine's
-        /// options in place. Returning focus to the sidebar (Menu) restores it.
-        private func tvEngineOptionsRow(_ engine: PlayerEngineKind) -> some View {
-            Button {
-                selectedEngineOptions = engine
-            } label: {
+        /// The drilled-in Engines pane: the priority list, then a row per engine
+        /// with options. AVPlayer has none, so it gets no row.
+        var tvEnginesDetail: some View {
+            VStack(alignment: .leading, spacing: 28) {
+                Text("Engines")
+                    .font(.system(size: 34, weight: .bold))
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Priority")
+
+                    VStack(spacing: 2) {
+                        ForEach(Array(enginePriority.enumerated()), id: \.element) { index, kind in
+                            tvEnginePriorityRow(kind: kind, index: index)
+                        }
+                    }
+
+                    Text(primaryEngine.subtitle)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Options")
+                    VStack(spacing: 2) {
+                        ForEach([PlayerEngineKind.ksPlayer, .vlcKit, .lumeEngine]) { engine in
+                            tvDrillInRow(label: Text(verbatim: engine.displayName)) { selectedEngineOptions = engine }
+                        }
+                    }
+                    Text("AVPlayer has no configurable options.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+
+        /// A row that replaces the current detail with a deeper one in place.
+        /// Returning focus to the sidebar (Menu) restores the top level.
+        private func tvDrillInRow(_ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+            tvDrillInRow(label: Text(title), action: action)
+        }
+
+        private func tvDrillInRow(label: Text, action: @escaping () -> Void) -> some View {
+            Button(action: action) {
                 HStack(spacing: 16) {
-                    Text("\(engine.displayName) Options")
+                    label
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 20, weight: .semibold))
@@ -234,42 +259,6 @@ import SwiftUI
             guard list.indices.contains(index) else { return }
             list.remove(at: index)
             setPreferredLanguageCodes(list)
-        }
-
-        /// A drill-in row that replaces the player detail with the language
-        /// list in place, mirroring `tvEngineOptionsRow`.
-        private func tvPreferredLanguageRow() -> some View {
-            Button {
-                preferredLanguagePane = .list
-            } label: {
-                HStack(spacing: 16) {
-                    Text("Audio Languages")
-                    Spacer(minLength: 16)
-                    tvPreferredLanguageValue
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .buttonStyle(TVSettingsRowButtonStyle())
-        }
-
-        /// The row's trailing summary. `.opacity` rather than `.secondary`: the
-        /// focused row's label turns black, which a secondary style washes out.
-        @ViewBuilder
-        private var tvPreferredLanguageValue: some View {
-            let codes = preferredLanguageCodes
-            Group {
-                if codes.isEmpty {
-                    Text("Automatic")
-                } else {
-                    Text(verbatim: codes.map { TrackLanguageMatcher.displayName(for: $0) }.joined(separator: ", "))
-                }
-            }
-            .font(.system(size: TVSettingsMetrics.secondaryFontSize))
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .opacity(0.6)
         }
 
         /// The drilled-in pane for the language list: the ordered list itself,
