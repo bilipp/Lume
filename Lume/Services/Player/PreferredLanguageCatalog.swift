@@ -40,7 +40,8 @@ nonisolated enum PreferredLanguageCatalog {
         "ja", "ko", "tr", "nl", "pl", "sv", "no", "da", "fi", "el",
         "cs", "sk", "hu", "ro", "bg", "uk", "sr", "hr", "he", "fa",
         "ur", "bn", "ta", "th", "vi", "id", "ms", "tl", "sw", "af",
-        "ca", "sq"
+        "ca", "sq", "te", "uz", "kk", "my", "mr", "gu", "pa", "ml",
+        "km", "lo", "am", "yo", "zu", "eu", "et", "is", "ga"
     ]
 
     /// The curated shortlist, named and ordered for display.
