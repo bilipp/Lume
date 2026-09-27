@@ -130,7 +130,7 @@
             }
         }
 
-        /// A Lume Pro switch: free users see it off with a PRO badge, and
+        /// A Lume Pro switch: free users see it off with a crown, and
         /// flipping it opens the paywall instead of changing the setting.
         private func premiumToggle(_ title: LocalizedStringKey, isOn value: Binding<Bool>) -> some View {
             Toggle(isOn: Binding(
@@ -146,23 +146,10 @@
                 HStack(spacing: 6) {
                     Text(title)
                     if !premium.isPremium {
-                        ProBadge()
+                        PremiumBadge()
                     }
                 }
             }
-        }
-    }
-
-    /// The small PRO capsule on Lume Pro settings for free users.
-    struct ProBadge: View {
-        var body: some View {
-            Text(verbatim: "PRO")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1)
-                .background(Color.orange, in: .rect(cornerRadius: 4))
-                .accessibilityLabel("Lume Pro")
         }
     }
 

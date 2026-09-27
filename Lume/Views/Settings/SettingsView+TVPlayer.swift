@@ -46,7 +46,7 @@ import SwiftUI
                         }
                     }
                 ),
-                showsProBadge: !premium.isPremium
+                showsPremiumBadge: !premium.isPremium
             )
         }
 
