@@ -60,6 +60,9 @@ final class Playlist {
     var expDate: String?
 
     var syncEnabled: Bool = true
+    /// The content tabs hidden for this playlist (Settings › Library › Tabs),
+    /// encoded by `PlaylistTab`. Synced with the rest of the playlist config.
+    var hiddenTabsRaw: String = ""
     var lastSyncDate: Date?
     var syncStatusRaw: String = "idle"
 

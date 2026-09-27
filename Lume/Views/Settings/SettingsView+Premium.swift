@@ -2,36 +2,25 @@
 //  SettingsView+Premium.swift
 //  Lume
 //
-//  The Lume Pro surfaces in Settings: the shared paywall helpers, the
-//  status / upgrade row that sits first in the iOS/macOS list, the DEBUG-only
-//  developer override, and the tvOS Premium pane. Split out of SettingsView to
-//  keep that file within the project's line-count cap.
+//  The Lume Pro surfaces in Settings: the shared paywall helpers, the plan
+//  details page behind the iOS / macOS Lume Pro row, the DEBUG-only developer
+//  page, and the tvOS Lume Pro pane. Split out of SettingsView to keep that
+//  file within the project's line-count cap.
 //
 
 import SwiftUI
 
-extension SettingsView {
-    /// Sets the highlighted feature and presents the paywall.
-    func presentPaywall(_ feature: PremiumFeature? = nil) {
-        paywallHighlight = feature
-        showPaywall = true
-    }
-
-    /// Whether a new playlist can be added for free (first playlist always free).
-    var canAddPlaylist: Bool {
-        premium.isPremium || playlists.isEmpty
-    }
-
-    /// Which plan is unlocking Premium — the headline of the status row.
-    var premiumPlanTitle: String {
+extension PremiumManager {
+    /// Which plan is unlocking Premium — the headline of the plan details.
+    var planTitle: String {
         #if !SIDE_LOAD
             // A lifetime unlock outranks a subscription: it can't lapse, so that's the
             // more useful thing to show if someone somehow holds both. The retired
             // non-consumable is lifetime access too — it just never renewed.
-            if premium.owns(.lifetime) || premium.owns(.retiredMonthly) {
+            if owns(.lifetime) || owns(.retiredMonthly) {
                 return String(localized: "Lifetime access")
             }
-            if premium.owns(.monthly) { return String(localized: "Monthly subscription") }
+            if owns(.monthly) { return String(localized: "Monthly subscription") }
         #endif
         return String(localized: "All features unlocked")
     }
@@ -39,8 +28,8 @@ extension SettingsView {
     /// Billing line under the plan title: the next charge date, the cut-off date once
     /// cancelled, or a prompt to fix a failed payment. Nil for anything that doesn't
     /// renew, so lifetime owners never see a billing date.
-    var premiumRenewalDetail: String? {
-        guard premium.owns(.monthly), let status = premium.subscriptionStatus else { return nil }
+    var renewalDetail: String? {
+        guard owns(.monthly), let status = subscriptionStatus else { return nil }
         if status.isInBillingRetry {
             return String(localized: "Payment issue — update your payment method")
         }
@@ -53,31 +42,44 @@ extension SettingsView {
     }
 
     /// Plan and billing state on one line, for the tvOS pane's single subtitle slot.
-    var premiumStatusDetail: String {
-        guard let detail = premiumRenewalDetail else { return premiumPlanTitle }
-        return "\(premiumPlanTitle) · \(detail)"
+    var statusDetail: String {
+        guard let renewalDetail else { return planTitle }
+        return "\(planTitle) · \(renewalDetail)"
+    }
+}
+
+extension SettingsView {
+    /// Sets the highlighted feature and presents the paywall.
+    func presentPaywall(_ feature: PremiumFeature? = nil) {
+        paywallHighlight = feature
+        showPaywall = true
+    }
+
+    /// Whether a new playlist can be added for free (first playlist always free).
+    var canAddPlaylist: Bool {
+        premium.isPremium || playlists.isEmpty
     }
 }
 
 #if !os(tvOS)
 
-    extension SettingsView {
-        /// The first row in Settings: current Premium status, or a tap-to-upgrade
-        /// prompt for free users.
-        var premiumStatusSection: some View {
-            Section {
-                if premium.isPremium {
+    /// The page behind the Lume Pro row once Pro is unlocked: the plan, its
+    /// billing state, and what it includes. Free users get the paywall instead.
+    struct PremiumPlanView: View {
+        @State private var premium = PremiumManager.shared
+
+        var body: some View {
+            List {
+                Section {
                     HStack(spacing: 12) {
                         Image(systemName: "crown")
                             .foregroundStyle(.tint)
                             .font(.title3)
                             .frame(width: 30)
                         VStack(alignment: .leading, spacing: 1) {
-                            // The plan, not the product name — the section header
-                            // already says "Lume Pro".
-                            Text(premiumPlanTitle)
-                            if let premiumRenewalDetail {
-                                Text(premiumRenewalDetail)
+                            Text(premium.planTitle)
+                            if let renewalDetail = premium.renewalDetail {
+                                Text(renewalDetail)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -90,72 +92,70 @@ extension SettingsView {
                     if premium.hasManageableSubscription {
                         ManageSubscriptionRow()
                     }
-                } else {
-                    Button {
-                        presentPaywall(nil)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "crown")
-                                .foregroundStyle(.tint)
-                                .font(.title3)
-                                .frame(width: 30)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Unlock Lume Pro")
-                                    .foregroundStyle(.primary)
-                                Text("Free plan · See what's included")
+                }
+
+                Section {
+                    ForEach(PremiumFeature.allCases) { feature in
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(feature.title)
+                                Text(feature.subtitle)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
+                        } icon: {
+                            Image(systemName: feature.systemImage)
+                                .foregroundStyle(.tint)
                         }
-                        .padding(.vertical, 2)
-                    }
-                }
-            } header: {
-                // Not "Subscription" — lifetime owners see this section too, and
-                // labelling a one-time purchase a subscription is what sent people
-                // hunting for a cancel button that couldn't exist.
-                Text("Lume Pro")
-            }
-        }
-
-        #if DEBUG && !SIDE_LOAD
-            /// DEBUG-only override to preview the free tier and the paywall without
-            /// archiving a Release build.
-            var developerSection: some View {
-                Section {
-                    Toggle("Force Premium", isOn: Binding(
-                        get: { premium.debugForcePremium },
-                        set: { premium.debugForcePremium = $0 }
-                    ))
-
-                    Button("Recalculate Recommendations") {
-                        RecommendationCacheStore().clear(for: ActiveProfileStore.current)
-                        recommendationsRecalcToken += 1
                     }
                 } header: {
-                    Text("Developer")
-                } footer: {
-                    Text("DEBUG only. Force Premium previews the free tier and paywall. Recalculate rebuilds the For You row now, bypassing the once-a-day throttle.")
+                    Text("Included")
                 }
             }
-        #endif
+            .platformNavigationTitle("Lume Pro")
+        }
     }
+
+    #if DEBUG && !SIDE_LOAD
+        /// DEBUG-only overrides to preview the free tier and the paywall without
+        /// archiving a Release build.
+        struct DeveloperSettingsView: View {
+            @State private var premium = PremiumManager.shared
+            /// Force-recompute counter the For You row watches.
+            @AppStorage(RecommendationSettings.manualRecalculationKey) private var recommendationsRecalcToken = 0
+
+            var body: some View {
+                List {
+                    Section {
+                        Toggle("Force Premium", isOn: Binding(
+                            get: { premium.debugForcePremium },
+                            set: { premium.debugForcePremium = $0 }
+                        ))
+
+                        Button("Recalculate Recommendations") {
+                            RecommendationCacheStore().clear(for: ActiveProfileStore.current)
+                            recommendationsRecalcToken += 1
+                        }
+                    } footer: {
+                        Text("DEBUG only. Force Premium previews the free tier and paywall. Recalculate rebuilds the For You row now, bypassing the once-a-day throttle.")
+                    }
+                }
+                .platformNavigationTitle("Developer")
+            }
+        }
+    #endif
 
 #endif
 
 #if os(tvOS)
 
     extension SettingsView {
-        /// The tvOS Premium pane: status, the full benefits list, and upgrade /
+        /// The tvOS Lume Pro pane: status, the full benefits list, and upgrade /
         /// restore actions for free users.
         var tvPremiumDetail: some View {
             VStack(alignment: .leading, spacing: 28) {
                 VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Premium")
+                    TVSettingsSectionLabel("Lume Pro")
 
                     HStack(spacing: 18) {
                         Image(systemName: "crown")
@@ -168,7 +168,7 @@ extension SettingsView {
                             Text(premium.isPremium ? "Lume Pro" : "Free Plan")
                                 .font(.system(size: 26, weight: .semibold))
                             Text(premium.isPremium
-                                ? premiumStatusDetail
+                                ? premium.statusDetail
                                 : String(localized: "Upgrade to unlock the features below"))
                                 .font(.system(size: 20))
                                 .foregroundStyle(.secondary)

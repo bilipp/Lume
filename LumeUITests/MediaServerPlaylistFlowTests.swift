@@ -74,6 +74,7 @@ final class MediaServerPlaylistFlowTests: XCTestCase {
         // Fresh install shows the login form as root; otherwise add via Settings.
         if app.tabBars.firstMatch.waitForExistence(timeout: 5) {
             app.settingsToolbarButton.tap()
+            XCTAssertTrue(app.openPlaylistsFromSettingsRoot(), "Settings › Playlists did not open")
             let addButton = app.buttons["Add Playlist"]
             XCTAssertTrue(addButton.waitForExistence(timeout: 3))
             addButton.tap()

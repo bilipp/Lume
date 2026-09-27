@@ -37,7 +37,7 @@ final class M3UPlaylistFlowTests: XCTestCase {
         app.launchArguments = ["-ui-testing"]
         app.launch()
 
-        XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
+        XCTAssertTrue(app.openSettingsPlaylists(), "Settings › Playlists did not open")
         let addButton = app.buttons["Add Playlist"]
         XCTAssertTrue(addButton.waitForExistence(timeout: 10))
         addButton.tap()
@@ -86,7 +86,7 @@ final class M3UPlaylistFlowTests: XCTestCase {
     private func dismissSettingsToTabBar(_ app: XCUIApplication) {
         // iOS Settings is a sheet with no Done button (Done is macOS-only), so
         // dismiss it by dragging its navigation bar down to the bottom edge.
-        let settingsNav = app.navigationBars["Settings"]
+        let settingsNav = app.navigationBars["Playlists"]
         if settingsNav.waitForExistence(timeout: 10) {
             let from = settingsNav.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             let target = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.0))

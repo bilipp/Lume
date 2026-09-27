@@ -2,57 +2,27 @@
 //  SettingsView+AutoSync.swift
 //  Lume
 //
-//  The global "Automatic Sync" frequency control, split out of SettingsView to
-//  keep that type's body small. The frequency is one shared setting for every
-//  playlist (see SyncFrequency); whether a given playlist participates is still
-//  gated by its own `syncEnabled` flag, edited in PlaylistDetailView.
+//  The global "Automatic Sync" frequency control in the tvOS Playlists pane,
+//  split out of SettingsView to keep that type's body small. The frequency is
+//  one shared setting for every playlist (see SyncFrequency); whether a given
+//  playlist participates is still gated by its own `syncEnabled` flag, edited in
+//  PlaylistDetailView. iOS / macOS show it in `PlaylistsSettingsView`.
 //
 
 import SwiftUI
 
-extension SettingsView {
-    /// Two-way binding over the raw `@AppStorage` string so pickers can work in
-    /// terms of `SyncFrequency` directly.
-    var syncFrequency: Binding<SyncFrequency> {
-        Binding(
-            get: { SyncFrequency.resolve(syncFrequencyRaw) },
-            set: { syncFrequencyRaw = $0.rawValue }
-        )
-    }
+#if os(tvOS)
 
-    #if !os(tvOS)
-        /// iOS / macOS grouped-list section.
-        var autoSyncSection: some View {
-            Section {
-                Picker("Automatic Sync", selection: syncFrequency) {
-                    ForEach(SyncFrequency.allCases) { frequency in
-                        Text(frequency.label).tag(frequency)
-                    }
-                }
-                .pickerStyle(.menu)
-                .disabled(playlists.isEmpty)
-            } header: {
-                Text("Automatic Sync")
-            } footer: {
-                Text("Playlists refresh automatically in the background at this interval. Disable a specific playlist's sync in its details.")
-            }
+    extension SettingsView {
+        /// Two-way binding over the raw `@AppStorage` string so pickers can work in
+        /// terms of `SyncFrequency` directly.
+        var syncFrequency: Binding<SyncFrequency> {
+            Binding(
+                get: { SyncFrequency.resolve(syncFrequencyRaw) },
+                set: { syncFrequencyRaw = $0.rawValue }
+            )
         }
 
-        /// iOS / macOS grouped-list section linking to the dedicated EPG settings.
-        var epgSection: some View {
-            Section {
-                NavigationLink {
-                    EPGSettingsView()
-                } label: {
-                    Label("TV Guide", systemImage: "list.clipboard")
-                }
-            } header: {
-                Text("TV Guide")
-            } footer: {
-                Text("Add EPG sources and set how often the guide refreshes, separately from playlist content.")
-            }
-        }
-    #else
         /// tvOS detail-pane section, using the same checkmark-row style as the
         /// player engine picker.
         var tvAutoSyncSection: some View {
@@ -84,5 +54,6 @@ extension SettingsView {
                     .padding(.top, 6)
             }
         }
-    #endif
-}
+    }
+
+#endif

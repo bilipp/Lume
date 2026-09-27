@@ -201,11 +201,18 @@ import SwiftUI
     struct TVOptionToggleRow: View {
         let title: LocalizedStringKey
         @Binding var isOn: Bool
+        /// A crown after the title, marking a Lume Pro setting for free users.
+        var showsProBadge = false
 
         var body: some View {
             Button { isOn.toggle() } label: {
                 HStack(spacing: 16) {
                     Text(title)
+                    if showsProBadge {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 20))
+                            .accessibilityLabel("Lume Pro")
+                    }
                     Spacer(minLength: 0)
                     Text(isOn ? "On" : "Off")
                         .foregroundStyle(.secondary)

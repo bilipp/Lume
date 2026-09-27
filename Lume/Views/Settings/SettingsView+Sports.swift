@@ -2,37 +2,17 @@
 //  SettingsView+Sports.swift
 //  Lume
 //
-//  The Sports settings entry in the main list and its dedicated pane. Follows the
-//  same shape as the TV Guide / Auto-Sync sections: a NavigationLink from the
-//  grouped list into `SportsSettingsView`, which manages followed teams, the tab
-//  toggle and a manual refresh. tvOS reaches the equivalent
-//  controls through `TVSportsSettingsPane` (SettingsView+TVComponents), so both
-//  the section and the pane below are iOS / macOS / visionOS only.
+//  The Sports settings page behind the root Sports row: followed teams, Hide
+//  Scores and a manual refresh. The tab switch lives in Library › Tabs. tvOS
+//  reaches the equivalent controls through `TVSportsSettingsPane`
+//  (SettingsView+TVComponents), so this page is iOS / macOS / visionOS only.
 //
 
 import SwiftUI
 
 #if !os(tvOS)
 
-    extension SettingsView {
-        /// iOS / macOS grouped-list section linking to the dedicated Sports pane.
-        var sportsSection: some View {
-            Section {
-                NavigationLink {
-                    SportsSettingsView()
-                } label: {
-                    Label("Sports", systemImage: "sportscourt")
-                }
-            } header: {
-                Text("Sports")
-            } footer: {
-                Text("Follow leagues and teams to build your Sports Hub.")
-            }
-        }
-    }
-
     struct SportsSettingsView: View {
-        @AppStorage(SportsSyncService.tabEnabledKey) private var tabEnabled = SportsSyncService.tabEnabledDefault
         @AppStorage(SportsSyncService.hideScoresKey) private var hideScores = false
         @State private var sync = SportsSyncService.shared
         @State private var showingManageTeams = false
@@ -40,7 +20,6 @@ import SwiftUI
         var body: some View {
             Form {
                 teamsSection
-                tabSection
                 scoresSection
                 refreshSection
             }
@@ -65,14 +44,6 @@ import SwiftUI
                 }
             } header: {
                 Text("Following")
-            }
-        }
-
-        private var tabSection: some View {
-            Section {
-                Toggle("Show Sports Tab", isOn: $tabEnabled)
-            } footer: {
-                Text("Show the Sports tab. The fixtures rail on Home follows your Home layout settings.")
             }
         }
 

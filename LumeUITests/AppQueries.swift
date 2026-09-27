@@ -33,6 +33,21 @@ extension XCUIApplication {
         return navigationBars["Settings"].waitForExistence(timeout: timeout)
     }
 
+    /// Opens Settings › Playlists — the playlist list and Add Playlist live one
+    /// level below the root, behind its Playlists row.
+    func openSettingsPlaylists(timeout: TimeInterval = 60) -> Bool {
+        guard openSettingsSheet(timeout: timeout) else { return false }
+        return openPlaylistsFromSettingsRoot()
+    }
+
+    /// Taps the Playlists row of an already-open Settings root.
+    func openPlaylistsFromSettingsRoot(timeout: TimeInterval = 10) -> Bool {
+        let row = buttons["Playlists"].firstMatch
+        guard row.waitForExistence(timeout: timeout) else { return false }
+        row.tap()
+        return navigationBars["Playlists"].waitForExistence(timeout: timeout)
+    }
+
     /// The toolbar's playlist switcher for the playlist named `name`.
     ///
     /// The switcher carries an explicit `accessibilityLabel` of
@@ -48,8 +63,8 @@ extension XCUIApplication {
     /// Scrolls the screen up until `element` exists, and reports whether it
     /// ever did.
     ///
-    /// Settings is a lazy SwiftUI `List` of about twenty sections: a row below
-    /// the fold is not merely off screen, it is absent from the accessibility
+    /// Settings pages are lazy SwiftUI `List`s: a row below the fold is not
+    /// merely off screen, it is absent from the accessibility
     /// tree entirely, so `waitForExistence` alone can never find one however
     /// long it waits.
     func scrollUntilExists(_ element: XCUIElement, maxSwipes: Int = 15) -> Bool {
