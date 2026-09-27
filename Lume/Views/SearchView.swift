@@ -262,16 +262,19 @@ struct SearchView: View {
     private func localSearch(
         query: String, playlist: Playlist?, wantMovies: Bool, wantSeries: Bool, wantLive: Bool
     ) async -> SearchHits {
-        // Scope to the active playlist unless cross-playlist search is on. Every
-        // catalog row's id carries its playlist's UUID as a prefix (see
-        // `SearchScope.playlistIDPrefix`), so a prefix test on the indexed `id`
-        // limits results to that playlist. Hidden/restricted categories are
-        // excluded in the fetch rather than afterwards, so `resultLimit` isn't
-        // spent on rows the viewer will never see.
+        // Scope to the active playlist unless cross-playlist search is on, in
+        // which case every playlist is named and each gets its own share of the
+        // budget — one catalog would otherwise fill all `resultLimit` rows and
+        // the others would look unsearched. Every catalog row's id carries its
+        // playlist's UUID as a prefix (see `SearchScope.playlistIDPrefix`), so a
+        // prefix test on the indexed `id` limits results to that playlist.
+        // Hidden/restricted categories are excluded in the fetch rather than
+        // afterwards, so `resultLimit` isn't spent on rows the viewer will
+        // never see.
+        let scoped = searchAllPlaylists ? playlists : [playlist].compactMap(\.self)
         let request = SearchRequest(
             query: query,
-            playlistID: playlist?.id.uuidString ?? "",
-            restrictToPlaylist: !searchAllPlaylists && playlist != nil,
+            playlistIDs: scoped.map(\.id.uuidString),
             wantMovies: wantMovies,
             wantSeries: wantSeries,
             wantLive: wantLive,
@@ -284,7 +287,7 @@ struct SearchView: View {
         // used to leave its scans running to the end, so on a large catalog the
         // superseded work piled up behind the query the viewer is waiting for.
         // Forwarding the cancellation lets `SearchFetcher` bail between its
-        // three scans; the partial hits it returns are dropped by
+        // scans; the partial hits it returns are dropped by
         // `updateResults`, which is the task being cancelled.
         let fetch = Task.detached(priority: .userInitiated) {
             SearchFetcher.fetch(container: container, request: request)
