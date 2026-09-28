@@ -30,6 +30,27 @@ struct SearchView: View {
     /// list stays responsive even when a playlist holds tens of thousands of items.
     private let resultLimit = 50
 
+    // How long typing has to pause before a query runs. Longer on tvOS: a
+    // remote enters a letter every second or so, which a short debounce turns
+    // into a full search and list rebuild per letter while the keyboard is
+    // still being driven.
+    #if os(tvOS)
+        private static let debounce: Duration = .milliseconds(700)
+    #else
+        private static let debounce: Duration = .milliseconds(300)
+    #endif
+
+    /// Whether the content filter is on screen. tvOS keeps it up while the
+    /// query is empty too, so the first letter doesn't restructure the list
+    /// under the keyboard.
+    private var showsFilter: Bool {
+        #if os(tvOS)
+            true
+        #else
+            !trimmedQuery.isEmpty
+        #endif
+    }
+
     private var trimmedQuery: String {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -37,14 +58,7 @@ struct SearchView: View {
     var body: some View {
         NavigationStack {
             List {
-                if trimmedQuery.isEmpty {
-                    ContentUnavailableView(
-                        "Search",
-                        systemImage: "magnifyingglass",
-                        description: Text("Search for movies, series, or live TV channels")
-                    )
-                } else {
-                    // Filter Picker
+                if showsFilter {
                     Picker("Filter", selection: $selectedFilter) {
                         ForEach(ContentFilter.allCases) { filter in
                             Text(filter.label).tag(filter)
@@ -53,7 +67,15 @@ struct SearchView: View {
                     .pickerStyle(.segmented)
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+                }
 
+                if trimmedQuery.isEmpty {
+                    ContentUnavailableView(
+                        "Search",
+                        systemImage: "magnifyingglass",
+                        description: Text("Search for movies, series, or live TV channels")
+                    )
+                } else {
                     // Results — only show "No Results" once a query has actually
                     // been run, so it doesn't flash while the input is debouncing.
                     if results.isEmpty {
@@ -101,41 +123,37 @@ struct SearchView: View {
                     }
                 }
             }
-            .platformNavigationTitle("Search")
-            .searchable(text: $searchText, prompt: "Movies, Series, Live TV...")
-            #if os(iOS)
-                .searchToolbarMinimizeIfAvailable()
-            #endif
-                .navigationDestination(for: Movie.self) { movie in
-                    MovieDetailView(movie: movie, animationNamespace: animationNamespace)
-                    #if os(iOS)
-                        .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))
-                    #endif
+            .searchField(text: $searchText)
+            .navigationDestination(for: Movie.self) { movie in
+                MovieDetailView(movie: movie, animationNamespace: animationNamespace)
+                #if os(iOS)
+                    .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))
+                #endif
+            }
+            .navigationDestination(for: Series.self) { series in
+                SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                #if os(iOS)
+                    .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
+                #endif
+            }
+            .task(id: searchText) {
+                // Debounce raw keystrokes. .task(id:) cancels the in-flight task
+                // (including this sleep) the instant searchText changes, so the
+                // fetch below only fires once typing actually pauses.
+                let trimmed = trimmedQuery
+                guard !trimmed.isEmpty else {
+                    debouncedSearchText = ""
+                    return
                 }
-                .navigationDestination(for: Series.self) { series in
-                    SeriesDetailView(series: series, animationNamespace: animationNamespace)
-                    #if os(iOS)
-                        .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
-                    #endif
-                }
-                .task(id: searchText) {
-                    // Debounce raw keystrokes. .task(id:) cancels the in-flight task
-                    // (including this sleep) the instant searchText changes, so the
-                    // fetch below only fires once typing actually pauses.
-                    let trimmed = trimmedQuery
-                    guard !trimmed.isEmpty else {
-                        debouncedSearchText = ""
-                        return
-                    }
-                    try? await Task.sleep(for: .milliseconds(300))
-                    guard !Task.isCancelled else { return }
-                    debouncedSearchText = trimmed
-                }
-                .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter, allPlaylists: searchAllPlaylists)) {
-                    // Re-run whenever the settled query or the filter changes.
-                    // Filter changes are instant (no debounce on the segmented control).
-                    await updateResults()
-                }
+                try? await Task.sleep(for: Self.debounce)
+                guard !Task.isCancelled else { return }
+                debouncedSearchText = trimmed
+            }
+            .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter, allPlaylists: searchAllPlaylists)) {
+                // Re-run whenever the settled query or the filter changes.
+                // Filter changes are instant (no debounce on the segmented control).
+                await updateResults()
+            }
         }
         #if os(iOS) || os(tvOS)
         .fullScreenCover(item: $playingMedia) { media in
@@ -323,29 +341,21 @@ struct SearchView: View {
         // has always shown is restored here, over at most `resultLimit`
         // hydrated rows per type. `localizedStandardCompare` is what
         // `SortDescriptor(\.name)` used, so the ordering is unchanged.
-        for movie in hydrateSortedByName(localHits.movies, name: \Movie.name) {
+        for movie in sortedByName(hydrateSearchHits(localHits.movies, in: modelContext) as [Movie], name: \.name) {
             add(.movie(movie), categoryID: movie.categoryId)
         }
-        for series in hydrateSortedByName(localHits.series, name: \Series.name) {
+        for series in sortedByName(hydrateSearchHits(localHits.series, in: modelContext) as [Series], name: \.name) {
             add(.series(series), categoryID: series.categoryId)
         }
-        for stream in hydrateSortedByName(localHits.streams, name: \LiveStream.name) {
+        for stream in sortedByName(hydrateSearchHits(localHits.streams, in: modelContext) as [LiveStream], name: \.name) {
             add(.liveStream(stream), categoryID: stream.categoryId)
         }
         return matches
     }
 
-    /// Hydrates rows the background fetch matched, in name order. The fetch
-    /// itself no longer sorts (a `sortBy:` would make SQLite sort every match
-    /// before applying the limit), so this is where the list's per-type
-    /// alphabetical order comes from — over at most `resultLimit` rows.
-    /// `localizedStandardCompare` is the comparator `SortDescriptor(\.name)`
-    /// defaulted to, so the resulting order is the same one the list showed.
-    private func hydrateSortedByName<Model: PersistentModel>(
-        _ ids: [PersistentIdentifier], name: KeyPath<Model, String>
-    ) -> [Model] {
-        ids.compactMap { modelContext.model(for: $0) as? Model }
-            .sorted { $0[keyPath: name].localizedStandardCompare($1[keyPath: name]) == .orderedAscending }
+    /// Name order, by the comparator `SortDescriptor(\.name)` defaults to.
+    private func sortedByName<Model>(_ models: [Model], name: KeyPath<Model, String>) -> [Model] {
+        models.sorted { $0[keyPath: name].localizedStandardCompare($1[keyPath: name]) == .orderedAscending }
     }
 
     /// Fetches `Movie` rows for the given ids in one query, returned in id order.
@@ -368,6 +378,70 @@ struct SearchView: View {
         return ids.compactMap { byId[$0] }
     }
 }
+
+// MARK: - Search field
+
+private extension View {
+    /// The search field, pinned at the top wherever it lands in the
+    /// navigation bar — iPad, the More list, and some iPhones — where it would
+    /// otherwise stay hidden until the list is pulled down (iPadOS 26 even
+    /// parks it as a collapsed magnifier button). Where the search tab puts
+    /// the field in the tab bar instead, that placement still wins.
+    func searchField(text: Binding<String>) -> some View {
+        modifier(SearchFieldModifier(text: text))
+    }
+}
+
+private struct SearchFieldModifier: ViewModifier {
+    @Binding var text: String
+    #if os(tvOS)
+        @State private var fieldText = FieldText()
+    #endif
+
+    func body(content: Content) -> some View {
+        #if os(tvOS)
+            content.searchable(text: fieldBinding, prompt: "Movies, Series, Live TV...")
+        #else
+            content.searchable(text: $text, placement: placement, prompt: "Movies, Series, Live TV...")
+        #endif
+    }
+
+    #if os(tvOS)
+        /// Text typed on the iPhone Remote keyboard appears in the field and is
+        /// then deleted again, from the second letter on — the known tvOS
+        /// `.searchable` fight between the remote session and SwiftUI writing
+        /// its binding back into the field. The getter here answers with the
+        /// text the field itself last reported, read from a plain reference
+        /// rather than view state, so a write-back can never carry an older
+        /// value than the one on screen.
+        private var fieldBinding: Binding<String> {
+            let fieldText = fieldText
+            return Binding(
+                get: { fieldText.value },
+                set: { newValue in
+                    fieldText.value = newValue
+                    text = newValue
+                }
+            )
+        }
+    #endif
+
+    private var placement: SearchFieldPlacement {
+        #if os(iOS)
+            .navigationBarDrawer(displayMode: .always)
+        #else
+            .automatic
+        #endif
+    }
+}
+
+#if os(tvOS)
+    /// The search field's latest text. A class, and deliberately not
+    /// observable: writing it must not schedule a view update of its own.
+    private final class FieldText {
+        var value = ""
+    }
+#endif
 
 // MARK: - Search Key
 
@@ -440,142 +514,6 @@ enum SearchResult: Identifiable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
-    }
-}
-
-// MARK: - Search Result Row
-
-struct SearchResultRow: View {
-    let result: SearchResult
-    /// Which playlist this row came from, or `nil` to leave the badge off.
-    var playlistName: String?
-
-    var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnail
-            CachedAsyncImage(url: thumbnailURL, maxPixelSize: 90) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .overlay {
-                            ProgressView()
-                        }
-                case let .success(image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .overlay {
-                            Image(systemName: iconName)
-                                .foregroundStyle(.secondary)
-                        }
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .frame(width: 60, height: 90)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .lineLimit(2)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: categoryIcon)
-                        Text(LocalizedStringKey(categoryName))
-                    }
-                    .foregroundStyle(.blue)
-                    // Only present while searching across playlists, where the
-                    // category alone doesn't say which provider a row is from.
-                    if let playlistName {
-                        HStack(spacing: 4) {
-                            Image(systemName: "rectangle.stack")
-                            Text(playlistName)
-                        }
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    }
-                }
-                .font(.caption2)
-            }
-
-            Spacer()
-        }
-    }
-
-    private var thumbnailURL: URL? {
-        switch result {
-        case let .movie(movie):
-            URL(string: movie.streamIcon ?? "")
-        case let .series(series):
-            URL(string: series.cover ?? "")
-        case let .liveStream(stream):
-            URL(string: stream.streamIcon ?? "")
-        }
-    }
-
-    private var title: String {
-        switch result {
-        case let .movie(movie):
-            movie.name
-        case let .series(series):
-            series.name
-        case let .liveStream(stream):
-            stream.name
-        }
-    }
-
-    private var subtitle: String {
-        switch result {
-        case let .movie(movie):
-            movie.genre ?? movie.releaseDate ?? ""
-        case let .series(series):
-            series.genre ?? series.releaseDate ?? ""
-        case .liveStream:
-            "Live"
-        }
-    }
-
-    private var categoryName: String {
-        switch result {
-        case .movie:
-            "Movie"
-        case .series:
-            "Series"
-        case .liveStream:
-            "Live TV"
-        }
-    }
-
-    private var categoryIcon: String {
-        switch result {
-        case .movie:
-            "film"
-        case .series:
-            "tv"
-        case .liveStream:
-            "antenna.radiowaves.left.and.right"
-        }
-    }
-
-    private var iconName: String {
-        switch result {
-        case .movie:
-            "film"
-        case .series:
-            "tv"
-        case .liveStream:
-            "antenna.radiowaves.left.and.right"
-        }
     }
 }
 
