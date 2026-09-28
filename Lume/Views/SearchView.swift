@@ -395,7 +395,9 @@ private extension View {
 
 private struct SearchFieldModifier: ViewModifier {
     @Binding var text: String
-    #if !os(tvOS)
+    #if os(tvOS)
+        @State private var fieldText = FieldText()
+    #else
         @FocusState private var isFocused: Bool
     #endif
     #if os(iOS)
@@ -404,7 +406,7 @@ private struct SearchFieldModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         #if os(tvOS)
-            content.searchable(text: $text, prompt: "Movies, Series, Live TV...")
+            content.searchable(text: fieldBinding, prompt: "Movies, Series, Live TV...")
         #else
             content
                 .searchable(text: $text, placement: placement, prompt: "Movies, Series, Live TV...")
@@ -419,6 +421,26 @@ private struct SearchFieldModifier: ViewModifier {
         #endif
     }
 
+    #if os(tvOS)
+        /// Text typed on the iPhone Remote keyboard appears in the field and is
+        /// then deleted again, from the second letter on — the known tvOS
+        /// `.searchable` fight between the remote session and SwiftUI writing
+        /// its binding back into the field. The getter here answers with the
+        /// text the field itself last reported, read from a plain reference
+        /// rather than view state, so a write-back can never carry an older
+        /// value than the one on screen.
+        private var fieldBinding: Binding<String> {
+            let fieldText = fieldText
+            return Binding(
+                get: { fieldText.value },
+                set: { newValue in
+                    fieldText.value = newValue
+                    text = newValue
+                }
+            )
+        }
+    #endif
+
     private var placement: SearchFieldPlacement {
         #if os(iOS)
             horizontalSizeClass == .regular ? .navigationBarDrawer(displayMode: .always) : .automatic
@@ -427,6 +449,14 @@ private struct SearchFieldModifier: ViewModifier {
         #endif
     }
 }
+
+#if os(tvOS)
+    /// The search field's latest text. A class, and deliberately not
+    /// observable: writing it must not schedule a view update of its own.
+    private final class FieldText {
+        var value = ""
+    }
+#endif
 
 // MARK: - Search Key
 
