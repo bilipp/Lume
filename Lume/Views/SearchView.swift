@@ -383,11 +383,10 @@ struct SearchView: View {
 // MARK: - Search field
 
 private extension View {
-    /// The search field, focused when the tab opens. In regular width (iPad)
-    /// it is pinned under the title: iPadOS 26 otherwise parks the search tab's
-    /// field in the toolbar as a collapsed magnifier button that has to be
-    /// tapped before it takes input. Compact width keeps the search tab's own
-    /// field in the tab bar.
+    /// The search field. In regular width (iPad) it is pinned under the title:
+    /// iPadOS 26 otherwise parks the search tab's field in the toolbar as a
+    /// collapsed magnifier button that has to be tapped before it takes input.
+    /// Compact width keeps the search tab's own field in the tab bar.
     func searchField(text: Binding<String>) -> some View {
         modifier(SearchFieldModifier(text: text))
     }
@@ -397,8 +396,6 @@ private struct SearchFieldModifier: ViewModifier {
     @Binding var text: String
     #if os(tvOS)
         @State private var fieldText = FieldText()
-    #else
-        @FocusState private var isFocused: Bool
     #endif
     #if os(iOS)
         @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -408,16 +405,7 @@ private struct SearchFieldModifier: ViewModifier {
         #if os(tvOS)
             content.searchable(text: fieldBinding, prompt: "Movies, Series, Live TV...")
         #else
-            content
-                .searchable(text: $text, placement: placement, prompt: "Movies, Series, Live TV...")
-                .searchFocused($isFocused)
-                .task {
-                    // Opening the tab goes straight to typing — but not when
-                    // coming back from a result, where the keyboard would cover
-                    // the list just left.
-                    guard text.isEmpty else { return }
-                    isFocused = true
-                }
+            content.searchable(text: $text, placement: placement, prompt: "Movies, Series, Live TV...")
         #endif
     }
 
