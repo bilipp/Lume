@@ -169,24 +169,35 @@ final class ProfileManager {
     }
 
     /// Re-project the catalog onto another profile's saved state.
-    func switchProfile(to id: UUID) async {
-        guard id != activeProfileID, !isSwitching else { return }
+    @discardableResult
+    func switchProfile(to id: UUID) async -> Bool {
+        guard id != activeProfileID else { return true }
+        guard !isSwitching else { return false }
         let from = activeProfileID
         switchingToProfileID = id
+        defer { switchingToProfileID = nil }
         // Flush any pending catalog edits (e.g. a favorite toggled moments ago,
         // not yet autosaved) so the engine — which reads the catalog through its
         // own background context — exports the outgoing profile's *current* state
         // rather than a stale snapshot. This flushes the CATALOG main context;
         // profile rows live in the separate cloud store.
-        try? catalogContainer.mainContext.save()
-        // The engine commits `ActiveProfileStore.current = id` atomically with
-        // the projection swap (see `CloudSyncEngine.switchProfile`), so there is
-        // no window where the catalog and the active-profile pointer disagree.
-        await coordinator.switchProfile(from: from, to: id)
+        do {
+            if catalogContainer.mainContext.hasChanges {
+                try catalogContainer.mainContext.save()
+            }
+            // The engine commits `ActiveProfileStore.current = id` atomically
+            // with the projection swap (see `CloudSyncEngine.switchProfile`), so
+            // there is no window where the catalog and active-profile pointer
+            // disagree.
+            try await coordinator.switchProfile(from: from, to: id)
+        } catch {
+            Logger.sync.error("Profile switch aborted; keeping the current profile: \(error.localizedDescription)")
+            return false
+        }
         activeProfileID = id
-        switchingToProfileID = nil
         // Re-baseline the freshly projected state against the cloud.
         coordinator.reconcile()
+        return true
     }
 
     /// Delete a profile and all of its saved watch state. The last remaining
@@ -199,7 +210,7 @@ final class ProfileManager {
             return
         }
         if profile.id == activeProfileID {
-            await switchProfile(to: fallback.id)
+            guard await switchProfile(to: fallback.id) else { return }
         }
         await coordinator.purgeProfileData(profile.id)
         LiveChannelHistory.purge(profileID: profile.id)
