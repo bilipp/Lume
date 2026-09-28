@@ -25,7 +25,10 @@ extension DownloadManager {
         /// The finished file for `id`, if one is already on disk.
         func downloadedFile(for id: String) -> URL? {
             let sanitized = sanitize(id)
-            return files.first { $0.deletingPathExtension().lastPathComponent == sanitized }
+            return files.first {
+                $0.deletingPathExtension().lastPathComponent == sanitized
+                    && DownloadValidator.isUsableFile(at: $0)
+            }
         }
 
         let context = ModelContext(container)
