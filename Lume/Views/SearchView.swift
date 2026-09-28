@@ -383,10 +383,11 @@ struct SearchView: View {
 // MARK: - Search field
 
 private extension View {
-    /// The search field. In regular width (iPad) it is pinned under the title:
-    /// iPadOS 26 otherwise parks the search tab's field in the toolbar as a
-    /// collapsed magnifier button that has to be tapped before it takes input.
-    /// Compact width keeps the search tab's own field in the tab bar.
+    /// The search field, pinned under the title wherever it lands in the
+    /// navigation bar — iPad, the More list, and some iPhones — where it would
+    /// otherwise stay hidden until the list is pulled down (iPadOS 26 even
+    /// parks it as a collapsed magnifier button). Where the search tab puts
+    /// the field in the tab bar instead, that placement still wins.
     func searchField(text: Binding<String>) -> some View {
         modifier(SearchFieldModifier(text: text))
     }
@@ -396,9 +397,6 @@ private struct SearchFieldModifier: ViewModifier {
     @Binding var text: String
     #if os(tvOS)
         @State private var fieldText = FieldText()
-    #endif
-    #if os(iOS)
-        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
     func body(content: Content) -> some View {
@@ -431,7 +429,7 @@ private struct SearchFieldModifier: ViewModifier {
 
     private var placement: SearchFieldPlacement {
         #if os(iOS)
-            horizontalSizeClass == .regular ? .navigationBarDrawer(displayMode: .always) : .automatic
+            .navigationBarDrawer(displayMode: .always)
         #else
             .automatic
         #endif
