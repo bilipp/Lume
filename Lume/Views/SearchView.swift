@@ -123,7 +123,6 @@ struct SearchView: View {
                     }
                 }
             }
-            .platformNavigationTitle("Search")
             .searchField(text: $searchText)
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
@@ -383,7 +382,7 @@ struct SearchView: View {
 // MARK: - Search field
 
 private extension View {
-    /// The search field, pinned under the title wherever it lands in the
+    /// The search field, pinned at the top wherever it lands in the
     /// navigation bar — iPad, the More list, and some iPhones — where it would
     /// otherwise stay hidden until the list is pulled down (iPadOS 26 even
     /// parks it as a collapsed magnifier button). Where the search tab puts
