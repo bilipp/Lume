@@ -146,31 +146,30 @@ struct PreferredLanguageStorageTests {
         #expect(PlayerSettings.Language.preferredAudioLanguagesKey == "player.preferredAudioLanguages")
     }
 
-    @Test func `the list ships empty`() {
-        // The shipped default is "no preference at all": every engine then
-        // leaves track selection exactly as the container asks for it.
+    @Test func `the stored list ships empty for automatic selection`() {
         #expect(PlayerSettings.Language.preferredAudioLanguagesDefault == "")
     }
 
-    @Test func `load yields an empty array for an untouched key`() {
+    @Test func `load uses system languages for an untouched key`() {
         withSuite { defaults in
-            let options = PlayerLanguageOptions.load(from: defaults)
-            #expect(options.preferredAudioLanguages.isEmpty)
+            let options = PlayerLanguageOptions.load(from: defaults, systemLanguages: ["fr-FR", "en-GB"])
+            #expect(options.preferredAudioLanguages == ["fr", "en"])
         }
     }
 
     @Test func `load reads the stored list in order`() {
         withSuite { defaults in
             defaults.set("de,en", forKey: PlayerSettings.Language.preferredAudioLanguagesKey)
-            let options = PlayerLanguageOptions.load(from: defaults)
+            let options = PlayerLanguageOptions.load(from: defaults, systemLanguages: ["fr-FR"])
             #expect(options.preferredAudioLanguages == ["de", "en"])
         }
     }
 
-    @Test func `an empty stored string still means no preference`() {
+    @Test func `an empty stored string uses system languages`() {
         withSuite { defaults in
             defaults.set("", forKey: PlayerSettings.Language.preferredAudioLanguagesKey)
-            #expect(PlayerLanguageOptions.load(from: defaults).preferredAudioLanguages.isEmpty)
+            let options = PlayerLanguageOptions.load(from: defaults, systemLanguages: ["ja-JP"])
+            #expect(options.preferredAudioLanguages == ["ja"])
         }
     }
 }
