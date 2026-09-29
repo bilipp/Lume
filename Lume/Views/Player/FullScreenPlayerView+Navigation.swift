@@ -57,8 +57,10 @@ extension FullScreenPlayerView {
     func switchMedia(to newMedia: PlayableMedia) {
         guard newMedia.id != activeMedia.id else { return }
         // Flush the outgoing stream's progress before the clock resets — capture
-        // happens synchronously inside `persistProgressDetached`.
-        persistProgressDetached(force: true)
+        // happens synchronously inside `persistProgressDetached`. A channel's
+        // touch is held for the player's next flush rather than saved while the
+        // next stream opens.
+        persistProgressDetached(force: true, holdingLive: true)
         // The completion claim covers exactly that one flush. Left standing, a
         // step back onto the same episode would never record progress again.
         completedRef = nil
