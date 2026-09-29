@@ -55,7 +55,7 @@ nonisolated struct TraktPendingWatched: Codable, Equatable {
 
 /// Reads and writes ``TraktPendingWatched`` on disk, caching it in memory so the
 /// per-series lookup in `insertEpisodes` costs nothing after the first hit.
-enum TraktPendingWatchedStore {
+nonisolated enum TraktPendingWatchedStore {
     private nonisolated(unsafe) static var cached: TraktPendingWatched?
     private static let lock = NSLock()
 

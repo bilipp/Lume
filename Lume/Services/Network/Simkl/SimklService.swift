@@ -289,10 +289,11 @@ final class SimklService {
     // MARK: - Watched import
 
     /// Imports the user's Simkl watched history into the local catalog, marking
-    /// matching movies and episodes as watched. Writes through `context` (the
-    /// catalog container's context the UI binds to); the iCloud reconciler then
-    /// mirrors the change to the user's other devices. No-ops when not connected
-    /// or an import is already running.
+    /// matching movies and episodes as watched. Writes through a context of its
+    /// own on `context`'s container, off the main actor; the UI's context picks
+    /// the change up on merge, and the iCloud reconciler then mirrors it to the
+    /// user's other devices. No-ops when not connected or an import is already
+    /// running.
     func importWatched(into context: ModelContext) async {
         guard isConnected, !isImporting else { return }
         isImporting = true
@@ -305,10 +306,16 @@ final class SimklService {
         }
         do {
             let items = try await client.watchedItems(accessToken: accessToken)
-            lastImport = SimklWatchedImporter.apply(items: items, in: context)
+            lastImport = await Self.applyImport(items: items, container: context.container)
         } catch {
             lastImport = .failure
         }
+    }
+
+    /// Off the main actor for the same reason as `TraktService.applyImport`.
+    @concurrent
+    private static func applyImport(items: SimklAllItems, container: ModelContainer) async -> SimklImportSummary {
+        SimklWatchedImporter.apply(items: items, in: ModelContext(container))
     }
 
     // MARK: - Tokens
