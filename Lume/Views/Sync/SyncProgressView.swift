@@ -108,7 +108,9 @@ struct SyncProgressView: View {
             defer { epgSync.contentSyncDidFinish(succeeded: succeeded) }
             do {
                 let syncManager = ContentSyncManager(modelContainer: modelContext.container)
-                try await syncManager.syncPlaylist(playlist, progress: progress, full: full)
+                try await BackgroundActivity.perform("Playlist sync") {
+                    try await syncManager.syncPlaylist(playlist, progress: progress, full: full)
+                }
                 succeeded = true
                 await MainActor.run {
                     // Newly synced titles need indexing; the launch-time pass

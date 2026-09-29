@@ -66,6 +66,27 @@ struct ContentSyncPruneTests {
         #expect(try storedMovieIds(container) == seenIds)
     }
 
+    @Test func `sweep reaches every row when id digit counts vary`() async throws {
+        // Real provider ids mix digit counts (a 181k VOD catalog spans 5-7
+        // digits). A number-aware page order against a byte-wise `id > cursor`
+        // seek jumps past whole digit ranges — the default String comparator
+        // swept 31,951 of that catalog's 180,971 rows.
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        let ranges = [9000 ..< 11000, 99000 ..< 101_000, 999_000 ..< 1_001_000]
+        for range in ranges {
+            try insertMovies(range, playlistId: playlistId, container: container)
+        }
+
+        let seen = ranges.flatMap(\.self).filter { $0 % 7 != 0 }
+        let seenIds = Set(seen.map { movieId($0, playlistId: playlistId) })
+
+        let manager = ContentSyncManager(modelContainer: container)
+        await manager.pruneStaleMovies(playlistId: playlistId, seenIds: seenIds)
+
+        #expect(try storedMovieIds(container) == seenIds)
+    }
+
     @Test func `sweep removes rows that fill whole pages`() async throws {
         let container = try makeTestContainer()
         let playlistId = UUID()

@@ -62,7 +62,7 @@ enum CategorySortOption: String, CaseIterable, Identifiable {
 
 // MARK: - Content Sort
 
-enum ContentSortOption: String, CaseIterable, Identifiable {
+nonisolated enum ContentSortOption: String, CaseIterable, Identifiable {
     case playlist
     case nameAscending
     case nameDescending

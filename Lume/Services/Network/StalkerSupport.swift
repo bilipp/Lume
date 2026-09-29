@@ -263,6 +263,17 @@ actor StalkerSessionStore {
 // MARK: - Response validation
 
 extension StalkerClient {
+    /// `decodeValidated` on the global executor rather than on whichever actor
+    /// awaited the request — a `get_all_channels` payload runs to megabytes.
+    @concurrent
+    static func decodeValidatedOffActor<T: Decodable & Sendable>(
+        _ type: T.Type,
+        response: URLResponse,
+        data: Data
+    ) async throws -> T {
+        try decodeValidated(type, response: response, data: data)
+    }
+
     /// Maps a portal response onto `StalkerError`, or decodes it. Split out of
     /// `perform` so its one catch can fingerprint every failure path.
     nonisolated static func decodeValidated<T: Decodable>(_: T.Type, response: URLResponse, data: Data) throws -> T {

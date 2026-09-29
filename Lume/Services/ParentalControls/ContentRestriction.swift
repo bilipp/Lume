@@ -79,15 +79,15 @@ extension EnvironmentValues {
 /// Content that belongs to a `Category`, so it can be filtered when that category
 /// is hidden or restricted. Movies, series and live channels all carry a
 /// `categoryId`.
-protocol CategorizedContent {
+nonisolated protocol CategorizedContent {
     var categoryId: String? { get }
 }
 
-extension Movie: CategorizedContent {}
-extension Series: CategorizedContent {}
-extension LiveStream: CategorizedContent {}
+nonisolated extension Movie: CategorizedContent {}
+nonisolated extension Series: CategorizedContent {}
+nonisolated extension LiveStream: CategorizedContent {}
 
-extension Sequence where Element: CategorizedContent {
+nonisolated extension Sequence where Element: CategorizedContent {
     /// Drops items whose category is hidden or restricted for the current
     /// viewer. A no-op when nothing is excluded.
     func excludingRestricted(_ restriction: ContentRestriction) -> [Element] {

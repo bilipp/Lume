@@ -117,6 +117,30 @@ struct PlayerItemNavigationTests {
         #expect(surfedUp?.contentRef == expectedUp?.contentRef)
     }
 
+    @Test(arguments: LiveSurfMode.allCases)
+    func `off-main resolution matches the in-context answer and the remote's mapping`(mode: LiveSurfMode) async throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+
+        let resolved = await PlayerItemNavigation.resolveNeighbours(
+            for: bravo, sort: .playlist, restriction: ContentRestriction(), container: context.container
+        )
+        #expect(resolved.anchorID == bravo.id)
+        #expect(resolved.next?.contentRef == liveRef(102, playlist))
+        #expect(resolved.previous?.contentRef == liveRef(100, playlist))
+
+        // The tvOS remote reads these instead of resolving again, so the
+        // direction mapping it applies must land where a fresh lookup would.
+        for direction in [LiveChannelNavigator.SurfDirection.up, .down] {
+            let fromNeighbours = direction.movesForward(in: mode) ? resolved.next : resolved.previous
+            let fresh = LiveChannelNavigator.adjacentMedia(
+                for: bravo, surfing: direction, mode: mode, sort: .playlist,
+                restriction: ContentRestriction(), in: context
+            )
+            #expect(fromNeighbours?.contentRef == fresh?.contentRef)
+        }
+    }
+
     @Test func `the ends of a channel list wrap`() throws {
         let (context, playlist) = try makeWorld(streams: threeChannels)
         let alpha = try media(forStreamId: 100, playlist: playlist, in: context)

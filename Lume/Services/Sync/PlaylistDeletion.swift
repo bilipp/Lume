@@ -56,6 +56,7 @@ nonisolated enum PlaylistDeletion {
         SweepSkipDefaults.removeAll(playlistId: playlistID)
         M3UDigestStore.remove(playlistId: playlistID)
         WebDAVDigestStore.remove(playlistId: playlistID)
+        XtreamDigestStore.removeAll(playlistId: playlistID)
         // Remembered sports channel picks name a channel in this playlist; drop
         // them here so both deletion paths (Settings and the iCloud reconcile's
         // `CloudSyncEngine.deletePlaylist`, which funnels through this method)

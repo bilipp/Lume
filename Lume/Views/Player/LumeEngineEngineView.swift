@@ -391,15 +391,15 @@ struct LumeEngineEngineView: View {
     }
 
     #if os(tvOS)
-        /// Change the live channel from the Siri Remote. Up/Down surf to the
-        /// adjacent channel, the way the viewer's `LiveSurfMode` maps the
-        /// press; Right recalls the channel watched just before this one.
-        /// Falls back to summoning the controls when there's nothing to jump to.
+        /// Change the live channel from the Siri Remote: up/down surf the way the
+        /// viewer's `LiveSurfMode` maps the press, right recalls the previous
+        /// channel. Summons the controls when there's nothing to jump to.
         private func switchLiveChannel(_ direction: MoveCommandDirection) {
             mediaSwapper.surf(
                 direction, from: media,
                 through: .init(
-                    sortRaw: liveContentSortRaw, restriction: restriction, context: modelContext
+                    sortRaw: liveContentSortRaw, restriction: restriction, context: modelContext,
+                    neighbours: itemNeighbours
                 ),
                 select: { onSelectMedia?($0) },
                 showControls: showControls

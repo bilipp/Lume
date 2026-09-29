@@ -12,7 +12,7 @@
 import Foundation
 import SwiftData
 
-enum PlaylistOwner {
+nonisolated enum PlaylistOwner {
     /// The number of characters a canonical `UUID.uuidString` occupies. Ids are
     /// built from that exact spelling, so the owner's UUID is the leading slice.
     private static let uuidLength = 36

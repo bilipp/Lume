@@ -7,10 +7,16 @@
 
 import Foundation
 import OSLog
+import Synchronization
 
 // MARK: - XtreamClient
 
-class XtreamClient: APIClient {
+/// Nonisolated so its work runs on the caller — the `ContentSyncManager` actor
+/// during a sync, never the main actor — and the decode itself always runs off
+/// any actor (`decode(_:from:)`). Under the project's default MainActor
+/// isolation an unannotated client put every bulk catalog decode on the main
+/// thread: about 1.6 s per Xtream sync on a Mac for a 280k-row provider.
+final nonisolated class XtreamClient: Sendable {
     nonisolated struct Configuration {
         let serverURL: String
         let username: String
@@ -32,7 +38,15 @@ class XtreamClient: APIClient {
     /// clock. Read by `ContentSyncManager` to space consecutive bulk requests
     /// apart without re-paying wall clock the sync has already spent elsewhere.
     /// Stamped on failures too — a 401/403 still occupied the slot.
-    private(set) var lastRequestFinishedAt: ContinuousClock.Instant?
+    var lastRequestFinishedAt: ContinuousClock.Instant? {
+        lastRequestFinished.withLock { $0 }
+    }
+
+    private let lastRequestFinished = Mutex<ContinuousClock.Instant?>(nil)
+
+    private func stampRequestFinished() {
+        lastRequestFinished.withLock { $0 = ContinuousClock.now }
+    }
 
     nonisolated init(configuration: Configuration, urlSession: URLSession? = nil) {
         self.configuration = configuration
@@ -90,7 +104,7 @@ class XtreamClient: APIClient {
         return components?.url
     }
 
-    private func buildURL(serverURL: String, path: String, queryItems: [URLQueryItem]) -> URL? {
+    func buildURL(serverURL: String, path: String, queryItems: [URLQueryItem]) -> URL? {
         var components = URLComponents(string: serverURL)
         // Ensure the path is appended properly
         if !(components?.path.hasSuffix("/") ?? false), !path.hasPrefix("/") {
@@ -125,55 +139,59 @@ class XtreamClient: APIClient {
     ///   has already proven the credentials, a 401/403 is almost always the
     ///   provider's connection/rate limit rather than bad credentials. Login
     ///   (`getInfo`) leaves it `false` so wrong credentials fail fast.
-    private func request<T: Decodable>(
+    private func request<T: Decodable & Sendable>(
         _ url: URL,
         action: String,
         retryAuthFailure: Bool = true,
         phases: RequestPhases? = nil
     ) async throws -> T {
-        var attempt = 0
+        try await withRetries(action: action, retryAuthFailure: retryAuthFailure) {
+            let (data, response) = try await fetchValidated(url, action: action, phases: phases)
+            return try await decodeResponse(T.self, data: data, response: response, action: action, phases: phases)
+        }
+    }
+
+    /// Runs `attempt` with retry-and-backoff for transient failures; see
+    /// `request(_:action:retryAuthFailure:phases:)` for the parameters.
+    func withRetries<R>(
+        action: String,
+        retryAuthFailure: Bool = true,
+        _ attempt: () async throws -> R
+    ) async throws -> R {
+        var attemptCount = 0
         while true {
-            attempt += 1
+            attemptCount += 1
             do {
-                return try await performRequest(url, action: action, phases: phases)
+                return try await attempt()
             } catch let error as XtreamError {
                 let retriable = error.isRetriable || (retryAuthFailure && error.isAuthFailure)
-                guard retriable, attempt < Self.maxAttempts else {
+                guard retriable, attemptCount < Self.maxAttempts else {
                     Logger.network.error(
-                        "Xtream \(action, privacy: .public) request failed permanently (\(error.logDescription, privacy: .public)) after \(attempt, privacy: .public) attempt(s)"
+                        "Xtream \(action, privacy: .public) request failed permanently (\(error.logDescription, privacy: .public)) after \(attemptCount, privacy: .public) attempt(s)"
                     )
                     throw error
                 }
 
                 // Exponential backoff: 2s, then 4s. Gives the provider time to
                 // release the connection slot / clear the rate-limit window.
-                let delay = pow(2.0, Double(attempt))
+                let delay = pow(2.0, Double(attemptCount))
                 let reason = error.logDescription
-                let retryLabel = "\(attempt)/\(Self.maxAttempts - 1)"
+                let retryLabel = "\(attemptCount)/\(Self.maxAttempts - 1)"
                 Logger.network.warning(
                     "Xtream \(action, privacy: .public) failed (\(reason, privacy: .public)); retry \(retryLabel, privacy: .public) after \(delay, privacy: .public)s"
                 )
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 Logger.network.warning(
-                    "Xtream \(action, privacy: .public) backoff of \(delay, privacy: .public)s elapsed; retrying (attempt \(attempt + 1, privacy: .public))"
+                    "Xtream \(action, privacy: .public) backoff of \(delay, privacy: .public)s elapsed; retrying (attempt \(attemptCount + 1, privacy: .public))"
                 )
             }
         }
     }
 
-    /// A single request attempt. Network-level failures are wrapped into
-    /// `XtreamError.networkError` so callers see a consistent error type.
-    private func performRequest<T: Decodable>(_ url: URL, action: String, phases: RequestPhases? = nil) async throws -> T {
-        #if DEBUG
-            // VERIFIED, not defensive: `XtreamClient` declares no isolation, so
-            // `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` infers `@MainActor` for the
-            // whole type (unlike the sibling `nonisolated class M3UClient`). This
-            // holds even when the caller is `actor ContentSyncManager`, and the body
-            // never leaves that domain, so the bulk transfer's continuation and the
-            // multi-hundred-thousand-element `decoder.decode` below both run on the
-            // main actor. Remove only together with making the type `nonisolated`.
-            MainActor.assertIsolated("XtreamClient.performRequest runs on the main actor")
-        #endif
+    /// Downloads `url` and checks the HTTP status. Network-level failures are
+    /// wrapped into `XtreamError.networkError` so callers see a consistent
+    /// error type.
+    func fetchValidated(_ url: URL, action: String, phases: RequestPhases?) async throws -> (Data, URLResponse) {
         let data: Data
         let response: URLResponse
         let fetchInterval = phases.map { Perf.begin($0.fetch) }
@@ -181,11 +199,11 @@ class XtreamClient: APIClient {
             (data, response) = try await session.data(from: url)
         } catch {
             if let fetchInterval { Perf.end(fetchInterval) }
-            lastRequestFinishedAt = ContinuousClock.now
+            stampRequestFinished()
             throw XtreamError.networkError(error)
         }
         if let fetchInterval { Perf.end(fetchInterval) }
-        lastRequestFinishedAt = ContinuousClock.now
+        stampRequestFinished()
 
         let byteCount = data.count
         Logger.network.info(
@@ -204,21 +222,38 @@ class XtreamClient: APIClient {
             }
             throw XtreamError.serverError(httpResponse.statusCode)
         }
+        return (data, response)
+    }
 
+    /// Decodes a validated response, fingerprinting it for the log on failure.
+    func decodeResponse<T: Decodable & Sendable>(
+        _: T.Type,
+        data: Data,
+        response: URLResponse,
+        action: String,
+        phases: RequestPhases?
+    ) async throws -> T {
         let decodeInterval = phases.map { Perf.begin($0.decode) }
         defer { if let decodeInterval { Perf.end(decodeInterval) } }
         do {
-            let decoder = JSONDecoder()
-            return try decoder.decode(T.self, from: data)
+            return try await Self.decode(T.self, from: data)
         } catch {
             // Only fingerprint small bodies: a multi-hundred-MB catalog that
             // fails to decode would otherwise be re-parsed just for the log.
-            let fingerprint = byteCount <= 1_048_576
+            let fingerprint = data.count <= 1_048_576
                 ? NetworkDiagnostics.fingerprint(response: response, data: data)
                 : NetworkDiagnostics.fingerprint(response: response, data: nil)
             Logger.network.error("Xtream \(action) undecodable: \(fingerprint)")
             throw XtreamError.decodingError(error)
         }
+    }
+
+    /// Decodes on the global executor rather than on whichever actor awaited
+    /// the request: a 66 MB `get_vod_streams` payload takes about a second even
+    /// on a fast Mac, and several times that on an Apple TV.
+    @concurrent
+    private static func decode<T: Decodable & Sendable>(_: T.Type, from data: Data) async throws -> T {
+        try JSONDecoder().decode(T.self, from: data)
     }
 
     // MARK: - API Methods
@@ -508,7 +543,7 @@ class XtreamClient: APIClient {
 // MARK: - Supporting Types
 
 /// Wrapper some panels put around `get_short_epg` listings.
-private struct ShortEPGResponse: Decodable {
+private nonisolated struct ShortEPGResponse: Decodable {
     let epgListings: XtreamList<XtreamShortEPG>
 
     enum CodingKeys: String, CodingKey {
@@ -516,7 +551,7 @@ private struct ShortEPGResponse: Decodable {
     }
 }
 
-enum StreamFormat: String {
+nonisolated enum StreamFormat: String {
     case m3u8
     case tsStream = "ts"
 }

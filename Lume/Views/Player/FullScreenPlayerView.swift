@@ -280,11 +280,21 @@ struct FullScreenPlayerView: View {
             // skip-intro button (intro/recap windows) and the next-up arm time
             // (outro window) — so the fetch needs one of them to be both enabled
             // and reachable; the outro is dead weight with no next episode to
-            // advance to. Resolving the lookup key touches SwiftData on the main
-            // actor; the fetch itself is off it.
-            itemNeighbours = Self.resolveNeighbours(
-                for: activeMedia, sortRaw: liveContentSortRaw, restriction: contentRestriction, in: modelContext
+            // advance to. The neighbours resolve off the main actor; until they
+            // land, the transport pair shows disabled in place rather than acting
+            // on the previous stream's answer. The IntroDB lookup key is one
+            // indexed fetch on the main context; the fetch itself is off it.
+            let media = activeMedia
+            itemNeighbours = PlayerItemNavigation.Neighbours(
+                axis: PlayerItemNavigation.axis(for: media), neighboursUnknown: true
             )
+            nextUpMedia = nil
+            let resolved = await Self.resolveNeighbours(
+                for: media, sortRaw: liveContentSortRaw, restriction: contentRestriction,
+                container: modelContext.container
+            )
+            guard !Task.isCancelled else { return }
+            itemNeighbours = resolved
             nextUpMedia = Self.queuedEpisode(from: itemNeighbours)
             skipSegments = nil
             guard PremiumManager.shared.isPremium,

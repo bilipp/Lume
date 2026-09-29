@@ -189,6 +189,12 @@ private extension CloudSyncEngine {
         values: ContentStateValues
     ) {
         if let mirror = map[id] {
+            // An export rewrites every mirror a profile owns, and nearly all of
+            // them already hold these values. Writing them anyway (and bumping
+            // `updatedAt`) dirtied ~19k unchanged records per profile switch
+            // at heavy-user scale — every one a CloudKit export, re-imported
+            // by each of the account's other devices.
+            guard !Self.mirror(mirror, holds: values, profileID: profileID, kind: kind) else { return }
             mirror.profileID = profileID
             mirror.kindRaw = kind.rawValue
             mirror.watchProgress = values.watchProgress

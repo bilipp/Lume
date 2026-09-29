@@ -111,12 +111,24 @@ final class CloudSyncCoordinator {
             // that empty pass — plus the `@Query` refresh it triggers over the
             // whole catalog — is what froze the app on tvOS.
             reconcile(reason: .foreground)
-        case .background, .inactive:
+        case .background:
             // Flush local edits now, not debounced: the system may suspend the app
             // before a delayed pass could run. Always runs — this is how a toggled
             // favorite or watch-progress reaches the cloud, and the safety net that
             // lets foreground / remote-change passes skip freely.
             reconcile(reason: .backgroundFlush, debounced: false)
+        case .inactive:
+            // iOS, tvOS and visionOS pass through `.inactive` on the way to the
+            // background *and* on the way back, and for Control Center, the
+            // notification shade and the app switcher. Flushing there ran a full
+            // pass on every foreground (defeating the gate above) and a second
+            // one queued behind the real background flush. The `.background`
+            // that follows a real exit flushes on its own. A Mac app is never
+            // suspended and a window going inactive may be the last phase change
+            // before quit, so macOS keeps flushing here.
+            #if os(macOS)
+                reconcile(reason: .backgroundFlush, debounced: false)
+            #endif
         @unknown default:
             break
         }
@@ -173,7 +185,9 @@ final class CloudSyncCoordinator {
         cloudImportPending = false
 
         Task {
-            let result = await engine.reconcile()
+            let result = await BackgroundActivity.perform("iCloud reconcile") {
+                await engine.reconcile()
+            }
             // Back on the main actor (this closure is main-actor isolated).
             status.lastReconcile = Date()
             status.lastResult = result

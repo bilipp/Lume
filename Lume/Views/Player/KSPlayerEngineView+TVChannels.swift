@@ -51,7 +51,8 @@
             mediaSwapper.surf(
                 direction, from: media,
                 through: .init(
-                    sortRaw: liveContentSortRaw, restriction: restriction, context: modelContext
+                    sortRaw: liveContentSortRaw, restriction: restriction, context: modelContext,
+                    neighbours: itemNeighbours
                 ),
                 select: { onSelectMedia?($0) },
                 showControls: showControls

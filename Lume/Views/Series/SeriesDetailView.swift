@@ -33,6 +33,10 @@ struct SeriesDetailView: View {
     /// cost for long-running shows with hundreds of episodes. Recomputed when the
     /// episodes relationship changes (see `recomputeSeasons`).
     @State private var availableSeasons: [Int] = []
+    /// Per-season episode lists, cached alongside `availableSeasons` so the body
+    /// doesn't re-filter and re-sort the whole episodes relationship on every
+    /// render (it's read by the episode list, the play button and `playTitle`).
+    @State private var episodesBySeason: [Int: [Episode]] = [:]
     @State private var isLoadingEpisodes = false
     @State private var playingMedia: PlayableMedia?
     @State private var similar: [HomeMediaItem] = []
@@ -378,6 +382,8 @@ struct SeriesDetailView: View {
 
     private func recomputeSeasons() {
         availableSeasons = Set(series.episodes.map(\.seasonNum)).sorted()
+        episodesBySeason = Dictionary(grouping: series.episodes, by: \.seasonNum)
+            .mapValues { $0.sorted { $0.episodeNum < $1.episodeNum } }
     }
 
     private func determineDefaultSeason() -> Int {
@@ -397,9 +403,7 @@ struct SeriesDetailView: View {
     }
 
     private var seasonEpisodes: [Episode] {
-        series.episodes
-            .filter { $0.seasonNum == selectedSeason }
-            .sorted { $0.episodeNum < $1.episodeNum }
+        episodesBySeason[selectedSeason] ?? []
     }
 
     /// Play button target — see `SeriesEpisodeProgress.nextEpisode`. Read on

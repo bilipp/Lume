@@ -65,7 +65,7 @@ enum LiveSurfMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum LiveChannelNavigator {
+nonisolated enum LiveChannelNavigator {
     /// How many rows of a tied run are read at a time while the playing channel
     /// is located. A page size, not a cap: a run that ties on every sort key is
     /// read page by page until the playing channel turns up, because stopping at
@@ -99,6 +99,12 @@ enum LiveChannelNavigator {
         /// mirror images — the list is walked either way, only the sign
         /// differs — which is exactly why the choice belongs to the viewer
         /// rather than to whichever host handled the press.
+        /// Whether this press moves to the list's next channel under `mode`,
+        /// rather than its previous one.
+        func movesForward(in mode: LiveSurfMode) -> Bool {
+            offset(in: mode) > 0
+        }
+
         fileprivate func offset(in mode: LiveSurfMode) -> Int {
             switch (mode, self) {
             case (.channelUpDown, .up), (.listOrder, .down): 1

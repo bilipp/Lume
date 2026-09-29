@@ -97,7 +97,7 @@ nonisolated enum LiveChannelScope: Hashable, Codable {
 
 // MARK: - Query
 
-enum LiveChannelQuery {
+nonisolated enum LiveChannelQuery {
     /// Cap on the Recently Watched collection — watch history is naturally
     /// bounded but we don't want it to grow without limit.
     static let recentLimit = 50

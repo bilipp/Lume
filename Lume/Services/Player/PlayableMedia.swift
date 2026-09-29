@@ -3,7 +3,7 @@ import Foundation
 /// A self-contained, value-type description of something playable.
 /// The player view does not know about SwiftData models — it only needs this.
 /// `Codable` conformance lets us pass it as the value of a SwiftUI `Window`.
-struct PlayableMedia: Identifiable, Hashable, Codable {
+nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     enum Kind: Hashable, Codable {
         case vod
         case live
@@ -108,7 +108,7 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     }
 }
 
-extension PlayableMedia {
+nonisolated extension PlayableMedia {
     // m3u content carries its full playback URL on the model (`directURL` /
     // `directSource`); Xtream content builds one from credentials + stream id.
     // When a local file is available (downloaded for offline viewing), it takes

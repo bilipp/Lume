@@ -10,10 +10,15 @@
 
 import Foundation
 import OSLog
+import Synchronization
 
 // MARK: - StalkerClient
 
-class StalkerClient {
+/// Nonisolated for the same reason as `XtreamClient`: a MainActor client decoded
+/// `get_all_channels` and every page of a thousands-of-pages catalog walk on the
+/// main thread. Its work now runs on the caller (the sync actor, or the walk's
+/// child tasks) and each decode runs off any actor.
+final nonisolated class StalkerClient: Sendable {
     nonisolated struct Configuration {
         let portalURL: String
         let macAddress: String
@@ -160,7 +165,13 @@ class StalkerClient {
     }
 
     /// What the most recent failed `perform` got back, for the failure logs.
-    private var lastResponseFingerprint: String?
+    private var lastResponseFingerprint: String? {
+        responseFingerprint.withLock { $0 }
+    }
+
+    /// Written by concurrent page fetches during a walk; last writer wins, which
+    /// is all a failure log needs.
+    private let responseFingerprint = Mutex<String?>(nil)
 
     // MARK: - Request plumbing
 
@@ -177,7 +188,7 @@ class StalkerClient {
     /// Issues an authorized request for the given action, retrying once on an
     /// auth failure with a fresh handshake, and with backoff on transient
     /// network errors.
-    private func request<T: Decodable>(
+    private func request<T: Decodable & Sendable>(
         type: String,
         action: String,
         extraQuery: [URLQueryItem] = []
@@ -220,7 +231,7 @@ class StalkerClient {
     /// A single request attempt. Sets the MAC cookie, bearer token and MAG
     /// headers the portal requires, and maps transport/HTTP failures onto
     /// `StalkerError`.
-    private func perform<T: Decodable>(url: URL, token: String?) async throws -> T {
+    private func perform<T: Decodable & Sendable>(url: URL, token: String?) async throws -> T {
         var urlRequest = URLRequest(url: url)
         urlRequest.setValue(stalkerUserAgent, forHTTPHeaderField: "User-Agent")
         urlRequest.setValue("Model: MAG250; Link: WiFi", forHTTPHeaderField: "X-User-Agent")
@@ -235,19 +246,20 @@ class StalkerClient {
 
         let data: Data
         let response: URLResponse
-        lastResponseFingerprint = nil
+        responseFingerprint.withLock { $0 = nil }
         do {
             (data, response) = try await session.data(for: urlRequest)
         } catch {
             throw StalkerError.networkError(error)
         }
         do {
-            return try Self.decodeValidated(T.self, response: response, data: data)
+            return try await Self.decodeValidatedOffActor(T.self, response: response, data: data)
         } catch {
             // Failure path only: fingerprinting parses the body.
-            lastResponseFingerprint = NetworkDiagnostics.fingerprint(
+            let fingerprint = NetworkDiagnostics.fingerprint(
                 response: response, data: data.count <= 1_048_576 ? data : nil
             )
+            responseFingerprint.withLock { $0 = fingerprint }
             throw error
         }
     }

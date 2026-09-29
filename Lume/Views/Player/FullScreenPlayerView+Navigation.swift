@@ -19,17 +19,20 @@ extension FullScreenPlayerView {
     /// `restriction` is threaded in rather than defaulted, like
     /// `LiveChannelNavigator.adjacentMedia`: a permissive default here would let
     /// a child profile step into a category a parent locked (see PR #162).
+    ///
+    /// Resolved off the main actor, on a context of its own: the host calls this
+    /// as each stream starts, while the engine opens it.
     static func resolveNeighbours(
         for media: PlayableMedia,
         sortRaw: String,
         restriction: ContentRestriction,
-        in context: ModelContext
-    ) -> PlayerItemNavigation.Neighbours {
-        PlayerItemNavigation.neighbours(
+        container: ModelContainer
+    ) async -> PlayerItemNavigation.Neighbours {
+        await PlayerItemNavigation.resolveNeighbours(
             for: media,
             sort: ContentSortOption(rawValue: sortRaw) ?? .playlist,
             restriction: restriction,
-            in: context
+            container: container
         )
     }
 

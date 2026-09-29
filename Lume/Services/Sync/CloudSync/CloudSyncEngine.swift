@@ -210,6 +210,9 @@ actor CloudSyncEngine {
         // single-row fetch per id.
         var deferred: [(id: String, verdict: MergeVerdict<ContentStateValues>)] = []
         var deferredIDs: [SyncedContentKind: [String]] = [:]
+        // Local "clears" whose catalog row may be gone rather than reset. See
+        // the resolution loop below.
+        var clearChecks: [String] = []
 
         for id in ids {
             // Garbage-collect state whose owning playlist no longer exists on
@@ -233,6 +236,11 @@ actor CloudSyncEngine {
                 deferredIDs[kind, default: []].append(id)
                 continue
             }
+            if case .pushToCloud(.none) = verdict, localValues[id] == nil, let kind = mirrors[id]?.kind {
+                clearChecks.append(id)
+                deferredIDs[kind, default: []].append(id)
+                continue
+            }
             try applyContentVerdict(
                 verdict,
                 id: id,
@@ -252,6 +260,32 @@ actor CloudSyncEngine {
                 continue
             }
             try applyContentVerdict(verdict, id: id, mirror: mirrors[id], loaded: model, into: &result)
+        }
+
+        try resolveClearChecks(clearChecks, loaded: loaded, mirrors: mirrors, into: &result)
+    }
+
+    /// Resolves the local "clears" deferred by `reconcileContent`. A missing
+    /// local value reads the same whether the user cleared the state or the
+    /// catalog row itself is gone — pruned because the provider dropped the
+    /// title, or re-keyed. Only the first is a delete. Pushing the second would
+    /// destroy the favorite, progress or hidden flag on every device, for a row
+    /// the user never touched. So when the row is gone, keep the cloud record
+    /// and forget the shadow: the id now reads as a pending pull, and the state
+    /// comes back if the title ever returns.
+    private func resolveClearChecks(
+        _ ids: [String],
+        loaded: [String: any PersistentModel],
+        mirrors: [String: UserContentState],
+        into result: inout CloudSyncReconcileResult
+    ) throws {
+        for id in ids {
+            guard let model = loaded[id] else {
+                shadow.setContentShadow(id, nil)
+                result.contentPending += 1
+                continue
+            }
+            try applyContentVerdict(.pushToCloud(nil), id: id, mirror: mirrors[id], loaded: model, into: &result)
         }
     }
 
