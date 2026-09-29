@@ -272,12 +272,15 @@ struct SportsHomeRail: View {
                 resolved = [:]
                 return
             }
-            resolved = await SportsChannelResolver.resolve(
+            let result = await SportsChannelResolver.resolve(
                 container: modelContext.container,
                 fixtures: fixtures,
                 now: Date(),
                 restriction: restriction
             )
+            // A resolve superseded by a newer `.task(id:)` pass must not overwrite it.
+            guard !Task.isCancelled else { return }
+            resolved = result
         }
 
         // MARK: - Playback
