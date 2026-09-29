@@ -484,6 +484,13 @@ nonisolated enum SweepSkipDefaults {
         return UserDefaults.standard.dictionaryRepresentation().keys.contains { $0.hasPrefix(prefix) }
     }
 
+    /// Whether the sweep of one content kind is currently being held back. The
+    /// Xtream digest skip reads it per kind, since each endpoint is its own
+    /// payload.
+    static func isHoldingBack(playlistId: UUID, kind: String) -> Bool {
+        UserDefaults.standard.object(forKey: key(playlistId: playlistId, kind: kind)) != nil
+    }
+
     static func removeAll(playlistId: UUID) {
         let prefix = keyPrefix(playlistId: playlistId)
         let defaults = UserDefaults.standard
