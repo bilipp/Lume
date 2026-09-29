@@ -313,8 +313,8 @@ final class BrowseQueryBenchmarks: XCTestCase {
     private func searchRequest(query: String, restrictToPlaylist: Bool = false) -> SearchRequest {
         SearchRequest(
             query: query,
-            playlistID: playlistID.uuidString,
-            restrictToPlaylist: restrictToPlaylist,
+            // One id scopes the search to that playlist; none searches unscoped.
+            playlistIDs: restrictToPlaylist ? [playlistID.uuidString] : [],
             wantMovies: true,
             wantSeries: false,
             wantLive: false,
