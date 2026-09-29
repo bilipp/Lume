@@ -337,6 +337,13 @@ struct M3USyncTests {
         #expect(listings.count == 1, "Only programmes for known tvg-ids are imported")
         #expect(listings.first?.title == "Midday News")
         #expect(listings.first?.channelId == "news.1")
+
+        // A refresh whose download fails leaves the guide as it was: every
+        // source is fetched before the old listings are cleared.
+        try FileManager.default.removeItem(at: epgFile)
+        let refreshed = await EPGSyncManager(modelContainer: container).syncAllSources()
+        #expect(!refreshed)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<EPGListing>()) == 1)
     }
 
     // MARK: - Cancellation

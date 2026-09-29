@@ -45,8 +45,8 @@ final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
         let delegate = XMLTVParser(batchSize: batchSize, onBatch: onBatch)
         xmlParser.delegate = delegate
         xmlParser.parse()
-        // Flush remaining
-        if !delegate.batch.isEmpty {
+        // Flush remaining, unless a cancellation stopped the parse partway.
+        if !delegate.batch.isEmpty, !Task.isCancelled {
             onBatch(delegate.batch)
         }
         return delegate.totalCount
@@ -69,7 +69,7 @@ final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
         currentText += string
     }
 
-    func parser(_: XMLParser, didEndElement elementName: String, namespaceURI _: String?, qualifiedName _: String?) {
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI _: String?, qualifiedName _: String?) {
         if elementName == "programme" {
             if let startDate = XMLTVDate.parse(currentStart),
                let endDate = XMLTVDate.parse(currentStop),
@@ -90,6 +90,9 @@ final nonisolated class XMLTVParser: NSObject, XMLParserDelegate {
                 if batch.count >= batchSize {
                     onBatch(batch)
                     batch.removeAll(keepingCapacity: true)
+                    // A cancelled refresh (a content sync starting) stops here
+                    // instead of parsing the rest of the file at full CPU.
+                    if Task.isCancelled { parser.abortParsing() }
                 }
             }
             currentStart = nil
