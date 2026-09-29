@@ -186,9 +186,31 @@ order of magnitude, pass 2's scope has come off the `EPGListing` fetch (a
 time-only scan of the whole guide) or pass 3 has started re-folding channel names
 per fixture instead of once in pass 1. `LumeTests/Services/BrowseQueryShapeTests.swift`
 holds the matching cheap contract — that `epgCandidateDescriptor` is bounded by
-both the window and the channel ids and omits `listingDescription`, and that
+both the window and the channel ids and reads `listingDescription` (a conference
+programme names its games only there), and that
 `candidateStreamDescriptor` excludes hidden and restricted channels in SQL — so a
 regression fails a normal-suite test even when nobody runs this benchmark.
+
+### At provider scale
+
+`SportsResolveScaleBenchmarks` resolves 200 fixtures spread over a week against
+57,000 channels sharing 7,000 guide ids, with about 210,000 listings — a large
+provider and the hub's Upcoming list for someone following four US leagues. The
+fixtures sit an even 50 minutes apart, so their kickoff windows merge into one
+that covers the whole week: the worst case for the guide fetch.
+
+iPhone 17 Pro simulator (iOS 26.5), Benchmark configuration, 2026-09-29:
+
+| Benchmark | Clock | Peak RSS |
+|---|---|---|
+| `testSportsResolve200FixturesOver57kChannels` | 12.4 s | 127,634 kB |
+
+Measured phase by phase, matching is 0.07 s of that. The rest is SwiftData
+materializing rows: about 7.5 s for the guide rows in the window and 2 s for the
+57k channels. Before the word index narrowed each fixture to the channels that
+can match it, matching scored every channel against every fixture — 11.4M pairs
+here, which does not finish in a benchmark run. A jump back toward that means a
+fixture is being scored against channels the index should have excluded.
 
 ## The parser microbenchmarks, and the offset-less XMLTV win
 
