@@ -173,7 +173,9 @@ final class CloudSyncCoordinator {
         cloudImportPending = false
 
         Task {
-            let result = await engine.reconcile()
+            let result = await BackgroundActivity.perform("iCloud reconcile") {
+                await engine.reconcile()
+            }
             // Back on the main actor (this closure is main-actor isolated).
             status.lastReconcile = Date()
             status.lastResult = result

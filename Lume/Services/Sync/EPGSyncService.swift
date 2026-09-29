@@ -204,7 +204,9 @@ final class EPGSyncService {
         // profile showed EPG ingest pegging a background thread at 100% in
         // lockstep with a frozen main thread right after a playlist sync.
         task = Task(priority: .utility) {
-            let succeeded = await manager.syncAllSources()
+            let succeeded = await BackgroundActivity.perform("Guide refresh") {
+                await manager.syncAllSources()
+            }
             if succeeded {
                 EPGSyncSchedule.lastSyncDate = Date()
                 EPGSyncSchedule.schemaVersion = SyncFrequency.epgCurrentSchemaVersion

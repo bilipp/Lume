@@ -80,10 +80,19 @@ struct LumeApp: App {
         // at load (NSCocoaErrorDomain 134060). Tests/previews are un-entitled so
         // `.automatic` silently resolves to no-sync there — which is why this only
         // bites real builds. The catalog must stay strictly local.
+        // `groupContainer: .none` keeps the store in the app's own container.
+        // The default resolves into the app group once the app is entitled for
+        // one, and iOS kills a suspended app that holds a SQLite lock there
+        // (0xdead10cc) — see `StoreRelocation`, which moves an existing store.
         let catalogConfiguration = ModelConfiguration(
             schema: catalogSchema,
             isStoredInMemoryOnly: false,
+            groupContainer: .none,
             cloudKitDatabase: .none
+        )
+        StoreRelocation.moveOutOfAppGroup(
+            from: ModelConfiguration(schema: catalogSchema, isStoredInMemoryOnly: false, cloudKitDatabase: .none).url,
+            to: catalogConfiguration.url
         )
         // Create any index the models declare that this store predates. SwiftData
         // applies `#Index` only when it creates the file, and no version bump or
@@ -135,10 +144,20 @@ struct LumeApp: App {
             // counterpart (read through `SportsFollowService`).
             SyncedSportsFollow.self
         ])
+        // Out of the app group for the same reason as the catalog store.
         let cloudConfiguration = ModelConfiguration(
             ContentSyncManager.cloudMirrorConfigurationName,
             schema: cloudSchema,
+            groupContainer: .none,
             cloudKitDatabase: cloudKitDatabase
+        )
+        StoreRelocation.moveOutOfAppGroup(
+            from: ModelConfiguration(
+                ContentSyncManager.cloudMirrorConfigurationName,
+                schema: cloudSchema,
+                cloudKitDatabase: cloudKitDatabase
+            ).url,
+            to: cloudConfiguration.url
         )
         do {
             return try ModelContainer(for: cloudSchema, configurations: cloudConfiguration)
