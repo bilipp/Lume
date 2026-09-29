@@ -20,6 +20,10 @@
         @Query private var playlists: [Playlist]
 
         @State private var selectedSeason: Int = 1
+        /// Season numbers and per-season episodes, cached so the body doesn't
+        /// re-sort every episode on each render (see `recomputeSeasons`).
+        @State private var availableSeasons: [Int] = []
+        @State private var episodesBySeason: [Int: [Episode]] = [:]
         @State private var isLoadingEpisodes = false
         @State private var playingMedia: PlayableMedia?
         @State private var similar: [HomeMediaItem] = []
@@ -93,6 +97,7 @@
             .task(id: series.id) { await refreshEpisodesIfStale() }
             .onChange(of: series.similarTMDBIds) { resolveSimilar() }
             .onChange(of: refreshToken) { resolveSimilar() }
+            .onChange(of: series.episodes.count) { recomputeSeasons() }
         }
 
         private var content: some View {
@@ -363,8 +368,11 @@
             availableSeasons.count == 1 ? "1 Season" : "\(availableSeasons.count) Seasons"
         }
 
-        private var availableSeasons: [Int] {
-            Set(series.episodes.map(\.seasonNum)).sorted()
+        /// Runs only when episodes are added or removed; their numbers never change.
+        private func recomputeSeasons() {
+            availableSeasons = Set(series.episodes.map(\.seasonNum)).sorted()
+            episodesBySeason = Dictionary(grouping: series.episodes, by: \.seasonNum)
+                .mapValues { $0.sorted { $0.episodeNum < $1.episodeNum } }
         }
 
         private func determineDefaultSeason() -> Int {
@@ -384,9 +392,7 @@
         }
 
         private var seasonEpisodes: [Episode] {
-            series.episodes
-                .filter { $0.seasonNum == selectedSeason }
-                .sorted { $0.episodeNum < $1.episodeNum }
+            episodesBySeason[selectedSeason] ?? []
         }
 
         /// Play button target — see `SeriesEpisodeProgress.nextEpisode`. Read
@@ -414,6 +420,7 @@
             if series.episodes.isEmpty {
                 await loadEpisodes()
             }
+            recomputeSeasons()
             selectedSeason = determineDefaultSeason()
         }
 

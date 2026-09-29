@@ -291,12 +291,16 @@ struct LumeApp: App {
 
                     // Restore a previously connected Trakt session (refreshing
                     // the token if stale) so watched-sync and the watchlist work
-                    // from launch.
-                    await TraktService.shared.restore()
+                    // from launch. Fired rather than awaited, like Simkl below:
+                    // each is up to two network round trips with no timeout of
+                    // its own, and nothing further down this chain depends on
+                    // either, so awaiting them held back iCloud, indexing and
+                    // the guide refresh behind the network.
+                    Task { await TraktService.shared.restore() }
 
                     // Same for Simkl (a second tracker integration, AUTH V2
                     // device flow): refresh stale tokens, restore the username.
-                    await SimklService.shared.restore()
+                    Task { await SimklService.shared.restore() }
 
                     // Restore the OpenSubtitles session (a keychain read, no
                     // network) so the in-player subtitle search can download
