@@ -10,7 +10,7 @@ import SwiftData
 /// next" behaviour for both auto-advance and the on-screen Next Episode button.
 /// Cross-platform: the host (`FullScreenPlayerView`) owns the lookup and hands
 /// the result down to whichever engine is active.
-enum NextEpisodeResolver {
+nonisolated enum NextEpisodeResolver {
     /// The next episode after `ref` as `PlayableMedia`, or `nil` when `ref` is not
     /// an episode, the series can't be resolved, this is the last episode, or no
     /// playlist can build a URL for it.

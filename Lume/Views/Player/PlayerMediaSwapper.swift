@@ -30,7 +30,7 @@ import SwiftUI
 @MainActor
 final class PlayerMediaSwapper {
     /// Which end of the host-resolved neighbours a press asks for.
-    enum Step {
+    nonisolated enum Step {
         case previous
         case next
     }
@@ -91,6 +91,10 @@ final class PlayerMediaSwapper {
             let sortRaw: String
             let restriction: ContentRestriction
             let context: ModelContext
+            /// The host's resolved transport neighbours. When they belong to the
+            /// playing channel, up/down reads them instead of resolving the list
+            /// again on the main actor.
+            var neighbours = PlayerItemNavigation.Neighbours.none
         }
 
         /// Change the live channel from the Siri Remote: up/down surf to the
@@ -114,12 +118,19 @@ final class PlayerMediaSwapper {
             let target: PlayableMedia?
             switch direction {
             case .up, .down:
-                let sort = ContentSortOption(rawValue: lookup.sortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
-                    for: media, surfing: direction == .up ? .up : .down,
-                    mode: .preferred,
-                    sort: sort, restriction: lookup.restriction, in: lookup.context
-                )
+                let surf: LiveChannelNavigator.SurfDirection = direction == .up ? .up : .down
+                let mode = LiveSurfMode.preferred
+                let neighbours = lookup.neighbours
+                if neighbours.axis == .channel, !neighbours.neighboursUnknown, neighbours.anchorID == media.id {
+                    target = surf.movesForward(in: mode) ? neighbours.next : neighbours.previous
+                } else {
+                    // Pressed before the host finished resolving this channel.
+                    let sort = ContentSortOption(rawValue: lookup.sortRaw) ?? .playlist
+                    target = LiveChannelNavigator.adjacentMedia(
+                        for: media, surfing: surf, mode: mode,
+                        sort: sort, restriction: lookup.restriction, in: lookup.context
+                    )
+                }
             case .right:
                 target = LiveChannelHistory.recallMedia(
                     in: lookup.context, scope: media.channelScope, restriction: lookup.restriction

@@ -35,11 +35,16 @@ enum PlayerItemNavigation {
     /// about. The buttons render disabled in that case rather than vanishing,
     /// which would move the rest of the transport row out from under the
     /// viewer's finger.
-    struct Neighbours: Equatable {
+    nonisolated struct Neighbours: Equatable {
         var axis: Axis?
         var previous: PlayableMedia?
         var next: PlayableMedia?
         var neighboursUnknown = false
+        /// The stream these were resolved around. The host resolves off the main
+        /// actor, so for a moment after a swap it still holds the previous
+        /// stream's answer; a reader that acts on it (the tvOS remote surf)
+        /// checks this first.
+        var anchorID: PlayableMedia.ID?
 
         /// No transport pair at all — a movie, or a stream whose axis is
         /// deliberately suppressed.
@@ -76,14 +81,14 @@ enum PlayerItemNavigation {
     /// `restriction` is required rather than defaulted, like
     /// `LiveChannelNavigator.adjacentMedia`: a permissive default here would let
     /// a child profile step out of the catalog a parent locked.
-    static func neighbours(
+    nonisolated static func neighbours(
         for media: PlayableMedia,
         sort: ContentSortOption,
         restriction: ContentRestriction,
         in context: ModelContext,
         client: XtreamClient = XtreamClient()
     ) -> Neighbours {
-        switch axis(for: media) {
+        var resolved: Neighbours = switch axis(for: media) {
         case .episode:
             episodeNeighbours(for: media.contentRef, in: context, client: client)
         case .channel:
@@ -91,6 +96,24 @@ enum PlayerItemNavigation {
         case nil:
             .none
         }
+        resolved.anchorID = media.id
+        return resolved
+    }
+
+    /// `neighbours(for:…)` on a context of its own, off the main actor.
+    ///
+    /// It runs as a stream starts, on every zap and episode swap: a `fetchCount`
+    /// and a bisection of single-row reads per direction, each ordered by a
+    /// collated name no index can serve — tens of queries that used to share the
+    /// main thread with the engine's open and first frame.
+    @concurrent
+    nonisolated static func resolveNeighbours(
+        for media: PlayableMedia,
+        sort: ContentSortOption,
+        restriction: ContentRestriction,
+        container: ModelContainer
+    ) async -> Neighbours {
+        neighbours(for: media, sort: sort, restriction: restriction, in: ModelContext(container))
     }
 
     /// Which way, if either, `media` can be stepped — decided from the stream
@@ -125,7 +148,7 @@ enum PlayerItemNavigation {
     /// Reachable on its own for the tvOS transport row, which drives channel
     /// surfing from the remote and so has no live sort to hand `neighbours` —
     /// it needs this axis and no other.
-    static func episodeNeighbours(
+    nonisolated static func episodeNeighbours(
         for ref: PlayableMedia.ContentRef,
         in context: ModelContext,
         client: XtreamClient = XtreamClient()
@@ -153,7 +176,7 @@ enum PlayerItemNavigation {
     /// and would run a button labelled "next" backwards under `.listOrder`.
     ///
     /// Only reached for a stream `axis(for:)` has already put on this axis.
-    private static func channelNeighbours(
+    private nonisolated static func channelNeighbours(
         for media: PlayableMedia,
         sort: ContentSortOption,
         restriction: ContentRestriction,
