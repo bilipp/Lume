@@ -30,7 +30,7 @@ nonisolated struct StalkerString: Decodable, Equatable {
     }
 }
 
-extension KeyedDecodingContainer {
+nonisolated extension KeyedDecodingContainer {
     /// Decodes a `String` from a field the portal may send as a string or a
     /// number, returning `nil` when the key is absent or null.
     /// `nonisolated` so the DTOs' `nonisolated init(from:)` can call it without
@@ -57,6 +57,9 @@ nonisolated struct StalkerEnvelope<T: Decodable>: Decodable {
 
 /// A paginated `js` payload: `{ "total_items": …, "max_page_items": …, "data": [...] }`.
 /// `get_all_channels` reuses this shape with only `data` populated.
+/// Sendable so a response can leave `StalkerClient`'s off-actor decode.
+extension StalkerEnvelope: Sendable where T: Sendable {}
+
 nonisolated struct StalkerPage<Item: Decodable>: Decodable {
     let data: [Item]
     let totalItems: Int?
@@ -75,6 +78,8 @@ nonisolated struct StalkerPage<Item: Decodable>: Decodable {
         case maxPageItems = "max_page_items"
     }
 }
+
+extension StalkerPage: Sendable where Item: Sendable {}
 
 // MARK: - Handshake / profile
 

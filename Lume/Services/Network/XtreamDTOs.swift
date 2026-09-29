@@ -6,7 +6,7 @@ import Foundation
 /// arrive as a string on one provider and a number on the next. These helpers
 /// accept either representation (and swallow null / absent keys) so a single
 /// odd field can't fail a whole response.
-extension KeyedDecodingContainer {
+nonisolated extension KeyedDecodingContainer {
     func lenientString(forKey key: Key) -> String? {
         if let string = try? decodeIfPresent(String.self, forKey: key) { return string }
         if let int = try? decodeIfPresent(Int.self, forKey: key) { return String(int) }
@@ -38,7 +38,7 @@ extension KeyedDecodingContainer {
 /// happens to be JSON, or an `{"error": …}` body), the first element error is
 /// rethrown: reporting garbage as "zero items" would let the sync prune the
 /// entire catalog.
-struct XtreamList<Element: Decodable>: Decodable {
+nonisolated struct XtreamList<Element: Decodable>: Decodable {
     let items: [Element]
 
     /// Decoded in place of an element that failed, purely to advance the
@@ -103,7 +103,7 @@ struct XtreamList<Element: Decodable>: Decodable {
 
 // MARK: - Server & User Info
 
-struct XtreamAuthResponse: Decodable {
+nonisolated struct XtreamAuthResponse: Decodable {
     let userInfo: XtreamUserInfo
     let serverInfo: XtreamServerInfo
 
@@ -113,7 +113,7 @@ struct XtreamAuthResponse: Decodable {
     }
 }
 
-struct XtreamUserInfo: Decodable {
+nonisolated struct XtreamUserInfo: Decodable {
     let username: String?
     let status: String?
     let expDate: String?
@@ -140,7 +140,7 @@ struct XtreamUserInfo: Decodable {
     }
 }
 
-struct XtreamServerInfo: Decodable {
+nonisolated struct XtreamServerInfo: Decodable {
     let url: String?
     let port: String?
     let httpsPort: String?
@@ -171,7 +171,7 @@ struct XtreamServerInfo: Decodable {
 
 // MARK: - Categories
 
-struct XtreamCategory: Decodable {
+nonisolated struct XtreamCategory: Decodable {
     let categoryId: String
     let categoryName: String
     let parentId: Int?
@@ -203,7 +203,7 @@ struct XtreamCategory: Decodable {
 
 // MARK: - Live Streams
 
-struct XtreamLiveStream: Decodable {
+nonisolated struct XtreamLiveStream: Decodable {
     let num: Int?
     let name: String?
     let streamType: String?
@@ -250,7 +250,7 @@ struct XtreamLiveStream: Decodable {
 
 // MARK: - VOD Streams
 
-struct XtreamVODStream: Decodable {
+nonisolated struct XtreamVODStream: Decodable {
     let num: Int?
     let name: String?
     let streamType: String?
@@ -299,7 +299,7 @@ struct XtreamVODStream: Decodable {
 
 // MARK: - VOD Info
 
-struct XtreamVODInfo: Decodable {
+nonisolated struct XtreamVODInfo: Decodable {
     let info: XtreamVODMetadata?
     let movieData: XtreamVODStreamData?
 
@@ -317,7 +317,7 @@ struct XtreamVODInfo: Decodable {
     }
 }
 
-struct XtreamVODMetadata: Decodable {
+nonisolated struct XtreamVODMetadata: Decodable {
     let tmdbId: String?
     let name: String?
     let movieImage: String?
@@ -356,7 +356,7 @@ struct XtreamVODMetadata: Decodable {
     }
 }
 
-struct XtreamVODStreamData: Decodable {
+nonisolated struct XtreamVODStreamData: Decodable {
     let streamId: Int?
     let containerExtension: String?
 
@@ -374,7 +374,7 @@ struct XtreamVODStreamData: Decodable {
 
 // MARK: - Series
 
-struct XtreamSeries: Decodable {
+nonisolated struct XtreamSeries: Decodable {
     let num: Int?
     let name: String?
     let seriesId: Int?
@@ -425,7 +425,7 @@ struct XtreamSeries: Decodable {
 
 // MARK: - Series Info
 
-struct XtreamSeriesInfoResponse: Decodable {
+nonisolated struct XtreamSeriesInfoResponse: Decodable {
     let info: XtreamSeriesInfo?
     let episodes: [String: [XtreamEpisode]]?
 
@@ -456,7 +456,7 @@ struct XtreamSeriesInfoResponse: Decodable {
     }
 }
 
-struct XtreamSeriesInfo: Decodable {
+nonisolated struct XtreamSeriesInfo: Decodable {
     let name: String?
     let cover: String?
     let plot: String?
@@ -490,7 +490,7 @@ struct XtreamSeriesInfo: Decodable {
     }
 }
 
-struct XtreamEpisode: Decodable {
+nonisolated struct XtreamEpisode: Decodable {
     let id: String?
     let episodeNum: Int?
     let title: String?
@@ -526,7 +526,7 @@ struct XtreamEpisode: Decodable {
     }
 }
 
-struct XtreamEpisodeInfo: Decodable {
+nonisolated struct XtreamEpisodeInfo: Decodable {
     let airDate: String?
     let movieImage: String?
     let durationSecs: Int?
@@ -554,7 +554,7 @@ struct XtreamEpisodeInfo: Decodable {
 
 // MARK: - EPG
 
-struct XtreamShortEPG: Decodable {
+nonisolated struct XtreamShortEPG: Decodable {
     let start: String?
     let end: String?
     let title: String?
@@ -575,7 +575,7 @@ struct XtreamShortEPG: Decodable {
 
 // MARK: - Bulk EPG (get_simple_data_table)
 
-struct XtreamDataTableEPG: Decodable {
+nonisolated struct XtreamDataTableEPG: Decodable {
     let epgId: String?
     let title: String?
     let description: String?
