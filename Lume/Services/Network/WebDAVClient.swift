@@ -75,12 +75,16 @@ final nonisolated class WebDAVClient: Sendable {
     let session: URLSession
 
     init(urlSession: URLSession? = nil) {
-        session = urlSession ?? Self.makeSession()
+        session = urlSession ?? Self.sharedSession
     }
 
     /// Matches the m3u client: a generous resource timeout for slow NAS boxes,
     /// and a recognizable User-Agent because some shares sit behind a proxy
     /// that blocks unknown clients.
+    /// Shared by every client: `ContentSyncManager` builds one per instance, and
+    /// views build a manager per detail screen.
+    private static let sharedSession = makeSession()
+
     private static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30

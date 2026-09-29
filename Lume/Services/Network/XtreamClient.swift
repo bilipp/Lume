@@ -23,7 +23,9 @@ final nonisolated class XtreamClient: Sendable {
         let password: String
         let timeout: TimeInterval
 
-        init(serverURL: String, username: String, password: String, timeout: TimeInterval = 30) {
+        static let defaultTimeout: TimeInterval = 30
+
+        init(serverURL: String, username: String, password: String, timeout: TimeInterval = defaultTimeout) {
             self.serverURL = serverURL
             self.username = username
             self.password = password
@@ -50,7 +52,7 @@ final nonisolated class XtreamClient: Sendable {
 
     nonisolated init(configuration: Configuration, urlSession: URLSession? = nil) {
         self.configuration = configuration
-        session = urlSession ?? Self.makeSession(timeout: configuration.timeout)
+        session = urlSession ?? Self.session(timeout: configuration.timeout)
     }
 
     /// Convenience initializer for backward compatibility
@@ -71,11 +73,28 @@ final nonisolated class XtreamClient: Sendable {
     /// Serializing connections (instead of reusing `.shared`'s pool, which the
     /// server may RST after a heavy transfer) avoids tripping that limit. Also
     /// applies the configured timeout, which was previously ignored.
-    private nonisolated static func makeSession(timeout: TimeInterval) -> URLSession {
+    ///
+    /// One session serves every client with the default timeout. The cap is per
+    /// session, not per provider: when each sync manager, detail screen and
+    /// play-URL builder built its own session, a detail request made during a
+    /// sync opened a second connection to the provider — the 401/403 the cap
+    /// exists to prevent — and every request paid a fresh TCP and TLS handshake.
+    /// Sharing it queues that request behind the sync's transfer instead.
+    ///
+    /// The resource timeout allows ten minutes: `get_vod_streams` runs to tens of
+    /// megabytes, uncompressed, and a retry restarts the whole transfer, so a
+    /// two-minute cap turned a slow link into minutes of retries and a failed sync.
+    private static let sharedSession = makeSession(timeout: Configuration.defaultTimeout)
+
+    private static func session(timeout: TimeInterval) -> URLSession {
+        timeout == Configuration.defaultTimeout ? sharedSession : makeSession(timeout: timeout)
+    }
+
+    private static func makeSession(timeout: TimeInterval) -> URLSession {
         let config = URLSessionConfiguration.default
         config.httpMaximumConnectionsPerHost = 1
         config.timeoutIntervalForRequest = timeout
-        config.timeoutIntervalForResource = 120
+        config.timeoutIntervalForResource = 600
         // Some panels only return JSON to a recognized player UA; the default
         // CFNetwork UA gets an HTML block page that fails to decode.
         config.httpAdditionalHeaders = ["User-Agent": lumeCatalogUserAgent]
