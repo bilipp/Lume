@@ -46,9 +46,11 @@ struct LiveTVView: View {
     @State private var categoryMemo = LiveTVCategoryMemo()
 
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
-    @State private var selectedSection: LiveTVSection?
-    /// The playlist `selectedSection` was last seeded for — see `seedSelection`.
-    @State private var seededPrefix: String?
+    /// Holds the selection so it survives the tab being unmounted; the
+    /// fallbacks serve previews, which have no router.
+    @Environment(DeepLinkRouter.self) private var tabRouter: DeepLinkRouter?
+    @State private var fallbackSection: LiveTVSection?
+    @State private var fallbackSeededPrefix: String?
     @State private var showingSync = false
     @State private var playingMedia: PlayableMedia?
     @State private var showingSettings = false
@@ -231,7 +233,7 @@ struct LiveTVView: View {
             VStack(spacing: 0) {
                 CategoryBar(
                     sections: sections,
-                    selectedSection: $selectedSection
+                    selectedSection: selectedSectionBinding
                 )
 
                 if let displayed {
@@ -251,7 +253,7 @@ struct LiveTVView: View {
         HStack(spacing: 0) {
             CategorySidebar(
                 sections: sections,
-                selectedSection: $selectedSection
+                selectedSection: selectedSectionBinding
             )
             .frame(width: 200)
 
@@ -277,7 +279,7 @@ struct LiveTVView: View {
         private func tvOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
             TVLiveTVScreen(
                 sections: sections,
-                selectedSection: $selectedSection,
+                selectedSection: selectedSectionBinding,
                 displayedSection: displayed,
                 layoutModeRaw: $layoutModeRaw,
                 contentSort: contentSort,
@@ -322,6 +324,25 @@ struct LiveTVView: View {
             sort: categorySort,
             restriction: restriction
         )
+    }
+
+    private var selectedSection: LiveTVSection? {
+        get { tabRouter.map(\.liveTVSection) ?? fallbackSection }
+        nonmutating set {
+            if let tabRouter { tabRouter.liveTVSection = newValue } else { fallbackSection = newValue }
+        }
+    }
+
+    private var selectedSectionBinding: Binding<LiveTVSection?> {
+        Binding(get: { selectedSection }, set: { selectedSection = $0 })
+    }
+
+    /// The playlist `selectedSection` was last seeded for — see `seedSelection`.
+    private var seededPrefix: String? {
+        get { tabRouter.map(\.liveTVSeededPrefix) ?? fallbackSeededPrefix }
+        nonmutating set {
+            if let tabRouter { tabRouter.liveTVSeededPrefix = newValue } else { fallbackSeededPrefix = newValue }
+        }
     }
 
     /// Points the rail at its first section. On first appearance that only means
