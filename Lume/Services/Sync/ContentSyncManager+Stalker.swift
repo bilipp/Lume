@@ -108,9 +108,10 @@ extension ContentSyncManager {
 
         for (index, cat) in cats.enumerated() where !cat.id.isEmpty {
             if let existing = lookup[cat.id] {
-                existing.name = cat.title
-                existing.sortOrder = index
-                existing.lastRefreshed = Date()
+                // Written only when changed, so an unchanged sync saves nothing.
+                // `lastRefreshed` is stamped on insert only: nothing reads it.
+                if existing.name != cat.title { existing.name = cat.title }
+                if existing.sortOrder != index { existing.sortOrder = index }
             } else {
                 let category = Category(apiId: cat.id, name: cat.title, parentId: 0, type: type, playlist: playlist)
                 category.sortOrder = index
@@ -118,7 +119,7 @@ extension ContentSyncManager {
                 context.insert(category)
             }
         }
-        try context.save()
+        if context.hasChanges { try context.save() }
 
         if !cats.isEmpty {
             pruneStaleCategories(playlistId: playlistId, type: type, seenApiIds: Set(cats.map(\.id)))
@@ -266,17 +267,11 @@ extension ContentSyncManager {
                 movie = Movie(id: movieId, streamId: streamId, name: "")
                 context.insert(movie)
             }
-            movie.name = item.name ?? ""
-            movie.streamIcon = item.screenshot
-            movie.plot = item.description
-            movie.releaseDate = item.year
-            movie.rating = Double(item.rating ?? "") ?? movie.rating
-            movie.added = item.added ?? movie.added
-            movie.categoryId = playlistPrefix + categoryId
-            movie.directURL = cmd
+            applyStalkerMovieFields(from: item, cmd: cmd, to: movie, categoryId: playlistPrefix + categoryId)
             imported += 1
         }
-        try? context.save()
+        // An unchanged page leaves the context clean (see applyStalkerMovieFields).
+        if context.hasChanges { try? context.save() }
         return imported
     }
 
@@ -349,17 +344,10 @@ extension ContentSyncManager {
                 series = Series(id: id, seriesId: seriesId, name: "")
                 context.insert(series)
             }
-            series.name = item.name ?? ""
-            series.cover = item.screenshot
-            series.plot = item.description
-            series.releaseDate = item.year
-            // The Recently Added series rail orders by `lastModified`; the
-            // portal's `added` timestamp is the closest equivalent.
-            series.lastModified = item.added ?? series.lastModified
-            series.categoryId = playlistPrefix + categoryId
+            applyStalkerSeriesFields(from: item, to: series, categoryId: playlistPrefix + categoryId)
             imported += 1
         }
-        try? context.save()
+        if context.hasChanges { try? context.save() }
         return imported
     }
 
@@ -480,16 +468,9 @@ extension ContentSyncManager {
                 stream = LiveStream(id: id, streamId: streamId, name: "")
                 context.insert(stream)
             }
-            stream.name = channel.name ?? ""
-            stream.streamIcon = channel.logo
-            stream.epgChannelId = channel.xmltvId
-            stream.directURL = cmd
-            stream.num = channel.number ?? 0
-            if let genreId = channel.genreId {
-                stream.categoryId = playlistPrefix + genreId
-            }
+            applyStalkerChannelFields(from: channel, cmd: cmd, to: stream, playlistPrefix: playlistPrefix)
         }
-        try? context.save()
+        if context.hasChanges { try? context.save() }
     }
 
     // MARK: - Playlist bookkeeping
