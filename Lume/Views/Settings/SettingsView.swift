@@ -85,6 +85,20 @@ struct SettingsView: View {
         /// whole detail pane (same reasoning as `selectedPlaylist`). Not
         /// `private`: set by the SettingsView+Library extension (separate file).
         @State var showingContentManagement = false
+        /// Focus handle on the Content Management pane, written once the pane
+        /// has replaced the Library detail (see `beginContentManagementHandoff`).
+        @FocusState private var contentManagementFocused: Bool
+        /// Open while Content Management is taking over the pane — the drill-in
+        /// itself, or the PIN pad giving way to it — until focus lands in it.
+        /// See `beginContentManagementHandoff`.
+        @State private var contentManagementHandoff = false
+        /// Draws the sidebar unfocused through the handoff and a beat past it.
+        /// Outlives `contentManagementHandoff` because focus leaving the sidebar
+        /// reaches `focusedCategory` a render before the row's own `isFocused`:
+        /// unmasking on that same render would flash Profiles.
+        @State private var sidebarFocusMasked = false
+        @State private var contentManagementHandoffTimeout: Task<Void, Never>?
+        @State private var sidebarFocusUnmask: Task<Void, Never>?
         /// Whether the Player category is drilled into Engines — the priority
         /// list and the per-engine option rows — in place. Not `private`: read
         /// by the SettingsView+TVPlayer extension (separate file).
@@ -263,6 +277,19 @@ struct SettingsView: View {
                 .paywall(isPresented: $showPaywall, highlight: paywallHighlight)
                 .defaultFocus($focusedCategory, .profiles)
                 .onChange(of: focusedCategory) { _, newValue in
+                    // The sidebar landing a swap's orphaned focus, not the user
+                    // coming back to it: pass it on into Content Management.
+                    // It closes once focus has really left the sidebar again —
+                    // not when the write below lands, which runs ahead of the
+                    // engine.
+                    if contentManagementHandoff {
+                        if newValue == nil {
+                            endContentManagementHandoff()
+                        } else {
+                            Task { @MainActor in contentManagementFocused = true }
+                        }
+                        return
+                    }
                     // Follow focus so the detail pane mirrors the highlighted
                     // category. Ignore nil (focus moved into the detail pane),
                     // which keeps the current selection visible.
@@ -305,7 +332,12 @@ struct SettingsView: View {
                                     Text(category.title)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .buttonStyle(TVSettingsSidebarButtonStyle(isSelected: selectedCategory == category))
+                                // Focus only passes through here during the
+                                // handoff; drawing it would flash Profiles.
+                                .buttonStyle(TVSettingsSidebarButtonStyle(
+                                    isSelected: selectedCategory == category,
+                                    suppressesFocus: sidebarFocusMasked
+                                ))
                                 .focused($focusedCategory, equals: category)
                             }
                         }
@@ -326,10 +358,51 @@ struct SettingsView: View {
         @ViewBuilder
         private var tvDetailContainer: some View {
             if selectedCategory == .library, showingContentManagement {
-                ParentalGateView { ContentManagementView() }
-                    .focusSection()
+                ParentalGateView {
+                    ContentManagementView()
+                        .onAppear(perform: beginContentManagementHandoff)
+                }
+                .focusSection()
+                .focused($contentManagementFocused)
             } else {
                 tvDetail
+            }
+        }
+
+        /// Replacing the pane wholesale removes the focused view with the
+        /// scroll view around it — the Categories & Channels row, or the PIN
+        /// pad once it unlocks — and the engine then drops focus on the
+        /// sidebar's default (Profiles). Left alone, the sidebar's focus handler
+        /// would take that for the user leaving and undo the drill-in on the
+        /// spot. The handoff forwards that focus into the pane and, until it
+        /// lands there, draws the sidebar unfocused so Profiles never flashes.
+        /// It closes once focus arrives, or after half a second at most, so a
+        /// swap that keeps its focus can't swallow the user's own later move
+        /// to the sidebar. Not `private`: the Library pane's row calls it
+        /// (SettingsView+Library).
+        func beginContentManagementHandoff() {
+            contentManagementHandoff = true
+            sidebarFocusUnmask?.cancel()
+            sidebarFocusMasked = true
+            contentManagementHandoffTimeout?.cancel()
+            contentManagementHandoffTimeout = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                endContentManagementHandoff()
+            }
+        }
+
+        private func endContentManagementHandoff() {
+            contentManagementHandoffTimeout?.cancel()
+            contentManagementHandoffTimeout = nil
+            contentManagementHandoff = false
+            // Unmask once the rows' own focus has caught up: one focus
+            // animation's length (TVSettingsSidebarButtonStyle) is plenty.
+            sidebarFocusUnmask?.cancel()
+            sidebarFocusUnmask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+                sidebarFocusMasked = false
             }
         }
 

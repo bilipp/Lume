@@ -238,15 +238,23 @@
     /// when focused.
     struct TVSettingsSidebarButtonStyle: ButtonStyle {
         let isSelected: Bool
+        /// Renders the row unfocused even while it holds focus — for focus that
+        /// only passes through the sidebar on its way into the detail pane.
+        var suppressesFocus = false
 
         func makeBody(configuration: Configuration) -> some View {
-            StyleBody(configuration: configuration, isSelected: isSelected)
+            StyleBody(configuration: configuration, isSelected: isSelected, suppressesFocus: suppressesFocus)
         }
 
         struct StyleBody: View {
             let configuration: ButtonStyleConfiguration
             let isSelected: Bool
-            @Environment(\.isFocused) private var isFocused
+            let suppressesFocus: Bool
+            @Environment(\.isFocused) private var hasFocus
+
+            private var isFocused: Bool {
+                hasFocus && !suppressesFocus
+            }
 
             var body: some View {
                 let background: AnyShapeStyle = isFocused

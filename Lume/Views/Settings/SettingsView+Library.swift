@@ -134,6 +134,7 @@ extension PlaylistTab {
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Content")
                     Button {
+                        beginContentManagementHandoff()
                         showingContentManagement = true
                     } label: {
                         HStack(spacing: 16) {
