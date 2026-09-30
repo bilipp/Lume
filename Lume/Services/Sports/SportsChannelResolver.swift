@@ -177,31 +177,36 @@ nonisolated enum SportsChannelResolver {
             defer { Perf.end(interval) }
 
             let context = ModelContext(container)
+            let generation = CacheGeneration(container: container, context: context, restriction: restriction, picks: pickIndex)
+            let cache = ResolveCache.shared
+            let hits = cache.lookup(fixtures, generation: generation)
+            let misses = fixtures.filter { hits[$0.id] == nil }
+            guard !misses.isEmpty else { return hits }
 
             // Pass 1 — candidate channels across all playlists.
             let streams = (try? context.fetch(candidateStreamDescriptor(restriction: restriction))) ?? []
-            guard !streams.isEmpty, !Task.isCancelled else { return [:] }
+            guard !streams.isEmpty, !Task.isCancelled else { return hits }
             let (channels, channelIds) = buildChannels(from: streams)
 
-            // Pass 2 — the guide around each kickoff, not the span between the
-            // earliest and the latest one.
-            let guide = buildGuide(context: context, channelIds: channelIds, windows: guideWindows(for: fixtures))
-            guard !Task.isCancelled else { return [:] }
+            // Pass 2 — the guide around each uncached kickoff, not the span
+            // between the earliest and the latest one.
+            let guide = buildGuide(context: context, channelIds: channelIds, windows: guideWindows(for: misses))
+            guard !Task.isCancelled else { return hits }
 
             // Pass 3 — match each fixture against the channels that can match it.
             let index = CandidateIndex(channels: channels, guide: guide, pickIndex: pickIndex)
-            var result: [String: [ResolvedChannel]] = [:]
-            for fixture in fixtures {
-                guard !Task.isCancelled else { return [:] }
-                let candidates = index.candidates(for: fixture).map { channels[$0] }
-                result[fixture.id] = resolveOne(
+            var resolved: [String: [ResolvedChannel]] = [:]
+            for fixture in misses {
+                guard !Task.isCancelled else { return hits }
+                resolved[fixture.id] = resolveOne(
                     fixture: fixture,
-                    channels: candidates,
+                    channels: index.candidates(for: fixture).map { channels[$0] },
                     guide: guide,
                     pickIndex: pickIndex
                 )
             }
-            return result
+            cache.store(resolved, for: misses, generation: generation)
+            return hits.merging(resolved) { cached, _ in cached }
         }
         return await withTaskCancellationHandler {
             await task.value

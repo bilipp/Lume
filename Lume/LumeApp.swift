@@ -307,6 +307,9 @@ struct LumeApp: App {
                     // without sending the viewer to Settings first.
                     OpenSubtitlesService.shared.restore()
 
+                    // A Mac rarely reaches `.background`, so also trim at launch.
+                    ImageDiskCache.shared.trimInBackground()
+
                     // Kick off iCloud sync: check account reachability, then run
                     // a first reconcile between the local catalog and the cloud
                     // mirrors. Runs after progress reconciliation so a fresh
@@ -339,6 +342,9 @@ struct LumeApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     DiagnosticSession.scenePhaseChanged(to: phase)
                     cloudSync.handleScenePhaseChange(to: phase)
+                    // Keep the image disk cache inside its size limit. Rate-limited
+                    // and run at background priority by the cache itself.
+                    if phase == .background { ImageDiskCache.shared.trimInBackground() }
                     #if !os(macOS)
                         // Shrink the resident footprint before the system suspends
                         // the app: a 256 MB decoded-image cache makes it a prime

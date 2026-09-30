@@ -329,33 +329,36 @@ struct MainTabView: View {
             }
         }
     #else
+        /// Search stays mounted: it holds only the query the viewer typed and a
+        /// playlist lookup. The content tabs unmount after sitting unshown — see
+        /// `IdleUnmountingTab`.
         private func tabView(selection: Binding<AppTab>) -> some View {
             TabView(selection: selection) {
                 Tab("Home", systemImage: "house", value: AppTab.home) {
-                    HomeView()
+                    IdleUnmountingTab(isSelected: selection.wrappedValue == .home) { HomeView() }
                 }
 
                 if showsTab(.movies) {
                     Tab("Movies", systemImage: "film", value: AppTab.movies) {
-                        MoviesView()
+                        IdleUnmountingTab(isSelected: selection.wrappedValue == .movies) { MoviesView() }
                     }
                 }
 
                 if showsTab(.series) {
                     Tab("Series", systemImage: "tv", value: AppTab.series) {
-                        SeriesView()
+                        IdleUnmountingTab(isSelected: selection.wrappedValue == .series) { SeriesView() }
                     }
                 }
 
                 if showsTab(.liveTV) {
                     Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.liveTV) {
-                        LiveTVView()
+                        IdleUnmountingTab(isSelected: selection.wrappedValue == .liveTV) { LiveTVView() }
                     }
                 }
 
                 if sportsTabEnabled {
                     Tab("Sports", systemImage: "sportscourt", value: AppTab.sports) {
-                        SportsHubView()
+                        IdleUnmountingTab(isSelected: selection.wrappedValue == .sports) { SportsHubView() }
                     }
                 }
 

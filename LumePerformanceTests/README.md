@@ -199,13 +199,21 @@ provider and the hub's Upcoming list for someone following four US leagues. The
 fixtures sit an even 50 minutes apart, so their kickoff windows merge into one
 that covers the whole week: the worst case for the guide fetch.
 
-iPhone 17 Pro simulator (iOS 26.5), Benchmark configuration, 2026-09-29:
+iPhone 17 Pro simulator (iOS 26.5), Benchmark configuration, 2026-10-01:
 
 | Benchmark | Clock | Peak RSS |
 |---|---|---|
-| `testSportsResolve200FixturesOver57kChannels` | 12.4 s | 127,634 kB |
+| `testSportsResolve200FixturesOver57kChannels` (cold) | 12.5-13.6 s | 145-670 MB |
+| `testSportsResolveWarmCache` (same batch, cache warm) | 0.005 s | |
 
-Measured phase by phase, matching is 0.07 s of that. The rest is SwiftData
+The warm number is `SportsChannelResolver.ResolveCache`: a resolve reuses each
+fixture's answer while the restriction, picks, playlist and guide syncs and the
+hidden-channel count are unchanged, so a surface re-running its `.task(id:)`, or a
+second surface asking for fixtures the first resolved, costs milliseconds.
+
+Peak memory for the cold resolve is noisy between runs (one run held at 128 MB,
+later ones ranged 145-670 MB with and without the result cache); read the clock.
+Measured phase by phase, matching is 0.07 s of the cold resolve. The rest is SwiftData
 materializing rows: about 7.5 s for the guide rows in the window and 2 s for the
 57k channels. Before the word index narrowed each fixture to the channels that
 can match it, matching scored every channel against every fixture — 11.4M pairs

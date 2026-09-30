@@ -21,6 +21,7 @@ import Foundation
 import ImageIO
 import OSLog
 import SwiftUI
+import Synchronization
 
 #if canImport(UIKit)
     import UIKit
@@ -112,9 +113,14 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
     private let directory: URL
     private let fileManager = FileManager.default
 
-    private init() {
-        let base = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        directory = base.appendingPathComponent("LumeImageCache", isDirectory: true)
+    private convenience init() {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        self.init(directory: base.appendingPathComponent("LumeImageCache", isDirectory: true))
+    }
+
+    /// A cache rooted at `directory`; tests use their own.
+    init(directory: URL) {
+        self.directory = directory
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
@@ -124,7 +130,12 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
     }
 
     func data(for key: String) -> Data? {
-        try? Data(contentsOf: fileURL(for: key))
+        let url = fileURL(for: key)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        // A hit counts as a use: `trim` evicts the least recently used first,
+        // and APFS doesn't reliably keep access times.
+        try? fileManager.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+        return data
     }
 
     func store(_ data: Data, for key: String) {
@@ -134,6 +145,61 @@ final nonisolated class ImageDiskCache: @unchecked Sendable {
     func removeAll() {
         try? fileManager.removeItem(at: directory)
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    // MARK: Size limit
+
+    /// Nothing else evicts this cache: every poster, backdrop, logo and crest
+    /// the app ever showed stays on disk, which for a 180k-title catalog grows
+    /// to gigabytes (macOS never purges Caches on its own).
+    static let sizeLimit = 500 * 1024 * 1024
+    /// Trimmed to this, below the limit, so the next trim isn't due at once.
+    static let trimTarget = 400 * 1024 * 1024
+
+    private let lastTrim = Mutex<Date?>(nil)
+
+    /// Trims the cache on a background task, at most once an hour.
+    func trimInBackground() {
+        let due = lastTrim.withLock { last in
+            guard last.map({ Date().timeIntervalSince($0) > 3600 }) ?? true else { return false }
+            last = Date()
+            return true
+        }
+        guard due else { return }
+        Task.detached(priority: .background) { [self] in
+            trim(limit: Self.sizeLimit, target: Self.trimTarget)
+        }
+    }
+
+    /// Deletes the least recently used files until the cache fits `target`,
+    /// once it has grown past `limit`. Returns how many bytes it removed.
+    @discardableResult
+    func trim(limit: Int, target: Int) -> Int {
+        let keys: [URLResourceKey] = [.totalFileAllocatedSizeKey, .contentModificationDateKey]
+        guard let urls = try? fileManager.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: keys, options: .skipsHiddenFiles
+        ) else { return 0 }
+
+        var files: [(url: URL, size: Int, date: Date)] = []
+        files.reserveCapacity(urls.count)
+        var total = 0
+        for url in urls {
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
+            let size = values.totalFileAllocatedSize ?? 0
+            files.append((url, size, values.contentModificationDate ?? .distantPast))
+            total += size
+        }
+        guard total > limit else { return 0 }
+
+        var removed = 0
+        for file in files.sorted(by: { $0.date < $1.date }) {
+            guard total - removed > target else { break }
+            if (try? fileManager.removeItem(at: file.url)) != nil {
+                removed += file.size
+            }
+        }
+        Logger.memory.notice("Image disk cache trimmed by \(removed / 1_048_576, privacy: .public) MB")
+        return removed
     }
 
     private func fileURL(for key: String) -> URL {

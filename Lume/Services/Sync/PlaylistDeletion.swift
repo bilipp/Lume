@@ -11,8 +11,10 @@
 //  playlist holds) and the content indexer keeps resolving titles whose playlist
 //  no longer exists.
 //
-//  This removes that orphaned catalog content alongside the playlist. Run it on
-//  the same context the deletion happens on so `@Query`-backed views refresh.
+//  This removes that orphaned catalog content alongside the playlist. The
+//  playlist row is deleted on the caller's context; the content goes through
+//  contexts of its own, saved as it goes, and reaches `@Query`-backed views as
+//  those saves merge.
 //
 
 import Foundation
@@ -63,57 +65,88 @@ nonisolated enum PlaylistDeletion {
         // leave no dangling pin.
         SportsChannelPicks().remove(playlistID: playlistID)
 
-        // Scope each fetch to the playlist in SQLite via the playlist-prefixed
-        // id instead of hydrating the whole catalog into memory just to filter
-        // it — on a large library that was a multi-table full dump per deletion.
-        // `starts(with:)` compiles to a range seek on the unique `id` index.
-        let movieDescriptor = FetchDescriptor<Movie>(
-            predicate: #Predicate { $0.id.starts(with: prefix) }
-        )
-        for movie in (try? context.fetch(movieDescriptor)) ?? [] {
-            context.delete(movie)
-        }
+        // Deleted without holding the catalog in memory. The old sweep fetched
+        // every movie, series and channel of the playlist into this context and
+        // saved once: about 1.2 GB for 178k movie rows, far past what an Apple TV
+        // allows. Everything is scoped by the playlist-prefixed id, which
+        // `starts(with:)` turns into a range seek on the unique `id` index.
+        //
+        // Channels and guide listings have no relationships, so
+        // `delete(model:where:)` removes them without materializing a row (300k
+        // rows: 2.6 s and 19 MB), on a context of their own. Episodes can't go
+        // this way: Core Data refuses a batch delete that has to nullify their
+        // series inverse, so they cascade from the series pages below.
+        let bulk = ModelContext(context.container)
+        bulk.autosaveEnabled = false
 
-        let seriesDescriptor = FetchDescriptor<Series>(
-            predicate: #Predicate { $0.id.starts(with: prefix) }
-        )
-        for show in (try? context.fetch(seriesDescriptor)) ?? [] {
-            context.delete(show)
-        }
-
-        // Split the channels in SQLite too: the ones this playlist brought in
-        // (deleted below), and the ones still owned elsewhere — a channel
-        // another playlist also carries keeps its guide listings. The surviving
-        // fetch only needs `epgChannelId`, so it skips full-row hydration.
-        let removedDescriptor = FetchDescriptor<LiveStream>(
-            predicate: #Predicate { $0.id.starts(with: prefix) }
-        )
-        let removedStreams = (try? context.fetch(removedDescriptor)) ?? []
-        let removedChannelIDs = Set(removedStreams.compactMap(\.epgChannelId))
-
-        var survivingDescriptor = FetchDescriptor<LiveStream>(
-            predicate: #Predicate { !$0.id.starts(with: prefix) }
-        )
+        // A channel another playlist also carries keeps its guide listings, so
+        // split the channel ids first; both reads fetch only `epgChannelId`.
+        var removedDescriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        removedDescriptor.propertiesToFetch = [\.epgChannelId]
+        let removedChannelIDs = Set(((try? bulk.fetch(removedDescriptor)) ?? []).compactMap(\.epgChannelId))
+        var survivingDescriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { !$0.id.starts(with: prefix) })
         survivingDescriptor.propertiesToFetch = [\.epgChannelId]
-        let survivingChannelIDs = Set(
-            ((try? context.fetch(survivingDescriptor)) ?? []).compactMap(\.epgChannelId)
-        )
+        let survivingChannelIDs = Set(((try? bulk.fetch(survivingDescriptor)) ?? []).compactMap(\.epgChannelId))
 
-        for stream in removedStreams {
-            context.delete(stream)
+        try? bulk.delete(model: LiveStream.self, where: #Predicate { $0.id.starts(with: prefix) })
+
+        // Prune the guide listings for channels no surviving playlist carries,
+        // in `IN` batches well under SQLite's bound-variable limit.
+        let orphaned = Array(removedChannelIDs.subtracting(survivingChannelIDs)).sorted()
+        for start in stride(from: 0, to: orphaned.count, by: 500) {
+            let chunk = Array(orphaned[start ..< min(start + 500, orphaned.count)])
+            try? bulk.delete(model: EPGListing.self, where: #Predicate { chunk.contains($0.channelId) })
         }
+        try? bulk.save()
 
-        // Prune the guide listings for channels no surviving playlist carries.
-        // Scoped by `channelId` (now indexed) so this seeks the orphaned rows
-        // instead of hydrating the entire — potentially huge — guide table.
-        let orphanedChannelIDs = Array(removedChannelIDs.subtracting(survivingChannelIDs))
-        if !orphanedChannelIDs.isEmpty {
-            let listingDescriptor = FetchDescriptor<EPGListing>(
-                predicate: #Predicate { orphanedChannelIDs.contains($0.channelId) }
+        // Movies and series cascade to their cast (and series to their
+        // episodes), which a predicate delete would orphan, so they go row by
+        // row — a page at a time, each page on its own context and saved, so no
+        // page outlives its own deletion.
+        deletePaged(container: context.container, idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
+            var descriptor = FetchDescriptor<Movie>(
+                predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
+                sortBy: [SortDescriptor(\.id, comparator: .lexical)]
             )
-            for listing in (try? context.fetch(listingDescriptor)) ?? [] {
-                context.delete(listing)
+            descriptor.fetchLimit = limit
+            return descriptor
+        })
+        deletePaged(container: context.container, idOf: { (show: Series) in show.id }, page: { cursor, limit in
+            var descriptor = FetchDescriptor<Series>(
+                predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
+                sortBy: [SortDescriptor(\.id, comparator: .lexical)]
+            )
+            descriptor.fetchLimit = limit
+            return descriptor
+        })
+    }
+
+    /// Deletes every row `page` selects, `pageSize` at a time, keyed on the last
+    /// id seen. `page` must ask for `id > cursor` in lexical order — see
+    /// `ContentSyncManager.sweepPaged` for why the default comparator skips
+    /// rows. Deleting while paging is sound: every row a page removes sorts at
+    /// or before the cursor.
+    private static func deletePaged<T: PersistentModel>(
+        container: ModelContainer,
+        pageSize: Int = 2000,
+        idOf: (T) -> String,
+        page: (_ cursor: String, _ limit: Int) -> FetchDescriptor<T>
+    ) {
+        var cursor = ""
+        while true {
+            var fetched = 0
+            autoreleasepool {
+                let context = ModelContext(container)
+                context.autosaveEnabled = false
+                let rows = (try? context.fetch(page(cursor, pageSize))) ?? []
+                fetched = rows.count
+                if let last = rows.last { cursor = idOf(last) }
+                for row in rows {
+                    context.delete(row)
+                }
+                if !rows.isEmpty { try? context.save() }
             }
+            if fetched < pageSize { return }
         }
     }
 }

@@ -25,10 +25,11 @@ struct HomeHeroCarousel: View {
     /// page (and animate the crossfade + loading bar) where nobody can see it.
     @State private var isVisible = true
 
-    /// Fill of the active page indicator (0…1). Driven by `autoAdvance()` and
-    /// reset on every page change, it doubles as the auto-advance clock so the
-    /// loading-bar dot and the actual slide jump can never drift apart.
-    @State private var progress: Double = 0
+    /// The auto-advance clock, which the page dots render as a loading bar.
+    /// Read only by `HeroClockIndicator`: held as plain `@State` it was read by
+    /// this body, which re-rendered the whole carousel — artwork, gradient and
+    /// copy — at the clock's 20 Hz tick. The same split as tvOS's `TVHeroModel`.
+    @State private var clock = HeroClock()
 
     /// Which hero the overlay is showing. Deliberately LAGS the scroll position:
     /// on a page change the overlay fades out, swaps while invisible, then fades
@@ -130,7 +131,7 @@ struct HomeHeroCarousel: View {
         }
         .onChange(of: currentItemID) { _, _ in
             // Restart the loading bar on every page change — auto or manual.
-            progress = 0
+            clock.progress = 0
             prefetchNeighbours()
             crossfadeInfo()
         }
@@ -189,10 +190,10 @@ struct HomeHeroCarousel: View {
     @ViewBuilder
     private var pageIndicator: some View {
         if items.count > 1 {
-            HeroPageIndicator(
+            HeroClockIndicator(
+                clock: clock,
                 count: items.count,
-                activeIndex: currentIndex,
-                progress: progress
+                activeIndex: currentIndex
             )
             .padding(.bottom, 14)
         }
@@ -249,16 +250,19 @@ struct HomeHeroCarousel: View {
             // no paging, prefetching or crossfades where nobody can see them,
             // and a full dwell once the hero scrolls back into view.
             if isInteracting || !isVisible {
-                progress = 0
+                // Writing an equal value still notifies the dots, so only reset once.
+                if clock.progress != 0 { clock.progress = 0 }
+                // Nothing moves while paused, so check back less often.
+                try? await Task.sleep(for: .milliseconds(200))
                 continue
             }
-            if progress >= 1 {
+            if clock.progress >= 1 {
                 // Reset BEFORE paging so the next tick can't re-trigger an advance
                 // in the window before `onChange(currentItemID)` resets it.
-                progress = 0
+                clock.progress = 0
                 advance()
             } else {
-                progress = min(progress + step, 1)
+                clock.progress = min(clock.progress + step, 1)
             }
         }
     }
@@ -303,6 +307,25 @@ struct HomeHeroCarousel: View {
                 infoOpacity = 1
             }
         }
+    }
+}
+
+/// The carousel's auto-advance clock, observed only by `HeroClockIndicator`.
+@Observable
+private final class HeroClock {
+    /// Fill of the active page dot (0…1). It doubles as the auto-advance clock
+    /// so the loading-bar dot and the slide jump can never drift apart.
+    var progress: Double = 0
+}
+
+/// The page dots, as the one view that reads the clock.
+private struct HeroClockIndicator: View {
+    let clock: HeroClock
+    let count: Int
+    let activeIndex: Int
+
+    var body: some View {
+        HeroPageIndicator(count: count, activeIndex: activeIndex, progress: clock.progress)
     }
 }
 

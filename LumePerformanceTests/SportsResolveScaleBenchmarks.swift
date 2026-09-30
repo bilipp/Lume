@@ -43,10 +43,26 @@ final class SportsResolveScaleBenchmarks: XCTestCase {
         let fixtures = makeFixtures()
 
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
+            // Cold: without this, every run after the first is a cache hit.
+            SportsChannelResolver.ResolveCache.shared.removeAll()
             let result = resolveSynchronously(fixtures: fixtures)
             // Each fixture is carried by the streams of exactly one guide channel.
             XCTAssertEqual(result[fixtures[0].id]?.count, streamsPerGuideChannel)
             XCTAssertEqual(result[fixtures[fixtureCount - 1].id]?.count, streamsPerGuideChannel)
+        }
+    }
+
+    /// The same batch resolved again under an unchanged catalog: what a Sports
+    /// surface pays when its `.task(id:)` re-runs, or a second surface asks for
+    /// fixtures the first already resolved.
+    func testSportsResolveWarmCache() {
+        let fixtures = makeFixtures()
+        SportsChannelResolver.ResolveCache.shared.removeAll()
+        _ = resolveSynchronously(fixtures: fixtures)
+
+        measure(metrics: [XCTClockMetric()]) {
+            let result = resolveSynchronously(fixtures: fixtures)
+            XCTAssertEqual(result[fixtures[0].id]?.count, streamsPerGuideChannel)
         }
     }
 

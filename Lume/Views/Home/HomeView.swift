@@ -76,6 +76,7 @@ struct HomeView: View {
     @State private var showingSettings = false
     /// Shown when a channel's "Start Multi-View" is picked without Lume Pro.
     @State private var showingPaywall = false
+    @Environment(DeepLinkRouter.self) var pathRouter: DeepLinkRouter?
     #if os(tvOS)
         @Environment(DeepLinkRouter.self) private var router
     #else
@@ -84,9 +85,8 @@ struct HomeView: View {
     #endif
 
     #if os(tvOS)
-        /// Hero selected on the immersive home. Drives navigation
-        /// programmatically: the hero surface is a stable Button (not a
-        /// NavigationLink) so paging the carousel never changes its identity.
+        /// Hero selected on the immersive home: a stable Button, not a
+        /// NavigationLink, so paging the carousel never changes its identity.
         @State private var selectedHero: HeroItem?
     #endif
 
@@ -141,7 +141,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: homePath) {
             Group {
                 if playlists.isEmpty {
                     ContentUnavailableView(
