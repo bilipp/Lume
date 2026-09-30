@@ -85,6 +85,45 @@ struct PlaylistDeletionTests {
         #expect(try context.fetchCount(FetchDescriptor<EPGListing>()) == 0)
     }
 
+    @Test func `a catalog larger than a page is deleted in full, cast and episodes included`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let doomed = Playlist(name: "Doomed", serverURL: "http://a.test", username: "u", password: "p")
+        let kept = Playlist(name: "Kept", serverURL: "http://b.test", username: "u", password: "p")
+        seed(kept, channelId: "ch.kept", in: context)
+        context.insert(doomed)
+        let prefix = doomed.id.uuidString
+        // Several pages, with ids crossing a digit-count boundary.
+        for index in 9000 ..< 13500 {
+            let movie = Movie(id: "\(prefix)-movie-\(index)", streamId: index, name: "Movie \(index)")
+            context.insert(movie)
+            if index.isMultiple(of: 500) {
+                context.insert(CastMember(id: "cast-\(index)", tmdbPersonId: index, name: "Actor", movie: movie))
+            }
+        }
+        let series = Series(id: "\(prefix)-series-1", seriesId: 1, name: "Long Show")
+        context.insert(series)
+        for number in 1 ... 50 {
+            let episode = Episode(
+                id: "\(prefix)-series-1-e\(number)", episodeId: "\(number)", title: "E\(number)",
+                containerExtension: "mkv", seasonNum: 1, episodeNum: number
+            )
+            context.insert(episode)
+            series.episodes.append(episode)
+        }
+        try context.save()
+
+        PlaylistDeletion.delete(doomed, in: context)
+        try context.save()
+
+        let check = ModelContext(container)
+        #expect(try check.fetchCount(FetchDescriptor<Movie>()) == 1)
+        #expect(try check.fetchCount(FetchDescriptor<Series>()) == 1)
+        #expect(try check.fetchCount(FetchDescriptor<Episode>()) == 1)
+        #expect(try check.fetchCount(FetchDescriptor<CastMember>()) == 0)
+        #expect(try check.fetchCount(FetchDescriptor<LiveStream>()) == 1)
+    }
+
     @Test func `deleting one playlist leaves another playlist's content intact`() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
