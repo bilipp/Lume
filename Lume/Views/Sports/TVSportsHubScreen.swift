@@ -347,6 +347,16 @@
                 resolved = [:]
                 return
             }
+            // The next day and a half first, so the top of a long list isn't
+            // waiting on the guide for the rest of the week; the full pass then only
+            // computes what the cache doesn't already hold.
+            if let soon = SportsChannelResolver.nearTermSubset(of: fixtures, now: Date()) {
+                let first = await SportsChannelResolver.resolve(
+                    container: modelContext.container, fixtures: soon, now: Date(), restriction: restriction
+                )
+                guard !Task.isCancelled else { return }
+                resolved = first
+            }
             let result = await SportsChannelResolver.resolve(
                 container: modelContext.container,
                 fixtures: fixtures,
