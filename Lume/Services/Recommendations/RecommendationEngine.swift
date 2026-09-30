@@ -201,49 +201,67 @@ actor RecommendationEngine {
 
         // Movies: unwatched, not favorited, never opened, not yet voted on (a
         // voted title — up or down — has already left the rail).
-        forEachPage(predicate: #Predicate<Movie> {
-            $0.embeddingData != nil && !$0.isWatched && !$0.isFavorite
-                && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0
-        }, sortBy: [SortDescriptor(\.id)]) { movie in
+        forEachPage(idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
+            var descriptor = FetchDescriptor<Movie>(
+                predicate: #Predicate {
+                    $0.embeddingData != nil && !$0.isWatched && !$0.isFavorite
+                        && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor
+                },
+                sortBy: [SortDescriptor(\.id, comparator: .lexical)]
+            )
+            descriptor.fetchLimit = limit
+            descriptor.propertiesToFetch = [\.id, \.categoryId, \.embeddingData]
+            return descriptor
+        }, body: { movie in
             guard !excluded.contains(movie.categoryId ?? ""),
                   let vector = movie.embeddingData.map(TextEmbedder.decode) else { return }
             consider(movie.id, .movie, RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike))
-        }
+        })
 
         // Series: not favorited, never opened, not yet voted on.
-        forEachPage(predicate: #Predicate<Series> {
-            $0.embeddingData != nil && !$0.isFavorite
-                && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0
-        }, sortBy: [SortDescriptor(\.id)]) { show in
+        forEachPage(idOf: { (show: Series) in show.id }, page: { cursor, limit in
+            var descriptor = FetchDescriptor<Series>(
+                predicate: #Predicate {
+                    $0.embeddingData != nil && !$0.isFavorite
+                        && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor
+                },
+                sortBy: [SortDescriptor(\.id, comparator: .lexical)]
+            )
+            descriptor.fetchLimit = limit
+            descriptor.propertiesToFetch = [\.id, \.categoryId, \.embeddingData]
+            return descriptor
+        }, body: { show in
             guard !excluded.contains(show.categoryId ?? ""),
                   let vector = show.embeddingData.map(TextEmbedder.decode) else { return }
             consider(show.id, .series, RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike))
-        }
+        })
 
         return top.map(\.item)
     }
 
     /// Walks every matching row `pageSize` at a time on a fresh context per page,
     /// so no managed object outlives the page it came from — what keeps peak
-    /// memory bounded regardless of catalog size. `sortBy` must be stable, or
-    /// offset paging would skip or repeat rows.
+    /// memory bounded regardless of catalog size.
+    ///
+    /// Pages are keyed on the last id seen, never on `fetchOffset`: an offset
+    /// makes SQLite re-walk every row it skips, so a 179k-row catalog cost
+    /// roughly the square of its page count — tens of seconds on a Mac. `page`
+    /// must ask for `id > cursor` ordered by `id` with `comparator: .lexical`,
+    /// the byte order `>` compares in and the unique `id` index holds; the
+    /// default comparator is number-aware and would skip rows (see
+    /// `ContentSyncManager.sweepPaged`). The empty string sorts before every id.
     private func forEachPage<Model: PersistentModel>(
-        predicate: Predicate<Model>,
-        sortBy: [SortDescriptor<Model>],
+        idOf: (Model) -> String,
+        page: (_ cursor: String, _ limit: Int) -> FetchDescriptor<Model>,
         body: (Model) -> Void
     ) {
-        var offset = 0
+        var cursor = ""
         while true {
             let context = ModelContext(modelContainer)
-            var descriptor = FetchDescriptor<Model>(predicate: predicate, sortBy: sortBy)
-            descriptor.fetchOffset = offset
-            descriptor.fetchLimit = pageSize
-            let page = (try? context.fetch(descriptor)) ?? []
-            page.forEach(body)
-            if page.count < pageSize {
-                return
-            }
-            offset += pageSize
+            let rows = (try? context.fetch(page(cursor, pageSize))) ?? []
+            rows.forEach(body)
+            guard rows.count == pageSize, let last = rows.last else { return }
+            cursor = idOf(last)
         }
     }
 }

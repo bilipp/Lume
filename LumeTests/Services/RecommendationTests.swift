@@ -104,6 +104,26 @@ struct RecommendationEngineTests {
         #expect(ids.first == "similar") // most similar ranks first
     }
 
+    /// The time limit is the guard: with the default, number-aware comparator
+    /// the `id > cursor` pages re-read earlier rows instead of advancing, and
+    /// this test took about 100 s instead of 1 s.
+    @Test(.timeLimit(.minutes(1)))
+    func `finds the best candidate past the first pages`() async throws {
+        // More candidates than one page, with ids crossing a digit-count
+        // boundary: the paging has to reach the best match wherever it sorts.
+        let container = try makeTestContainer()
+        makeMovie(container, id: "liked", vector: [1, 0, 0, 0], favorite: true)
+        for index in 9001 ... 11500 where index != 11400 {
+            makeMovie(container, id: "m-\(index)", vector: [0, 0, 0, 1])
+        }
+        makeMovie(container, id: "m-11400", vector: [0.9, 0.1, 0, 0])
+        try container.mainContext.save()
+
+        let result = await makeEngine(container).recommendations()
+
+        #expect(result.first?.id == "m-11400")
+    }
+
     @Test func `returns nothing without any taste signal`() async throws {
         let container = try makeTestContainer()
         makeMovie(container, id: "a", vector: [1, 0, 0, 0])

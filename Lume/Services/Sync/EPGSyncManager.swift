@@ -4,9 +4,9 @@
 //
 //  The dedicated EPG pipeline, split out of the playlist sync. It rebuilds the
 //  whole `EPGListing` store from every enabled `EPGSource`: collect the channel
-//  ids any live stream references, bulk-delete the old listings once, then
-//  stream-parse each source's XMLTV file and insert only programmes whose
-//  channel a stream actually uses.
+//  ids any live stream references, download every source's XMLTV file, and only
+//  then bulk-delete the old listings once and stream-parse each file, inserting
+//  only programmes whose channel a stream actually uses.
 //
 //  A channel is guided by exactly one source. Sources are walked oldest-first
 //  and each claims the channels it carries; later sources are then confined to
@@ -49,12 +49,39 @@ actor EPGSyncManager {
             return false
         }
 
+        // Download every source before touching the listings. Clearing first
+        // left the guide and now/next blank for the whole transfer (a 73 MB
+        // XMLTV file on a large provider), and empty until the next refresh
+        // when the download failed or was cancelled — which is routine, since a
+        // content sync cancels a background guide refresh.
+        var downloads: [Download] = []
+        for source in sources {
+            if let download = await download(source) {
+                downloads.append(download)
+            }
+        }
+        defer {
+            for download in downloads where download.isRemote {
+                try? FileManager.default.removeItem(at: download.fileURL)
+            }
+        }
+        guard !downloads.isEmpty, !Task.isCancelled else {
+            for download in downloads {
+                markStatus(download.source.id, .idle)
+            }
+            return false
+        }
+
         clearListings()
 
         var anySucceeded = false
         var unclaimedChannelIDs = knownChannelIDs
-        for source in sources {
-            let result = await sync(sourceID: source.id, url: source.url, knownChannelIDs: unclaimedChannelIDs)
+        for download in downloads {
+            guard !Task.isCancelled else {
+                markStatus(download.source.id, .idle)
+                continue
+            }
+            let result = ingest(download, knownChannelIDs: unclaimedChannelIDs)
             unclaimedChannelIDs.subtract(result.claimedChannelIDs)
             anySucceeded = anySucceeded || result.didSync
         }
@@ -70,40 +97,53 @@ actor EPGSyncManager {
         let claimedChannelIDs: Set<String>
     }
 
-    private func sync(sourceID: UUID, url: String, knownChannelIDs: Set<String>) async -> SourceResult {
-        let interval = Perf.begin(.epgSourceSync)
-        defer { Perf.end(interval) }
+    /// A source's XMLTV file, on disk and ready to ingest.
+    private struct Download {
+        let source: SourceInfo
+        let fileURL: URL
+        /// Downloaded to a temp file this refresh owns (a local `file://`
+        /// source is read in place and never removed).
+        let isRemote: Bool
+    }
 
-        markStatus(sourceID, .syncing)
-        guard !url.isEmpty else {
-            markStatus(sourceID, .error)
-            return SourceResult(didSync: false, claimedChannelIDs: [])
-        }
-        guard !knownChannelIDs.isEmpty else {
-            // Every channel this source could guide is already covered by an
-            // earlier one; downloading it would only produce overlaps.
-            Logger.database.info("EPG source \(sourceID, privacy: .public) skipped, all channels already guided")
-            markSynced(sourceID)
-            return SourceResult(didSync: true, claimedChannelIDs: [])
+    private func download(_ source: SourceInfo) async -> Download? {
+        markStatus(source.id, .syncing)
+        guard !source.url.isEmpty else {
+            markStatus(source.id, .error)
+            return nil
         }
         do {
-            let isRemote = !(URL(string: url)?.isFileURL ?? false)
-            let fileURL = try await client.downloadEPG(from: url)
-            defer { if isRemote { try? FileManager.default.removeItem(at: fileURL) } }
-
-            let inserted = insertListings(from: fileURL, knownChannelIDs: knownChannelIDs)
-            Logger.database.info("EPG source \(sourceID) inserted \(inserted.count) listings for \(inserted.channelIDs.count) channels")
-            markSynced(sourceID)
-            return SourceResult(didSync: true, claimedChannelIDs: inserted.channelIDs)
+            let isRemote = !(URL(string: source.url)?.isFileURL ?? false)
+            let fileURL = try await client.downloadEPG(from: source.url)
+            return Download(source: source, fileURL: fileURL, isRemote: isRemote)
         } catch {
             // Credential-free detail (never a URL) so it can be public in
             // user-exported diagnostic logs.
             let nsError = error as NSError
             let detail = (error as? M3UError)?.logDescription ?? "\(nsError.domain) \(nsError.code)"
+            let sourceID = source.id
             Logger.database.warning("EPG source \(sourceID, privacy: .public) sync failed: \(detail, privacy: .public)")
-            markStatus(sourceID, .error)
-            return SourceResult(didSync: false, claimedChannelIDs: [])
+            markStatus(source.id, Task.isCancelled ? .idle : .error)
+            return nil
         }
+    }
+
+    private func ingest(_ download: Download, knownChannelIDs: Set<String>) -> SourceResult {
+        let interval = Perf.begin(.epgSourceSync)
+        defer { Perf.end(interval) }
+
+        let sourceID = download.source.id
+        guard !knownChannelIDs.isEmpty else {
+            // Every channel this source could guide is already covered by an
+            // earlier one; ingesting it would only produce overlaps.
+            Logger.database.info("EPG source \(sourceID, privacy: .public) skipped, all channels already guided")
+            markSynced(sourceID)
+            return SourceResult(didSync: true, claimedChannelIDs: [])
+        }
+        let inserted = insertListings(from: download.fileURL, knownChannelIDs: knownChannelIDs)
+        Logger.database.info("EPG source \(sourceID) inserted \(inserted.count) listings for \(inserted.channelIDs.count) channels")
+        markSynced(sourceID)
+        return SourceResult(didSync: true, claimedChannelIDs: inserted.channelIDs)
     }
 
     // MARK: - Source / channel lookups

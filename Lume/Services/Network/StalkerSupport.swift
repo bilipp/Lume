@@ -298,3 +298,38 @@ extension StalkerClient {
         }
     }
 }
+
+// MARK: - Session
+
+/// Split from StalkerClient.swift, which sits at SwiftLint's file-length limit.
+extension StalkerClient {
+    /// One session for every client with the default timeout, as in
+    /// `XtreamClient`: a client is built per search, category import and stream
+    /// resolve, and each used to pay its own TCP and TLS handshake — on the zap
+    /// path, straight into time-to-first-frame — and bring its own connection
+    /// allowance to a portal that caps them.
+    static let sharedSession = makeSession(timeout: 30)
+
+    static func session(timeout: TimeInterval) -> URLSession {
+        timeout == 30 ? sharedSession : makeSession(timeout: timeout)
+    }
+
+    static func makeSession(timeout: TimeInterval) -> URLSession {
+        let config = URLSessionConfiguration.default
+        // Matches `walkConcurrency`: catalog pages are fetched in parallel
+        // (portal page size is fixed at ~14 items, so a big catalog is
+        // thousands of ~2s requests — serially that reads as a hung sync).
+        config.httpMaximumConnectionsPerHost = Self.walkConcurrency
+        config.timeoutIntervalForRequest = timeout
+        // `get_all_channels` runs to megabytes; see `XtreamClient.makeSession`.
+        config.timeoutIntervalForResource = 600
+        config.httpShouldSetCookies = false
+        return URLSession(configuration: config)
+    }
+
+    /// Ordered-list pages fetched concurrently during a catalog walk.
+    /// Empirically portals serve ~8 parallel middleware requests fine and
+    /// fast-reject with 503 above ~10; 6 leaves headroom, and a portal that
+    /// still 503s gets the retry-with-backoff path.
+    static let walkConcurrency = 6
+}

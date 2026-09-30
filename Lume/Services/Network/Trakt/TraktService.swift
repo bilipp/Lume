@@ -227,10 +227,11 @@ final class TraktService {
     // MARK: - Watched import
 
     /// Imports the user's Trakt watched history into the local catalog, marking
-    /// matching movies and episodes as watched. Writes through `context` (the
-    /// catalog container's context the UI binds to); the iCloud reconciler then
-    /// mirrors the change to the user's other devices. No-ops when not connected
-    /// or an import is already running.
+    /// matching movies and episodes as watched. Writes through a context of its
+    /// own on `context`'s container, off the main actor; the UI's context picks
+    /// the change up on merge, and the iCloud reconciler then mirrors it to the
+    /// user's other devices. No-ops when not connected or an import is already
+    /// running.
     func importWatched(into context: ModelContext) async {
         guard isConnected, !isImporting else { return }
         isImporting = true
@@ -242,12 +243,23 @@ final class TraktService {
             return
         }
         do {
-            let movies = try await client.watchedMovies(accessToken: accessToken)
-            let shows = try await client.watchedShows(accessToken: accessToken)
-            lastImport = TraktWatchedImporter.apply(movies: movies, shows: shows, in: context)
+            async let movies = client.watchedMovies(accessToken: accessToken)
+            async let shows = client.watchedShows(accessToken: accessToken)
+            lastImport = try await Self.applyImport(movies: movies, shows: shows, container: context.container)
         } catch {
             lastImport = .failure
         }
+    }
+
+    /// Matching the history against the catalog fetches and faults catalog
+    /// rows, which ran on the main thread when it wrote through the view context.
+    @concurrent
+    private static func applyImport(
+        movies: [TraktWatchedMovie],
+        shows: [TraktWatchedShow],
+        container: ModelContainer
+    ) async -> TraktImportSummary {
+        TraktWatchedImporter.apply(movies: movies, shows: shows, in: ModelContext(container))
     }
 
     // MARK: - Tokens

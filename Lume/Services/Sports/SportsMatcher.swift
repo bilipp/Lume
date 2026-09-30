@@ -212,14 +212,37 @@ nonisolated enum SportsMatcher {
     /// Lowercases, strips diacritics, replaces every non-alphanumeric run with a
     /// space, and pads with leading/trailing spaces so `containsWord` can rely on
     /// word boundaries.
+    ///
+    /// One pass over the folded scalars, with ASCII classified by range. The
+    /// channel resolver runs this three times per guide listing in its kickoff
+    /// windows (hundreds of thousands on a large provider), where the
+    /// map-to-Characters, split and join it replaced — and `CharacterSet`
+    /// lookups for plain ASCII — were most of the cost.
     static func normalize(_ text: String) -> String {
         let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
-        let cleaned = folded.unicodeScalars.map { scalar -> Character in
-            CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : " "
+        var result = String.UnicodeScalarView()
+        result.append(" ")
+        var inWord = false
+        var wroteWord = false
+        for scalar in folded.unicodeScalars {
+            let value = scalar.value
+            let isWordScalar = value < 0x80
+                ? (value >= 0x30 && value <= 0x39) || (value >= 0x41 && value <= 0x5A) || (value >= 0x61 && value <= 0x7A)
+                : alphanumerics.contains(scalar)
+            if isWordScalar {
+                if !inWord, wroteWord { result.append(" ") }
+                result.append(scalar)
+                inWord = true
+                wroteWord = true
+            } else {
+                inWord = false
+            }
         }
-        let collapsed = String(cleaned).split(separator: " ").joined(separator: " ")
-        return " \(collapsed) "
+        result.append(" ")
+        return String(result)
     }
+
+    private static let alphanumerics = CharacterSet.alphanumerics
 
     /// Generic club affixes that don't distinguish one team from another. Kept
     /// minimal and safe: words like "real", "atletico" or "sporting" are left as

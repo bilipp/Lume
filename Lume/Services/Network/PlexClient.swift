@@ -227,9 +227,13 @@ final nonisolated class PlexClient: Sendable {
     static let pageSize = 200
 
     init(urlSession: URLSession? = nil, accountBaseURL: URL? = nil) {
-        session = urlSession ?? Self.makeSession()
+        session = urlSession ?? Self.sharedSession
         self.accountBaseURL = accountBaseURL ?? URL(string: "https://plex.tv")!
     }
+
+    /// Shared by every client: `ContentSyncManager` builds one per instance, and
+    /// views build a manager per detail screen.
+    private static let sharedSession = makeSession()
 
     private static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.default

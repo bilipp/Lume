@@ -13,11 +13,13 @@
 //   1. One scoped fetch of candidate `LiveStream`s across *all* playlists —
 //      hidden channels and parental-/user-restricted categories excluded in
 //      SQLite, not in Swift.
-//   2. One `EPGListing` fetch, bounded by the union kickoff window *and* the
-//      candidate channel ids, with the wide `listingDescription` column left
-//      out — never the unscoped time-only scan that froze the guide.
+//   2. One `EPGListing` fetch per kickoff window (merged where fixtures
+//      overlap), bounded by the candidate channel ids too — never the
+//      unscoped time-only scan that froze the guide.
 //   3. Matching in Swift, via the pure `SportsMatcher` token logic, plus the
-//      viewer's remembered picks and a channel-name fallback.
+//      viewer's remembered picks and a channel-name fallback — run only on the
+//      channels `CandidateIndex` finds for each fixture (see
+//      SportsChannelResolver+Index.swift).
 //
 
 import Foundation
@@ -100,6 +102,9 @@ nonisolated enum SportsChannelResolver {
         let summary: ResolvedStreamSummary
         let playlistID: UUID
         let nameHaystack: String
+        /// `SportsChannelPicks.channelKey`, folded once here rather than per
+        /// fixture.
+        let key: String
     }
 
     /// The `EPGListing` fetch shape, exposed for the query-shape contract test.
@@ -115,7 +120,10 @@ nonisolated enum SportsChannelResolver {
             predicate: #Predicate {
                 channelIds.contains($0.channelId) && $0.start < windowEnd && $0.end > windowStart
             },
-            sortBy: [SortDescriptor(\.channelId), SortDescriptor(\.start)]
+            // No SQL sort: every window's rows would go through a temp B-tree
+            // no index serves. `buildGuide` orders each channel's handful of
+            // rows by start instead, which is all the matchers read in order.
+            sortBy: []
         )
         descriptor.propertiesToFetch = [
             \.channelId, \.title, \.subtitle, \.category, \.listingDescription, \.start, \.end
@@ -151,7 +159,7 @@ nonisolated enum SportsChannelResolver {
     nonisolated static func resolve(
         container: ModelContainer,
         fixtures: [SportsFixture],
-        now: Date,
+        now _: Date,
         restriction: ContentRestriction = ContentRestriction(),
         picks: SportsChannelPicks = SportsChannelPicks()
     ) async -> [String: [ResolvedChannel]] {
@@ -160,7 +168,11 @@ nonisolated enum SportsChannelResolver {
         guard !fixtures.isEmpty else { return [:] }
         let pickIndex = picks.snapshot()
 
-        return await Task.detached(priority: .utility) {
+        // Detached to keep `.utility` priority, with the caller's cancellation
+        // forwarded: `.task(id:)` restarts a resolve whenever the fixture set
+        // or the sync state flips, and a detached task used to run each
+        // superseded one to completion.
+        let task = Task.detached(priority: .utility) { () -> [String: [ResolvedChannel]] in
             let interval = Perf.begin(.sportsChannelResolve)
             defer { Perf.end(interval) }
 
@@ -168,29 +180,34 @@ nonisolated enum SportsChannelResolver {
 
             // Pass 1 — candidate channels across all playlists.
             let streams = (try? context.fetch(candidateStreamDescriptor(restriction: restriction))) ?? []
-            guard !streams.isEmpty else { return [:] }
+            guard !streams.isEmpty, !Task.isCancelled else { return [:] }
             let (channels, channelIds) = buildChannels(from: streams)
 
-            // Pass 2 — one bounded EPG fetch over the union kickoff window.
-            let kickoffs = fixtures.map(\.startDate)
-            let windowStart = (kickoffs.min() ?? now).addingTimeInterval(-SportsMatcher.leadTime)
-            let windowEnd = (kickoffs.max() ?? now).addingTimeInterval(SportsMatcher.lateStart)
-            let guide = buildGuide(
-                context: context, channelIds: channelIds, windowStart: windowStart, windowEnd: windowEnd
-            )
+            // Pass 2 — the guide around each kickoff, not the span between the
+            // earliest and the latest one.
+            let guide = buildGuide(context: context, channelIds: channelIds, windows: guideWindows(for: fixtures))
+            guard !Task.isCancelled else { return [:] }
 
-            // Pass 3 — match each fixture in Swift.
+            // Pass 3 — match each fixture against the channels that can match it.
+            let index = CandidateIndex(channels: channels, guide: guide, pickIndex: pickIndex)
             var result: [String: [ResolvedChannel]] = [:]
             for fixture in fixtures {
+                guard !Task.isCancelled else { return [:] }
+                let candidates = index.candidates(for: fixture).map { channels[$0] }
                 result[fixture.id] = resolveOne(
                     fixture: fixture,
-                    channels: channels,
+                    channels: candidates,
                     guide: guide,
                     pickIndex: pickIndex
                 )
             }
             return result
-        }.value
+        }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     /// Maps candidate `LiveStream`s to `Channel`s (with normalized name
@@ -212,7 +229,8 @@ nonisolated enum SportsChannelResolver {
                     epgChannelId: stream.epgChannelId
                 ),
                 playlistID: playlistID,
-                nameHaystack: SportsMatcher.normalize(stream.name)
+                nameHaystack: SportsMatcher.normalize(stream.name),
+                key: SportsChannelPicks.channelKey(epgChannelId: stream.epgChannelId, name: stream.name)
             ))
             if let cid = stream.epgChannelId, !cid.isEmpty { channelIds.insert(cid) }
         }
@@ -236,18 +254,20 @@ nonisolated enum SportsChannelResolver {
     /// commentators and filler.
     private static let descriptionScanLength = 400
 
-    /// Runs the bounded EPG fetch and groups the listings by channel id, folding
-    /// each listing's title and subtitle once.
+    /// Runs one bounded EPG fetch per kickoff window and groups the listings by
+    /// channel id, folding each listing's title, subtitle and description once.
     private nonisolated static func buildGuide(
         context: ModelContext,
         channelIds: Set<String>,
-        windowStart: Date,
-        windowEnd: Date
+        windows: [ClosedRange<Date>]
     ) -> [String: [NormalizedCandidate]] {
         guard !channelIds.isEmpty else { return [:] }
-        let listings = (try? context.fetch(epgCandidateDescriptor(
-            channelIds: Array(channelIds), windowStart: windowStart, windowEnd: windowEnd
-        ))) ?? []
+        let ids = Array(channelIds)
+        let listings = windows.flatMap { window in
+            (try? context.fetch(epgCandidateDescriptor(
+                channelIds: ids, windowStart: window.lowerBound, windowEnd: window.upperBound
+            ))) ?? []
+        }
         var guide: [String: [NormalizedCandidate]] = [:]
         for listing in listings {
             guide[listing.channelId, default: []].append(NormalizedCandidate(
@@ -260,6 +280,9 @@ nonisolated enum SportsChannelResolver {
                 start: listing.start,
                 end: listing.end
             ))
+        }
+        for channelId in guide.keys {
+            guide[channelId]?.sort { $0.start < $1.start }
         }
         return guide
     }
@@ -345,11 +368,8 @@ nonisolated enum SportsChannelResolver {
     ) -> ResolvedChannel? {
         let homeTokens = context.homeTokens
         let awayTokens = context.awayTokens
-        let channelKey = SportsChannelPicks.channelKey(
-            epgChannelId: channel.summary.epgChannelId, name: channel.summary.name
-        )
         let isPick = pickIndex[
-            SportsChannelPicks.compositeKey(competitionKey: context.competitionKey, channelKey: channelKey)
+            SportsChannelPicks.compositeKey(competitionKey: context.competitionKey, channelKey: channel.key)
         ] != nil
 
         let epg = channel.summary.epgChannelId

@@ -530,7 +530,7 @@ struct FullScreenPlayerView: View {
     /// resulting store merge can't disturb playback. Captures the clock
     /// synchronously *before* awaiting, so a subsequent `clock.reset()` can't
     /// race the read; clears the buffer entry once the write lands.
-    func persistProgressDetached(force: Bool) {
+    func persistProgressDetached(force: Bool, holdingLive: Bool = false) {
         guard let writer = progressWriter else { return }
         if activeMedia.isLive, !force { return }
         let ref = activeMedia.contentRef
@@ -548,7 +548,7 @@ struct FullScreenPlayerView: View {
         pendingProgressWrite = Task { @MainActor in
             await previous?.value
             let completion = await writer.record(
-                ref: ref, progress: now, duration: total, force: force
+                ref: ref, progress: now, duration: total, force: force, holdLive: holdingLive
             )
             WatchProgressBuffer.remove(ref: ref)
             if let completion {

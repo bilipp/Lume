@@ -200,8 +200,12 @@ final nonisolated class JellyfinClient: Sendable {
     let session: URLSession
 
     init(urlSession: URLSession? = nil) {
-        session = urlSession ?? Self.makeSession()
+        session = urlSession ?? Self.sharedSession
     }
+
+    /// Shared by every client: `ContentSyncManager` builds one per instance, and
+    /// views build a manager per detail screen.
+    private static let sharedSession = makeSession()
 
     private static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.default

@@ -35,11 +35,8 @@ nonisolated extension SportsChannelResolver {
                 channelNamesSeries: channelNamesSeries,
                 kickoff: fixture.startDate
             )
-            let channelKey = SportsChannelPicks.channelKey(
-                epgChannelId: channel.summary.epgChannelId, name: channel.summary.name
-            )
             let isPick = pickIndex[
-                SportsChannelPicks.compositeKey(competitionKey: fixture.leagueId, channelKey: channelKey)
+                SportsChannelPicks.compositeKey(competitionKey: fixture.leagueId, channelKey: channel.key)
             ] != nil
             // A series-named channel ("Sky Sports F1") with no guide entry at the
             // session's start is a fallback; one airing something else is not.

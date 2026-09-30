@@ -26,7 +26,7 @@ import Foundation
 import SwiftData
 
 /// The outcome of an import, surfaced in the settings UI.
-struct SimklImportSummary: Equatable {
+nonisolated struct SimklImportSummary: Equatable {
     var moviesMarked = 0
     var episodesMarked = 0
     /// Shows whose watched episodes were parked because the catalog has no
@@ -41,7 +41,7 @@ struct SimklImportSummary: Equatable {
     }
 }
 
-enum SimklWatchedImporter {
+nonisolated enum SimklWatchedImporter {
     /// Marks the local movies and episodes that Simkl reports as watched,
     /// writing through the given catalog context. Returns what changed.
     static func apply(items: SimklAllItems, in context: ModelContext) -> SimklImportSummary {
@@ -92,8 +92,7 @@ enum SimklWatchedImporter {
         }
         guard !watchedIDs.isEmpty else { return 0 }
 
-        let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId != nil })
-        let candidates = (try? context.fetch(descriptor)) ?? []
+        let candidates = moviesMatching(tmdbIDs: watchedIDs, in: context)
 
         var count = 0
         for movie in candidates where !movie.isWatched {
@@ -106,6 +105,29 @@ enum SimklWatchedImporter {
             count += 1
         }
         return count
+    }
+
+    // MARK: - Candidate lookup
+
+    /// The movies whose TMDB id is in `tmdbIDs`, fetched in `IN` batches rather
+    /// than by loading every movie with any TMDB id — most of a large catalog.
+    static func moviesMatching(tmdbIDs: Set<Int>, in context: ModelContext) -> [Movie] {
+        batches(of: tmdbIDs).flatMap { chunk in
+            (try? context.fetch(FetchDescriptor<Movie>(predicate: movieTmdbIdPredicate(ids: chunk)))) ?? []
+        }
+    }
+
+    /// The series whose TMDB id is in `tmdbIDs`; see `moviesMatching`.
+    static func seriesMatching(tmdbIDs: Set<Int>, in context: ModelContext) -> [Series] {
+        batches(of: tmdbIDs).flatMap { chunk in
+            (try? context.fetch(FetchDescriptor<Series>(predicate: seriesTmdbIdPredicate(ids: chunk)))) ?? []
+        }
+    }
+
+    /// Keeps each `IN` list well under SQLite's bound-variable limit.
+    private static func batches(of ids: Set<Int>) -> [Set<Int>] {
+        let sorted = ids.sorted()
+        return stride(from: 0, to: sorted.count, by: 500).map { Set(sorted[$0 ..< min($0 + 500, sorted.count)]) }
     }
 
     // MARK: - Shows
@@ -128,8 +150,7 @@ enum SimklWatchedImporter {
         }
         guard !showsByTMDB.isEmpty else { return (0, 0) }
 
-        let descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId != nil })
-        let candidates = (try? context.fetch(descriptor)) ?? []
+        let candidates = seriesMatching(tmdbIDs: Set(showsByTMDB.keys), in: context)
 
         var pending = SimklPendingWatchedStore.load()
         var pendingChanged = false

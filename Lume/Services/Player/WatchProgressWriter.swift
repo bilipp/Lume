@@ -18,6 +18,12 @@ actor WatchProgressWriter {
     private var lastRef: PlayableMedia.ContentRef?
     private var lastProgress: TimeInterval = -1
 
+    /// Channels left by a zap, and when, waiting for the next unheld write.
+    /// Saving on every zap merged into the main context while the next stream
+    /// opened, re-running the Live TV `@Query`s still mounted under the player
+    /// inside its first-frame window; a surfing session now saves once.
+    private var heldLiveTouches: [String: Date] = [:]
+
     /// Surfaced when an item crosses the "watched" line on this write, so the
     /// caller can fire a one-time Trakt sync back on the main actor.
     struct Completion {
@@ -50,13 +56,16 @@ actor WatchProgressWriter {
 
     /// Write `progress` for `ref` and return a `Completion` if the item just
     /// became watched (≥ 90%). `force` bypasses the paused-playback dedup so
-    /// the final save on close/switch always lands.
+    /// the final save on close/switch always lands. `holdLive` keeps a live
+    /// channel's touch in memory for the next write that isn't held — the
+    /// player's close, disappear or background flush — instead of saving it now.
     @discardableResult
     func record(
         ref: PlayableMedia.ContentRef,
         progress: TimeInterval,
         duration: TimeInterval,
-        force: Bool
+        force: Bool,
+        holdLive: Bool = false
     ) -> Completion? {
         guard progress > 0 else { return nil }
 
@@ -77,7 +86,11 @@ actor WatchProgressWriter {
             case let .episode(id):
                 return try writeEpisode(id: id, progress: progress, completed: completed, ref: ref)
             case let .live(id):
-                try touchLive(id: id)
+                if holdLive {
+                    heldLiveTouches[id] = Date()
+                } else {
+                    try touchLive(id: id)
+                }
                 return nil
             }
         } catch {
@@ -161,11 +174,17 @@ actor WatchProgressWriter {
         return completion
     }
 
+    /// Stamps `id` and every held channel, in one save.
     private func touchLive(id: String) throws {
-        var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let stream = try context.fetch(descriptor).first else { return }
-        stream.lastWatchedDate = Date()
+        var touches = heldLiveTouches
+        heldLiveTouches = [:]
+        touches[id] = Date()
+        let ids = Array(touches.keys)
+        let streams = try context.fetch(FetchDescriptor<LiveStream>(predicate: #Predicate { ids.contains($0.id) }))
+        guard !streams.isEmpty else { return }
+        for stream in streams {
+            stream.lastWatchedDate = touches[stream.id]
+        }
         try context.save()
     }
 }
