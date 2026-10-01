@@ -143,4 +143,48 @@ struct EPGGridBuilderTests {
 
         #expect(Set(cells.map(\.id)).count == cells.count)
     }
+
+    // MARK: - Replay eligibility
+
+    private static func programCell(
+        startMinutes: Double, endMinutes: Double, isGap: Bool = false
+    ) -> EPGProgramCell {
+        EPGProgramCell(
+            id: "p", title: "Programme", detail: "",
+            start: windowStart.addingTimeInterval(startMinutes * 60),
+            end: windowStart.addingTimeInterval(endMinutes * 60),
+            listingID: isGap ? nil : "listing", isGap: isGap, width: 0
+        )
+    }
+
+    /// The gate that lets the EPG detail sheet and the grid's replay glyph
+    /// offer catch-up for a programme still airing, not just a finished one —
+    /// the archive-window check itself (`PlayableMedia.isCatchupAvailable`,
+    /// `EPGChannelRow.isReplayable`) never cared about past vs. live.
+    @Test func `a currently airing programme is replay eligible`() {
+        let now = Self.windowStart.addingTimeInterval(45 * 60)
+        let cell = Self.programCell(startMinutes: 30, endMinutes: 60)
+        #expect(cell.isLive(at: now))
+        #expect(cell.isReplayEligible(at: now))
+    }
+
+    @Test func `a finished programme is replay eligible`() {
+        let now = Self.windowStart.addingTimeInterval(90 * 60)
+        let cell = Self.programCell(startMinutes: 30, endMinutes: 60)
+        #expect(cell.isPast(at: now))
+        #expect(cell.isReplayEligible(at: now))
+    }
+
+    @Test func `an upcoming programme is not replay eligible`() {
+        let now = Self.windowStart
+        let cell = Self.programCell(startMinutes: 30, endMinutes: 60)
+        #expect(!cell.isLive(at: now) && !cell.isPast(at: now))
+        #expect(!cell.isReplayEligible(at: now))
+    }
+
+    @Test func `a gap filler is never replay eligible`() {
+        let now = Self.windowStart.addingTimeInterval(45 * 60)
+        let cell = Self.programCell(startMinutes: 30, endMinutes: 60, isGap: true)
+        #expect(!cell.isReplayEligible(at: now))
+    }
 }

@@ -4,8 +4,9 @@
 //
 //  Programme detail presented when a guide cell is selected: channel, title,
 //  airing time, live progress, synopsis, and a watch action that hands back to
-//  the caller to start playback — live for the current programme, catch-up for
-//  a past one still inside the channel's archive.
+//  the caller to start playback. A programme still inside the channel's
+//  archive window — whether it already finished or is still airing — offers
+//  catch-up alongside (or instead of) joining live; anything else is live only.
 //
 
 import SwiftUI
@@ -24,7 +25,7 @@ struct EPGProgramDetailView: View {
     }
 
     private var canPlayCatchup: Bool {
-        !cell.isGap && cell.isPast(at: now)
+        cell.isReplayEligible(at: now)
             && PlayableMedia.isCatchupAvailable(stream: stream, start: cell.start, now: now)
     }
 
@@ -142,7 +143,7 @@ struct EPGProgramDetailView: View {
                         // them would otherwise push them off-screen and out of reach.
                         VStack(alignment: .leading, spacing: 20) {
                             if canPlayCatchup {
-                                TVPlayButton(title: "Watch", systemImage: "play.fill") {
+                                TVPlayButton(title: "Watch from Start", systemImage: "play.fill") {
                                     onPlayCatchup()
                                     dismiss()
                                 }
@@ -279,8 +280,9 @@ struct EPGProgramDetailView: View {
         return "\(minutes)m"
     }
 
-    /// The primary action: catch-up for a replayable past programme (with a
-    /// secondary "Watch Live" escape hatch to the channel), live otherwise.
+    /// The primary action: catch-up for a replayable programme — past or still
+    /// airing — with a secondary "Watch Live" to join the channel's current
+    /// broadcast, live only otherwise.
     @ViewBuilder
     private var watchButton: some View {
         if canPlayCatchup {
@@ -289,7 +291,7 @@ struct EPGProgramDetailView: View {
                     onPlayCatchup()
                     dismiss()
                 } label: {
-                    Label("Watch", systemImage: "play.fill")
+                    Label("Watch from Start", systemImage: "play.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }

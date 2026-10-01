@@ -121,6 +121,16 @@ nonisolated struct EPGProgramCell: Identifiable, Equatable {
         end <= now
     }
 
+    /// Whether catch-up replay should be offered for this cell at all — a past
+    /// programme still inside the archive window, or one currently airing, so a
+    /// viewer who joined partway through can restart from the beginning as well
+    /// as jump to live. Gaps are never replayable. Doesn't check the archive
+    /// window itself — pair with `PlayableMedia.isCatchupAvailable` /
+    /// `EPGChannelRow.isReplayable(start:now:)`.
+    func isReplayEligible(at now: Date) -> Bool {
+        !isGap && (isPast(at: now) || isLive(at: now))
+    }
+
     /// Fraction of the programme elapsed at `now`, in `0...1`.
     func progress(at now: Date) -> Double {
         let total = end.timeIntervalSince(start)

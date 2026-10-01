@@ -242,8 +242,9 @@ struct EPGChannelCell: View {
 
 /// A single programme in the grid. Live programmes are tinted and carry a
 /// progress bar; past programmes are dimmed — except replayable ones (inside
-/// the channel's catch-up archive), which stay brighter and carry a replay
-/// glyph; gaps are inert.
+/// the channel's catch-up archive), which stay brighter. A replay glyph marks
+/// any replayable programme, live or past, since a still-airing one can also
+/// be restarted from the beginning; gaps are inert.
 struct EPGProgramBlockView: View {
     let cell: EPGProgramCell
     let metrics: EPGMetrics
