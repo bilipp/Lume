@@ -33,7 +33,11 @@ import SwiftUI
 
         /// A Lume Pro switch: free users see it off with a crown, and Select
         /// opens the paywall instead of changing the setting.
-        private func tvPremiumToggleRow(_ title: LocalizedStringKey, isOn value: Binding<Bool>) -> some View {
+        private func tvPremiumToggleRow(
+            _ title: LocalizedStringKey,
+            isOn value: Binding<Bool>,
+            feature: PremiumFeature
+        ) -> some View {
             TVOptionToggleRow(
                 title: title,
                 isOn: Binding(
@@ -42,7 +46,7 @@ import SwiftUI
                         if premium.isPremium {
                             value.wrappedValue = newValue
                         } else {
-                            presentPaywall(.playbackControls)
+                            presentPaywall(feature)
                         }
                     }
                 ),
@@ -54,9 +58,9 @@ import SwiftUI
             VStack(alignment: .leading, spacing: 28) {
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Playback")
-                    tvPremiumToggleRow("Autoplay Next Episode", isOn: $autoPlayNext)
-                    tvPremiumToggleRow("Show Next Episode Button", isOn: $showNextEpisodeButton)
-                    tvPremiumToggleRow("Show Skip Intro Button", isOn: $showSkipIntroButton)
+                    tvPremiumToggleRow("Autoplay Next Episode", isOn: $autoPlayNext, feature: .playbackControls)
+                    tvPremiumToggleRow("Show Next Episode Button", isOn: $showNextEpisodeButton, feature: .playbackControls)
+                    tvPremiumToggleRow("Show Skip Intro Button", isOn: $showSkipIntroButton, feature: .playbackControls)
                 }
 
                 // Second in the pane, right under Playback: this is a
@@ -91,6 +95,14 @@ import SwiftUI
                     }
 
                     Text("Up and down move to the next and previous channel, like a TV remote. List Order moves the way the channel list reads on screen instead — up goes to the row above.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+
+                    tvPremiumToggleRow("Guide Preview", isOn: $tvGuidePreview, feature: .guidePreview)
+
+                    Text("Plays the focused channel muted in the Guide. Uses a provider connection while you browse.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)

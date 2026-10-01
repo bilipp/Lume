@@ -94,6 +94,8 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         }
     }
 
+    var isAdoptedFromPreview = false
+
     var onTime: ((TimeInterval) -> Void)?
     var onDuration: ((TimeInterval) -> Void)?
 
@@ -110,6 +112,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
 
     /// The stream currently loaded, kept so the failure-retry path can rebuild it.
     private var currentMedia: PlayableMedia?
+
     /// Fires `onPlaybackFailure` if playback never starts within `startupTimeout`.
     private var startupWatchdog: Task<Void, Never>?
     /// Guards `onPlaybackFailure` so a failure is reported at most once per load.
@@ -170,6 +173,11 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
     /// The container view hands its `AVPlayerLayer` over once it mounts. PiP can
     /// only be set up against a real layer, so it is wired here too.
     func attach(layer: AVPlayerLayer) {
+        // A coordinator full screen adopted from the tvOS Guide preview is
+        // still on that tile's layer, which stays mounted under the cover.
+        if isAdoptedFromPreview, let previous = playerLayer, previous !== layer {
+            previous.player = nil
+        }
         playerLayer = layer
         layer.player = player
         applyVideoGravity()
@@ -191,6 +199,27 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         load(media: media)
     }
 
+    /// Takes `media` over without replacing the item when the current one is
+    /// already healthily playing that same stream, as a session adopted from
+    /// the tvOS Guide preview is; `false` means the caller has to load it.
+    func keepLoadedItem(as media: PlayableMedia) -> Bool {
+        guard let currentMedia, let item, player.currentItem === item,
+              item.status != .failed, !didReportFailure,
+              media.url == currentMedia.url,
+              media.httpHeaders == currentMedia.httpHeaders,
+              media.startTime == currentMedia.startTime
+        else { return false }
+        self.currentMedia = media
+        isLive = media.isLive
+        beginStartupTracking(isLive: media.isLive)
+        let duration = item.duration.seconds
+        if duration.isFinite, duration > 0 {
+            onDuration?(duration)
+        }
+        Logger.player.log("AVPlayer load skipped: this stream is already loaded")
+        return true
+    }
+
     private func load(media: PlayableMedia) {
         teardownItemObservers()
         trackLoadTask?.cancel()
@@ -210,8 +239,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         isBuffering = true
         hasStartedPlayback = false
         didReportFailure = false
-        PlaybackQoE.shared.beginStartup(engine: .avPlayer, isLive: media.isLive)
-        startStartupWatchdog()
+        beginStartupTracking(isLive: media.isLive)
 
         let asset = if let headers = media.httpHeaders, !headers.isEmpty {
             AVURLAsset(url: media.url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
@@ -229,6 +257,15 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         // swiftlint:disable:next line_length
         Logger.player.log("AVPlayer load: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         player.playImmediately(atRate: selectedRate)
+    }
+
+    private func beginStartupTracking(isLive: Bool) {
+        PlaybackQoE.shared.beginStartup(engine: .avPlayer, isLive: isLive)
+        if hasStartedPlayback {
+            PlaybackQoE.shared.noteFirstFrame()
+        } else {
+            startStartupWatchdog()
+        }
     }
 
     // MARK: - Failure handling

@@ -199,6 +199,20 @@ enum PlayerSettings {
         UserDefaults.standard.bool(tvRemoteSwipesKey, default: tvRemoteSwipesDefault)
     }
 
+    /// Whether the tvOS Guide plays a muted live preview of the focused
+    /// channel. Device-wide, on by default; the preview holds a provider
+    /// connection while the Guide is browsed. Also gated by Lume Pro
+    /// (`PremiumFeature.guidePreview`) — see `GuidePreviewPolicy`.
+    static let tvGuidePreviewKey = "player.tvGuidePreview"
+
+    static let tvGuidePreviewDefault = true
+
+    /// Read off `UserDefaults` directly so the Guide needn't hold an
+    /// `@AppStorage` that would re-render the grid when toggled.
+    static var tvGuidePreviewEnabled: Bool {
+        UserDefaults.standard.bool(tvGuidePreviewKey, default: tvGuidePreviewDefault)
+    }
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default

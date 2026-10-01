@@ -56,6 +56,7 @@ struct LiveTVView: View {
     @State private var showingSettings = false
     #if os(tvOS)
         @Environment(DeepLinkRouter.self) private var router
+        @State private var guidePreview = GuidePreviewController()
     #else
         /// Non-nil while Multi-View is up; carries the channels it opened with,
         /// when it was started from a channel rather than the toolbar.
@@ -200,7 +201,11 @@ struct LiveTVView: View {
             ))
             #if os(iOS) || os(tvOS)
             .fullScreenCover(item: $playingMedia) { media in
-                FullScreenPlayerView(media: media)
+                #if os(tvOS)
+                    FullScreenPlayerView(media: media, adopting: guidePreview.handle)
+                #else
+                    FullScreenPlayerView(media: media)
+                #endif
             }
             #endif
             #if os(iOS)
@@ -288,8 +293,18 @@ struct LiveTVView: View {
                 onOpenMultiView: { openMultiView() },
                 onStartMultiView: { startMultiView(with: $0) },
                 playlistPrefix: playlistPrefix,
-                sourceType: activePlaylist?.knownSourceType
+                sourceType: activePlaylist?.knownSourceType,
+                preview: EPGGuidePreviewInputs(
+                    media: { [activePlaylist] stream in
+                        activePlaylist.flatMap { PlayableMedia.from(stream: stream, playlist: $0) }
+                    },
+                    playlistID: activePlaylist?.id,
+                    controller: guidePreview
+                )
             )
+            // Never from an `onDisappear`, which a `fullScreenCover` doesn't
+            // deliver.
+            .guidePreviewSuspension(guidePreview, playingMedia: $playingMedia)
         }
     #endif
 
@@ -423,9 +438,17 @@ struct LiveTVView: View {
     }
 
     private func present(_ media: PlayableMedia) {
-        if ExternalPlayback.open(media) { return }
+        if ExternalPlayback.open(media) {
+            #if os(tvOS)
+                guidePreview.stopForExternalPlayback()
+            #endif
+            return
+        }
         #if os(macOS)
             MacPlayerWindowRouter.shared.play(media, using: openWindow)
+        #elseif os(tvOS)
+            guidePreview.prepareToPresent(media)
+            playingMedia = media
         #else
             playingMedia = media
         #endif

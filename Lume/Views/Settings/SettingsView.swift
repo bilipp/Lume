@@ -44,6 +44,8 @@ struct SettingsView: View {
         var liveSurfModeRaw: String = LiveSurfMode.default.rawValue
         @AppStorage(PlayerSettings.tvRemoteSwipesKey)
         var tvRemoteSwipes = PlayerSettings.tvRemoteSwipesDefault
+        @AppStorage(PlayerSettings.tvGuidePreviewKey)
+        var tvGuidePreview = PlayerSettings.tvGuidePreviewDefault
         @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
         var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
         /// tvOS only: off tvOS the transport row carries an always-available

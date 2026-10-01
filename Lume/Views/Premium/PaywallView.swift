@@ -45,8 +45,8 @@ struct PaywallView: View {
 
     /// The features shown as benefits — the highlighted one first, if any.
     private var orderedFeatures: [PremiumFeature] {
-        guard let highlight else { return PremiumFeature.allCases }
-        return [highlight] + PremiumFeature.allCases.filter { $0 != highlight }
+        guard let highlight else { return PremiumFeature.available }
+        return [highlight] + PremiumFeature.available.filter { $0 != highlight }
     }
 
     // MARK: - iOS / macOS

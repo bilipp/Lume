@@ -12,9 +12,55 @@ import OSLog
 import SwiftData
 import SwiftUI
 
+/// What a tile is for. `.guidePreview` is the tvOS Guide's muted preview: a
+/// shorter KSPlayer live buffer so the picture arrives sooner, an audio session
+/// that mixes with other apps' audio where the engine lets the app choose one,
+/// the channel logo instead of a Try Again button (the pane has no focusable
+/// room for one), and `handle`, the seam full screen adopts its session through.
+enum MultiViewTileRole {
+    case multiView
+    case guidePreview(handle: PreviewPlayerHandle?)
+
+    /// Upper bound on KSPlayer's live forward buffer, in seconds; `nil` keeps
+    /// the viewer's saved setting.
+    var liveForwardBufferCap: TimeInterval? {
+        isGuidePreview ? 1.5 : nil
+    }
+
+    var mixesWithOtherAudio: Bool {
+        isGuidePreview
+    }
+
+    var showsRetry: Bool {
+        !isGuidePreview
+    }
+
+    var logPrefix: String {
+        isGuidePreview ? "guide-preview" : "multi-view"
+    }
+
+    var previewHandle: PreviewPlayerHandle? {
+        guard case let .guidePreview(handle) = self else { return nil }
+        return handle
+    }
+
+    /// False once the Guide preview's session belongs to full screen.
+    var ownsSession: Bool {
+        previewHandle.ownsSession
+    }
+
+    private var isGuidePreview: Bool {
+        if case .guidePreview = self { true } else { false }
+    }
+}
+
 struct MultiViewTilePlayer: View {
     let media: PlayableMedia
     let isMuted: Bool
+    let role: MultiViewTileRole
+    /// Fires once when the tile gives up: every engine failed, or the Stalker
+    /// link could not be resolved.
+    let onFailure: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
 
@@ -36,6 +82,7 @@ struct MultiViewTilePlayer: View {
     @State private var isPlaying = false
     /// Set when every engine has been tried and none could open the stream.
     @State private var loadFailed = false
+    @State private var didReportFailure = false
 
     /// A tile gets a shorter startup window than the full-screen player: the
     /// viewer is already watching another stream while it loads, so a dead one
@@ -44,9 +91,16 @@ struct MultiViewTilePlayer: View {
     /// Startup window while another engine remains to try.
     static let fallbackStartupTimeout: TimeInterval = 12
 
-    init(media: PlayableMedia, isMuted: Bool) {
+    init(
+        media: PlayableMedia,
+        isMuted: Bool,
+        role: MultiViewTileRole = .multiView,
+        onFailure: (() -> Void)? = nil
+    ) {
         self.media = media
         self.isMuted = isMuted
+        self.role = role
+        self.onFailure = onFailure
         let defaults = UserDefaults.standard
         enginePriority = PlayerEnginePriority.resolve(
             priorityRaw: defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? "",
@@ -110,6 +164,7 @@ struct MultiViewTilePlayer: View {
             isPlaying = false
             loadFailed = false
             resolveFailed = false
+            didReportFailure = false
         }
     }
 
@@ -121,51 +176,51 @@ struct MultiViewTilePlayer: View {
                 media: media,
                 isMuted: isMuted,
                 usesQuickStartupTimeout: hasFallbackEngine,
+                role: role,
                 onPlaybackStarted: { isPlaying = true },
-                onPlaybackFailed: handleFailure
+                onPlaybackFailed: handleFailure,
+                sourceMedia: self.media
             )
         case .vlcKit:
             MultiViewVLCTile(
                 media: media,
                 isMuted: isMuted,
                 usesQuickStartupTimeout: hasFallbackEngine,
+                role: role,
                 onPlaybackStarted: { isPlaying = true },
-                onPlaybackFailed: handleFailure
+                onPlaybackFailed: handleFailure,
+                sourceMedia: self.media
             )
         case .avPlayer:
             MultiViewAVTile(
                 media: media,
                 isMuted: isMuted,
                 usesQuickStartupTimeout: hasFallbackEngine,
+                role: role,
                 onPlaybackStarted: { isPlaying = true },
-                onPlaybackFailed: handleFailure
+                onPlaybackFailed: handleFailure,
+                sourceMedia: self.media
             )
         case .lumeEngine:
             MultiViewLumeTile(
                 media: media,
                 isMuted: isMuted,
                 usesQuickStartupTimeout: hasFallbackEngine,
+                role: role,
                 onPlaybackStarted: { isPlaying = true },
-                onPlaybackFailed: handleFailure
+                onPlaybackFailed: handleFailure,
+                sourceMedia: self.media
             )
         }
     }
 
     private var failureBadge: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.title3)
-                .foregroundStyle(.white.opacity(0.7))
-            Text("Stream unavailable")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.7))
-            Button("Try Again") { retry() }
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.borderless)
-                .tint(.white)
-        }
+        LiveChannelUnavailableBadge(
+            logoURL: media.posterURL,
+            logoSide: 80,
+            onRetry: role.showsRetry ? { retry() } : nil
+        )
         .padding()
-        .multilineTextAlignment(.center)
     }
 
     /// An engine couldn't open the stream: try the next one, or give up and show
@@ -173,11 +228,19 @@ struct MultiViewTilePlayer: View {
     private func handleFailure() {
         guard hasFallbackEngine else {
             loadFailed = true
+            reportFailure()
             return
         }
         let failed = engine
         engineAttempt += 1
-        Logger.player.log("multi-view: \(failed.rawValue, privacy: .public) could not start the tile; falling back to \(engine.rawValue, privacy: .public)")
+        let prefix = role.logPrefix
+        Logger.player.log("\(prefix, privacy: .public): \(failed.rawValue, privacy: .public) could not start the tile; falling back to \(engine.rawValue, privacy: .public)")
+    }
+
+    private func reportFailure() {
+        guard !didReportFailure else { return }
+        didReportFailure = true
+        onFailure?()
     }
 
     private func retry() {
@@ -185,6 +248,7 @@ struct MultiViewTilePlayer: View {
         isPlaying = false
         loadFailed = false
         resolveFailed = false
+        didReportFailure = false
         reloadToken += 1
     }
 
@@ -199,7 +263,64 @@ struct MultiViewTilePlayer: View {
         } catch {
             resolveFailed = true
             let detail = (error as? StalkerError)?.logDescription ?? LogRedaction.describe(error)
-            Logger.player.error("multi-view: Stalker stream resolution failed: \(detail, privacy: .public)")
+            let prefix = role.logPrefix
+            Logger.player.error("\(prefix, privacy: .public): Stalker stream resolution failed: \(detail, privacy: .public)")
+            // A resolve cut short by a channel change is not the channel failing.
+            guard !Task.isCancelled, !(error is CancellationError) else { return }
+            reportFailure()
         }
+    }
+}
+
+/// A live channel's logo, falling back to an antenna glyph, sized for a dark
+/// video surface.
+struct LiveChannelLogoPlaceholder: View {
+    let url: URL?
+    let side: CGFloat
+
+    var body: some View {
+        // Never an `EmptyView` in any phase: `CachedAsyncImage` loads from a
+        // `.task` on its content, which never runs on an `EmptyView`.
+        CachedAsyncImage(url: url, maxPixelSize: side * 2) { phase in
+            switch phase {
+            case let .success(image):
+                image.resizable().aspectRatio(contentMode: .fit)
+            default:
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+        .frame(width: side, height: side)
+    }
+}
+
+/// "Stream unavailable" under a warning glyph and over a Try Again button,
+/// or, with no retry, under the channel logo.
+struct LiveChannelUnavailableBadge: View {
+    let logoURL: URL?
+    let logoSide: CGFloat
+    var onRetry: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if onRetry == nil {
+                LiveChannelLogoPlaceholder(url: logoURL, side: logoSide)
+            } else {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            Text("Stream unavailable")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.7))
+            if let onRetry {
+                Button("Try Again", action: onRetry)
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.borderless)
+                    .tint(.white)
+            }
+        }
+        .multilineTextAlignment(.center)
     }
 }

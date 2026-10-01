@@ -61,6 +61,9 @@ struct KSPlayerEngineView: View {
     var onRemoteAdvance: ((PlayerMediaSwapper.Step) -> Bool)?
 
     @StateObject var coordinator = KSVideoPlayer.Coordinator()
+    /// Set when `coordinator` came from the tvOS Guide preview already
+    /// playing. See `KSPlayerEngineView+Adoption`.
+    @State var isAdoptedSession = false
     /// Drives bounded backoff reconnects when the stream drops (see
     /// `handleState`). KSPlayer otherwise stops dead on a mid-stream failure.
     /// Non-private so the playback/reconnect logic in `KSPlayerEngineView+Playback`
@@ -203,48 +206,46 @@ struct KSPlayerEngineView: View {
                 Color.black
                     .ignoresSafeArea()
 
-                KSVideoPlayer(coordinator: coordinator, url: media.url, options: options)
-                    .onStateChanged { _, state in
-                        // Defer all state mutations so they never run inside a
-                        // SwiftUI view-update pass, which would trigger the
-                        // "Modifying state during view update" / "Publishing
-                        // changes from within view updates" runtime warnings.
-                        DispatchQueue.main.async {
-                            isPlaying = (state == .bufferFinished)
-                            updateLoadingState(state)
-                            engine.syncState(state)
-                            handleState(state)
-                        }
+                videoSurface(options: options) { _, state in
+                    // Defer all state mutations so they never run inside a
+                    // SwiftUI view-update pass, which would trigger the
+                    // "Modifying state during view update" / "Publishing
+                    // changes from within view updates" runtime warnings.
+                    DispatchQueue.main.async {
+                        isPlaying = (state == .bufferFinished)
+                        updateLoadingState(state)
+                        engine.syncState(state)
+                        handleState(state)
                     }
-                    .onPlay { current, total in
-                        // Defer for the same reason as onStateChanged; also
-                        // prevents rapid back-to-back transitions (e.g.
-                        // bufferFinished → buffering) from publishing two
-                        // @ObservableObject changes in the same SwiftUI frame,
-                        // which triggers "onChange updated multiple times per
-                        // frame" warnings.
-                        DispatchQueue.main.async {
-                            if !isSeeking {
-                                if current.isFinite {
-                                    clock.current = current
-                                }
-                                if total.isFinite, total > 0 {
-                                    clock.duration = total
-                                }
+                } onPlay: { current, total in
+                    // Defer for the same reason as onStateChanged; also
+                    // prevents rapid back-to-back transitions (e.g.
+                    // bufferFinished → buffering) from publishing two
+                    // @ObservableObject changes in the same SwiftUI frame,
+                    // which triggers "onChange updated multiple times per
+                    // frame" warnings.
+                    DispatchQueue.main.async {
+                        if !isSeeking {
+                            if current.isFinite {
+                                clock.current = current
                             }
-                            notePlaybackProgress(current)
-                            noteClockDrift()
-                            // syncState (onStateChanged) already refreshes this
-                            // on every transition; only chase it from the
-                            // per-tick play callback until it first lands, so
-                            // steady playback doesn't re-read tracks/codec each
-                            // tick.
-                            if engine.videoInfo == nil {
-                                engine.refreshVideoInfo()
+                            if total.isFinite, total > 0 {
+                                clock.duration = total
                             }
                         }
+                        notePlaybackProgress(current)
+                        noteClockDrift()
+                        // syncState (onStateChanged) already refreshes this
+                        // on every transition; only chase it from the
+                        // per-tick play callback until it first lands, so
+                        // steady playback doesn't re-read tracks/codec each
+                        // tick.
+                        if engine.videoInfo == nil {
+                            engine.refreshVideoInfo()
+                        }
                     }
-                    .ignoresSafeArea()
+                }
+                .ignoresSafeArea()
 
                 // KSPlayer decodes the selected subtitle into
                 // `subtitleModel.parts`, but the bare `KSVideoPlayer` above draws
@@ -305,6 +306,7 @@ struct KSPlayerEngineView: View {
                 attachNowPlayingTransport()
                 scheduleHide()
                 startStartupWatchdog()
+                seedAdoptedSessionState()
             }
             .onDisappear {
                 hideTask?.cancel()
@@ -430,31 +432,29 @@ struct KSPlayerEngineView: View {
         private var standardBody: some View {
             let options = makeOptions()
             return ZStack {
-                KSVideoPlayer(coordinator: coordinator, url: media.url, options: options)
-                    .onStateChanged { _, state in
-                        DispatchQueue.main.async {
-                            isPlaying = (state == .bufferFinished)
-                            updateLoadingState(state)
-                            refreshVideoInfo()
-                            handleState(state)
-                        }
+                videoSurface(options: options) { _, state in
+                    DispatchQueue.main.async {
+                        isPlaying = (state == .bufferFinished)
+                        updateLoadingState(state)
+                        refreshVideoInfo()
+                        handleState(state)
                     }
-                    .onPlay { current, total in
-                        DispatchQueue.main.async {
-                            if !isSeeking {
-                                if current.isFinite {
-                                    clock.current = current
-                                }
-                                if total.isFinite, total > 0 {
-                                    clock.duration = total
-                                }
+                } onPlay: { current, total in
+                    DispatchQueue.main.async {
+                        if !isSeeking {
+                            if current.isFinite {
+                                clock.current = current
                             }
-                            notePlaybackProgress(current)
-                            noteClockDrift()
-                            chaseVideoInfo()
+                            if total.isFinite, total > 0 {
+                                clock.duration = total
+                            }
                         }
+                        notePlaybackProgress(current)
+                        noteClockDrift()
+                        chaseVideoInfo()
                     }
-                    .ignoresSafeArea()
+                }
+                .ignoresSafeArea()
 
                 // KSPlayer decodes the selected subtitle into
                 // `subtitleModel.parts`, but the bare `KSVideoPlayer` above draws
@@ -492,6 +492,7 @@ struct KSPlayerEngineView: View {
                 scheduleHide()
                 observePipState()
                 startStartupWatchdog()
+                seedAdoptedSessionState()
             }
             .onDisappear {
                 hideTask?.cancel()

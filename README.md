@@ -127,6 +127,7 @@ adapted per size class
 - **Multi-View**: watch up to four channels at once in a 2 / 3 / 2×2 grid, with the audio on whichever tile you pick — channels can come from different playlists, so a provider limited to one concurrent connection is no obstacle
 - Channel zapping with recently-watched history
 - **In-player channel browser** on tvOS (left-press overlay with category/channel grid)
+- **Guide preview** on tvOS: a muted live preview of the focused channel above the Guide timeline (Lume Pro)
 - Favorite channels and per-channel management
 
 #### 🏅 Sports Hub

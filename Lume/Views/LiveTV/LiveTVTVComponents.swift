@@ -315,6 +315,8 @@
         /// explain itself. See `LiveTVEmptyState`.
         let sourceType: PlaylistSourceType?
 
+        var preview = EPGGuidePreviewInputs()
+
         private var layoutMode: LiveTVLayoutMode {
             LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
         }
@@ -354,7 +356,8 @@
                         onPlayCatchup: onPlayCatchup,
                         onStartMultiView: onStartMultiView,
                         focusToken: guideFocusToken,
-                        onDidClaimFocus: { guideFocusToken = 0 }
+                        onDidClaimFocus: { guideFocusToken = 0 },
+                        preview: preview
                     )
                     .id("\(section.id)-\(contentSort.rawValue)-guide")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -39,6 +39,8 @@ struct EPGGridScroller: View {
     /// just activated); `onDidClaimFocus` resets it once claimed.
     var focusToken = 0
     var onDidClaimFocus: () -> Void = {}
+    /// tvOS Guide preview inputs — see `EPGGridScroller+Preview.swift`.
+    var preview = EPGGuidePreviewInputs()
 
     private let metrics = EPGMetrics.current
     private let now = Date()
@@ -55,7 +57,7 @@ struct EPGGridScroller: View {
         /// UIKit strip's focus callbacks).
         @State private var surfaceFocused = false
         /// The channel or programme the surface highlights and acts on.
-        @State private var virtualFocus: EPGVirtualFocus?
+        @State var virtualFocus: EPGVirtualFocus?
         /// The x a run of vertical cell moves keeps aiming at, so rows with
         /// different programme boundaries don't make focus drift sideways.
         @State private var preferredX: CGFloat?
@@ -66,10 +68,18 @@ struct EPGGridScroller: View {
         /// focus (the rail button), so a focus-state write is honoured, where
         /// a raw `UIFocusSystem.requestFocusUpdate` is silently ignored.
         @FocusState private var surfaceClaimsFocus: Bool
+        /// The channel the preview settled on after focus rested on it.
+        @State var previewTarget: EPGPreviewTarget?
+        /// Channels whose preview failed this visit; never retried.
+        @State var previewFailedStreamIDs: Set<String> = []
     #endif
 
     var body: some View {
         VStack(spacing: 0) {
+            #if os(tvOS)
+                previewBand
+            #endif
+
             // Header: corner + time ruler. Touch/pointer get a jump-to-now
             // button in the corner; tvOS auto-scrolls to now on appear and has
             // no use for a corner button it can't easily reach, so the corner
@@ -111,6 +121,10 @@ struct EPGGridScroller: View {
             #endif
         }
         #if os(tvOS)
+        // The preview band pushes the grid below the rail's first categories;
+        // this section spans the band too, so Right from those still enters
+        // the strip instead of finding nothing level with it.
+        .focusSection()
         .onChange(of: surfaceFocused) { _, focused in
             if focused {
                 // Entering the guide lands on a channel — the hub. When the
