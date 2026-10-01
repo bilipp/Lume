@@ -78,11 +78,13 @@ nonisolated enum DiagnosticLevel: String, CaseIterable {
 
 nonisolated struct LumeLogger {
     let category: String
+    private let osLog: OSLog
     private let osLogger: Logger
 
     init(category: String) {
         self.category = category
-        osLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.bilipp.lume", category: category)
+        osLog = OSLog(subsystem: Bundle.main.bundleIdentifier ?? "com.bilipp.lume", category: category)
+        osLogger = Logger(osLog)
     }
 
     func debug(_ message: @autoclosure () -> LumeLogMessage) {
@@ -127,7 +129,13 @@ nonisolated struct LumeLogger {
         #if DEBUG
             let wantsOS = true
         #else
-            let wantsOS = osLogger.isEnabled(type: level.osLogType)
+            // Ask the `OSLog`, not the `Logger`: `Logger.isEnabled(type:)`
+            // only exists in the OS 26 libswiftos, yet the SDK lets it inherit
+            // Logger's OS 14 availability, so it compiles against an 18.0
+            // target and binds strongly — every OS 18 launch then dies in dyld
+            // ("Symbol missing"), and `#available` can't help. `OSLog`'s is
+            // `os_log_type_enabled` from libSystem.
+            let wantsOS = osLog.isEnabled(type: level.osLogType)
         #endif
         guard wantsJournal || wantsOS else { return }
 
