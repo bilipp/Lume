@@ -76,6 +76,7 @@ struct MultiViewScreen: View {
     @State var session: MultiViewSession
     /// The tile whose channel picker is open.
     @State private var pickingSlot: MultiViewPickerTarget?
+    @State private var holdOwner = "multi-view-\(UUID().uuidString)"
     /// Which tile holds focus. Hoisted out of the tiles so the screen can hand
     /// focus to one on open — tvOS otherwise lands it on the close button, the
     /// first focusable in the tree.
@@ -207,16 +208,15 @@ struct MultiViewScreen: View {
             .preferredColorScheme(.dark)
             .task {
                 // The tiles' QoE reports would be nonsense against a summary that
-                // models one stream at a time.
-                PlaybackQoE.shared.isSuspended = true
+                // models one stream at a time, and background indexing merges
+                // periodic saves into the main context, which hitches every
+                // running decoder — more so with four of them.
+                PlaybackSurfaceHold.set(true, owner: holdOwner)
                 // Reported from here rather than the presentation sites: on macOS
                 // the grid is its own window with the browse root still visible,
                 // so an armed rating sheet would otherwise animate in over four
                 // running streams.
                 AppStoreReviewPrompt.shared.notePlayerAppeared()
-                // Background indexing merges periodic saves into the main context,
-                // which hitches every running decoder — more so with four of them.
-                ContentIndexingService.shared.isPlaybackActive = true
                 configureAudioSession()
                 adoptQueuedChannels()
                 landInitialFocus()
@@ -272,8 +272,7 @@ struct MultiViewScreen: View {
                     chromeHideTask?.cancel()
                 #endif
                 releaseAudioSession()
-                ContentIndexingService.shared.isPlaybackActive = false
-                PlaybackQoE.shared.isSuspended = false
+                PlaybackSurfaceHold.set(false, owner: holdOwner)
                 AppStoreReviewPrompt.shared.notePlayerDisappeared()
             }
         #if os(tvOS)

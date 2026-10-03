@@ -161,6 +161,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
         eventTask = Task { [events = session.events] in
             for await event in events {
+                guard self.session === session else { return }
                 self.handle(event: event)
             }
         }
@@ -193,6 +194,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 }
                 await session.play()
             } catch {
+                // `tearDown` shuts a still-opening session down, which throws
+                // here; that is not this coordinator's stream failing.
+                guard self.session === session else { return }
                 self.reportFailure()
             }
         }

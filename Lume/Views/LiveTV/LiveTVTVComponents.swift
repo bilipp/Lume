@@ -289,21 +289,31 @@
 
     // MARK: - tvOS Live TV screen
 
-    /// The unified tvOS Live TV screen for both layouts: a slim, always-visible
-    /// category rail on the leading edge — topped by a single List/Guide switch —
-    /// beside the content area, which shows either the channel list or the
-    /// programme guide. One rail and one switch, in one place and one style,
-    /// across both modes makes moving between the two views consistent.
+    /// The Live TV screen's horizontal layout, which the guide's two-hour
+    /// track width is derived from.
+    enum TVLiveTVLayout {
+        /// The 1920 pt screen inside tvOS's 80 pt horizontal safe area.
+        static let contentWidth: CGFloat = 1760
+        static let railWidth: CGFloat = 340
+        static let spacing: CGFloat = 32
+
+        /// What the rail leaves for the channel list or guide.
+        static var paneWidth: CGFloat {
+            contentWidth - railWidth - spacing
+        }
+    }
+
+    /// The unified tvOS Live TV screen for both layouts: an always-visible
+    /// category sidebar on the leading edge beside the content area, which shows
+    /// either the channel list or the programme guide. The layout is chosen in
+    /// Settings › Player › Live TV.
     struct TVLiveTVScreen: View {
         let sections: [LiveTVSection]
         @Binding var selectedSection: LiveTVSection?
         let displayedSection: LiveTVSection?
-        @Binding var layoutModeRaw: String
         let contentSort: ContentSortOption
         let onPlay: (LiveStream) -> Void
         let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
-        /// Raises Multi-View (or the paywall) — the rail hosts the entry point.
-        let onOpenMultiView: () -> Void
         /// Raises Multi-View seeded with a channel, from its long-press menu.
         let onStartMultiView: (LiveStream) -> Void
 
@@ -315,17 +325,18 @@
         /// explain itself. See `LiveTVEmptyState`.
         let sourceType: PlaylistSourceType?
 
-        private var layoutMode: LiveTVLayoutMode {
-            LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
-        }
+        let layoutMode: LiveTVLayoutMode
+
+        var preview = EPGGuidePreviewInputs()
 
         /// Bumped when the user activates a rail category, asking the guide to
         /// take focus (landing on the first channel). Reset to 0 once claimed,
         /// so unrelated guide rebuilds (sort changes) never steal focus.
         @State private var guideFocusToken = 0
+        @State private var focusRegions = TVLiveTVFocusRegions()
 
         var body: some View {
-            HStack(spacing: 0) {
+            HStack(spacing: TVLiveTVLayout.spacing) {
                 // The rail owns its own focus state. Keeping it in a child means
                 // moving focus between categories re-evaluates only the rail —
                 // not this screen's `content`, which would otherwise reconstruct
@@ -333,11 +344,15 @@
                 TVCategoryRail(
                     sections: sections,
                     selectedSection: $selectedSection,
-                    layoutModeRaw: $layoutModeRaw,
-                    onOpenMultiView: onOpenMultiView,
                     onCategoryActivated: { guideFocusToken += 1 }
                 )
                 content
+            }
+            .environment(focusRegions)
+            .overlay(alignment: .top) {
+                if layoutMode == .guide {
+                    TVLiveTVEntryCatcher(regions: focusRegions) { guideFocusToken += 1 }
+                }
             }
         }
 
@@ -354,7 +369,8 @@
                         onPlayCatchup: onPlayCatchup,
                         onStartMultiView: onStartMultiView,
                         focusToken: guideFocusToken,
-                        onDidClaimFocus: { guideFocusToken = 0 }
+                        onDidClaimFocus: { guideFocusToken = 0 },
+                        preview: preview
                     )
                     .id("\(section.id)-\(contentSort.rawValue)-guide")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -378,220 +394,6 @@
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-    }
-
-    // MARK: - tvOS category rail
-
-    /// The leading rail: the List/Guide switch above the scrollable category
-    /// list. Owns the rail's `@FocusState` so focus changes here never propagate
-    /// up to `TVLiveTVScreen` and rebuild the (expensive) content area.
-    private struct TVCategoryRail: View {
-        let sections: [LiveTVSection]
-        @Binding var selectedSection: LiveTVSection?
-        @Binding var layoutModeRaw: String
-        let onOpenMultiView: () -> Void
-        /// Fired when the user activates (clicks) a category.
-        var onCategoryActivated: () -> Void = {}
-
-        /// Which rail control currently holds focus — drives the highlight.
-        private enum RailItem: Hashable {
-            case mode(String)
-            case multiView
-            case category(String)
-        }
-
-        @FocusState private var focused: RailItem?
-        /// Whether focus is settled inside the rail. Cleared when focus
-        /// leaves, so it is already false — and rendered — before the engine
-        /// hands focus back. Entry lands on the geometrically nearest
-        /// category, not the selected one (`prefersDefaultFocus` can't steer
-        /// the UIKit hand-off), and the snap to the selection only runs a
-        /// commit later: without the pre-armed mask the wrong category
-        /// flashes fully styled for that first frame.
-        @State private var railOwnsFocus = false
-
-        private let railWidth: CGFloat = 280
-
-        private var layoutMode: LiveTVLayoutMode {
-            LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
-        }
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                // The switch and the category list are each their own focus
-                // section so a Down press moves between them as vertical groups.
-                // Without this, pressing Down from the right-hand "Guide" segment
-                // misses the left-aligned categories (only the left "List"
-                // segment sits directly above them).
-                HStack(spacing: 8) {
-                    viewModeSwitch
-                    multiViewButton
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 40)
-                .padding(.bottom, 18)
-                .focusSection()
-
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 8) {
-                        ForEach(sections) { section in
-                            categoryButton(section)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 40)
-                }
-                .scrollClipDisabled()
-                .focusSection()
-            }
-            .frame(width: railWidth, alignment: .leading)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .onChange(of: focused) { oldValue, newValue in
-                guard let newValue else {
-                    // Focus left the rail — pre-arm the mask for re-entry.
-                    railOwnsFocus = false
-                    return
-                }
-                if case let .category(id) = newValue, oldValue == nil,
-                   let selectedID = selectedSection?.id, id != selectedID
-                {
-                    // Entry landed on the wrong category (masked, so it never
-                    // rendered styled) — snap to the selection.
-                    focused = .category(selectedID)
-                } else {
-                    railOwnsFocus = true
-                }
-            }
-        }
-
-        // MARK: View-mode switch
-
-        /// A two-segment List/Guide control rendered as a focusable pill pair —
-        /// the system white-fill focus idiom reads clearly with a remote, where a
-        /// `.segmented` Picker does not.
-        private var viewModeSwitch: some View {
-            HStack(spacing: 6) {
-                ForEach(LiveTVLayoutMode.allCases) { mode in
-                    modeSegment(mode)
-                }
-            }
-            .padding(4)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.white.opacity(0.08))
-            )
-        }
-
-        private func modeSegment(_ mode: LiveTVLayoutMode) -> some View {
-            let isActive = layoutMode == mode
-            let isItemFocused = focused == .mode(mode.rawValue)
-            return Button {
-                layoutModeRaw = mode.rawValue
-            } label: {
-                VStack(spacing: 4) {
-                    Image(systemName: mode.systemImage)
-                        .font(.system(size: 22, weight: .semibold))
-                    Text(mode.label)
-                        .font(.system(size: 16, weight: .semibold))
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .foregroundStyle(segmentForeground(isFocused: isItemFocused, isActive: isActive))
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(segmentFill(isFocused: isItemFocused, isActive: isActive))
-                )
-            }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
-            .focused($focused, equals: .mode(mode.rawValue))
-            .animation(.easeOut(duration: 0.18), value: isItemFocused)
-        }
-
-        /// Sits outside the List/Guide pill group: it is an action, not a third
-        /// segment of a mutually exclusive choice. Sharing the row's focus section
-        /// keeps it a left/right move away, and leaves Down landing on the
-        /// categories from any of the three controls.
-        private var multiViewButton: some View {
-            let isItemFocused = focused == .multiView
-            return Button(action: onOpenMultiView) {
-                Image(systemName: "rectangle.split.2x2")
-                    .font(.system(size: 22, weight: .semibold))
-                    .frame(width: 52)
-                    .padding(.vertical, 20)
-                    .foregroundStyle(isItemFocused ? .black : .white.opacity(0.6))
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(isItemFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.white.opacity(0.08)))
-                    )
-            }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.04))
-            .focused($focused, equals: .multiView)
-            .accessibilityLabel("Multi-View")
-            .animation(.easeOut(duration: 0.18), value: isItemFocused)
-        }
-
-        private func segmentForeground(isFocused: Bool, isActive: Bool) -> Color {
-            if isFocused { return .black }
-            if isActive { return .white }
-            return .white.opacity(0.5)
-        }
-
-        private func segmentFill(isFocused: Bool, isActive: Bool) -> AnyShapeStyle {
-            if isFocused { return AnyShapeStyle(.white) }
-            if isActive { return AnyShapeStyle(.white.opacity(0.22)) }
-            return AnyShapeStyle(.clear)
-        }
-
-        private func categoryButton(_ section: LiveTVSection) -> some View {
-            let isSelected = selectedSection?.id == section.id
-            // The selected category is exempt: when entry lands there
-            // directly, it should read as focused from the first frame.
-            let suppressed = !railOwnsFocus && !isSelected
-            let isItemFocused = focused == .category(section.id) && !suppressed
-            return Button {
-                selectedSection = section
-                onCategoryActivated()
-            } label: {
-                HStack(spacing: 8) {
-                    if let icon = section.icon {
-                        Image(systemName: icon)
-                            .font(.system(size: 20, weight: .semibold))
-                    }
-                    section.titleText
-                        .font(.system(
-                            size: 22,
-                            weight: isSelected || isItemFocused ? .semibold : .regular
-                        ))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                        .multilineTextAlignment(.leading)
-                }
-                .foregroundStyle(textColor(isFocused: isItemFocused, isSelected: isSelected))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(categoryFill(isFocused: isItemFocused, isSelected: isSelected))
-                )
-            }
-            .buttonStyle(TVCardButtonStyle(focusScale: 1.03, suppressFocusEffects: suppressed))
-            .focused($focused, equals: .category(section.id))
-            .animation(.easeOut(duration: 0.18), value: isItemFocused)
-        }
-
-        private func textColor(isFocused: Bool, isSelected: Bool) -> Color {
-            if isFocused { return .black }
-            if isSelected { return .white }
-            return .white.opacity(0.6)
-        }
-
-        private func categoryFill(isFocused: Bool, isSelected: Bool) -> AnyShapeStyle {
-            if isFocused { return AnyShapeStyle(.white) }
-            if isSelected { return AnyShapeStyle(.white.opacity(0.14)) }
-            return AnyShapeStyle(.clear)
         }
     }
 #endif

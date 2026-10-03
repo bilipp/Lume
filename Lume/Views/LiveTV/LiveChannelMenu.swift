@@ -26,9 +26,7 @@ extension View {
             FavoriteMenuItems.favorite(isFavorite: isFavorite, action: onToggleFavorite)
 
             if let onStartMultiView {
-                Button(action: onStartMultiView) {
-                    Label("Start Multi-View", systemImage: "rectangle.split.2x2")
-                }
+                FavoriteMenuItems.startMultiView(onStartMultiView)
             }
 
             if let onRemoveFromRecents {
@@ -50,6 +48,21 @@ enum FavoriteMenuItems {
                 systemImage: isFavorite ? "heart.slash" : "heart"
             )
         }
+    }
+
+    static func startMultiView(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label("Start Multi-View", systemImage: "rectangle.split.2x2")
+        }
+    }
+
+    /// The same titles as plain strings, for UIKit accessibility actions.
+    static func favoriteTitle(isFavorite: Bool) -> String {
+        isFavorite ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites")
+    }
+
+    static var startMultiViewTitle: String {
+        String(localized: "Start Multi-View")
     }
 
     static func removeFromRecents(_ action: @escaping () -> Void) -> some View {

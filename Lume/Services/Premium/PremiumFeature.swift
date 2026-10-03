@@ -19,10 +19,21 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     case playbackControls
     case recommendations
     case multiView
+    case guidePreview
     case sportsHub
 
     var id: String {
         rawValue
+    }
+
+    /// The features this platform offers. Guide Preview only exists in the
+    /// tvOS Guide, so other platforms never advertise it.
+    static var available: [PremiumFeature] {
+        #if os(tvOS)
+            allCases
+        #else
+            allCases.filter { $0 != .guidePreview }
+        #endif
     }
 
     var title: LocalizedStringResource {
@@ -35,6 +46,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .playbackControls: "Smart Playback"
         case .recommendations: "For You Recommendations"
         case .multiView: "Multi-View"
+        case .guidePreview: "Guide Preview"
         case .sportsHub: "Sports Hub"
         }
     }
@@ -49,6 +61,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .playbackControls: "Autoplay the next episode, skip intros, and jump ahead with one tap."
         case .recommendations: "Get an on-device \"For You\" row tuned to your taste from your library and what you watch."
         case .multiView: "Watch up to four live channels side by side — across playlists, so a single-connection provider is no obstacle."
+        case .guidePreview: "Preview the focused channel, muted, right in the TV Guide."
         case .sportsHub: "Follow your leagues and teams — fixtures, live scores, standings and one tap to the channel that's carrying the game."
         }
     }
@@ -63,6 +76,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .playbackControls: "forward.end.alt"
         case .recommendations: "sparkles"
         case .multiView: "rectangle.split.2x2"
+        case .guidePreview: "play.rectangle"
         case .sportsHub: "sportscourt"
         }
     }

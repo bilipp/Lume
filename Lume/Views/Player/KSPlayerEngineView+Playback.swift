@@ -72,6 +72,11 @@ extension KSPlayerEngineView {
     func notePlaybackProgress(_ current: TimeInterval) {
         guard current.isFinite, !isSeeking else { return }
         defer { tick.lastPlayhead = current }
+        // `.bufferFinished` comes before the first frame is drawn; a held
+        // zap frame waits until the new stream's playhead really moves.
+        if zapFrame != nil, hasStartedPlayback, tick.lastPlayhead >= 0, current > tick.lastPlayhead {
+            releaseZapFrame(fading: true)
+        }
         guard isBuffering, tick.lastPlayhead >= 0, current > tick.lastPlayhead else { return }
         markPlaybackStarted()
         setBuffering(false)
@@ -280,6 +285,7 @@ extension KSPlayerEngineView {
             onPlaybackFailed?()
             return
         }
+        releaseZapFrame()
         withAnimation(.easeInOut(duration: 0.25)) {
             isBuffering = false
             loadFailed = true

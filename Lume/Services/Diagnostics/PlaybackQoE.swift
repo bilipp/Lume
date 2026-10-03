@@ -105,12 +105,28 @@ final class PlaybackQoE {
 
     private let defaults: UserDefaults
 
-    /// While set, every session hook below is a no-op. The summary models one
-    /// stream at a time — join time, rebuffer ratio, exits before video start —
-    /// so Multi-View, which runs up to four streams concurrently through the
-    /// same coordinators, would fill it with meaningless numbers. Held for the
-    /// lifetime of `MultiViewScreen` rather than checked at each call site.
-    var isSuspended = false
+    /// While any owner holds a suspension, every session hook below is a no-op.
+    /// The summary models one stream at a time — join time, rebuffer ratio,
+    /// exits before video start — so Multi-View, which runs up to four streams
+    /// concurrently through the same coordinators, would fill it with
+    /// meaningless numbers. Held for the lifetime of `MultiViewScreen` rather
+    /// than checked at each call site.
+    ///
+    /// Keyed by owner so one surface going away can't re-enable QoE under
+    /// another that still holds it.
+    private var suspensionHolders = SuspensionHolders()
+
+    var isSuspended: Bool {
+        suspensionHolders.isActive
+    }
+
+    func suspend(for owner: String) {
+        suspensionHolders.insert(owner)
+    }
+
+    func resume(for owner: String) {
+        suspensionHolders.remove(owner)
+    }
 
     // MARK: - Session lifecycle
 

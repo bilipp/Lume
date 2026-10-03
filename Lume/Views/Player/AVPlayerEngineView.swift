@@ -61,7 +61,10 @@ struct AVPlayerEngineView: View {
     /// `nil` on tvOS, where the Siri Remote already owns stream changes.
     var onRemoteAdvance: ((PlayerMediaSwapper.Step) -> Bool)?
 
-    @StateObject private var coordinator = AVPlayerCoordinator()
+    @StateObject var coordinator = AVPlayerCoordinator()
+    /// Set when `coordinator` came from the tvOS Guide preview already playing
+    /// `media`; cleared by the first stream it isn't already playing.
+    @State var isAdoptedSession = false
     @State private var isControlsVisible = true
     /// Set once the stream is given up on (initial-load failure with no fallback
     /// left). Swaps the player for the `PlayerErrorIndicator` (Try Again / Back).
@@ -172,7 +175,9 @@ struct AVPlayerEngineView: View {
             }
             coordinator.onPlaybackFailure = { reportFailure() }
             coordinator.startupTimeout = usesQuickStartupTimeout ? fallbackStartupTimeout : startupTimeout
-            coordinator.configure(media: media)
+            if !keepAdoptedItem(as: media) {
+                coordinator.configure(media: media)
+            }
             NowPlayingService.shared.attachTransport(.init(
                 isPlaying: { [weak coordinator] in coordinator?.isPlaying ?? false },
                 play: { [weak coordinator] in
@@ -209,7 +214,9 @@ struct AVPlayerEngineView: View {
             seekPosition = 0
             isPanelOpen = false
             loadFailed = false
-            coordinator.reload(media: newMedia)
+            if !keepAdoptedItem(as: newMedia) {
+                coordinator.reload(media: newMedia)
+            }
             resetHideTimer()
         }
         .onChange(of: isControlsVisible) { _, visible in
@@ -456,6 +463,13 @@ struct AVPlayerEngineView: View {
         withAnimation(.easeInOut(duration: 0.25)) { loadFailed = true }
     }
 
+    private func keepAdoptedItem(as media: PlayableMedia) -> Bool {
+        guard isAdoptedSession else { return false }
+        if coordinator.keepLoadedItem(as: media) { return true }
+        isAdoptedSession = false
+        return false
+    }
+
     /// Re-prepare the current stream after a failure (the Try Again button).
     private func retryPlayback() {
         withAnimation(.easeInOut(duration: 0.25)) { loadFailed = false }
@@ -496,76 +510,6 @@ private extension View {
         #endif
     }
 }
-
-// MARK: - Video Container (AVPlayerLayer bridge)
-
-// Hosts a view whose backing layer is an `AVPlayerLayer`. The coordinator owns
-// the `AVPlayer` and is handed the layer once it mounts so it can drive content
-// gravity and Picture in Picture.
-#if os(macOS)
-    private struct AVPlayerVideoContainer: NSViewRepresentable {
-        let coordinator: AVPlayerCoordinator
-
-        func makeNSView(context _: Context) -> AVPlayerHostNSView {
-            let view = AVPlayerHostNSView()
-            coordinator.attach(layer: view.playerLayer)
-            return view
-        }
-
-        func updateNSView(_: AVPlayerHostNSView, context _: Context) {}
-    }
-
-    /// AppKit has no `layerClass` hook, so the `AVPlayerLayer` is created and
-    /// kept in sync with the view's bounds manually.
-    private final class AVPlayerHostNSView: NSView {
-        let playerLayer = AVPlayerLayer()
-
-        override init(frame frameRect: NSRect) {
-            super.init(frame: frameRect)
-            wantsLayer = true
-            playerLayer.frame = bounds
-            layer?.addSublayer(playerLayer)
-            layer?.backgroundColor = NSColor.black.cgColor
-        }
-
-        @available(*, unavailable)
-        required init?(coder _: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        override func layout() {
-            super.layout()
-            playerLayer.frame = bounds
-        }
-    }
-#else
-    private struct AVPlayerVideoContainer: UIViewRepresentable {
-        let coordinator: AVPlayerCoordinator
-
-        func makeUIView(context _: Context) -> AVPlayerHostUIView {
-            let view = AVPlayerHostUIView()
-            view.backgroundColor = .black
-            coordinator.attach(layer: view.playerLayer)
-            return view
-        }
-
-        func updateUIView(_: AVPlayerHostUIView, context _: Context) {}
-    }
-
-    /// `layerClass` makes the view's backing layer an `AVPlayerLayer`, so it
-    /// resizes with the view automatically.
-    private final class AVPlayerHostUIView: UIView {
-        // swiftlint:disable:next static_over_final_class
-        override class var layerClass: AnyClass {
-            AVPlayerLayer.self
-        }
-
-        var playerLayer: AVPlayerLayer {
-            // swiftlint:disable:next force_cast
-            layer as! AVPlayerLayer
-        }
-    }
-#endif
 
 #Preview {
     AVPlayerEngineView(

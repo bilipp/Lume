@@ -336,6 +336,19 @@ actor ImagePipeline {
     }
 }
 
+extension ImagePipeline {
+    /// The image as a `CGImage`, through the shared pipeline's caches; `nil`
+    /// when it fails to load.
+    nonisolated static func cgImage(for url: URL, maxPixelSize: CGFloat) async -> CGImage? {
+        guard let image = try? await shared.image(for: url, maxPixelSize: maxPixelSize) else { return nil }
+        #if canImport(UIKit)
+            return image.cgImage
+        #else
+            return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        #endif
+    }
+}
+
 enum ImagePipelineError: Error {
     case decodingFailed
     case httpStatus(Int)

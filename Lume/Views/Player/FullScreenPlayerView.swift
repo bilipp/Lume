@@ -1,3 +1,4 @@
+import KSPlayer
 import OSLog
 import SwiftData
 import SwiftUI
@@ -13,7 +14,7 @@ struct FullScreenPlayerView: View {
     let media: PlayableMedia
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.modelContext) var modelContext
     @Environment(\.scenePhase) private var scenePhase
     /// Optional so previews (which don't inject it) don't crash.
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
@@ -54,6 +55,7 @@ struct FullScreenPlayerView: View {
     /// stream is driven through the AVPlayer engine regardless of the user's
     /// engine preference. See `engine` / `castService`.
     @State private var castService = CastService.shared
+    @State private var indexingHoldOwner = "full-screen-\(UUID().uuidString)"
 
     /// Ids of streams AVPlayer couldn't start while casting over AirPlay (a codec
     /// or container AVPlayer can't open — common for MPEG-TS / MKV IPTV that only
@@ -133,8 +135,10 @@ struct FullScreenPlayerView: View {
     @AppStorage(SortStorageKey.liveContent)
     private var liveContentSortRaw: String = ContentSortOption.playlist.rawValue
     @Environment(\.contentRestriction) private var contentRestriction
+    /// The tvOS Guide preview's running session this player took over.
+    @State var adoption: PreviewAdoption?
 
-    init(media: PlayableMedia) {
+    init(media: PlayableMedia, adopting handle: PreviewPlayerHandle? = nil) {
         self.media = media
         _activeMedia = State(initialValue: media)
         let defaults = UserDefaults.standard
@@ -143,6 +147,14 @@ struct FullScreenPlayerView: View {
             legacyEngineRaw: defaults.string(forKey: PlayerSettings.engineKey)
                 ?? PlayerEngineKind.defaultValue.rawValue
         )
+        let adoption = handle == nil ? nil : Self.previewAdoption(
+            of: handle, for: media, enginePriority: enginePriority, airPlayActive: CastService.shared.isAirPlayActive
+        )
+        _adoption = State(initialValue: adoption)
+        if let adoption {
+            _engineAttempt = State(initialValue: adoption.engineAttempt)
+            _resolvedMedia = State(initialValue: adoption.resolvedMedia)
+        }
     }
 
     /// The engine the user's priority list selects for the current attempt,
@@ -248,15 +260,17 @@ struct FullScreenPlayerView: View {
         // own appearance, and an async baseline can land after them — which
         // would bake a fault the viewer just lived through into the "before"
         // snapshot and read the session as flawless.
-        .onAppear { beginReviewSession() }
+        .onAppear { beginReviewSession(); beginPreviewAdoption() }
         .task {
             // Seed the recall pair with the channel we opened on, so the very
             // first in-player recall has somewhere to jump back to.
             LiveChannelHistory.record(activeMedia)
             // Pause background indexing — its periodic saves merge into the
             // main context and hitch KSPlayer's render loop.
-            ContentIndexingService.shared.isPlaybackActive = true
-            configureAudioSessionForPlayback()
+            ContentIndexingService.shared.suspend(for: indexingHoldOwner)
+            if adoption == nil {
+                configureAudioSessionForPlayback()
+            }
         }
         .task(id: activeMedia.id) {
             // Resolve a deferred Stalker placeholder into a real (short-lived)
@@ -361,7 +375,8 @@ struct FullScreenPlayerView: View {
             persistProgressDetached(force: true)
             NowPlayingService.shared.endSession()
             releaseAudioSession()
-            ContentIndexingService.shared.isPlaybackActive = false
+            ContentIndexingService.shared.resume(for: indexingHoldOwner)
+            adoption?.handle.release()
             endReviewSession(isChildWatching: profileManager?.activeProfileIsChild ?? false)
         }
     }
@@ -409,10 +424,10 @@ struct FullScreenPlayerView: View {
             )
             .id(engineAttempt)
         case .avPlayer:
+            let adopted = takeOverAdoptedAVCoordinator()
             AVPlayerEngineView(
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
-                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
-                skipSegments: skipSegments,
+                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours, skipSegments: skipSegments,
                 // During an AirPlay override there's no next engine to try, but
                 // report failure anyway so `handlePlaybackFailure` can revert to
                 // local playback instead of AVPlayer raising its offline overlay.
@@ -423,19 +438,19 @@ struct FullScreenPlayerView: View {
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: handlePlaybackFailure,
                 onSelectMedia: switchMedia,
-                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler
+                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler, coordinator: adopted ?? .init(), isAdoptedSession: adopted != nil
             )
             .id(engineAttempt)
         case .ksPlayer:
+            let adopted = adoptedKSCoordinator
             KSPlayerEngineView(
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
-                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
-                skipSegments: skipSegments,
+                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours, skipSegments: skipSegments,
                 reportsStartupFailure: hasFallbackEngine,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia,
-                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler
+                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler, coordinator: adopted ?? .init(), isAdoptedSession: adopted != nil
             )
             .id(engineAttempt)
         case .vlcKit:
@@ -458,7 +473,7 @@ struct FullScreenPlayerView: View {
     /// (open, channel surf, next episode), so each switch resolves a fresh,
     /// short-lived URL.
     private func resolveActiveMedia() async {
-        guard StalkerLink.isPlaceholder(activeMedia.url) else { return }
+        guard StalkerLink.isPlaceholder(activeMedia.url), !keepsAdoptedResolution else { return }
         resolvedMedia = nil
         resolveError = nil
         do {
@@ -555,29 +570,6 @@ struct FullScreenPlayerView: View {
                 syncWatchedServices(ref: completion.ref)
                 AppStoreReviewPrompt.shared.noteCompletedTitle()
             }
-        }
-    }
-
-    /// One-time "watched" sync to every connected tracker. Runs at most once per
-    /// title (when it crosses 90%), so the main-context fetch here is off the
-    /// playback hot path. The services are `@MainActor`, hence this stays on the
-    /// main actor.
-    func syncWatchedServices(ref: PlayableMedia.ContentRef) {
-        switch ref {
-        case let .movie(id):
-            var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
-            descriptor.fetchLimit = 1
-            guard let movie = try? modelContext.fetch(descriptor).first else { return }
-            TraktService.shared.syncWatched(movie: movie, watched: true)
-            SimklService.shared.syncWatched(movie: movie, watched: true)
-        case let .episode(id):
-            var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
-            descriptor.fetchLimit = 1
-            guard let episode = try? modelContext.fetch(descriptor).first else { return }
-            TraktService.shared.syncWatched(episode: episode, watched: true)
-            SimklService.shared.syncWatched(episode: episode, watched: true)
-        case .live:
-            break
         }
     }
 }

@@ -227,12 +227,17 @@ import SwiftUI
     struct TVOptionCycleRow: View {
         let title: LocalizedStringKey
         let valueLabel: String
+        /// A crown after the title, marking a Lume Pro setting for free users.
+        var showsPremiumBadge = false
         let onAdvance: () -> Void
 
         var body: some View {
             Button(action: onAdvance) {
                 HStack(spacing: 16) {
                     Text(title)
+                    if showsPremiumBadge {
+                        PremiumBadge()
+                    }
                     Spacer(minLength: 0)
                     Text(verbatim: valueLabel)
                         .foregroundStyle(.secondary)

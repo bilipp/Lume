@@ -55,6 +55,23 @@ struct PlayerSettingsTests {
     @Test func `engine priority storage key`() {
         #expect(PlayerSettings.enginePriorityKey == "player.enginePriority")
     }
+
+    @Test func `guide preview mode storage key and default`() {
+        #expect(PlayerSettings.tvGuidePreviewModeKey == "player.tvGuidePreviewMode")
+        #expect(PlayerSettings.tvGuidePreviewModeDefault == .small)
+    }
+
+    @Test func `guide preview mode reads the default until a value is stored`() throws {
+        let name = "PlayerSettingsTests-\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: name) }
+        let defaults = try #require(UserDefaults(suiteName: name))
+        let key = PlayerSettings.tvGuidePreviewModeKey
+        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .small)
+        defaults.set(GuidePreviewMode.large.rawValue, forKey: key)
+        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .large)
+        defaults.set("bogus", forKey: key)
+        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .small)
+    }
 }
 
 struct PlayerEnginePriorityTests {

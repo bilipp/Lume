@@ -37,10 +37,24 @@ final class ContentIndexingService {
     private(set) var indexedCount = 0
     private(set) var totalCount = 0
 
-    /// Set by the player while the full-screen player is up. The indexer
-    /// polls this and pauses: even background-context saves force a
+    /// Held by each player surface while it is up. The indexer polls
+    /// `isPlaybackActive` and pauses: even background-context saves force a
     /// main-context merge that re-runs every @Query and hitches KSPlayer.
-    var isPlaybackActive = false
+    /// Keyed by owner so one surface closing can't resume indexing under
+    /// another that is still playing.
+    private var playbackHolders = SuspensionHolders()
+
+    var isPlaybackActive: Bool {
+        playbackHolders.isActive
+    }
+
+    func suspend(for owner: String) {
+        playbackHolders.insert(owner)
+    }
+
+    func resume(for owner: String) {
+        playbackHolders.remove(owner)
+    }
 
     /// Set by `CloudSyncCoordinator` while `NSPersistentCloudKitContainer` is
     /// mid import/export. The indexer pauses then: CloudKit tears down and

@@ -26,9 +26,19 @@ struct MultiViewKSTile: View {
     let media: PlayableMedia
     let isMuted: Bool
     let usesQuickStartupTimeout: Bool
+    /// A Guide preview's session is registered for a full-screen handoff, and
+    /// the tile stops managing it once it is handed over.
+    let role: MultiViewTileRole
     var onPlaybackStarted: () -> Void
     var onPlaybackFailed: () -> Void
+    /// The channel as the Guide knows it — for Stalker, the placeholder `media`
+    /// was resolved from.
+    let sourceMedia: PlayableMedia
 
+    /// No mixing audio session for a guide preview here: KSPlayer's player
+    /// initializers claim a non-mixable `.playback` session themselves
+    /// (`KSOptions.setAudioSession()`, a static the app cannot override), so
+    /// keeping other apps' audio playing would take a KSPlayer patch.
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
     /// Bounded backoff for a *mid-stream* drop. KSPlayer has no safe in-place
     /// re-prepare (see `KSPlayerEngineView+Playback`), so a reconnect here bumps
@@ -39,27 +49,68 @@ struct MultiViewKSTile: View {
     @State private var startupWatchdog: Task<Void, Never>?
 
     var body: some View {
+        surface
+            .id(reloadToken)
+            .onAppear {
+                coordinator.isMuted = isMuted
+                startWatchdog()
+            }
+            .onDisappear {
+                startupWatchdog?.cancel()
+                reconnector.cancel()
+            }
+            .previewHandoff(role, media: sourceMedia, resolved: media, coordinator: .ks(coordinator))
+            .onChange(of: isMuted) { _, muted in
+                guard role.ownsSession else { return }
+                coordinator.isMuted = muted
+            }
+    }
+
+    @ViewBuilder
+    private var surface: some View {
+        #if os(tvOS)
+            if let previewHandle = role.previewHandle {
+                KSHostedPlayerSurface(
+                    coordinator: coordinator,
+                    url: media.url,
+                    options: makeOptions(),
+                    mode: .preview(previewHandle),
+                    onStateChanged: stateChanged
+                )
+            } else {
+                videoPlayer
+            }
+        #else
+            videoPlayer
+        #endif
+    }
+
+    private var videoPlayer: some View {
         KSVideoPlayer(
             coordinator: coordinator,
             url: media.url,
-            options: KSPlayerOptionsFactory.make(for: media, allowsPictureInPicture: false)
+            options: makeOptions()
         )
-        .onStateChanged { _, state in
-            // Deferred so the mutations below never land inside a SwiftUI view
-            // update pass, exactly as the full-screen KSPlayer host does it.
-            DispatchQueue.main.async { handle(state) }
+        .onStateChanged(stateChanged)
+    }
+
+    private func stateChanged(_ layer: KSPlayerLayer, _ state: KSPlayerState) {
+        // Deferred so the mutations below never land inside a SwiftUI view
+        // update pass, exactly as the full-screen KSPlayer host does it.
+        DispatchQueue.main.async {
+            // A state queued by a layer that has since been reset (teardown,
+            // or the reconnect below) must not fail or reconnect the tile.
+            guard layer === coordinator.playerLayer, role.ownsSession else { return }
+            handle(state)
         }
-        .id(reloadToken)
-        .onAppear {
-            coordinator.isMuted = isMuted
-            startWatchdog()
+    }
+
+    private func makeOptions() -> KSOptions {
+        let options = KSPlayerOptionsFactory.make(for: media, allowsPictureInPicture: false)
+        if media.isLive, let cap = role.liveForwardBufferCap {
+            options.preferredForwardBufferDuration = min(options.preferredForwardBufferDuration, cap)
         }
-        .onDisappear {
-            startupWatchdog?.cancel()
-            reconnector.cancel()
-            coordinator.resetPlayer()
-        }
-        .onChange(of: isMuted) { _, muted in coordinator.isMuted = muted }
+        return options
     }
 
     private func handle(_ state: KSPlayerState) {
@@ -72,6 +123,7 @@ struct MultiViewKSTile: View {
             guard !hasStarted else { return }
             hasStarted = true
             startupWatchdog?.cancel()
+            role.previewHandle?.markStarted()
             onPlaybackStarted()
         case .error:
             startupWatchdog?.cancel()
@@ -81,10 +133,22 @@ struct MultiViewKSTile: View {
             }
             // The stream had been playing and dropped — reconnect quietly rather
             // than replacing the tile with a failure badge.
-            reconnector.scheduleRetry { reloadToken += 1 }
+            reconnector.scheduleRetry { reconnect() }
         default:
             break
         }
+    }
+
+    private func reconnect() {
+        guard role.ownsSession else { return }
+        // The preview's `KSHostedPlayerSurface` leaves the player alone when it
+        // is dismantled, so the stale layer has to go before the new surface
+        // asks for a view — otherwise `makeView` hands the dead session
+        // straight back.
+        if role.previewHandle != nil {
+            coordinator.resetPlayer()
+        }
+        reloadToken += 1
     }
 
     /// KSPlayer can hang in `.preparing`/`.buffering` indefinitely without ever
@@ -108,9 +172,15 @@ struct MultiViewVLCTile: View {
     let media: PlayableMedia
     let isMuted: Bool
     let usesQuickStartupTimeout: Bool
+    /// A Guide preview's session is registered so stopping the preview stops
+    /// it at once; VLCKit can't hand it over to full screen.
+    let role: MultiViewTileRole
     var onPlaybackStarted: () -> Void
     var onPlaybackFailed: () -> Void
+    let sourceMedia: PlayableMedia
 
+    /// No mixing audio session for a guide preview here: VLCKit's audio output
+    /// sets its own `.playback` session when the stream opens.
     @StateObject private var coordinator = VLCPlayerCoordinator(isEmbedded: true)
 
     var body: some View {
@@ -123,7 +193,7 @@ struct MultiViewVLCTile: View {
                 coordinator.onPlaybackFailure = onPlaybackFailed
                 coordinator.configure(media: media)
             }
-            .onDisappear { coordinator.tearDown() }
+            .previewHandoff(role, media: sourceMedia, resolved: media, coordinator: .vlc(coordinator))
             .onChange(of: isMuted) { _, muted in coordinator.isMuted = muted }
             .onChange(of: coordinator.hasStartedPlayback) { _, started in
                 // libVLC applies the mute to the audio output, which only exists
@@ -142,14 +212,20 @@ struct MultiViewAVTile: View {
     let media: PlayableMedia
     let isMuted: Bool
     let usesQuickStartupTimeout: Bool
+    /// See `MultiViewKSTile.role`.
+    let role: MultiViewTileRole
     var onPlaybackStarted: () -> Void
     var onPlaybackFailed: () -> Void
+    let sourceMedia: PlayableMedia
 
     @StateObject private var coordinator = AVPlayerCoordinator(isEmbedded: true)
 
     var body: some View {
         MultiViewAVSurface(coordinator: coordinator)
             .onAppear {
+                if role.mixesWithOtherAudio {
+                    MultiViewTileAudioSession.configureMixing()
+                }
                 coordinator.isMuted = isMuted
                 coordinator.startupTimeout = usesQuickStartupTimeout
                     ? MultiViewTilePlayer.fallbackStartupTimeout
@@ -157,10 +233,15 @@ struct MultiViewAVTile: View {
                 coordinator.onPlaybackFailure = onPlaybackFailed
                 coordinator.configure(media: media)
             }
-            .onDisappear { coordinator.tearDown() }
-            .onChange(of: isMuted) { _, muted in coordinator.isMuted = muted }
+            .previewHandoff(role, media: sourceMedia, resolved: media, coordinator: .av(coordinator))
+            .onChange(of: isMuted) { _, muted in
+                guard role.ownsSession else { return }
+                coordinator.isMuted = muted
+            }
             .onChange(of: coordinator.hasStartedPlayback) { _, started in
+                guard role.ownsSession else { return }
                 if started {
+                    role.previewHandle?.markStarted()
                     onPlaybackStarted()
                 }
             }
@@ -173,8 +254,11 @@ struct MultiViewLumeTile: View {
     let media: PlayableMedia
     let isMuted: Bool
     let usesQuickStartupTimeout: Bool
+    /// See `MultiViewVLCTile.role`.
+    let role: MultiViewTileRole
     var onPlaybackStarted: () -> Void
     var onPlaybackFailed: () -> Void
+    let sourceMedia: PlayableMedia
 
     @StateObject private var coordinator = LumeEngineCoordinator()
     /// The engine never retries on its own schedule — reconnect policy is the
@@ -184,6 +268,9 @@ struct MultiViewLumeTile: View {
     var body: some View {
         LumeEngineVideoSurface(coordinator: coordinator)
             .onAppear {
+                if role.mixesWithOtherAudio {
+                    MultiViewTileAudioSession.configureMixing()
+                }
                 coordinator.isEmbedded = true
                 coordinator.isMuted = isMuted
                 coordinator.startupTimeout = usesQuickStartupTimeout
@@ -194,16 +281,51 @@ struct MultiViewLumeTile: View {
                 coordinator.onRecovered = { reconnector.reset() }
                 coordinator.configure(media: media)
             }
-            .onDisappear {
-                reconnector.cancel()
-                coordinator.tearDown()
-            }
+            .onDisappear { reconnector.cancel() }
+            .previewHandoff(role, media: sourceMedia, resolved: media, coordinator: .lume(coordinator))
             .onChange(of: isMuted) { _, muted in coordinator.isMuted = muted }
             .onChange(of: coordinator.hasStartedPlayback) { _, started in
                 if started {
                     onPlaybackStarted()
                 }
             }
+    }
+}
+
+// MARK: - Guide preview handoff
+
+private extension View {
+    /// Registers a Guide preview tile's session with its handle, and stops the
+    /// session when the tile goes away unless full screen has taken it over.
+    func previewHandoff(
+        _ role: MultiViewTileRole,
+        media: PlayableMedia,
+        resolved: PlayableMedia,
+        coordinator: PreviewPlayerHandle.EngineCoordinator
+    ) -> some View {
+        onAppear {
+            role.previewHandle?.register(media: media, resolved: resolved, coordinator: coordinator)
+        }
+        .onDisappear {
+            guard role.ownsSession else { return }
+            coordinator.stop()
+            role.previewHandle?.unregister(coordinator)
+        }
+    }
+}
+
+// MARK: - Audio session
+
+/// A muted guide preview must not interrupt audio another app is playing.
+/// `.ambient` mixes with it. Never deactivated here: by the time a preview
+/// tile goes away, the full-screen player may already own the session.
+enum MultiViewTileAudioSession {
+    static func configureMixing() {
+        #if os(tvOS)
+            let session = AVAudioSession.sharedInstance()
+            guard session.category != .ambient || session.mode != .default || !session.categoryOptions.isEmpty else { return }
+            try? session.setCategory(.ambient, mode: .default, options: [])
+        #endif
     }
 }
 

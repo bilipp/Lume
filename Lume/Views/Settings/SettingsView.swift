@@ -44,6 +44,10 @@ struct SettingsView: View {
         var liveSurfModeRaw: String = LiveSurfMode.default.rawValue
         @AppStorage(PlayerSettings.tvRemoteSwipesKey)
         var tvRemoteSwipes = PlayerSettings.tvRemoteSwipesDefault
+        @AppStorage(PlayerSettings.tvGuidePreviewModeKey)
+        var tvGuidePreviewModeRaw = PlayerSettings.tvGuidePreviewModeDefault.rawValue
+        @AppStorage(LiveTVLayoutMode.storageKey)
+        var liveTVLayoutModeRaw: String = LiveTVLayoutMode.defaultMode.rawValue
         @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
         var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
         /// tvOS only: off tvOS the transport row carries an always-available
@@ -103,7 +107,6 @@ struct SettingsView: View {
         /// `focusedCategory` it tells whether focus is outside Settings — up in
         /// the tab bar — which is when `tvTabBarEntryCatcher` takes it.
         @FocusState private var detailFocused: Bool
-        @FocusState private var tabBarEntryFocused: Bool
         /// Whether the Player category is drilled into Engines — the priority
         /// list and the per-engine option rows — in place. Not `private`: read
         /// by the SettingsView+TVPlayer extension (separate file).
@@ -368,21 +371,14 @@ struct SettingsView: View {
         /// category. It's focusable only while focus is outside Settings, so
         /// moving up from the panes still reaches the tab bar.
         private var tvTabBarEntryCatcher: some View {
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .frame(height: 1)
-                .focusable(focusedCategory == nil && !detailFocused)
-                .focused($tabBarEntryFocused)
-                .onChange(of: tabBarEntryFocused) { _, isFocused in
-                    guard isFocused else { return }
-                    // Same-frame focus writes from a focus callback get dropped.
-                    Task { @MainActor in focusedCategory = selectedCategory }
-                }
-                // Just below the tab bar, which overlaps this overlay's top
-                // by ~60 pt, and above the panes' first rows (72 pt top
-                // padding). Measured on tvOS 26.5: y ≈ 130 between a tab bar
-                // ending at 114 and the first detail row at 157.
-                .padding(.top, 77)
+            TVTabBarEntryCatcher(isEnabled: focusedCategory == nil && !detailFocused) {
+                focusedCategory = selectedCategory
+            }
+            // Just below the tab bar, which overlaps this overlay's top
+            // by ~60 pt, and above the panes' first rows (72 pt top
+            // padding). Measured on tvOS 26.5: y ≈ 130 between a tab bar
+            // ending at 114 and the first detail row at 157.
+            .padding(.top, 77)
         }
 
         /// Content Management brings its own scroll/background, so it replaces the

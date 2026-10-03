@@ -175,4 +175,51 @@ struct PlaybackQoETests {
         #expect(qoe.summary.engines.isEmpty)
         #expect(qoe.summary.totalSessions == 0)
     }
+
+    // MARK: - Suspension holders
+
+    @Test
+    func `suspension lasts until every holder has resumed`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+
+        qoe.suspend(for: "a")
+        qoe.suspend(for: "b")
+        qoe.resume(for: "a")
+        #expect(qoe.isSuspended)
+
+        qoe.resume(for: "b")
+        #expect(!qoe.isSuspended)
+    }
+
+    @Test
+    func `suspending twice and resuming twice is harmless`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+
+        qoe.suspend(for: "a")
+        qoe.suspend(for: "a")
+        qoe.resume(for: "a")
+        #expect(!qoe.isSuspended)
+
+        qoe.resume(for: "a")
+        qoe.resume(for: "never-suspended")
+        #expect(!qoe.isSuspended)
+
+        qoe.suspend(for: "b")
+        #expect(qoe.isSuspended)
+    }
+
+    @Test
+    func `a session started while suspended records nothing`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+
+        qoe.suspend(for: "multi-view")
+        qoe.beginStartup(engine: .ksPlayer, isLive: true)
+        qoe.noteFirstFrame()
+        qoe.resume(for: "multi-view")
+
+        #expect(qoe.summary.totalSessions == 0)
+    }
 }
