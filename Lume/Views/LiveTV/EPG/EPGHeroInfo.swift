@@ -85,10 +85,6 @@
         private var header: some View {
             HStack(spacing: 16) {
                 EPGTVLogoTile(url: channel.logoURL, side: 56, cornerRadius: 14, padding: 6, glyphSize: 22)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                    }
 
                 Text(channel.name)
                     .font(.system(size: 23, weight: .semibold))
