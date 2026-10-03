@@ -21,7 +21,7 @@
             TVChannelBrowserOverlay(
                 media: media,
                 onSelect: { target in
-                    onSelectMedia?(target)
+                    selectMedia(target)
                     withAnimation(.easeInOut(duration: 0.25)) { isChannelBrowserOpen = false }
                     showControls()
                 },
@@ -54,7 +54,7 @@
                     sortRaw: liveContentSortRaw, restriction: restriction, context: modelContext,
                     neighbours: itemNeighbours
                 ),
-                select: { onSelectMedia?($0) },
+                select: { selectMedia($0) },
                 showControls: showControls
             )
         }

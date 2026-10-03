@@ -17,7 +17,7 @@ extension KSPlayerEngineView {
             clock: clock,
             controlsVisible: controlsVisible,
             onSeek: onSeek,
-            onSelectMedia: { onSelectMedia?($0) }
+            onSelectMedia: { selectMedia($0) }
         )
     }
 }
