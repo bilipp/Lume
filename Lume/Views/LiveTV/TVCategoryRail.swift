@@ -32,13 +32,19 @@
 
         private let panelPadding: CGFloat = 16
         private let rowInset: CGFloat = 18
-        private let iconSize: CGFloat = 26
+        private let iconSize: CGFloat = 22
 
         private var panelShape: RoundedRectangle {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
         }
 
         var body: some View {
+            ScrollViewReader { proxy in
+                panel(proxy)
+            }
+        }
+
+        private func panel(_ proxy: ScrollViewProxy) -> some View {
             VStack(alignment: .leading, spacing: 0) {
                 header
 
@@ -49,9 +55,15 @@
                         }
                     }
                     .padding(.horizontal, panelPadding)
+                    // Room for the focused row's lift at both ends; the
+                    // horizontal padding already holds it sideways.
+                    .padding(.top, 4)
                     .padding(.bottom, panelPadding)
                 }
-                .scrollClipDisabled()
+                // tvOS scroll views draw outside their bounds (for focus
+                // effects), so a long category list would run out of the
+                // panel's bottom; it scrolls inside the glass instead.
+                .clipped()
                 .focusSection()
             }
             .frame(width: TVLiveTVLayout.railWidth, alignment: .leading)
@@ -59,19 +71,35 @@
             .background(panelShape.fill(.white.opacity(0.06)))
             .glassEffectCompat(.regular, in: panelShape)
             .overlay(panelShape.strokeBorder(.white.opacity(0.12), lineWidth: 1))
-            .onChange(of: focused) { oldValue, newValue in
-                if let focusRegions, focusRegions.railFocused != (newValue != nil) {
-                    focusRegions.railFocused = newValue != nil
-                }
+            .onChange(of: focused) { _, newValue in
                 guard let newValue else {
-                    // Focus left the rail — pre-arm the mask for re-entry.
-                    railOwnsFocus = false
+                    // A move onto a row the lazy list only just built passes
+                    // through nil; only a nil that is still there a turn later
+                    // means focus left the rail. Pre-arm the mask for re-entry.
+                    Task { @MainActor in
+                        guard focused == nil else { return }
+                        railOwnsFocus = false
+                        if let focusRegions, focusRegions.railFocused {
+                            focusRegions.railFocused = false
+                        }
+                    }
                     return
                 }
-                if oldValue == nil, let selectedID = selectedSection?.id, newValue != selectedID {
+                if let focusRegions, !focusRegions.railFocused {
+                    focusRegions.railFocused = true
+                }
+                if !railOwnsFocus, let selectedID = selectedSection?.id, newValue != selectedID {
                     // Entry landed on the wrong category (masked, so it never
-                    // rendered styled) — snap to the selection.
-                    focused = selectedID
+                    // rendered styled) — snap to the selection. It may sit
+                    // scrolled out of the lazy list, where a focus write finds
+                    // nothing: bring it in first, then focus it a turn later.
+                    withTransaction(Transaction(animation: nil)) {
+                        proxy.scrollTo(selectedID, anchor: .center)
+                    }
+                    Task { @MainActor in
+                        focused = selectedID
+                        railOwnsFocus = true
+                    }
                 } else {
                     railOwnsFocus = true
                 }
@@ -105,14 +133,16 @@
                 // collections' icon trails, so every label lines up whether or
                 // not its row has one.
                 HStack(spacing: 16) {
+                    // One line at one size: provider names like
+                    // "DE • Sport • Bundesliga • RAW" truncate rather than wrap,
+                    // so every row keeps the same height.
                     section.titleText
                         .font(.system(
-                            size: 25,
+                            size: 22,
                             weight: isSelected || isItemFocused ? .semibold : .medium
                         ))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                        .multilineTextAlignment(.leading)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                     Spacer(minLength: 0)
                     if let icon = section.icon {
                         Image(systemName: icon)

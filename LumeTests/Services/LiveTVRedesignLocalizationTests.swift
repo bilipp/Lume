@@ -19,7 +19,6 @@ struct LiveTVRedesignLocalizationTests {
     static let newKeys = [
         "%lld min left",
         "Up next · %@ %@",
-        "Channel %lld",
         "Today · %@",
         "No Programme",
         "Hold a channel to add it to Favorites or Multi-View",

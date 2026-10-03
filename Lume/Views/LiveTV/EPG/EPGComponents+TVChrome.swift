@@ -62,13 +62,6 @@ import SwiftUI
                         .foregroundStyle(isHub ? EPGColors.ink : LiveTVPalette.accent)
                         .accessibilityLabel(Text("Catch-up available"))
                 }
-                if let number = row.number {
-                    Text(number, format: .number.grouping(.never))
-                        .font(.system(size: 19))
-                        .foregroundStyle(isHub ? EPGColors.inkSecondary : .white.opacity(0.55))
-                        .lineLimit(1)
-                        .fixedSize()
-                }
             }
             .padding(.horizontal, 16)
             .frame(width: metrics.channelColumnWidth, height: metrics.rowHeight, alignment: .leading)

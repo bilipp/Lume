@@ -35,7 +35,6 @@
         /// progress row and Up next still place the programme in time).
         let isCompact: Bool
 
-        private static let secondary = Color.white.opacity(0.62)
         private static let tertiary = Color.white.opacity(0.58)
         private static let meta = Color.white.opacity(0.7)
 
@@ -91,17 +90,9 @@
                             .strokeBorder(.white.opacity(0.12), lineWidth: 1)
                     }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(channel.name)
-                        .font(.system(size: 23, weight: .semibold))
-                        .lineLimit(1)
-                    if let number = channel.number {
-                        Text("Channel \(number)")
-                            .font(.system(size: 19))
-                            .foregroundStyle(Self.secondary)
-                            .lineLimit(1)
-                    }
-                }
+                Text(channel.name)
+                    .font(.system(size: 23, weight: .semibold))
+                    .lineLimit(1)
 
                 LiveBadge(fontSize: 17)
                     .padding(.leading, 8)

@@ -182,8 +182,6 @@ struct EPGChannelRow: Identifiable {
     /// How many days the archive reaches back (≥ 1 when `catchupCapable`).
     let archiveDays: Int
     let cells: [EPGProgramCell]
-    /// The provider's channel number; `nil` when the provider sends none (`0`).
-    var number: Int?
 
     /// Snapshot equivalent of `PlayableMedia.isCatchupAvailable` for the
     /// scroll path: whether a programme starting at `start` is replayable.
@@ -215,8 +213,7 @@ enum EPGGridBuilder {
                 logoURL: URL(string: stream.streamIcon ?? ""),
                 catchupCapable: stream.tvArchive > 0 && stream.directURL == nil,
                 archiveDays: max(1, stream.tvArchiveDuration),
-                cells: cells,
-                number: stream.num > 0 ? stream.num : nil
+                cells: cells
             )
         }
     }
