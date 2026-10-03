@@ -36,6 +36,9 @@ struct ChannelLogoTintTests {
     }
 
     private nonisolated static let redLogo = logo(background: (1, 1, 1, 1), band: ((0.8, 0.1, 0.1), 0.4))
+    /// The Kids channels' orange logo with black text: too bright for white
+    /// text, but a glow colour all the same.
+    private nonisolated static let orangeLogo = logo(background: (0.98, 0.596, 0.227, 1), band: ((0, 0, 0), 0.2))
     private nonisolated static let whiteLogo = logo(background: (1, 1, 1, 1))
     private nonisolated static let blackLogo = logo(background: (0, 0, 0, 1))
     private nonisolated static let transparentLogo = logo(background: (0, 0, 0, 0))
@@ -68,7 +71,7 @@ struct ChannelLogoTintTests {
     @Test func `a saturated logo tints the glow`() async throws {
         let tint = try #require(await cache(log: LoadLog()).tint(forLogo: "https://a/red.png"))
         #expect(tint.hasPrefix("CC"))
-        #expect(LiveTVPalette.glowColor(forTintHex: tint) == TeamPalette.usableTint(fromHex: tint))
+        #expect(LiveTVPalette.glowColor(forTintHex: tint) == Color(hex: tint))
         #expect(LiveTVPalette.glowColor(forTintHex: tint) != LiveTVPalette.accent)
     }
 
@@ -88,6 +91,9 @@ struct ChannelLogoTintTests {
         #expect(LiveTVPalette.glowColor(forTintHex: "FFFFFF") == LiveTVPalette.accent)
         #expect(LiveTVPalette.glowColor(forTintHex: "000000") == LiveTVPalette.accent)
         #expect(LiveTVPalette.glowColor(forTintHex: "zz") == LiveTVPalette.accent)
+        // Grey reads as no colour; very dark would not show on the backdrop.
+        #expect(LiveTVPalette.glowColor(forTintHex: "808080") == LiveTVPalette.accent)
+        #expect(LiveTVPalette.glowColor(forTintHex: "140A0A") == LiveTVPalette.accent)
     }
 
     @Test func `a missing or empty logo is never loaded`() async {
@@ -135,5 +141,27 @@ struct ChannelLogoTintTests {
 
         _ = await cache.tint(forLogo: "https://a/2")
         #expect(await log.count(of: "https://a/2") == 2)
+    }
+
+    @Test func `bright logos keep their colour for the glow`() {
+        // The Kids channels' orange and yellow logos, which white-text contrast
+        // rules would refuse.
+        for hex in ["FA983A", "F6B93B", "#FFD200"] {
+            #expect(LiveTVPalette.glowColor(forTintHex: hex) != LiveTVPalette.accent, "\(hex)")
+            #expect(LiveTVPalette.glowColor(forTintHex: hex) == Color(hex: hex), "\(hex)")
+        }
+    }
+
+    @Test func `an orange logo tints the glow orange`() async throws {
+        let log = LoadLog()
+        let cache = cache(log: log, image: { _ in Self.orangeLogo })
+        let tint = try #require(await cache.tint(forLogo: "https://a/toons"))
+        #expect(LiveTVPalette.glowColor(forTintHex: tint) != LiveTVPalette.accent)
+        // The red channel leads: orange, not some shadow or the black text.
+        #expect(tint.hasPrefix("F") || tint.hasPrefix("E"))
+    }
+
+    @Test func `the sports crest extraction keeps its contrast floor`() {
+        #expect(SportsCrestTint.dominantHex(of: Self.orangeLogo) == nil)
     }
 }

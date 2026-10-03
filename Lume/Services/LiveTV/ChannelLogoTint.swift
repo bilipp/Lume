@@ -3,7 +3,8 @@
 //  Lume
 //
 //  The colour the tvOS Live TV glow is tinted with: the dominant colour of the
-//  settled channel's logo, read with the Sports Hub's crest extraction so a
+//  settled channel's logo, read with the Sports Hub's crest extraction (with
+//  the glow's own colour check in place of its white-text contrast floor) so a
 //  white, black or transparent logo yields nothing and the glow falls back to
 //  the Live TV accent. Video frames are never sampled.
 //
@@ -55,7 +56,9 @@ actor ChannelLogoTintCache {
             return known.isEmpty ? nil : known
         }
         guard let image = await loadImage(url), !Task.isCancelled else { return nil }
-        let tint = SportsCrestTint.dominantHex(of: image)
+        // The glow has no text over it, so the crest extraction's white-text
+        // contrast floor would wrongly drop orange and yellow logos.
+        let tint = SportsCrestTint.dominantHex(of: image, isUsable: LiveTVPalette.isGlowTint)
         store(tint ?? "", for: logo)
         return tint
     }

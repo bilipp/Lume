@@ -32,9 +32,10 @@ final class GuideHeroModel {
             guard !Task.isCancelled, let self else { return }
             let color = LiveTVPalette.glowColor(forTintHex: hex)
             guard color != glowTint else { return }
-            withAnimation(.easeInOut(duration: 0.6)) {
-                self.glowTint = color
-            }
+            // A plain write: wrapped in `withAnimation` from this task, the
+            // backdrop missed the change until something else re-rendered it.
+            // The backdrop animates the crossfade itself.
+            glowTint = color
         }
     }
 }

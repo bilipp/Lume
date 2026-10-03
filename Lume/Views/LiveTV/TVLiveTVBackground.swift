@@ -31,6 +31,7 @@
         }
 
         var body: some View {
+            let tint = tint
             GeometryReader { proxy in
                 let scale = proxy.size.width / Self.canvasWidth
                 let size = CGSize(width: Self.glowSize.width * scale, height: Self.glowSize.height * scale)
@@ -38,6 +39,9 @@
                     .overlay(alignment: .topLeading) {
                         Rectangle()
                             .fill(Self.glow(tint))
+                            // The crossfade lives here, keyed on the colour,
+                            // rather than in the model's write.
+                            .animation(.easeInOut(duration: 0.6), value: tint)
                             .frame(width: size.width, height: size.height)
                             .offset(
                                 x: Self.glowCenter.x * scale - size.width / 2,

@@ -88,6 +88,7 @@
                     startPoint: .topTrailing,
                     endPoint: .bottomLeading
                 )
+                .animation(.easeInOut(duration: 0.6), value: tint)
 
                 if isUnavailable {
                     LiveChannelUnavailableBadge(logoURL: logoURL, logoSide: logoSide)

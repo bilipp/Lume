@@ -46,7 +46,13 @@ nonisolated enum SportsCrestTint {
 
     /// The crest's most common saturated colour that is usable as a card tint,
     /// as `RRGGBB`; `nil` when the crest is monochrome, pale, or transparent.
-    static func dominantHex(of image: CGImage) -> String? {
+    /// `isUsable` decides what "usable" means: by default `TeamPalette`'s
+    /// contrast floor for white text; a caller with no text over the colour
+    /// (the Live TV glow) passes a looser check.
+    static func dominantHex(
+        of image: CGImage,
+        isUsable: (String) -> Bool = { TeamPalette.usableTint(fromHex: $0) != nil }
+    ) -> String? {
         guard let pixels = rgbaPixels(of: image) else { return nil }
         let (buckets, opaque) = colourBuckets(pixels)
         guard opaque > 0 else { return nil }
@@ -65,7 +71,7 @@ nonisolated enum SportsCrestTint {
             // lettering reads as olive), not a colour of its own.
             if larger.contains(where: { shade.isShadow(of: $0) }) { continue }
             let candidate = hex(red: red, green: green, blue: blue)
-            if TeamPalette.usableTint(fromHex: candidate) != nil { return candidate }
+            if isUsable(candidate) { return candidate }
         }
         return nil
     }
