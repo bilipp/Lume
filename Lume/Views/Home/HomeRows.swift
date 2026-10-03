@@ -247,17 +247,6 @@ private struct HomePosterCard: View {
                     if isLive { liveCardBackground }
                 }
 
-                if isLive {
-                    Text("LIVE")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.red, in: Capsule())
-                        .padding(6)
-                }
-
                 if let progress {
                     ProgressView(value: progress)
                         .progressViewStyle(.linear)
