@@ -46,19 +46,16 @@
 
         private func panel(_ proxy: ScrollViewProxy) -> some View {
             VStack(alignment: .leading, spacing: 0) {
-                header
-
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(sections) { section in
                             categoryButton(section)
                         }
                     }
-                    .padding(.horizontal, panelPadding)
-                    // Room for the focused row's lift at both ends; the
-                    // horizontal padding already holds it sideways.
-                    .padding(.top, 4)
-                    .padding(.bottom, panelPadding)
+                    // The same inset on every side, so the first category
+                    // sits in the panel's corner like the rest of the rows;
+                    // it also holds the focused row's lift.
+                    .padding(panelPadding)
                 }
                 // tvOS scroll views draw outside their bounds (for focus
                 // effects), so a long category list would run out of the
@@ -92,30 +89,26 @@
                     // Entry landed on the wrong category (masked, so it never
                     // rendered styled) — snap to the selection. It may sit
                     // scrolled out of the lazy list, where a focus write finds
-                    // nothing: bring it in first, then focus it a turn later.
+                    // nothing: bring it in first (only as far as needed, so a
+                    // visible selection doesn't move), then focus it a turn
+                    // later. The mask stays on until focus reaches it — lifted
+                    // any earlier, the landing row starts its focus fade and
+                    // flashes. Should the engine refuse the write, it lifts
+                    // anyway so the rail never stays masked.
                     withTransaction(Transaction(animation: nil)) {
-                        proxy.scrollTo(selectedID, anchor: .center)
+                        proxy.scrollTo(selectedID)
                     }
                     Task { @MainActor in
                         focused = selectedID
-                        railOwnsFocus = true
+                        try? await Task.sleep(for: .milliseconds(300))
+                        if !railOwnsFocus {
+                            railOwnsFocus = true
+                        }
                     }
                 } else {
                     railOwnsFocus = true
                 }
             }
-        }
-
-        private var header: some View {
-            Text("Categories")
-                .textCase(.uppercase)
-                .font(.system(size: 19, weight: .semibold))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.58))
-                .padding(.horizontal, panelPadding + rowInset)
-                .padding(.top, panelPadding + 10)
-                .padding(.bottom, 12)
-                .accessibilityAddTraits(.isHeader)
         }
 
         private func categoryButton(_ section: LiveTVSection) -> some View {

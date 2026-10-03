@@ -26,10 +26,9 @@ struct LiveTVRedesignLocalizationTests {
         "How the Live TV tab shows channels: Guide lays them out on a programme timeline, List as a plain channel list."
     ]
 
-    /// Existing keys the sidebar, hero, layout values and the guide's
-    /// VoiceOver actions reuse.
+    /// Existing keys the hero, layout values and the guide's VoiceOver
+    /// actions reuse.
     static let reusedKeys = [
-        "Categories",
         "LIVE",
         "List",
         "Guide",
