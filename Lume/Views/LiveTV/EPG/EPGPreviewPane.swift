@@ -21,7 +21,7 @@
     }
 
     /// The hero's size for the chosen `GuidePreviewMode`. Small frees exactly
-    /// two guide rows (144 pt) and compacts the info beside the picture.
+    /// two guide rows (2 × 80 pt) and compacts the info beside the picture.
     struct EPGHeroLayout: Equatable {
         let height: CGFloat
         let isCompact: Bool
@@ -32,7 +32,7 @@
                 height = 360
                 isCompact = false
             case .small:
-                height = 216
+                height = 200
                 isCompact = true
             case .off:
                 height = 0

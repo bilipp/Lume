@@ -75,7 +75,7 @@
             hero?.glowTint ?? LiveTVPalette.accent
         }
 
-        /// A third of the hero's height: 120 pt regular, 72 pt small.
+        /// A third of the hero's height: 120 pt regular, about 67 pt small.
         private var logoSide: CGFloat {
             layout.height / 3
         }

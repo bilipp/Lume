@@ -54,7 +54,8 @@ struct EPGMetrics {
             return EPGMetrics(
                 pointsPerMinute: trackWidth / 120,
                 rowHeight: 70,
-                rowSpacing: 2,
+                // The design's 8 pt gap plus its 2 pt row margin.
+                rowSpacing: 10,
                 channelColumnWidth: channelColumnWidth,
                 headerHeight: 36,
                 blockCornerRadius: 16,
