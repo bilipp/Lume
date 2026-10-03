@@ -14,7 +14,7 @@ struct PlaylistStreamFormatTests {
         ))
     }
 
-    private func makePlaylist(format: PlaylistStreamFormat = .automatic) -> Playlist {
+    private func makePlaylist(format: PlaylistStreamFormat = .automatic, allowed: [String]? = nil) -> Playlist {
         let playlist = Playlist(
             name: "Test",
             serverURL: "http://example.com:8080",
@@ -22,6 +22,7 @@ struct PlaylistStreamFormatTests {
             password: "testpass"
         )
         playlist.streamFormat = format
+        playlist.allowedOutputFormats = allowed
         return playlist
     }
 
@@ -80,6 +81,53 @@ struct PlaylistStreamFormatTests {
         let stream = LiveStream(id: "l-4", streamId: 555, name: "Test Channel")
         let url = makeClient().buildLiveStreamURL(for: stream, playlist: makePlaylist(format: .mpegTS), format: .m3u8)
         #expect(url?.absoluteString == "http://example.com:8080/live/testuser/testpass/555.m3u8")
+    }
+
+    // MARK: - Account-allowed containers
+
+    @Test func `automatic requests ts when the account disallows HLS`() {
+        // The panel 405s a container outside allowed_output_formats on every
+        // engine, so automatic must pick the one the account permits.
+        let stream = LiveStream(id: "l-8", streamId: 555, name: "Test Channel")
+        let url = makeClient().buildLiveStreamURL(for: stream, playlist: makePlaylist(allowed: ["ts"]))
+        #expect(url?.absoluteString == "http://example.com:8080/live/testuser/testpass/555.ts")
+    }
+
+    @Test func `automatic keeps HLS when the account allows it`() {
+        let stream = LiveStream(id: "l-9", streamId: 555, name: "Test Channel")
+        let url = makeClient().buildLiveStreamURL(for: stream, playlist: makePlaylist(allowed: ["m3u8", "ts", "rtmp"]))
+        #expect(url?.absoluteString.hasSuffix("/555.m3u8") == true)
+    }
+
+    @Test func `automatic keeps HLS when no usable container is allowed`() {
+        let stream = LiveStream(id: "l-10", streamId: 555, name: "Test Channel")
+        let url = makeClient().buildLiveStreamURL(for: stream, playlist: makePlaylist(allowed: ["rtmp"]))
+        #expect(url?.absoluteString.hasSuffix("/555.m3u8") == true)
+    }
+
+    @Test func `an explicit choice outranks the allowed containers`() {
+        let stream = LiveStream(id: "l-11", streamId: 555, name: "Test Channel")
+        let url = makeClient().buildLiveStreamURL(for: stream, playlist: makePlaylist(format: .hls, allowed: ["ts"]))
+        #expect(url?.absoluteString.hasSuffix("/555.m3u8") == true)
+    }
+
+    @Test func `automatic catchup requests HLS when the account disallows ts`() throws {
+        let stream = LiveStream(id: "l-12", streamId: 777, name: "Catchup Channel")
+        let url = try #require(makeClient().buildCatchupURL(
+            for: stream,
+            playlist: makePlaylist(allowed: ["m3u8"]),
+            start: Date(timeIntervalSince1970: 1_700_000_000),
+            durationMinutes: 90
+        ))
+        #expect(url.absoluteString.hasSuffix("/777.m3u8"))
+    }
+
+    @Test func `allowed containers round-trip and drop an empty list`() {
+        let playlist = makePlaylist(allowed: ["m3u8", "ts"])
+        #expect(playlist.allowedOutputFormatsRaw == "m3u8,ts")
+        #expect(playlist.allowedOutputFormats == ["m3u8", "ts"])
+        playlist.allowedOutputFormats = []
+        #expect(playlist.allowedOutputFormatsRaw == nil)
     }
 
     // MARK: - Xtream catch-up URLs

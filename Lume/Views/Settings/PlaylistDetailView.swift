@@ -349,7 +349,11 @@ struct PlaylistDetailView: View {
     var streamFormatFooter: LocalizedStringKey {
         isM3U
             ? "Automatic plays channels at the URL the playlist lists. Choose HLS or MPEG-TS to request that container instead; channels served through another kind of URL are unaffected."
-            : "Automatic requests live channels as HLS. Choose MPEG-TS if channels stutter, refuse to start, or drop out — servers often serve one container more reliably than the other."
+            : """
+            Automatic requests live channels as HLS, or as MPEG-TS when the account only allows that. \
+            Choose MPEG-TS if channels stutter, refuse to start, or drop out — servers often serve one \
+            container more reliably than the other.
+            """
     }
 
     /// Field label for the primary URL, shared across the iOS/macOS and tvOS

@@ -58,6 +58,10 @@ final class Playlist {
     var maxConnections: String?
     var activeConnections: String?
     var expDate: String?
+    /// Xtream: the account's `allowed_output_formats`, comma-separated, refreshed
+    /// on every auth. `nil` when the panel doesn't advertise them. Device-local
+    /// like the rest of the account info. Access through `allowedOutputFormats`.
+    var allowedOutputFormatsRaw: String?
 
     var syncEnabled: Bool = true
     /// The content tabs hidden for this playlist (Settings › Library › Tabs),
@@ -252,6 +256,14 @@ extension Playlist {
     var streamFormat: PlaylistStreamFormat {
         get { PlaylistStreamFormat(rawValue: streamFormatRaw) ?? .automatic }
         set { streamFormatRaw = newValue.rawValue }
+    }
+
+    /// The live containers the Xtream account may request, or `nil` when the
+    /// panel didn't say. An empty list is stored as `nil` — a panel that
+    /// allows nothing is more likely misreporting than serious.
+    var allowedOutputFormats: [String]? {
+        get { allowedOutputFormatsRaw.map { $0.split(separator: ",").map(String.init) } }
+        set { allowedOutputFormatsRaw = newValue.flatMap { $0.isEmpty ? nil : $0.joined(separator: ",") } }
     }
 
     /// The source type, or nil when the stored raw value comes from a newer

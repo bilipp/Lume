@@ -6230,54 +6230,54 @@
         }
       }
     },
-    "Automatic requests live channels as HLS. Choose MPEG-TS if channels stutter, refuse to start, or drop out — servers often serve one container more reliably than the other." : {
+    "Automatic requests live channels as HLS, or as MPEG-TS when the account only allows that. Choose MPEG-TS if channels stutter, refuse to start, or drop out — servers often serve one container more reliably than the other." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "„Automatisch“ fordert Live-Kanäle als HLS an. Wähle MPEG-TS, wenn Kanäle stocken, nicht starten oder abbrechen – Server liefern oft eines der beiden Formate zuverlässiger."
+            "value" : "„Automatisch“ fordert Live-Kanäle als HLS an – oder als MPEG-TS, wenn der Account nur das erlaubt. Wähle MPEG-TS, wenn Kanäle stocken, nicht starten oder abbrechen – Server liefern oft eines der beiden Formate zuverlässiger."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Automático» solicita los canales en directo como HLS. Elige MPEG-TS si los canales se cortan, no arrancan o se interrumpen: los servidores suelen ofrecer un contenedor con más fiabilidad que el otro."
+            "value" : "«Automático» solicita los canales en directo como HLS, o como MPEG-TS si la cuenta solo permite ese formato. Elige MPEG-TS si los canales se cortan, no arrancan o se interrumpen: los servidores suelen ofrecer un contenedor con más fiabilidad que el otro."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "« Automatique » demande les chaînes en direct en HLS. Choisissez MPEG-TS si les chaînes saccadent, ne démarrent pas ou s’interrompent : les serveurs diffusent souvent l’un des deux conteneurs de manière plus fiable."
+            "value" : "« Automatique » demande les chaînes en direct en HLS, ou en MPEG-TS si le compte n’autorise que ce format. Choisissez MPEG-TS si les chaînes saccadent, ne démarrent pas ou s’interrompent : les serveurs diffusent souvent l’un des deux conteneurs de manière plus fiable."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Automatico» richiede i canali live come HLS. Scegli MPEG-TS se i canali scattano, non partono o si interrompono: i server offrono spesso un contenitore in modo più affidabile dell’altro."
+            "value" : "«Automatico» richiede i canali live come HLS, oppure come MPEG-TS se l’account consente solo quello. Scegli MPEG-TS se i canali scattano, non partono o si interrompono: i server offrono spesso un contenitore in modo più affidabile dell’altro."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「自動」はライブチャンネルを HLS で要求します。映像が途切れる、再生が始まらない、途中で止まる場合は MPEG-TS を選んでください。サーバーによってどちらか一方のコンテナが安定していることがよくあります。"
+            "value" : "「自動」はライブチャンネルを HLS で要求します（アカウントが MPEG-TS のみ許可している場合は MPEG-TS）。映像が途切れる、再生が始まらない、途中で止まる場合は MPEG-TS を選んでください。サーバーによってどちらか一方のコンテナが安定していることがよくあります。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "‘자동’은 라이브 채널을 HLS로 요청합니다. 채널이 끊기거나 재생이 시작되지 않거나 도중에 멈추면 MPEG-TS를 선택하세요. 서버에 따라 한쪽 컨테이너가 더 안정적인 경우가 많습니다."
+            "value" : "‘자동’은 라이브 채널을 HLS로 요청하며, 계정이 MPEG-TS만 허용하면 MPEG-TS로 요청합니다. 채널이 끊기거나 재생이 시작되지 않거나 도중에 멈추면 MPEG-TS를 선택하세요. 서버에 따라 한쪽 컨테이너가 더 안정적인 경우가 많습니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Automático» pede os canais ao vivo em HLS. Escolha MPEG-TS se os canais engasgarem, não iniciarem ou caírem — os servidores costumam fornecer um dos contentores de forma mais fiável do que o outro."
+            "value" : "«Automático» pede os canais ao vivo em HLS, ou em MPEG-TS quando a conta só permite esse formato. Escolha MPEG-TS se os canais engasgarem, não iniciarem ou caírem — os servidores costumam fornecer um dos contentores de forma mais fiável do que o outro."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“自动”会以 HLS 请求直播频道。如果频道卡顿、无法开始播放或中断，请选择 MPEG-TS——服务器往往对其中一种封装格式的支持更稳定。"
+            "value" : "“自动”会以 HLS 请求直播频道；如果账户只允许 MPEG-TS，则改用 MPEG-TS。如果频道卡顿、无法开始播放或中断，请选择 MPEG-TS——服务器往往对其中一种封装格式的支持更稳定。"
           }
         }
       }

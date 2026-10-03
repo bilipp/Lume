@@ -515,12 +515,18 @@ final nonisolated class XtreamClient: Sendable {
         return URL(string: "\(playlist.serverURL)/live/\(playlist.username)/\(playlist.password)/\(stream.streamId).\(ext)")
     }
 
+    /// An explicit argument or playlist choice wins. On automatic, `fallback`
+    /// is used unless the account's `allowed_output_formats` exclude it — panels
+    /// answer a disallowed container with a 405 on every engine, so the other
+    /// container is the only one that can play.
     private nonisolated static func resolvedFormat(
         _ requested: StreamFormat?,
         playlist: Playlist,
         fallback: StreamFormat
     ) -> StreamFormat {
-        requested ?? playlist.streamFormat.xtreamFormat ?? fallback
+        if let chosen = requested ?? playlist.streamFormat.xtreamFormat { return chosen }
+        guard let allowed = playlist.allowedOutputFormats, !allowed.contains(fallback.rawValue) else { return fallback }
+        return [StreamFormat.m3u8, .tsStream].first { allowed.contains($0.rawValue) } ?? fallback
     }
 
     /// `Y-m-d:H-i` is the start format Xtream Codes panels expect in a timeshift
