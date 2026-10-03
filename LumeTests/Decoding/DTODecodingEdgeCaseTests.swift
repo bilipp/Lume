@@ -299,6 +299,29 @@ struct DTODecodingEdgeCaseTests {
         #expect(response.serverInfo.timestampNow == 1_700_000_000)
     }
 
+    @Test func `auth response decodes allowed output formats`() throws {
+        let json = Data("""
+        {
+            "user_info": {"username": "test", "allowed_output_formats": ["TS", "rtmp"]},
+            "server_info": {}
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(XtreamAuthResponse.self, from: json)
+        #expect(response.userInfo.allowedOutputFormats == ["ts", "rtmp"])
+    }
+
+    @Test func `malformed allowed output formats read as not advertised`() throws {
+        // A panel that sends something other than a list must not fail auth.
+        let json = Data("""
+        {
+            "user_info": {"username": "test", "allowed_output_formats": "ts"},
+            "server_info": {}
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(XtreamAuthResponse.self, from: json)
+        #expect(response.userInfo.allowedOutputFormats == nil)
+    }
+
     // MARK: - XtreamCategory coercion
 
     @Test func `category decodes int id and string parent id`() throws {

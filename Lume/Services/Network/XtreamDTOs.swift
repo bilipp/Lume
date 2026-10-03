@@ -1,33 +1,5 @@
 import Foundation
 
-// MARK: - Lenient field decoding
-
-/// Xtream panel forks disagree on JSON types field by field — the same key can
-/// arrive as a string on one provider and a number on the next. These helpers
-/// accept either representation (and swallow null / absent keys) so a single
-/// odd field can't fail a whole response.
-nonisolated extension KeyedDecodingContainer {
-    func lenientString(forKey key: Key) -> String? {
-        if let string = try? decodeIfPresent(String.self, forKey: key) { return string }
-        if let int = try? decodeIfPresent(Int.self, forKey: key) { return String(int) }
-        if let double = try? decodeIfPresent(Double.self, forKey: key) { return String(double) }
-        return nil
-    }
-
-    func lenientInt(forKey key: Key) -> Int? {
-        if let int = try? decodeIfPresent(Int.self, forKey: key) { return int }
-        if let string = try? decodeIfPresent(String.self, forKey: key) { return Int(string) }
-        if let double = try? decodeIfPresent(Double.self, forKey: key) { return Int(double) }
-        return nil
-    }
-
-    func lenientDouble(forKey key: Key) -> Double? {
-        if let double = try? decodeIfPresent(Double.self, forKey: key) { return double }
-        if let string = try? decodeIfPresent(String.self, forKey: key) { return Double(string) }
-        return nil
-    }
-}
-
 // MARK: - Lenient list decoding
 
 /// A list endpoint payload. Panels return either a JSON array or — on some
@@ -120,6 +92,10 @@ nonisolated struct XtreamUserInfo: Decodable {
     let isTrial: String?
     let activeCons: String?
     let maxConnections: String?
+    /// The live containers the account may request (`m3u8`, `ts`, `rtmp`),
+    /// lowercased. Panels answer a container outside this list with a 405, so
+    /// `nil` — absent, or not a list of strings — means "not advertised".
+    let allowedOutputFormats: [String]?
 
     enum CodingKeys: String, CodingKey {
         case username, status
@@ -127,6 +103,7 @@ nonisolated struct XtreamUserInfo: Decodable {
         case isTrial = "is_trial"
         case activeCons = "active_cons"
         case maxConnections = "max_connections"
+        case allowedOutputFormats = "allowed_output_formats"
     }
 
     init(from decoder: Decoder) throws {
@@ -137,6 +114,8 @@ nonisolated struct XtreamUserInfo: Decodable {
         isTrial = container.lenientString(forKey: .isTrial)
         activeCons = container.lenientString(forKey: .activeCons)
         maxConnections = container.lenientString(forKey: .maxConnections)
+        allowedOutputFormats = (try? container.decodeIfPresent([String].self, forKey: .allowedOutputFormats))?
+            .map { $0.lowercased() }
     }
 }
 

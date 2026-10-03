@@ -45,6 +45,7 @@ nonisolated extension DebugLogExporter {
         if let expiry = playlist.expDate { account.append("expires \(expiryDescription(expiry, now: now))") }
         if let max = playlist.maxConnections { account.append("connections \(playlist.activeConnections ?? "?")/\(max)") }
         if let timezone = playlist.serverTimezone { account.append("server tz \(timezone)") }
+        if let outputs = playlist.allowedOutputFormatsRaw { account.append("outputs \(outputs)") }
         if playlist.streamFormat != .automatic { account.append("format \(playlist.streamFormat.rawValue)") }
         return account.isEmpty ? nil : "   account: \(account.joined(separator: " · "))"
     }
