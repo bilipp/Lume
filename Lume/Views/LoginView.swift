@@ -382,6 +382,7 @@ struct LoginView: View {
                     playlist.maxConnections = String(info.userInfo.maxConnections ?? "0")
                     playlist.activeConnections = String(info.userInfo.activeCons ?? "0")
                     playlist.expDate = info.userInfo.expDate
+                    playlist.allowedOutputFormats = info.userInfo.allowedOutputFormats
                     insertAndFinish(playlist)
                 }
             } catch {

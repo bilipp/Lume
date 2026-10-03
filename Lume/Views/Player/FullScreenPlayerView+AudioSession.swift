@@ -24,7 +24,7 @@ extension FullScreenPlayerView {
         // does not touch global audio state, so it is the app's job.)
         #if os(iOS) || os(tvOS)
             let session = AVAudioSession.sharedInstance()
-            try? session.setCategory(.playback, mode: .moviePlayback, options: [])
+            session.setMoviePlaybackCategory()
             // Ask for the route's full width (HDMI LPCM surround); harmless
             // when the route is stereo — the session clamps and LumeEngine
             // downmixes to whatever was actually granted.
@@ -38,6 +38,7 @@ extension FullScreenPlayerView {
                 .joined(separator: "+")
             Logger.player.info("""
             Audio session active: route=\(route, privacy: .public) \
+            policy=\(session.routeSharingPolicy.rawValue) \
             outputChannels=\(session.outputNumberOfChannels) \
             maxChannels=\(maxChannels) sampleRate=\(session.sampleRate)
             """)
@@ -50,3 +51,25 @@ extension FullScreenPlayerView {
         #endif
     }
 }
+
+#if os(iOS) || os(tvOS)
+    extension AVAudioSession {
+        /// `.playback` / `.moviePlayback`, on tvOS with the long-form route
+        /// sharing policy.
+        ///
+        /// On tvOS the HomePods picked in Control Center (a multi-room group, or
+        /// the TV's default speakers) are the shared long-form route; a session
+        /// on the default policy was heard on only one of two HomePods. KSPlayer
+        /// sets this policy itself; LumeEngine leaves the session to us.
+        /// `.longFormVideo` is unavailable on tvOS, hence `.longFormAudio`, which
+        /// takes no category options. iOS stays on the default policy: there,
+        /// AirPlay hands playback to AVPlayer.
+        func setMoviePlaybackCategory() {
+            #if os(tvOS)
+                try? setCategory(.playback, mode: .moviePlayback, policy: .longFormAudio, options: [])
+            #else
+                try? setCategory(.playback, mode: .moviePlayback, options: [])
+            #endif
+        }
+    }
+#endif
