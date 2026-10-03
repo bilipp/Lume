@@ -18,10 +18,10 @@ struct GuidePreviewLocalizationTests {
     /// the Lume Pro paywall entry (the row shares the feature title's key).
     static let newKeys = [
         "Guide Preview",
-        "Regular",
+        "Large",
         "Small",
         "Info Only",
-        "Regular and Small play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.",
+        "Small and Large play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.",
         "Preview the focused channel, muted, right in the TV Guide."
     ]
 

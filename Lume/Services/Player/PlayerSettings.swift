@@ -200,12 +200,12 @@ enum PlayerSettings {
     }
 
     /// How the tvOS Guide shows its now-playing hero — a `GuidePreviewMode`
-    /// raw value. Device-wide, `regular` by default; a playing preview holds a
+    /// raw value. Device-wide, `small` by default; a playing preview holds a
     /// provider connection while the Guide is browsed, and the video is also
     /// gated by Lume Pro (`PremiumFeature.guidePreview`).
     static let tvGuidePreviewModeKey = "player.tvGuidePreviewMode"
 
-    static let tvGuidePreviewModeDefault = GuidePreviewMode.regular
+    static let tvGuidePreviewModeDefault = GuidePreviewMode.small
 
     // MARK: - Playback behaviour
 

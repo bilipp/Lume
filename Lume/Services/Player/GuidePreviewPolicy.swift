@@ -10,22 +10,23 @@
 import Foundation
 
 /// How the tvOS Guide's now-playing hero appears above the timeline.
-/// `regular` and `small` play the muted preview (Lume Pro); without Pro, or
+/// `small` and `large` play the muted preview (Lume Pro); without Pro, or
 /// with the system's video autoplay off, they keep their size and show the
 /// channel's logo instead.
 nonisolated enum GuidePreviewMode: String, CaseIterable {
-    case regular
-    /// A shorter hero, so the guide shows two more rows.
+    /// The default: a short hero, leaving the guide two more rows.
     case small
-    /// The regular hero with the logo in place of the video.
+    /// The full design-size hero.
+    case large
+    /// The large hero with the logo in place of the video.
     case infoOnly
     /// No hero: the guide takes the full height.
     case off
 
     var displayName: String {
         switch self {
-        case .regular: String(localized: "Regular")
         case .small: String(localized: "Small")
+        case .large: String(localized: "Large")
         case .infoOnly: String(localized: "Info Only")
         case .off: String(localized: "Off")
         }
@@ -33,7 +34,7 @@ nonisolated enum GuidePreviewMode: String, CaseIterable {
 
     /// Whether the hero may play the channel's video at all.
     var playsVideo: Bool {
-        self == .regular || self == .small
+        self == .small || self == .large
     }
 
     var showsHero: Bool {
@@ -42,7 +43,7 @@ nonisolated enum GuidePreviewMode: String, CaseIterable {
 
     /// An unknown or missing stored value reads as the default.
     init(storedValue: String?) {
-        self = storedValue.flatMap(Self.init(rawValue:)) ?? .regular
+        self = storedValue.flatMap(Self.init(rawValue:)) ?? .small
     }
 }
 

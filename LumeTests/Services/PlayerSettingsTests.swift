@@ -58,7 +58,7 @@ struct PlayerSettingsTests {
 
     @Test func `guide preview mode storage key and default`() {
         #expect(PlayerSettings.tvGuidePreviewModeKey == "player.tvGuidePreviewMode")
-        #expect(PlayerSettings.tvGuidePreviewModeDefault == .regular)
+        #expect(PlayerSettings.tvGuidePreviewModeDefault == .small)
     }
 
     @Test func `guide preview mode reads the default until a value is stored`() throws {
@@ -66,11 +66,11 @@ struct PlayerSettingsTests {
         defer { UserDefaults.standard.removePersistentDomain(forName: name) }
         let defaults = try #require(UserDefaults(suiteName: name))
         let key = PlayerSettings.tvGuidePreviewModeKey
-        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .regular)
-        defaults.set(GuidePreviewMode.small.rawValue, forKey: key)
         #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .small)
+        defaults.set(GuidePreviewMode.large.rawValue, forKey: key)
+        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .large)
         defaults.set("bogus", forKey: key)
-        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .regular)
+        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .small)
     }
 }
 

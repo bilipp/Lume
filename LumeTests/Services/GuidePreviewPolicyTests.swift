@@ -201,8 +201,8 @@ struct GuidePreviewPolicyTests {
 
 struct GuidePreviewModeTests {
     @Test func `only the sized previews play video`() {
-        #expect(GuidePreviewMode.regular.playsVideo)
         #expect(GuidePreviewMode.small.playsVideo)
+        #expect(GuidePreviewMode.large.playsVideo)
         #expect(!GuidePreviewMode.infoOnly.playsVideo)
         #expect(!GuidePreviewMode.off.playsVideo)
     }
@@ -212,12 +212,12 @@ struct GuidePreviewModeTests {
     }
 
     @Test func `the settings row cycles every mode in order`() {
-        #expect(GuidePreviewMode.allCases == [.regular, .small, .infoOnly, .off])
+        #expect(GuidePreviewMode.allCases == [.small, .large, .infoOnly, .off])
     }
 
-    @Test func `unknown or missing stored values read as regular`() {
-        #expect(GuidePreviewMode(storedValue: nil) == .regular)
-        #expect(GuidePreviewMode(storedValue: "player.tvGuidePreview") == .regular)
+    @Test func `unknown or missing stored values read as small`() {
+        #expect(GuidePreviewMode(storedValue: nil) == .small)
+        #expect(GuidePreviewMode(storedValue: "regular") == .small)
         #expect(GuidePreviewMode(storedValue: "infoOnly") == .infoOnly)
     }
 }

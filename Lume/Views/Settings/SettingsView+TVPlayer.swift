@@ -110,7 +110,7 @@ import SwiftUI
                         tvGuidePreviewModeRaw = PlayerOptionCycle.next(tvGuidePreviewModeRaw, in: GuidePreviewMode.self)
                     }
 
-                    Text("Regular and Small play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.")
+                    Text("Small and Large play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)

@@ -28,7 +28,7 @@
 
         init(_ mode: GuidePreviewMode) {
             switch mode {
-            case .regular, .infoOnly:
+            case .large, .infoOnly:
                 height = 360
                 isCompact = false
             case .small:
@@ -53,7 +53,7 @@
 
     extension EnvironmentValues {
         /// Set by the Guide's preview band for the hero inside it.
-        @Entry var epgHeroLayout = EPGHeroLayout(.regular)
+        @Entry var epgHeroLayout = EPGHeroLayout(PlayerSettings.tvGuidePreviewModeDefault)
     }
 
     /// The channel the preview has settled on, snapshotted so comparing panes
