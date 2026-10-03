@@ -50,10 +50,19 @@
         let onMove: (MoveCommandDirection) -> Void
         let onSelect: () -> Void
         let onLongSelect: () -> Void
+        /// Whether focus just walked out of the strip (Left, Up, or Menu to
+        /// the rail); runs right before `isFocused` turns false.
+        let onDeparture: (_ walkedOut: Bool) -> Void
         /// Bumped by the scroller to hand real focus to the rail (Menu from
         /// the hub). A token, not a call: the UIKit move must run outside the
         /// SwiftUI action that requested it.
         let railExitToken: Int
+        /// What VoiceOver reads. The strip itself is the focused element, so a
+        /// SwiftUI label on its host never reaches it.
+        let accessibilityLabel: String
+        /// The hub's long-press actions for VoiceOver, built only when it asks
+        /// so nothing here observes the channel's favourite flag.
+        let accessibilityActions: () -> [UIAccessibilityCustomAction]
 
         func makeUIView(context: Context) -> ContainerView {
             let view = ContainerView()
@@ -67,8 +76,9 @@
         }
 
         private func apply(to view: ContainerView, context _: Context) {
-            view.strip.onFocusChange = { focused in
+            view.strip.onFocusChange = { focused, walkedOut in
                 Task { @MainActor in
+                    if !focused { onDeparture(walkedOut) }
                     isFocused = focused
                 }
             }
@@ -77,6 +87,15 @@
             view.strip.onLongSelect = onLongSelect
             view.setExitsLeft(exitsLeft)
             view.setExitsUp(exitsUp)
+            view.strip.actionsProvider = accessibilityActions
+            if view.strip.accessibilityLabel != accessibilityLabel {
+                view.strip.accessibilityLabel = accessibilityLabel
+                // Virtual moves never move real focus, so VoiceOver has to be
+                // told the focused element now reads differently.
+                if view.strip.isEngineFocused, UIAccessibility.isVoiceOverRunning {
+                    UIAccessibility.post(notification: .layoutChanged, argument: view.strip)
+                }
+            }
             if view.lastRailExitToken != railExitToken {
                 view.lastRailExitToken = railExitToken
                 view.moveFocusToRail()
@@ -159,6 +178,7 @@
             /// own callbacks, which the engine honours.
             func moveFocusToRail() {
                 guard strip.isEngineFocused, let rail = railContainer() else { return }
+                strip.walksOut = true
                 preferredOverride = [rail]
                 setNeedsFocusUpdate()
                 updateFocusIfNeeded()
@@ -229,7 +249,7 @@
 
             override init(frame: CGRect) {
                 super.init(frame: frame)
-                backgroundColor = UIColor.white.withAlphaComponent(0.01)
+                backgroundColor = UIColor.black.withAlphaComponent(0.01)
             }
 
             @available(*, unavailable)
@@ -243,7 +263,7 @@
         }
 
         final class StripView: UIView {
-            var onFocusChange: ((Bool) -> Void)?
+            var onFocusChange: ((_ focused: Bool, _ walkedOut: Bool) -> Void)?
             var onMove: ((MoveCommandDirection) -> Void)?
             var onSelect: (() -> Void)?
             var onLongSelect: (() -> Void)?
@@ -255,6 +275,11 @@
             var exitsUp = false
 
             private(set) var isEngineFocused = false
+            /// Whether the last action walks focus out. Every press resets it,
+            /// so a stale walk-out the engine had no target for can't misreport
+            /// a later presentation.
+            var walksOut = false
+            var actionsProvider: (() -> [UIAccessibilityCustomAction])?
             private var longPressFired = false
             private var moveConsumed = false
 
@@ -262,7 +287,8 @@
                 super.init(frame: frame)
                 // Near-invisible but non-zero: fully transparent views are
                 // dropped from the engine's directional candidacy.
-                backgroundColor = UIColor.white.withAlphaComponent(0.01)
+                backgroundColor = UIColor.black.withAlphaComponent(0.01)
+                isAccessibilityElement = true
 
                 let select = UITapGestureRecognizer(target: self, action: #selector(handleSelect))
                 select.allowedPressTypes = [NSNumber(value: UIPress.PressType.select.rawValue)]
@@ -283,16 +309,22 @@
                 true
             }
 
+            override var accessibilityCustomActions: [UIAccessibilityCustomAction]? {
+                get { actionsProvider?() }
+                set {}
+            }
+
             override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
                 super.didUpdateFocus(in: context, with: coordinator)
                 if context.nextFocusedView === self {
                     isEngineFocused = true
+                    walksOut = false
                     onEngineFocusChanged?()
-                    onFocusChange?(true)
+                    onFocusChange?(true, false)
                 } else if context.previouslyFocusedView === self {
                     isEngineFocused = false
                     onEngineFocusChanged?()
-                    onFocusChange?(false)
+                    onFocusChange?(false, walksOut)
                 }
             }
 
@@ -309,12 +341,19 @@
                 guard let direction = Self.direction(from: context.focusHeading) else { return true }
                 // Left from the hub leaves the guide: allow the move so the
                 // engine carries focus to the exit guide (→ the rail).
-                if direction == .left, exitsLeft { return true }
+                if direction == .left, exitsLeft {
+                    walksOut = true
+                    return true
+                }
                 // Up from the top row leaves the guide: allow the move so the
                 // engine carries focus to the tab bar above.
-                if direction == .up, exitsUp { return true }
+                if direction == .up, exitsUp {
+                    walksOut = true
+                    return true
+                }
                 // Every other direction stays inside: veto and navigate
                 // virtually, even when the engine targeted the tab bar.
+                walksOut = false
                 moveConsumed = true
                 Task { @MainActor in
                     self.moveConsumed = false
@@ -338,12 +377,14 @@
                     longPressFired = false
                     return
                 }
+                walksOut = false
                 onSelect?()
             }
 
             @objc private func handleLongSelect(_ recognizer: UILongPressGestureRecognizer) {
                 guard recognizer.state == .began else { return }
                 longPressFired = true
+                walksOut = false
                 onLongSelect?()
             }
         }

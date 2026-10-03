@@ -14,17 +14,21 @@ import Testing
 
 @Suite("Guide preview localization")
 struct GuidePreviewLocalizationTests {
-    /// The Settings › Player › Live TV toggle and its footnote, plus the
-    /// Lume Pro paywall entry (the toggle shares the feature title's key).
+    /// The Settings › Player › Live TV row, its choices and footnote, plus
+    /// the Lume Pro paywall entry (the row shares the feature title's key).
     static let newKeys = [
         "Guide Preview",
-        "Plays the focused channel muted in the Guide. Uses a provider connection while you browse.",
+        "Regular",
+        "Small",
+        "Info Only",
+        "Regular and Small play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.",
         "Preview the focused channel, muted, right in the TV Guide."
     ]
 
-    /// Existing keys the preview pane and the retry-less tile reuse.
+    /// Existing keys the preview pane, the retry-less tile and the row reuse.
     static let reusedKeys = [
-        "Stream unavailable"
+        "Stream unavailable",
+        "Off"
     ]
 
     @Test func `every Guide preview string is translated in all nine locales`() throws {

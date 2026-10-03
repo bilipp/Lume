@@ -244,14 +244,7 @@ actor SportsCrestTintCache {
     /// Loads through the shared image pipeline, so a crest the hub already shows
     /// comes from its caches instead of the network.
     static let pipelineImage: @Sendable (URL) async -> CGImage? = { url in
-        guard let image = try? await ImagePipeline.shared.image(for: url, maxPixelSize: SportsCrestTint.thumbnailSize) else {
-            return nil
-        }
-        #if canImport(UIKit)
-            return image.cgImage
-        #else
-            return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        #endif
+        await ImagePipeline.cgImage(for: url, maxPixelSize: SportsCrestTint.thumbnailSize)
     }
 }
 

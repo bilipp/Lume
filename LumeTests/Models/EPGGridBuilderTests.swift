@@ -143,4 +143,18 @@ struct EPGGridBuilderTests {
 
         #expect(Set(cells.map(\.id)).count == cells.count)
     }
+
+    @MainActor
+    @Test func `rows carry the channel number, nil when the provider sends none`() {
+        let numbered = LiveStream(id: "l-1", streamId: 1, name: "One", num: 7)
+        let unnumbered = LiveStream(id: "l-2", streamId: 2, name: "Two")
+
+        let rows = EPGGridBuilder.rows(
+            streams: [numbered, unnumbered],
+            cellsByChannel: [:],
+            timeline: Self.timeline
+        )
+
+        #expect(rows.map(\.number) == [7, nil])
+    }
 }

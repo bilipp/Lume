@@ -9,9 +9,9 @@
 import SwiftData
 import SwiftUI
 
-/// How the Live TV detail area presents channels: a scannable list (default) or
-/// the EPG timeline grid. Persisted across launches.
-enum LiveTVLayoutMode: String, CaseIterable, Identifiable {
+/// How the Live TV detail area presents channels: a scannable list or the EPG
+/// timeline grid. Persisted per device across launches.
+nonisolated enum LiveTVLayoutMode: String, CaseIterable, Identifiable {
     case list
     case guide
 
@@ -19,8 +19,8 @@ enum LiveTVLayoutMode: String, CaseIterable, Identifiable {
         rawValue
     }
 
-    var label: LocalizedStringKey {
-        self == .list ? "List" : "Guide"
+    var displayName: String {
+        self == .list ? String(localized: "List") : String(localized: "Guide")
     }
 
     var systemImage: String {
@@ -28,6 +28,22 @@ enum LiveTVLayoutMode: String, CaseIterable, Identifiable {
     }
 
     static let storageKey = "lume.liveTV.layoutMode"
+
+    static func platformDefault(isTV: Bool) -> LiveTVLayoutMode {
+        isTV ? .guide : .list
+    }
+
+    #if os(tvOS)
+        static let defaultMode = platformDefault(isTV: true)
+    #else
+        static let defaultMode = platformDefault(isTV: false)
+    #endif
+
+    /// Resolves the stored raw value; a missing or unknown one reads as the
+    /// platform default, so a user who never picked follows it.
+    init(storedValue: String?) {
+        self = storedValue.flatMap(Self.init(rawValue:)) ?? Self.defaultMode
+    }
 }
 
 struct LiveTVView: View {
@@ -57,6 +73,7 @@ struct LiveTVView: View {
     #if os(tvOS)
         @Environment(DeepLinkRouter.self) private var router
         @State private var guidePreview = GuidePreviewController()
+        @State private var guideHero = GuideHeroModel()
     #else
         /// Non-nil while Multi-View is up; carries the channels it opened with,
         /// when it was started from a channel rather than the toolbar.
@@ -67,7 +84,7 @@ struct LiveTVView: View {
 
     @AppStorage(SortStorageKey.liveCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.liveContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
-    @AppStorage(LiveTVLayoutMode.storageKey) private var layoutModeRaw: String = LiveTVLayoutMode.list.rawValue
+    @AppStorage(LiveTVLayoutMode.storageKey) private var layoutModeRaw: String = LiveTVLayoutMode.defaultMode.rawValue
 
     private var categorySort: CategorySortOption {
         CategorySortOption(rawValue: categorySortRaw) ?? .playlist
@@ -78,14 +95,14 @@ struct LiveTVView: View {
     }
 
     private var layoutMode: LiveTVLayoutMode {
-        LiveTVLayoutMode(rawValue: layoutModeRaw) ?? .list
+        LiveTVLayoutMode(storedValue: layoutModeRaw)
     }
 
     /// Guide/List segmented switch shared across platforms.
     private var layoutModePicker: some View {
         Picker("Layout", selection: $layoutModeRaw) {
             ForEach(LiveTVLayoutMode.allCases) { mode in
-                Label(mode.label, systemImage: mode.systemImage).tag(mode.rawValue)
+                Label(mode.displayName, systemImage: mode.systemImage).tag(mode.rawValue)
             }
         }
         .pickerStyle(.segmented)
@@ -277,34 +294,38 @@ struct LiveTVView: View {
     }
 
     #if os(tvOS)
-        /// One shape for both modes: a slim category rail on the leading edge —
-        /// topped by a single List/Guide switch — beside the content area, which
-        /// shows either the channel list or the programme guide. Sharing one rail
-        /// and one switch keeps moving between the two views consistent.
+        /// One shape for both modes: the category sidebar on the leading edge
+        /// beside the content area, which shows either the channel list or the
+        /// programme guide (picked in Settings › Player › Live TV).
         private func tvOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
             TVLiveTVScreen(
                 sections: sections,
                 selectedSection: selectedSectionBinding,
                 displayedSection: displayed,
-                layoutModeRaw: $layoutModeRaw,
                 contentSort: contentSort,
                 onPlay: { playChannel($0, scope: displayed?.scope) },
                 onPlayCatchup: { playCatchup($0, cell: $1) },
-                onOpenMultiView: { openMultiView() },
                 onStartMultiView: { startMultiView(with: $0) },
                 playlistPrefix: playlistPrefix,
                 sourceType: activePlaylist?.knownSourceType,
+                layoutMode: layoutMode,
                 preview: EPGGuidePreviewInputs(
                     media: { [activePlaylist] stream in
                         activePlaylist.flatMap { PlayableMedia.from(stream: stream, playlist: $0) }
                     },
                     playlistID: activePlaylist?.id,
-                    controller: guidePreview
+                    controller: guidePreview,
+                    hero: guideHero
                 )
             )
             // Never from an `onDisappear`, which a `fullScreenCover` doesn't
             // deliver.
             .guidePreviewSuspension(guidePreview, playingMedia: $playingMedia)
+            // The list has no settled channel to tint the glow from.
+            .background {
+                TVLiveTVBackground(hero: layoutMode == .guide ? guideHero : nil)
+                    .ignoresSafeArea()
+            }
         }
     #endif
 

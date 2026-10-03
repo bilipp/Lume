@@ -2,33 +2,58 @@
 //  EPGPreviewPane.swift
 //  Lume
 //
-//  The tvOS Guide's live preview band: a muted picture of the settled channel
-//  over the channel column, and what it is airing now beside it. It sits
-//  above the time ruler, outside the focus strip, and is never a focus target.
+//  The tvOS Guide's now-playing hero: what the focused channel is airing on
+//  the left, the settled channel's muted picture on the right. It sits above the time ruler,
+//  outside the focus strip, and is never a focus target.
 //
 
 #if os(tvOS)
     import SwiftUI
 
     extension EPGMetrics {
-        var previewBandHeight: CGFloat {
-            200
-        }
-
-        /// The video spans the channel column, so nothing in the band sits left
-        /// of it — `EPGFocusStrip` would read anything there as the rail.
-        var previewVideoWidth: CGFloat {
-            channelColumnWidth
+        var previewVideoCornerRadius: CGFloat {
+            28
         }
 
         var previewSpacing: CGFloat {
-            32
+            48
+        }
+    }
+
+    /// The hero's size for the chosen `GuidePreviewMode`. Small frees exactly
+    /// two guide rows (144 pt) and compacts the info beside the picture.
+    struct EPGHeroLayout: Equatable {
+        let height: CGFloat
+        let isCompact: Bool
+
+        init(_ mode: GuidePreviewMode) {
+            switch mode {
+            case .regular, .infoOnly:
+                height = 360
+                isCompact = false
+            case .small:
+                height = 216
+                isCompact = true
+            case .off:
+                height = 0
+                isCompact = false
+            }
         }
 
-        /// The gap between the band and the time ruler beneath it.
-        var previewBandBottomPadding: CGFloat {
-            rowSpacing * 2
+        /// 16:9 at the hero's height.
+        var videoWidth: CGFloat {
+            (height * 16 / 9).rounded()
         }
+
+        /// The gap between the hero and the time ruler beneath it.
+        var bottomPadding: CGFloat {
+            height > 0 ? 36 : 0
+        }
+    }
+
+    extension EnvironmentValues {
+        /// Set by the Guide's preview band for the hero inside it.
+        @Entry var epgHeroLayout = EPGHeroLayout(.regular)
     }
 
     /// The channel the preview has settled on, snapshotted so comparing panes
@@ -46,15 +71,24 @@
 
     extension EPGPreviewTarget {
         init(row: EPGChannelRow, rowIndex: Int, media: PlayableMedia?) {
-            self.init(streamID: row.id, rowIndex: rowIndex, name: row.name, logoURL: row.logoURL, media: media)
+            self.init(
+                streamID: row.id,
+                rowIndex: rowIndex,
+                name: row.name,
+                logoURL: row.logoURL,
+                media: media
+            )
         }
     }
 
     struct EPGPreviewPane: View, Equatable {
         let target: EPGPreviewTarget?
-        /// The focused row's cells; the info line always shows the programme
-        /// airing now, whichever cell has focus.
-        let cells: [EPGProgramCell]
+        /// The settled channel's row, described while focus is outside the
+        /// guide.
+        let settledRow: EPGChannelRow?
+        /// Read only by the info block, which follows the focused row, and the
+        /// placeholder card's tint.
+        let hero: GuideHeroModel?
         let isAllowed: Bool
         /// The channel already failed this Guide visit and is not retried.
         let isFailed: Bool
@@ -64,13 +98,15 @@
         let onFailure: () -> Void
 
         private let metrics = EPGMetrics.current
+        @Environment(\.epgHeroLayout) private var layout
         /// Per pane, so a stale pane's late `onDisappear` can't release the
         /// hold of the pane that replaced it.
         @State private var holdOwner = "guide-preview-\(UUID().uuidString)"
 
         init(
             target: EPGPreviewTarget?,
-            cells: [EPGProgramCell],
+            settledRow: EPGChannelRow?,
+            hero: GuideHeroModel?,
             isAllowed: Bool,
             isFailed: Bool = false,
             restartToken: Int,
@@ -78,7 +114,8 @@
             onFailure: @escaping () -> Void
         ) {
             self.target = target
-            self.cells = cells
+            self.settledRow = settledRow
+            self.hero = hero
             self.isAllowed = isAllowed
             self.isFailed = isFailed
             self.restartToken = restartToken
@@ -88,7 +125,8 @@
 
         static func == (lhs: Self, rhs: Self) -> Bool {
             lhs.target == rhs.target
-                && lhs.cells == rhs.cells
+                && lhs.settledRow?.cells == rhs.settledRow?.cells
+                && lhs.hero === rhs.hero
                 && lhs.isAllowed == rhs.isAllowed
                 && lhs.isFailed == rhs.isFailed
                 && lhs.restartToken == rhs.restartToken
@@ -96,25 +134,24 @@
         }
 
         var body: some View {
-            HStack(alignment: .center, spacing: metrics.previewSpacing) {
-                video
-                    .frame(width: metrics.previewVideoWidth, height: metrics.previewVideoWidth * 9 / 16)
-                    .clipShape(RoundedRectangle(cornerRadius: metrics.blockCornerRadius, style: .continuous))
+            // The info starts at the band's leading edge, level with the focus
+            // strip: `EPGFocusStrip` reads anything left of the strip as the rail.
+            HStack(alignment: .bottom, spacing: metrics.previewSpacing) {
+                EPGHeroInfo(hero: hero, settled: settledRow)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
 
-                if let target {
-                    TimelineView(.everyMinute) { context in
-                        EPGPreviewInfo(
-                            channelName: target.name,
-                            programme: GuidePreviewPolicy.currentProgramme(in: cells, at: context.date),
-                            now: context.date
-                        )
-                    }
-                }
-
-                Spacer(minLength: 0)
+                EPGHeroVideoFigure(
+                    target: target,
+                    isAllowed: isAllowed,
+                    isFailed: isFailed,
+                    restartToken: restartToken,
+                    handle: handle,
+                    hero: hero,
+                    onFailure: onFailure
+                )
             }
-            .frame(height: metrics.previewBandHeight)
-            .padding(.bottom, metrics.previewBandBottomPadding)
+            .frame(height: layout.height)
+            .padding(.bottom, layout.bottomPadding)
             .focusable(false)
             .accessibilityHidden(true)
             .onChange(of: holdsPlayback, initial: true) { _, holds in
@@ -127,56 +164,6 @@
         /// records as any other full-screen session does.
         private var holdsPlayback: Bool {
             target?.media != nil && isAllowed && handle?.owner != .fullScreen
-        }
-
-        private var video: some View {
-            ZStack {
-                Color.black
-
-                if let target {
-                    if isFailed {
-                        LiveChannelUnavailableBadge(logoURL: target.logoURL, logoSide: 96)
-                    } else if isAllowed, let media = target.media {
-                        MultiViewTilePlayer(
-                            media: media,
-                            isMuted: true,
-                            role: .guidePreview(handle: handle),
-                            onFailure: onFailure
-                        )
-                        .id("\(target.streamID)-\(restartToken)")
-                    } else {
-                        LiveChannelLogoPlaceholder(url: target.logoURL, side: 96)
-                    }
-                }
-            }
-        }
-    }
-
-    private struct EPGPreviewInfo: View {
-        let channelName: String
-        let programme: EPGProgramCell?
-        let now: Date
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 10) {
-                if let programme {
-                    Text(programme.title)
-                        .font(.system(size: 34, weight: .semibold))
-                        .lineLimit(1)
-                    Text(programme.start ..< programme.end, format: .interval.hour().minute())
-                        .font(.system(size: 24))
-                        .foregroundStyle(.secondary)
-                    ProgressView(value: programme.progress(at: now))
-                        .progressViewStyle(.linear)
-                        // `Color.accentColor` is white on tvOS.
-                        .tint(.red)
-                        .frame(maxWidth: 520)
-                }
-                Text(channelName)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
         }
     }
 
@@ -194,10 +181,15 @@
                 listingID: "b", isGap: false, width: 240
             )
         ]
+        let row = EPGChannelRow(
+            id: "1", stream: LiveStream(id: "1", streamId: 1, name: "BBC One"), name: "BBC One",
+            logoURL: nil, catchupCapable: false, archiveDays: 1, cells: cells
+        )
         VStack(alignment: .leading, spacing: 40) {
             EPGPreviewPane(
-                target: EPGPreviewTarget(streamID: "1", rowIndex: 0, name: "BBC One", logoURL: nil, media: nil),
-                cells: cells,
+                target: EPGPreviewTarget(row: row, rowIndex: 0, media: nil),
+                settledRow: row,
+                hero: nil,
                 isAllowed: false,
                 restartToken: 0,
                 handle: nil,
@@ -205,14 +197,15 @@
             )
             EPGPreviewPane(
                 target: EPGPreviewTarget(streamID: "2", rowIndex: 1, name: "CNN International", logoURL: nil, media: nil),
-                cells: [],
+                settledRow: nil,
+                hero: nil,
                 isAllowed: true,
                 isFailed: true,
                 restartToken: 0,
                 handle: nil,
                 onFailure: {}
             )
-            EPGPreviewPane(target: nil, cells: [], isAllowed: true, restartToken: 0, handle: nil, onFailure: {})
+            EPGPreviewPane(target: nil, settledRow: nil, hero: nil, isAllowed: true, restartToken: 0, handle: nil, onFailure: {})
         }
         .padding(60)
     }

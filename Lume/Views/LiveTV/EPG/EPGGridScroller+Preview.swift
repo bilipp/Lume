@@ -2,7 +2,7 @@
 //  EPGGridScroller+Preview.swift
 //  Lume
 //
-//  Wires the tvOS Guide's live preview band (`EPGPreviewPane`) into the
+//  Wires the tvOS Guide's now-playing hero (`EPGPreviewPane`) into the
 //  scroller: the Guide opens on its first channel, focus has to rest on
 //  another channel before the preview switches to it, and the last channel
 //  keeps playing while focus is on the rail or the tab bar.
@@ -20,17 +20,21 @@
         var previewBand: some View {
             EPGPreviewBand(
                 target: previewTarget,
-                cells: previewCells,
+                settledRow: previewRow,
                 dataVersion: dataVersion,
                 isFrozen: isPreviewFrozen,
                 isFailed: previewTarget.map { previewFailedStreamIDs.contains($0.streamID) } ?? false,
                 controller: preview.controller,
+                hero: preview.hero,
                 playlistID: preview.playlistID,
                 onFailure: { [streamID = previewTarget?.streamID] in markPreviewFailed(streamID) }
             )
             .equatable()
             .task(id: PreviewSettleKey(streamID: previewFocusedStreamID, isFrozen: isPreviewFrozen)) {
                 await settlePreview()
+            }
+            .onChange(of: HeroFocusKey(streamID: previewFocusedStreamID, dataVersion: dataVersion), initial: true) {
+                publishFocusedRow()
             }
         }
 
@@ -43,27 +47,21 @@
 
         /// `nil` while real focus is outside the grid.
         private var previewFocusedStreamID: String? {
-            guard let focus = virtualFocus, rows.indices.contains(focus.rowIndex) else { return nil }
-            return rows[focus.rowIndex].id
+            virtualFocusRow?.id
         }
 
-        private var previewCells: [EPGProgramCell] {
-            guard let target = previewTarget else { return [] }
+        private var previewRow: EPGChannelRow? {
+            guard let target = previewTarget else { return nil }
             if rows.indices.contains(target.rowIndex), rows[target.rowIndex].id == target.streamID {
-                return rows[target.rowIndex].cells
+                return rows[target.rowIndex]
             }
-            return rows.first { $0.id == target.streamID }?.cells ?? []
+            return rows.first { $0.id == target.streamID }
         }
 
         private func settlePreview() async {
+            // Settles whether or not the preview may play: the hero describes
+            // the settled channel and shows its logo when the video can't run.
             guard !isPreviewFrozen else { return }
-            guard EPGPreviewBand.isAvailable(
-                isPremium: PremiumManager.shared.isPremium,
-                autoplayAllowed: UIAccessibility.isVideoAutoplayEnabled
-            ) else {
-                if previewTarget != nil { previewTarget = nil }
-                return
-            }
             let streamID: String
             switch GuidePreviewPolicy.step(
                 focused: previewFocusedStreamID,
@@ -82,6 +80,18 @@
             guard let rowIndex = rows.firstIndex(where: { $0.id == streamID }) else { return }
             let row = rows[rowIndex]
             previewTarget = EPGPreviewTarget(row: row, rowIndex: rowIndex, media: preview.media(row.stream))
+            preview.hero?.settleGlow(onLogo: row.logoURL)
+        }
+
+        /// Hands the hero's info block the focused row on every row change,
+        /// through the hero model so the scroller never reads it back.
+        private func publishFocusedRow() {
+            guard let hero = preview.hero else { return }
+            // A focus move runs in the focus engine's animated context; the
+            // info swaps rather than crossfading on every press.
+            withTransaction(Transaction(animation: nil)) {
+                hero.focusedRow = virtualFocusRow
+            }
         }
 
         private func markPreviewFailed(_ streamID: String?) {
@@ -97,23 +107,37 @@
         let isFrozen: Bool
     }
 
-    /// Decides whether the band shows at all. Owns the reads that change on
+    private struct HeroFocusKey: Equatable {
+        let streamID: String?
+        let dataVersion: Int
+    }
+
+    /// Decides whether the band's tile may play at all. Owns the reads that change on
     /// their own — Lume Pro and the accessibility autoplay setting — so they
     /// never re-render the scroller.
     private struct EPGPreviewBand: View, Equatable {
         let target: EPGPreviewTarget?
-        /// Compared through `target` and `dataVersion` instead: the cells of a
-        /// channel only change with the data.
-        let cells: [EPGProgramCell]
+        /// Compared through `target` and `dataVersion` instead: a channel's
+        /// row only changes with the data.
+        let settledRow: EPGChannelRow?
         let dataVersion: Int
         let isFrozen: Bool
         let isFailed: Bool
         let controller: GuidePreviewController?
+        let hero: GuideHeroModel?
         let playlistID: UUID?
         let onFailure: () -> Void
 
         @State private var premium = PremiumManager.shared
         @State private var autoplayAllowed = UIAccessibility.isVideoAutoplayEnabled
+        /// Read here, never by the scroller, so changing it re-renders only
+        /// the band; the grid below takes whatever height the band leaves.
+        @AppStorage(PlayerSettings.tvGuidePreviewModeKey)
+        private var modeRaw = PlayerSettings.tvGuidePreviewModeDefault.rawValue
+
+        private var mode: GuidePreviewMode {
+            GuidePreviewMode(storedValue: modeRaw)
+        }
 
         static func == (lhs: Self, rhs: Self) -> Bool {
             lhs.target == rhs.target
@@ -121,32 +145,47 @@
                 && lhs.isFrozen == rhs.isFrozen
                 && lhs.isFailed == rhs.isFailed
                 && lhs.controller === rhs.controller
+                && lhs.hero === rhs.hero
                 && lhs.playlistID == rhs.playlistID
         }
 
-        static func isAvailable(isPremium: Bool, autoplayAllowed: Bool) -> Bool {
-            PlayerSettings.tvGuidePreviewEnabled && isPremium && autoplayAllowed
+        static func isAvailable(mode: GuidePreviewMode, isPremium: Bool, autoplayAllowed: Bool) -> Bool {
+            mode.playsVideo && isPremium && autoplayAllowed
         }
 
         var body: some View {
             Group {
-                // Fixed per visit, so the grid never changes height while browsing.
-                if Self.isAvailable(isPremium: premium.isPremium, autoplayAllowed: autoplayAllowed) {
+                // Both hero branches keep the hero's full height, so the grid
+                // never moves when the preview becomes available or stops
+                // being so. Off leaves a zero-height host, never an empty
+                // view, so the settle task above keeps running.
+                if !mode.showsHero {
+                    Color.clear.frame(height: 0)
+                } else if Self.isAvailable(mode: mode, isPremium: premium.isPremium, autoplayAllowed: autoplayAllowed) {
                     EPGPreviewBandContent(
                         target: target,
-                        cells: cells,
+                        settledRow: settledRow,
                         isFrozen: isFrozen,
                         isFailed: isFailed,
                         controller: controller,
+                        hero: hero,
                         playlistID: playlistID,
                         onFailure: onFailure
                     )
                 } else {
-                    // Zero height rather than `EmptyView`: the scroller's settle
-                    // `.task` hangs off this view and never runs on an empty one.
-                    Color.clear.frame(height: 0)
+                    EPGPreviewPane(
+                        target: target,
+                        settledRow: settledRow,
+                        hero: hero,
+                        isAllowed: false,
+                        restartToken: 0,
+                        handle: nil,
+                        onFailure: onFailure
+                    )
+                    .equatable()
                 }
             }
+            .environment(\.epgHeroLayout, EPGHeroLayout(mode))
             .allowsHitTesting(false)
             .onReceive(NotificationCenter.default.publisher(for: UIAccessibility.videoAutoplayStatusDidChangeNotification)) { _ in
                 autoplayAllowed = UIAccessibility.isVideoAutoplayEnabled
@@ -158,10 +197,11 @@
     /// controller's suspension, so they re-render only this view.
     private struct EPGPreviewBandContent: View {
         let target: EPGPreviewTarget?
-        let cells: [EPGProgramCell]
+        let settledRow: EPGChannelRow?
         let isFrozen: Bool
         let isFailed: Bool
         let controller: GuidePreviewController?
+        let hero: GuideHeroModel?
         let onFailure: () -> Void
 
         @State private var epgSync = EPGSyncService.shared
@@ -170,18 +210,20 @@
 
         init(
             target: EPGPreviewTarget?,
-            cells: [EPGProgramCell],
+            settledRow: EPGChannelRow?,
             isFrozen: Bool,
             isFailed: Bool,
             controller: GuidePreviewController?,
+            hero: GuideHeroModel?,
             playlistID: UUID?,
             onFailure: @escaping () -> Void
         ) {
             self.target = target
-            self.cells = cells
+            self.settledRow = settledRow
             self.isFrozen = isFrozen
             self.isFailed = isFailed
             self.controller = controller
+            self.hero = hero
             self.onFailure = onFailure
             if let playlistID {
                 _playlists = Query(filter: #Predicate<Playlist> { $0.id == playlistID })
@@ -209,7 +251,8 @@
         var body: some View {
             EPGPreviewPane(
                 target: target,
-                cells: cells,
+                settledRow: settledRow,
+                hero: hero,
                 isAllowed: isAllowed,
                 isFailed: isFailed,
                 restartToken: controller?.restartToken ?? 0,

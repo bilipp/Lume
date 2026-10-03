@@ -56,6 +56,36 @@ nonisolated struct EPGTimeline: Equatable {
         return result
     }
 
+    /// The half-hour marks whose x falls in `from...to`, for drawing only
+    /// the labels near the visible window.
+    func halfHourTicks(from minX: CGFloat, to maxX: CGFloat) -> [Date] {
+        let tick = pointsPerMinute * 30
+        guard tick > 0, maxX >= minX else { return [] }
+        let first = max(0, Int((minX / tick).rounded(.up)))
+        let last = Int((min(maxX, totalWidth) / tick).rounded(.down))
+        guard first <= last else { return [] }
+        return (first ... last).map { start.addingTimeInterval(Double($0) * 30 * 60) }
+    }
+
+    /// The scroll offset that parks the window on the half-hour mark at or
+    /// before `leadIn` minutes ahead of `now`, so the ruler's first label is
+    /// whole rather than cut by the leading edge. Ticks sit at multiples of 30
+    /// minutes from `start`, which is itself floored to a half hour.
+    func halfHourParkingX(forNow now: Date, leadIn minutes: CGFloat) -> CGFloat {
+        let tick = pointsPerMinute * 30
+        let target = x(for: now.addingTimeInterval(-Double(minutes) * 60))
+        guard tick > 0 else { return target }
+        return max(0, (target / tick).rounded(.down) * tick)
+    }
+
+    /// Whether the half-hour label at `tick` would sit under the now pill
+    /// centred on `now`. Labels run rightwards from their tick, so a tick up to
+    /// about one label width before now collides as well as one just after.
+    static func tickIsCoveredByNowPill(_ tick: Date, now: Date) -> Bool {
+        let minutes = tick.timeIntervalSince(now) / 60
+        return minutes > -11 && minutes < 5
+    }
+
     /// A guide window anchored around `now`: a little history for context plus a
     /// day of upcoming programmes, with the leading edge floored to a tidy
     /// half-hour so the ruler labels read cleanly.
@@ -88,6 +118,11 @@ nonisolated struct EPGTimeline: Equatable {
 /// off-screen. Shifting by the hidden amount pins the text to the visible part
 /// of the block; the cap stops it from sliding out of the block's own trailing
 /// edge as the block scrolls away.
+///
+/// Both block views apply it from `visualEffect` rather than the shared scroll
+/// offset: the closure re-runs on geometry change without invalidating the
+/// block's body, where observing the guide's per-frame offset would re-render
+/// every realized cell — the cost the grid is built around.
 ///
 /// `nonisolated`: called from the `visualEffect` closure, which is `@Sendable`.
 nonisolated enum EPGStickyText {
@@ -147,6 +182,8 @@ struct EPGChannelRow: Identifiable {
     /// How many days the archive reaches back (≥ 1 when `catchupCapable`).
     let archiveDays: Int
     let cells: [EPGProgramCell]
+    /// The provider's channel number; `nil` when the provider sends none (`0`).
+    var number: Int?
 
     /// Snapshot equivalent of `PlayableMedia.isCatchupAvailable` for the
     /// scroll path: whether a programme starting at `start` is replayable.
@@ -178,7 +215,8 @@ enum EPGGridBuilder {
                 logoURL: URL(string: stream.streamIcon ?? ""),
                 catchupCapable: stream.tvArchive > 0 && stream.directURL == nil,
                 archiveDays: max(1, stream.tvArchiveDuration),
-                cells: cells
+                cells: cells,
+                number: stream.num > 0 ? stream.num : nil
             )
         }
     }

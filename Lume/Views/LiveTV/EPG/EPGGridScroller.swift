@@ -42,10 +42,10 @@ struct EPGGridScroller: View {
     /// tvOS Guide preview inputs — see `EPGGridScroller+Preview.swift`.
     var preview = EPGGuidePreviewInputs()
 
-    private let metrics = EPGMetrics.current
+    let metrics = EPGMetrics.current
     private let now = Date()
 
-    @State private var sync = EPGScrollSync()
+    @State var sync = EPGScrollSync()
     @State private var selection: EPGSelection?
     @State private var scrollRequest: EPGScrollRequest?
     #if os(tvOS)
@@ -60,9 +60,11 @@ struct EPGGridScroller: View {
         @State var virtualFocus: EPGVirtualFocus?
         /// The x a run of vertical cell moves keeps aiming at, so rows with
         /// different programme boundaries don't make focus drift sideways.
-        @State private var preferredX: CGFloat?
+        @State var preferredX: CGFloat?
         /// Bumped to hand real focus to the rail (Menu from the hub).
         @State private var railExitToken = 0
+        /// Select was the last press, so a focus loss means it played.
+        @State var selectedBeforeDeparture = false
         /// SwiftUI-side focus binding for the strip. Written to claim focus
         /// after a rail category activation — at that moment SwiftUI owns
         /// focus (the rail button), so a focus-state write is honoured, where
@@ -83,8 +85,8 @@ struct EPGGridScroller: View {
             // Header: corner + time ruler. Touch/pointer get a jump-to-now
             // button in the corner; tvOS auto-scrolls to now on appear and has
             // no use for a corner button it can't easily reach, so the corner
-            // is left empty there.
-            HStack(spacing: 0) {
+            // shows the date there.
+            HStack(spacing: metrics.channelColumnGap) {
                 corner
                     .frame(width: metrics.channelColumnWidth, height: metrics.headerHeight)
 
@@ -97,12 +99,12 @@ struct EPGGridScroller: View {
             #endif
 
             // Body: frozen channel column + scrollable programme grid.
-            HStack(spacing: 0) {
+            HStack(spacing: metrics.channelColumnGap) {
                 EPGFrozenColumn(
                     rows: rows,
                     metrics: metrics,
                     sync: sync,
-                    focusedRowIndex: columnFocusRowIndex,
+                    virtualFocus: gridVirtualFocus,
                     onSelectChannel: { onPlay($0.stream) },
                     onStartMultiView: { onStartMultiView($0.stream) }
                 )
@@ -119,6 +121,10 @@ struct EPGGridScroller: View {
             .overlay(alignment: .leading) { focusSurface }
             .focusSection()
             #endif
+
+            #if os(tvOS)
+                EPGGuideHint()
+            #endif
         }
         #if os(tvOS)
         // The preview band pushes the grid below the rail's first categories;
@@ -126,22 +132,14 @@ struct EPGGridScroller: View {
         // the strip instead of finding nothing level with it.
         .focusSection()
         .onChange(of: surfaceFocused) { _, focused in
-            if focused {
-                // Entering the guide lands on a channel — the hub. When the
-                // virtual focus survived (details sheet round-trip), the
-                // user's place is kept instead.
-                guard virtualFocus == nil else { return }
-                Task { @MainActor in
-                    landOnChannel()
-                }
-            } else if selection == nil {
-                // Focus left towards the rail or the tab bar. A presented
-                // details sheet also steals real focus, but the user returns
-                // to the guide — keep their place for that round-trip.
-                virtualFocus = nil
-                preferredX = nil
+            // A virtual focus that survived a round trip is kept (see
+            // `guideDidLoseFocus`).
+            guard focused, virtualFocus == nil else { return }
+            Task { @MainActor in
+                landOnChannel()
             }
         }
+        .reportsGuideFocus(surfaceFocused)
         #else
         .background(.background)
         #endif
@@ -183,14 +181,6 @@ struct EPGGridScroller: View {
         #endif
     }
 
-    private var columnFocusRowIndex: Int? {
-        #if os(tvOS)
-            if case let .channel(rowIndex) = virtualFocus { rowIndex } else { nil }
-        #else
-            nil
-        #endif
-    }
-
     /// A past programme still inside the channel's archive plays as catch-up;
     /// everything else plays the channel live. Runs on selection — touching
     /// the SwiftData model here is fine.
@@ -206,8 +196,12 @@ struct EPGGridScroller: View {
 
     /// Scroll offset that parks `date` `metrics.nowLeadInMinutes` inside the
     /// grid's leading edge.
-    private func scrollTarget(forNow date: Date) -> CGFloat {
-        timeline.x(for: date.addingTimeInterval(-Double(metrics.nowLeadInMinutes) * 60))
+    func scrollTarget(forNow date: Date) -> CGFloat {
+        #if os(tvOS)
+            timeline.halfHourParkingX(forNow: date, leadIn: metrics.nowLeadInMinutes)
+        #else
+            timeline.x(for: date.addingTimeInterval(-Double(metrics.nowLeadInMinutes) * 60))
+        #endif
     }
 
     /// The initial target, handed to the grid. Bound to the view's captured
@@ -221,7 +215,7 @@ struct EPGGridScroller: View {
     /// Asks the grid to scroll. On tvOS the frozen panes' mirror is updated in
     /// the same breath with a matching animation, so CoreAnimation interpolates
     /// both surfaces together without per-frame main-thread work.
-    private func requestScroll(to point: CGPoint, animated: Bool) {
+    func requestScroll(to point: CGPoint, animated: Bool) {
         let clamped = CGPoint(x: max(0, point.x), y: max(0, point.y))
         scrollRequest = EPGScrollRequest(
             token: (scrollRequest?.token ?? 0) + 1,
@@ -246,7 +240,7 @@ struct EPGGridScroller: View {
     @ViewBuilder
     private var corner: some View {
         #if os(tvOS)
-            Color.clear
+            EPGTVRulerCorner(date: now)
         #else
             Button {
                 requestScroll(to: CGPoint(x: scrollTarget(forNow: Date()), y: sync.offset.y), animated: true)
@@ -281,20 +275,27 @@ struct EPGGridScroller: View {
                 exitsLeft: exitsLeft,
                 exitsUp: exitsUp,
                 onMove: { direction in
+                    selectedBeforeDeparture = false
                     moveVirtualFocus(direction)
                 },
                 onSelect: {
+                    selectedBeforeDeparture = true
                     activateVirtualFocus()
                 },
                 onLongSelect: {
+                    selectedBeforeDeparture = false
                     longSelectVirtualFocus()
                 },
-                railExitToken: railExitToken
+                onDeparture: { walkedOut in
+                    guideDidLoseFocus(walkedOut: walkedOut)
+                },
+                railExitToken: railExitToken,
+                accessibilityLabel: virtualFocusDescription,
+                accessibilityActions: { channelAccessibilityActions() }
             )
             .frame(width: metrics.channelColumnWidth)
             .frame(maxHeight: .infinity)
             .focused($surfaceClaimsFocus)
-            .accessibilityLabel(Text(virtualFocusDescription))
             .onExitCommand {
                 handleMenu()
             }
@@ -311,12 +312,10 @@ struct EPGGridScroller: View {
                 titleVisibility: .visible,
                 presenting: channelActions
             ) { row in
-                Button(row.stream.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
+                FavoriteMenuItems.favorite(isFavorite: row.stream.isFavorite) {
                     LiveChannelFavorites.toggle(row.stream, in: modelContext)
                 }
-                Button("Start Multi-View") {
-                    onStartMultiView(row.stream)
-                }
+                FavoriteMenuItems.startMultiView { onStartMultiView(row.stream) }
             }
             // Runs on appear *and* on token change: a category activation both
             // rebuilds the guide (fresh scroller) and bumps the token, and the
@@ -351,21 +350,6 @@ struct EPGGridScroller: View {
             } else {
                 railExitToken += 1
             }
-        }
-
-        private var topVisibleRowIndex: Int {
-            let rowStride = metrics.rowHeight + metrics.rowSpacing
-            guard rowStride > 0, !rows.isEmpty else { return 0 }
-            return max(0, min(rows.count - 1, Int((sync.offset.y / rowStride).rounded())))
-        }
-
-        /// Entering the guide (from the rail or the tab bar) lands on the top
-        /// visible channel, reading as "now" on a channel.
-        private func landOnChannel() {
-            guard !rows.isEmpty else { return }
-            requestScroll(to: CGPoint(x: scrollTarget(forNow: Date()), y: sync.offset.y), animated: false)
-            preferredX = nil
-            virtualFocus = .channel(rowIndex: topVisibleRowIndex)
         }
 
         private func moveVirtualFocus(_ direction: MoveCommandDirection) {
@@ -472,6 +456,10 @@ struct EPGGridScroller: View {
 
         /// Scrolls just enough to keep the virtually focused programme inside
         /// the viewport, mirroring the focus engine's follow behaviour.
+        /// How much of a programme must show before focusing it stops
+        /// scrolling its start into view.
+        private static let readableCellWidth: CGFloat = 240
+
         private func ensureCellVisible(rowIndex: Int, cell: EPGProgramCell) {
             let viewport = sync.viewport
             guard viewport.width > 0, viewport.height > 0 else { return }
@@ -479,8 +467,14 @@ struct EPGGridScroller: View {
             let margin: CGFloat = 40
             let cellStart = timeline.x(for: cell.start)
             let cellEnd = cellStart + cell.width
+            let visibleWidth = min(cellEnd, target.x + viewport.width) - max(cellStart, target.x)
             if cellStart < target.x + margin {
-                target.x = cellStart - margin
+                // A programme already showing a readable stretch keeps the
+                // timeline still — its title sticks to the leading edge — so
+                // entering the live programme never throws now off to the right.
+                if visibleWidth < min(cell.width, Self.readableCellWidth) {
+                    target.x = cellStart - margin
+                }
             } else if cellEnd > target.x + viewport.width - margin {
                 // Wide programmes pin their start to the leading edge instead
                 // of pushing it off-screen.
@@ -497,10 +491,11 @@ struct EPGGridScroller: View {
             clampAndScroll(to: target)
         }
 
-        private func rowScrollTarget(_ rowIndex: Int, currentY: CGFloat) -> CGFloat {
-            let rowStride = metrics.rowHeight + metrics.rowSpacing
-            let top = CGFloat(rowIndex) * rowStride
-            let bottom = top + metrics.rowHeight
+        /// Keeps the row's focused card — taller than the row by the focus
+        /// overflow on each side — fully inside the viewport.
+        func rowScrollTarget(_ rowIndex: Int, currentY: CGFloat) -> CGFloat {
+            let top = metrics.rowOriginY(rowIndex) - metrics.focusOverflow
+            let bottom = top + metrics.focusedBlockHeight
             if top < currentY {
                 return top
             }
@@ -511,14 +506,18 @@ struct EPGGridScroller: View {
         }
 
         private func clampAndScroll(to point: CGPoint) {
-            let rowStride = metrics.rowHeight + metrics.rowSpacing
-            let contentHeight = max(0, CGFloat(rows.count) * rowStride - metrics.rowSpacing)
-            var target = point
-            target.x = max(0, min(target.x, max(0, timeline.totalWidth - sync.viewport.width)))
-            target.y = max(0, min(target.y, max(0, contentHeight - sync.viewport.height)))
+            let target = clampedOffset(point)
             if target != sync.offset {
                 requestScroll(to: target, animated: true)
             }
+        }
+
+        func clampedOffset(_ point: CGPoint) -> CGPoint {
+            let contentHeight = metrics.contentHeight(rowCount: rows.count)
+            return CGPoint(
+                x: max(0, min(point.x, max(0, timeline.totalWidth - sync.viewport.width))),
+                y: max(0, min(point.y, max(0, contentHeight - sync.viewport.height)))
+            )
         }
 
         /// Menu from the programmes: collapse to the channel hub and snap
@@ -561,10 +560,29 @@ struct EPGGridScroller: View {
             selection = EPGSelection(id: cell.id, stream: rows[rowIndex].stream, cell: cell)
         }
 
+        var virtualFocusRow: EPGChannelRow? {
+            guard let focus = virtualFocus, rows.indices.contains(focus.rowIndex) else { return nil }
+            return rows[focus.rowIndex]
+        }
+
+        /// The hub's long-press actions, offered to VoiceOver on every row.
+        private func channelAccessibilityActions() -> [UIAccessibilityCustomAction] {
+            guard let stream = virtualFocusRow?.stream else { return [] }
+            return [
+                UIAccessibilityCustomAction(name: FavoriteMenuItems.startMultiViewTitle) { _ in
+                    onStartMultiView(stream)
+                    return true
+                },
+                UIAccessibilityCustomAction(name: FavoriteMenuItems.favoriteTitle(isFavorite: stream.isFavorite)) { _ in
+                    LiveChannelFavorites.toggle(stream, in: modelContext)
+                    return true
+                }
+            ]
+        }
+
         private var virtualFocusDescription: String {
-            guard let focus = virtualFocus, rows.indices.contains(focus.rowIndex) else { return "" }
-            let row = rows[focus.rowIndex]
-            guard case let .cell(_, cellID) = focus,
+            guard let row = virtualFocusRow else { return "" }
+            guard case let .cell(_, cellID) = virtualFocus,
                   let cell = row.cells.first(where: { $0.id == cellID }), !cell.isGap
             else {
                 return row.name

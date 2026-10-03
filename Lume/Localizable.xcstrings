@@ -1401,6 +1401,65 @@
         }
       }
     },
+    "%lld min left" : {
+      "comment" : "tvOS Live TV guide hero: minutes left in the programme airing now on the focused channel, beside its progress bar. The argument is a whole number of minutes.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch %lld Min."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld min left"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quedan %lld min"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encore %lld min"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora %lld min"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残り%lld分"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld분 남음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faltam %lld min"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %lld 分钟"
+          }
+        }
+      }
+    },
     "%lld of %lld digits entered" : {
       "localizations" : {
         "de" : {
@@ -7955,6 +8014,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更改PIN码"
+          }
+        }
+      }
+    },
+    "Channel %lld" : {
+      "comment" : "tvOS Live TV guide hero: the focused channel's number from the provider, under the channel name.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanal %lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaîne %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canale %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャンネル %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채널 %lld"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "频道 %lld"
           }
         }
       }
@@ -21613,6 +21731,65 @@
         }
       }
     },
+    "Hold a channel to add it to Favorites or Multi-View" : {
+      "comment" : "tvOS Live TV guide: hint under the guide. Holding the remote's select button on a channel name offers Add to Favorites and Start Multi-View.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte einen Sender gedrückt, um ihn zu den Favoriten oder zu Multi-View hinzuzufügen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold a channel to add it to Favorites or Multi-View"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsado un canal para añadirlo a Favoritos o a Multi-View"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maintenez une chaîne enfoncée pour l’ajouter aux Favoris ou à Multi-View"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tieni premuto un canale per aggiungerlo ai Preferiti o a Multi-View"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャンネルを長押しすると、お気に入りやマルチビューに追加できます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채널을 길게 눌러 즐겨찾기나 멀티뷰에 추가하세요"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantenha um canal pressionado para adicioná-lo aos Favoritos ou ao Multi-View"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住频道可将其添加到收藏或多画面"
+          }
+        }
+      }
+    },
     "Home" : {
       "localizations" : {
         "de" : {
@@ -21661,6 +21838,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "主页"
+          }
+        }
+      }
+    },
+    "How the Live TV tab shows channels: Guide lays them out on a programme timeline, List as a plain channel list." : {
+      "comment" : "Footnote under the tvOS Settings row 'Live TV Layout'. 'Guide' and 'List' are the two layout values shown in that row.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So zeigt der Tab „Live-TV“ die Sender: „Programmführer“ ordnet sie auf einer Programm-Zeitleiste an, „Liste“ als einfache Senderliste."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How the Live TV tab shows channels: Guide lays them out on a programme timeline, List as a plain channel list."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cómo muestra los canales la pestaña TV en directo: Guía los ordena en una línea de tiempo de programas; Lista, en una lista simple de canales."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment l’onglet TV en direct affiche les chaînes : Guide les dispose sur une grille horaire des programmes, Liste sous forme de simple liste de chaînes."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come la scheda TV in diretta mostra i canali: Guida li dispone su una timeline dei programmi, Elenco come semplice elenco di canali."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブTVタブでのチャンネルの表示方法です。「番組表」は番組のタイムライン上に、「リスト」はシンプルなチャンネル一覧で表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 TV 탭에서 채널을 보여 주는 방식입니다. 편성표는 프로그램 타임라인에, 목록은 단순한 채널 목록으로 표시합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como a aba TV ao vivo mostra os canais: Guia os organiza em uma linha do tempo de programas; Lista, em uma lista simples de canais."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直播电视标签页显示频道的方式：“指南”将频道排列在节目时间轴上，“列表”则显示为简单的频道列表。"
           }
         }
       }
@@ -22863,6 +23099,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "信息"
+          }
+        }
+      }
+    },
+    "Info Only" : {
+      "comment" : "tvOS Settings › Player › Live TV › Guide Preview: show the channel's programme information above the Guide, without video.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur Infos"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Info Only"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo información"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Infos uniquement"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo informazioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "情報のみ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정보만"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só informações"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅信息"
           }
         }
       }
@@ -25267,6 +25562,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直播电视频道"
+          }
+        }
+      }
+    },
+    "Live TV Layout" : {
+      "comment" : "tvOS Settings › Player › Live TV: row that switches the Live TV tab between the List and Guide layouts.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live-TV-Layout"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live TV Layout"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disposición de TV en directo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disposition de la TV en direct"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layout della TV in diretta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブTVのレイアウト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 TV 레이아웃"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layout da TV ao vivo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直播电视布局"
           }
         }
       }
@@ -31343,6 +31697,65 @@
         }
       }
     },
+    "No Programme" : {
+      "comment" : "Live TV guide: title of an empty stretch in a channel's timeline where the EPG lists no programme.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Programm"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Programme"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin programa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun programme"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun programma"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "番組なし"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로그램 없음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem programação"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无节目"
+          }
+        }
+      }
+    },
     "No programme information" : {
       "comment" : "A hint for a gap in a channel's EPG.",
       "isCommentAutoGenerated" : true,
@@ -35899,65 +36312,6 @@
         }
       }
     },
-    "Plays the focused channel muted in the Guide. Uses a provider connection while you browse." : {
-      "comment" : "Footnote under the tvOS Settings toggle for the Guide preview. 'Provider connection' is one of the limited simultaneous streams the IPTV provider allows.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spielt den ausgewählten Sender stumm im Programmführer ab. Belegt beim Stöbern eine Verbindung deines Anbieters."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plays the focused channel muted in the Guide. Uses a provider connection while you browse."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reproduce sin sonido el canal seleccionado en la guía. Usa una conexión del proveedor mientras navegas."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lit la chaîne sélectionnée sans le son dans le guide. Utilise une connexion du fournisseur pendant que vous naviguez."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Riproduce senza audio il canale selezionato nella guida. Usa una connessione del provider mentre navighi."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "フォーカス中のチャンネルを番組表内でミュート再生します。閲覧中はプロバイダの接続を 1 つ使用します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "편성표에서 선택한 채널을 음소거 상태로 재생합니다. 둘러보는 동안 제공업체 연결을 하나 사용합니다."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reproduz sem som o canal selecionado no guia. Usa uma ligação do fornecedor enquanto navegas."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在指南中静音播放当前选中的频道。浏览时会占用一个服务商连接。"
-          }
-        }
-      }
-    },
     "Plex rejected this account. Check your username and password — with two-factor authentication, add the current code to the end of the password." : {
       "comment" : "Error message when a plex.tv sign-in is refused.",
       "localizations" : {
@@ -38997,6 +39351,124 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在刷新…"
+          }
+        }
+      }
+    },
+    "Regular" : {
+      "comment" : "tvOS Settings › Player › Live TV › Guide Preview: the full-size live preview above the Guide.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regular"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標準"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보통"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标准"
+          }
+        }
+      }
+    },
+    "Regular and Small play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height." : {
+      "comment" : "tvOS Settings › Player › Live TV: footnote under the Guide Preview row, explaining its four choices (Regular, Small, Info Only, Off).",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Normal“ und „Klein“ spielen den ausgewählten Sender stumm über dem Programmführer ab und belegen beim Stöbern eine Verbindung deines Anbieters. „Nur Infos“ zeigt den Sender ohne Video; „Aus“ gibt dem Programmführer die volle Höhe."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regular and Small play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal y Pequeña reproducen sin sonido el canal seleccionado sobre la guía y usan una conexión de tu proveedor mientras navegas. Solo información muestra el canal sin vídeo; Desactivado deja a la guía toda la altura."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal et Petit lisent la chaîne sélectionnée sans le son au-dessus du guide et utilisent une connexion de votre fournisseur pendant la navigation. Infos uniquement affiche la chaîne sans vidéo ; Désactivé donne au guide toute la hauteur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normale e Piccola riproducono senza audio il canale selezionato sopra la guida e usano una connessione del provider mentre navighi. Solo informazioni mostra il canale senza video; Disattivato lascia alla guida tutta l'altezza."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「標準」と「小」は、選択中のチャンネルを番組表の上で消音再生し、閲覧中はプロバイダの接続を1つ使用します。「情報のみ」は映像なしでチャンネルを表示し、「オフ」では番組表が画面の高さいっぱいに表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "'보통'과 '작게'는 선택한 채널을 편성표 위에서 음소거로 재생하며, 둘러보는 동안 제공업체 연결을 하나 사용합니다. '정보만'은 영상 없이 채널을 표시하고, '끔'은 편성표를 전체 높이로 표시합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal e Pequena reproduzem sem som o canal selecionado acima do guia e usam uma conexão do seu provedor enquanto você navega. Só informações mostra o canal sem vídeo; Desativado deixa o guia com a altura toda."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“标准”和“小”会在指南上方静音播放所选频道，浏览时占用一个服务商连接。“仅信息”显示频道但不播放视频；“关”让指南占满整个高度。"
           }
         }
       }
@@ -45958,6 +46430,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跳过回顾"
+          }
+        }
+      }
+    },
+    "Small" : {
+      "comment" : "tvOS Settings › Player › Live TV › Guide Preview: a smaller live preview, leaving room for more Guide rows.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klein"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pequeña"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Petit"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piccola"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "작게"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pequena"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小"
           }
         }
       }
@@ -53414,6 +53945,65 @@
         }
       }
     },
+    "Today · %@" : {
+      "comment" : "tvOS Live TV guide: label over the channel column of the time ruler. The argument is today's date, already formatted for the locale with an abbreviated weekday, day and month (e.g. Fri 2 Oct).",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute · %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today · %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoy · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aujourd’hui · %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oggi · %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日 · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오늘 · %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoje · %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天 · %@"
+          }
+        }
+      }
+    },
     "Token" : {
       "comment" : "tvOS row label for a stored Plex token.",
       "localizations" : {
@@ -55079,6 +55669,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上下键像电视遥控器一样切换到下一个和上一个频道。选择“列表顺序”则按屏幕上频道列表的顺序移动——上键前往上一行。"
+          }
+        }
+      }
+    },
+    "Up next · %@ %@" : {
+      "comment" : "tvOS Live TV guide hero: the programme after the one airing now. The first argument is its start time (e.g. 21:30), the second its title.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danach · %1$@ %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up next · %@ %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A continuación · %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À suivre · %1$@ %2$@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A seguire · %1$@ %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の番組 · %1$@ %2$@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 · %1$@ %2$@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A seguir · %1$@ %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接下来 · %1$@ %2$@"
           }
         }
       }

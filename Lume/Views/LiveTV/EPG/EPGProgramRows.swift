@@ -44,27 +44,17 @@ struct EPGRows: View, Equatable {
         }
     }
 
-    private var rowStride: CGFloat {
-        metrics.rowHeight + metrics.rowSpacing
-    }
-
     private var contentHeight: CGFloat {
-        guard !rows.isEmpty else { return 0 }
-        return CGFloat(rows.count) * rowStride - metrics.rowSpacing
+        metrics.contentHeight(rowCount: rows.count)
     }
 
     private var realizedRows: [IndexedRow] {
         let window = sync.rowWindow
-        guard rowStride > 0, !rows.isEmpty else { return [] }
-        let first = max(0, Int((window.start / rowStride).rounded(.down)))
-        let last = min(rows.count - 1, Int((window.end / rowStride).rounded(.up)))
+        guard !rows.isEmpty else { return [] }
+        let first = max(0, metrics.rowIndex(atY: window.start, .down))
+        let last = min(rows.count - 1, metrics.rowIndex(atY: window.end, .up))
         guard first <= last else { return [] }
         return (first ... last).map { IndexedRow(index: $0, row: rows[$0]) }
-    }
-
-    private func focusedCellID(forRow rowIndex: Int) -> String? {
-        guard case let .cell(focusRow, cellID) = virtualFocus, focusRow == rowIndex else { return nil }
-        return cellID
     }
 
     var body: some View {
@@ -76,12 +66,11 @@ struct EPGRows: View, Equatable {
                     metrics: metrics,
                     now: now,
                     sync: sync,
-                    focusedCellID: focusedCellID(forRow: entry.index),
                     onPlay: { cell in onPlay(entry.row, cell) },
                     onShowDetails: { cell in onShowDetails(entry.row, cell) }
                 )
                 .equatable()
-                .offset(y: CGFloat(entry.index) * rowStride)
+                .offset(y: metrics.rowOriginY(entry.index))
             }
         }
         .frame(width: timeline.totalWidth, height: contentHeight, alignment: .topLeading)
@@ -92,14 +81,39 @@ struct EPGRows: View, Equatable {
                     .allowsHitTesting(false)
             }
         }
+        #if os(tvOS)
+        // Above the now line and every row, so the card's overflow and
+        // shadow cover its neighbours; the strips themselves never re-render
+        // for a focus move.
+        .overlay(alignment: .topLeading) { focusedCard }
+        #endif
     }
+
+    #if os(tvOS)
+        @ViewBuilder
+        private var focusedCard: some View {
+            if case let .cell(rowIndex, cellID) = virtualFocus, rows.indices.contains(rowIndex),
+               let cell = rows[rowIndex].cells.first(where: { $0.id == cellID })
+            {
+                EPGTVProgramBlock(
+                    cell: cell,
+                    metrics: metrics,
+                    now: now,
+                    isFocused: true,
+                    canReplay: EPGProgramStrip.canReplay(cell, in: rows[rowIndex], now: now)
+                )
+                .offset(x: timeline.x(for: cell.start), y: metrics.rowOriginY(rowIndex) - metrics.focusOverflow)
+                .allowsHitTesting(false)
+            }
+        }
+    #endif
 }
 
 // MARK: - Programme strip
 
 /// A single channel's row of programme blocks. On tvOS the blocks are plain
-/// views — the guide's focusable surface interprets the remote, and
-/// `focusedCellID` drives the highlight. On touch/pointer platforms each
+/// views — the guide's focusable surface interprets the remote, and `EPGRows`
+/// draws the focused card over them. On touch/pointer platforms each
 /// block is a button: a tap plays, a long press opens the detail sheet.
 ///
 /// Cells are placed at their exact timeline offset, and only the ones inside
@@ -113,14 +127,12 @@ struct EPGProgramStrip: View, Equatable {
     let now: Date
     /// Observed for `window` only (per-property tracking).
     let sync: EPGScrollSync
-    let focusedCellID: String?
     let onPlay: (EPGProgramCell) -> Void
     let onShowDetails: (EPGProgramCell) -> Void
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.row.id == rhs.row.id
             && lhs.row.cells.count == rhs.row.cells.count
-            && lhs.focusedCellID == rhs.focusedCellID
             && lhs.timeline == rhs.timeline
     }
 
@@ -156,26 +168,15 @@ struct EPGProgramStrip: View, Equatable {
         .frame(width: timeline.totalWidth, height: metrics.rowHeight, alignment: .topLeading)
     }
 
-    private func canReplay(_ cell: EPGProgramCell) -> Bool {
+    static func canReplay(_ cell: EPGProgramCell, in row: EPGChannelRow, now: Date) -> Bool {
         // Snapshot-based: cell realization runs mid-scroll, where a SwiftData
         // model read could fault to SQLite on the main thread.
         !cell.isGap && cell.isPast(at: now) && row.isReplayable(start: cell.start, now: now)
     }
 
     #if os(tvOS)
-        @ViewBuilder
         private func cellView(_ cell: EPGProgramCell) -> some View {
-            let focused = cell.id == focusedCellID
-            EPGProgramBlockView(
-                cell: cell,
-                metrics: metrics,
-                now: now,
-                isFocused: focused,
-                canReplay: canReplay(cell)
-            )
-            .shadow(color: .black.opacity(0.4), radius: focused ? 10 : 0, y: focused ? 6 : 0)
-            .scaleEffect(focused ? 1.04 : 1)
-            .animation(.easeOut(duration: 0.18), value: focused)
+            EPGTVProgramBlock(cell: cell, metrics: metrics, now: now, canReplay: Self.canReplay(cell, in: row, now: now))
         }
     #else
         @ViewBuilder
@@ -197,7 +198,7 @@ struct EPGProgramStrip: View, Equatable {
                 } label: {
                     Color.clear.frame(width: cell.width, height: metrics.rowHeight)
                 }
-                .buttonStyle(EPGBlockButtonStyle(cell: cell, metrics: metrics, now: now, canReplay: canReplay(cell)))
+                .buttonStyle(EPGBlockButtonStyle(cell: cell, metrics: metrics, now: now, canReplay: Self.canReplay(cell, in: row, now: now)))
                 // A long press opens the detail sheet. The gesture takes the
                 // press once it recognizes, so a hold doesn't also fire the
                 // button's play action.

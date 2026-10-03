@@ -56,19 +56,21 @@ struct PlayerSettingsTests {
         #expect(PlayerSettings.enginePriorityKey == "player.enginePriority")
     }
 
-    @Test func `guide preview storage key and default`() {
-        #expect(PlayerSettings.tvGuidePreviewKey == "player.tvGuidePreview")
-        #expect(PlayerSettings.tvGuidePreviewDefault)
+    @Test func `guide preview mode storage key and default`() {
+        #expect(PlayerSettings.tvGuidePreviewModeKey == "player.tvGuidePreviewMode")
+        #expect(PlayerSettings.tvGuidePreviewModeDefault == .regular)
     }
 
-    @Test func `guide preview reads the default until a value is stored`() throws {
+    @Test func `guide preview mode reads the default until a value is stored`() throws {
         let name = "PlayerSettingsTests-\(UUID().uuidString)"
         defer { UserDefaults.standard.removePersistentDomain(forName: name) }
         let defaults = try #require(UserDefaults(suiteName: name))
-        let key = PlayerSettings.tvGuidePreviewKey
-        #expect(defaults.bool(key, default: PlayerSettings.tvGuidePreviewDefault))
-        defaults.set(false, forKey: key)
-        #expect(!defaults.bool(key, default: PlayerSettings.tvGuidePreviewDefault))
+        let key = PlayerSettings.tvGuidePreviewModeKey
+        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .regular)
+        defaults.set(GuidePreviewMode.small.rawValue, forKey: key)
+        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .small)
+        defaults.set("bogus", forKey: key)
+        #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .regular)
     }
 }
 

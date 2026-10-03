@@ -100,9 +100,30 @@ import SwiftUI
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                         .padding(.top, 6)
 
-                    tvPremiumToggleRow("Guide Preview", isOn: $tvGuidePreview, feature: .guidePreview)
+                    // Every choice is open to everyone: the layout is free,
+                    // only the video needs Lume Pro (the crown says so).
+                    TVOptionCycleRow(
+                        title: "Guide Preview",
+                        valueLabel: GuidePreviewMode(storedValue: tvGuidePreviewModeRaw).displayName,
+                        showsPremiumBadge: !premium.isPremium
+                    ) {
+                        tvGuidePreviewModeRaw = PlayerOptionCycle.next(tvGuidePreviewModeRaw, in: GuidePreviewMode.self)
+                    }
 
-                    Text("Plays the focused channel muted in the Guide. Uses a provider connection while you browse.")
+                    Text("Regular and Small play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+
+                    TVOptionCycleRow(
+                        title: "Live TV Layout",
+                        valueLabel: LiveTVLayoutMode(storedValue: liveTVLayoutModeRaw).displayName
+                    ) {
+                        liveTVLayoutModeRaw = PlayerOptionCycle.next(liveTVLayoutModeRaw, in: LiveTVLayoutMode.self)
+                    }
+
+                    Text("How the Live TV tab shows channels: Guide lays them out on a programme timeline, List as a plain channel list.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)

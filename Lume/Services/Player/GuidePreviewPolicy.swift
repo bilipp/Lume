@@ -9,6 +9,43 @@
 
 import Foundation
 
+/// How the tvOS Guide's now-playing hero appears above the timeline.
+/// `regular` and `small` play the muted preview (Lume Pro); without Pro, or
+/// with the system's video autoplay off, they keep their size and show the
+/// channel's logo instead.
+nonisolated enum GuidePreviewMode: String, CaseIterable {
+    case regular
+    /// A shorter hero, so the guide shows two more rows.
+    case small
+    /// The regular hero with the logo in place of the video.
+    case infoOnly
+    /// No hero: the guide takes the full height.
+    case off
+
+    var displayName: String {
+        switch self {
+        case .regular: String(localized: "Regular")
+        case .small: String(localized: "Small")
+        case .infoOnly: String(localized: "Info Only")
+        case .off: String(localized: "Off")
+        }
+    }
+
+    /// Whether the hero may play the channel's video at all.
+    var playsVideo: Bool {
+        self == .regular || self == .small
+    }
+
+    var showsHero: Bool {
+        self != .off
+    }
+
+    /// An unknown or missing stored value reads as the default.
+    init(storedValue: String?) {
+        self = storedValue.flatMap(Self.init(rawValue:)) ?? .regular
+    }
+}
+
 nonisolated enum GuidePreviewPolicy {
     /// How long focus has to rest on a channel before its preview starts. Also
     /// gates the Stalker `create_link` resolve, so browsing never spends one.
@@ -46,6 +83,23 @@ nonisolated enum GuidePreviewPolicy {
     /// The programme airing at `date`, whichever cell the viewer has focused.
     static func currentProgramme(in cells: [EPGProgramCell], at date: Date) -> EPGProgramCell? {
         cells.first { $0.isLive(at: date) }
+    }
+
+    /// The earliest programme starting strictly after `date`. Passing "now"
+    /// gives what airs after the current programme, or after a gap when
+    /// nothing is on; an overlapping programme counts once it starts later.
+    static func nextProgramme(in cells: [EPGProgramCell], after date: Date) -> EPGProgramCell? {
+        cells.lazy
+            .filter { !$0.isGap && $0.start > date }
+            .min { $0.start < $1.start }
+    }
+
+    /// Whole minutes until `cell` ends, rounded up so a programme reads
+    /// "1 min left" until its last second; never negative once it has ended.
+    static func minutesLeft(of cell: EPGProgramCell, at date: Date) -> Int {
+        let seconds = cell.end.timeIntervalSince(date)
+        guard seconds > 0 else { return 0 }
+        return Int((seconds / 60).rounded(.up))
     }
 
     /// Whether the preview's running player can be adopted by full screen.

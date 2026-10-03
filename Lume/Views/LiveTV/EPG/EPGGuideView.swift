@@ -22,6 +22,8 @@ struct EPGGuidePreviewInputs {
     var playlistID: UUID?
     /// A reference, so its changes re-render only the preview band.
     var controller: GuidePreviewController?
+    /// A reference, so focus and glow changes re-render only the hero.
+    var hero: GuideHeroModel?
 }
 
 struct EPGGuideView: View {

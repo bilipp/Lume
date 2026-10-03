@@ -23,18 +23,29 @@ struct EPGRulerStrip: View {
     let sync: EPGScrollSync
 
     var body: some View {
-        Color.clear
-            .frame(maxWidth: .infinity)
-            .frame(height: metrics.headerHeight)
-            .overlay(alignment: .leading) {
-                ZStack(alignment: .topLeading) {
-                    EPGTimeRuler(timeline: timeline, metrics: metrics)
-                    nowPill.offset(x: timeline.x(for: now))
+        #if os(tvOS)
+            // Only the labels near the visible window, each placed relative to
+            // the mirror: offsetting a ruler as wide as the whole day (tens of
+            // thousands of points) left its animated moves uncommitted until
+            // the next one, so it trailed the grid by a step.
+            EPGTVTimeRuler(timeline: timeline, metrics: metrics, sync: sync)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: metrics.headerHeight)
+                .clipped()
+        #else
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: metrics.headerHeight)
+                .overlay(alignment: .leading) {
+                    ZStack(alignment: .topLeading) {
+                        EPGTimeRuler(timeline: timeline, metrics: metrics)
+                        nowPill.offset(x: timeline.x(for: now))
+                    }
+                    .frame(width: timeline.totalWidth, alignment: .leading)
+                    .offset(x: -sync.mirror.x)
                 }
-                .frame(width: timeline.totalWidth, alignment: .leading)
-                .offset(x: -sync.mirror.x)
-            }
-            .clipped()
+                .clipped()
+        #endif
     }
 
     private var nowPill: some View {
@@ -58,8 +69,8 @@ struct EPGFrozenColumn: View {
     let rows: [EPGChannelRow]
     let metrics: EPGMetrics
     let sync: EPGScrollSync
-    /// The row the guide's virtual focus highlights in the column (tvOS).
-    let focusedRowIndex: Int?
+    /// The guide's virtual focus, which highlights its row's channel (tvOS).
+    let virtualFocus: EPGVirtualFocus?
     /// Touch/pointer: tapping a channel plays it live — the same action the
     /// tvOS channel hub performs on select. Unused on tvOS, where the focus
     /// strip owns activation.
@@ -81,7 +92,7 @@ struct EPGFrozenColumn: View {
                     rows: rows,
                     metrics: metrics,
                     sync: sync,
-                    focusedRowIndex: focusedRowIndex,
+                    virtualFocus: virtualFocus,
                     onSelectChannel: onSelectChannel,
                     onStartMultiView: onStartMultiView
                 )
@@ -110,7 +121,7 @@ struct EPGColumnCells: View, Equatable {
     let metrics: EPGMetrics
     /// Observed for `rowWindow` only (per-property tracking).
     let sync: EPGScrollSync
-    let focusedRowIndex: Int?
+    let virtualFocus: EPGVirtualFocus?
     #if !os(tvOS)
         /// For the long-press menu's favourite toggle.
         @Environment(\.modelContext) private var modelContext
@@ -124,7 +135,7 @@ struct EPGColumnCells: View, Equatable {
         lhs.rows.count == rhs.rows.count
             && lhs.rows.first?.id == rhs.rows.first?.id
             && lhs.rows.last?.id == rhs.rows.last?.id
-            && lhs.focusedRowIndex == rhs.focusedRowIndex
+            && lhs.virtualFocus == rhs.virtualFocus
     }
 
     private struct IndexedRow: Identifiable {
@@ -135,15 +146,11 @@ struct EPGColumnCells: View, Equatable {
         }
     }
 
-    private var rowStride: CGFloat {
-        metrics.rowHeight + metrics.rowSpacing
-    }
-
     private var realizedRows: [IndexedRow] {
         let window = sync.rowWindow
-        guard rowStride > 0, !rows.isEmpty else { return [] }
-        let first = max(0, Int((window.start / rowStride).rounded(.down)))
-        let last = min(rows.count - 1, Int((window.end / rowStride).rounded(.up)))
+        guard !rows.isEmpty else { return [] }
+        let first = max(0, metrics.rowIndex(atY: window.start, .down))
+        let last = min(rows.count - 1, metrics.rowIndex(atY: window.end, .up))
         guard first <= last else { return [] }
         return (first ... last).map { IndexedRow(index: $0, row: rows[$0]) }
     }
@@ -152,12 +159,12 @@ struct EPGColumnCells: View, Equatable {
         ZStack(alignment: .topLeading) {
             ForEach(realizedRows) { entry in
                 cell(for: entry)
-                    .offset(y: CGFloat(entry.index) * rowStride)
+                    .offset(y: metrics.rowOriginY(entry.index))
             }
         }
         .frame(
             width: metrics.channelColumnWidth,
-            height: max(0, CGFloat(rows.count) * rowStride - metrics.rowSpacing),
+            height: metrics.contentHeight(rowCount: rows.count),
             alignment: .topLeading
         )
     }
@@ -170,12 +177,12 @@ struct EPGColumnCells: View, Equatable {
     @ViewBuilder
     private func cell(for entry: IndexedRow) -> some View {
         #if os(tvOS)
-            EPGChannelCell(row: entry.row, metrics: metrics, isFocused: entry.index == focusedRowIndex)
+            EPGTVChannelCell(row: entry.row, metrics: metrics, highlight: highlight(forRow: entry.index))
         #else
             Button {
                 onSelectChannel(entry.row)
             } label: {
-                EPGChannelCell(row: entry.row, metrics: metrics, isFocused: entry.index == focusedRowIndex)
+                EPGChannelCell(row: entry.row, metrics: metrics)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -186,4 +193,14 @@ struct EPGColumnCells: View, Equatable {
             )
         #endif
     }
+
+    #if os(tvOS)
+        private func highlight(forRow index: Int) -> EPGChannelCellHighlight {
+            switch virtualFocus {
+            case let .channel(rowIndex) where rowIndex == index: .hub
+            case let .cell(rowIndex, _) where rowIndex == index: .row
+            default: .none
+            }
+        }
+    #endif
 }
