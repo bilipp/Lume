@@ -207,6 +207,10 @@
             /// tree so the UIKit strip needs no direct reference to the SwiftUI
             /// rail; pointing a focus guide at the container (not a leaf) lets
             /// the engine descend and focus the rail's remembered category.
+            /// Empty leaves are skipped: before tvOS 26 the rail's material
+            /// fallback adds childless graphics and hit-testing views with the
+            /// rail's exact frame ahead of it, and a guide aimed at one of
+            /// those goes nowhere, so Left and Menu never reached the rail.
             private func railContainer() -> UIFocusEnvironment? {
                 guard let window else { return nil }
                 let stripFrame = strip.convert(strip.bounds, to: window)
@@ -217,7 +221,7 @@
                     for sibling in parent.subviews where sibling !== node {
                         let frame = sibling.convert(sibling.bounds, to: window)
                         if frame.maxX <= stripFrame.minX + 1, frame.width > 100, frame.height > 100,
-                           frame.minX < bestMinX
+                           frame.minX < bestMinX, !sibling.subviews.isEmpty || sibling.canBecomeFocused
                         {
                             best = sibling
                             bestMinX = frame.minX

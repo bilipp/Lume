@@ -43,6 +43,13 @@ struct EPGGrid: View, Equatable {
 
     @State private var position = ScrollPosition()
     @State private var didInitialScroll = false
+    /// The initial scroll, kept until the grid has actually reached it. The
+    /// first `scrollTo` runs while the container is still a few points wide,
+    /// and OS 26 replays it after layout. OS 18 drops it, along with any
+    /// replay issued from inside the layout pass, and leaves the grid at the
+    /// window's start, hours before now, while the ruler mirrors now.
+    @State private var pendingInitialScroll: CGPoint?
+    @State private var initialScrollReplays = 0
     /// A combined horizontal+vertical ScrollView centers content that is shorter
     /// than the viewport. The frozen channel column pins its cells to the top, so
     /// without this the two panes drift apart when a category has only a few
@@ -75,6 +82,7 @@ struct EPGGrid: View, Equatable {
         }
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGRect.self) { CGRect(origin: $0.contentOffset, size: $0.containerSize) } action: { _, new in
+            replayInitialScrollIfDropped(at: new)
             let clamped = CGPoint(x: max(0, new.origin.x), y: max(0, new.origin.y))
             sync.offset = clamped
             sync.viewport = new.size
@@ -123,10 +131,12 @@ struct EPGGrid: View, Equatable {
             withTransaction(transaction) {
                 sync.mirror = CGPoint(x: nowTarget, y: 0)
             }
+            pendingInitialScroll = CGPoint(x: nowTarget, y: 0)
             position.scrollTo(point: CGPoint(x: nowTarget, y: 0))
         }
         .onChange(of: scrollRequest) { _, request in
             guard let request else { return }
+            pendingInitialScroll = nil
             if request.animated {
                 withAnimation(.easeOut(duration: 0.25)) {
                     position.scrollTo(point: request.point)
@@ -134,6 +144,29 @@ struct EPGGrid: View, Equatable {
             } else {
                 position.scrollTo(point: request.point)
             }
+        }
+    }
+
+    /// Re-issues a dropped initial scroll once the grid has a real size,
+    /// a turn later and outside the layout pass. It gives up after a few
+    /// tries so it can never fight a drag on touch platforms.
+    private func replayInitialScrollIfDropped(at geometry: CGRect) {
+        guard let pending = pendingInitialScroll, geometry.width > 0, geometry.height > 0 else { return }
+        let reached = abs(geometry.origin.x - pending.x) <= 1 && abs(geometry.origin.y - pending.y) <= 1
+        guard !reached, initialScrollReplays < 3 else {
+            pendingInitialScroll = nil
+            return
+        }
+        initialScrollReplays += 1
+        Task { @MainActor in
+            guard pendingInitialScroll == pending else { return }
+            // The binding still holds the dropped target, and writing the
+            // same point again is no change to SwiftUI, so it doesn't scroll.
+            // Clear it first.
+            position = ScrollPosition()
+            await Task.yield()
+            guard pendingInitialScroll == pending else { return }
+            position.scrollTo(point: pending)
         }
     }
 }
