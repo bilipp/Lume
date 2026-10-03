@@ -510,7 +510,7 @@ struct MultiViewScreen: View {
     private func configureAudioSession() {
         #if os(iOS) || os(tvOS)
             let session = AVAudioSession.sharedInstance()
-            try? session.setCategory(.playback, mode: .moviePlayback, options: [])
+            session.setMoviePlaybackCategory()
             try? session.setActive(true, options: [])
         #endif
     }
