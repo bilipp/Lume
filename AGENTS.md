@@ -122,12 +122,26 @@ Lume/
 │   ├── Sync/                ContentSyncManager (background catalog indexing + enrichment)
 │   ├── Player/              PlayerSettings, PlayerHistory, NextUp resolver
 │   ├── Diagnostics/         Perf signposts, PlaybackQoE, MetricKit subscriber
-│   └── Images/              CachedAsyncImage, ImagePipeline
+│   └── Images/              ImageCache, ImagePipeline (CachedAsyncImage is a view: Views/Components/Images)
 └── Views/                   SwiftUI, platform-adaptive
     ├── Home/                Hero carousel, rails, tvOS fold
     ├── Player/              Engine wrappers + unified overlay
+    ├── Components/          Shared building blocks, grouped: Cards, Compat, Detail, Images, Library, Playlists, Status
     └── …
 ```
+
+### Where a view goes
+- A view lives in its feature folder until a **second** feature uses it, then it
+  moves to `Views/Components/<group>/`. A component only one feature uses moves
+  back into that feature.
+- Screens don't count: one feature opening another's screen
+  (`FullScreenPlayerView`, `MovieDetailView`) is navigation, not reuse.
+- A doc comment that only *mentions* a type ("matches `HomeRow`'s heading") is
+  not a use.
+- A shared component gets its own file, not a slot in a feature's grab-bag file.
+- The app is one module, so nothing flags a cross-feature reference. Placement
+  is a review concern. Moves are free: no imports to fix, and `Lume/` is a
+  synchronized folder, so the pbxproj doesn't change.
 
 Two separate `ModelContainer`s:
 - **Catalog** (`default.store`) — local-only, what all `@Query` bindings target

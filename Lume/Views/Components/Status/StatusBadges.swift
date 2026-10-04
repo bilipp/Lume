@@ -1,12 +1,11 @@
 //
-//  SportsBadges.swift
+//  StatusBadges.swift
 //  Lume
 //
-//  The small shared marks the sports cards and detail headers draw: the live
-//  badge (a red dot before "LIVE" in a tinted capsule, sized to its host), its
-//  quiet grey sibling for a finished game, and a competition crest with a
-//  fallback glyph. One definition each, so a phone card, a tvOS card and the
-//  detail header never drift.
+//  The live badge (a red dot before "LIVE" in a tinted capsule, sized to its
+//  host) and its quiet grey sibling for a finished game. Drawn by the sports
+//  cards and detail headers and the Live TV guide hero. One definition each, so
+//  a phone card, a tvOS card and the guide never drift.
 //
 
 import SwiftUI
@@ -60,26 +59,5 @@ private struct StatusCapsule<Content: View>: View {
         .padding(.vertical, fontSize * 0.3)
         .background(Capsule().fill(tint.opacity(0.14)))
         .accessibilityElement(children: .ignore)
-    }
-}
-
-/// A competition crest at `size`, with a court glyph while it loads or when
-/// the provider sent none.
-struct LeagueCrest: View {
-    let url: URL?
-    var size: CGFloat
-
-    var body: some View {
-        CachedAsyncImage(url: url, maxPixelSize: size * 2) { phase in
-            if case let .success(image) = phase {
-                image.resizable().scaledToFit()
-            } else {
-                Image(systemName: "sportscourt")
-                    .font(.system(size: size * 0.55))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
     }
 }
