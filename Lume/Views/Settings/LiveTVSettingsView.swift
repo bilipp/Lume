@@ -4,8 +4,9 @@
 //
 //  The iOS / macOS / visionOS Live TV page behind the root Live TV row: how
 //  the Live TV tab lays out channels (Guide or List — the only place to switch
-//  it), and the recording server with its recordings library. tvOS builds its
-//  own pane in TVLiveTVSettingsPane.
+//  it), which buttons the iPhone / iPad toolbar shows, and the recording server
+//  with its recordings library. tvOS builds its own pane in
+//  TVLiveTVSettingsPane.
 //
 
 #if !os(tvOS)
@@ -15,6 +16,12 @@
     struct LiveTVSettingsView: View {
         @AppStorage(LiveTVLayoutMode.storageKey)
         private var layoutModeRaw = LiveTVLayoutMode.defaultMode.rawValue
+        #if os(iOS)
+            @AppStorage(LiveTVToolbarSettings.showsRecordingsKey)
+            private var showsRecordingsInToolbar = LiveTVToolbarSettings.showsRecordingsDefault
+            @AppStorage(LiveTVToolbarSettings.showsMultiViewKey)
+            private var showsMultiViewInToolbar = LiveTVToolbarSettings.showsMultiViewDefault
+        #endif
         @State private var configService = RecordingServerConfigService.shared
         @State private var store = RecordingServerStore.shared
         @State private var showPaywall = false
@@ -53,6 +60,22 @@
                     Text("How the Live TV tab shows channels: Guide lays them out on a programme timeline, List as a plain channel list.")
                 }
 
+                #if os(iOS)
+                    // macOS always shows both buttons; its toolbar has room.
+                    Section {
+                        Toggle(isOn: $showsRecordingsInToolbar) {
+                            Label("Recordings", systemImage: "recordingtape")
+                        }
+                        Toggle(isOn: $showsMultiViewInToolbar) {
+                            Label("Multi-View", systemImage: "rectangle.split.2x2")
+                        }
+                    } header: {
+                        Text("Toolbar")
+                    } footer: {
+                        Text("Shows these buttons in the Live TV toolbar. Recordings appears once a recording server is paired.")
+                    }
+                #endif
+
                 Section {
                     recordingServerRow
                     if access.showsRecordingsRow {
@@ -73,7 +96,7 @@
 
         /// Free with nothing paired, the row opens the paywall rather than a
         /// page that would only repeat it. A lapsed subscriber's paired server
-        /// stays reachable, crown and all, so it can be unpaired or removed.
+        /// stays reachable, crown and all, so it can be removed.
         @ViewBuilder
         private var recordingServerRow: some View {
             if access.serverRowOpensPaywall {

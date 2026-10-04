@@ -111,7 +111,7 @@
 
         /// Free with nothing paired, the row opens the paywall rather than a
         /// pane that would only repeat it. A lapsed subscriber's paired server
-        /// stays reachable, crown and all, so it can be unpaired or removed.
+        /// stays reachable, crown and all, so it can be removed.
         private var recordingServerRow: some View {
             Button {
                 if access.serverRowOpensPaywall {

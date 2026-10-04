@@ -5,12 +5,12 @@
 //  The iOS / macOS / visionOS Recording Server page, behind Settings › Live
 //  TV: find a LumeRecorder server
 //  on the network (or type its address), pair with the code it prints, and,
-//  once paired, its status with Test Connection, Unpair and Remove. The pairing
+//  once paired, its status with Test Connection and Remove Server. The pairing
 //  is a synced `SyncedRecordingServer` row, so one pairing serves every device
 //  on the account.
 //
 //  Pairing needs Lume Pro. A lapsed subscriber still reaches the page while a
-//  server is paired, to see its status and unpair or remove it.
+//  server is paired, to see its status and remove it.
 //
 //  Bonjour browsing runs only while the setup list is on screen, so the
 //  local-network prompt appears when the user is looking for a server and not
@@ -28,6 +28,8 @@
         @State private var discovery = RecordingServerDiscovery()
         @State private var pairingTarget: RecordingServerPairingTarget?
         @State private var showsPaywall = false
+        /// Set after a removal whose revoke didn't reach the server.
+        @State private var removalNote: String?
         @AppStorage(RecordingServerSetup.disclosureAcknowledgedKey) private var disclosureAcknowledged = false
 
         private var browsesForServers: Bool {
@@ -36,9 +38,17 @@
 
         var body: some View {
             List {
+                if configService.activeServer == nil, let removalNote {
+                    Section {
+                        Label(removalNote, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 if let server = configService.activeServer {
                     RecordingServerPairedSection(server: server, isLocked: !store.isUnlocked) { baseURL in
                         pairingTarget = RecordingServerPairingTarget(baseURL: baseURL)
+                    } onRemoved: { removal in
+                        removalNote = removal == .revokeFailed ? RecordingServerSetup.revokeFailedNote : nil
                     }
                 } else if !store.isUnlocked {
                     lockedSection
@@ -194,7 +204,7 @@
                         }
                         Spacer(minLength: 8)
                         Button("Remove", role: .destructive) {
-                            store.remove(id: server.id)
+                            store.forget(id: server.id)
                         }
                         .buttonStyle(.borderless)
                     }
@@ -210,15 +220,22 @@
     /// The paired server's identity, disk and recording status, and its actions.
     private struct RecordingServerPairedSection: View {
         let server: RecordingServerConfig
-        /// Lume Pro has lapsed: only the server's identity and Unpair / Remove.
+        /// Lume Pro has lapsed: only the server's identity and Remove Server.
         let isLocked: Bool
         /// Re-pairs with the same server once its token was revoked.
         let repair: (_ baseURL: URL) -> Void
+        /// The server is gone on every device; says whether the server itself
+        /// revoked the pairing.
+        let onRemoved: (RecordingServerStore.Removal) -> Void
 
         @State private var store = RecordingServerStore.shared
         @State private var connection = RecordingServerConnectionModel()
-        @State private var confirmsUnpair = false
         @State private var confirmsRemove = false
+
+        private var serverName: String {
+            let name = connection.info?.name ?? server.name
+            return name.isEmpty ? String(localized: "Recording Server") : name
+        }
 
         var body: some View {
             Section {
@@ -268,43 +285,29 @@
                 }
 
                 Button(role: .destructive) {
-                    confirmsUnpair = true
+                    confirmsRemove = true
                 } label: {
                     HStack {
-                        Label("Unpair", systemImage: "minus.circle")
+                        Label("Remove Server", systemImage: "trash")
                         Spacer(minLength: 8)
-                        if connection.isUnpairing {
+                        if connection.isRemoving {
                             ProgressView()
                                 .controlSize(.small)
                         }
                     }
                 }
-                .disabled(connection.isUnpairing)
-                .confirmationDialog(
-                    "Unpair this recording server?",
-                    isPresented: $confirmsUnpair,
-                    titleVisibility: .visible
-                ) {
-                    Button("Unpair", role: .destructive) {
-                        Task { await connection.unpair(server) }
-                    }
+                .disabled(connection.isRemoving)
+                .alert(RecordingServerSetup.removeConfirmationTitle(serverName), isPresented: $confirmsRemove) {
                     Button("Cancel", role: .cancel) {}
-                }
-
-                Button(role: .destructive) {
-                    confirmsRemove = true
-                } label: {
-                    Label("Remove", systemImage: "trash")
-                }
-                .confirmationDialog(
-                    "Remove this recording server from Lume?",
-                    isPresented: $confirmsRemove,
-                    titleVisibility: .visible
-                ) {
                     Button("Remove", role: .destructive) {
-                        store.remove(id: server.id)
+                        Task {
+                            if let removal = await connection.remove(server) {
+                                onRemoved(removal)
+                            }
+                        }
                     }
-                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text(RecordingServerSetup.removeConfirmationMessage)
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
@@ -318,11 +321,7 @@
                     case nil:
                         EmptyView()
                     }
-                    if let actionError = connection.actionError {
-                        Text(actionError)
-                            .foregroundStyle(.red)
-                    }
-                    Text(RecordingServerSetup.unpairFooter)
+                    Text(RecordingServerSetup.removeFooter)
                     Text(RecordingServerSetup.disclaimer)
                 }
             }

@@ -114,6 +114,13 @@ struct RecordingSettingsAccessTests {
         #expect(RecordingServerSetup.showsRecordingsInLiveTVRailDefault == false)
     }
 
+    @Test func `the iPhone and iPad toolbar buttons are opt-in`() {
+        #expect(LiveTVToolbarSettings.showsRecordingsKey == "lume.liveTV.showsRecordingsInToolbar")
+        #expect(LiveTVToolbarSettings.showsMultiViewKey == "lume.liveTV.showsMultiViewInToolbar")
+        #expect(LiveTVToolbarSettings.showsRecordingsDefault == false)
+        #expect(LiveTVToolbarSettings.showsMultiViewDefault == false)
+    }
+
     @Test func `the Live TV settings strings are translated in all nine locales`() throws {
         let catalog = try StringCatalog.localizable()
         for key in [
@@ -124,7 +131,23 @@ struct RecordingSettingsAccessTests {
             "Live TV Layout",
             "Recordings",
             "Recording Server",
-            "Not paired"
+            "Not paired",
+            "Toolbar",
+            "Multi-View",
+            "Shows these buttons in the Live TV toolbar. Recordings appears once a recording server is paired."
+        ] {
+            expectTranslatedEverywhere(key, in: catalog)
+        }
+    }
+
+    @Test func `the Remove Server strings are translated in all nine locales`() throws {
+        let catalog = try StringCatalog.localizable()
+        for key in [
+            "Remove Server",
+            "Remove “%@”?",
+            "Lume forgets this server on all your devices. Recordings and schedules stay on the server.",
+            "Removing the server keeps its recordings and schedules on the server.",
+            "Lume couldn't reach the server, so it may still list this device. Pair again or remove it there."
         ] {
             expectTranslatedEverywhere(key, in: catalog)
         }

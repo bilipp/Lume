@@ -2,8 +2,9 @@
 //  RecordingServerStoreTests.swift
 //  LumeTests
 //
-//  `RecordingServerStore` against a scripted backend: pairing, record now,
-//  schedule, stop, delete, error mapping, the polling ref-count and the
+//  `RecordingServerStore` against a scripted backend
+//  (`StubRecordingServerBackend`): pairing, removal, record now, schedule,
+//  stop, delete, error mapping, the polling ref-count and the
 //  pending-recording lookup. The config lives in the cloud half of the profile
 //  test container (in-memory, `cloudKitDatabase: .none`).
 //
@@ -13,119 +14,6 @@ import Foundation
 import LumeRecorderKit
 import Synchronization
 import Testing
-
-// MARK: - Stub backend
-
-final class StubRecordingServerBackend: RecordingServerBackend {
-    struct State {
-        var info = ServerInfo(id: UUID(), name: "Living Room", version: "1.0.0", apiVersion: 1)
-        var pairResult: Result<PairResponse, RecordingServerError>?
-        var recordings: [Recording] = []
-        var status = ServerStatus(
-            activeRecordings: 0, scheduledRecordings: 0,
-            freeDiskBytes: 1000, totalDiskBytes: 2000, maxConcurrent: 2
-        )
-        /// Thrown by every call except `serverInfo` when set.
-        var failure: RecordingServerError?
-        var created: [(request: CreateRecordingRequest, key: String)] = []
-        var stopped: [UUID] = []
-        var deleted: [UUID] = []
-        var unpaired: [UUID] = []
-        var pairCodes: [String] = []
-        var deviceNames: [String] = []
-        var recordingsCalls = 0
-        var grantURL = URL(string: "http://192.168.1.20:8090/hls/signed/index.m3u8")!
-    }
-
-    let state = Mutex(State())
-
-    var kind: RecordingServerKind {
-        .lumeRecorder
-    }
-
-    private func failIfScripted() throws(RecordingServerError) {
-        if let failure = state.withLock({ $0.failure }) {
-            throw failure
-        }
-    }
-
-    func serverInfo() async throws(RecordingServerError) -> ServerInfo {
-        state.withLock { $0.info }
-    }
-
-    func pair(code: String, deviceName: String) async throws(RecordingServerError) -> PairResponse {
-        let result = state.withLock { state in
-            state.pairCodes.append(code)
-            state.deviceNames.append(deviceName)
-            return state.pairResult ?? .success(PairResponse(token: "token-1", deviceID: UUID(), server: state.info))
-        }
-        return try result.get()
-    }
-
-    func status() async throws(RecordingServerError) -> ServerStatus {
-        try failIfScripted()
-        return state.withLock { $0.status }
-    }
-
-    func recordings() async throws(RecordingServerError) -> [Recording] {
-        try failIfScripted()
-        return state.withLock { state in
-            state.recordingsCalls += 1
-            return state.recordings
-        }
-    }
-
-    func createRecording(
-        _ request: CreateRecordingRequest,
-        idempotencyKey: String
-    ) async throws(RecordingServerError) -> Recording {
-        try failIfScripted()
-        return state.withLock { state in
-            state.created.append((request, idempotencyKey))
-            let recording = Recording(
-                id: UUID(), title: request.title, channelName: request.channelName,
-                channelLogoURL: request.channelLogoURL, programmeDescription: request.programmeDescription,
-                sourceRef: request.sourceRef, start: request.start, end: request.end,
-                status: request.start > Date() ? .scheduled : .recording, failureReason: nil,
-                createdAt: Date(), startedAt: nil, finishedAt: nil, durationSeconds: nil, sizeBytes: nil
-            )
-            state.recordings.append(recording)
-            return recording
-        }
-    }
-
-    func stopRecording(id: UUID) async throws(RecordingServerError) -> Recording {
-        try failIfScripted()
-        let stopped = state.withLock { state -> Recording? in
-            state.stopped.append(id)
-            guard let index = state.recordings.firstIndex(where: { $0.id == id }) else { return nil }
-            state.recordings[index].status = .cancelled
-            return state.recordings[index]
-        }
-        guard let stopped else { throw .notFound }
-        return stopped
-    }
-
-    func deleteRecording(id: UUID) async throws(RecordingServerError) {
-        try failIfScripted()
-        state.withLock { state in
-            state.deleted.append(id)
-            state.recordings.removeAll { $0.id == id }
-        }
-    }
-
-    func playbackGrant(id _: UUID) async throws(RecordingServerError) -> PlaybackGrant {
-        try failIfScripted()
-        return state.withLock { PlaybackGrant(url: $0.grantURL, expiresAt: Date().addingTimeInterval(3600)) }
-    }
-
-    func unpair(deviceID: UUID) async throws(RecordingServerError) {
-        try failIfScripted()
-        state.withLock { $0.unpaired.append(deviceID) }
-    }
-}
-
-// MARK: - Tests
 
 @MainActor
 struct RecordingServerStoreTests {
@@ -155,7 +43,8 @@ struct RecordingServerStoreTests {
     private func makeHarness(
         unlocked: Bool = true,
         stalkerURL: URL? = URL(string: "http://portal.example/play/1.ts?token=abc"),
-        pollInterval: Duration = .seconds(60)
+        pollInterval: Duration = .seconds(60),
+        revokeTimeout: Duration = .seconds(5)
     ) throws -> Harness {
         let container = try makeProfileTestContainer()
         let configService = RecordingServerConfigService()
@@ -177,6 +66,7 @@ struct RecordingServerStoreTests {
             now: { [now] in now },
             pendingPollInterval: pollInterval,
             idlePollInterval: pollInterval,
+            revokeTimeout: revokeTimeout,
             progressDefaults: progressDefaults
         )
         return Harness(
@@ -185,10 +75,12 @@ struct RecordingServerStoreTests {
         )
     }
 
-    private func paired(unlocked: Bool = true, stalkerURL: URL? = URL(string: "http://portal.example/play/1.ts?token=abc"))
-        async throws -> Harness
-    {
-        let harness = try makeHarness(unlocked: unlocked, stalkerURL: stalkerURL)
+    private func paired(
+        unlocked: Bool = true,
+        stalkerURL: URL? = URL(string: "http://portal.example/play/1.ts?token=abc"),
+        revokeTimeout: Duration = .seconds(5)
+    ) async throws -> Harness {
+        let harness = try makeHarness(unlocked: unlocked, stalkerURL: stalkerURL, revokeTimeout: revokeTimeout)
         try await harness.store.pair(baseURL: baseURL, code: "123456")
         return harness
     }
@@ -253,36 +145,74 @@ struct RecordingServerStoreTests {
         #expect(!harness.store.isPaired)
     }
 
-    @Test func `unpair revokes the device and deletes the config`() async throws {
+    @Test func `removing a server revokes the device and deletes the config`() async throws {
         let harness = try await paired()
         let config = try #require(harness.configService.activeServer)
 
-        try await harness.store.unpair(id: config.id)
+        let removal = await harness.store.removeServer(id: config.id)
 
+        #expect(removal == .revoked)
         #expect(harness.backend.state.withLock { $0.unpaired } == [config.deviceID].compactMap(\.self))
         #expect(!harness.store.isPaired)
+        #expect(harness.configService.server(id: config.id) == nil)
         #expect(harness.store.recordings.isEmpty)
     }
 
-    @Test func `unpair keeps the config when the server is unreachable`() async throws {
+    @Test func `removing a server it can't reach still deletes the config`() async throws {
         let harness = try await paired()
         let config = try #require(harness.configService.activeServer)
         harness.backend.state.withLock { $0.failure = .unreachable(.cannotConnectToHost) }
 
-        await #expect(throws: RecordingServerError.unreachable(.cannotConnectToHost)) {
-            try await harness.store.unpair(id: config.id)
-        }
-        #expect(harness.store.isPaired)
+        let removal = await harness.store.removeServer(id: config.id)
+
+        #expect(removal == .revokeFailed)
+        #expect(!harness.store.isPaired)
+        #expect(harness.configService.server(id: config.id) == nil)
     }
 
-    @Test func `unpair still deletes a config whose token was already revoked`() async throws {
+    @Test func `removing a server that errors still deletes the config`() async throws {
         let harness = try await paired()
         let config = try #require(harness.configService.activeServer)
-        harness.backend.state.withLock { $0.failure = .unauthorized }
+        harness.backend.state.withLock { $0.failure = .server(status: 500, code: nil) }
 
-        try await harness.store.unpair(id: config.id)
+        #expect(await harness.store.removeServer(id: config.id) == .revokeFailed)
+        #expect(!harness.store.isPaired)
+    }
+
+    @Test(arguments: [RecordingServerError.unauthorized, .notFound])
+    func `removing a server whose pairing is already gone counts as revoked`(failure: RecordingServerError) async throws {
+        let harness = try await paired()
+        let config = try #require(harness.configService.activeServer)
+        harness.backend.state.withLock { $0.failure = failure }
+
+        let removal = await harness.store.removeServer(id: config.id)
+
+        #expect(removal == .revoked)
+        #expect(!harness.store.isPaired)
+    }
+
+    @Test func `removing a server that doesn't answer in time gives up and deletes the config`() async throws {
+        let harness = try await paired(revokeTimeout: .milliseconds(50))
+        let config = try #require(harness.configService.activeServer)
+        harness.backend.state.withLock { $0.unpairDelay = .seconds(30) }
+
+        let started = ContinuousClock.now
+        let removal = await harness.store.removeServer(id: config.id)
+
+        #expect(removal == .revokeFailed)
+        #expect(started.duration(to: .now) < .seconds(10))
+        #expect(!harness.store.isPaired)
+        #expect(harness.backend.state.withLock { $0.unpaired }.isEmpty)
+    }
+
+    @Test func `forgetting a server never contacts it`() async throws {
+        let harness = try await paired()
+        let config = try #require(harness.configService.activeServer)
+
+        harness.store.forget(id: config.id)
 
         #expect(!harness.store.isPaired)
+        #expect(harness.backend.state.withLock { $0.unpaired }.isEmpty)
     }
 
     // MARK: Record now

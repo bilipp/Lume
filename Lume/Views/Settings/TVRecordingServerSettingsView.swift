@@ -51,6 +51,8 @@
         @State private var store = RecordingServerStore.shared
         @State private var discovery = RecordingServerDiscovery()
         @State private var showPaywall = false
+        /// Set after a removal whose revoke didn't reach the server.
+        @State private var removalNote: String?
         @AppStorage(RecordingServerSetup.disclosureAcknowledgedKey) private var disclosureAcknowledged = false
         @FocusState private var focus: TVRecordingServerFocus?
 
@@ -60,6 +62,13 @@
 
         var body: some View {
             VStack(alignment: .leading, spacing: 36) {
+                if route == nil, configService.activeServer == nil, let removalNote {
+                    Label(removalNote, systemImage: "exclamationmark.triangle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                }
+
                 if let route, store.isUnlocked {
                     TVRecordingServerPairingStep(baseURL: route.baseURL) {
                         self.route = nil
@@ -70,10 +79,11 @@
                     }
                 } else if let server = configService.activeServer {
                     // Also for a lapsed subscriber, who must still be able to
-                    // unpair or remove it.
+                    // remove it.
                     TVRecordingServerPairedSection(server: server, isLocked: !store.isUnlocked, focus: $focus) { baseURL in
                         route = .server(baseURL)
-                    } onRemoved: {
+                    } onRemoved: { removal in
+                        removalNote = removal == .revokeFailed ? RecordingServerSetup.revokeFailedNote : nil
                         moveFocus(to: setupFocus)
                     }
                 } else if !store.isUnlocked {
@@ -276,7 +286,7 @@
 
                 ForEach(configService.unusableServers) { server in
                     Button {
-                        store.remove(id: server.id)
+                        store.forget(id: server.id)
                         moveFocus(to: configService.activeServer == nil ? setupFocus : .testConnection)
                     } label: {
                         HStack(spacing: 16) {
@@ -303,19 +313,23 @@
     /// The paired server's identity, disk and recording status, and its actions.
     private struct TVRecordingServerPairedSection: View {
         let server: RecordingServerConfig
-        /// Lume Pro has lapsed: only the server's identity and Unpair / Remove.
+        /// Lume Pro has lapsed: only the server's identity and Remove Server.
         let isLocked: Bool
         var focus: FocusState<TVRecordingServerFocus?>.Binding
         /// Re-pairs with the same server once its token was revoked.
         let repair: (_ baseURL: URL) -> Void
-        /// The pairing is gone (unpaired or removed); the pane falls back to
-        /// discovery.
-        let onRemoved: () -> Void
+        /// The server is gone on every device, and the pane falls back to its
+        /// unpaired state; says whether the server itself revoked the pairing.
+        let onRemoved: (RecordingServerStore.Removal) -> Void
 
         @State private var store = RecordingServerStore.shared
         @State private var connection = RecordingServerConnectionModel()
-        @State private var confirmsUnpair = false
         @State private var confirmsRemove = false
+
+        private var serverName: String {
+            let name = connection.info?.name ?? server.name
+            return name.isEmpty ? String(localized: "Recording Server") : name
+        }
 
         var body: some View {
             VStack(alignment: .leading, spacing: 36) {
@@ -393,45 +407,26 @@
                     EmptyView()
                 }
 
-                actionRow("Unpair", systemImage: "minus.circle", isDestructive: true, isBusy: connection.isUnpairing) {
-                    confirmsUnpair = true
+                // Stays enabled while removing: disabling the focused row would
+                // throw focus elsewhere. The model ignores a second press.
+                actionRow("Remove Server", systemImage: "trash", isDestructive: true, isBusy: connection.isRemoving) {
+                    confirmsRemove = true
                 }
-                .confirmationDialog(
-                    "Unpair this recording server?",
-                    isPresented: $confirmsUnpair,
-                    titleVisibility: .visible
-                ) {
-                    Button("Unpair", role: .destructive) {
+                .alert(RecordingServerSetup.removeConfirmationTitle(serverName), isPresented: $confirmsRemove) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Remove", role: .destructive) {
                         Task {
-                            if await connection.unpair(server) {
-                                onRemoved()
+                            if let removal = await connection.remove(server) {
+                                onRemoved(removal)
                             }
                         }
                     }
-                    Button("Cancel", role: .cancel) {}
-                }
-
-                actionRow("Remove", systemImage: "trash", isDestructive: true) {
-                    confirmsRemove = true
-                }
-                .confirmationDialog(
-                    "Remove this recording server from Lume?",
-                    isPresented: $confirmsRemove,
-                    titleVisibility: .visible
-                ) {
-                    Button("Remove", role: .destructive) {
-                        store.remove(id: server.id)
-                        onRemoved()
-                    }
-                    Button("Cancel", role: .cancel) {}
-                }
-
-                if let actionError = connection.actionError {
-                    statusText(actionError, color: .red)
+                } message: {
+                    Text(RecordingServerSetup.removeConfirmationMessage)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(RecordingServerSetup.unpairFooter)
+                    Text(RecordingServerSetup.removeFooter)
                     Text(RecordingServerSetup.disclaimer)
                 }
                 .font(.system(size: 22))

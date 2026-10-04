@@ -11,21 +11,6 @@
 import LumeRecorderKit
 import SwiftUI
 
-extension View {
-    /// Adds the Recordings button to the Live TV toolbar once a recording
-    /// server is paired. Without Lume Pro it carries the crown and opens the
-    /// paywall. tvOS reaches the library from the Live TV rail and its
-    /// Settings pane instead.
-    @ViewBuilder
-    func recordingsLibraryToolbar() -> some View {
-        #if os(tvOS)
-            self
-        #else
-            modifier(RecordingsLibraryToolbarModifier())
-        #endif
-    }
-}
-
 #if !os(tvOS)
 
     extension View {
@@ -38,33 +23,6 @@ extension View {
                 }
                 .recordingsSheetFrame()
             }
-        }
-    }
-
-    private struct RecordingsLibraryToolbarModifier: ViewModifier {
-        @State private var store = RecordingServerStore.shared
-        @State private var showingRecordings = false
-        @State private var showingPaywall = false
-
-        func body(content: Content) -> some View {
-            content
-                .toolbar {
-                    if store.isPaired {
-                        ToolbarItem(placement: .automatic) {
-                            Button {
-                                if store.isUnlocked {
-                                    showingRecordings = true
-                                } else {
-                                    showingPaywall = true
-                                }
-                            } label: {
-                                Label("Recordings", systemImage: store.isUnlocked ? "recordingtape" : "crown")
-                            }
-                        }
-                    }
-                }
-                .recordingsLibrarySheet(isPresented: $showingRecordings)
-                .paywall(isPresented: $showingPaywall, highlight: .recordingServer)
         }
     }
 

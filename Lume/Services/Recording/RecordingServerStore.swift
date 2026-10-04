@@ -54,6 +54,7 @@ final class RecordingServerStore {
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let pendingPollInterval: Duration
     @ObservationIgnored private let idlePollInterval: Duration
+    @ObservationIgnored private let revokeTimeout: Duration
     @ObservationIgnored private let progressDefaults: UserDefaults
 
     @ObservationIgnored private var observerCount = 0
@@ -70,6 +71,7 @@ final class RecordingServerStore {
         now: @escaping () -> Date = Date.init,
         pendingPollInterval: Duration = .seconds(10),
         idlePollInterval: Duration = .seconds(60),
+        revokeTimeout: Duration = .seconds(5),
         progressDefaults: UserDefaults = .standard
     ) {
         // `.shared` is resolved here, not as a default argument: default
@@ -81,6 +83,7 @@ final class RecordingServerStore {
         self.now = now
         self.pendingPollInterval = pendingPollInterval
         self.idlePollInterval = idlePollInterval
+        self.revokeTimeout = revokeTimeout
         self.progressDefaults = progressDefaults
     }
 
@@ -167,36 +170,6 @@ final class RecordingServerStore {
         resetMirroredState()
         await reload()
         return config
-    }
-
-    /// Revokes this pairing on the server, then forgets it everywhere. A token
-    /// the server already rejects still lets the row go; an unreachable server
-    /// keeps it so the user can retry or remove it outright.
-    func unpair(id: UUID) async throws(RecordingServerError) {
-        guard let config = configService.server(id: id) else { return }
-        if let endpoint = config.endpoint, let deviceID = config.deviceID {
-            let backend = makeBackend(endpoint)
-            do {
-                try await Self.offMain { () async throws(RecordingServerError) in
-                    try await backend.unpair(deviceID: deviceID)
-                }
-            } catch .unauthorized, .notFound {
-                // Already revoked on the server.
-            } catch {
-                Logger.recording.error("Recording server unpair failed: \(error.logDescription, privacy: .public)")
-                throw error
-            }
-        }
-        remove(id: id)
-    }
-
-    /// Forgets a server config without contacting it. Anything scheduled on
-    /// the server is left untouched.
-    func remove(id: UUID) {
-        configService.delete(id: id)
-        if configService.activeServer?.endpoint != loadedEndpoint {
-            resetMirroredState()
-        }
     }
 
     // MARK: - Polling
@@ -536,6 +509,80 @@ final class RecordingServerStore {
             let name = UIDevice.current.name
         #endif
         return "Lume – \(name)"
+    }
+}
+
+// MARK: - Removal
+
+extension RecordingServerStore {
+    /// What removing a server managed on the server itself.
+    nonisolated enum Removal: Equatable {
+        /// Revoked, already gone on the server, or nothing to revoke.
+        case revoked
+        /// Not reached in time, or refused: the server may still list this device.
+        case revokeFailed
+    }
+
+    /// Forgets a server on every device on the account. First asks the server,
+    /// once and briefly, to revoke the pairing; the config row goes whatever it
+    /// answers, so an unreachable server never strands it. Recordings and
+    /// schedules on the server are left untouched.
+    @discardableResult
+    func removeServer(id: UUID) async -> Removal {
+        guard let config = configService.server(id: id) else { return .revoked }
+        let removal = await revoke(config)
+        forget(id: id)
+        return removal
+    }
+
+    /// Forgets a server config without contacting it: the Other Servers rows,
+    /// which this build can't talk to.
+    func forget(id: UUID) {
+        configService.delete(id: id)
+        if configService.activeServer?.endpoint != loadedEndpoint {
+            resetMirroredState()
+        }
+    }
+
+    private func revoke(_ config: RecordingServerConfig) async -> Removal {
+        guard let endpoint = config.endpoint, let deviceID = config.deviceID else { return .revoked }
+        let backend = makeBackend(endpoint)
+        let timeout = revokeTimeout
+        do {
+            try await Self.offMain { () async throws(RecordingServerError) in
+                try await Self.withTimeout(timeout) { () async throws(RecordingServerError) in
+                    try await backend.unpair(deviceID: deviceID)
+                }
+            }
+            return .revoked
+        } catch .unauthorized, .notFound {
+            // Already revoked on the server.
+            return .revoked
+        } catch {
+            Logger.recording.error("Recording server revoke failed: \(error.logDescription, privacy: .public)")
+            return .revokeFailed
+        }
+    }
+
+    /// Fails with `.unreachable(.timedOut)` once `timeout` passes, cancelling
+    /// `operation`.
+    private nonisolated static func withTimeout(
+        _ timeout: Duration,
+        _ operation: @escaping @Sendable () async throws(RecordingServerError) -> Void
+    ) async throws(RecordingServerError) {
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask { try await operation() }
+                group.addTask {
+                    try await Task.sleep(for: timeout)
+                    throw RecordingServerError.unreachable(.timedOut)
+                }
+                defer { group.cancelAll() }
+                try await group.next()
+            }
+        } catch {
+            throw RecordingServerError(error)
+        }
     }
 }
 

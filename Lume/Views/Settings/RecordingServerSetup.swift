@@ -4,7 +4,7 @@
 //
 //  Copy and state shared by the Recording Server settings page
 //  (iOS / macOS / visionOS) and its tvOS pane, so both platforms show the same
-//  disclosure and disclaimer, acknowledge it once, and pair, test and unpair
+//  disclosure and disclaimer, acknowledge it once, and pair, test and remove
 //  the same way.
 //
 
@@ -37,16 +37,28 @@ enum RecordingServerSetup {
         String(localized: "Only record content you're entitled to. You're responsible for following your provider's terms and the law where you live.")
     }
 
-    static var unpairFooter: String {
-        String(localized: "Unpair revokes this pairing on the server for all your devices. Remove only forgets the server in Lume. Either way, recordings and schedules on the server are kept.")
+    static var removeFooter: String {
+        String(localized: "Removing the server keeps its recordings and schedules on the server.")
+    }
+
+    static func removeConfirmationTitle(_ serverName: String) -> String {
+        String(
+            localized: "Remove “\(serverName)”?",
+            comment: "Confirmation title before removing the paired recording server; the argument is its name."
+        )
+    }
+
+    static var removeConfirmationMessage: String {
+        String(localized: "Lume forgets this server on all your devices. Recordings and schedules stay on the server.")
+    }
+
+    /// Shown after a removal whose revoke didn't reach the server.
+    static var revokeFailedNote: String {
+        String(localized: "Lume couldn't reach the server, so it may still list this device. Pair again or remove it there.")
     }
 
     static var localNetworkUnavailable: String {
         String(localized: "Lume can't search the local network. Allow Local Network access for Lume in the system settings, or enter the server's address manually.")
-    }
-
-    static func unpairFailure(_ error: RecordingServerError) -> String {
-        String(localized: "Lume couldn't unpair from the server: \(error.localizedDescription) You can remove it from Lume instead.")
     }
 
     static func diskSummary(_ status: ServerStatus?) -> String {
@@ -65,7 +77,7 @@ enum RecordingServerSetup {
 /// Which recording rows the Live TV settings page offers and what each opens,
 /// on every platform. The page itself is free (its layout switch is); Lume Pro
 /// gates recording. A lapsed subscriber still reaches a paired server's page to
-/// unpair or remove it — pairing a new one is what needs Lume Pro.
+/// remove it — pairing a new one is what needs Lume Pro.
 struct RecordingSettingsAccess: Equatable {
     /// Lume Pro unlocks recording.
     let isUnlocked: Bool
@@ -183,7 +195,7 @@ final class RecordingServerPairingModel {
 
 // MARK: - Paired server
 
-/// The paired server's identity, Test Connection and Unpair.
+/// The paired server's identity, Test Connection and Remove Server.
 @MainActor
 @Observable
 final class RecordingServerConnectionModel {
@@ -195,8 +207,7 @@ final class RecordingServerConnectionModel {
     private(set) var info: ServerInfo?
     private(set) var isTesting = false
     private(set) var testResult: TestResult?
-    private(set) var isUnpairing = false
-    private(set) var actionError: String?
+    private(set) var isRemoving = false
 
     private var store: RecordingServerStore {
         .shared
@@ -227,19 +238,12 @@ final class RecordingServerConnectionModel {
         }
     }
 
-    /// `true` once the pairing is gone.
-    @discardableResult
-    func unpair(_ server: RecordingServerConfig) async -> Bool {
-        guard !isUnpairing else { return false }
-        isUnpairing = true
-        actionError = nil
-        defer { isUnpairing = false }
-        do {
-            try await store.unpair(id: server.id)
-            return true
-        } catch {
-            actionError = RecordingServerSetup.unpairFailure(error)
-            return false
-        }
+    /// Removes the server on every device after a best-effort revoke; `nil`
+    /// while a removal is already running.
+    func remove(_ server: RecordingServerConfig) async -> RecordingServerStore.Removal? {
+        guard !isRemoving else { return nil }
+        isRemoving = true
+        defer { isRemoving = false }
+        return await store.removeServer(id: server.id)
     }
 }
