@@ -57306,54 +57306,54 @@
         }
       }
     },
-    "Watch up to four live channels side by side — across playlists, so a single-connection provider is no obstacle." : {
+    "Watch up to four live channels side by side. Each tile can come from a different playlist, which helps if your provider allows only one connection per account." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sieh bis zu vier Live-Kanäle nebeneinander – auch aus verschiedenen Playlists, sodass ein Anbieter mit nur einer Verbindung kein Hindernis ist."
+            "value" : "Sieh bis zu vier Live-Kanäle nebeneinander. Jedes Feld kann aus einer anderen Playlist stammen – hilfreich, wenn dein Anbieter nur eine Verbindung pro Konto erlaubt."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mira hasta cuatro canales en directo a la vez, incluso de listas distintas, así que un proveedor de una sola conexión no es un problema."
+            "value" : "Mira hasta cuatro canales en directo a la vez. Cada recuadro puede venir de una lista distinta, algo útil si tu proveedor solo permite una conexión por cuenta."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Regardez jusqu'à quatre chaînes en direct côte à côte, y compris depuis des playlists différentes : un fournisseur limité à une seule connexion n'est plus un obstacle."
+            "value" : "Regardez jusqu'à quatre chaînes en direct côte à côte. Chaque tuile peut provenir d'une playlist différente, ce qui aide si votre fournisseur n'autorise qu'une seule connexion par compte."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guarda fino a quattro canali in diretta affiancati, anche da playlist diverse: un provider con una sola connessione non è più un ostacolo."
+            "value" : "Guarda fino a quattro canali in diretta affiancati. Ogni riquadro può provenire da una playlist diversa: utile se il tuo provider consente una sola connessione per account."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最大 4 つのライブチャンネルを並べて視聴できます。異なるプレイリストにも対応するので、同時接続が 1 つだけのプロバイダでも問題ありません。"
+            "value" : "最大 4 つのライブチャンネルを並べて視聴できます。タイルごとに別のプレイリストを使えるので、1 アカウントにつき同時接続が 1 つだけのプロバイダでも役立ちます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "라이브 채널을 최대 4개까지 나란히 시청하세요. 서로 다른 재생목록에서도 가능하므로 동시 접속이 하나뿐인 제공업체도 문제없습니다."
+            "value" : "라이브 채널을 최대 4개까지 나란히 시청하세요. 타일마다 다른 재생목록을 사용할 수 있어, 계정당 하나의 연결만 허용하는 제공업체에 유용합니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vê até quatro canais ao vivo lado a lado — mesmo de playlists diferentes, para que um fornecedor com uma única ligação não seja um obstáculo."
+            "value" : "Vê até quatro canais ao vivo lado a lado. Cada bloco pode vir de uma playlist diferente, o que ajuda se o teu fornecedor só permitir uma ligação por conta."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最多可并排观看四个直播频道，还能跨播放列表——即使服务商只允许一个连接也不受影响。"
+            "value" : "最多可并排观看四个直播频道。每个画面都可以来自不同的播放列表，适合每个账户只允许一个连接的服务商。"
           }
         }
       }
