@@ -61,10 +61,72 @@ struct SettingsCategoryTests {
         #expect(!visible.contains(.about))
     }
 
-    @Test func `recording server is a Lume Pro row in the playback group`() {
+    @Test func `live TV sits in the experience group between home and sports`() {
+        let experience = SettingsCategory.grouped(hasConnectedServices: false).first { $0.group == .experience }
+        #expect(experience?.categories == [.home, .liveTV, .sports, .appearance])
         let playback = SettingsCategory.grouped(hasConnectedServices: false).first { $0.group == .playback }
-        #expect(playback?.categories == [.player, .downloads, .recordingServer])
-        #expect(SettingsCategory.recordingServer.lockedFeature == .recordingServer)
-        #expect(SettingsCategory.premium.lockedFeature == nil)
+        #expect(playback?.categories == [.player, .downloads])
+    }
+
+    @Test func `a raw value from an older build resolves to nothing rather than crashing`() {
+        // Nothing persists a category today; should anything ever, the
+        // removed standalone Recording Server row must fail soft.
+        #expect(SettingsCategory(rawValue: "recordingServer") == nil)
+        #expect(SettingsCategory(rawValue: "liveTV") == .liveTV)
+    }
+}
+
+struct RecordingSettingsAccessTests {
+    @Test func `a free user with nothing paired hits the paywall on the server row`() {
+        let access = RecordingSettingsAccess(isUnlocked: false, hasServers: false, isPaired: false)
+        #expect(access.serverRowOpensPaywall)
+        #expect(access.serverRowShowsBadge)
+        #expect(!access.showsRecordingsRow)
+    }
+
+    @Test func `a lapsed subscriber keeps the paired server's page behind the crown`() {
+        let access = RecordingSettingsAccess(isUnlocked: false, hasServers: true, isPaired: true)
+        #expect(!access.serverRowOpensPaywall)
+        #expect(access.serverRowShowsBadge)
+        #expect(access.showsRecordingsRow)
+        #expect(access.recordingsRowOpensPaywall)
+    }
+
+    @Test func `an unusable server row alone still opens the page to remove it`() {
+        let access = RecordingSettingsAccess(isUnlocked: false, hasServers: true, isPaired: false)
+        #expect(!access.serverRowOpensPaywall)
+        #expect(!access.showsRecordingsRow)
+    }
+
+    @Test func `a subscriber opens everything without the crown`() {
+        let unpaired = RecordingSettingsAccess(isUnlocked: true, hasServers: false, isPaired: false)
+        #expect(!unpaired.serverRowOpensPaywall)
+        #expect(!unpaired.serverRowShowsBadge)
+        #expect(!unpaired.showsRecordingsRow)
+
+        let paired = RecordingSettingsAccess(isUnlocked: true, hasServers: true, isPaired: true)
+        #expect(paired.showsRecordingsRow)
+        #expect(!paired.recordingsRowOpensPaywall)
+    }
+
+    @Test func `the tvOS rail lists Recordings only once switched on`() {
+        #expect(RecordingServerSetup.showsRecordingsInLiveTVRailKey == "lume.liveTV.showsRecordingsInRail")
+        #expect(RecordingServerSetup.showsRecordingsInLiveTVRailDefault == false)
+    }
+
+    @Test func `the Live TV settings strings are translated in all nine locales`() throws {
+        let catalog = try StringCatalog.localizable()
+        for key in [
+            "Show in Live TV Sidebar",
+            "Lists Recordings in the Live TV sidebar, below Favorites and Recently Watched.",
+            "Live TV",
+            "Layout",
+            "Live TV Layout",
+            "Recordings",
+            "Recording Server",
+            "Not paired"
+        ] {
+            expectTranslatedEverywhere(key, in: catalog)
+        }
     }
 }

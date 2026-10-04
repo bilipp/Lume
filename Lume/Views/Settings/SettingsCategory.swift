@@ -13,8 +13,8 @@ import SwiftUI
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case premium, profiles
     case playlists, epg, library
-    case home, sports, appearance
-    case player, downloads, recordingServer
+    case home, liveTV, sports, appearance
+    case player, downloads
     case iCloud, connectedServices
     case storage, help, about, developer
 
@@ -30,11 +30,11 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .epg: "TV Guide"
         case .library: "Library"
         case .home: "Home"
+        case .liveTV: "Live TV"
         case .sports: "Sports"
         case .appearance: "Appearance"
         case .player: "Player"
         case .downloads: "Downloads"
-        case .recordingServer: "Recording Server"
         case .iCloud: "iCloud"
         case .connectedServices: "Connected Services"
         case .storage: "Storage & Cache"
@@ -48,8 +48,8 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .premium, .profiles: .account
         case .playlists, .epg, .library: .content
-        case .home, .sports, .appearance: .experience
-        case .player, .downloads, .recordingServer: .playback
+        case .home, .liveTV, .sports, .appearance: .experience
+        case .player, .downloads: .playback
         case .iCloud, .connectedServices: .sync
         case .storage, .help, .about, .developer: .system
         }
@@ -100,15 +100,6 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
             return members.isEmpty ? nil : (group, members)
         }
     }
-
-    /// The Lume Pro feature a free user hits on this row: it shows the crown
-    /// and opens the paywall instead of the page.
-    var lockedFeature: PremiumFeature? {
-        switch self {
-        case .recordingServer: .recordingServer
-        default: nil
-        }
-    }
 }
 
 /// The groups the root list is split into. tvOS separates them with spacing
@@ -142,11 +133,11 @@ enum SettingsCategoryGroup: CaseIterable {
             case .epg: "list.clipboard"
             case .library: "slider.horizontal.3"
             case .home: "house"
+            case .liveTV: "antenna.radiowaves.left.and.right"
             case .sports: "sportscourt"
             case .appearance: "circle.lefthalf.filled"
             case .player: "play.circle"
             case .downloads: "arrow.down.circle"
-            case .recordingServer: "record.circle"
             case .iCloud: "icloud"
             case .connectedServices: "arrow.trianglehead.2.clockwise.rotate.90.circle"
             case .storage: "internaldrive"
@@ -162,14 +153,10 @@ enum SettingsCategoryGroup: CaseIterable {
     struct SettingsCategoryRowLabel: View {
         let category: SettingsCategory
         var value: Text?
-        var showsPremiumBadge = false
 
         var body: some View {
             HStack {
                 Label(category.title, systemImage: category.systemImage)
-                if showsPremiumBadge {
-                    PremiumBadge()
-                }
                 Spacer(minLength: 8)
                 if let value {
                     value

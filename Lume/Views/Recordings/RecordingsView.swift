@@ -4,7 +4,8 @@
 //
 //  The recordings library on iOS, macOS and visionOS: the paired server's
 //  recordings by status, with stop, cancel and delete, and playback of
-//  anything that has captured video. Opened from the Live TV toolbar.
+//  anything that has captured video. Opened from the Live TV toolbar and
+//  from Settings › Live TV.
 //
 
 import LumeRecorderKit
@@ -13,7 +14,8 @@ import SwiftUI
 extension View {
     /// Adds the Recordings button to the Live TV toolbar once a recording
     /// server is paired. Without Lume Pro it carries the crown and opens the
-    /// paywall. tvOS reaches the library from the Live TV rail instead.
+    /// paywall. tvOS reaches the library from the Live TV rail and its
+    /// Settings pane instead.
     @ViewBuilder
     func recordingsLibraryToolbar() -> some View {
         #if os(tvOS)
@@ -25,6 +27,19 @@ extension View {
 }
 
 #if !os(tvOS)
+
+    extension View {
+        /// The recordings library as a sheet, the way every iOS / macOS /
+        /// visionOS entry point presents it (macOS sizes the sheet itself).
+        func recordingsLibrarySheet(isPresented: Binding<Bool>) -> some View {
+            sheet(isPresented: isPresented) {
+                NavigationStack {
+                    RecordingsView()
+                }
+                .recordingsSheetFrame()
+            }
+        }
+    }
 
     private struct RecordingsLibraryToolbarModifier: ViewModifier {
         @State private var store = RecordingServerStore.shared
@@ -48,12 +63,7 @@ extension View {
                         }
                     }
                 }
-                .sheet(isPresented: $showingRecordings) {
-                    NavigationStack {
-                        RecordingsView()
-                    }
-                    .recordingsSheetFrame()
-                }
+                .recordingsLibrarySheet(isPresented: $showingRecordings)
                 .paywall(isPresented: $showingPaywall, highlight: .recordingServer)
         }
     }

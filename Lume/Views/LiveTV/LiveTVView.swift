@@ -98,17 +98,6 @@ struct LiveTVView: View {
         LiveTVLayoutMode(storedValue: layoutModeRaw)
     }
 
-    /// Guide/List segmented switch shared across platforms.
-    private var layoutModePicker: some View {
-        Picker("Layout", selection: $layoutModeRaw) {
-            ForEach(LiveTVLayoutMode.allCases) { mode in
-                Label(mode.displayName, systemImage: mode.systemImage).tag(mode.rawValue)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-    }
-
     /// The channel detail area for the selected section, honouring the current
     /// layout mode. Shared by every platform's layout.
     private func detail(for section: LiveTVSection) -> some View {
@@ -189,11 +178,9 @@ struct LiveTVView: View {
             #endif
             #if os(iOS) || os(macOS)
             .toolbar {
+                // Guide or List is chosen in Settings › Live TV, the one place
+                // to switch it on every platform.
                 if !playlists.isEmpty, !categories.isEmpty {
-                    ToolbarItem(placement: .principal) {
-                        layoutModePicker
-                            .frame(maxWidth: 240)
-                    }
                     // Its own ToolbarItem with a titled Label, for the same
                     // reason `LibraryToolbar` splits its buttons up: an item
                     // pushed into the "..." overflow needs a menu representation.

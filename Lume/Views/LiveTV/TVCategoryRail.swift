@@ -16,7 +16,8 @@
         @Binding var selectedSection: LiveTVSection?
         /// Fired when the user activates (clicks) a category.
         var onCategoryActivated: () -> Void = {}
-        /// The Recordings entry after the categories; nil hides it.
+        /// The Recordings entry, below the virtual collections and above the
+        /// first category; nil hides it.
         var recordings: TVCategoryRailRecordingsEntry?
         /// Told whether focus is inside the rail, for the tab-bar entry catcher.
         @Environment(TVLiveTVFocusRegions.self) private var focusRegions: TVLiveTVFocusRegions?
@@ -50,12 +51,7 @@
             VStack(alignment: .leading, spacing: 0) {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(sections) { section in
-                            categoryButton(section)
-                        }
-                        if let recordings {
-                            recordingsButton(recordings)
-                        }
+                        rows
                     }
                     // The same inset on every side, so the first category
                     // sits in the panel's corner like the rest of the rows;
@@ -73,6 +69,9 @@
             .background(panelShape.fill(.white.opacity(0.06)))
             .glassEffectCompat(.regular, in: panelShape)
             .overlay(panelShape.strokeBorder(.white.opacity(0.12), lineWidth: 1))
+            .onChange(of: recordings == nil) { _, isHidden in
+                if isHidden { recordingsEntryRemoved(proxy) }
+            }
             .onChange(of: focused) { _, newValue in
                 guard let newValue else {
                     // A move onto a row the lazy list only just built passes
@@ -114,6 +113,33 @@
                     railOwnsFocus = true
                 }
             }
+        }
+
+        /// Visual order is focus order: Favorites and Recently Watched
+        /// (whichever exist), Recordings, then the provider's categories.
+        @ViewBuilder
+        private var rows: some View {
+            let pinnedCount = sections.prefix(while: \.isVirtual).count
+            ForEach(sections.prefix(pinnedCount)) { section in
+                categoryButton(section)
+            }
+            if let recordings {
+                recordingsButton(recordings)
+            }
+            ForEach(sections.dropFirst(pinnedCount)) { section in
+                categoryButton(section)
+            }
+        }
+
+        /// The entry went away under focus (turned off in Settings or the
+        /// server unpaired): hand focus to the selected category rather than
+        /// leaving the engine to pick a row.
+        private func recordingsEntryRemoved(_ proxy: ScrollViewProxy) {
+            guard focused == TVCategoryRailRecordingsEntry.id, let selectedID else { return }
+            withTransaction(Transaction(animation: nil)) {
+                proxy.scrollTo(selectedID)
+            }
+            Task { @MainActor in focused = selectedID }
         }
 
         /// The row that reads as selected: Recordings while its library shows,
@@ -198,8 +224,9 @@
         }
     }
 
-    /// The Recordings row at the end of the rail, shown while a recording
-    /// server is paired. Locked (no Lume Pro) it carries the crown.
+    /// The Recordings row under the virtual collections, shown while a
+    /// recording server is paired and Settings › Live TV lists it in the rail.
+    /// Locked (no Lume Pro) it carries the crown.
     struct TVCategoryRailRecordingsEntry {
         static let id = "lume.liveSection.recordings"
 

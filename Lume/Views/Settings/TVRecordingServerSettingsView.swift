@@ -2,7 +2,8 @@
 //  TVRecordingServerSettingsView.swift
 //  Lume
 //
-//  The tvOS Recording Server pane, shown in SettingsView's detail column. Every
+//  The tvOS Recording Server pane, drilled into from Settings › Live TV and
+//  shown in place in SettingsView's detail column. Every
 //  step — the disclosure, servers found on the network, a typed address, the
 //  pairing code and the paired server's status — replaces the pane's content in
 //  place, inside the detail column's persistent scroll view: a push would hide

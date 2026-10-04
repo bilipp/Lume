@@ -25051,7 +25051,7 @@
       }
     },
     "Info Only" : {
-      "comment" : "tvOS Settings › Player › Live TV › Guide Preview: show the channel's programme information above the Guide at the Large size, without video.",
+      "comment" : "tvOS Settings › Live TV › Guide Preview: show the channel's programme information above the Guide at the Large size, without video.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -26052,7 +26052,7 @@
       }
     },
     "Large" : {
-      "comment" : "tvOS Settings › Player › Live TV › Guide Preview: the large live preview above the Guide (the counterpart of Small).",
+      "comment" : "tvOS Settings › Live TV › Guide Preview: the large live preview above the Guide (the counterpart of Small).",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -27206,6 +27206,65 @@
         }
       }
     },
+    "Lists Recordings in the Live TV sidebar, below Favorites and Recently Watched." : {
+      "comment" : "tvOS Settings › Live TV › Recordings: footnote under the Show in Live TV Sidebar switch.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt Aufnahmen in der Live-TV-Seitenleiste unter Favoriten und Kürzlich gesehen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lists Recordings in the Live TV sidebar, below Favorites and Recently Watched."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra Grabaciones en la barra lateral de TV en directo, debajo de Favoritos y Visto recientemente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche Enregistrements dans la barre latérale de la TV en direct, sous Favoris et Vu récemment."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra Registrazioni nella barra laterale della TV in diretta, sotto Preferiti e Visti di recente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブTVのサイドバーで、お気に入りと最近視聴した項目の下に録画を表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 TV 사이드바의 즐겨찾기와 최근 시청함 아래에 녹화를 표시합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra Gravações na barra lateral da TV ao vivo, abaixo de Favoritos e Assistidos Recentemente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在直播电视边栏中的“收藏”和“最近观看”下方列出录制内容。"
+          }
+        }
+      }
+    },
     "Live" : {
       "localizations" : {
         "de" : {
@@ -27573,7 +27632,7 @@
       }
     },
     "Live TV Layout" : {
-      "comment" : "tvOS Settings › Player › Live TV: row that switches the Live TV tab between the List and Guide layouts.",
+      "comment" : "Settings › Live TV: row that switches the Live TV tab between the List and Guide layouts.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -48866,6 +48925,65 @@
         }
       }
     },
+    "Show in Live TV Sidebar" : {
+      "comment" : "tvOS Settings › Live TV › Recordings: switch that adds a Recordings entry to the Live TV tab's category sidebar.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In der Live-TV-Seitenleiste zeigen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show in Live TV Sidebar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar en la barra lateral de TV en directo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher dans la barre latérale de la TV en direct"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra nella barra laterale della TV in diretta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブTVのサイドバーに表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 TV 사이드바에 표시"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar na barra lateral da TV ao vivo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在直播电视边栏中显示"
+          }
+        }
+      }
+    },
     "Show Large" : {
       "localizations" : {
         "de" : {
@@ -50388,7 +50506,7 @@
       }
     },
     "Small" : {
-      "comment" : "tvOS Settings › Player › Live TV › Guide Preview: the default, smaller live preview, leaving room for more Guide rows (the counterpart of Large).",
+      "comment" : "tvOS Settings › Live TV › Guide Preview: the default, smaller live preview, leaving room for more Guide rows (the counterpart of Large).",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -50447,7 +50565,7 @@
       }
     },
     "Small and Large play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height." : {
-      "comment" : "tvOS Settings › Player › Live TV: footnote under the Guide Preview row, explaining its four choices (Small, Large, Info Only, Off).",
+      "comment" : "tvOS Settings › Live TV: footnote under the Guide Preview row, explaining its four choices (Small, Large, Info Only, Off).",
       "localizations" : {
         "de" : {
           "stringUnit" : {

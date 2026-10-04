@@ -3,8 +3,9 @@
 //  Lume
 //
 //  The recordings library on tvOS, shown beside the Live TV category rail
-//  when its Recordings entry is picked: one full-width band of cards per
-//  status, play on select, stop / cancel / delete from the card's menu.
+//  when its Recordings entry is picked, and full screen from Settings › Live
+//  TV: one full-width band of cards per status, play on select, stop / cancel
+//  / delete from the card's menu.
 //
 
 #if os(tvOS)
@@ -12,6 +13,11 @@
     import SwiftUI
 
     struct TVRecordingsView: View {
+        /// Full screen there is no rail beside an empty library to keep focus,
+        /// and a presentation with nothing focused can strand the Menu press:
+        /// an invisible target holds it so Menu always dismisses.
+        var holdsFocusWhenEmpty = false
+
         @State private var model = RecordingsLibraryModel()
 
         private var store: RecordingServerStore {
@@ -24,6 +30,14 @@
                 if groups.isEmpty {
                     RecordingsLibraryEmptyState(store: store)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background {
+                            if holdsFocusWhenEmpty {
+                                Color.clear
+                                    .frame(width: 1, height: 1)
+                                    .focusable()
+                                    .accessibilityHidden(true)
+                            }
+                        }
                 } else {
                     library(groups)
                 }
@@ -86,7 +100,7 @@
         }
     }
 
-    private enum TVRecordingsMetrics {
+    enum TVRecordingsMetrics {
         static let cardWidth = TVDetailMetrics.episodeCardWidth
         static let artHeight = TVDetailMetrics.episodeStillHeight
         /// Room for the focused card's lift inside the band's clip.

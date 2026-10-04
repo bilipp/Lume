@@ -2,7 +2,8 @@
 //  RecordingServerSettingsView.swift
 //  Lume
 //
-//  The iOS / macOS / visionOS Recording Server page: find a LumeRecorder server
+//  The iOS / macOS / visionOS Recording Server page, behind Settings › Live
+//  TV: find a LumeRecorder server
 //  on the network (or type its address), pair with the code it prints, and,
 //  once paired, its status with Test Connection, Unpair and Remove. The pairing
 //  is a synced `SyncedRecordingServer` row, so one pairing serves every device

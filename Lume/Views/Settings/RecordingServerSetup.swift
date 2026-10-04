@@ -14,6 +14,11 @@ import Observation
 
 enum RecordingServerSetup {
     static let disclosureAcknowledgedKey = "recordingServer.disclosureAcknowledged"
+    /// tvOS: whether the Live TV category rail lists Recordings (below
+    /// Favorites and Recently Watched). Off unless the user turns it on in
+    /// Settings › Live TV; the library is always a row there as well.
+    static let showsRecordingsInLiveTVRailKey = "lume.liveTV.showsRecordingsInRail"
+    static let showsRecordingsInLiveTVRailDefault = false
 
     /// The paywall's own line for the feature, so the two never drift apart.
     static var intro: String {
@@ -52,6 +57,44 @@ enum RecordingServerSetup {
             localized: "\(free) free of \(total)",
             comment: "Recording server disk space: free bytes, then total bytes (e.g. “120 GB free of 500 GB”)."
         )
+    }
+}
+
+// MARK: - Access
+
+/// Which recording rows the Live TV settings page offers and what each opens,
+/// on every platform. The page itself is free (its layout switch is); Lume Pro
+/// gates recording. A lapsed subscriber still reaches a paired server's page to
+/// unpair or remove it — pairing a new one is what needs Lume Pro.
+struct RecordingSettingsAccess: Equatable {
+    /// Lume Pro unlocks recording.
+    let isUnlocked: Bool
+    /// Any server row is stored, usable or not: the page has something to
+    /// manage even without Lume Pro.
+    let hasServers: Bool
+    /// A usable server is paired.
+    let isPaired: Bool
+
+    /// The Recording Server row opens the paywall instead of its page.
+    var serverRowOpensPaywall: Bool {
+        !isUnlocked && !hasServers
+    }
+
+    /// The Recording Server row carries the crown.
+    var serverRowShowsBadge: Bool {
+        !isUnlocked
+    }
+
+    /// The Recordings row is offered at all; the toolbar button and the tvOS
+    /// rail entry follow the same rule.
+    var showsRecordingsRow: Bool {
+        isPaired
+    }
+
+    /// The Recordings row shows the crown and opens the paywall instead of
+    /// the library.
+    var recordingsRowOpensPaywall: Bool {
+        !isUnlocked
     }
 }
 
