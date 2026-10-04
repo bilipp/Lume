@@ -101,7 +101,7 @@ enum WatchProgressBuffer {
         switch ref {
         case let .movie(id): (.movie, id)
         case let .episode(id): (.episode, id)
-        case .live: nil
+        case .live, .recording: nil
         }
     }
 

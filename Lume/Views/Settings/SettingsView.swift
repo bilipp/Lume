@@ -27,6 +27,7 @@ struct SettingsView: View {
         /// dark and a per-app light mode makes no sense there.
         @AppStorage(AppAppearance.storageKey)
         private var appearanceRaw = AppAppearance.defaultValue.rawValue
+        @State private var recordingServerConfig = RecordingServerConfigService.shared
     #endif
 
     #if os(tvOS)
@@ -114,6 +115,9 @@ struct SettingsView: View {
         /// Whether the Player category is drilled into OpenSubtitles in place.
         /// Not `private`: set by the SettingsView+TVPlayer extension (separate file).
         @State var showingOpenSubtitles = false
+        /// How far the Recording Server pane is drilled in, in place. `nil` is
+        /// its top level.
+        @State private var recordingServerRoute: TVRecordingServerRoute?
         /// The engine whose options are drilled into from Engines, replacing it
         /// in place (same reasoning as `selectedPlaylist`). Not `private`: read by
         /// the SettingsView+TVPlayer extension (separate file).
@@ -195,14 +199,18 @@ struct SettingsView: View {
 
         @ViewBuilder
         private func row(for category: SettingsCategory) -> some View {
-            if category == .premium, !premium.isPremium {
-                // The free plan's row opens the paywall itself rather than a
-                // page that would only repeat it.
+            if !premium.isPremium, category == .premium || paywallFeature(for: category) != nil {
+                // The free plan's row, and a Lume Pro page's, open the paywall
+                // itself rather than a page that would only repeat it.
                 Button {
-                    presentPaywall(nil)
+                    presentPaywall(paywallFeature(for: category))
                 } label: {
                     HStack(spacing: 8) {
-                        SettingsCategoryRowLabel(category: category, value: Text("Free"))
+                        SettingsCategoryRowLabel(
+                            category: category,
+                            value: category == .premium ? Text("Free") : nil,
+                            showsPremiumBadge: category.lockedFeature != nil
+                        )
                         Image(systemName: "chevron.right")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.tertiary)
@@ -214,9 +222,22 @@ struct SettingsView: View {
                 NavigationLink {
                     SettingsCategoryDestination(category: category)
                 } label: {
-                    SettingsCategoryRowLabel(category: category, value: value(for: category))
+                    // A lapsed subscriber's page that stays open keeps the crown.
+                    SettingsCategoryRowLabel(
+                        category: category,
+                        value: value(for: category),
+                        showsPremiumBadge: !premium.isPremium && category.lockedFeature != nil
+                    )
                 }
             }
+        }
+
+        /// `lockedFeature`, unless the page still holds something a lapsed
+        /// subscriber has to manage: a paired recording server stays reachable so
+        /// it can be unpaired or removed (pairing a new one still needs Lume Pro).
+        private func paywallFeature(for category: SettingsCategory) -> PremiumFeature? {
+            if category == .recordingServer, !recordingServerConfig.servers.isEmpty { return nil }
+            return category.lockedFeature
         }
 
         /// The trailing value: only for single-choice pages, plus the Lume Pro
@@ -254,6 +275,7 @@ struct SettingsView: View {
             case .appearance: AppearanceSettingsView()
             case .player: PlayerSettingsView()
             case .downloads: DownloadsSettingsView()
+            case .recordingServer: RecordingServerSettingsView()
             case .iCloud: CloudSyncSettingsView()
             case .connectedServices: ConnectedServicesView()
             case .storage: StorageManagementView()
@@ -313,6 +335,7 @@ struct SettingsView: View {
                         showingContentManagement = false
                         showingEngines = false
                         showingOpenSubtitles = false
+                        recordingServerRoute = nil
                         selectedEngineOptions = nil
                         preferredLanguagePane = nil
                     }
@@ -339,8 +362,15 @@ struct SettingsView: View {
                                 Button {
                                     selectedCategory = category
                                 } label: {
-                                    Text(category.title)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    // The crown on a Lume Pro page matches the
+                                    // iOS root list; the lock itself is in the pane.
+                                    HStack(spacing: 10) {
+                                        Text(category.title)
+                                        if !premium.isPremium, category.lockedFeature != nil {
+                                            PremiumBadge()
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                                 // Focus only passes through here during the
                                 // handoff; drawing it would flash Profiles.
@@ -470,6 +500,8 @@ struct SettingsView: View {
                         } else {
                             tvPlayerDetail
                         }
+                    case .recordingServer:
+                        TVRecordingServerSettingsView(route: $recordingServerRoute)
                     case .iCloud:
                         TVCloudSyncSection()
                     case .connectedServices:

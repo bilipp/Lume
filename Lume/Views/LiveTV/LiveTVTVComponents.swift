@@ -246,6 +246,7 @@
             .focused($isFocused)
             .animation(.easeOut(duration: 0.18), value: isFocused)
             .liveChannelMenu(
+                stream: stream,
                 isFavorite: stream.isFavorite,
                 onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) },
                 onStartMultiView: onStartMultiView,
@@ -334,6 +335,15 @@
         /// so unrelated guide rebuilds (sort changes) never steal focus.
         @State private var guideFocusToken = 0
         @State private var focusRegions = TVLiveTVFocusRegions()
+        @State private var recordingStore = RecordingServerStore.shared
+        /// The Recordings rail entry is selected; it replaces the channel
+        /// list or guide until a category is picked again.
+        @State private var showsRecordings = false
+        @State private var showingRecordingsPaywall = false
+
+        private var recordingsShown: Bool {
+            showsRecordings && recordingStore.isPaired && recordingStore.isUnlocked
+        }
 
         var body: some View {
             HStack(spacing: TVLiveTVLayout.spacing) {
@@ -344,14 +354,37 @@
                 TVCategoryRail(
                     sections: sections,
                     selectedSection: $selectedSection,
-                    onCategoryActivated: { guideFocusToken += 1 }
+                    onCategoryActivated: {
+                        showsRecordings = false
+                        guideFocusToken += 1
+                    },
+                    recordings: recordingsEntry
                 )
-                content
+                if recordingsShown {
+                    TVRecordingsView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    content
+                }
             }
             .environment(focusRegions)
+            .paywall(isPresented: $showingRecordingsPaywall, highlight: .recordingServer)
             .overlay(alignment: .top) {
-                if layoutMode == .guide {
+                // The library has no guide to hand caught focus to.
+                if layoutMode == .guide, !recordingsShown {
                     TVLiveTVEntryCatcher(regions: focusRegions) { guideFocusToken += 1 }
+                }
+            }
+        }
+
+        private var recordingsEntry: TVCategoryRailRecordingsEntry? {
+            guard recordingStore.isPaired else { return nil }
+            let isLocked = !recordingStore.isUnlocked
+            return TVCategoryRailRecordingsEntry(isSelected: recordingsShown, isLocked: isLocked) {
+                if isLocked {
+                    showingRecordingsPaywall = true
+                } else {
+                    showsRecordings = true
                 }
             }
         }

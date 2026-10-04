@@ -51,6 +51,7 @@ struct EPGGridScroller: View {
     #if os(tvOS)
         /// For the channel actions' favourite toggle.
         @Environment(\.modelContext) private var modelContext
+        @Environment(\.recordChannel) private var recordChannel
         /// The channel whose actions the hub's long press raised.
         @State private var channelActions: EPGChannelRow?
         /// Whether the guide's focus strip holds real focus (driven by the
@@ -151,6 +152,7 @@ struct EPGGridScroller: View {
                 onPlay: { onPlay(selection.stream) },
                 onPlayCatchup: { onPlayCatchup(selection.stream, selection.cell) }
             )
+            .recordActionFlow(toastPlacement: .sheet)
         }
     }
 
@@ -316,6 +318,9 @@ struct EPGGridScroller: View {
                     LiveChannelFavorites.toggle(row.stream, in: modelContext)
                 }
                 FavoriteMenuItems.startMultiView { onStartMultiView(row.stream) }
+                FavoriteMenuItems.record(stream: row.stream)
+            } message: { row in
+                recordChannel?.lockedDialogMessage(for: row.stream)
             }
             // Runs on appear *and* on token change: a category activation both
             // rebuilds the guide (fresh scroller) and bumps the token, and the
@@ -576,8 +581,9 @@ struct EPGGridScroller: View {
                 UIAccessibilityCustomAction(name: FavoriteMenuItems.favoriteTitle(isFavorite: stream.isFavorite)) { _ in
                     LiveChannelFavorites.toggle(stream, in: modelContext)
                     return true
-                }
-            ]
+                },
+                recordChannel?.accessibilityAction(for: stream)
+            ].compactMap(\.self)
         }
 
         private var virtualFocusDescription: String {

@@ -15,6 +15,15 @@ import Foundation
 import SwiftData
 
 enum PlayerFavorites {
+    /// Whether `ref` has a catalog row to favorite at all; the overlays hide
+    /// the control when it doesn't.
+    static func supportsFavorites(_ ref: PlayableMedia.ContentRef) -> Bool {
+        switch ref {
+        case .episode, .movie, .live: true
+        case .recording: false
+        }
+    }
+
     /// Whether the content behind `ref` is currently favorited.
     static func isFavorite(for ref: PlayableMedia.ContentRef, in context: ModelContext) -> Bool {
         switch ref {
@@ -24,6 +33,8 @@ enum PlayerFavorites {
             PlayerContentLookup.movie(id, in: context)?.isFavorite ?? false
         case let .live(id):
             PlayerContentLookup.liveStream(id, in: context)?.isFavorite ?? false
+        case .recording:
+            false
         }
     }
 
@@ -41,6 +52,8 @@ enum PlayerFavorites {
         case let .live(id):
             guard let stream = PlayerContentLookup.liveStream(id, in: context) else { return false }
             return LiveChannelFavorites.toggle(stream, in: context)
+        case .recording:
+            return false
         }
     }
 }

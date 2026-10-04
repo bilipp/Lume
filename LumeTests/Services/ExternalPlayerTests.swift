@@ -176,6 +176,21 @@ struct ExternalPlayerTests {
         }
     }
 
+    @Test func `recordings never hand off regardless of scope`() throws {
+        let recording = try PlayableMedia(
+            id: "recording-1", url: #require(URL(string: "http://192.168.1.20:8090/play/abc/index.m3u8")),
+            title: "Recording", subtitle: nil, posterURL: nil, kind: .vod, startTime: 0, contentRef: .recording("1")
+        )
+
+        withStoredPlayer { playerDefaults in
+            playerDefaults.set("infuse", forKey: PlayerSettings.externalPlayerKey)
+            withStoredScope { defaults in
+                defaults.set("all", forKey: PlayerSettings.externalPlayerScopeKey)
+                #expect(ExternalPlayback.target(for: recording) == nil)
+            }
+        }
+    }
+
     private func makeMedia(url: URL, kind: PlayableMedia.Kind) -> PlayableMedia {
         PlayableMedia(
             id: kind == .live ? "channel-1" : "movie-1",

@@ -171,6 +171,25 @@ enum PlaylistSourceType: String, Codable {
         case .webdav, .jellyfin, .emby, .plex: false
         }
     }
+
+    /// Whether a recording server can be pointed at this source's live
+    /// channels. The server fetches the stream itself, so only sources whose
+    /// live URL stands alone without per-request headers qualify.
+    nonisolated var supportsRecording: Bool {
+        switch self {
+        case .xtream, .m3u, .stalker: true
+        case .webdav, .jellyfin, .emby, .plex: false
+        }
+    }
+
+    /// Whether a recording can be scheduled for later. Stalker `create_link`
+    /// URLs expire within minutes, so a portal can only record now.
+    nonisolated var supportsRecordingSchedule: Bool {
+        switch self {
+        case .xtream, .m3u: true
+        case .stalker, .webdav, .jellyfin, .emby, .plex: false
+        }
+    }
 }
 
 /// The container a playlist's live streams are requested in.

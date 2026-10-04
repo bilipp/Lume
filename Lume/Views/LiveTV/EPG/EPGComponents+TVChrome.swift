@@ -208,12 +208,24 @@ import SwiftUI
     /// What the channel hub's long press offers, which nothing on screen
     /// would otherwise reveal. Never focusable.
     struct EPGGuideHint: View {
+        @Environment(\.recordChannel) private var recordChannel
+
+        /// The long press offers Record once a server is paired, behind the
+        /// crown if Lume Pro has lapsed, so Pro doesn't change the hint.
+        private var offersRecording: Bool {
+            recordChannel != nil && RecordingServerStore.shared.isPaired
+        }
+
         var body: some View {
             HStack(spacing: 8) {
                 Image(systemName: "smallcircle.filled.circle")
                     .font(.system(size: 16))
                     .accessibilityHidden(true)
-                Text("Hold a channel to add it to Favorites or Multi-View")
+                if offersRecording {
+                    Text("Hold a channel to add it to Favorites or Multi-View, or to record it")
+                } else {
+                    Text("Hold a channel to add it to Favorites or Multi-View")
+                }
             }
             .font(.system(size: 17))
             .foregroundStyle(.white.opacity(0.5))

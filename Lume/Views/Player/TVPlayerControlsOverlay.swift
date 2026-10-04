@@ -239,6 +239,7 @@
                     isLive: media.isLive,
                     epgNow: epgNow,
                     clock: clock,
+                    timeline: media.recordingTimeline,
                     isScrubbing: isScrubbing,
                     scrubTarget: scrubTarget,
                     focus: $focus,
@@ -367,14 +368,18 @@
             .disabled(!enabled)
         }
 
-        // MARK: - Trailing controls (audio / subtitles / favorite)
+        // MARK: - Trailing controls (audio / subtitles / favorite / record)
 
         private var trailingControls: some View {
             HStack(spacing: 16) {
                 audioTrackMenu
                 subtitleMenu
-                favoriteButton
+                if PlayerFavorites.supportsFavorites(media.contentRef) {
+                    favoriteButton
+                }
+                recordButton
             }
+            .tvPlayerRecordFocusHandoff(media: media, focus: $focus)
         }
 
         /// Icon-only heart sitting alongside the track menus, rendered in the
@@ -496,6 +501,8 @@
         /// overlay or the engine view above it (see the `@Binding`-to-observable
         /// re-render trap that drove the menu flicker).
         let clock: PlaybackClock
+        /// A recording still being captured: spans its growing playlist.
+        let timeline: RecordingTimeline?
         let isScrubbing: Bool
         let scrubTarget: TimeInterval
         var focus: FocusState<TVPlayerFocus?>.Binding
@@ -542,14 +549,14 @@
                 guard total > 0 else { return 0 }
                 return min(max(Date().timeIntervalSince(epgNow.start) / total, 0), 1)
             }
-            let total = max(clock.duration, 1)
+            let total = max(clock.displayDuration(growing: timeline), 1)
             return min(max(clock.current / total, 0), 1)
         }
 
         /// VOD playhead position for the scrubber bar — the scrub target while
         /// scrubbing, otherwise live playback time.
         private var scrubberFraction: Double {
-            let total = max(clock.duration, 1)
+            let total = max(clock.displayDuration(growing: timeline), 1)
             let reference = isScrubbing ? scrubTarget : clock.current
             return min(max(reference / total, 0), 1)
         }
@@ -566,7 +573,7 @@
                 return Self.wallClock(epgNow.end)
             }
             let reference = isScrubbing ? scrubTarget : clock.current
-            return "-" + Self.timeString(max(clock.duration - reference, 0))
+            return "-" + Self.timeString(max(clock.displayDuration(growing: timeline) - reference, 0))
         }
 
         private static func wallClock(_ date: Date) -> String {

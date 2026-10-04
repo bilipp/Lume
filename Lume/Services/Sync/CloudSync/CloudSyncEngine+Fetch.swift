@@ -93,6 +93,27 @@ extension CloudSyncEngine {
         return existing
     }
 
+    /// Collapse every `T` row sharing a `key` down to the most recently updated
+    /// one, deleting the rest.
+    func collapseDuplicates<T: PersistentModel, K: Hashable>(
+        _: T.Type,
+        key: (T) -> K,
+        updatedAt: (T) -> Date
+    ) throws -> (kept: Int, deduped: Int) {
+        var kept: [K: T] = [:]
+        var deduped = 0
+        for row in try cloudContext.fetch(FetchDescriptor<T>()) {
+            let rowKey = key(row)
+            if let existing = kept[rowKey] {
+                kept[rowKey] = dedupe(row, against: existing, updatedAt: updatedAt)
+                deduped += 1
+            } else {
+                kept[rowKey] = row
+            }
+        }
+        return (kept.count, deduped)
+    }
+
     func dedupe(_ candidate: SyncedPlaylist, against existing: SyncedPlaylist?) -> SyncedPlaylist {
         dedupe(candidate, against: existing, updatedAt: \.updatedAt)
     }

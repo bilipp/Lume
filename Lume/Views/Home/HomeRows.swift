@@ -126,6 +126,7 @@ private struct HomeItemMenu: ViewModifier {
         switch item {
         case let .live(stream):
             content.liveChannelMenu(
+                stream: stream,
                 isFavorite: stream.isFavorite,
                 onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) },
                 onStartMultiView: onStartMultiView.map { action in { action(stream) } },

@@ -213,6 +213,7 @@ import SwiftUI
                 } else {
                     PlaybackTimeline(
                         clock: clock,
+                        timeline: media.recordingTimeline,
                         isSeeking: $isSeeking,
                         seekPosition: $seekPosition,
                         onEditingChanged: onSliderEditingChanged
@@ -271,7 +272,10 @@ import SwiftUI
                     playbackRateMenu
                 }
                 contentModeButton
-                favoriteButton
+                if PlayerFavorites.supportsFavorites(media.contentRef) {
+                    favoriteButton
+                }
+                PlayerRecordButton(media: media, onResetHideTimer: onResetHideTimer)
             }
             .padding(.horizontal, 4)
             .glassEffectCompat(.regularInteractive, in: Capsule())
@@ -446,17 +450,20 @@ import SwiftUI
     @available(iOS 16.0, macOS 13.0, *)
     private struct PlaybackTimeline: View {
         var clock: PlaybackClock
+        /// A recording still being captured: spans its growing playlist.
+        let timeline: RecordingTimeline?
         @Binding var isSeeking: Bool
         @Binding var seekPosition: TimeInterval
         var onEditingChanged: (Bool) -> Void
 
         var body: some View {
+            let duration = clock.displayDuration(growing: timeline)
             Slider(
                 value: Binding<TimeInterval>(
                     get: { isSeeking ? seekPosition : (clock.current.isFinite ? clock.current : 0) },
                     set: { seekPosition = $0 }
                 ),
-                in: 0 ... max(clock.duration.isFinite ? clock.duration : 1, 1),
+                in: 0 ... max(duration.isFinite ? duration : 1, 1),
                 onEditingChanged: onEditingChanged
             )
             .tint(.white)
@@ -466,7 +473,7 @@ import SwiftUI
                     .contentTransition(.numericText())
                     .foregroundStyle(.white)
                 Spacer()
-                Text(timeString(from: max(clock.duration, 0)))
+                Text(timeString(from: max(duration, 0)))
                     .foregroundStyle(.white.opacity(0.7))
             }
             .font(.caption.monospacedDigit())

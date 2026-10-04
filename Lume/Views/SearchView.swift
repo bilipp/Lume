@@ -112,6 +112,7 @@ struct SearchView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .liveChannelMenu(
+                                        stream: stream,
                                         isFavorite: stream.isFavorite,
                                         onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) }
                                     )
@@ -160,6 +161,7 @@ struct SearchView: View {
             FullScreenPlayerView(media: media)
         }
         #endif
+        .recordActionFlow(observesWhileVisible: false)
     }
 
     // MARK: - Playback

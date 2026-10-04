@@ -14,61 +14,61 @@
       }
     },
     "NSLocalNetworkUsageDescription" : {
-      "comment" : "Permission prompt shown when Lume first reaches a media server or WebDAV share on the local network.",
+      "comment" : "Permission prompt shown when Lume first reaches a media server, WebDAV share or recording server on the local network.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume benötigt Zugriff auf dein lokales Netzwerk, um darin laufende Medienserver und WebDAV-Freigaben zu erreichen."
+            "value" : "Lume benötigt Zugriff auf dein lokales Netzwerk, um darin laufende Medienserver, WebDAV-Freigaben und Aufnahmeserver zu erreichen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume needs access to your local network to reach media servers and WebDAV shares running on it."
+            "value" : "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume necesita acceso a tu red local para conectarse a los servidores multimedia y recursos compartidos WebDAV que se ejecutan en ella."
+            "value" : "Lume necesita acceso a tu red local para conectarse a los servidores multimedia, recursos compartidos WebDAV y servidores de grabación que se ejecutan en ella."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume a besoin d’accéder à votre réseau local pour atteindre les serveurs multimédias et les partages WebDAV qui s’y trouvent."
+            "value" : "Lume a besoin d’accéder à votre réseau local pour atteindre les serveurs multimédias, les partages WebDAV et les serveurs d’enregistrement qui s’y trouvent."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume ha bisogno di accedere alla rete locale per raggiungere i server multimediali e le condivisioni WebDAV presenti su di essa."
+            "value" : "Lume ha bisogno di accedere alla rete locale per raggiungere i server multimediali, le condivisioni WebDAV e i server di registrazione presenti su di essa."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume は、ローカルネットワーク上のメディアサーバーや WebDAV 共有に接続するためにアクセス権が必要です。"
+            "value" : "Lume は、ローカルネットワーク上のメディアサーバー、WebDAV 共有、録画サーバーに接続するためにアクセス権が必要です。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume가 로컬 네트워크에서 실행 중인 미디어 서버 및 WebDAV 공유에 연결하려면 접근 권한이 필요합니다."
+            "value" : "Lume가 로컬 네트워크에서 실행 중인 미디어 서버, WebDAV 공유 및 녹화 서버에 연결하려면 접근 권한이 필요합니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Lume precisa de acesso à sua rede local para alcançar servidores de mídia e compartilhamentos WebDAV em execução nela."
+            "value" : "O Lume precisa de acesso à sua rede local para alcançar servidores de mídia, compartilhamentos WebDAV e servidores de gravação em execução nela."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume 需要访问您的本地网络，以连接其中运行的媒体服务器和 WebDAV 共享。"
+            "value" : "Lume 需要访问您的本地网络，以连接其中运行的媒体服务器、WebDAV 共享和录制服务器。"
           }
         }
       }

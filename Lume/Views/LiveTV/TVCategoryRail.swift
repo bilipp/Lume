@@ -16,6 +16,8 @@
         @Binding var selectedSection: LiveTVSection?
         /// Fired when the user activates (clicks) a category.
         var onCategoryActivated: () -> Void = {}
+        /// The Recordings entry after the categories; nil hides it.
+        var recordings: TVCategoryRailRecordingsEntry?
         /// Told whether focus is inside the rail, for the tab-bar entry catcher.
         @Environment(TVLiveTVFocusRegions.self) private var focusRegions: TVLiveTVFocusRegions?
 
@@ -51,6 +53,9 @@
                         ForEach(sections) { section in
                             categoryButton(section)
                         }
+                        if let recordings {
+                            recordingsButton(recordings)
+                        }
                     }
                     // The same inset on every side, so the first category
                     // sits in the panel's corner like the rest of the rows;
@@ -85,7 +90,7 @@
                 if let focusRegions, !focusRegions.railFocused {
                     focusRegions.railFocused = true
                 }
-                if !railOwnsFocus, let selectedID = selectedSection?.id, newValue != selectedID {
+                if !railOwnsFocus, let selectedID, newValue != selectedID {
                     // Entry landed on the wrong category (masked, so it never
                     // rendered styled) — snap to the selection. It may sit
                     // scrolled out of the lazy list, where a focus write finds
@@ -111,17 +116,39 @@
             }
         }
 
+        /// The row that reads as selected: Recordings while its library shows,
+        /// else the selected category.
+        private var selectedID: String? {
+            recordings?.isSelected == true ? TVCategoryRailRecordingsEntry.id : selectedSection?.id
+        }
+
         private func categoryButton(_ section: LiveTVSection) -> some View {
-            let isSelected = selectedSection?.id == section.id
+            railButton(id: section.id, title: section.titleText, icon: section.icon) {
+                selectedSection = section
+                onCategoryActivated()
+            }
+        }
+
+        private func recordingsButton(_ entry: TVCategoryRailRecordingsEntry) -> some View {
+            railButton(
+                id: TVCategoryRailRecordingsEntry.id,
+                title: Text("Recordings"),
+                icon: entry.isLocked ? "crown" : "recordingtape",
+                action: entry.onActivate
+            )
+            // Outside the ForEach, so the snap to the selection needs an id
+            // to scroll to.
+            .id(TVCategoryRailRecordingsEntry.id)
+        }
+
+        private func railButton(id: String, title: Text, icon: String?, action: @escaping () -> Void) -> some View {
+            let isSelected = selectedID == id
             // The selected category is exempt: when entry lands there
             // directly, it should read as focused from the first frame.
             let suppressed = !railOwnsFocus && !isSelected
-            let isItemFocused = focused == section.id && !suppressed
+            let isItemFocused = focused == id && !suppressed
             let rowShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-            return Button {
-                selectedSection = section
-                onCategoryActivated()
-            } label: {
+            return Button(action: action) {
                 // Labels start flush at the row's edge; the virtual
                 // collections' icon trails, so every label lines up whether or
                 // not its row has one.
@@ -129,7 +156,7 @@
                     // One line at one size: provider names like
                     // "DE • Sport • Bundesliga • RAW" truncate rather than wrap,
                     // so every row keeps the same height.
-                    section.titleText
+                    title
                         .font(.system(
                             size: 22,
                             weight: isSelected || isItemFocused ? .semibold : .medium
@@ -137,7 +164,7 @@
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Spacer(minLength: 0)
-                    if let icon = section.icon {
+                    if let icon {
                         Image(systemName: icon)
                             .font(.system(size: iconSize, weight: .semibold))
                             .frame(width: iconSize)
@@ -150,7 +177,7 @@
                 .overlay(rowShape.strokeBorder(rowBorder(isFocused: isItemFocused, isSelected: isSelected), lineWidth: 1))
             }
             .buttonStyle(TVCardButtonStyle(focusScale: 1.03, suppressFocusEffects: suppressed))
-            .focused($focused, equals: section.id)
+            .focused($focused, equals: id)
             .animation(.easeOut(duration: 0.18), value: isItemFocused)
         }
 
@@ -169,5 +196,15 @@
         private func rowBorder(isFocused: Bool, isSelected: Bool) -> Color {
             isSelected && !isFocused ? .white.opacity(0.22) : .clear
         }
+    }
+
+    /// The Recordings row at the end of the rail, shown while a recording
+    /// server is paired. Locked (no Lume Pro) it carries the crown.
+    struct TVCategoryRailRecordingsEntry {
+        static let id = "lume.liveSection.recordings"
+
+        let isSelected: Bool
+        let isLocked: Bool
+        let onActivate: () -> Void
     }
 #endif

@@ -87,7 +87,9 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
     /// and four players each grabbing external playback fight over one route.
     var isEmbedded = false {
         didSet {
-            player.allowsExternalPlayback = !isEmbedded
+            #if !os(visionOS)
+                player.allowsExternalPlayback = !isEmbedded
+            #endif
             #if os(iOS)
                 player.usesExternalPlaybackWhileExternalScreenIsActive = !isEmbedded
             #endif

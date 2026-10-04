@@ -187,6 +187,7 @@ struct EPGColumnCells: View, Equatable {
             }
             .buttonStyle(.plain)
             .liveChannelMenu(
+                stream: entry.row.stream,
                 isFavorite: entry.row.stream.isFavorite,
                 onToggleFavorite: { LiveChannelFavorites.toggle(entry.row.stream, in: modelContext) },
                 onStartMultiView: { onStartMultiView(entry.row) }

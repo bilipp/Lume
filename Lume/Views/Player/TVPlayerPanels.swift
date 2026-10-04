@@ -29,6 +29,7 @@
         case audio
         case subtitles
         case favorite
+        case record
         case panelClose
         case episode(String)
         case channel(String)

@@ -36,6 +36,7 @@ nonisolated extension Logger {
     static let review = LumeLogger(category: "Review")
     static let storage = LumeLogger(category: "Storage")
     static let metadata = LumeLogger(category: "Metadata")
+    static let recording = LumeLogger(category: "Recording")
     /// App lifecycle and user-reported problems — the spine of a report.
     static let app = LumeLogger(category: "App")
     /// Shares its category with `Perf`'s signposts, so one filter shows both the

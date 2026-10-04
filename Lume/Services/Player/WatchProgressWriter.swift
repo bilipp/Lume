@@ -92,6 +92,10 @@ actor WatchProgressWriter {
                     try touchLive(id: id)
                 }
                 return nil
+            case .recording:
+                // Recordings never write catalog progress; their per-device
+                // resume point lives in RecordingProgressStore.
+                return nil
             }
         } catch {
             // A dropped progress write is recoverable on the next tick; never
@@ -117,7 +121,7 @@ actor WatchProgressWriter {
                 return try writeMovie(id: id, progress: duration, completed: true, ref: ref)
             case let .episode(id):
                 return try writeEpisode(id: id, progress: duration, completed: true, ref: ref)
-            case .live:
+            case .live, .recording:
                 return nil
             }
         } catch {

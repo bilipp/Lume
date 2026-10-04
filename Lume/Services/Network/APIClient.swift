@@ -17,8 +17,8 @@ import Foundation
 /// empty body instead of JSON. That decodes as `DecodingError.dataCorrupted`,
 /// surfaced to the user as "the data couldn't be read because it isn't in the
 /// correct format". Sending a VLC UA, which panels universally accept, makes
-/// them respond with the expected JSON. (Other native players, e.g. UHF, work
-/// against these same panels for exactly this reason.)
+/// them respond with the expected JSON. (Other native players work against
+/// these same panels for exactly this reason.)
 nonisolated let lumeCatalogUserAgent = "VLC/3.0.20 LibVLC/3.0.20"
 
 // MARK: - APIClient Protocol

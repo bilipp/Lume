@@ -255,6 +255,7 @@ struct FullScreenPlayerView: View {
         .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.dark)
         .macPlayerWindow(activeMedia: activeMedia, launchMedia: media) { switchMedia(to: $0) }
+        .playerRecording(for: activeMedia)
         // Synchronous on purpose, and ahead of the `.task` below: the engine
         // coordinators report `beginStartup` / `noteEngineFallback` from their
         // own appearance, and an async baseline can land after them — which
@@ -546,6 +547,7 @@ struct FullScreenPlayerView: View {
     /// synchronously *before* awaiting, so a subsequent `clock.reset()` can't
     /// race the read; clears the buffer entry once the write lands.
     func persistProgressDetached(force: Bool, holdingLive: Bool = false) {
+        if persistRecordingProgress() { return }
         guard let writer = progressWriter else { return }
         if activeMedia.isLive, !force { return }
         let ref = activeMedia.contentRef

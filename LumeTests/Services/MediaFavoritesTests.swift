@@ -220,7 +220,10 @@ struct MediaFavoriteMenuStringsTests {
         "Remove from Favorites",
         "Remove from Recently Watched",
         "More Like This",
-        "Not Interested"
+        "Not Interested",
+        // The live-channel menu's recording item.
+        "Record",
+        "Stop Recording"
     ]
 
     @Test func `menu literals resolve to a non empty string`() {

@@ -60,4 +60,11 @@ struct SettingsCategoryTests {
         #expect(!visible.contains(.help))
         #expect(!visible.contains(.about))
     }
+
+    @Test func `recording server is a Lume Pro row in the playback group`() {
+        let playback = SettingsCategory.grouped(hasConnectedServices: false).first { $0.group == .playback }
+        #expect(playback?.categories == [.player, .downloads, .recordingServer])
+        #expect(SettingsCategory.recordingServer.lockedFeature == .recordingServer)
+        #expect(SettingsCategory.premium.lockedFeature == nil)
+    }
 }

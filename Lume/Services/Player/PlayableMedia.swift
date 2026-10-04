@@ -13,6 +13,9 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         case movie(String)
         case episode(String)
         case live(String)
+        /// A recording on the paired recording server, by its server-side id.
+        /// Not a catalog item: no favorites, history, watch state or trackers.
+        case recording(String)
     }
 
     let id: String
@@ -36,6 +39,9 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     /// and `id` stay clean, and a restored window carries no credential-bearing
     /// MRL into a deep link, a Cast payload or a download task description.
     let httpHeaders: [String: String]?
+    /// For a recording still being captured, how far its growing playlist
+    /// reaches, which the engines don't report. `nil` for everything else.
+    let recordingTimeline: RecordingTimeline?
 
     nonisolated init(
         id: String,
@@ -47,7 +53,8 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         startTime: TimeInterval,
         contentRef: ContentRef,
         channelScope: LiveChannelScope? = nil,
-        httpHeaders: [String: String]? = nil
+        httpHeaders: [String: String]? = nil,
+        recordingTimeline: RecordingTimeline? = nil
     ) {
         self.id = id
         self.url = url
@@ -59,6 +66,7 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         self.contentRef = contentRef
         self.channelScope = channelScope
         self.httpHeaders = httpHeaders
+        self.recordingTimeline = recordingTimeline
     }
 
     var isLive: Bool {
@@ -82,7 +90,8 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
             startTime: position,
             contentRef: contentRef,
             channelScope: channelScope,
-            httpHeaders: httpHeaders
+            httpHeaders: httpHeaders,
+            recordingTimeline: recordingTimeline
         )
     }
 
@@ -103,7 +112,8 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
             startTime: startTime,
             contentRef: contentRef,
             channelScope: channelScope,
-            httpHeaders: httpHeaders
+            httpHeaders: httpHeaders,
+            recordingTimeline: recordingTimeline
         )
     }
 }
@@ -250,21 +260,7 @@ nonisolated extension PlayableMedia {
         scope: LiveChannelScope? = nil,
         client: XtreamClient = XtreamClient()
     ) -> PlayableMedia? {
-        let url: URL
-        if playlist.sourceType == .stalker {
-            guard let cmd = stream.directURL, let placeholder = StalkerLink.placeholder(type: .itv, cmd: cmd) else { return nil }
-            url = placeholder
-        } else {
-            // WebDAV and the media servers deliberately take this direct-URL
-            // path too, though none of those playlist kinds has live channels
-            // to reach it with.
-            // An m3u channel plays at the URL the playlist listed; the chosen
-            // container rewrites it only when the provider used one of the two
-            // interchangeable live endpoints. Xtream URLs are built with it.
-            let directURL = stream.directURL.flatMap(URL.init(string:)).map(playlist.streamFormat.applied(to:))
-            guard let resolved = directURL ?? client.buildLiveStreamURL(for: stream, playlist: playlist) else { return nil }
-            url = resolved
-        }
+        guard let url = LiveStreamURLResolver.playbackURL(for: stream, playlist: playlist, client: client) else { return nil }
         return PlayableMedia(
             id: "live-\(stream.id)",
             url: url,
