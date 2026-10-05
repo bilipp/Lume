@@ -15,6 +15,10 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 <a href="https://discord.gg/DMnQfr69Ug">
   <img src="https://img.shields.io/badge/Join_the_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Lume Discord" height="48">
 </a>
+&nbsp;&nbsp;
+<a href="https://buymeacoffee.com/bilipp">
+  <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee" height="48">
+</a>
 
 <br><br>
 
