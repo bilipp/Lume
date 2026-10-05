@@ -280,8 +280,8 @@ struct FullScreenPlayerView: View {
         .task(id: activeMedia.id) {
             // Publish the session system-wide: Now Playing metadata + remote
             // commands (lock screen, Control Center, the iPhone's Apple TV
-            // remote) and the iOS Live Activity. Runs per active stream so a
-            // channel surf / next episode republishes; cancelled on swap.
+            // remote). Runs per active stream so a channel surf / next episode
+            // republishes; cancelled on swap.
             await NowPlayingService.shared.runSession(
                 media: activeMedia, clock: clock, container: modelContext.container
             )

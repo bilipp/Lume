@@ -3,9 +3,9 @@
 //  Lume
 //
 //  Publishes the active playback session to the system: `MPNowPlayingInfoCenter`
-//  metadata + `MPRemoteCommandCenter` transport on every platform, and (on iOS)
-//  the lock-screen / Dynamic Island Live Activity. On tvOS this is what makes
-//  an iPhone's Apple TV remote surface show what Lume is playing.
+//  metadata + `MPRemoteCommandCenter` transport on every platform — the lock
+//  screen / Control Center player on iOS. On tvOS this is what makes an
+//  iPhone's Apple TV remote surface show what Lume is playing.
 //
 //  One instance serves all four engines. `FullScreenPlayerView` runs a session
 //  per active stream; the engine views attach a `Transport` while they are on
@@ -83,8 +83,7 @@ final class NowPlayingService {
     /// Publishes `media` for as long as the calling `.task(id:)` lives — the
     /// host cancels and restarts it on every stream swap (channel surf, next
     /// episode). Registers remote commands, publishes metadata + artwork,
-    /// keeps live-TV EPG now/next fresh across programme boundaries, and
-    /// drives the iOS Live Activity.
+    /// and keeps live-TV EPG now/next fresh across programme boundaries.
     func runSession(media: PlayableMedia, clock: PlaybackClock, container: ModelContainer) async {
         currentMedia = media
         self.clock = clock
@@ -94,9 +93,6 @@ final class NowPlayingService {
         PlaybackResumeStore.save(media)
         registerCommands(for: media)
         publish()
-        #if os(iOS)
-            PlaybackActivityController.shared.startOrUpdate(state: makeActivityState())
-        #endif
 
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadArtwork(for: media) }
@@ -108,8 +104,8 @@ final class NowPlayingService {
     }
 
     /// Tear the whole session down: player dismissed. Also snapshots the final
-    /// position so the Live Activity's tap-to-resume can reopen where playback
-    /// left off even after the session is gone.
+    /// position so `lume://resume` can reopen where playback left off even
+    /// after the session is gone.
     func endSession() {
         if let media = currentMedia {
             let position = clock?.current ?? 0
@@ -124,9 +120,6 @@ final class NowPlayingService {
         channelName = nil
         removeCommands()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-        #if os(iOS)
-            PlaybackActivityController.shared.end()
-        #endif
     }
 
     // MARK: - Remote commands
@@ -293,9 +286,6 @@ final class NowPlayingService {
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         setPlaybackState(playing: playing)
-        #if os(iOS)
-            PlaybackActivityController.shared.startOrUpdate(state: makeActivityState(isPaused: !playing))
-        #endif
     }
 
     /// `playbackState` drives the macOS Now Playing widget; iOS/tvOS infer the
@@ -314,10 +304,6 @@ final class NowPlayingService {
         guard currentMedia?.id == media.id else { return }
         artwork = Self.makeArtwork(image)
         publish()
-        #if os(iOS)
-            PlaybackActivityController.shared.setArtwork(image, mediaID: media.id)
-            PlaybackActivityController.shared.startOrUpdate(state: makeActivityState())
-        #endif
     }
 
     /// The request handler is invoked by the system from arbitrary threads;
@@ -340,9 +326,6 @@ final class NowPlayingService {
             channelName = resolved?.channelName
             channelEPG = resolved?.epg
             publish()
-            #if os(iOS)
-                PlaybackActivityController.shared.startOrUpdate(state: makeActivityState())
-            #endif
             // Re-resolve at the programme boundary; when the guide has no
             // current entry, retry on a slow cadence in case a sync lands one.
             let boundary = resolved?.epg.current?.end ?? Date.now.addingTimeInterval(15 * 60)
@@ -399,38 +382,10 @@ final class NowPlayingService {
             lastWall = .now
         }
     }
-
-    // MARK: - Live Activity state
-
-    #if os(iOS)
-        private func makeActivityState(isPaused: Bool? = nil) -> PlaybackActivityAttributes.ContentState {
-            let media = currentMedia
-            let paused = isPaused ?? !(transport?.isPlaying() ?? true)
-            var state = PlaybackActivityAttributes.ContentState(
-                title: media?.title ?? "",
-                subtitle: media?.subtitle,
-                isLive: media?.isLive ?? false,
-                isPaused: paused
-            )
-            if media?.isLive == true {
-                state.programmeTitle = channelEPG?.current?.title
-                state.windowStart = channelEPG?.current?.start
-                state.windowEnd = channelEPG?.current?.end
-                state.nextTitle = channelEPG?.next?.title
-                state.nextStart = channelEPG?.next?.start
-            } else if let clock, clock.duration > 0 {
-                state.elapsed = clock.current
-                state.duration = clock.duration
-                state.windowStart = Date.now.addingTimeInterval(-clock.current)
-                state.windowEnd = Date.now.addingTimeInterval(clock.duration - clock.current)
-            }
-            return state
-        }
-    #endif
 }
 
-/// Snapshot of the last played stream, for the Live Activity's tap-to-resume
-/// (`lume://resume`) after the player — or the whole app — is gone.
+/// Snapshot of the last played stream, for `lume://resume` to reopen it after
+/// the player — or the whole app — is gone.
 /// `PlayableMedia` is `Codable`, so the snapshot round-trips as JSON.
 enum PlaybackResumeStore {
     private static let key = "nowPlaying.lastMediaSnapshot"

@@ -4,7 +4,6 @@ import WidgetKit
 @main
 struct LumeWidgetsBundle: WidgetBundle {
     var body: some Widget {
-        PlaybackLiveActivity()
         DownloadLiveActivity()
     }
 }
