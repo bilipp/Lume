@@ -84,7 +84,7 @@
 
         private var header: some View {
             HStack(spacing: 16) {
-                EPGTVLogoTile(url: channel.logoURL, side: 56, cornerRadius: 14, padding: 6, glyphSize: 22)
+                EPGLogoTile(url: channel.logoURL, side: 56, cornerRadius: 14, padding: 6, glyphSize: 22)
 
                 Text(channel.name)
                     .font(.system(size: 23, weight: .semibold))
@@ -97,7 +97,7 @@
 
         private func progress(of programme: EPGProgramCell) -> some View {
             HStack(spacing: 16) {
-                EPGTVProgressBar(
+                EPGProgressBar(
                     progress: programme.progress(at: now),
                     track: .white.opacity(0.18),
                     fill: LiveTVPalette.accent,

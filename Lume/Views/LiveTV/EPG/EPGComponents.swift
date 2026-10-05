@@ -2,9 +2,10 @@
 //  EPGComponents.swift
 //  Lume
 //
-//  The shared building blocks of the guide grid: per-platform metrics, the time
-//  ruler, the channel cell, the programme block, and the "now" indicator. These
-//  are reused by both the touch/pointer scroller and the tvOS focus scroller.
+//  The shared building blocks of the guide grid: the palette, per-platform
+//  metrics, the programme block with its focus card, and the "now" line. The
+//  same views draw the 10-foot guide and the touch/pointer one; only the
+//  metrics differ.
 //
 
 import SwiftUI
@@ -13,17 +14,44 @@ import SwiftUI
 
 /// Explicit guide colours. The app ships an empty `AccentColor` asset, so
 /// `Color.accentColor` resolves to *white* on tvOS — which renders a focused
-/// block as white text on a white fill. The 10-foot UI therefore uses these
+/// block as white text on a white fill. The guide therefore uses these
 /// concrete colours and the system "focused = solid white, dark text" idiom
 /// (mirroring `TVGlassButtonStyle`) instead of the accent colour.
+///
+/// Tiles are tinted with `.primary`, so they read on the dark tvOS backdrop
+/// and on a light iOS or macOS window alike. The focus card inverts in light
+/// mode: a dark card with light text.
 enum EPGColors {
-    /// Tint for the currently-airing programme (progress bar + live accents).
+    /// Tint for the currently-airing programme in the player's channel list.
     static let live = Color.blue
+    /// Dark text, and the light-mode card.
+    static let ink = Color(.sRGB, red: 11 / 255, green: 13 / 255, blue: 18 / 255)
+    static let inkSecondary = Color(.sRGB, red: 58 / 255, green: 64 / 255, blue: 76 / 255)
+    /// The guide's focus card and its edge.
+    static let cardFill = adaptive(light: ink, dark: .white.opacity(0.96))
+    static let cardBorder = adaptive(light: .clear, dark: .white.opacity(0.6))
+    /// Text on the focus card.
+    static let cardText = adaptive(light: .white, dark: ink)
+    static let cardTextSecondary = adaptive(light: .white.opacity(0.7), dark: inkSecondary)
+    /// Text on the accent now pill.
+    static let onAccent = Color(.sRGB, red: 6 / 255, green: 18 / 255, blue: 31 / 255)
+
+    private static func adaptive(light: Color, dark: Color) -> Color {
+        #if os(macOS)
+            Color(NSColor(name: nil) { appearance in
+                appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(dark) : NSColor(light)
+            })
+        #else
+            Color(UIColor { traits in
+                traits.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light)
+            })
+        #endif
+    }
 }
 
 // MARK: - Metrics
 
-/// Platform-tuned sizing for the guide. The 10-foot UI needs far larger touch
+/// Platform-tuned sizing for the guide. The 10-foot UI needs far larger
 /// targets and type than a phone or a pointer-driven window.
 struct EPGMetrics {
     var pointsPerMinute: CGFloat
@@ -33,6 +61,9 @@ struct EPGMetrics {
     var headerHeight: CGFloat
     var blockCornerRadius: CGFloat
     var blockInset: CGFloat
+    /// Horizontal gap between adjacent programmes, taken from the end of
+    /// each block's exact width so tiling stays aligned across rows.
+    var blockGap: CGFloat
     /// How much of the programme already in progress stays visible when the
     /// guide parks on "now": enough to show where the current show started —
     /// and the tail of the one before it — rather than only what is still to
@@ -44,6 +75,22 @@ struct EPGMetrics {
     /// A focused programme's height; taller than `rowHeight` where the
     /// focused card overflows its row.
     var focusedBlockHeight: CGFloat
+    var cardShadowRadius: CGFloat
+    var cardShadowOpacity: Double
+    var progressBarHeight: CGFloat
+    var channelCornerRadius: CGFloat
+    var channelCellSpacing: CGFloat
+    var channelCellPadding: CGFloat
+    var channelNameLineLimit: Int
+    var logoSide: CGFloat
+    var blockTitleFont: Font
+    var cardTitleFont: Font
+    var blockTimeFont: Font
+    var channelNameFont: Font
+    var catchupGlyphFont: Font
+    var rulerFont: Font
+    var nowPillFont: Font
+    var cornerFont: Font
 
     static var current: EPGMetrics {
         #if os(tvOS)
@@ -60,9 +107,26 @@ struct EPGMetrics {
                 headerHeight: 36,
                 blockCornerRadius: 16,
                 blockInset: 18,
+                blockGap: 8,
                 nowLeadInMinutes: 10,
                 channelColumnGap: channelColumnGap,
-                focusedBlockHeight: 80
+                focusedBlockHeight: 80,
+                cardShadowRadius: 22,
+                cardShadowOpacity: 0.55,
+                progressBarHeight: 4,
+                channelCornerRadius: 18,
+                channelCellSpacing: 14,
+                channelCellPadding: 16,
+                channelNameLineLimit: 1,
+                logoSide: 46,
+                blockTitleFont: .system(size: 23, weight: .medium),
+                cardTitleFont: .system(size: 24, weight: .semibold),
+                blockTimeFont: .system(size: 19),
+                channelNameFont: .system(size: 23, weight: .semibold),
+                catchupGlyphFont: .system(size: 18, weight: .semibold),
+                rulerFont: .system(size: 20),
+                nowPillFont: .system(size: 18, weight: .bold),
+                cornerFont: .system(size: 19)
             )
         #elseif os(macOS)
             EPGMetrics(
@@ -70,273 +134,251 @@ struct EPGMetrics {
                 rowHeight: 58,
                 rowSpacing: 4,
                 channelColumnWidth: 210,
-                headerHeight: 36,
-                blockCornerRadius: 7,
+                headerHeight: 32,
+                blockCornerRadius: 8,
                 blockInset: 10,
+                blockGap: 4,
                 nowLeadInMinutes: 10,
-                channelColumnGap: 0,
-                focusedBlockHeight: 58
+                channelColumnGap: 6,
+                focusedBlockHeight: 58,
+                cardShadowRadius: 6,
+                cardShadowOpacity: 0.25,
+                progressBarHeight: 3,
+                channelCornerRadius: 10,
+                channelCellSpacing: 10,
+                channelCellPadding: 10,
+                channelNameLineLimit: 2,
+                logoSide: 34,
+                blockTitleFont: .subheadline.weight(.medium),
+                cardTitleFont: .subheadline.weight(.semibold),
+                blockTimeFont: .caption,
+                channelNameFont: .subheadline.weight(.semibold),
+                catchupGlyphFont: .caption.weight(.semibold),
+                rulerFont: .caption,
+                nowPillFont: .caption.weight(.bold),
+                cornerFont: .caption
             )
         #else
             EPGMetrics(
                 pointsPerMinute: 3.0,
-                rowHeight: 68,
+                rowHeight: 64,
                 rowSpacing: 4,
                 channelColumnWidth: 136,
-                headerHeight: 36,
-                blockCornerRadius: 9,
+                headerHeight: 32,
+                blockCornerRadius: 10,
                 blockInset: 10,
+                blockGap: 4,
                 nowLeadInMinutes: 10,
-                channelColumnGap: 0,
-                focusedBlockHeight: 68
+                channelColumnGap: 4,
+                focusedBlockHeight: 64,
+                cardShadowRadius: 6,
+                cardShadowOpacity: 0.25,
+                progressBarHeight: 3,
+                channelCornerRadius: 12,
+                channelCellSpacing: 8,
+                channelCellPadding: 8,
+                channelNameLineLimit: 2,
+                logoSide: 36,
+                blockTitleFont: .subheadline.weight(.medium),
+                cardTitleFont: .subheadline.weight(.semibold),
+                blockTimeFont: .caption2,
+                channelNameFont: .footnote.weight(.semibold),
+                catchupGlyphFont: .caption2.weight(.semibold),
+                rulerFont: .caption,
+                nowPillFont: .caption2.weight(.bold),
+                cornerFont: .caption
             )
         #endif
     }
+
+    /// How far a focused programme card overflows its row at the top and at
+    /// the bottom. The rows and the channel column are padded by it so the
+    /// first and last row's card is not clipped by the scroll view.
+    var focusOverflow: CGFloat {
+        (focusedBlockHeight - rowHeight) / 2
+    }
+
+    var rowStride: CGFloat {
+        rowHeight + rowSpacing
+    }
+
+    /// The rows' total height, including the focus overflow padding.
+    func contentHeight(rowCount: Int) -> CGFloat {
+        guard rowCount > 0 else { return 0 }
+        return CGFloat(rowCount) * rowStride - rowSpacing + 2 * focusOverflow
+    }
+
+    /// The top of the row at `index` in the rows' content.
+    func rowOriginY(_ index: Int) -> CGFloat {
+        focusOverflow + CGFloat(index) * rowStride
+    }
+
+    /// The inverse of `rowOriginY(_:)`, rounded by `rule`.
+    func rowIndex(atY offsetY: CGFloat, _ rule: FloatingPointRoundingRule) -> Int {
+        guard rowStride > 0 else { return 0 }
+        return Int(((offsetY - focusOverflow) / rowStride).rounded(rule))
+    }
 }
-
-// MARK: - Time ruler
-
-#if !os(tvOS)
-    /// The horizontal time axis. Half-hour marks with the hour emphasised; a new
-    /// day prints its short date so a 24-hour window stays unambiguous. tvOS has
-    /// its own, `EPGTVTimeRuler`.
-    struct EPGTimeRuler: View {
-        let timeline: EPGTimeline
-        let metrics: EPGMetrics
-
-        private var slotWidth: CGFloat {
-            metrics.pointsPerMinute * 30
-        }
-
-        var body: some View {
-            HStack(spacing: 0) {
-                ForEach(timeline.halfHourTicks, id: \.self) { tick in
-                    tickLabel(tick)
-                        .frame(width: slotWidth, alignment: .leading)
-                }
-            }
-            .frame(height: metrics.headerHeight)
-        }
-
-        @ViewBuilder
-        private func tickLabel(_ date: Date) -> some View {
-            let isHour = Calendar.current.component(.minute, from: date) == 0
-            let isMidnight = isHour && Calendar.current.component(.hour, from: date) == 0
-
-            HStack(spacing: 6) {
-                Rectangle()
-                    .fill(.quaternary)
-                    .frame(width: 1, height: isHour ? metrics.headerHeight * 0.5 : metrics.headerHeight * 0.3)
-
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(date, format: .dateTime.hour().minute())
-                        .font(isHour ? .subheadline.weight(.semibold) : .caption)
-                        .foregroundStyle(isHour ? .primary : .secondary)
-                    if isMidnight {
-                        Text(date, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-        }
-    }
-#endif
-
-// MARK: - Channel cell
-
-#if !os(tvOS)
-    /// The frozen left-column entry for a channel: logo + name. Opaque so programme
-    /// blocks scrolling underneath stay hidden. tvOS has its own,
-    /// `EPGTVChannelCell`.
-    struct EPGChannelCell: View {
-        let row: EPGChannelRow
-        let metrics: EPGMetrics
-
-        var body: some View {
-            HStack(spacing: 10) {
-                logo
-                Text(row.name)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                // Flag channels with an archive so the viewer knows the row
-                // offers replays — same idiom as the player's channel overlay.
-                if row.catchupCapable {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.blue)
-                        .accessibilityLabel(Text("Catch-up available"))
-                }
-            }
-            .padding(.horizontal, 12)
-            .frame(width: metrics.channelColumnWidth, height: metrics.rowHeight, alignment: .leading)
-            .background(.background)
-            .overlay(alignment: .trailing) {
-                Rectangle().fill(.quaternary).frame(width: 1)
-            }
-        }
-
-        private var logo: some View {
-            CachedAsyncImage(url: row.logoURL, maxPixelSize: 76) { phase in
-                switch phase {
-                case .empty:
-                    placeholder.overlay { ProgressView().controlSize(.small) }
-                case let .success(image):
-                    image.resizable().aspectRatio(contentMode: .fit)
-                case .failure:
-                    placeholder.overlay {
-                        Image(systemName: "antenna.radiowaves.left.and.right")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                @unknown default:
-                    placeholder
-                }
-            }
-            .frame(width: 38, height: 38)
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        }
-
-        private var placeholder: some View {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(.fill.tertiary)
-        }
-    }
-#endif
 
 // MARK: - Programme block
 
-#if !os(tvOS)
-    /// A single programme in the grid. Live programmes are tinted and carry a
-    /// progress bar; past programmes are dimmed — except replayable ones (inside
-    /// the channel's catch-up archive), which stay brighter and carry a replay
-    /// glyph; gaps are inert.
-    struct EPGProgramBlockView: View {
-        let cell: EPGProgramCell
-        let metrics: EPGMetrics
-        let now: Date
-        let isFocused: Bool
-        var canReplay = false
+/// A programme in the guide. Unfocused it is a translucent tile the height of
+/// its row; focused (or pressed) it is the card, with inverted text and a
+/// progress bar while live. On tvOS the card is taller than the row and is
+/// drawn over the grid by `EPGRows`.
+struct EPGProgramBlock: View {
+    let cell: EPGProgramCell
+    let metrics: EPGMetrics
+    let now: Date
+    var isFocused = false
+    var canReplay = false
+    /// Off outside a scroll view — a context-menu preview — where there is
+    /// no scrolled edge to stick to.
+    var sticksToLeadingEdge = true
 
-        private var isLive: Bool {
-            cell.isLive(at: now)
-        }
+    private var isLive: Bool {
+        cell.isLive(at: now)
+    }
 
-        private var isPast: Bool {
-            cell.isPast(at: now)
-        }
+    private var isCard: Bool {
+        isFocused && !cell.isGap
+    }
 
-        /// Hairline gap between adjacent blocks. Applied as inset *inside* the
-        /// cell's exact width so tiling stays pixel-aligned across rows.
-        private var gap: CGFloat {
-            metrics.rowSpacing
-        }
+    /// Only a card that overflows its row grows its radius and inset with it;
+    /// where it doesn't, a press must not nudge the text.
+    private var grows: Bool {
+        isFocused && metrics.focusOverflow > 0
+    }
 
-        var body: some View {
-            ZStack(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(cell.isGap ? "No Programme" : cell.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(titleColor)
-                        .lineLimit(lineLimit)
+    private var height: CGFloat {
+        isFocused ? metrics.focusedBlockHeight : metrics.rowHeight
+    }
 
-                    if showsTime {
-                        HStack(spacing: 4) {
-                            if canReplay {
-                                Image(systemName: "clock.arrow.circlepath")
-                            }
-                            Text(cell.start, format: .dateTime.hour().minute())
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+    private var cornerRadius: CGFloat {
+        grows ? metrics.blockCornerRadius + 2 : metrics.blockCornerRadius
+    }
+
+    private var inset: CGFloat {
+        grows ? metrics.blockInset + 2 : metrics.blockInset
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        labels
+            .frame(width: max(0, cell.width - metrics.blockGap), height: height, alignment: .leading)
+            .background(fill, in: shape)
+            .overlay {
+                shape.strokeBorder(borderColor, lineWidth: isFocused ? 1.5 : 1)
+            }
+            .overlay(alignment: .bottom) {
+                if isCard, isLive {
+                    progressBar
+                }
+            }
+            .clipShape(shape)
+            .modifier(CardShadow(radius: isCard ? metrics.cardShadowRadius : 0, opacity: metrics.cardShadowOpacity))
+            .opacity(opacity)
+            .frame(width: cell.width, height: height, alignment: .leading)
+    }
+
+    private var labels: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            title
+                .font(isCard ? metrics.cardTitleFont : metrics.blockTitleFont)
+                .foregroundStyle(isCard ? EPGColors.cardText : .primary)
+                .lineLimit(1)
+
+            if showsTime {
+                HStack(spacing: 6) {
+                    if canReplay {
+                        Image(systemName: "clock.arrow.circlepath")
                     }
+                    Text(cell.start ..< cell.end, format: .interval.hour().minute())
                 }
-                .padding(.horizontal, metrics.blockInset)
-                .padding(.vertical, metrics.blockInset * 0.55)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                // Keeps the text of a partially scrolled block readable; see
-                // `EPGStickyText` for why this is a `visualEffect`.
-                .visualEffect { [inset = metrics.blockInset] content, proxy in
-                    content.offset(
-                        x: EPGStickyText.shift(
-                            blockMinX: proxy.frame(in: .scrollView).minX,
-                            blockWidth: proxy.size.width,
-                            inset: inset
-                        )
-                    )
-                }
-
-                if isLive {
-                    liveProgressBar
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: metrics.blockCornerRadius, style: .continuous))
-            .opacity(cell.isGap ? 0.5 : (isPast && !isFocused ? (canReplay ? 0.8 : 0.55) : 1))
-            .padding(.trailing, gap)
-            .padding(.vertical, gap / 2)
-            .frame(width: cell.width, height: metrics.rowHeight, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-
-        /// The block is wide enough to show a start time alongside the title.
-        private var showsTime: Bool {
-            !cell.isGap && cell.width > metrics.channelColumnWidth * 0.55
-        }
-
-        private var lineLimit: Int {
-            cell.width > metrics.channelColumnWidth ? 2 : 1
-        }
-
-        @ViewBuilder
-        private var background: some View {
-            let shape = RoundedRectangle(cornerRadius: metrics.blockCornerRadius, style: .continuous)
-            if cell.isGap {
-                shape.fill(.fill.quaternary)
-            } else {
-                if isFocused {
-                    shape.fill(Color.accentColor)
-                } else if isLive {
-                    shape.fill(Color.accentColor.opacity(0.18))
-                        .overlay {
-                            shape.strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
-                        }
-                } else {
-                    shape.fill(.fill.tertiary)
-                }
+                .font(metrics.blockTimeFont)
+                .foregroundStyle(isCard ? EPGColors.cardTextSecondary : .primary.opacity(0.6))
+                .lineLimit(1)
             }
         }
-
-        private var liveProgressBar: some View {
-            GeometryReader { geo in
-                Capsule()
-                    .fill(progressTint)
-                    .frame(width: geo.size.width * cell.progress(at: now), height: 3)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-            .frame(height: 3)
-            .padding(.horizontal, 2)
-            .padding(.bottom, 2)
-        }
-
-        private var progressTint: Color {
-            isFocused ? .white : .accentColor
-        }
-
-        private var titleColor: Color {
-            if cell.isGap { return .secondary }
-            return isFocused ? .white : .primary
+        .padding(.horizontal, inset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        // Keeps the text of a partially scrolled block readable; see
+        // `EPGStickyText` for why this is a `visualEffect`.
+        .visualEffect { [inset, sticksToLeadingEdge] content, proxy in
+            content.offset(
+                x: !sticksToLeadingEdge ? 0 : EPGStickyText.shift(
+                    blockMinX: proxy.frame(in: .scrollView).minX,
+                    blockWidth: proxy.size.width,
+                    inset: inset
+                )
+            )
         }
     }
 
-    /// Wraps a programme block in its selection affordance: a press dip on touch
-    /// and pointer, a lift under keyboard focus. Builds the visual from the cell
-    /// so the block can react to focus (which is only observable from inside a
-    /// style).
-    struct EPGBlockButtonStyle: ButtonStyle {
+    private var title: Text {
+        cell.isGap ? Text("No Programme") : Text(cell.title)
+    }
+
+    private var showsTime: Bool {
+        !cell.isGap && cell.width > metrics.channelColumnWidth * 0.55
+    }
+
+    private var fill: Color {
+        if isCard {
+            return EPGColors.cardFill
+        }
+        // A focused gap keeps a light fill: a no-EPG row is one gap
+        // spanning the whole track, and a solid card bar reads as noise.
+        if isFocused {
+            return .primary.opacity(0.18)
+        }
+        return .primary.opacity(isLive ? 0.12 : 0.05)
+    }
+
+    private var borderColor: Color {
+        isCard ? EPGColors.cardBorder : .primary.opacity(0.1)
+    }
+
+    private var opacity: Double {
+        if cell.isGap {
+            return isFocused ? 1 : 0.5
+        }
+        guard !isFocused, cell.isPast(at: now) else { return 1 }
+        return canReplay ? 0.8 : 0.55
+    }
+
+    /// Only the card casts one: a zero-radius shadow still sits in the render
+    /// tree of every realized block (#27).
+    private struct CardShadow: ViewModifier {
+        let radius: CGFloat
+        let opacity: Double
+
+        func body(content: Content) -> some View {
+            if radius > 0 {
+                content.shadow(color: .black.opacity(opacity), radius: radius, y: radius)
+            } else {
+                content
+            }
+        }
+    }
+
+    private var progressBar: some View {
+        EPGProgressBar(
+            progress: cell.progress(at: now),
+            track: EPGColors.cardText.opacity(0.14),
+            fill: EPGColors.cardText,
+            height: metrics.progressBarHeight
+        )
+        .padding(.horizontal, inset)
+        .padding(.bottom, metrics.progressBarHeight * 2.25)
+    }
+}
+
+#if !os(tvOS)
+    /// Draws a programme button as its block: the card while pressed or under
+    /// keyboard focus, the tile otherwise. Focus is only observable from
+    /// inside a style.
+    struct EPGProgramButtonStyle: ButtonStyle {
         let cell: EPGProgramCell
         let metrics: EPGMetrics
         let now: Date
@@ -355,48 +397,46 @@ struct EPGMetrics {
             @Environment(\.isFocused) private var isFocused
 
             var body: some View {
-                let focused = isFocused
-                let scale = focused ? 1.04 : (isPressed ? 0.97 : 1.0)
-                // Radius 0 when unfocused: a transparent radius-10 shadow still
-                // sits in the render tree of every realized cell, and hundreds of
-                // shadowed cells is what made focus-scrolling stutter (#27).
-                EPGProgramBlockView(cell: cell, metrics: metrics, now: now, isFocused: focused, canReplay: canReplay)
-                    .shadow(color: .black.opacity(0.4), radius: focused ? 10 : 0, y: focused ? 6 : 0)
-                    .scaleEffect(scale)
-                    .animation(.easeOut(duration: 0.18), value: focused)
-                    .animation(.easeOut(duration: 0.12), value: isPressed)
+                let highlighted = isFocused || isPressed
+                EPGProgramBlock(cell: cell, metrics: metrics, now: now, isFocused: highlighted, canReplay: canReplay)
+                    .animation(.easeOut(duration: 0.15), value: highlighted)
             }
         }
     }
 #endif
 
-// MARK: - Now indicator
-
-/// The vertical "now" line drawn over the grid content. A small cap at the top
-/// marks the current moment on the ruler; on tvOS the ruler's pill does.
-struct EPGNowIndicator: View {
+/// A capsule track filled from the leading edge to `progress`.
+struct EPGProgressBar: View {
+    let progress: Double
+    let track: Color
+    let fill: Color
     let height: CGFloat
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Rectangle()
-                .fill(lineColor)
-                .frame(width: 2)
-            #if !os(tvOS)
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 9, height: 9)
-                    .offset(y: -4)
-            #endif
-        }
-        .frame(width: 9, height: height, alignment: .top)
+        Capsule()
+            .fill(track)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(fill)
+                    .scaleEffect(x: CGFloat(progress), y: 1, anchor: .leading)
+            }
+            .clipShape(Capsule())
+            .frame(height: height)
     }
+}
 
-    private var lineColor: Color {
-        #if os(tvOS)
-            LiveTVPalette.accent.opacity(0.85)
-        #else
-            .red
-        #endif
+// MARK: - Now indicator
+
+/// The vertical "now" line drawn over the grid content; the ruler's pill
+/// marks the moment above it.
+struct EPGNowIndicator: View {
+    let height: CGFloat
+
+    static let width: CGFloat = 2
+
+    var body: some View {
+        Rectangle()
+            .fill(LiveTVPalette.accent.opacity(0.85))
+            .frame(width: Self.width, height: height)
     }
 }
