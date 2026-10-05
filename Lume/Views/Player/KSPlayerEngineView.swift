@@ -125,6 +125,11 @@ struct KSPlayerEngineView: View {
     @State var hideTask: Task<Void, Never>?
     @State private var hoverHideTask: Task<Void, Never>?
     @State var pipObservationTask: Task<Void, Never>?
+    #if os(iOS)
+        /// Whether the stream was playing as the app left the foreground, so
+        /// automatic PiP can resume it if the handoff paused it.
+        @State var resumesWhenPipStarts = false
+    #endif
     #if os(macOS)
         /// Drives PiP on macOS in place of the layer's `isPipActive`, whose
         /// delegate leaves the PiP window's buttons dead there.
@@ -516,6 +521,11 @@ struct KSPlayerEngineView: View {
                 NowPlayingService.shared.detachTransport(owner: coordinator)
                 coordinator.resetPlayer()
             }
+            #if os(iOS)
+            .onChange(of: scenePhase) { oldPhase, phase in
+                trackScenePhaseForPip(from: oldPhase, to: phase)
+            }
+            #endif
             .onChange(of: media.id) { _, _ in
                 resetVideoInfo()
                 // An in-player swap reuses the KSPlayerLayer but re-prepares it;

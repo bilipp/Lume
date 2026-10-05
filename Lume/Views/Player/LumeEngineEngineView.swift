@@ -222,7 +222,9 @@ struct LumeEngineEngineView: View {
         .onChange(of: scenePhase) { _, phase in
             // The Home button backgrounds the app without calling onDisappear,
             // so pause here to stop audio when the player loses focus.
-            if phase != .active, coordinator.isPlaying { coordinator.togglePlay() }
+            if coordinator.isPlaying, PlayerBackgrounding.shouldPause(for: phase, pipActive: coordinator.isPipActive) {
+                coordinator.togglePlay()
+            }
         }
         .onChange(of: media) { _, newMedia in
             // The host swapped the stream (e.g. a new episode). Reset local
@@ -285,6 +287,11 @@ struct LumeEngineEngineView: View {
             if !isSeeking, current.isFinite { clock.current = current }
             if duration.isFinite, duration > 0 { clock.duration = duration }
         }
+        #if os(iOS)
+            coordinator.onPictureInPictureStop = {
+                PlayerBackgrounding.pictureInPictureDidStop { closePlayer() }
+            }
+        #endif
         coordinator.onPlaybackFailure = {
             Logger.player.error("LumeEngine startup failure → \(reportsStartupFailure && !coordinator.hasStartedPlayback ? "falling back to next engine" : "failure overlay", privacy: .public)")
             reportFailure()
@@ -529,38 +536,6 @@ struct LumeEngineEngineView: View {
         withAnimation(.easeInOut(duration: 0.25)) { loadFailed = false }
         reconnector.reset()
         coordinator.reload()
-    }
-}
-
-// MARK: - Engine-rendered subtitles
-
-/// Draws the engine's active subtitle cues over the video. A leaf that observes
-/// only the standalone `SubtitleCueModel`, so per-cue changes invalidate this
-/// view alone — never the engine view above it, and never the controls overlay
-/// (both of which observe the coordinator, whose `objectWillChange` therefore
-/// no longer fires at tick rate). Keeping the cue text off the coordinator is
-/// what stops an open track menu flickering and dropping taps.
-private struct LumeEngineSubtitleOverlay: View {
-    @ObservedObject var cues: SubtitleCueModel
-    /// Lifts the cues above the controls' scrubber while they're showing.
-    let controlsVisible: Bool
-
-    var body: some View {
-        if let text = cues.text, !text.isEmpty {
-            VStack {
-                Spacer()
-                Text(text)
-                    .font(.title3.weight(.medium))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.9), radius: 2, x: 0, y: 1)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
-                    .padding(.bottom, controlsVisible ? 120 : 40)
-            }
-            .allowsHitTesting(false)
-        }
     }
 }
 

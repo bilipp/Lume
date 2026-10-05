@@ -42,6 +42,10 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
     /// to the next engine or raises the failure overlay.
     var onPlaybackFailure: (() -> Void)?
 
+    /// Invoked when the PiP window goes away, so the host can end the session
+    /// if the user closed it rather than restoring the player.
+    var onPictureInPictureStop: (() -> Void)?
+
     /// How long to wait for playback to start before declaring the stream dead.
     /// Set by the host before `configure` — shorter when a fallback engine is
     /// available so the hand-off is prompt.
@@ -558,12 +562,20 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
 // MARK: - AVPictureInPictureControllerDelegate
 
 extension AVPlayerCoordinator: AVPictureInPictureControllerDelegate {
+    /// Raised at *will* start: automatic PiP begins as the app leaves the
+    /// foreground, and `pauseForBackground` must already see it by the time
+    /// the scene reaches `.background`, before `didStart` arrives.
+    func pictureInPictureControllerWillStartPictureInPicture(_: AVPictureInPictureController) {
+        isPipActive = true
+    }
+
     func pictureInPictureControllerDidStartPictureInPicture(_: AVPictureInPictureController) {
         isPipActive = true
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_: AVPictureInPictureController) {
         isPipActive = false
+        onPictureInPictureStop?()
     }
 
     func pictureInPictureController(

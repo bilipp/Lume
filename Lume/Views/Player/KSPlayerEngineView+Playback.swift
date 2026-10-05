@@ -1,3 +1,4 @@
+import AVKit
 import Combine
 import KSPlayer
 import OSLog
@@ -399,12 +400,77 @@ extension KSPlayerEngineView {
                         attempts += 1
                     }
                     guard !Task.isCancelled, let playerLayer = coordinator.playerLayer else { return }
-                    for await active in playerLayer.$isPipActive.values {
-                        guard !Task.isCancelled else { return }
-                        isPipActive = active
-                    }
+                    #if os(iOS)
+                        await withTaskGroup(of: Void.self) { group in
+                            group.addTask { await observeLayerPipFlag(playerLayer) }
+                            group.addTask { await followSystemPip(playerLayer) }
+                        }
+                    #else
+                        await observeLayerPipFlag(playerLayer)
+                    #endif
                 }
             #endif
+        }
+
+        private func observeLayerPipFlag(_ playerLayer: KSPlayerLayer) async {
+            for await active in playerLayer.$isPipActive.values {
+                guard !Task.isCancelled else { return }
+                isPipActive = active
+            }
+        }
+    }
+#endif
+
+// MARK: - Background PiP (iOS)
+
+#if os(iOS)
+    @available(iOS 16.0, *)
+    extension KSPlayerEngineView {
+        /// Follows the system PiP controller itself. The layer's `isPipActive`
+        /// only tracks PiP started from Lume's button: automatic PiP (the Home
+        /// gesture) never sets it, and closing the window with its ✕ never
+        /// clears it.
+        func followSystemPip(_ playerLayer: KSPlayerLayer) async {
+            guard let pip = playerLayer.player.pipController else { return }
+            let changes = pip.publisher(for: \.isPictureInPictureActive, options: [.new]).values
+            for await active in changes {
+                guard !Task.isCancelled else { return }
+                if active {
+                    resumeIfPipStartPaused()
+                } else {
+                    PlayerBackgrounding.pictureInPictureDidStop { closePlayer() }
+                }
+            }
+        }
+
+        /// KSPlayer pauses on `didEnterBackground` unless PiP is already
+        /// active, and automatic PiP is usually still starting at that point.
+        /// The stream then sat frozen in the PiP window. Remember whether it
+        /// was playing as the app began leaving, and resume once PiP is up.
+        func trackScenePhaseForPip(from oldPhase: ScenePhase, to phase: ScenePhase) {
+            switch phase {
+            case .active:
+                resumesWhenPipStarts = false
+            case .inactive, .background:
+                if oldPhase == .active {
+                    resumesWhenPipStarts = coordinator.playerLayer?.state.isPlaying ?? false
+                }
+                // PiP can finish starting before the scene reports background.
+                if phase == .background { resumeIfPipStartPaused() }
+            @unknown default:
+                break
+            }
+        }
+
+        private func resumeIfPipStartPaused() {
+            guard resumesWhenPipStarts, let playerLayer = coordinator.playerLayer,
+                  let pip = playerLayer.player.pipController, pip.isPictureInPictureActive
+            else { return }
+            resumesWhenPipStarts = false
+            guard !playerLayer.state.isPlaying else { return }
+            playerLayer.play()
+            // The PiP window caches the paused state; make it ask again.
+            pip.invalidatePlaybackState()
         }
     }
 #endif

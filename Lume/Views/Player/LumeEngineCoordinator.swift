@@ -5,27 +5,6 @@ import LumeEngine
 import OSLog
 import SwiftUI
 
-/// Holds the engine's active subtitle cue text, refreshed from the coordinator's
-/// 10 Hz playback tick. Deliberately a separate `ObservableObject` from
-/// `LumeEngineCoordinator`: were the cue text `@Published` on the coordinator,
-/// every per-tick update would fire the coordinator's `objectWillChange` and
-/// re-render every overlay that observes it — flickering an open audio/subtitle
-/// `Menu` and cancelling in-flight taps. Only the subtitle-rendering leaf
-/// observes this model, so a cue change invalidates that leaf alone. Mirrors why
-/// KSPlayer keeps its `SubtitleModel` off the controls overlay's observed surface.
-@MainActor
-final class SubtitleCueModel: ObservableObject {
-    @Published private(set) var text: String?
-
-    /// Assigns only on an actual change, so an unchanged cue repeated across
-    /// ticks doesn't invalidate the leaf ten times a second.
-    func update(_ newText: String?) {
-        if text != newText {
-            text = newText
-        }
-    }
-}
-
 /// Playback surface for the LumeEngine (FFmpeg) backend.
 ///
 /// Wraps a `PlayerSession` per stream — the engine has no rebuild-in-place, so
@@ -69,6 +48,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     var onTime: ((TimeInterval, TimeInterval) -> Void)?
     /// Initial-load failure (hard error or startup timeout before first frame).
     var onPlaybackFailure: (() -> Void)?
+    /// The PiP window went away, so the host can end the session if the user
+    /// closed it rather than restoring the player.
+    var onPictureInPictureStop: (() -> Void)?
     /// Mid-stream stall after playback had started (the engine's watchdog);
     /// the view routes this through `PlaybackRetryController`.
     var onStalled: (() -> Void)?
@@ -185,7 +167,14 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 self.publishTracks(info: info)
                 self.publishVideoInfo(info: info)
                 if !self.isEmbedded {
-                    self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                    let bridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                    // Follows the system rather than the button: PiP also ends
+                    // from its own window, which the toggle never sees.
+                    bridge.onActiveChange = { [weak self] active in
+                        self?.isPipActive = active
+                        if !active { self?.onPictureInPictureStop?() }
+                    }
+                    self.pipBridge = bridge
                 }
                 // Resume position is handled by the engine via
                 // configuration.startPosition (seek-before-first-read).
@@ -302,7 +291,6 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             let isStarting = pipBridge?.isActive == false
         #endif
         pipBridge?.toggle()
-        isPipActive = pipBridge?.isActive ?? false
         #if os(macOS)
             // Sample-buffer PiP comes out cropped on macOS without this.
             if isStarting {
