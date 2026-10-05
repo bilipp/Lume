@@ -7,6 +7,7 @@
 //  that view file focused on the SwiftUI body.
 //
 
+import CoreMedia
 import Foundation
 import KSPlayer
 import os
@@ -38,9 +39,50 @@ final nonisolated class LumeKSOptions: KSOptions {
     /// Written from the main actor, read on KSPlayer's open thread.
     private let hasManualAudioSelection = OSAllocatedUnfairLock(initialState: false)
 
-    init(preferredAudioLanguages: [String]) {
+    /// Whether this session may switch the TV's display mode when the tvOS
+    /// "Match Content" settings are on. KSPlayer sets the frame rate and dynamic
+    /// range once the first frame decodes, and clears them when the layer
+    /// deinits, so on an embedded tile every zap clears the mode and sets it
+    /// again: two HDMI re-syncs, a black screen each time. Only full screen
+    /// matches the display, the way AVKit only does it for full-screen playback.
+    ///
+    /// Written from the main actor, read wherever the layer deinits.
+    private let matchesDisplayCriteria: OSAllocatedUnfairLock<Bool>
+    /// The last format KSPlayer asked the display to match, applied when full
+    /// screen adopts an embedded session that has been holding it back.
+    @MainActor private var pendingDisplayCriteria: (refreshRate: Float, isDovi: Bool, format: CMFormatDescription?)?
+
+    init(preferredAudioLanguages: [String], matchesDisplayCriteria: Bool) {
         self.preferredAudioLanguages = preferredAudioLanguages
+        self.matchesDisplayCriteria = OSAllocatedUnfairLock(initialState: matchesDisplayCriteria)
         super.init()
+    }
+
+    /// Full screen took over this session from the Guide preview: from now on
+    /// it matches the display, starting with the stream already playing.
+    @MainActor
+    func beginMatchingDisplayCriteria() {
+        let wasMatching = matchesDisplayCriteria.withLock { matches in
+            defer { matches = true }
+            return matches
+        }
+        guard !wasMatching, let pending = pendingDisplayCriteria else { return }
+        updateVideo(refreshRate: pending.refreshRate, isDovi: pending.isDovi, formatDescription: pending.format)
+    }
+
+    @MainActor
+    override func updateVideo(refreshRate: Float, isDovi: Bool, formatDescription: CMFormatDescription?) {
+        pendingDisplayCriteria = (refreshRate, isDovi, formatDescription)
+        guard matchesDisplayCriteria.withLock({ $0 }) else { return }
+        super.updateVideo(refreshRate: refreshRate, isDovi: isDovi, formatDescription: formatDescription)
+    }
+
+    /// An embedded session never set the display mode, so it must not reset
+    /// it either — that would knock full screen, or the next tile, back to the
+    /// interface's mode.
+    override func playerLayerDeinit() {
+        guard matchesDisplayCriteria.withLock({ $0 }) else { return }
+        super.playerLayerDeinit()
     }
 
     /// Call from every manual audio-track pick, before `select(track:)`.
@@ -93,10 +135,11 @@ enum KSPlayerOptionsFactory {
         #endif
     }()
 
-    /// - Parameter allowsPictureInPicture: `false` for a Multi-View tile — four
-    ///   tiles each allowed to start PiP from inline would fight over the one
-    ///   PiP window.
-    static func make(for media: PlayableMedia, allowsPictureInPicture: Bool = true) -> KSOptions {
+    /// - Parameter isEmbedded: `true` for a Multi-View tile or the Guide
+    ///   preview. Four tiles each allowed to start PiP from inline would fight
+    ///   over the one PiP window, and a tile switching the TV's display mode
+    ///   blacks out the whole screen on every zap.
+    static func make(for media: PlayableMedia, isEmbedded: Bool = false) -> KSOptions {
         _ = configureGlobalOptions
 
         let settings = KSPlayerOptions.load()
@@ -108,7 +151,8 @@ enum KSPlayerOptionsFactory {
         KSOptions.firstPlayerType = settings.primaryEngine == .ffmpeg ? KSMEPlayer.self : KSAVPlayer.self
 
         let options = LumeKSOptions(
-            preferredAudioLanguages: PlayerLanguageOptions.load().preferredAudioLanguages
+            preferredAudioLanguages: PlayerLanguageOptions.load().preferredAudioLanguages,
+            matchesDisplayCriteria: !isEmbedded
         )
         // Now Playing metadata + remote commands are owned by
         // `NowPlayingService` for all engines; KSPlayer's built-in
@@ -124,7 +168,7 @@ enum KSPlayerOptionsFactory {
         options.videoAdaptable = settings.adaptive
         options.nobuffer = settings.noBuffer
         options.codecLowDelay = settings.codecLowDelay
-        options.canStartPictureInPictureAutomaticallyFromInline = allowsPictureInPicture && settings.autoPip
+        options.canStartPictureInPictureAutomaticallyFromInline = !isEmbedded && settings.autoPip
         options.autoSelectEmbedSubtitle = settings.autoSelectSubtitle
         options.maxBufferDuration = Double(settings.maxBuffer)
         options.preferredForwardBufferDuration = Double(media.isLive ? settings.liveBuffer : settings.vodBuffer)

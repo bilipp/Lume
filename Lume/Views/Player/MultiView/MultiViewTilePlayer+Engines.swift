@@ -106,7 +106,7 @@ struct MultiViewKSTile: View {
     }
 
     private func makeOptions() -> KSOptions {
-        let options = KSPlayerOptionsFactory.make(for: media, allowsPictureInPicture: false)
+        let options = KSPlayerOptionsFactory.make(for: media, isEmbedded: true)
         if media.isLive, let cap = role.liveForwardBufferCap {
             options.preferredForwardBufferDuration = min(options.preferredForwardBufferDuration, cap)
         }
