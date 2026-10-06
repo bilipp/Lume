@@ -1,10 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%@ · %@" : {
-      "comment" : "Live Activity up-next line: start time · programme title",
-      "shouldTranslate" : false
-    },
     "%lld Downloads Complete" : {
       "comment" : "Live Activity headline: several downloads finished",
       "localizations" : {
@@ -319,59 +315,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下载失败"
-          }
-        }
-      }
-    },
-    "LIVE" : {
-      "comment" : "Badge marking a live TV stream",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LIVE"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "EN VIVO"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DIRECT"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LIVE"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ライブ"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "라이브"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AO VIVO"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "直播"
           }
         }
       }

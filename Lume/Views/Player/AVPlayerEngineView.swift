@@ -174,6 +174,11 @@ struct AVPlayerEngineView: View {
                 if total.isFinite, total > 0 { clock.duration = total }
             }
             coordinator.onPlaybackFailure = { reportFailure() }
+            #if os(iOS)
+                coordinator.onPictureInPictureStop = {
+                    PlayerBackgrounding.pictureInPictureDidStop { closePlayer() }
+                }
+            #endif
             coordinator.startupTimeout = usesQuickStartupTimeout ? fallbackStartupTimeout : startupTimeout
             if !keepAdoptedItem(as: media) {
                 coordinator.configure(media: media)
@@ -205,7 +210,7 @@ struct AVPlayerEngineView: View {
         .onChange(of: scenePhase) { _, phase in
             // The Home button backgrounds the app without calling onDisappear,
             // so pause here to stop audio when the player loses focus.
-            if phase != .active { coordinator.pauseForBackground() }
+            if PlayerBackgrounding.shouldPause(for: phase) { coordinator.pauseForBackground() }
         }
         .onChange(of: media) { _, newMedia in
             // The host swapped the stream (e.g. a new episode). Reset local
