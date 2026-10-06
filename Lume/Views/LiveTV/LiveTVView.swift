@@ -169,8 +169,6 @@ struct LiveTVView: View {
                     }
                 }
             }
-            .platformNavigationTitle("Live TV")
-            .liveTVInlineTitle()
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,
@@ -464,18 +462,4 @@ struct LiveTVView: View {
 
 #Preview("No Playlists") {
     LiveTVView()
-}
-
-private extension View {
-    /// Inline title on iOS: the category selector sits directly below the nav
-    /// bar, so a large title would rubber-band down and float behind the
-    /// selector when the channel list is overscrolled.
-    @ViewBuilder
-    func liveTVInlineTitle() -> some View {
-        #if os(iOS)
-            navigationBarTitleDisplayMode(.inline)
-        #else
-            self
-        #endif
-    }
 }
