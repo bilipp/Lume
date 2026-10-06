@@ -14,8 +14,8 @@ import Foundation
 nonisolated enum DeepLink: Equatable {
     case movie(tmdbId: Int)
     case series(tmdbId: Int)
-    /// Reopens the player on the last played stream — the Live Activity's
-    /// tap target (see `PlaybackLiveActivity` / `PlaybackResumeStore`).
+    /// Reopens the player on the last played stream, where it left off
+    /// (see `PlaybackResumeStore`).
     case resume
     /// Opens the downloads list — the download Live Activity's tap target
     /// (see `DownloadLiveActivity`).

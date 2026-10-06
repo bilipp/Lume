@@ -31,7 +31,7 @@ struct MainTabView: View {
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
     @State private var router = DeepLinkRouter()
 
-    /// The stream a `lume://resume` deep link (a Live Activity tap) asked to
+    /// The stream a `lume://resume` deep link asked to
     /// reopen. Presented directly here, independent of any tab's own player
     /// cover.
     @State private var resumeMedia: PlayableMedia?
@@ -403,9 +403,9 @@ struct MainTabView: View {
             router.seriesPath = NavigationPath()
             router.seriesPath.append(series)
         case .resume:
-            // The Live Activity was tapped. When a player session is already
-            // up, foregrounding the app is all that's needed; otherwise reopen
-            // the last played stream where it left off.
+            // When a player session is already up, foregrounding the app is
+            // all that's needed; otherwise reopen the last played stream where
+            // it left off.
             guard NowPlayingService.shared.currentMedia == nil,
                   let media = PlaybackResumeStore.load() else { return }
             #if os(macOS)

@@ -39,6 +39,10 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// either falls back to the next engine or raises the failure overlay.
     var onPlaybackFailure: (() -> Void)?
 
+    /// Invoked when the PiP window goes away, so the host can end the session
+    /// if the user closed it rather than restoring the player.
+    var onPictureInPictureStop: (() -> Void)?
+
     /// How long to wait for the first frame before declaring the stream dead.
     /// Set by the host before `configure` — shorter when a fallback engine is
     /// available so the hand-off is prompt.
@@ -536,7 +540,12 @@ extension VLCPlayerCoordinator: VLCDrawable, VLCPictureInPictureDrawable, VLCPic
             guard let self else { return }
             pipController = controller
             controller?.stateChangeEventHandler = { [weak self] isStarted in
-                DispatchQueue.main.async { self?.isPipActive = isStarted }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    let wasActive = isPipActive
+                    isPipActive = isStarted
+                    if wasActive, !isStarted { onPictureInPictureStop?() }
+                }
             }
             DispatchQueue.main.async { self.isPipSupported = controller != nil }
         }
