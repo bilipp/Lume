@@ -13,10 +13,14 @@ import SwiftUI
 
 extension View {
     /// - Parameters:
+    ///   - stream: the channel the Record item acts on; the item hides itself
+    ///     where no record flow is installed, no server is paired, or the
+    ///     playlist can't record.
     ///   - isFavorite: drives the favorite item's wording and glyph.
     ///   - onStartMultiView: omitted where Multi-View has no entry point.
     ///   - onRemoveFromRecents: only in the Recently Watched collection.
     func liveChannelMenu(
+        stream: LiveStream,
         isFavorite: Bool,
         onToggleFavorite: @escaping () -> Void,
         onStartMultiView: (() -> Void)? = nil,
@@ -28,6 +32,8 @@ extension View {
             if let onStartMultiView {
                 FavoriteMenuItems.startMultiView(onStartMultiView)
             }
+
+            FavoriteMenuItems.record(stream: stream)
 
             if let onRemoveFromRecents {
                 FavoriteMenuItems.removeFromRecents(onRemoveFromRecents)
@@ -68,6 +74,37 @@ enum FavoriteMenuItems {
     static func removeFromRecents(_ action: @escaping () -> Void) -> some View {
         Button(role: .destructive, action: action) {
             Label("Remove from Recently Watched", systemImage: "clock.badge.xmark")
+        }
+    }
+
+    static func record(stream: LiveStream) -> some View {
+        LiveChannelRecordButton(stream: stream)
+    }
+}
+
+/// Its own view so the recording-state read is tracked here, not by the row
+/// that owns the menu — a refresh that changes the recordings then re-renders
+/// this item alone. The screens hosting these menus don't poll, so the item
+/// refreshes stale recordings when the menu builds it.
+private struct LiveChannelRecordButton: View {
+    let stream: LiveStream
+    @Environment(\.recordChannel) private var recordChannel
+
+    var body: some View {
+        if let recordChannel, let state = recordChannel.channelState(for: stream) {
+            Button {
+                recordChannel(stream)
+            } label: {
+                switch state {
+                case .record:
+                    Label("Record", systemImage: "record.circle")
+                case .stop:
+                    Label("Stop Recording", systemImage: "stop.circle")
+                case .locked:
+                    Label("Record", systemImage: "crown")
+                }
+            }
+            .task { await RecordingServerStore.shared.refreshIfStale(maxAge: .seconds(30)) }
         }
     }
 }

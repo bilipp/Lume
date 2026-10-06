@@ -121,6 +121,7 @@ struct ChannelsList: View {
                             }
                             .buttonStyle(.plain)
                             .liveChannelMenu(
+                                stream: stream,
                                 isFavorite: stream.isFavorite,
                                 onToggleFavorite: { LiveChannelFavorites.toggle(stream, in: modelContext) },
                                 onStartMultiView: { onStartMultiView(stream) },

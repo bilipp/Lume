@@ -5,7 +5,8 @@
 //  The programme rows inside the guide's scrollable surface: windowed
 //  absolute placement of rows and cells, plus the "now" line. On tvOS cells
 //  are plain views highlighted by the scroller's virtual focus; on touch and
-//  pointer platforms they are tappable buttons.
+//  pointer platforms they are buttons whose hold (right-click on macOS) offers
+//  the programme's actions, Record among them.
 //
 
 import SwiftUI
@@ -77,7 +78,7 @@ struct EPGRows: View, Equatable {
         .overlay(alignment: .topLeading) {
             TimelineView(.everyMinute) { context in
                 EPGNowIndicator(height: contentHeight)
-                    .offset(x: timeline.x(for: context.date) - 4.5)
+                    .offset(x: timeline.x(for: context.date) - EPGNowIndicator.width / 2)
                     .allowsHitTesting(false)
             }
         }
@@ -95,7 +96,7 @@ struct EPGRows: View, Equatable {
             if case let .cell(rowIndex, cellID) = virtualFocus, rows.indices.contains(rowIndex),
                let cell = rows[rowIndex].cells.first(where: { $0.id == cellID })
             {
-                EPGTVProgramBlock(
+                EPGProgramBlock(
                     cell: cell,
                     metrics: metrics,
                     now: now,
@@ -114,7 +115,8 @@ struct EPGRows: View, Equatable {
 /// A single channel's row of programme blocks. On tvOS the blocks are plain
 /// views — the guide's focusable surface interprets the remote, and `EPGRows`
 /// draws the focused card over them. On touch/pointer platforms each
-/// block is a button: a tap plays, a long press opens the detail sheet.
+/// block is a button: a tap plays, a hold or right-click opens its context
+/// menu — watch, record, details.
 ///
 /// Cells are placed at their exact timeline offset, and only the ones inside
 /// the shared realization window (plus one neighbour on each side, so
@@ -176,39 +178,81 @@ struct EPGProgramStrip: View, Equatable {
 
     #if os(tvOS)
         private func cellView(_ cell: EPGProgramCell) -> some View {
-            EPGTVProgramBlock(cell: cell, metrics: metrics, now: now, canReplay: Self.canReplay(cell, in: row, now: now))
+            EPGProgramBlock(cell: cell, metrics: metrics, now: now, canReplay: Self.canReplay(cell, in: row, now: now))
         }
     #else
         @ViewBuilder
         private func cellView(_ cell: EPGProgramCell) -> some View {
+            let canReplay = Self.canReplay(cell, in: row, now: now)
+            let button = Button {
+                onPlay(cell)
+            } label: {
+                Color.clear.frame(width: cell.width, height: metrics.rowHeight)
+            }
+            .buttonStyle(EPGProgramButtonStyle(cell: cell, metrics: metrics, now: now, canReplay: canReplay))
+            .contextMenu {
+                menuItems(for: cell, canReplay: canReplay)
+            } preview: {
+                EPGProgramBlock(cell: cell.previewSized, metrics: metrics, now: now, isFocused: true, canReplay: canReplay, sticksToLeadingEdge: false)
+            }
+
             if cell.isGap {
                 // A channel with no EPG is a single full-width gap; it stays a
                 // playable target so the channel can be started from the grid.
-                Button {
-                    onPlay(cell)
-                } label: {
-                    Color.clear.frame(width: cell.width, height: metrics.rowHeight)
-                }
-                .buttonStyle(EPGBlockButtonStyle(cell: cell, metrics: metrics, now: now))
-                .accessibilityLabel(Text(row.name))
-                .accessibilityHint(Text("No programme information"))
+                button
+                    .accessibilityLabel(Text(row.name))
+                    .accessibilityHint(Text("No programme information"))
             } else {
+                button
+                    .accessibilityLabel(Text(cell.title))
+                    .accessibilityHint(Text("\(cell.start, format: .dateTime.hour().minute()) to \(cell.end, format: .dateTime.hour().minute()) on \(row.name)"))
+                    .accessibilityAction(named: Text("Show Details")) { onShowDetails(cell) }
+            }
+        }
+
+        /// Watch plays what a tap would — the replay of an archived programme,
+        /// the channel live otherwise. A gap has no details to show.
+        @ViewBuilder
+        private func menuItems(for cell: EPGProgramCell, canReplay: Bool) -> some View {
+            Button {
+                onPlay(cell)
+            } label: {
+                if canReplay {
+                    Label("Watch", systemImage: "play.fill")
+                } else {
+                    Label("Watch Live", systemImage: "play.fill")
+                }
+            }
+
+            EPGProgramRecordMenuItem(recording: EPGProgramRecording(stream: row.stream, cell: cell, now: now))
+
+            if !cell.isGap {
                 Button {
-                    onPlay(cell)
-                } label: {
-                    Color.clear.frame(width: cell.width, height: metrics.rowHeight)
-                }
-                .buttonStyle(EPGBlockButtonStyle(cell: cell, metrics: metrics, now: now, canReplay: Self.canReplay(cell, in: row, now: now)))
-                // A long press opens the detail sheet. The gesture takes the
-                // press once it recognizes, so a hold doesn't also fire the
-                // button's play action.
-                .onLongPressGesture(minimumDuration: 0.4) {
                     onShowDetails(cell)
+                } label: {
+                    Label("Show Details", systemImage: "info.circle")
                 }
-                .accessibilityLabel(Text(cell.title))
-                .accessibilityHint(Text("\(cell.start, format: .dateTime.hour().minute()) to \(cell.end, format: .dateTime.hour().minute()) on \(row.name)"))
-                .accessibilityAction(named: Text("Show Details")) { onShowDetails(cell) }
             }
         }
     #endif
 }
+
+#if !os(tvOS)
+    private extension EPGProgramCell {
+        /// The cell at a width that reads as a card in a context-menu preview:
+        /// a short programme is widened to show its time, a long one is cut
+        /// down from the hours it spans in the grid.
+        var previewSized: EPGProgramCell {
+            EPGProgramCell(
+                id: id,
+                title: title,
+                detail: detail,
+                start: start,
+                end: end,
+                listingID: listingID,
+                isGap: isGap,
+                width: min(max(width, 260), 360)
+            )
+        }
+    }
+#endif

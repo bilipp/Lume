@@ -48,7 +48,7 @@ enum SubtitleSearchQuery {
                 episode: episode.episodeNum
             )
 
-        case .live:
+        case .live, .recording:
             return nil
         }
     }

@@ -133,7 +133,7 @@ enum PlayerItemNavigation {
             // TV, so the channel axis is suppressed for it — the kind, not the
             // ref, is what separates the two.
             if case .live = media.kind { .channel } else { nil }
-        case .movie:
+        case .movie, .recording:
             nil
         }
     }

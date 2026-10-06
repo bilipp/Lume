@@ -131,9 +131,10 @@ adapted per size class
 - **Multi-View**: watch up to four channels at once in a 2 / 3 / 2×2 grid, with the audio on whichever tile you pick. Each tile can come from a different playlist, which helps if your provider allows only one connection per account (two tiles on the same account still need two connections)
 - Channel zapping with recently-watched history
 - **In-player channel browser** on tvOS (left-press overlay with category/channel grid)
-- **Redesigned Live TV on tvOS**: a now-playing hero above the Guide shows the focused channel's live programme, time left and what's up next, beside a muted live preview of the channel (Lume Pro), over a glow tinted with the channel's logo colour — Small (the default, with two more guide rows), Large, Info Only or Off (the guide takes the full height) in Settings; a glass category sidebar sits alongside both layouts
-- **Guide or List** on tvOS is chosen in Settings › Player › Live TV (Guide by default)
+- **Redesigned Live TV on tvOS**: a now-playing hero above the Guide shows the focused channel's live programme, time left and what's up next, beside a muted live preview of the channel (Lume Pro), over a glow tinted with the channel's logo colour — Small (the default, with two more guide rows), Large, Info Only or Off (the guide takes the full height) in Settings › Live TV; a glass category sidebar sits alongside both layouts
+- **Guide or List** is chosen in Settings › Live TV on every platform (Guide by default on tvOS, List elsewhere)
 - **Hold a channel** in the tvOS Guide to add it to Favorites or start Multi-View with it
+- **Recording server (DVR)** (Lume Pro): pair a self-hosted [LumeRecorder](https://github.com/bilipp/LumeRecorder) server on your network from Settings › Live TV, record the live channel now or schedule a programme from the Guide, and play back finished and in-progress recordings on every device — from the Live TV toolbar, Settings › Live TV, or (optionally) the tvOS Live TV sidebar
 - Favorite channels and per-channel management
 
 #### 🏅 Sports Hub

@@ -181,6 +181,12 @@ enum KSPlayerOptionsFactory {
         if !media.isLive, media.startTime > 1 {
             options.startPlayTime = media.startTime
         }
+        // A recording still being captured is an HLS EVENT playlist without
+        // `#EXT-X-ENDLIST`, which FFmpeg's HLS demuxer treats as live and opens
+        // three segments from the end. Recordings open at their first segment.
+        if media.recordingTimeline != nil {
+            options.formatContextOptions["live_start_index"] = 0
+        }
         #if os(macOS)
             options.automaticWindowResize = false
         #endif

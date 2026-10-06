@@ -22,21 +22,11 @@ extension CloudSyncEngine {
     /// for one follow. Keeps the most recently updated (cloud-wins tie-break) and
     /// deletes the rest.
     func reconcileSportsFollows(into result: inout CloudSyncReconcileResult) throws {
-        var kept: [String: SyncedSportsFollow] = [:]
-        for follow in try cloudContext.fetch(FetchDescriptor<SyncedSportsFollow>()) {
-            let composite = "\(follow.key)|\(follow.profileID?.uuidString ?? "nil")"
-            if let existing = kept[composite] {
-                kept[composite] = dedupe(follow, against: existing)
-                result.sportsFollowsDeduped += 1
-            } else {
-                kept[composite] = follow
-            }
-        }
-        result.sportsFollowsKept = kept.count
-    }
-
-    func dedupe(_ candidate: SyncedSportsFollow, against existing: SyncedSportsFollow?) -> SyncedSportsFollow {
-        dedupe(candidate, against: existing, updatedAt: \.updatedAt)
+        (result.sportsFollowsKept, result.sportsFollowsDeduped) = try collapseDuplicates(
+            SyncedSportsFollow.self,
+            key: { "\($0.key)|\($0.profileID?.uuidString ?? "nil")" },
+            updatedAt: \.updatedAt
+        )
     }
 
     /// Delete every sports-follow record owned by a profile (called when the

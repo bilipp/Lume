@@ -133,10 +133,12 @@ enum ExternalPlayback {
 
     /// The player `media` would be handed off to, or `nil` when it stays in the
     /// built-in player — because no player is selected, the current scope
-    /// excludes this kind of stream, or the media is a local download other
-    /// apps cannot read from Lume's sandbox.
+    /// excludes this kind of stream, the media is a local download other
+    /// apps cannot read from Lume's sandbox, or it is a recording, which stays
+    /// in-app in v1.
     static func target(for media: PlayableMedia) -> ExternalPlayer? {
-        guard let player = preferred, scope.includes(media.kind), !media.url.isFileURL else { return nil }
+        guard let player = preferred, scope.includes(media.kind), !media.url.isFileURL,
+              !media.contentRef.isRecording else { return nil }
         return player
     }
 

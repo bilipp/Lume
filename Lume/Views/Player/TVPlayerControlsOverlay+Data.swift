@@ -53,6 +53,8 @@
                 epgNext = listings.first { $0.start > now }
                 recentChannels = TVPlayerContent.recentChannels(in: modelContext, restriction: restriction)
                 recentNowTitles = TVPlayerContent.nowProgrammeTitles(for: recentChannels, in: modelContext)
+            case .recording:
+                break
             }
         }
 
@@ -124,10 +126,16 @@
             withAnimation(.easeOut(duration: 0.15)) { isScrubbing = true }
         }
 
+        /// How far a scrub can reach: the engine's duration, or a growing
+        /// recording's timeline while the engine reports none.
+        private var scrubDuration: TimeInterval {
+            clock.displayDuration(growing: media.recordingTimeline)
+        }
+
         /// Commit the seek and leave scrub mode, resuming playback if it had
         /// been playing when scrubbing began.
         func commitScrub() {
-            let target = min(max(scrubTarget, 0), max(clock.duration, 0))
+            let target = min(max(scrubTarget, 0), max(scrubDuration, 0))
             coordinator.seek(to: target)
             clock.current = target
             finishScrub(resume: wasPlayingBeforeScrub)
@@ -152,7 +160,8 @@
         /// Step the scrub target on a left/right press. The step grows with
         /// sustained input in one direction and decays after a brief pause.
         func moveScrub(_ direction: MoveCommandDirection) {
-            guard isScrubbing, clock.duration > 0 else { return }
+            let duration = scrubDuration
+            guard isScrubbing, duration > 0 else { return }
             let sign: Double
             switch direction {
             case .left: sign = -1
@@ -165,7 +174,7 @@
             // A single tap nudges ~30s; a held d-pad ramps to ~20 min/press, so
             // even a long movie crosses in a second or two of sustained input.
             let step = 30.0 * Double(scrubStepLevel)
-            scrubTarget = min(max(scrubTarget + sign * step, 0), clock.duration)
+            scrubTarget = min(max(scrubTarget + sign * step, 0), duration)
             onResetHideTimer()
 
             scrubResetTask?.cancel()

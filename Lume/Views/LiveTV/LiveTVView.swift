@@ -98,17 +98,6 @@ struct LiveTVView: View {
         LiveTVLayoutMode(storedValue: layoutModeRaw)
     }
 
-    /// Guide/List segmented switch shared across platforms.
-    private var layoutModePicker: some View {
-        Picker("Layout", selection: $layoutModeRaw) {
-            ForEach(LiveTVLayoutMode.allCases) { mode in
-                Label(mode.displayName, systemImage: mode.systemImage).tag(mode.rawValue)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-    }
-
     /// The channel detail area for the selected section, honouring the current
     /// layout mode. Shared by every platform's layout.
     private func detail(for section: LiveTVSection) -> some View {
@@ -181,32 +170,7 @@ struct LiveTVView: View {
                 }
             }
             .platformNavigationTitle("Live TV")
-            #if os(iOS)
-                // Inline title: the category selector sits directly below the
-                // nav bar, so a large title would rubber-band down and float
-                // behind the selector when the channel list is overscrolled.
-                .navigationBarTitleDisplayMode(.inline)
-            #endif
-            #if os(iOS) || os(macOS)
-            .toolbar {
-                if !playlists.isEmpty, !categories.isEmpty {
-                    ToolbarItem(placement: .principal) {
-                        layoutModePicker
-                            .frame(maxWidth: 240)
-                    }
-                    // Its own ToolbarItem with a titled Label, for the same
-                    // reason `LibraryToolbar` splits its buttons up: an item
-                    // pushed into the "..." overflow needs a menu representation.
-                    ToolbarItem(placement: .automatic) {
-                        Button {
-                            openMultiView()
-                        } label: {
-                            Label("Multi-View", systemImage: "rectangle.split.2x2")
-                        }
-                    }
-                }
-            }
-            #endif
+            .liveTVInlineTitle()
             .libraryToolbar(config: LibraryToolbarConfiguration(
                 playlists: playlists,
                 selectedPlaylistID: $selectedPlaylistID,
@@ -216,6 +180,17 @@ struct LiveTVView: View {
                 showingSettings: $showingSettings,
                 activePlaylist: activePlaylist
             ))
+            // After `libraryToolbar`, so Recordings and Multi-View lead the bar
+            // as their own cluster, never beside Settings. Guide or List is
+            // chosen in Settings › Live TV on every platform. The switcher's
+            // title (shown by `libraryToolbar` with several playlists) tells
+            // the cluster how much room is left for it.
+            .liveTVToolbarCluster(
+                multiViewAvailable: !playlists.isEmpty && !categories.isEmpty,
+                switcherTitle: playlists.count > 1 ? activePlaylist?.name : nil
+            ) {
+                openMultiView()
+            }
             #if os(iOS) || os(tvOS)
             .fullScreenCover(item: $playingMedia) { media in
                 #if os(tvOS)
@@ -231,6 +206,7 @@ struct LiveTVView: View {
             }
             #endif
             .paywall(isPresented: $showingPaywall, highlight: .multiView)
+            .recordActionFlow(observesWhileVisible: false)
         }
     }
 
@@ -488,4 +464,18 @@ struct LiveTVView: View {
 
 #Preview("No Playlists") {
     LiveTVView()
+}
+
+private extension View {
+    /// Inline title on iOS: the category selector sits directly below the nav
+    /// bar, so a large title would rubber-band down and float behind the
+    /// selector when the channel list is overscrolled.
+    @ViewBuilder
+    func liveTVInlineTitle() -> some View {
+        #if os(iOS)
+            navigationBarTitleDisplayMode(.inline)
+        #else
+            self
+        #endif
+    }
 }

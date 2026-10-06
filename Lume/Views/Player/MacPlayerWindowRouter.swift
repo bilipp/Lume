@@ -135,6 +135,13 @@ import SwiftUI
                     // call — and SwiftUI's frame autosave brings it back at the
                     // size and position it was last left at.
                     router.adopt(window, title: activeMedia.title)
+                    // The window's launch value is what state restoration
+                    // writes to disk, and an expiring URL must not be
+                    // restored; the per-device resume point is all a
+                    // recording persists.
+                    if launchMedia.hasEphemeralURL {
+                        window.isRestorable = false
+                    }
                 })
                 .onAppear { router.playerDidOpen(with: launchMedia) }
                 .onDisappear { router.playerDidClose() }

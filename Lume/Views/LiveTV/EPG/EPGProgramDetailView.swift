@@ -77,6 +77,8 @@ struct EPGProgramDetailView: View {
                         }
 
                         watchButton
+
+                        recordActions
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 24)
@@ -157,6 +159,8 @@ struct EPGProgramDetailView: View {
                                     dismiss()
                                 }
                             }
+
+                            recordActions
                         }
                         .frame(maxWidth: 460)
                         .padding(.top, 16)

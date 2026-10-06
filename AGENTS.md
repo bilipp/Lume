@@ -181,6 +181,13 @@ Two separate `ModelContainer`s:
 - Declared last in `PlayerEngineKind` so it appends to the end of existing priority lists — opt-in, never silently promoted while KSPlayer is the default.
 - The engine never retries on its own schedule: reconnect/backoff, engine fallback, and overlays stay Lume's job. If a fix would add retry policy to the engine, it belongs here instead.
 
+### LumeRecorder (DVR backend)
+- Recording-server support talks to our own self-hosted server, developed in the sibling repo [`bilipp/LumeRecorder`](https://github.com/bilipp/LumeRecorder). Its zero-dependency client is referenced as a **local** SPM package at `../LumeRecorder/Kit` (product `LumeRecorderKit`, static, link-only) — a clone without that sibling will not resolve.
+- Never edit the Kit from this repo. If its API is insufficient, change it in LumeRecorder and pair the commits.
+- App code talks to the `RecordingServerBackend` protocol (`Lume/Services/Recording/`); `LumeRecorderBackend` is the only implementation and owns its own `URLSession`. The client never retries — don't wrap POST/DELETE in retry helpers.
+- The paired server is `SyncedRecordingServer` in the **CloudKit** schema (token is `.allowsCloudEncryption`); recordings themselves are never stored in SwiftData. `CD_SyncedRecordingServer` must be deployed to CloudKit **Production** before release.
+- Stream URLs, playback grant URLs and tokens never go into logs or diagnostic exports.
+
 ### Localization
 String Catalogs (9 languages: en, de, es, fr, it, ja, ko, pt, zh-Hans; the App Store listing mirrors them — see `ship-release`'s `references/store-metadata.json`). Run `xcstringstool sync` and include the tvOS stringsdata. Normalize `.xcstrings` with `Scripts/normalize-xcstrings.swift` (pre-commit hook) to avoid format churn.
 

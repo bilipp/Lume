@@ -390,13 +390,23 @@ final class NowPlayingService {
 enum PlaybackResumeStore {
     private static let key = "nowPlaying.lastMediaSnapshot"
 
+    /// Media with an expiring URL is never snapshotted; it also clears the
+    /// previous stream's snapshot, which the tap would otherwise reopen in its
+    /// place.
     static func save(_ media: PlayableMedia) {
+        guard !media.hasEphemeralURL else {
+            UserDefaults.standard.removeObject(forKey: key)
+            return
+        }
         guard let data = try? JSONEncoder().encode(media) else { return }
         UserDefaults.standard.set(data, forKey: key)
     }
 
     static func load() -> PlayableMedia? {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(PlayableMedia.self, from: data)
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let media = try? JSONDecoder().decode(PlayableMedia.self, from: data),
+              !media.hasEphemeralURL
+        else { return nil }
+        return media
     }
 }

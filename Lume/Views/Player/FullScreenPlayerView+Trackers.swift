@@ -28,7 +28,7 @@ extension FullScreenPlayerView {
             guard let episode = try? modelContext.fetch(descriptor).first else { return }
             TraktService.shared.syncWatched(episode: episode, watched: true)
             SimklService.shared.syncWatched(episode: episode, watched: true)
-        case .live:
+        case .live, .recording:
             break
         }
     }

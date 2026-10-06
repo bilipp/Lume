@@ -15,7 +15,7 @@ import Testing
 @Suite("Live TV redesign localization")
 struct LiveTVRedesignLocalizationTests {
     /// The now-playing hero, the guide's ruler, empty cells and hint, and the
-    /// Settings › Player › Live TV layout row with its footnote.
+    /// Settings › Live TV layout row with its footnote.
     static let newKeys = [
         "%lld min left",
         "Up next · %@ %@",

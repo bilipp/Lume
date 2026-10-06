@@ -142,7 +142,10 @@ struct LumeApp: App {
             SyncedParentalPIN.self, SyncedCategoryRestriction.self,
             // Followed sports leagues/teams — per-profile, ordered, no local
             // counterpart (read through `SportsFollowService`).
-            SyncedSportsFollow.self
+            SyncedSportsFollow.self,
+            // Paired recording servers — account-wide, no local counterpart,
+            // never bound to a `@Query`.
+            SyncedRecordingServer.self
         ])
         // Out of the app group for the same reason as the catalog store.
         let cloudConfiguration = ModelConfiguration(
@@ -281,6 +284,7 @@ struct LumeApp: App {
                     // hand off to their own utility Tasks.
                     SportsFollowService.shared.configure(container: cloudContainer, profileManager: profileManager)
                     SportsSyncService.shared.configure(followSource: SportsFollowService.shared)
+                    RecordingServerConfigService.shared.configure(container: cloudContainer)
                     // Re-fetches every followed league whose snapshot is missing
                     // or stale, so the Home rail has current data on first render
                     // even after the system purged Caches/. Hits ESPN, not the
@@ -338,6 +342,8 @@ struct LumeApp: App {
                     // A reconcile may have pulled or deduped this profile's sports
                     // follows; re-read them so the hub reflects the merged set.
                     SportsFollowService.shared.reload()
+                    // Or pulled/deduped the paired recording server.
+                    RecordingServerConfigService.shared.reload()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     DiagnosticSession.scenePhaseChanged(to: phase)

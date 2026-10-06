@@ -13,7 +13,7 @@ import SwiftUI
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case premium, profiles
     case playlists, epg, library
-    case home, sports, appearance
+    case home, liveTV, sports, appearance
     case player, downloads
     case iCloud, connectedServices
     case storage, help, about, developer
@@ -30,6 +30,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .epg: "TV Guide"
         case .library: "Library"
         case .home: "Home"
+        case .liveTV: "Live TV"
         case .sports: "Sports"
         case .appearance: "Appearance"
         case .player: "Player"
@@ -47,7 +48,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .premium, .profiles: .account
         case .playlists, .epg, .library: .content
-        case .home, .sports, .appearance: .experience
+        case .home, .liveTV, .sports, .appearance: .experience
         case .player, .downloads: .playback
         case .iCloud, .connectedServices: .sync
         case .storage, .help, .about, .developer: .system
@@ -132,6 +133,7 @@ enum SettingsCategoryGroup: CaseIterable {
             case .epg: "list.clipboard"
             case .library: "slider.horizontal.3"
             case .home: "house"
+            case .liveTV: "antenna.radiowaves.left.and.right"
             case .sports: "sportscourt"
             case .appearance: "circle.lefthalf.filled"
             case .player: "play.circle"

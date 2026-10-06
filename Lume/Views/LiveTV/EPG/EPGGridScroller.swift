@@ -51,6 +51,7 @@ struct EPGGridScroller: View {
     #if os(tvOS)
         /// For the channel actions' favourite toggle.
         @Environment(\.modelContext) private var modelContext
+        @Environment(\.recordChannel) private var recordChannel
         /// The channel whose actions the hub's long press raised.
         @State private var channelActions: EPGChannelRow?
         /// Whether the guide's focus strip holds real focus (driven by the
@@ -82,21 +83,14 @@ struct EPGGridScroller: View {
                 previewBand
             #endif
 
-            // Header: corner + time ruler. Touch/pointer get a jump-to-now
-            // button in the corner; tvOS auto-scrolls to now on appear and has
-            // no use for a corner button it can't easily reach, so the corner
-            // shows the date there.
+            // Header: today's date over the channel column, beside the ruler.
             HStack(spacing: metrics.channelColumnGap) {
-                corner
+                EPGRulerCorner(date: now, metrics: metrics)
                     .frame(width: metrics.channelColumnWidth, height: metrics.headerHeight)
 
-                EPGRulerStrip(timeline: timeline, metrics: metrics, now: now, sync: sync)
+                EPGRulerStrip(timeline: timeline, metrics: metrics, sync: sync)
             }
             .frame(height: metrics.headerHeight)
-
-            #if !os(tvOS)
-                Divider()
-            #endif
 
             // Body: frozen channel column + scrollable programme grid.
             HStack(spacing: metrics.channelColumnGap) {
@@ -141,6 +135,9 @@ struct EPGGridScroller: View {
         }
         .reportsGuideFocus(surfaceFocused)
         #else
+        // The channel cards are inset like the tvOS column beside its rail,
+        // rather than running into the window edge.
+        .padding(.leading, metrics.channelColumnGap)
         .background(.background)
         #endif
         .sheet(item: $selection) { selection in
@@ -151,6 +148,7 @@ struct EPGGridScroller: View {
                 onPlay: { onPlay(selection.stream) },
                 onPlayCatchup: { onPlayCatchup(selection.stream, selection.cell) }
             )
+            .recordActionFlow(toastPlacement: .sheet)
         }
     }
 
@@ -212,17 +210,18 @@ struct EPGGridScroller: View {
         scrollTarget(forNow: now)
     }
 
-    /// Asks the grid to scroll. On tvOS the frozen panes' mirror is updated in
-    /// the same breath with a matching animation, so CoreAnimation interpolates
-    /// both surfaces together without per-frame main-thread work.
-    func requestScroll(to point: CGPoint, animated: Bool) {
-        let clamped = CGPoint(x: max(0, point.x), y: max(0, point.y))
-        scrollRequest = EPGScrollRequest(
-            token: (scrollRequest?.token ?? 0) + 1,
-            point: clamped,
-            animated: animated
-        )
-        #if os(tvOS)
+    #if os(tvOS)
+        /// Asks the grid to scroll, updating the frozen panes' mirror in the
+        /// same breath with a matching animation, so CoreAnimation
+        /// interpolates both surfaces together without per-frame main-thread
+        /// work. Touch and pointer scroll the grid directly.
+        func requestScroll(to point: CGPoint, animated: Bool) {
+            let clamped = CGPoint(x: max(0, point.x), y: max(0, point.y))
+            scrollRequest = EPGScrollRequest(
+                token: (scrollRequest?.token ?? 0) + 1,
+                point: clamped,
+                animated: animated
+            )
             if animated {
                 withAnimation(.easeOut(duration: 0.25)) {
                     sync.mirror = clamped
@@ -234,28 +233,8 @@ struct EPGGridScroller: View {
                     sync.mirror = clamped
                 }
             }
-        #endif
-    }
-
-    @ViewBuilder
-    private var corner: some View {
-        #if os(tvOS)
-            EPGTVRulerCorner(date: now)
-        #else
-            Button {
-                requestScroll(to: CGPoint(x: scrollTarget(forNow: Date()), y: sync.offset.y), animated: true)
-            } label: {
-                Label("Now", systemImage: "smallcircle.filled.circle")
-                    .font(.subheadline.weight(.semibold))
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(Color.accentColor)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .overlay(alignment: .trailing) { Rectangle().fill(.quaternary).frame(width: 1) }
-        #endif
-    }
+        }
+    #endif
 }
 
 // MARK: - tvOS focus surface & virtual navigation
@@ -307,7 +286,11 @@ struct EPGGridScroller: View {
                 channelActions?.name ?? "",
                 isPresented: Binding(
                     get: { channelActions != nil },
-                    set: { if !$0 { channelActions = nil } }
+                    set: {
+                        if !$0 {
+                            channelActions = nil
+                        }
+                    }
                 ),
                 titleVisibility: .visible,
                 presenting: channelActions
@@ -316,6 +299,9 @@ struct EPGGridScroller: View {
                     LiveChannelFavorites.toggle(row.stream, in: modelContext)
                 }
                 FavoriteMenuItems.startMultiView { onStartMultiView(row.stream) }
+                FavoriteMenuItems.record(stream: row.stream)
+            } message: { row in
+                recordChannel?.lockedDialogMessage(for: row.stream)
             }
             // Runs on appear *and* on token change: a category activation both
             // rebuilds the guide (fresh scroller) and bumps the token, and the
@@ -576,8 +562,9 @@ struct EPGGridScroller: View {
                 UIAccessibilityCustomAction(name: FavoriteMenuItems.favoriteTitle(isFavorite: stream.isFavorite)) { _ in
                     LiveChannelFavorites.toggle(stream, in: modelContext)
                     return true
-                }
-            ]
+                },
+                recordChannel?.accessibilityAction(for: stream)
+            ].compactMap(\.self)
         }
 
         private var virtualFocusDescription: String {

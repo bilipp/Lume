@@ -46,6 +46,10 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_lume-recorder._tcp</string>
+	</array>
 	<key>TMDBAccessToken</key>
 	<string></string>
 	<key>UIBackgroundModes</key>

@@ -2,10 +2,9 @@
 //  HomeView.swift
 //  Lume
 //
-//  Default landing screen. Shows Recently Watched, Favorites, For You (opt-in
-//  Pro recommendations), Trending Movies/Series and the Trakt/Simkl watchlists.
-//  Which rows appear and their order are user-configurable (Settings › Layout ›
-//  Home, see HomeLayoutSettings); each row only renders when it has content.
+//  Default landing screen: Recently Watched, Favorites, For You (opt-in Pro recommendations),
+//  Trending Movies/Series and the Trakt/Simkl watchlists. Row order and visibility are
+//  user-configurable (Settings › Layout › Home, see HomeLayoutSettings); rows render only with content.
 //
 
 import SwiftData
@@ -246,6 +245,7 @@ struct HomeView: View {
             #endif
             .paywall(isPresented: $showingPaywall, highlight: .multiView)
         }
+        .recordActionFlow(observesWhileVisible: false) // once, for every rail's channel menu
     }
 
     /// The horizontal rails, shared by the iOS/macOS scroll layout and the tvOS

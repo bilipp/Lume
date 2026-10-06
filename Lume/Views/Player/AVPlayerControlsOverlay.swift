@@ -243,7 +243,10 @@ import SwiftUI
                     playbackRateMenu
                 }
                 contentModeButton
-                favoriteButton
+                if PlayerFavorites.supportsFavorites(media.contentRef) {
+                    favoriteButton
+                }
+                PlayerRecordButton(media: media, onResetHideTimer: onResetHideTimer)
             }
             .padding(.horizontal, 4)
             .glassEffectCompat(.regularInteractive, in: Capsule())
@@ -338,13 +341,21 @@ import SwiftUI
 
         // MARK: - Scrubber
 
+        /// `duration`, or a growing recording's timeline while the engine
+        /// reports none (see `RecordingTimeline`).
+        private var displayDuration: TimeInterval {
+            RecordingTimeline.displayDuration(
+                engineDuration: duration, position: currentTime, timeline: media.recordingTimeline
+            )
+        }
+
         private var scrubber: some View {
             Slider(
                 value: Binding<TimeInterval>(
                     get: { isSeeking ? seekPosition : (currentTime.isFinite ? currentTime : 0) },
                     set: { seekPosition = $0 }
                 ),
-                in: 0 ... max(duration.isFinite ? duration : 1, 1),
+                in: 0 ... max(displayDuration.isFinite ? displayDuration : 1, 1),
                 onEditingChanged: onSliderEditingChanged
             )
             .tint(.white)
@@ -356,7 +367,7 @@ import SwiftUI
                     .contentTransition(.numericText())
                     .foregroundStyle(.white)
                 Spacer()
-                Text(timeString(from: max(duration, 0)))
+                Text(timeString(from: max(displayDuration, 0)))
                     .foregroundStyle(.white.opacity(0.7))
             }
             .font(.caption.monospacedDigit())

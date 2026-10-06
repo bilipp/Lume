@@ -17,9 +17,12 @@ nonisolated enum PlayerContentLookup {
     /// A miss returns `nil` — never a fallback to some other playlist, which
     /// would confidently name the wrong provider on a multi-playlist install.
     static func playlist(for ref: PlayableMedia.ContentRef, in context: ModelContext) -> Playlist? {
-        let rawId: String = switch ref {
+        let rawId: String
+        switch ref {
         case let .movie(id), let .episode(id), let .live(id):
-            id
+            rawId = id
+        case .recording:
+            return nil
         }
         guard let playlistId = UUID(uuidString: String(rawId.prefix(36))) else { return nil }
         var descriptor = FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })

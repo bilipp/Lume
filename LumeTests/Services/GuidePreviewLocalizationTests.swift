@@ -14,7 +14,7 @@ import Testing
 
 @Suite("Guide preview localization")
 struct GuidePreviewLocalizationTests {
-    /// The Settings › Player › Live TV row, its choices and footnote, plus
+    /// The Settings › Live TV row, its choices and footnote, plus
     /// the Lume Pro paywall entry (the row shares the feature title's key).
     static let newKeys = [
         "Guide Preview",

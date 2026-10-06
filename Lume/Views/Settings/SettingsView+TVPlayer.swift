@@ -83,7 +83,9 @@ import SwiftUI
                 // Viewer-facing too, so it belongs up here with Languages
                 // rather than under Advanced — and it is engine-independent:
                 // all four hosts route their up/down presses through
-                // LiveChannelNavigator.
+                // LiveChannelNavigator. It is how the player reads the remote,
+                // so it stays here; the Live TV tab's own layout and Guide
+                // Preview live in the Live TV category (TVLiveTVSettingsPane).
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Live TV")
 
@@ -95,35 +97,6 @@ import SwiftUI
                     }
 
                     Text("Up and down move to the next and previous channel, like a TV remote. List Order moves the way the channel list reads on screen instead — up goes to the row above.")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 6)
-
-                    // Every choice is open to everyone: the layout is free,
-                    // only the video needs Lume Pro (the crown says so).
-                    TVOptionCycleRow(
-                        title: "Guide Preview",
-                        valueLabel: GuidePreviewMode(storedValue: tvGuidePreviewModeRaw).displayName,
-                        showsPremiumBadge: !premium.isPremium
-                    ) {
-                        tvGuidePreviewModeRaw = PlayerOptionCycle.next(tvGuidePreviewModeRaw, in: GuidePreviewMode.self)
-                    }
-
-                    Text("Small and Large play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 6)
-
-                    TVOptionCycleRow(
-                        title: "Live TV Layout",
-                        valueLabel: LiveTVLayoutMode(storedValue: liveTVLayoutModeRaw).displayName
-                    ) {
-                        liveTVLayoutModeRaw = PlayerOptionCycle.next(liveTVLayoutModeRaw, in: LiveTVLayoutMode.self)
-                    }
-
-                    Text("How the Live TV tab shows channels: Guide lays them out on a programme timeline, List as a plain channel list.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
