@@ -45783,6 +45783,59 @@
         }
       }
     },
+    "Scan the code with your phone or visit %@." : {
+      "comment" : "tvOS Recording Server settings: under the setup guide's QR code. %@ is the guide's web address.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanne den Code mit deinem Handy oder besuche %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escanea el código con tu teléfono o visita %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scannez le code avec votre téléphone ou rendez-vous sur %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scansiona il codice con il telefono o visita %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スマートフォンでコードをスキャンするか、%@ にアクセスしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "휴대폰으로 코드를 스캔하거나 %@ 에 방문하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escaneie o código com seu telefone ou acesse %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用手机扫描二维码，或访问 %@。"
+          }
+        }
+      }
+    },
     "Scan the code with your phone to email a diagnostic summary to %@. Add a sentence about what went wrong before you send it." : {
       "localizations" : {
         "de" : {
@@ -48476,6 +48529,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置"
+          }
+        }
+      }
+    },
+    "Setup Guide" : {
+      "comment" : "Recording Server settings: link to the web page explaining how to install a LumeRecorder server.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einrichtungsanleitung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guía de configuración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guide de configuration"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guida alla configurazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットアップガイド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정 가이드"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guia de configuração"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置指南"
           }
         }
       }
@@ -52454,6 +52560,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "抢断"
+          }
+        }
+      }
+    },
+    "Step-by-step instructions for setting up a LumeRecorder server." : {
+      "comment" : "Recording Server settings: note under the Setup Guide link.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schritt-für-Schritt-Anleitung zum Einrichten eines LumeRecorder-Servers."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instrucciones paso a paso para configurar un servidor LumeRecorder."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instructions pas à pas pour configurer un serveur LumeRecorder."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Istruzioni passo passo per configurare un server LumeRecorder."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LumeRecorderサーバーをセットアップする手順を順を追って説明します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LumeRecorder 서버를 설정하는 단계별 안내입니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instruções passo a passo para configurar um servidor LumeRecorder."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "逐步说明如何设置LumeRecorder服务器。"
           }
         }
       }

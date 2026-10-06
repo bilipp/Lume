@@ -20,13 +20,22 @@ nonisolated enum SupportInfo {
     static let appStore = "https://apps.apple.com/app/id6779551584"
     static let appStoreReview = "https://apps.apple.com/app/id6779551584?action=write-review"
 
+    /// How to install and run a LumeRecorder server, linked from the Recording
+    /// Server settings.
+    static let recorderGuide = "https://getlume.org/recorder"
+
     /// Scheme-stripped forms for compact on-screen display.
     static let websiteDisplay = "GetLume.org"
     static let discordDisplay = "discord.gg/DMnQfr69Ug"
     static let appStoreDisplay = "App Store"
+    static let recorderGuideDisplay = "getlume.org/recorder"
 
     static var websiteURL: URL? {
         URL(string: website)
+    }
+
+    static var recorderGuideURL: URL? {
+        URL(string: recorderGuide)
     }
 
     static var discordURL: URL? {

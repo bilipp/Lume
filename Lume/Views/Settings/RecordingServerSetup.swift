@@ -37,6 +37,11 @@ enum RecordingServerSetup {
         String(localized: "Only record content you're entitled to. You're responsible for following your provider's terms and the law where you live.")
     }
 
+    /// Next to the link (a QR code on tvOS) to SupportInfo.recorderGuide.
+    static var setupGuideNote: String {
+        String(localized: "Step-by-step instructions for setting up a LumeRecorder server.")
+    }
+
     static var removeFooter: String {
         String(localized: "Removing the server keeps its recordings and schedules on the server.")
     }

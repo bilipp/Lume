@@ -69,6 +69,10 @@
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 }
 
+                if route == nil, configService.activeServer == nil {
+                    setupGuide
+                }
+
                 if let route, store.isUnlocked {
                     TVRecordingServerPairingStep(baseURL: route.baseURL) {
                         self.route = nil
@@ -120,6 +124,33 @@
         /// would otherwise drop it.
         private func moveFocus(to target: TVRecordingServerFocus) {
             Task { @MainActor in focus = target }
+        }
+
+        // MARK: - Setup guide
+
+        /// Apple TV can't open a URL, so the guide is a QR code to scan with a
+        /// phone. Leads the unpaired pane: nothing in it is focusable, so below
+        /// the last button focus-driven scrolling would never bring it into view.
+        private var setupGuide: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                TVSettingsSectionLabel("Setup Guide")
+
+                HStack(alignment: .center, spacing: 32) {
+                    QRCodeView(string: SupportInfo.recorderGuide)
+                        .frame(width: 140, height: 140)
+                        .padding(14)
+                        .background(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(RecordingServerSetup.setupGuideNote)
+                        Text("Scan the code with your phone or visit \(SupportInfo.recorderGuideDisplay).")
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.system(size: 24))
+                }
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            }
         }
 
         // MARK: - Locked

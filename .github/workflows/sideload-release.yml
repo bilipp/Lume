@@ -15,6 +15,9 @@ on:
       engine_ref:
         description: LumeEngine ref to build against (defaults to the pinned version)
         required: false
+      recorder_ref:
+        description: LumeRecorder ref to build against (defaults to the pinned version)
+        required: false
 
 # The build jobs attach assets to the release, which requires write access to
 # repo contents. The default GITHUB_TOKEN is read-only when the repo's default
@@ -36,6 +39,9 @@ env:
   # by hand, so a drifting engine would break this archive with no change on
   # Lume's side. Bump this when a release needs newer engine code.
   ENGINE_REF: ${{ github.event.inputs.engine_ref || 'v0.3.2' }}
+  # LumeRecorderKit (the DVR client) is the same story: a local package at
+  # ../LumeRecorder/Kit, pinned to the LumeRecorder tag the app was built with.
+  RECORDER_REF: ${{ github.event.inputs.recorder_ref || 'v0.1.1' }}
 
 jobs:
   build:
@@ -67,10 +73,11 @@ jobs:
         working-directory: Lume
 
     steps:
-      # Lume and LumeEngine are checked out as *siblings* rather than the app
-      # sitting at the workspace root, because the project references the engine
-      # by relative path (../LumeEngine) and actions/checkout refuses any `path`
-      # outside $GITHUB_WORKSPACE. Both therefore live one level down inside it.
+      # Lume, LumeEngine and LumeRecorder are checked out as *siblings* rather
+      # than the app sitting at the workspace root, because the project references
+      # the engine and the recorder kit by relative path (../LumeEngine,
+      # ../LumeRecorder/Kit) and actions/checkout refuses any `path` outside
+      # $GITHUB_WORKSPACE. All three therefore live one level down inside it.
       - name: Checkout Lume
         uses: actions/checkout@v5
         with:
@@ -86,6 +93,13 @@ jobs:
           repository: bilipp/LumeEngine
           ref: ${{ env.ENGINE_REF }}
           path: LumeEngine
+
+      - name: Checkout LumeRecorder
+        uses: actions/checkout@v5
+        with:
+          repository: bilipp/LumeRecorder
+          ref: ${{ env.RECORDER_REF }}
+          path: LumeRecorder
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1

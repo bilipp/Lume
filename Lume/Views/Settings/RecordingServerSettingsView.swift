@@ -57,6 +57,9 @@
                 } else {
                     disclosureSection
                 }
+                if configService.activeServer == nil {
+                    setupGuideSection
+                }
                 if !configService.unusableServers.isEmpty {
                     otherServersSection
                 }
@@ -184,6 +187,21 @@
                         .controlSize(.small)
                     Text("Searching for recording servers…")
                         .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        // MARK: - Setup guide
+
+        @ViewBuilder
+        private var setupGuideSection: some View {
+            if let url = SupportInfo.recorderGuideURL {
+                Section {
+                    Link(destination: url) {
+                        Label("Setup Guide", systemImage: "book")
+                    }
+                } footer: {
+                    Text(RecordingServerSetup.setupGuideNote)
                 }
             }
         }
