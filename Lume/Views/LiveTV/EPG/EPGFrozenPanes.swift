@@ -2,63 +2,15 @@
 //  EPGFrozenPanes.swift
 //  Lume
 //
-//  The guide's frozen edges: the time ruler across the top and the channel
-//  column on the left. Both mirror the grid's scroll position via the shared
-//  sync; the column's cells realize only inside the quantized row window. On
-//  tvOS the column is part of the guide's virtual navigation space — its
-//  highlight is driven by the scroller, not by real focus.
+//  The guide's frozen channel column on the left, mirroring the grid's
+//  vertical scroll position via the shared sync; its cells realize only
+//  inside the quantized row window. On tvOS the column is part of the guide's
+//  virtual navigation space — its highlight is driven by the scroller, not by
+//  real focus. The ruler across the top is `EPGRulerStrip`.
 //
 
 import SwiftData
 import SwiftUI
-
-// MARK: - Ruler strip
-
-/// The time ruler, shifted to mirror the grid's horizontal position. Observes
-/// the shared sync's `mirror` only, so its content is built once.
-struct EPGRulerStrip: View {
-    let timeline: EPGTimeline
-    let metrics: EPGMetrics
-    let now: Date
-    let sync: EPGScrollSync
-
-    var body: some View {
-        #if os(tvOS)
-            // Only the labels near the visible window, each placed relative to
-            // the mirror: offsetting a ruler as wide as the whole day (tens of
-            // thousands of points) left its animated moves uncommitted until
-            // the next one, so it trailed the grid by a step.
-            EPGTVTimeRuler(timeline: timeline, metrics: metrics, sync: sync)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: metrics.headerHeight)
-                .clipped()
-        #else
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .frame(height: metrics.headerHeight)
-                .overlay(alignment: .leading) {
-                    ZStack(alignment: .topLeading) {
-                        EPGTimeRuler(timeline: timeline, metrics: metrics)
-                        nowPill.offset(x: timeline.x(for: now))
-                    }
-                    .frame(width: timeline.totalWidth, alignment: .leading)
-                    .offset(x: -sync.mirror.x)
-                }
-                .clipped()
-        #endif
-    }
-
-    private var nowPill: some View {
-        Text("Now")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.red))
-            .fixedSize()
-            .alignmentGuide(.leading) { $0.width / 2 }
-    }
-}
 
 // MARK: - Frozen column
 
@@ -100,11 +52,6 @@ struct EPGFrozenColumn: View {
                 .offset(y: -sync.mirror.y)
             }
             .clipped()
-        #if !os(tvOS)
-            // The channel cards on tvOS already read as a separate rail, so
-            // a vertical rule would only add visual weight.
-            .overlay(alignment: .trailing) { Rectangle().fill(.quaternary).frame(width: 1) }
-        #endif
     }
 }
 
@@ -177,15 +124,15 @@ struct EPGColumnCells: View, Equatable {
     @ViewBuilder
     private func cell(for entry: IndexedRow) -> some View {
         #if os(tvOS)
-            EPGTVChannelCell(row: entry.row, metrics: metrics, highlight: highlight(forRow: entry.index))
+            EPGChannelCell(row: entry.row, metrics: metrics, highlight: highlight(forRow: entry.index))
         #else
             Button {
                 onSelectChannel(entry.row)
             } label: {
-                EPGChannelCell(row: entry.row, metrics: metrics)
-                    .contentShape(Rectangle())
+                Color.clear.frame(width: metrics.channelColumnWidth, height: metrics.rowHeight)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(EPGChannelButtonStyle(row: entry.row, metrics: metrics))
+            .accessibilityLabel(Text(entry.row.name))
             .liveChannelMenu(
                 stream: entry.row.stream,
                 isFavorite: entry.row.stream.isFavorite,
