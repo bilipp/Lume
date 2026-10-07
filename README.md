@@ -11,7 +11,9 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 <a href="https://apps.apple.com/us/app/lume-iptv-player/id6779551584">
   <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1700000000" alt="Download Lume on the App Store" height="48">
 </a>
-&nbsp;&nbsp;
+
+<br><br>
+
 <a href="https://discord.gg/DMnQfr69Ug">
   <img src="https://img.shields.io/badge/Join_the_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Lume Discord" height="48">
 </a>
