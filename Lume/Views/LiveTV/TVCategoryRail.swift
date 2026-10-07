@@ -32,6 +32,9 @@
         /// commit later: without the pre-armed mask the wrong category
         /// flashes fully styled for that first frame.
         @State private var railOwnsFocus = false
+        /// The pending "focus left the rail" verdict, cancelled when focus
+        /// lands on a row again before it runs.
+        @State private var exitCheck: Task<Void, Never>?
 
         private let panelPadding: CGFloat = 16
         private let rowInset: CGFloat = 18
@@ -73,12 +76,18 @@
                 if isHidden { recordingsEntryRemoved(proxy) }
             }
             .onChange(of: focused) { _, newValue in
+                exitCheck?.cancel()
                 guard let newValue else {
                     // A move onto a row the lazy list only just built passes
-                    // through nil; only a nil that is still there a turn later
-                    // means focus left the rail. Pre-arm the mask for re-entry.
-                    Task { @MainActor in
-                        guard focused == nil else { return }
+                    // through nil — for several frames while the list is
+                    // swiped through fast, so a single turn isn't enough: read
+                    // as an exit, the next row snapped focus back to the
+                    // selection. Only a nil that outlasts the build means focus
+                    // left the rail; re-entry takes another press, well after.
+                    // Pre-arm the mask for it.
+                    exitCheck = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(250))
+                        guard !Task.isCancelled, focused == nil else { return }
                         railOwnsFocus = false
                         if let focusRegions, focusRegions.railFocused {
                             focusRegions.railFocused = false
