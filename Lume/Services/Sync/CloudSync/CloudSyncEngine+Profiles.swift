@@ -147,14 +147,22 @@ private extension CloudSyncEngine {
     }
 
     /// Precisely sync the catalog's user state into a profile's mirrors: upsert
-    /// every non-default catalog item, and delete mirrors whose catalog item was
-    /// cleared this session (so an un-favorite during the session sticks).
+    /// every non-default catalog item, and delete mirrors whose *present* catalog
+    /// item was cleared this session (so an un-favorite during the session
+    /// sticks). A mirror whose catalog item has not been imported on this device
+    /// is preserved: absence from a partial local catalog is not a user deletion.
     func exportCatalogState(toProfile profileID: UUID, localValues: [String: LocalContentEntry]) throws {
         var mirrors = try fetchMirrors(forProfile: profileID)
         for (id, entry) in localValues {
             upsertMirror(&mirrors, id: id, profileID: profileID, kind: entry.kind, values: entry.values)
         }
+
+        var unresolvedIDsByKind: [SyncedContentKind: [String]] = [:]
         for (id, mirror) in mirrors where localValues[id] == nil {
+            unresolvedIDsByKind[mirror.kind, default: []].append(id)
+        }
+        let resolvedCatalogModels = try fetchCatalogModels(byKind: unresolvedIDsByKind)
+        for (id, mirror) in mirrors where localValues[id] == nil && resolvedCatalogModels[id] != nil {
             cloudContext.delete(mirror)
         }
     }
