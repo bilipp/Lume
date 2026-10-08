@@ -57,8 +57,17 @@ final class CloudSyncCoordinator {
 
     private var observers: [NSObjectProtocol] = []
 
-    init(catalogContainer: ModelContainer, cloudContainer: ModelContainer, cloudKitContainerIdentifier: String, cloudKitEnabled: Bool) {
-        engine = CloudSyncEngine(catalogContainer: catalogContainer, cloudContainer: cloudContainer)
+    init(
+        catalogContainer: ModelContainer,
+        cloudContainer: ModelContainer,
+        cloudKitContainerIdentifier: String,
+        cloudKitEnabled: Bool,
+        engine: CloudSyncEngine? = nil
+    ) {
+        self.engine = engine ?? CloudSyncEngine(
+            catalogContainer: catalogContainer,
+            cloudContainer: cloudContainer
+        )
         self.cloudKitContainerIdentifier = cloudKitContainerIdentifier
         self.cloudKitEnabled = cloudKitEnabled
         // Nothing to sync under previews / tests: open the launch gate now so an
@@ -189,7 +198,9 @@ final class CloudSyncCoordinator {
                 await engine.reconcile()
             }
             // Back on the main actor (this closure is main-actor isolated).
-            status.lastReconcile = Date()
+            if !result.failed {
+                status.lastReconcile = Date()
+            }
             status.lastResult = result
 
             isReconciling = false
@@ -236,11 +247,12 @@ final class CloudSyncCoordinator {
     }
 
     /// Re-project the catalog from one profile to another (flush, reset, hydrate).
-    func switchProfile(from: UUID, to toID: UUID) async {
+    func switchProfile(from: UUID, to toID: UUID) async throws {
         do {
             try await engine.switchProfile(from: from, to: toID)
         } catch {
             Logger.sync.error("Profile switch failed: \(error.localizedDescription)")
+            throw error
         }
     }
 

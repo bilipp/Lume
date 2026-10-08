@@ -13,6 +13,20 @@ import Foundation
 /// locking; `nonisolated` only frees it from the project's default main-actor
 /// isolation so the engine can hold and mutate it off the main thread.
 final nonisolated class CloudSyncShadow {
+    /// An in-memory savepoint for one reconcile pass. Reconcile mutates the
+    /// shadow while deriving its writes, before either SwiftData store has been
+    /// saved. If a fetch or save then fails, restoring this snapshot makes the
+    /// next pass compare against the last *successful* baseline instead of the
+    /// abandoned pass's partially advanced one.
+    struct Checkpoint {
+        fileprivate let playlists: [String: PlaylistConfigValues]
+        fileprivate let content: [String: ContentStateValues]
+        fileprivate let epgSources: [String: EPGSourceValues]
+        fileprivate let parentalPIN: ParentalPINValues?
+        fileprivate let categoryRestrictions: [String: CategoryRestrictionValues]
+        fileprivate let isDirty: Bool
+    }
+
     private let defaults: UserDefaults
     private let playlistsKey = "cloudsync.shadow.playlists.v1"
     private let contentKey = "cloudsync.shadow.content.v1"
@@ -156,6 +170,28 @@ final nonisolated class CloudSyncShadow {
         // local edit to push — re-arming the very PIN the shadow exists to let
         // us delete.
         isDirty = true
+    }
+
+    // MARK: Transactions
+
+    func checkpoint() -> Checkpoint {
+        Checkpoint(
+            playlists: playlists,
+            content: content,
+            epgSources: epgSources,
+            parentalPIN: parentalPIN,
+            categoryRestrictions: categoryRestrictions,
+            isDirty: isDirty
+        )
+    }
+
+    func restore(_ checkpoint: Checkpoint) {
+        playlists = checkpoint.playlists
+        content = checkpoint.content
+        epgSources = checkpoint.epgSources
+        parentalPIN = checkpoint.parentalPIN
+        categoryRestrictions = checkpoint.categoryRestrictions
+        isDirty = checkpoint.isDirty
     }
 
     // MARK: Persistence

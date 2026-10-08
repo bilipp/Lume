@@ -58,8 +58,7 @@ struct ProfileSelectionView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(background)
         .pinPrompt(target: $pendingSwitch) { profile in
-            Task { await profileManager?.switchProfile(to: profile.id) }
-            onComplete()
+            switchAndComplete(profile)
         }
     }
 
@@ -97,7 +96,13 @@ struct ProfileSelectionView: View {
         if parental?.requiresPIN(toSwitchTo: profile) == true {
             pendingSwitch = profile
         } else {
-            Task { await profileManager.switchProfile(to: profile.id) }
+            switchAndComplete(profile)
+        }
+    }
+
+    private func switchAndComplete(_ profile: UserProfile) {
+        Task {
+            guard await profileManager?.switchProfile(to: profile.id) == true else { return }
             onComplete()
         }
     }
