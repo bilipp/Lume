@@ -19,6 +19,7 @@ final nonisolated class CloudSyncShadow {
     private let epgSourcesKey = "cloudsync.shadow.epgsources.v1"
     private let parentalPINKey = "cloudsync.shadow.parentalpin.v1"
     private let categoryRestrictionsKey = "cloudsync.shadow.categoryrestrictions.v1"
+    private let liveTVPreferencesKey = "cloudsync.shadow.livetvpreferences.v1"
 
     private var playlists: [String: PlaylistConfigValues]
     private var content: [String: ContentStateValues]
@@ -27,6 +28,8 @@ final nonisolated class CloudSyncShadow {
     /// in a dictionary. `nil` means "no PIN last time we looked".
     private var parentalPIN: ParentalPINValues?
     private var categoryRestrictions: [String: CategoryRestrictionValues]
+    /// Single-valued, like the PIN. `nil` means the switches were never synced.
+    private var liveTVPreferences: LiveTVPreferenceValues?
 
     /// Set whenever a setter actually changes the baseline; cleared on `persist()`.
     /// A steady-state reconcile (every verdict `.noChange`) mutates nothing, so
@@ -40,6 +43,7 @@ final nonisolated class CloudSyncShadow {
         epgSources = Self.decode(defaults.data(forKey: epgSourcesKey)) ?? [:]
         parentalPIN = Self.decode(defaults.data(forKey: parentalPINKey))
         categoryRestrictions = Self.decode(defaults.data(forKey: categoryRestrictionsKey)) ?? [:]
+        liveTVPreferences = Self.decode(defaults.data(forKey: liveTVPreferencesKey))
     }
 
     // MARK: Playlists (keyed by UUID string)
@@ -118,6 +122,18 @@ final nonisolated class CloudSyncShadow {
         Set(categoryRestrictions.keys)
     }
 
+    // MARK: Live TV preferences
+
+    func liveTVPreferencesShadow() -> LiveTVPreferenceValues? {
+        liveTVPreferences
+    }
+
+    func setLiveTVPreferencesShadow(_ value: LiveTVPreferenceValues?) {
+        guard liveTVPreferences != value else { return }
+        liveTVPreferences = value
+        isDirty = true
+    }
+
     /// Drop the entire content baseline. Called on a profile switch: the catalog
     /// has been re-projected to a different profile, so the previous baseline no
     /// longer describes it. The next reconcile rebuilds it (a one-time union
@@ -154,7 +170,8 @@ final nonisolated class CloudSyncShadow {
         // still describes reality. Dropping it would turn "the parent removed the
         // PIN on another device" (local hash, cloud empty, no baseline) into a
         // local edit to push — re-arming the very PIN the shadow exists to let
-        // us delete.
+        // us delete. The Live TV preferences baseline is kept for the same
+        // reason: its local side is UserDefaults, not the catalog.
         isDirty = true
     }
 
@@ -177,6 +194,11 @@ final nonisolated class CloudSyncShadow {
             defaults.set(Self.encode(parentalPIN), forKey: parentalPINKey)
         } else {
             defaults.removeObject(forKey: parentalPINKey)
+        }
+        if let liveTVPreferences {
+            defaults.set(Self.encode(liveTVPreferences), forKey: liveTVPreferencesKey)
+        } else {
+            defaults.removeObject(forKey: liveTVPreferencesKey)
         }
         isDirty = false
     }

@@ -29,6 +29,10 @@
         private var categorySortRaw: String = CategorySortOption.playlist.rawValue
         @AppStorage(SortStorageKey.liveContent)
         private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+        @AppStorage(LiveTVRailSettings.showsFavoritesKey)
+        private var showsFavorites = LiveTVRailSettings.showsFavoritesDefault
+        @AppStorage(LiveTVRailSettings.showsRecentlyWatchedKey)
+        private var showsRecentlyWatched = LiveTVRailSettings.showsRecentlyWatchedDefault
 
         @State private var playlists: [Playlist] = []
         @State private var selectedPlaylistID: UUID?
@@ -260,8 +264,10 @@
             )
 
             var rail: [LiveTVSection] = []
-            if !fetchChannels(scope: .favorites, prefix: prefix).isEmpty { rail.append(.favorites) }
-            if !fetchChannels(scope: .recentlyWatched, prefix: prefix).isEmpty { rail.append(.recentlyWatched) }
+            if showsFavorites, !fetchChannels(scope: .favorites, prefix: prefix).isEmpty { rail.append(.favorites) }
+            if showsRecentlyWatched, !fetchChannels(scope: .recentlyWatched, prefix: prefix).isEmpty {
+                rail.append(.recentlyWatched)
+            }
             rail.append(contentsOf: categories.map(LiveTVSection.category))
             sections = rail
 

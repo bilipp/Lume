@@ -49804,6 +49804,65 @@
         }
       }
     },
+    "Shows these collections above your categories in Live TV." : {
+      "comment" : "Settings › Live TV › Categories: footnote under the Favorites and Recently Watched switches.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt diese Sammlungen in Live-TV über deinen Kategorien an."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows these collections above your categories in Live TV."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra estas colecciones encima de tus categorías en TV en directo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche ces collections au-dessus de vos catégories dans TV en direct."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra queste raccolte sopra le tue categorie in TV in diretta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブTVで、これらのコレクションをカテゴリの上に表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 TV에서 이 모음을 카테고리 위에 표시합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra estas coleções acima das suas categorias na TV ao vivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在直播电视中将这些合集显示在类别上方。"
+          }
+        }
+      }
+    },
     "Shows this channel in the large tile" : {
       "localizations" : {
         "de" : {
