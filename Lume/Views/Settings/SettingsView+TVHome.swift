@@ -23,7 +23,11 @@ import SwiftUI
         private func isHomeSectionEnabled(_ section: HomeSection) -> Bool {
             section == .forYou
                 ? recommendationsEnabled
-                : HomeLayoutSettings.isEnabled(section, disabledRaw: homeDisabledSectionsRaw)
+                : HomeLayoutSettings.isEnabled(
+                    section,
+                    disabledRaw: homeDisabledSectionsRaw,
+                    enabledRaw: homeEnabledSectionsRaw
+                )
         }
 
         private func toggleHomeSection(_ section: HomeSection) {
@@ -37,19 +41,18 @@ import SwiftUI
                 recommendationsEnabled.toggle()
                 return
             }
-            var disabled = HomeLayoutSettings.decodeDisabled(homeDisabledSectionsRaw)
-            if disabled.contains(section) {
-                // "Sports" is a Lume Pro feature — gate turning it on behind the
-                // paywall (disabling it is always allowed).
-                if section == .sports, !premium.isPremium {
-                    presentPaywall(.sportsHub)
-                    return
-                }
-                disabled.remove(section)
-            } else {
-                disabled.insert(section)
+            let turningOn = !isHomeSectionEnabled(section)
+            // "Sports" is a Lume Pro feature — gate turning it on behind the
+            // paywall (disabling it is always allowed).
+            if turningOn, section == .sports, !premium.isPremium {
+                presentPaywall(.sportsHub)
+                return
             }
-            homeDisabledSectionsRaw = HomeLayoutSettings.encodeDisabled(disabled)
+            HomeLayoutSettings.setEnabled(
+                section, turningOn,
+                disabledRaw: &homeDisabledSectionsRaw,
+                enabledRaw: &homeEnabledSectionsRaw
+            )
         }
 
         /// Move the section at `index` one slot up or down, persisting the new
