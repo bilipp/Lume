@@ -367,8 +367,8 @@ final class LiveTVCategoryMemo {
 // MARK: - Rail sections
 
 /// Resolves the Live TV rail — the two virtual collections, when the active
-/// playlist has anything visible in them, above the synced categories — and
-/// hands the result to `content`.
+/// playlist has anything visible in them and Settings › Live TV hasn't switched
+/// them off, above the synced categories — and hands the result to `content`.
 ///
 /// The gates live here, in a child view, because a `@Query`'s descriptor is
 /// fixed at `init` and `LiveTVView` is a tab root whose `init` does not re-run
@@ -379,6 +379,10 @@ final class LiveTVCategoryMemo {
 struct LiveTVSections<Content: View>: View {
     @Query private var favoriteProbe: [LiveStream]
     @Query private var recentProbe: [LiveStream]
+    @AppStorage(LiveTVRailSettings.showsFavoritesKey)
+    private var showsFavorites = LiveTVRailSettings.showsFavoritesDefault
+    @AppStorage(LiveTVRailSettings.showsRecentlyWatchedKey)
+    private var showsRecentlyWatched = LiveTVRailSettings.showsRecentlyWatchedDefault
 
     private let playlistPrefix: String
     private let categorySections: [LiveTVSection]
@@ -409,8 +413,8 @@ struct LiveTVSections<Content: View>: View {
         // properties used to carry before the probes moved into SQL.
         guard !playlistPrefix.isEmpty else { return categorySections }
         var resolved: [LiveTVSection] = []
-        if !favoriteProbe.isEmpty { resolved.append(.favorites) }
-        if !recentProbe.isEmpty { resolved.append(.recentlyWatched) }
+        if showsFavorites, !favoriteProbe.isEmpty { resolved.append(.favorites) }
+        if showsRecentlyWatched, !recentProbe.isEmpty { resolved.append(.recentlyWatched) }
         resolved.append(contentsOf: categorySections)
         return resolved
     }

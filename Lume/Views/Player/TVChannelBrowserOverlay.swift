@@ -40,6 +40,10 @@
         private var categorySortRaw: String = CategorySortOption.playlist.rawValue
         @AppStorage(SortStorageKey.liveContent)
         private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+        @AppStorage(LiveTVRailSettings.showsFavoritesKey)
+        private var showsFavorites = LiveTVRailSettings.showsFavoritesDefault
+        @AppStorage(LiveTVRailSettings.showsRecentlyWatchedKey)
+        private var showsRecentlyWatched = LiveTVRailSettings.showsRecentlyWatchedDefault
 
         @State private var sections: [LiveTVSection] = []
         /// The section whose channels fill the middle column.
@@ -376,10 +380,10 @@
             // descriptors the Live TV rail gates on, so the two surfaces can't
             // disagree about which collections a rail offers.
             var rail: [LiveTVSection] = []
-            if hasVisible(LiveChannelQuery.favoritesProbe(playlistPrefix: prefix, restriction: restriction)) {
+            if showsFavorites, hasVisible(LiveChannelQuery.favoritesProbe(playlistPrefix: prefix, restriction: restriction)) {
                 rail.append(.favorites)
             }
-            if hasVisible(LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: prefix, restriction: restriction)) {
+            if showsRecentlyWatched, hasVisible(LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: prefix, restriction: restriction)) {
                 rail.append(.recentlyWatched)
             }
             rail.append(contentsOf: categories.map(LiveTVSection.category))

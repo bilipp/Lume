@@ -28,6 +28,9 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
     /// Restrictions whose category hasn't synced to this device yet — left
     /// pending (shadow untouched) so a later pass applies them.
     var parentalPending = 0
+    /// The Live TV rail switches moved this pass (0 or 1 each way).
+    var preferencesPushed = 0
+    var preferencesPulled = 0
     /// Cloud states whose local catalog item hasn't synced yet — left pending
     /// (shadow untouched) so a later pass applies them once the catalog lands.
     var contentPending = 0
@@ -72,6 +75,8 @@ actor CloudSyncEngine {
     /// The CloudKit-mirrored store (SyncedPlaylist, UserContentState, UserProfile).
     let cloudContext: ModelContext
     let shadow: CloudSyncShadow
+    /// Where the synced settings live locally (`LiveTVRailSettings`).
+    let preferences: UserDefaults
 
     /// The profile whose state the catalog currently projects. Read from
     /// `ActiveProfileStore` at the start of each reconcile, so content state is
@@ -80,12 +85,18 @@ actor CloudSyncEngine {
     /// Not `private`: `CloudSyncEngine+Fetch.swift` reads it (`fetchContentMirrors`).
     var activeProfileID = UserProfile.defaultProfileID
 
-    init(catalogContainer: ModelContainer, cloudContainer: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow()) {
+    init(
+        catalogContainer: ModelContainer,
+        cloudContainer: ModelContainer,
+        shadow: CloudSyncShadow = CloudSyncShadow(),
+        preferences: UserDefaults = .standard
+    ) {
         catalogContext = ModelContext(catalogContainer)
         catalogContext.autosaveEnabled = false
         cloudContext = ModelContext(cloudContainer)
         cloudContext.autosaveEnabled = false
         self.shadow = shadow
+        self.preferences = preferences
     }
 
     #if DEBUG
@@ -94,12 +105,13 @@ actor CloudSyncEngine {
         /// behavior. Production uses the two-container designated init above so
         /// CloudKit's churn can't invalidate the catalog; the reconcile/merge logic
         /// the tests exercise routes identically either way.
-        init(container: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow()) {
+        init(container: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow(), preferences: UserDefaults = .standard) {
             let ctx = ModelContext(container)
             ctx.autosaveEnabled = false
             catalogContext = ctx
             cloudContext = ctx
             self.shadow = shadow
+            self.preferences = preferences
         }
     #endif
 
@@ -139,6 +151,8 @@ actor CloudSyncEngine {
             // Parental controls: the PIN and category restrictions. Neither is
             // profile-scoped, so this runs once per pass rather than per profile.
             try reconcileParentalControls(livePrefixes: livePrefixes, into: &result)
+            // Account-wide app settings (the Live TV rail switches).
+            try reconcileLiveTVPreferences(into: &result)
             // Manual EPG sources sync as their own lightweight mirror; each
             // playlist's derived (linked) source is regenerated locally so it
             // appears on every device that has the playlist.
@@ -157,7 +171,7 @@ actor CloudSyncEngine {
             // 3-way merge is idempotent).
             try saveStores()
             shadow.persist()
-            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled) par +\(result.parentalPushed)/\(result.parentalPulled) pend \(result.parentalPending) sports \(result.sportsFollowsKept)-\(result.sportsFollowsDeduped) rec \(result.recordingServersKept)-\(result.recordingServersDeduped)") // swiftlint:disable:this line_length
+            Logger.sync.info("Reconcile pl +\(result.playlistsPushed) new \(result.playlistsCreatedLocally) ct +\(result.contentPushed)/\(result.contentPulled) pend \(result.contentPending) epg +\(result.epgSourcesPushed)/\(result.epgSourcesPulled) par +\(result.parentalPushed)/\(result.parentalPulled) pend \(result.parentalPending) prefs +\(result.preferencesPushed)/\(result.preferencesPulled) sports \(result.sportsFollowsKept)-\(result.sportsFollowsDeduped) rec \(result.recordingServersKept)-\(result.recordingServersDeduped)") // swiftlint:disable:this line_length
         } catch {
             Logger.sync.error("Reconcile failed: \(error.localizedDescription)")
         }

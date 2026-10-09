@@ -3,7 +3,8 @@
 //  Lume
 //
 //  The tvOS Live TV settings pane: the Live TV tab's layout (Guide / List)
-//  and Guide Preview, then the recording server — a drill-in SettingsView
+//  and Guide Preview, whether Favorites and Recently Watched lead the rails,
+//  then the recording server — a drill-in SettingsView
 //  swaps in place, like Player's Engines — the recordings library and whether
 //  the Live TV rail lists it. Channel Surfing stays under Player: it is how
 //  the player reads the remote, not how the tab looks.
@@ -24,6 +25,10 @@
         private var layoutModeRaw = LiveTVLayoutMode.defaultMode.rawValue
         @AppStorage(PlayerSettings.tvGuidePreviewModeKey)
         private var guidePreviewModeRaw = PlayerSettings.tvGuidePreviewModeDefault.rawValue
+        @AppStorage(LiveTVRailSettings.showsFavoritesKey)
+        private var showsFavorites = LiveTVRailSettings.showsFavoritesDefault
+        @AppStorage(LiveTVRailSettings.showsRecentlyWatchedKey)
+        private var showsRecentlyWatched = LiveTVRailSettings.showsRecentlyWatchedDefault
         @AppStorage(RecordingServerSetup.showsRecordingsInLiveTVRailKey)
         private var showsRecordingsInRail = RecordingServerSetup.showsRecordingsInLiveTVRailDefault
         @State private var premium = PremiumManager.shared
@@ -33,7 +38,7 @@
         @FocusState private var focus: Row?
 
         private enum Row: Hashable {
-            case layout, guidePreview, recordingServer, recordings, rail
+            case layout, guidePreview, favorites, recentlyWatched, recordingServer, recordings, rail
         }
 
         private var access: RecordingSettingsAccess {
@@ -47,6 +52,7 @@
         var body: some View {
             VStack(alignment: .leading, spacing: 28) {
                 layoutSection
+                categoriesSection
                 recordingSection
             }
             // Entry from the sidebar lands on the first row, not the one
@@ -85,6 +91,22 @@
                 .focused($focus, equals: .guidePreview)
 
                 footer("Small and Large play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.")
+            }
+        }
+
+        // MARK: - Categories
+
+        private var categoriesSection: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                TVSettingsSectionLabel("Categories")
+
+                TVOptionToggleRow(title: "Favorites", isOn: $showsFavorites)
+                    .focused($focus, equals: .favorites)
+
+                TVOptionToggleRow(title: "Recently Watched", isOn: $showsRecentlyWatched)
+                    .focused($focus, equals: .recentlyWatched)
+
+                footer("Shows these collections above your categories in Live TV.")
             }
         }
 

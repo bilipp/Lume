@@ -238,6 +238,20 @@ nonisolated struct CategoryRestrictionValues: Codable, Equatable {
     }
 }
 
+// MARK: - Live TV preferences
+
+/// The syncable Live TV rail switches (`LiveTVRailSettings`).
+nonisolated struct LiveTVPreferenceValues: Codable, Equatable {
+    var showsFavorites: Bool
+    var showsRecentlyWatched: Bool
+
+    /// Conflict policy: cloud wins, matching playlist config and the PIN. Two
+    /// devices flipping the switches before they converge is a rare either/or.
+    static func mergeConflict(local _: LiveTVPreferenceValues, cloud: LiveTVPreferenceValues) -> LiveTVPreferenceValues {
+        cloud
+    }
+}
+
 // MARK: - Per-content user state
 
 /// The syncable user state of a single catalog item. Fields irrelevant to a

@@ -145,7 +145,9 @@ struct LumeApp: App {
             SyncedSportsFollow.self,
             // Paired recording servers — account-wide, no local counterpart,
             // never bound to a `@Query`.
-            SyncedRecordingServer.self
+            SyncedRecordingServer.self,
+            // Account-wide Live TV rail switches — reconciled into UserDefaults.
+            SyncedLiveTVPreferences.self
         ])
         // Out of the app group for the same reason as the catalog store.
         let cloudConfiguration = ModelConfiguration(

@@ -4,7 +4,8 @@
 //
 //  The iOS / macOS / visionOS Live TV page behind the root Live TV row: how
 //  the Live TV tab lays out channels (Guide or List — the only place to switch
-//  it), which buttons the iPhone / iPad toolbar shows, and the recording server
+//  it), whether Favorites and Recently Watched lead the category rail, which
+//  buttons the iPhone / iPad toolbar shows, and the recording server
 //  with its recordings library. tvOS builds its own pane in
 //  TVLiveTVSettingsPane.
 //
@@ -16,6 +17,10 @@
     struct LiveTVSettingsView: View {
         @AppStorage(LiveTVLayoutMode.storageKey)
         private var layoutModeRaw = LiveTVLayoutMode.defaultMode.rawValue
+        @AppStorage(LiveTVRailSettings.showsFavoritesKey)
+        private var showsFavorites = LiveTVRailSettings.showsFavoritesDefault
+        @AppStorage(LiveTVRailSettings.showsRecentlyWatchedKey)
+        private var showsRecentlyWatched = LiveTVRailSettings.showsRecentlyWatchedDefault
         #if os(iOS)
             @AppStorage(LiveTVToolbarSettings.showsRecordingsKey)
             private var showsRecordingsInToolbar = LiveTVToolbarSettings.showsRecordingsDefault
@@ -58,6 +63,19 @@
                     Text("Layout")
                 } footer: {
                     Text("How the Live TV tab shows channels: Guide lays them out on a programme timeline, List as a plain channel list.")
+                }
+
+                Section {
+                    Toggle(isOn: $showsFavorites) {
+                        Label("Favorites", systemImage: "heart.fill")
+                    }
+                    Toggle(isOn: $showsRecentlyWatched) {
+                        Label("Recently Watched", systemImage: "clock.arrow.circlepath")
+                    }
+                } header: {
+                    Text("Categories")
+                } footer: {
+                    Text("Shows these collections above your categories in Live TV.")
                 }
 
                 #if os(iOS)
