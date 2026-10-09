@@ -165,11 +165,10 @@ final class PlayerMediaSwapper {
             onSelect: @escaping (PlayableMedia) -> Void,
             onResetHideTimer: @escaping () -> Void
         ) -> some View {
-            onKeyPress(.upArrow) {
-                channelKeyStep(.next, neighbours, swapper, onSelect, onResetHideTimer)
-            }
-            .onKeyPress(.downArrow) {
-                channelKeyStep(.previous, neighbours, swapper, onSelect, onResetHideTimer)
+            onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
+                guard press.modifiers.isBare else { return .ignored }
+                let step: PlayerMediaSwapper.Step = press.key == .upArrow ? .next : .previous
+                return channelKeyStep(step, neighbours, swapper, onSelect, onResetHideTimer)
             }
         }
     }

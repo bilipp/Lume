@@ -67,6 +67,10 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// rest of the embedded surface lives in `VLCPlayerCoordinator+MultiView`.
     var isEmbedded = false
 
+    /// The audio this player should have, from the macOS volume or `isMuted`.
+    /// Re-applied on every state change, see `reapplyUserVolume`.
+    var userVolume: (level: Float, muted: Bool) = (1, false)
+
     var onTime: ((TimeInterval) -> Void)?
     var onDuration: ((TimeInterval) -> Void)?
 
@@ -451,6 +455,7 @@ extension VLCPlayerCoordinator: VLCMediaPlayerDelegate {
             guard let self else { return }
             logStateChange()
             handleRetry(for: mediaPlayer.state)
+            reapplyUserVolume()
             seekToResumeIfNeeded()
             isPlaying = mediaPlayer.isPlaying
             isPipSupported = pipController != nil

@@ -235,6 +235,7 @@ struct FullScreenPlayerView: View {
                 playerView
             #else
                 playerView
+                    .playerVolumeSession()
                     .ignoresSafeArea()
             #endif
 

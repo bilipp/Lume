@@ -511,4 +511,8 @@ extension UserDefaults {
     func integer(_ key: String, default def: Int) -> Int {
         object(forKey: key) == nil ? def : integer(forKey: key)
     }
+
+    nonisolated func float(_ key: String, default def: Float) -> Float {
+        object(forKey: key) == nil ? def : float(forKey: key)
+    }
 }

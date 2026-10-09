@@ -102,6 +102,10 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
 
     var isAdoptedFromPreview = false
 
+    /// Not `private`: set by the AVPlayerCoordinator+Volume extension (separate file).
+    @Published var isExternalPlaybackActive = false
+    var externalPlaybackObservation: NSKeyValueObservation?
+
     var onTime: ((TimeInterval) -> Void)?
     var onDuration: ((TimeInterval) -> Void)?
 
