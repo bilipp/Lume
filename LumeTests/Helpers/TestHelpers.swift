@@ -22,6 +22,14 @@ func makeTestContainer() throws -> ModelContainer {
     return try ModelContainer(for: schema, configurations: [config])
 }
 
+/// A fresh UUID-named `UserDefaults` suite, removed again once `body` returns.
+func withIsolatedDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
+    let suiteName = UUID().uuidString
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    try body(defaults)
+}
+
 /// The repo root, walked up from a test file's own path: neither the JSON
 /// fixtures nor the string catalog are copied into the test bundle.
 func repoRootURL(filePath: String = #filePath) -> URL {

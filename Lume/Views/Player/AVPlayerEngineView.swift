@@ -251,6 +251,7 @@ struct AVPlayerEngineView: View {
             }
             .onKeyPress(.leftArrow) { coordinator.skip(by: -15); resetHideTimer(); return .handled }
             .onKeyPress(.rightArrow) { coordinator.skip(by: 15); resetHideTimer(); return .handled }
+            .playerVolume(coordinator, onReveal: showControls)
             .liveChannelKeyNavigation(
                 neighbours: itemNeighbours, swapper: mediaSwapper,
                 onSelect: { onSelectMedia?($0) }, onResetHideTimer: resetHideTimer

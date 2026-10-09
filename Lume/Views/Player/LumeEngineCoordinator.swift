@@ -87,6 +87,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         Task { await session.setAudioEnabled(enabled) }
     }
 
+    /// The full-screen player's volume; every new `PlayerSession` inherits it.
+    var userVolume: Float = 1 {
+        didSet { session?.renderer.volume = userVolume }
+    }
+
     /// Set before `configure` for a Multi-View tile: with several tiles playing
     /// at once, Picture in Picture belongs to the full-screen player alone.
     var isEmbedded = false
@@ -139,7 +144,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         self.session = session
         displayLayer = session.renderer.displayLayer
         session.renderer.audioTimePitchAlgorithm = .timeDomain
-        session.renderer.isMuted = isMuted
+        applyAudioLevel(to: session)
 
         eventTask = Task { [events = session.events] in
             for await event in events {

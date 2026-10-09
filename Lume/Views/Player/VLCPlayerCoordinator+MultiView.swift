@@ -21,7 +21,10 @@ extension VLCPlayerCoordinator {
     /// except the one carrying the audio. libVLC keeps decoding a muted track,
     /// which is what lets the audio move between tiles without a reload.
     var isMuted: Bool {
-        get { mediaPlayer.audio?.isMuted ?? false }
-        set { mediaPlayer.audio?.isMuted = newValue }
+        get { userVolume.muted }
+        set {
+            userVolume.muted = newValue
+            reapplyUserVolume()
+        }
     }
 }

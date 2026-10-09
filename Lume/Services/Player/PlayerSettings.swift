@@ -207,6 +207,17 @@ enum PlayerSettings {
 
     static let tvGuidePreviewModeDefault = GuidePreviewMode.small
 
+    /// The macOS player's app-level volume, a `Float` in `0...1`. Device-local
+    /// and shared by every player window; mute is deliberately not stored, so
+    /// each new player opens unmuted at this level.
+    nonisolated static let volumeKey = "player.volume"
+
+    nonisolated static let volumeDefault: Float = 1.0
+
+    nonisolated static func volume(in defaults: UserDefaults = .standard) -> Float {
+        PlayerVolumeMath.clamped(defaults.float(volumeKey, default: volumeDefault))
+    }
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default

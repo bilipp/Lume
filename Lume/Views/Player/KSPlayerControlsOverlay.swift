@@ -276,9 +276,11 @@ import SwiftUI
                     favoriteButton
                 }
                 PlayerRecordButton(media: media, onResetHideTimer: onResetHideTimer)
+                PlayerVolumeControl(onResetHideTimer: onResetHideTimer)
             }
             .padding(.horizontal, 4)
             .glassEffectCompat(.regularInteractive, in: Capsule())
+            .playerVolumePanelHost(onResetHideTimer: onResetHideTimer)
         }
 
         private var favoriteButton: some View {

@@ -134,6 +134,8 @@ struct KSPlayerEngineView: View {
         /// Drives PiP on macOS in place of the layer's `isPipActive`, whose
         /// delegate leaves the PiP window's buttons dead there.
         @State var macPip = KSMacPictureInPicture()
+        /// Not `private`: re-asserted per stream in `KSPlayerEngineView+Volume`.
+        @Environment(PlayerVolumeStore.self) var playerVolume: PlayerVolumeStore?
     #endif
     // Serialises stream changes for this session — the Siri remote's channel
     // surfing and the on-screen transport controls share it, so two swaps can
@@ -399,12 +401,6 @@ struct KSPlayerEngineView: View {
             }
         }
 
-        func showControls() {
-            guard !isControlsVisible else { resetHideTimer(); return }
-            withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
-            scheduleHide()
-        }
-
         /// Dismiss the controls overlay (Menu button when no panel is open). A
         /// second Menu press, with the controls hidden, dismisses the player.
         private func hideControls() {
@@ -444,11 +440,18 @@ struct KSPlayerEngineView: View {
             let options = makeOptions()
             return ZStack {
                 videoSurface(options: options) { _, state in
+                    // KSMEPlayer reports readyToPlay on main just before it
+                    // calls play(): apply the volume now, or the zap's reset
+                    // to full volume is audible until the hop below runs.
+                    if Thread.isMainThread {
+                        MainActor.assumeIsolated { reassertUserVolume(after: state) }
+                    }
                     DispatchQueue.main.async {
                         isPlaying = (state == .bufferFinished)
                         updateLoadingState(state)
                         refreshVideoInfo()
                         handleState(state)
+                        reassertUserVolume(after: state)
                     }
                 } onPlay: { current, total in
                     DispatchQueue.main.async {
@@ -562,6 +565,7 @@ struct KSPlayerEngineView: View {
             }
             .onKeyPress(.leftArrow) { coordinator.skip(interval: -15); resetHideTimer(); return .handled }
             .onKeyPress(.rightArrow) { coordinator.skip(interval: 15); resetHideTimer(); return .handled }
+            .playerVolume(coordinator, onReveal: showControls)
             .liveChannelKeyNavigation(
                 neighbours: itemNeighbours, swapper: mediaSwapper,
                 onSelect: { selectMedia($0) }, onResetHideTimer: resetHideTimer

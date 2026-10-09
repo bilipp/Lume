@@ -72,6 +72,21 @@ struct PlayerSettingsTests {
         defaults.set("bogus", forKey: key)
         #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .small)
     }
+
+    @Test func `volume reads the default until a value is stored, clamped`() {
+        #expect(PlayerSettings.volumeKey == "player.volume")
+        withIsolatedDefaults { defaults in
+            #expect(PlayerSettings.volume(in: defaults) == 1.0)
+            defaults.set(Float(0.4), forKey: PlayerSettings.volumeKey)
+            #expect(PlayerSettings.volume(in: defaults) == 0.4)
+            defaults.set(Float(0), forKey: PlayerSettings.volumeKey)
+            #expect(PlayerSettings.volume(in: defaults) == 0)
+            defaults.set(Float(3), forKey: PlayerSettings.volumeKey)
+            #expect(PlayerSettings.volume(in: defaults) == 1)
+            defaults.set(Float(-2), forKey: PlayerSettings.volumeKey)
+            #expect(PlayerSettings.volume(in: defaults) == 0)
+        }
+    }
 }
 
 struct PlayerEnginePriorityTests {
