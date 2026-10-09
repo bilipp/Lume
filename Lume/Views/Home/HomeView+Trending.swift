@@ -251,3 +251,20 @@ nonisolated func seriesTmdbIdPredicate(ids: Set<Int>) -> Predicate<Series> {
     let optionalIds = Set(ids.map(Int?.some))
     return #Predicate { optionalIds.contains($0.tmdbId) }
 }
+
+// MARK: - Load state
+
+/// The trending/hero load's progress, driven by the loaders above.
+enum HomeLoadState {
+    case idle
+    case loading
+    case loaded
+    case failed
+
+    var isSettled: Bool {
+        switch self {
+        case .idle, .loading: false
+        case .loaded, .failed: true
+        }
+    }
+}

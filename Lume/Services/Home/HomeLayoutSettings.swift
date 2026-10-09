@@ -21,6 +21,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
     case traktWatchlist
     case simklWatchlist
     case sports
+    case downloads
 
     var id: String {
         rawValue
@@ -39,6 +40,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .traktWatchlist: "Trakt Watchlist"
         case .simklWatchlist: "Simkl Watchlist"
         case .sports: "Sports"
+        case .downloads: "Downloads"
         }
     }
 
@@ -55,6 +57,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .traktWatchlist: String(localized: "Trakt Watchlist")
         case .simklWatchlist: String(localized: "Simkl Watchlist")
         case .sports: String(localized: "Sports")
+        case .downloads: String(localized: "Downloads")
         }
     }
 
@@ -67,7 +70,18 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .trendingSeries: "tv"
         case .traktWatchlist, .simklWatchlist: "rectangle.stack.badge.play"
         case .sports: "sportscourt"
+        case .downloads: "arrow.down.circle"
         }
+    }
+
+    /// Whether this platform can show the section at all. tvOS has no
+    /// downloads, so that row is left out of Home and its settings there.
+    var isAvailable: Bool {
+        #if os(tvOS)
+            self != .downloads
+        #else
+            true
+        #endif
     }
 }
 
@@ -87,6 +101,14 @@ enum HomeLayoutSettings {
     /// (expensive) recommendation recompute on Home.
     static let disabledSectionsKey = "home.disabledSections.v1"
 
+    /// Sections that start switched off: these are tracked the other way round,
+    /// by presence in `enabledSectionsKey`, so they stay hidden until the user
+    /// turns them on.
+    static let optInSections: Set<HomeSection> = [.downloads]
+
+    /// Opt-in sections the user has switched on, encoded like the disabled set.
+    static let enabledSectionsKey = "home.enabledSections.v1"
+
     static func decodeDisabled(_ raw: String) -> Set<HomeSection> {
         Set(raw.split(separator: ",").compactMap { HomeSection(rawValue: String($0)) })
     }
@@ -99,14 +121,30 @@ enum HomeLayoutSettings {
 
     /// Whether `section` should render. Not meaningful for `.forYou` (see
     /// `disabledSectionsKey`); callers handle that case via `RecommendationSettings`.
-    static func isEnabled(_ section: HomeSection, disabledRaw: String) -> Bool {
-        !decodeDisabled(disabledRaw).contains(section)
+    static func isEnabled(_ section: HomeSection, disabledRaw: String, enabledRaw: String = "") -> Bool {
+        optInSections.contains(section)
+            ? decodeDisabled(enabledRaw).contains(section)
+            : !decodeDisabled(disabledRaw).contains(section)
+    }
+
+    /// Switches `section` on or off, updating whichever stored set tracks it.
+    static func setEnabled(_ section: HomeSection, _ isOn: Bool, disabledRaw: inout String, enabledRaw: inout String) {
+        if optInSections.contains(section) {
+            var enabled = decodeDisabled(enabledRaw)
+            if isOn { enabled.insert(section) } else { enabled.remove(section) }
+            enabledRaw = encodeDisabled(enabled)
+        } else {
+            var disabled = decodeDisabled(disabledRaw)
+            if isOn { disabled.remove(section) } else { disabled.insert(section) }
+            disabledRaw = encodeDisabled(disabled)
+        }
     }
 
     /// Decode the stored order into a complete, de-duplicated section list,
     /// falling back to the declaration order when nothing has been stored yet.
+    /// Sections this platform can't show are dropped.
     static func resolve(orderRaw: String) -> [HomeSection] {
-        normalized(decode(orderRaw))
+        normalized(decode(orderRaw)).filter(\.isAvailable)
     }
 
     /// Parse the comma-separated raw value into sections, dropping any token

@@ -15,4 +15,9 @@ extension HomeView {
         guard let pathRouter else { return .constant(NavigationPath()) }
         return Binding(get: { pathRouter.homePath }, set: { pathRouter.homePath = $0 })
     }
+
+    /// The Downloads row's "See All": pushes the full Downloads list.
+    func showAllDownloads() {
+        pathRouter?.homePath.append(HomeDownloadsRoute())
+    }
 }

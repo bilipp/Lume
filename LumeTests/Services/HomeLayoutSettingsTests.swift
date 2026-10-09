@@ -55,7 +55,7 @@ struct HomeLayoutSettingsTests {
 
     @Test func `normalized deduplicates`() {
         let result = HomeLayoutSettings.normalized([.favorites, .favorites, .forYou, .favorites])
-        let favoritesCount = result.filter { $0 == .favorites }.count
+        let favoritesCount = result.count(where: { $0 == .favorites })
         #expect(favoritesCount == 1)
     }
 
@@ -132,6 +132,46 @@ struct HomeLayoutSettingsTests {
 
     @Test func `isEnabled returns false for disabled section`() {
         #expect(!HomeLayoutSettings.isEnabled(.favorites, disabledRaw: "favorites,forYou"))
+    }
+
+    // MARK: - Opt-in sections
+
+    @Test func `downloads starts switched off`() {
+        #expect(!HomeLayoutSettings.isEnabled(.downloads, disabledRaw: "", enabledRaw: ""))
+    }
+
+    @Test func `opt-in section ignores the disabled set`() {
+        #expect(HomeLayoutSettings.isEnabled(.downloads, disabledRaw: "downloads", enabledRaw: "downloads"))
+        #expect(!HomeLayoutSettings.isEnabled(.downloads, disabledRaw: "", enabledRaw: "favorites"))
+    }
+
+    @Test func `setEnabled tracks opt-in sections in the enabled set`() {
+        var disabled = ""
+        var enabled = ""
+        HomeLayoutSettings.setEnabled(.downloads, true, disabledRaw: &disabled, enabledRaw: &enabled)
+        #expect(enabled == "downloads")
+        #expect(disabled.isEmpty)
+        #expect(HomeLayoutSettings.isEnabled(.downloads, disabledRaw: disabled, enabledRaw: enabled))
+
+        HomeLayoutSettings.setEnabled(.downloads, false, disabledRaw: &disabled, enabledRaw: &enabled)
+        #expect(enabled.isEmpty)
+        #expect(!HomeLayoutSettings.isEnabled(.downloads, disabledRaw: disabled, enabledRaw: enabled))
+    }
+
+    @Test func `setEnabled tracks regular sections in the disabled set`() {
+        var disabled = ""
+        var enabled = ""
+        HomeLayoutSettings.setEnabled(.favorites, false, disabledRaw: &disabled, enabledRaw: &enabled)
+        #expect(disabled == "favorites")
+        #expect(enabled.isEmpty)
+
+        HomeLayoutSettings.setEnabled(.favorites, true, disabledRaw: &disabled, enabledRaw: &enabled)
+        #expect(disabled.isEmpty)
+    }
+
+    @Test func `downloads sits last in the default order`() {
+        #expect(HomeLayoutSettings.resolve(orderRaw: "").last == .downloads)
+        #expect(HomeLayoutSettings.resolve(orderRaw: "sports,favorites").last == .downloads)
     }
 
     // MARK: - HomeSection properties

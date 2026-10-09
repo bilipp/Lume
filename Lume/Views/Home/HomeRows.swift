@@ -27,15 +27,13 @@ struct HomeRow: View {
     var onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
     /// Seeds Multi-View from a channel card's long-press menu.
     var onStartMultiView: ((LiveStream) -> Void)?
+    /// When set, the header gains a "See All" button, styled like the Sports rail's.
+    var onSeeAll: (() -> Void)?
     var animationNamespace: Namespace.ID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.bold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal)
+            header
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: PosterCardMetrics.railSpacing) {
@@ -57,6 +55,29 @@ struct HomeRow: View {
             .scrollClipDisabled()
             .frame(height: PosterCardMetrics.rowHeight)
         }
+    }
+
+    private var header: some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.bold)
+                .foregroundStyle(.secondary)
+            if let onSeeAll {
+                Spacer(minLength: 8)
+                Button(action: onSeeAll) {
+                    HStack(spacing: 2) {
+                        Text("See All")
+                        Image(systemName: "chevron.right").font(.caption2.weight(.bold))
+                            .accessibilityHidden(true)
+                    }
+                    .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal)
     }
 }
 

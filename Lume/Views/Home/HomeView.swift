@@ -46,9 +46,10 @@ struct HomeView: View {
     /// The user's chosen Home row order (Settings › Layout › Home). Falls back to
     /// the declaration order of `HomeSection` until they reorder.
     @AppStorage(HomeLayoutSettings.sectionOrderKey) private var sectionOrderRaw = ""
-    /// Sections the user switched off (Settings › Layout › Home). "For You" is
-    /// gated by `recommendationsEnabled` instead — see `HomeLayoutSettings`.
+    /// Sections the user switched off, and opt-in ones they switched on (Settings ›
+    /// Layout › Home). "For You" is gated by `recommendationsEnabled` instead.
     @AppStorage(HomeLayoutSettings.disabledSectionsKey) private var disabledSectionsRaw = ""
+    @AppStorage(HomeLayoutSettings.enabledSectionsKey) private var enabledSectionsRaw = ""
     /// Bumped by the DEBUG "Recalculate" action in Settings (always 0 otherwise);
     /// part of the task id so the row recomputes on demand.
     @AppStorage(RecommendationSettings.manualRecalculationKey) private var recommendationsRecalcToken = 0
@@ -206,6 +207,7 @@ struct HomeView: View {
                     .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
                 #endif
             }
+            .homeDownloadsDestination()
             #if os(tvOS)
             .navigationDestination(item: $selectedHero) { hero in
                 if let movie = hero.movie {
@@ -284,6 +286,8 @@ struct HomeView: View {
                 rail("From Your Simkl Watchlist", simklWatchlist)
             case .sports:
                 SportsHomeRail(isSyncBusy: isSyncBusy)
+            case .downloads:
+                HomeDownloadsRow(seriesResume: seriesResume, animationNamespace: animationNamespace, onSeeAll: showAllDownloads)
             }
         }
     }
@@ -294,7 +298,7 @@ struct HomeView: View {
     func isSectionEnabled(_ section: HomeSection) -> Bool {
         section == .forYou
             ? (recommendationsEnabled && premium.isPremium)
-            : HomeLayoutSettings.isEnabled(section, disabledRaw: disabledSectionsRaw)
+            : HomeLayoutSettings.isEnabled(section, disabledRaw: disabledSectionsRaw, enabledRaw: enabledSectionsRaw)
     }
 
     /// A standard Home rail that only renders when it has items. The Recently
@@ -569,23 +573,6 @@ private extension HomeView {
         try? modelContext.save()
 
         recommendations.removeAll { $0.id == item.id }
-    }
-}
-
-// MARK: - Load state
-
-/// Internal (not file-private): `HomeView+Trending.swift` drives the transitions.
-enum HomeLoadState {
-    case idle
-    case loading
-    case loaded
-    case failed
-
-    var isSettled: Bool {
-        switch self {
-        case .idle, .loading: false
-        case .loaded, .failed: true
-        }
     }
 }
 

@@ -11,6 +11,7 @@
         @AppStorage(RecommendationSettings.enabledKey) private var recommendationsEnabled = RecommendationSettings.enabledDefault
         @AppStorage(HomeLayoutSettings.sectionOrderKey) private var sectionOrderRaw = ""
         @AppStorage(HomeLayoutSettings.disabledSectionsKey) private var disabledSectionsRaw = ""
+        @AppStorage(HomeLayoutSettings.enabledSectionsKey) private var enabledSectionsRaw = ""
         @State private var premium = PremiumManager.shared
         @State private var showPaywall = false
         @State private var paywallHighlight: PremiumFeature = .recommendations
@@ -70,7 +71,7 @@
         /// On/off binding for a section. "For You" maps to the recommendations
         /// flag and is gated behind Lume Pro — a free user turning it on gets the
         /// paywall instead. Every other section is tracked by `HomeLayoutSettings`'
-        /// disabled set (absent ⇒ enabled).
+        /// disabled set (absent ⇒ enabled), or its enabled set for opt-in rows.
         private func enabledBinding(for section: HomeSection) -> Binding<Bool> {
             if section == .forYou {
                 return Binding(
@@ -88,7 +89,9 @@
                 )
             }
             return Binding(
-                get: { HomeLayoutSettings.isEnabled(section, disabledRaw: disabledSectionsRaw) },
+                get: {
+                    HomeLayoutSettings.isEnabled(section, disabledRaw: disabledSectionsRaw, enabledRaw: enabledSectionsRaw)
+                },
                 set: { isOn in
                     // "Sports" is a Lume Pro feature: a free user turning it on gets
                     // the paywall instead, and the toggle snaps back off because the
@@ -98,9 +101,11 @@
                         showPaywall = true
                         return
                     }
-                    var disabled = HomeLayoutSettings.decodeDisabled(disabledSectionsRaw)
-                    if isOn { disabled.remove(section) } else { disabled.insert(section) }
-                    disabledSectionsRaw = HomeLayoutSettings.encodeDisabled(disabled)
+                    HomeLayoutSettings.setEnabled(
+                        section, isOn,
+                        disabledRaw: &disabledSectionsRaw,
+                        enabledRaw: &enabledSectionsRaw
+                    )
                 }
             )
         }
