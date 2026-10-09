@@ -27,21 +27,32 @@ struct IdleUnmountingTab<Content: View>: View {
     /// visited isn't built at all.
     @State private var isMounted = false
 
+    /// Whether the tab is on screen. A tab the iPhone tab bar overflows into
+    /// "More" is shown without `TabView` ever writing its value to the
+    /// selection, so `isSelected` alone left it a blank `Color.clear`.
+    @State private var isVisible = false
+
     /// Long enough to cover checking another tab and coming straight back.
     static var idleDelay: Duration {
         .seconds(60)
     }
 
+    private var isActive: Bool {
+        isSelected || isVisible
+    }
+
     var body: some View {
         Group {
-            if isMounted || isSelected {
+            if isMounted || isActive {
                 content()
             } else {
                 Color.clear
             }
         }
-        .task(id: isSelected) {
-            guard !isSelected else {
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
+        .task(id: isActive) {
+            guard !isActive else {
                 isMounted = true
                 return
             }
