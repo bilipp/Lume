@@ -95,7 +95,11 @@ struct FullScreenPlayerView: View {
 
     /// Set when Stalker `create_link` resolution fails, so the host shows the
     /// failure overlay instead of an endless spinner.
-    @State private var resolveError: String?
+    @State var resolveError: String?
+
+    /// The Jellyfin/Emby version being looked up, chosen or played — see
+    /// `FullScreenPlayerView+Sources`.
+    @State var sourceSession = PlayerSourceSession()
 
     /// The episode queued to play after `activeMedia`, resolved whenever the
     /// active stream changes. Drives both the in-player Next Episode button and
@@ -185,17 +189,17 @@ struct FullScreenPlayerView: View {
     /// Suppressed during an AirPlay override: the forced AVPlayer either casts or
     /// shows its error overlay, rather than looping through the fallback chain
     /// (which would only land back on engines that can't cast video).
-    private var hasFallbackEngine: Bool {
+    var hasFallbackEngine: Bool {
         !isAirPlayOverride && engineAttempt + 1 < enginePriority.count
     }
 
     /// Called by an engine when it can't start the stream. Advances to the next
     /// engine in the priority list if one is available; the engine view rebuilds
-    /// against the new engine. When the list is exhausted this is never called
-    /// (the last engine shows its own error overlay instead), so there's nothing
-    /// to do here in that case.
+    /// against the new engine. Past the last engine it is only called for a
+    /// Jellyfin/Emby version that has others to try (see `reportsStartupFailure`);
+    /// otherwise the last engine shows its own error overlay instead.
     private func fallBackToNextEngine() {
-        guard hasFallbackEngine else { return }
+        guard hasFallbackEngine else { return recoverWithAnotherSource() }
         let failed = engine
         engineAttempt += 1
         PlaybackQoE.shared.noteEngineFallback(to: engine)
@@ -257,6 +261,7 @@ struct FullScreenPlayerView: View {
         .preferredColorScheme(.dark)
         .macPlayerWindow(activeMedia: activeMedia, launchMedia: media) { switchMedia(to: $0) }
         .playerRecording(for: activeMedia)
+        .modifier(PlayerSourceSwitcherHost(session: sourceSession, media: activeMedia, onPick: switchSource))
         // Synchronous on purpose, and ahead of the `.task` below: the engine
         // coordinators report `beginStartup` / `noteEngineFallback` from their
         // own appearance, and an async baseline can land after them — which
@@ -389,6 +394,11 @@ struct FullScreenPlayerView: View {
     /// matching the active stream so a stale resolution from the previous stream
     /// never reaches the engine during a channel/episode switch.
     private var displayMedia: PlayableMedia? {
+        switch sourceSession.display(for: activeMedia) {
+        case let .ready(media): return media
+        case .pending: return nil
+        case .notSourced: break
+        }
         guard StalkerLink.isPlaceholder(activeMedia.url) else { return activeMedia }
         guard let resolvedMedia, resolvedMedia.id == activeMedia.id else { return nil }
         return resolvedMedia
@@ -398,6 +408,8 @@ struct FullScreenPlayerView: View {
     private var playerView: some View {
         if let media = displayMedia {
             engineView(for: media)
+        } else if JellyfinSourceResolver.itemId(for: activeMedia) != nil {
+            sourcePhaseView
         } else if resolveError != nil {
             // Stalker `create_link` failed — surface the failure with a retry
             // rather than spinning forever.
@@ -418,7 +430,7 @@ struct FullScreenPlayerView: View {
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
                 nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
-                reportsStartupFailure: hasFallbackEngine,
+                reportsStartupFailure: reportsStartupFailure,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia,
@@ -436,7 +448,7 @@ struct FullScreenPlayerView: View {
                 // The cast attempt keeps the full startup window: giving up
                 // early would drop slow-to-start streams to audio-only when a
                 // few more seconds would have cast them fine.
-                reportsStartupFailure: isAirPlayOverride || hasFallbackEngine,
+                reportsStartupFailure: isAirPlayOverride || reportsStartupFailure,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: handlePlaybackFailure,
                 onSelectMedia: switchMedia,
@@ -448,7 +460,7 @@ struct FullScreenPlayerView: View {
             KSPlayerEngineView(
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
                 nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours, skipSegments: skipSegments,
-                reportsStartupFailure: hasFallbackEngine,
+                reportsStartupFailure: reportsStartupFailure,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia,
@@ -460,7 +472,7 @@ struct FullScreenPlayerView: View {
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
                 nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
-                reportsStartupFailure: hasFallbackEngine,
+                reportsStartupFailure: reportsStartupFailure,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia,
@@ -468,28 +480,6 @@ struct FullScreenPlayerView: View {
             )
             .id(engineAttempt)
         }
-    }
-
-    /// Resolves the active Stalker placeholder into a playable URL. A no-op for
-    /// directly playable streams. Re-runs whenever the active stream changes
-    /// (open, channel surf, next episode), so each switch resolves a fresh,
-    /// short-lived URL.
-    private func resolveActiveMedia() async {
-        guard StalkerLink.isPlaceholder(activeMedia.url), !keepsAdoptedResolution else { return }
-        resolvedMedia = nil
-        resolveError = nil
-        do {
-            resolvedMedia = try await StalkerStreamResolver.resolve(activeMedia, container: modelContext.container)
-        } catch {
-            resolveError = error.localizedDescription
-            let detail = (error as? StalkerError)?.logDescription ?? LogRedaction.describe(error)
-            Logger.player.error("Stalker stream resolution failed: \(detail, privacy: .public)")
-        }
-    }
-
-    private func retryResolve() {
-        engineAttempt = 0
-        Task { await resolveActiveMedia() }
     }
 
     private var closeButton: some View {
@@ -512,7 +502,7 @@ struct FullScreenPlayerView: View {
         #endif
     }
 
-    private func closePlayer() {
+    func closePlayer() {
         #if os(macOS)
             // Exit fullscreen first so the window animation is graceful, then close.
             if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) {

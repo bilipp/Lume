@@ -63,6 +63,18 @@ import SwiftUI
                     tvPremiumToggleRow("Show Skip Intro Button", isOn: $showSkipIntroButton, feature: .playbackControls)
                 }
 
+                VStack(alignment: .leading, spacing: 8) {
+                    TVSettingsSectionLabel("Sources")
+
+                    TVOptionToggleRow(title: "Choose Source Before Playing", isOn: $chooseSourceBeforePlaying)
+
+                    Text("When a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the server's first version.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
                 // Second in the pane, right under Playback: this is a
                 // viewer-facing playback preference (and the one that otherwise
                 // costs a menu trip on every zap), where everything under

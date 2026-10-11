@@ -235,10 +235,14 @@ enum PlayerSettings {
         /// the same response also carries the outro window that sets when the
         /// Next Episode button arms, so either toggle being on triggers it.
         static let showSkipIntroButtonKey = "player.showSkipIntroButton"
+        /// Ask which version to play when a Jellyfin/Emby title offers several.
+        /// Off plays the server's first (top-ranked) one without asking.
+        static let chooseSourceBeforePlayingKey = "player.chooseSourceBeforePlaying"
 
         static let autoPlayNextDefault = true
         static let showNextEpisodeButtonDefault = true
         static let showSkipIntroButtonDefault = true
+        static let chooseSourceBeforePlayingDefault = true
 
         /// Whether the skip-intro affordance is enabled, read off `UserDefaults`
         /// directly (so the player host needn't hold an `@AppStorage` that would
@@ -251,6 +255,10 @@ enum PlayerSettings {
         /// directly for the same reason as `showSkipIntroButton`.
         static var showNextEpisodeButton: Bool {
             UserDefaults.standard.bool(showNextEpisodeButtonKey, default: showNextEpisodeButtonDefault)
+        }
+
+        static var chooseSourceBeforePlaying: Bool {
+            UserDefaults.standard.bool(chooseSourceBeforePlayingKey, default: chooseSourceBeforePlayingDefault)
         }
     }
 

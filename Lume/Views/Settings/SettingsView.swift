@@ -53,6 +53,8 @@ struct SettingsView: View {
         var showNextEpisodeButton = PlayerSettings.Playback.showNextEpisodeButtonDefault
         @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
         var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+        @AppStorage(PlayerSettings.Playback.chooseSourceBeforePlayingKey)
+        var chooseSourceBeforePlaying = PlayerSettings.Playback.chooseSourceBeforePlayingDefault
         /// Comma-separated preferred languages, empty meaning no preference (see `PreferredLanguageList`).
         @AppStorage(PlayerSettings.Language.preferredAudioLanguagesKey)
         var preferredAudioLanguagesRaw = PlayerSettings.Language.preferredAudioLanguagesDefault

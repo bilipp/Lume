@@ -341,9 +341,13 @@ extension Playlist {
     }
 
     /// Whether a series' episodes are fetched from the provider on demand. The
-    /// m3u, WebDAV and media-server pipelines import every episode during sync,
-    /// so there is nothing to fetch lazily.
+    /// m3u, WebDAV and Plex pipelines import every episode during sync, so
+    /// there is nothing to fetch lazily. Jellyfin and Emby import them too,
+    /// but an AIOStreams-style server only lists them per show.
     var supportsPerSeriesEpisodeFetch: Bool {
-        sourceType == .xtream || sourceType == .stalker
+        switch sourceType {
+        case .xtream, .stalker, .jellyfin, .emby: true
+        case .m3u, .webdav, .plex: false
+        }
     }
 }

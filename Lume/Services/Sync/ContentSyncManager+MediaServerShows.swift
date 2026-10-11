@@ -16,12 +16,27 @@ import SwiftData
 extension ContentSyncManager {
     // MARK: - Series & episodes
 
-    func syncJellyfinShows(scope: JellyfinViewScope, seenSeries: inout Set<String>, seenEpisodes: inout Set<String>, progress: SyncProgress?) async throws {
+    /// What one sync saw across every TV library, for the prune sweep.
+    struct JellyfinShowsSeen {
+        var series = Set<String>()
+        var episodes = Set<String>()
+        /// Series from libraries that list their shows but no episodes under
+        /// them — AIOStreams-style servers, which only answer per show. Their
+        /// episodes are fetched when the show is opened (see
+        /// `fetchMediaServerEpisodes`), so this sync never saw them and must
+        /// not prune them.
+        var episodesFetchedPerShow = Set<String>()
+    }
+
+    func syncJellyfinShows(scope: JellyfinViewScope, seen: inout JellyfinShowsSeen, progress: SyncProgress?) async throws {
         // Series shells first, so episodes below can link against them.
         var shells = JellyfinShellIndex()
-        var seen = seenSeries
+        var seenSeries = seen.series
+        var librarySeries = Set<String>()
         _ = try await pageThroughJellyfinItems(types: ["Series"], scope: scope, progress: nil, unit: "series") { items in
-            seen.formUnion(upsertJellyfinSeries(items, scope: scope))
+            let ids = upsertJellyfinSeries(items, scope: scope)
+            seenSeries.formUnion(ids)
+            librarySeries.formUnion(ids)
             shells.insert(items)
         }
 
@@ -30,15 +45,19 @@ extension ContentSyncManager {
         // oddly) still imports, under the shell its `SeriesName` names — see
         // `JellyfinShellIndex` — so no playable file is ever dropped and a
         // mis-scanned library does not fan out into one show per file.
-        var seenEp = seenEpisodes
+        var seenEpisodes = seen.episodes
         let resolvedShells = shells
         let episodeCount = try await pageThroughJellyfinItems(types: ["Episode"], scope: scope, progress: progress, unit: "episode(s)") { items in
             let (series, episodes) = upsertJellyfinEpisodes(items, seriesShells: resolvedShells, scope: scope)
-            seen.formUnion(series)
-            seenEp.formUnion(episodes)
+            seenSeries.formUnion(series)
+            seenEpisodes.formUnion(episodes)
         }
-        seenSeries = seen
-        seenEpisodes = seenEp
+        seen.series = seenSeries
+        seen.episodes = seenEpisodes
+        if episodeCount == 0, !librarySeries.isEmpty {
+            seen.episodesFetchedPerShow.formUnion(librarySeries)
+            Logger.database.info("\(scope.flavor.displayName, privacy: .public) library \(scope.view.name, privacy: .public) lists \(librarySeries.count, privacy: .public) series but no episodes; episodes load per show")
+        }
         Logger.database.info("\(scope.flavor.displayName, privacy: .public) shows synced for library \(scope.view.name, privacy: .public): \(episodeCount, privacy: .public) episode(s)")
     }
 
@@ -271,7 +290,7 @@ extension ContentSyncManager {
         }
     }
 
-    func pruneJellyfinSeries(playlistId: UUID, flavor: MediaServerFlavor, seenSeries: Set<String>, seenEpisodes: Set<String>, fetched: Bool) {
+    func pruneJellyfinSeries(playlistId: UUID, flavor: MediaServerFlavor, seen: JellyfinShowsSeen, fetched: Bool) {
         guard fetched else { return }
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
@@ -281,10 +300,12 @@ extension ContentSyncManager {
         ))) ?? []
         let infix = "-\(flavor.idInfix)-"
         for series in rows where series.id.contains(infix) {
-            if seenSeries.contains(series.id) {
+            if seen.series.contains(series.id) {
+                // Fetched per show, not by this sync: nothing to compare against.
+                if seen.episodesFetchedPerShow.contains(series.id) { continue }
                 // The shell survives, but dropped episodes don't: delete them
                 // explicitly (no cascade from a surviving parent).
-                for episode in series.episodes where !seenEpisodes.contains(episode.id) {
+                for episode in series.episodes where !seen.episodes.contains(episode.id) {
                     context.delete(episode)
                 }
             } else {

@@ -17,6 +17,8 @@
         private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
         @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
         private var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+        @AppStorage(PlayerSettings.Playback.chooseSourceBeforePlayingKey)
+        private var chooseSourceBeforePlaying = PlayerSettings.Playback.chooseSourceBeforePlayingDefault
         @AppStorage(PlayerSettings.StreamInfo.enabledKey)
         private var streamInfoEnabled = PlayerSettings.StreamInfo.enabledDefault
         @AppStorage(PlayerSettings.StreamInfo.detailLevelKey)
@@ -43,6 +45,15 @@
                     Text("Playback")
                 } footer: {
                     Text("Automatically start the next episode when one finishes.")
+                }
+
+                // Free, like the stream caption below.
+                Section {
+                    Toggle("Choose Source Before Playing", isOn: $chooseSourceBeforePlaying)
+                } header: {
+                    Text("Sources")
+                } footer: {
+                    Text("When a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the server's first version.")
                 }
 
                 Section {
