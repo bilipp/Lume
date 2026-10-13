@@ -18,9 +18,13 @@ import SwiftUI
 
 struct ContentManagementView: View {
     @Query private var playlists: [Playlist]
-    @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+    @Environment(\.catalogScope) private var catalogScope
 
     @State private var selectedType: CategoryType = .live
+
+    /// The Combined member being managed. Unset, or naming a playlist that has
+    /// left the scope, it resolves to the priority-1 member.
+    @State private var pickedMemberID: UUID?
 
     /// True while a category is lifted for placement on tvOS — used to disable
     /// the type picker and the bulk actions so they can't steal focus mid-move.
@@ -105,8 +109,18 @@ struct ContentManagementView: View {
 
     // MARK: - Scoping
 
+    private var combinedMembers: [Playlist] {
+        playlists.combinedMembers(of: catalogScope)
+    }
+
+    /// Hidden and reordered categories are per playlist, so in Combined this
+    /// manages the member the picker names rather than the merged scope.
     private var activePlaylist: Playlist? {
-        playlists.active(for: selectedPlaylistID)
+        playlists.pickedMember(pickedMemberID, in: catalogScope) ?? playlists.primaryMember(of: catalogScope)
+    }
+
+    private var memberSelection: Binding<UUID?> {
+        Binding(get: { activePlaylist?.id }, set: { pickedMemberID = $0 })
     }
 
     /// The id prefix every Category of the active playlist shares. Empty only
@@ -220,7 +234,7 @@ struct ContentManagementView: View {
                             .font(.system(size: 34, weight: .bold))
                             .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
-                        if let name = activePlaylist?.name {
+                        if combinedMembers.isEmpty, let name = activePlaylist?.name {
                             Text(name)
                                 .font(.system(size: 22))
                                 .foregroundStyle(.secondary)
@@ -240,6 +254,10 @@ struct ContentManagementView: View {
                             .focusSection()
                         }
 
+                        if !combinedMembers.isEmpty {
+                            tvMemberPicker
+                        }
+
                         tvTypePicker
 
                         tvCategoryList(proxy: proxy)
@@ -251,6 +269,17 @@ struct ContentManagementView: View {
                 }
             }
             .tvSettingsBackground()
+        }
+
+        private var tvMemberPicker: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                CombinedMemberPicker(members: combinedMembers, selection: memberSelection)
+                    .disabled(isReordering)
+                Text("In Combined View, hidden and reordered categories still belong to each playlist. Pick the playlist to manage.")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            }
         }
 
         private var tvTypePicker: some View {
@@ -333,6 +362,14 @@ struct ContentManagementView: View {
                     .buttonStyle(.plain)
                 } footer: {
                     Text("Reorder all your favorite channels, movies, and series in one list.")
+                }
+
+                if !combinedMembers.isEmpty {
+                    Section {
+                        CombinedMemberPicker(members: combinedMembers, selection: memberSelection)
+                    } footer: {
+                        Text("In Combined View, hidden and reordered categories still belong to each playlist. Pick the playlist to manage.")
+                    }
                 }
 
                 Section {

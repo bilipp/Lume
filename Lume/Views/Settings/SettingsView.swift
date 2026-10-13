@@ -18,9 +18,14 @@ struct SettingsView: View {
     /// The globally-selected playlist, shared with the content tabs. Library's
     /// tab switches apply to it, and on tvOS (no toolbar switcher) the Playlists
     /// pane is also where it is chosen, the Play/Pause quick-switch overlay the
-    /// fast path. Not `private`: read by the SettingsView+Playlists / +Library
-    /// extensions (separate files).
+    /// fast path. The raw value can be `PlaylistSelectionStore.combined`, so it
+    /// is only ever read through `catalogScope`. Not `private`: written by the
+    /// SettingsView+Playlists extension (separate file).
     @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
+    /// The scope the content tabs show, published by `MainTabView`, which hosts
+    /// Settings as a tab or as a sheet on the library toolbar. Not `private`:
+    /// read by the SettingsView+Playlists / +Library extensions (separate files).
+    @Environment(\.catalogScope) var catalogScope
     #if !os(tvOS)
         /// The app-wide appearance override (System / Dark / Light), shown as the
         /// Appearance row's value. Not offered on tvOS — the TV UI is designed
@@ -68,6 +73,9 @@ struct SettingsView: View {
         /// Routes the switch through the blocking overlay (see PlaylistSwitchModel).
         /// Not `private`: read by the SettingsView+Playlists extension.
         @Environment(PlaylistSwitchModel.self) var playlistSwitch: PlaylistSwitchModel?
+        /// Carries the page another surface (the quick-switch overlay) asked
+        /// Settings to open on.
+        @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
         /// Not `private`: the Add Playlist row (SettingsView+Playlists) presents it.
         @State var showingAddPlaylist = false
         /// The category whose content is shown in the right pane. Follows focus
@@ -85,6 +93,9 @@ struct SettingsView: View {
         /// whole detail pane (same reasoning as `selectedPlaylist`). Not
         /// `private`: set by the SettingsView+Library extension (separate file).
         @State var showingContentManagement = false
+        /// Combined View drilled into, like `showingContentManagement`. Not
+        /// `private`: set by the SettingsView+Playlists extension.
+        @State var showingCombinedView = false
         /// Focus handle on the Content Management pane, written once the pane
         /// has replaced the Library detail (see `beginContentManagementHandoff`).
         @FocusState private var contentManagementFocused: Bool
@@ -152,6 +163,19 @@ struct SettingsView: View {
         }
     #endif
 
+    #if !os(tvOS)
+        /// Pages pushed above the root, seeded when Settings opens on a route.
+        @State private var path: [SettingsRoute]
+    #endif
+
+    /// - Parameter route: The page to open on instead of the root. tvOS's
+    ///   two-pane layout has no push stack to seed, so it ignores it.
+    init(opening route: SettingsRoute? = nil) {
+        #if !os(tvOS)
+            _path = State(initialValue: route?.stack ?? [])
+        #endif
+    }
+
     /// Whether this build has credentials for any Connected Services entry.
     private var hasConnectedServices: Bool {
         trakt.isConfigured || simkl.isConfigured
@@ -169,7 +193,7 @@ struct SettingsView: View {
 
     #if !os(tvOS)
         private var standardBody: some View {
-            NavigationStack {
+            NavigationStack(path: $path) {
                 List {
                     ForEach(SettingsCategory.grouped(hasConnectedServices: hasConnectedServices), id: \.group) { entry in
                         Section {
@@ -194,6 +218,7 @@ struct SettingsView: View {
                 }
                 #endif
                 .platformNavigationTitle("Settings")
+                .navigationDestination(for: SettingsRoute.self) { SettingsRouteDestination(route: $0) }
                 .paywall(isPresented: $showPaywall, highlight: paywallHighlight)
             }
             #if os(macOS)
@@ -245,6 +270,17 @@ struct SettingsView: View {
 }
 
 #if !os(tvOS)
+
+    private struct SettingsRouteDestination: View {
+        let route: SettingsRoute
+
+        var body: some View {
+            switch route {
+            case .playlists: PlaylistsSettingsView()
+            case .combinedView: CombinedPlaylistsSettingsView()
+            }
+        }
+    }
 
     /// The page behind a root Settings row.
     private struct SettingsCategoryDestination: View {
@@ -320,6 +356,7 @@ struct SettingsView: View {
                         // top-level list.
                         selectedPlaylist = nil
                         showingContentManagement = false
+                        showingCombinedView = false
                         showingEngines = false
                         showingOpenSubtitles = false
                         showingSubtitleStyle = false
@@ -331,6 +368,33 @@ struct SettingsView: View {
                 }
                 .fullScreenCover(isPresented: $showingAddPlaylist) {
                     LoginView(isModal: true)
+                }
+                .onChange(of: router?.pendingSettingsRoute, initial: true) { _, route in
+                    guard let route else { return }
+                    open(route)
+                }
+            }
+        }
+
+        /// Lands on the route's category. Focus is asserted once the tree has
+        /// mounted, released first — the sidebar's default focus otherwise
+        /// wins and pulls the pane back to Profiles.
+        private func open(_ route: SettingsRoute) {
+            router?.pendingSettingsRoute = nil
+            let category: SettingsCategory = switch route {
+            case .playlists, .combinedView: .playlists
+            }
+            selectedCategory = category
+            Task { @MainActor in
+                focusedCategory = nil
+                try? await Task.sleep(for: .milliseconds(150))
+                if route == .combinedView {
+                    beginContentManagementHandoff()
+                    selectedPlaylist = nil
+                    showingCombinedView = true
+                    contentManagementFocused = true
+                } else {
+                    focusedCategory = category
                 }
             }
         }
@@ -393,8 +457,9 @@ struct SettingsView: View {
             .padding(.top, 77)
         }
 
-        /// Content Management brings its own scroll/background, so it replaces the
-        /// detail pane wholesale rather than nesting inside the scrolling detail.
+        /// Content Management and Combined View bring their own scroll/background
+        /// (both host a `TVReorderableContentList`), so they replace the detail
+        /// pane wholesale rather than nesting inside the scrolling detail.
         @ViewBuilder
         private var tvDetailContainer: some View {
             if selectedCategory == .library, showingContentManagement {
@@ -404,6 +469,10 @@ struct SettingsView: View {
                 }
                 .focusSection()
                 .focused($contentManagementFocused)
+            } else if selectedCategory == .playlists, showingCombinedView {
+                TVCombinedViewSettingsPane(beginHandoff: beginContentManagementHandoff)
+                    .focusSection()
+                    .focused($contentManagementFocused)
             } else {
                 tvDetail
             }
@@ -418,8 +487,8 @@ struct SettingsView: View {
         /// lands there, draws the sidebar unfocused so Profiles never flashes.
         /// It closes once focus arrives, or after half a second at most, so a
         /// swap that keeps its focus can't swallow the user's own later move
-        /// to the sidebar. Not `private`: the Library pane's row calls it
-        /// (SettingsView+Library).
+        /// to the sidebar. Not `private`: the Library and Playlists panes call it
+        /// (SettingsView+Library, SettingsView+Playlists).
         func beginContentManagementHandoff() {
             contentManagementHandoff = true
             sidebarFocusUnmask?.cancel()

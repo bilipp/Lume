@@ -289,8 +289,8 @@ struct PlexClientTests {
         #expect(hashed != ContentSyncManager.plexStreamId("abd"))
     }
 
-    @Test func `addedAt becomes the yyyy-MM-dd string the catalog stores`() {
-        #expect(ContentSyncManager.plexDateString(from: 1_789_592_930) == "2026-09-16")
-        #expect(ContentSyncManager.plexDateString(from: 0) == "1970-01-01")
+    @Test func `addedAt becomes the 10-digit unix string the catalog stores`() {
+        #expect(CatalogAddedDate.unixString(seconds: 1_789_592_930) == "1789592930")
+        #expect(CatalogAddedDate.unixString(seconds: 0) == "0000000000")
     }
 }

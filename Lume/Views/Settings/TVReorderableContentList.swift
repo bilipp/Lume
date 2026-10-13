@@ -38,7 +38,8 @@
         /// When non-nil, each row shows a trailing drill-in link to the returned
         /// category's channels. nil for the channel list itself.
         var drillValue: ((Item) -> Category)?
-        let onToggleHidden: (Item) -> Void
+        /// nil drops the per-row toggle (the Combined View member list).
+        let onToggleHidden: ((Item) -> Void)?
         /// The per-row toggle's SF Symbol, given the row's `isHidden` value.
         /// Defaults to the eye / eye-slash hide control; the favorites reorder
         /// screen overrides it with a heart to mean "remove from favorites".
@@ -52,6 +53,9 @@
         /// doesn't apply (the channel list).
         var isRestricted: ((Item) -> Bool)?
         var onToggleRestricted: ((Item) -> Void)?
+        /// When set, each row gains a trailing pencil that opens it (the
+        /// Combined View member list); Select still lifts the row.
+        var onEdit: ((Item) -> Void)?
         /// Lets the host disable its type picker / Reset while a row is lifted,
         /// so they can't steal focus mid-move.
         @Binding var isReordering: Bool
@@ -72,12 +76,13 @@
             title: @escaping (Item) -> String,
             isHidden: @escaping (Item) -> Bool,
             drillValue: ((Item) -> Category)? = nil,
-            onToggleHidden: @escaping (Item) -> Void,
+            onToggleHidden: ((Item) -> Void)?,
             onCommitOrder: @escaping ([Item]) -> Void,
             isReordering: Binding<Bool>,
             scrollProxy: ScrollViewProxy,
             isRestricted: ((Item) -> Bool)? = nil,
             onToggleRestricted: ((Item) -> Void)? = nil,
+            onEdit: ((Item) -> Void)? = nil,
             toggleImage: @escaping (Bool) -> String = { $0 ? "eye.slash" : "eye" },
             toggleAccessibility: @escaping (Bool, String) -> String = { $0 ? "Show \($1)" : "Hide \($1)" }
         ) {
@@ -91,6 +96,7 @@
             self.scrollProxy = scrollProxy
             self.isRestricted = isRestricted
             self.onToggleRestricted = onToggleRestricted
+            self.onEdit = onEdit
             self.toggleImage = toggleImage
             self.toggleAccessibility = toggleAccessibility
         }
@@ -135,7 +141,8 @@
                         onToggleRestricted: onToggleRestricted.map { toggle in { toggle(item) } },
                         focus: $focusedID,
                         onGrabOrDrop: { lifted ? drop() : lift(item) },
-                        onToggleHidden: { onToggleHidden(item) },
+                        onEdit: onEdit.map { edit in { edit(item) } },
+                        onToggleHidden: onToggleHidden.map { toggle in { toggle(item) } },
                         onMove: handleMove,
                         onCancel: cancel
                     )
@@ -178,8 +185,19 @@
         }
 
         private func drop() {
-            if let working { onCommitOrder(working) }
+            let placed = liftedID
+            if let working {
+                onCommitOrder(working)
+            }
             endMove()
+            // The commit can re-sort the host's rows a beat later (Combined
+            // View's members follow the saved priority); that pass dropped
+            // focus on the first row. Put it back on the row just placed.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                guard liftedID == nil, let placed, focusedID != placed else { return }
+                focusedID = placed
+            }
         }
 
         private func cancel() {
@@ -248,7 +266,9 @@
         let onToggleRestricted: (() -> Void)?
         var focus: FocusState<String?>.Binding
         let onGrabOrDrop: () -> Void
-        let onToggleHidden: () -> Void
+        /// The trailing pencil's action; nil drops the pencil.
+        let onEdit: (() -> Void)?
+        let onToggleHidden: (() -> Void)?
         let onMove: (MoveCommandDirection) -> Void
         let onCancel: () -> Void
 
@@ -273,11 +293,13 @@
                 .accessibilityLabel(isLifted ? "Placing \(title). Move up or down, then select to place." : "Move \(title)")
 
                 if !isMoving {
-                    Button(action: onToggleHidden) {
-                        Image(systemName: toggleImageName)
+                    if let onToggleHidden {
+                        Button(action: onToggleHidden) {
+                            Image(systemName: toggleImageName)
+                        }
+                        .buttonStyle(TVContentIconButtonStyle())
+                        .accessibilityLabel(toggleAccessibilityLabel)
                     }
-                    .buttonStyle(TVContentIconButtonStyle())
-                    .accessibilityLabel(toggleAccessibilityLabel)
 
                     if let isRestricted, let onToggleRestricted {
                         Button(action: onToggleRestricted) {
@@ -285,6 +307,14 @@
                         }
                         .buttonStyle(TVContentIconButtonStyle())
                         .accessibilityLabel(restrictionAccessibilityLabel)
+                    }
+
+                    if let onEdit {
+                        Button(action: onEdit) {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(TVContentIconButtonStyle())
+                        .accessibilityLabel("Edit \(title)")
                     }
 
                     if let drillValue {

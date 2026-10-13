@@ -35,6 +35,10 @@ nonisolated struct SearchRequest {
     let excludedCategoryIDs: Set<String>
     /// Max rows per content type, across every playlist searched.
     let limit: Int
+    /// Per-type playlists replacing `playlistIDs` for that type — Combined,
+    /// where each member contributes only the types switched on for it. A type
+    /// mapped to no playlist searches nothing, never the whole store.
+    var playlistIDsByTab: [PlaylistTab: [String]]?
 
     /// The fetches one type is split into: one per playlist, so a single
     /// catalog can't spend the whole budget on its own. Scoping keys off the
@@ -48,6 +52,63 @@ nonisolated struct SearchRequest {
             SearchScope(query: query, playlistID: $0, restrictToPlaylist: true, excluded: excludedCategoryIDs)
         }
     }
+
+    func scopes(for tab: PlaylistTab) -> [SearchScope] {
+        guard let ids = playlistIDsByTab?[tab] else { return scopes }
+        return ids.map {
+            SearchScope(query: query, playlistID: $0, restrictToPlaylist: true, excluded: excludedCategoryIDs)
+        }
+    }
+}
+
+nonisolated extension SearchRequest {
+    /// The playlists a search covers: Combined keeps its members and their
+    /// types and takes the place of "Search All Playlists"; outside Combined
+    /// that setting picks between every playlist, for every type, and the one
+    /// shown.
+    static func searchedScope(
+        _ scope: CatalogScope, allPlaylistIDs: [UUID], searchAllPlaylists: Bool
+    ) -> CatalogScope {
+        guard !scope.isCombined, searchAllPlaylists else { return scope }
+        return .combined(allPlaylistIDs.map { (id: $0, tabs: Set(PlaylistTab.allCases)) })
+    }
+
+    /// The request for a `searchedScope`: each playlist is searched only for
+    /// the types it contributes, in priority order.
+    init(
+        query: String,
+        searching scope: CatalogScope,
+        wantMovies: Bool,
+        wantSeries: Bool,
+        wantLive: Bool,
+        excludedCategoryIDs: Set<String>,
+        limit: Int
+    ) {
+        let byTab: [PlaylistTab: [String]]? = scope.isEmpty
+            ? nil
+            : Dictionary(uniqueKeysWithValues: PlaylistTab.allCases.map { tab in
+                (tab, scope.members(for: tab).map(\.uuidString))
+            })
+        self.init(
+            query: query,
+            playlistIDs: scope.playlistIDs.map(\.uuidString),
+            wantMovies: wantMovies,
+            wantSeries: wantSeries,
+            wantLive: wantLive,
+            excludedCategoryIDs: excludedCategoryIDs,
+            limit: limit,
+            playlistIDsByTab: byTab
+        )
+    }
+
+    /// The playlists of a `searchedScope` whose Stalker portal search may be
+    /// asked, before the source-type filter: those contributing movies or
+    /// series.
+    static func portalCandidateIDs(in scope: CatalogScope) -> [UUID] {
+        scope.playlistIDs.filter {
+            scope.contributes(.movies, from: $0) || scope.contributes(.series, from: $0)
+        }
+    }
 }
 
 /// Runs the bounded `localizedStandardContains` fetches on a background
@@ -55,7 +116,6 @@ nonisolated struct SearchRequest {
 /// can't cross actor boundaries.
 nonisolated enum SearchFetcher {
     static func fetch(container: ModelContainer, request: SearchRequest) -> SearchHits {
-        let scopes = request.scopes
         let limit = request.limit
         let context = ModelContext(container)
         var hits = SearchHits()
@@ -80,17 +140,17 @@ nonisolated enum SearchFetcher {
         // inherit it), and `ids` checks it between scans. The partial hits
         // returned are discarded by the caller, which is cancelled too.
         if request.wantMovies {
-            hits.movies = ids(in: context, scopes: scopes, limit: limit, predicate: searchMoviePredicate)
+            hits.movies = ids(in: context, scopes: request.scopes(for: .movies), limit: limit, predicate: searchMoviePredicate)
         }
         guard !Task.isCancelled else { return hits }
 
         if request.wantSeries {
-            hits.series = ids(in: context, scopes: scopes, limit: limit, predicate: searchSeriesPredicate)
+            hits.series = ids(in: context, scopes: request.scopes(for: .series), limit: limit, predicate: searchSeriesPredicate)
         }
         guard !Task.isCancelled else { return hits }
 
         if request.wantLive {
-            hits.streams = ids(in: context, scopes: scopes, limit: limit, predicate: searchLiveStreamPredicate)
+            hits.streams = ids(in: context, scopes: request.scopes(for: .liveTV), limit: limit, predicate: searchLiveStreamPredicate)
         }
 
         return hits

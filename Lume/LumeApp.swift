@@ -328,6 +328,12 @@ struct LumeApp: App {
                     ContentIndexingService.shared.configure(container: catalogContainer)
                     ContentIndexingService.shared.kick()
 
+                    // One-time rewrite of "added" stamps stored before every
+                    // importer wrote Unix seconds. After `cloudSync.start()` and
+                    // on its own background context; it waits out playback,
+                    // syncs, iCloud imports and browsing like the indexer.
+                    AddedDateNormalization.runIfNeeded(container: catalogContainer)
+
                     // Refresh the TV guide on its own schedule. No-ops when no
                     // guide is due yet, and stands aside while a playlist sync
                     // is queued or running — the deferred refresh runs once

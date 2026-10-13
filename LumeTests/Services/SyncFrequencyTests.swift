@@ -1,5 +1,6 @@
 import Foundation
 @testable import Lume
+import SwiftData
 import Testing
 
 struct SyncFrequencyTests {
@@ -432,5 +433,104 @@ struct EPGSyncScheduleTests {
     @Test func `epg sync schedule nil when never set`() {
         EPGSyncSchedule.lastSyncDate = nil
         #expect(EPGSyncSchedule.lastSyncDate == nil)
+    }
+}
+
+// MARK: - AutoSync in Combined
+
+struct AutoSyncCombinedTests {
+    private func makePlaylist(_ name: String, tabs: Set<PlaylistTab> = []) -> Playlist {
+        let playlist = Playlist(name: name, serverURL: "http://\(name).example.com", username: "u", password: "p")
+        playlist.combinedTabs = tabs
+        return playlist
+    }
+
+    private let stale = Date().addingTimeInterval(-48 * 60 * 60)
+
+    @Test func `every combined member counts as on screen`() {
+        let memberA = makePlaylist("a", tabs: [.liveTV])
+        let memberB = makePlaylist("b", tabs: [.movies])
+        let outsider = makePlaylist("c")
+        let scope = [memberA, memberB, outsider].scope(for: PlaylistSelectionStore.combined, isPremium: true)
+
+        #expect(memberA.autoSyncCandidate(in: scope).isActive)
+        #expect(memberB.autoSyncCandidate(in: scope).isActive)
+        #expect(!outsider.autoSyncCandidate(in: scope).isActive)
+    }
+
+    @Test func `isolated scope keeps only the selected playlist on screen`() {
+        let memberA = makePlaylist("a", tabs: [.liveTV])
+        let memberB = makePlaylist("b", tabs: [.movies])
+        let scope = [memberA, memberB].scope(for: memberB.id.uuidString, isPremium: true)
+
+        #expect(!memberA.autoSyncCandidate(in: scope).isActive)
+        #expect(memberB.autoSyncCandidate(in: scope).isActive)
+    }
+
+    @Test func `a lapsed combined selection keeps only the priority-1 member on screen`() {
+        let memberA = makePlaylist("a", tabs: [.liveTV])
+        memberA.combinedPriority = 0
+        let memberB = makePlaylist("b", tabs: [.movies])
+        memberB.combinedPriority = 1
+        let scope = [memberB, memberA].scope(for: PlaylistSelectionStore.combined, isPremium: false)
+
+        #expect(memberA.autoSyncCandidate(in: scope).isActive)
+        #expect(!memberB.autoSyncCandidate(in: scope).isActive)
+    }
+
+    @Test func `a due member syncs and a due outsider waits`() {
+        let member = makePlaylist("a", tabs: [.liveTV])
+        member.lastSyncDate = stale
+        let other = makePlaylist("b", tabs: [.series])
+        let outsider = makePlaylist("c")
+        outsider.lastSyncDate = stale
+        let scope = [member, other, outsider].scope(for: PlaylistSelectionStore.combined, isPremium: true)
+
+        #expect(AutoSync.shouldSync(member.autoSyncCandidate(in: scope), frequency: .daily, alreadyStarted: false))
+        #expect(!AutoSync.shouldSync(outsider.autoSyncCandidate(in: scope), frequency: .daily, alreadyStarted: false))
+    }
+
+    @Test func `only combined members without content take the cover`() {
+        #expect(AutoSync.presentsCover(isCombined: false, hasContent: true))
+        #expect(AutoSync.presentsCover(isCombined: false, hasContent: false))
+        #expect(AutoSync.presentsCover(isCombined: true, hasContent: false))
+        #expect(!AutoSync.presentsCover(isCombined: true, hasContent: true))
+    }
+
+    @Test func `manual member sync takes the due members in order`() {
+        let dueA = makePlaylist("a")
+        dueA.lastSyncDate = stale
+        let fresh = makePlaylist("b")
+        fresh.lastSyncDate = Date()
+        let dueC = makePlaylist("c")
+
+        let queued = AutoSync.manualMemberSyncs([dueA, fresh, dueC], frequency: .daily)
+        #expect(queued.map(\.id) == [dueA.id, dueC.id])
+    }
+
+    @Test func `manual member sync takes every idle member when none is due`() {
+        let freshA = makePlaylist("a")
+        freshA.lastSyncDate = Date()
+        let syncing = makePlaylist("b")
+        syncing.syncStatus = .syncing
+        let freshC = makePlaylist("c")
+        freshC.lastSyncDate = Date()
+
+        let queued = AutoSync.manualMemberSyncs([freshA, syncing, freshC], frequency: .daily)
+        #expect(queued.map(\.id) == [freshA.id, freshC.id])
+    }
+
+    @Test func `content probe sees only the playlist's own rows`() throws {
+        try OnDiskCatalogStore.withContext { context in
+            let filled = makePlaylist("a")
+            let empty = makePlaylist("b")
+            context.insert(filled)
+            context.insert(empty)
+            context.insert(LiveStream(id: "\(filled.id.uuidString)-live-1", streamId: 1, name: "One"))
+            try context.save()
+
+            #expect(AutoSync.hasContent(filled.id, in: context))
+            #expect(!AutoSync.hasContent(empty.id, in: context))
+        }
     }
 }

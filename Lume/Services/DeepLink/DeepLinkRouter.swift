@@ -22,9 +22,10 @@ final class DeepLinkRouter {
     var seriesPath = NavigationPath()
     var sportsPath = NavigationPath()
     var homePath = NavigationPath()
-    /// Live TV's selected rail section, and the playlist it was seeded for.
+    /// Live TV's selected rail section, and the `CatalogScope.token` it was
+    /// seeded for.
     var liveTVSection: LiveTVSection?
-    var liveTVSeededPrefix: String?
+    var liveTVSeededScopeToken: String?
     #if os(tvOS)
         /// Whether Multi-View is covering the app. It is presented from
         /// `MainTabView` — above the tab bar — as a plain overlay rather than a
@@ -48,5 +49,10 @@ final class DeepLinkRouter {
         /// `interactiveDismissDisabled`. The modal needs Menu for itself so a PIN
         /// pad nested over it can consume the press first.
         var isQuickSwitchPresented = false
+
+        /// A Settings page another surface asked for, opened — and cleared — by
+        /// the Settings tab once it is on screen. tvOS Settings is a tab, not a
+        /// sheet a caller could seed with `SettingsView(opening:)`.
+        var pendingSettingsRoute: SettingsRoute?
     #endif
 }

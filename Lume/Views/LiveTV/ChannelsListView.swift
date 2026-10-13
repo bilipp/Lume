@@ -15,7 +15,7 @@ import SwiftUI
 
 struct ChannelsList: View {
     let scope: LiveChannelScope
-    let playlistPrefix: String
+    let catalogScope: CatalogScope
     /// Seeds Multi-View with this channel, gated on Lume Pro by the host.
     let onStartMultiView: (LiveStream) -> Void
     let onPlay: (LiveStream) -> Void
@@ -43,20 +43,20 @@ struct ChannelsList: View {
 
     init(
         scope: LiveChannelScope,
-        playlistPrefix: String,
+        catalogScope: CatalogScope,
         sort: ContentSortOption,
         onStartMultiView: @escaping (LiveStream) -> Void,
         onPlay: @escaping (LiveStream) -> Void
     ) {
         self.scope = scope
-        self.playlistPrefix = playlistPrefix
+        self.catalogScope = catalogScope
         self.onStartMultiView = onStartMultiView
         self.onPlay = onPlay
         _streams = Query(LiveChannelQuery.descriptor(for: scope, sort: sort))
     }
 
     private var scopedStreams: [LiveStream] {
-        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
+        LiveChannelQuery.scoped(streams, scope: scope, catalogScope: catalogScope, restriction: restriction)
     }
 
     /// Clears a channel's watch timestamp so it drops out of the Recently
@@ -71,7 +71,7 @@ struct ChannelsList: View {
     /// gates it on `hasRecents`).
     private func clearRecentlyWatched() {
         let container = modelContext.container
-        Task { await StorageManager.clearRecentlyWatchedChannels(playlistPrefix: playlistPrefix, container: container) }
+        Task { await StorageManager.clearRecentlyWatchedChannels(catalogScope: catalogScope, container: container) }
     }
 
     /// A trailing "Clear" button shown above the Recently Watched list. Stays
@@ -115,9 +115,12 @@ struct ChannelsList: View {
                             Button {
                                 onPlay(stream)
                             } label: {
-                                LiveStreamCardView(stream: stream, epg: epgByChannel[stream.epgChannelId ?? ""])
-                                    .padding(.horizontal)
-                                    .contentShape(Rectangle())
+                                LiveStreamCardView(
+                                    stream: stream,
+                                    epg: epgByChannel[stream.epgChannelId ?? ""]
+                                )
+                                .padding(.horizontal)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .liveChannelMenu(

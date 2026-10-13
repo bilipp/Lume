@@ -18,8 +18,9 @@ import SwiftUI
 /// The defaults leave the preview off, as every other platform has it.
 struct EPGGuidePreviewInputs {
     var media: (LiveStream) -> PlayableMedia? = { _ in nil }
-    /// The playlist whose content sync or guide refresh pauses the preview.
-    var playlistID: UUID?
+    /// The playlists whose content sync or guide refresh pauses the preview:
+    /// the one shown, or every Combined member contributing Live TV.
+    var playlistIDs: [UUID] = []
     /// A reference, so its changes re-render only the preview band.
     var controller: GuidePreviewController?
     /// A reference, so focus and glow changes re-render only the hero.
@@ -28,7 +29,7 @@ struct EPGGuidePreviewInputs {
 
 struct EPGGuideView: View {
     let scope: LiveChannelScope
-    let playlistPrefix: String
+    let catalogScope: CatalogScope
     let onPlay: (LiveStream) -> Void
     let onPlayCatchup: (LiveStream, EPGProgramCell) -> Void
     /// Seeds Multi-View from a channel's long-press menu in the column.
@@ -66,7 +67,7 @@ struct EPGGuideView: View {
 
     init(
         scope: LiveChannelScope,
-        playlistPrefix: String,
+        catalogScope: CatalogScope,
         sort: ContentSortOption,
         onPlay: @escaping (LiveStream) -> Void,
         onPlayCatchup: @escaping (LiveStream, EPGProgramCell) -> Void = { _, _ in },
@@ -76,7 +77,7 @@ struct EPGGuideView: View {
         preview: EPGGuidePreviewInputs = .init()
     ) {
         self.scope = scope
-        self.playlistPrefix = playlistPrefix
+        self.catalogScope = catalogScope
         self.onPlay = onPlay
         self.onPlayCatchup = onPlayCatchup
         self.onStartMultiView = onStartMultiView
@@ -96,7 +97,7 @@ struct EPGGuideView: View {
     }
 
     private var scopedStreams: [LiveStream] {
-        LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
+        LiveChannelQuery.scoped(streams, scope: scope, catalogScope: catalogScope, restriction: restriction)
     }
 
     var body: some View {
@@ -250,7 +251,7 @@ struct EPGGuideView: View {
         }
 
         var body: some View {
-            EPGGuideView(scope: .category(category.id), playlistPrefix: "", sort: .playlist) { _ in }
+            EPGGuideView(scope: .category(category.id), catalogScope: .empty, sort: .playlist) { _ in }
                 .modelContainer(container)
                 .frame(minHeight: 520)
         }

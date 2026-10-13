@@ -12,7 +12,10 @@
     /// Owns the rail's `@FocusState` so focus changes here never propagate up
     /// to `TVLiveTVScreen` and rebuild the (expensive) content area.
     struct TVCategoryRail: View {
-        let sections: [LiveTVSection]
+        /// One untitled group for a single Live TV playlist; with two or more
+        /// Combined members, the virtual collections above a titled group per
+        /// member.
+        let groups: [LiveTVSectionGroup]
         @Binding var selectedSection: LiveTVSection?
         /// Fired when the user activates (clicks) a category.
         var onCategoryActivated: () -> Void = {}
@@ -125,18 +128,26 @@
         }
 
         /// Visual order is focus order: Favorites and Recently Watched
-        /// (whichever exist), Recordings, then the provider's categories.
+        /// (whichever exist), Recordings, then the provider's categories —
+        /// under each Combined member's name when there are headers. Headers
+        /// are plain text, never focusable, so up/down hops straight from one
+        /// member's last category to the next one's first.
         @ViewBuilder
         private var rows: some View {
-            let pinnedCount = sections.prefix(while: \.isVirtual).count
-            ForEach(sections.prefix(pinnedCount)) { section in
+            ForEach((groups.first?.sections ?? []).prefix(while: \.isVirtual)) { section in
                 categoryButton(section)
             }
             if let recordings {
                 recordingsButton(recordings)
             }
-            ForEach(sections.dropFirst(pinnedCount)) { section in
-                categoryButton(section)
+            ForEach(groups) { group in
+                let categories = group.sections.drop(while: \.isVirtual)
+                if let title = group.title, !categories.isEmpty {
+                    TVRailGroupHeader(title: title)
+                }
+                ForEach(categories) { section in
+                    categoryButton(section)
+                }
             }
         }
 

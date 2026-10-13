@@ -35,13 +35,52 @@ extension Playlist {
         get { PlaylistTab.decode(hiddenTabsRaw) }
         set { hiddenTabsRaw = PlaylistTab.encode(newValue) }
     }
+
+    nonisolated var combinedTabs: Set<PlaylistTab> {
+        get { PlaylistTab.decode(combinedTypesRaw) }
+        set { combinedTypesRaw = PlaylistTab.encode(newValue) }
+    }
+
+    nonisolated var isCombinedMember: Bool {
+        !combinedTabs.isEmpty
+    }
 }
 
-extension Playlist? {
-    /// Whether `tab` shows in the tab bar for this (active) playlist. With no
-    /// playlist every tab shows.
+nonisolated extension CatalogScope {
+    /// The content tabs in the tab bar. An isolated playlist shows every tab it
+    /// doesn't hide (Settings › Library › Tabs); Combined shows every type at
+    /// least one member contributes, and no playlist's hidden tabs apply. With
+    /// no playlist at all every tab shows.
+    func visibleTabs(isolatedHidden hidden: Set<PlaylistTab>) -> Set<PlaylistTab> {
+        guard isCombined else { return Set(PlaylistTab.allCases).subtracting(hidden) }
+        return Set(PlaylistTab.allCases.filter { !members(for: $0).isEmpty })
+    }
+}
+
+nonisolated extension Set<PlaylistTab> {
+    /// Whether `tab` is in the tab bar. Home, Search, Sports and Settings are
+    /// no playlist's to hide.
     func showsTab(_ tab: AppTab) -> Bool {
-        guard let self else { return true }
-        return !self.hiddenTabs.contains { $0.appTab == tab }
+        guard let playlistTab = PlaylistTab.allCases.first(where: { $0.appTab == tab }) else { return true }
+        return contains(playlistTab)
+    }
+}
+
+nonisolated extension PlaylistTab {
+    /// The tab's name inside a sentence — VoiceOver labels naming a playlist.
+    var spokenName: String {
+        switch self {
+        case .movies: String(localized: "Movies")
+        case .series: String(localized: "Series")
+        case .liveTV: String(localized: "Live TV")
+        }
+    }
+}
+
+extension Set<PlaylistTab> {
+    /// The tabs in declaration order, for a member row's subtitle.
+    var summary: String {
+        let names = PlaylistTab.allCases.filter(contains).map(\.spokenName)
+        return names.isEmpty ? "—" : names.joined(separator: " · ")
     }
 }

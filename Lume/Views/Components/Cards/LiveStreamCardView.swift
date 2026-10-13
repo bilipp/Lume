@@ -12,6 +12,7 @@ struct LiveStreamCardView: View {
     /// The channel's now/next programmes, resolved once by the parent list (see
     /// `ChannelEPGSnapshot`) rather than by a per-card `@Query`.
     var epg: ChannelEPG?
+    @Environment(\.playlistProvenance) private var provenance
 
     private var currentEPG: EPGSlot? {
         epg?.current
@@ -99,6 +100,10 @@ struct LiveStreamCardView: View {
                     }
                     .font(.caption2)
                     .foregroundStyle(.blue)
+                }
+
+                if let playlistBadge = provenance.name(forContentID: stream.id, in: .liveTV) {
+                    PlaylistBadge(name: playlistBadge)
                 }
             }
 

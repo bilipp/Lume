@@ -28,37 +28,41 @@ enum GenreDerivation {
     /// isolation) — a visible hitch when opening the tab or after a sync
     /// invalidates the query. Running it off the main thread (and fetching only
     /// the three columns the derivation reads) removes the hang entirely.
-    static func movieGenres(in container: ModelContainer, playlistPrefix: String, restriction: ContentRestriction) async -> [String] {
+    static func movieGenres(in container: ModelContainer, scope: CatalogScope, restriction: ContentRestriction) async -> [String] {
         await Task.detached(priority: .userInitiated) {
             var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.genre != nil })
             descriptor.fetchLimit = genreSampleLimit
             descriptor.propertiesToFetch = [\.id, \.genre, \.categoryId]
             let movies = (try? ModelContext(container).fetch(descriptor)) ?? []
-            return Self.derive(playlistPrefix: playlistPrefix, restriction: restriction, rows: movies)
+            return Self.derive(scope: scope, tab: .movies, restriction: restriction, rows: movies)
         }.value
     }
 
-    static func seriesGenres(in container: ModelContainer, playlistPrefix: String, restriction: ContentRestriction) async -> [String] {
+    static func seriesGenres(in container: ModelContainer, scope: CatalogScope, restriction: ContentRestriction) async -> [String] {
         await Task.detached(priority: .userInitiated) {
             var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.genre != nil })
             descriptor.fetchLimit = genreSampleLimit
             descriptor.propertiesToFetch = [\.id, \.genre, \.categoryId]
             let series = (try? ModelContext(container).fetch(descriptor)) ?? []
-            return Self.derive(playlistPrefix: playlistPrefix, restriction: restriction, rows: series)
+            return Self.derive(scope: scope, tab: .series, restriction: restriction, rows: series)
         }.value
     }
 
-    /// Scopes the sampled rows to the active playlist and viewer (the
-    /// `excludingRestricted` filter, inlined so this stays `nonisolated`), then
-    /// derives the distinct genres. Runs on the caller's background context.
+    /// Scopes the sampled rows to the scope's contributing playlists and the
+    /// viewer (the `excludingRestricted` filter, inlined so this stays
+    /// `nonisolated`), then derives the distinct genres. Runs on the caller's
+    /// background context.
     private nonisolated static func derive(
-        playlistPrefix: String,
+        scope: CatalogScope,
+        tab: PlaylistTab,
         restriction: ContentRestriction,
         rows: [some GenreCarrying]
     ) -> [String] {
+        guard !scope.isEmpty else { return [] }
+        let matcher = CatalogScope.Matcher(scope)
         let excluded = restriction.excludedCategoryIDs
         let genres = rows.lazy
-            .filter { $0.id.hasPrefix(playlistPrefix) }
+            .filter { row in matcher.contains(row.id, tab) }
             .filter { excluded.isEmpty || !excluded.contains($0.categoryId ?? "") }
             .map(\.genre)
         return GenreParser.distinctByFrequency(Array(genres))
@@ -85,7 +89,7 @@ nonisolated extension Series: GenreCarrying {}
 
 // MARK: - Browse-by-genre section
 
-/// A tile grid of the genres present in the active playlist, most-common first.
+/// A tile grid of the genres present in the active scope, most-common first.
 /// Each tile navigates to that genre's full grid.
 ///
 /// The owning view derives the genres and renders this only when the list is
@@ -132,9 +136,9 @@ private let genreScanBudget = 500
 /// off-main fetch takes a single `Sendable` value, mirroring `SearchRequest`.
 nonisolated struct GenrePageRequest {
     let genre: String
-    /// `"<playlistUUID>-"` — the id prefix every title in the active playlist
-    /// shares, matched in SQLite rather than after materialization.
-    let playlistPrefix: String
+    /// The playlists whose titles the grid shows, matched in SQLite on their
+    /// `"<playlistUUID>-"` id prefixes rather than after materialization.
+    let scope: CatalogScope
     let excludedCategoryIDs: Set<String>
     /// Where in the source rows to resume; see `GenrePage.scanned`.
     let offset: Int
@@ -204,24 +208,42 @@ nonisolated enum GenrePageFetcher {
     /// `starts(with:)` compiles to a range seek on the unique `id` index, which
     /// is the only part of this predicate an index can serve: the genre match
     /// has to stay a substring test because the column holds several free-text
-    /// genres per title.
+    /// genres per title. One contributing playlist inlines that `starts(with:)`
+    /// exactly as isolated mode always had it; several compose the scope's OR
+    /// via `evaluate`.
     private static func moviePredicate(request: GenrePageRequest) -> Predicate<Movie> {
-        let (genre, prefix) = (request.genre, request.playlistPrefix)
+        let genre = request.genre
         let excluded = Set(request.excludedCategoryIDs.map(String?.some))
         let filtersCategories = !excluded.isEmpty
+        if let prefix = request.scope.singlePrefix(for: .movies) {
+            return #Predicate { movie in
+                movie.id.starts(with: prefix)
+                    && (movie.genre?.localizedStandardContains(genre) ?? false)
+                    && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
+            }
+        }
+        let scoped = request.scope.moviePredicate()
         return #Predicate { movie in
-            movie.id.starts(with: prefix)
+            scoped.evaluate(movie)
                 && (movie.genre?.localizedStandardContains(genre) ?? false)
                 && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
         }
     }
 
     private static func seriesPredicate(request: GenrePageRequest) -> Predicate<Series> {
-        let (genre, prefix) = (request.genre, request.playlistPrefix)
+        let genre = request.genre
         let excluded = Set(request.excludedCategoryIDs.map(String?.some))
         let filtersCategories = !excluded.isEmpty
+        if let prefix = request.scope.singlePrefix(for: .series) {
+            return #Predicate { series in
+                series.id.starts(with: prefix)
+                    && (series.genre?.localizedStandardContains(genre) ?? false)
+                    && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
+            }
+        }
+        let scoped = request.scope.seriesPredicate()
         return #Predicate { series in
-            series.id.starts(with: prefix)
+            scoped.evaluate(series)
                 && (series.genre?.localizedStandardContains(genre) ?? false)
                 && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
         }
@@ -267,7 +289,7 @@ nonisolated enum GenrePageFetcher {
 /// next page from a cell's `onAppear`, mid-scroll.
 struct MovieGenreView: View {
     let genre: String
-    let playlistPrefix: String
+    let scope: CatalogScope
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
@@ -333,7 +355,7 @@ struct MovieGenreView: View {
         let generation = loadGeneration
         let request = GenrePageRequest(
             genre: genre,
-            playlistPrefix: playlistPrefix,
+            scope: scope,
             excludedCategoryIDs: restriction.excludedCategoryIDs,
             offset: fetchedCount,
             pageSize: pageSize
@@ -367,7 +389,7 @@ struct MovieGenreView: View {
 /// `MovieGenreView` is.
 struct SeriesGenreView: View {
     let genre: String
-    let playlistPrefix: String
+    let scope: CatalogScope
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
@@ -422,7 +444,7 @@ struct SeriesGenreView: View {
         let generation = loadGeneration
         let request = GenrePageRequest(
             genre: genre,
-            playlistPrefix: playlistPrefix,
+            scope: scope,
             excludedCategoryIDs: restriction.excludedCategoryIDs,
             offset: fetchedCount,
             pageSize: pageSize

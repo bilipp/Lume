@@ -36,6 +36,7 @@ Release would change what ships. Debug, Release and Sideload are untouched.
 | Browse read path | `BrowseQueryBenchmarks`, `EPGQueryBenchmarks` | A browse fetch going back to scanning |
 | Sports resolve | `SportsQueryBenchmarks` | The fixture→channel resolve going back to an unbounded guide scan |
 | Player navigation | `BrowseQueryBenchmarks+Navigation` | A previous/next lookup going back to reading the whole list |
+| Combined browse | `CombinedBrowseQueryBenchmarks` | A multi-playlist fetch leaving SQL for a per-member fetch-and-merge |
 | End-to-end import | `M3UColdImportBenchmarks` | The whole production cold import, phase by phase |
 | Attribution harnesses | `M3UEpisodeRelationshipBenchmarks`, `M3UExistingRowFetchBenchmarks` | Which part of an import loop the time is actually in |
 | Signpost metrics | `SignpostBenchmarks` | A named production phase getting slower |
@@ -153,6 +154,51 @@ episode's own id, the owning playlist via `PlaylistOwner`) are seeks, and what i
 left is faulting the series' whole `episodes` inverse — ~28 ms for 480 episodes,
 and linear in the show's length. A long-running show is where to look if a season
 change ever feels slow.
+
+### Combined playlists
+
+A Combined selection (#204) scopes every browse fetch to several playlists at
+once. `CatalogScope` renders one member as exactly the isolated predicate, an
+`id.starts(with:)` seek, and several as a `Predicate.evaluate` OR fold of those
+seeks, still inside SQL. The regression this adds is a rewrite that fetches each
+member separately and merges in Swift: the rows are right, the cost is one query
+per member plus a main-actor merge, and for a positional read — the surf ring —
+it is not even correct.
+
+`BrowseQueryBenchmarks+Combined.swift` holds `CombinedBrowseQueryBenchmarks`, a
+class of its own with its own fixture so the isolated baselines above are not
+moved by rows their fetches never read. Three playlists in priority order, A and
+B contributing every type and C contributing Movies only, so the movie rail folds
+three prefixes while every Live TV fetch has C's channels to exclude. 15,000
+movies and 6,000 channels per playlist, `added` stamps as normalised ten-digit
+Unix seconds with a jitter from a fixed `SeededGenerator` seed so the members'
+newest titles interleave. Generated per run, never committed.
+
+- `testRecentlyAddedMovieRailCombined` — the Movies "Recently Added" rail
+  (`MovieCollectionQuery.rowDescriptor`) over all three members. Same index walk
+  on `Movie.added` as `testRecentlyAddedMovieRail`, with the three-way fold as
+  the filter; asserts the 200-row page draws from every member.
+- `testLiveFavoritesProbeCombined` — the Live TV Favorites `LIMIT 1` gate over A
+  and B. A has no favorites and the excluded C has the most, so the fold has to
+  reach past the first member, and a probe that lost its scope answers from C —
+  asserted, not just timed.
+- `testChannelSurfResolutionCombinedFavorites` — both neighbours of a channel in
+  A and B's merged 4,000-channel favorites list, launched from Combined
+  Favorites (the `LiveSurfScope` riding on `PlayableMedia`), with C's favorites
+  seeded and excluded. The same list length as `testChannelSurfResolution` in
+  one playlist, so the two numbers read side by side: the difference is the
+  fold's cost on the walk's ~14 positional reads.
+
+```bash
+Scripts/run-performance-tests.sh CombinedBrowseQueryBenchmarks
+```
+
+No baselines are recorded yet. Record them with the script above under the
+Benchmark configuration — never Debug, whose `-Onone` makes the numbers fiction
+— and accept them per machine as described in [Baselines](#baselines). The
+deterministic half of the guard (each combined fetch returns only member rows,
+in member order, without an in-memory fallback) is
+`LumeTests/Services/CatalogScopeShapeTests.swift`, on an on-disk store.
 
 ## The Sports Hub resolve is bounded, and this is the guard
 
