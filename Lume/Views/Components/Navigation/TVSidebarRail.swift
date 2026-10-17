@@ -62,6 +62,9 @@
         /// The pending "focus left the rail" verdict, cancelled when focus
         /// lands on a row again before it runs.
         @State private var exitCheck: Task<Void, Never>?
+        /// The panel in window coordinates, to tell focus that left the rail
+        /// from focus parked on its scroll view's fast-scroll index.
+        @State private var panelFrame: CGRect = .zero
 
         private let panelPadding: CGFloat = 16
         private let rowInset: CGFloat = 18
@@ -103,6 +106,7 @@
             .background(panelShape.fill(.white.opacity(0.06)))
             .glassEffectCompat(.regular, in: panelShape)
             .overlay(panelShape.strokeBorder(.white.opacity(0.12), lineWidth: 1))
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { panelFrame = $0 }
             .onChange(of: itemIDs) { _, ids in
                 // The focused row went away under focus (an entry turned off
                 // or unpaired): hand focus to the selection rather than
@@ -139,12 +143,16 @@
                 // through nil — for several frames while the list is swiped
                 // through fast, so a single turn isn't enough: read as an
                 // exit, the next row snapped focus back to the selection.
-                // Only a nil that outlasts the build means focus left the
-                // rail; re-entry takes another press, well after. Pre-arm the
-                // mask for it.
+                // Scrolling fast also hands focus to the scroll view's
+                // fast-scroll index, for as long as the user scrubs it; it
+                // sits inside the panel, so the verdict waits until focus is
+                // outside. Only then has focus left the rail; re-entry takes
+                // another press, well after. Pre-arm the mask for it.
                 exitCheck = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(250))
-                    guard !Task.isCancelled, focused == nil else { return }
+                    repeat {
+                        try? await Task.sleep(for: .milliseconds(250))
+                        guard !Task.isCancelled, focused == nil else { return }
+                    } while systemFocusIsInPanel
                     railOwnsFocus = false
                     onFocusChange(false)
                 }
@@ -175,6 +183,20 @@
             } else {
                 railOwnsFocus = true
             }
+        }
+
+        /// Whether UIKit's focus sits inside the panel — for a nil `focused`,
+        /// on the fast-scroll index, which `@FocusState` can't see.
+        private var systemFocusIsInPanel: Bool {
+            let window = UIApplication.shared.connectedScenes
+                .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+                .first
+            guard let window,
+                  let item = UIFocusSystem.focusSystem(for: window)?.focusedItem,
+                  let space = item.parentFocusEnvironment?.focusItemContainer?.coordinateSpace
+            else { return false }
+            let frame = space.convert(item.frame, to: window)
+            return panelFrame.contains(CGPoint(x: frame.midX, y: frame.midY))
         }
 
         /// Focuses the selected row, scrolling it into the lazy list first.
