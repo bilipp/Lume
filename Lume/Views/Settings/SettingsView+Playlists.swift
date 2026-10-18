@@ -45,6 +45,9 @@ import SwiftUI
         var body: some View {
             List {
                 playlistsSection
+                if playlists.count > 1 {
+                    syncAllSection
+                }
                 autoSyncSection
             }
             .platformNavigationTitle("Playlists")
@@ -97,6 +100,17 @@ import SwiftUI
                 } else {
                     Text("Free includes one playlist. Upgrade to Lume Pro to add more.")
                 }
+            }
+        }
+
+        private var syncAllSection: some View {
+            Section {
+                SyncPlaylistsButton(
+                    playlists: playlists,
+                    activeID: playlists.activeID(for: selectedPlaylistID)
+                )
+            } footer: {
+                Text("Syncs in the background, one playlist at a time.")
             }
         }
 
@@ -181,6 +195,11 @@ import SwiftUI
                     }
                 }
                 .buttonStyle(TVSettingsRowButtonStyle())
+
+                if playlists.count > 1 {
+                    SyncPlaylistsButton(playlists: playlists, activeID: effectivePlaylistID)
+                        .buttonStyle(TVSettingsRowButtonStyle())
+                }
 
                 if !premium.isPremium {
                     Text("Free includes one playlist. Upgrade to Lume Pro to add more.")
