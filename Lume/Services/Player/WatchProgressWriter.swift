@@ -192,3 +192,41 @@ actor WatchProgressWriter {
         try context.save()
     }
 }
+
+extension WatchProgressWriter {
+    /// One queued write: the arguments `record` takes, bundled so `enqueue`
+    /// stays inside the parameter cap.
+    nonisolated struct Write {
+        let ref: PlayableMedia.ContentRef
+        let progress: TimeInterval
+        let duration: TimeInterval
+        let force: Bool
+        var holdLive = false
+    }
+
+    /// Records after `previous` has landed, so one caller's writes keep their
+    /// order, then drops the item's buffered copy. `onCompleted` runs when this
+    /// write is the one that finished the item.
+    @MainActor
+    static func enqueue(
+        _ write: Write,
+        on writer: WatchProgressWriter,
+        after previous: Task<Void, Never>?,
+        onCompleted: @escaping @MainActor (PlayableMedia.ContentRef) -> Void
+    ) -> Task<Void, Never> {
+        Task { @MainActor in
+            await previous?.value
+            let completion = await writer.record(
+                ref: write.ref,
+                progress: write.progress,
+                duration: write.duration,
+                force: write.force,
+                holdLive: write.holdLive
+            )
+            WatchProgressBuffer.remove(ref: write.ref)
+            if let completion {
+                onCompleted(completion.ref)
+            }
+        }
+    }
+}

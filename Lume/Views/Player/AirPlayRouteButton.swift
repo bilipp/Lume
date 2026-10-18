@@ -40,7 +40,7 @@
         }
 
         private var picker: some View {
-            RoutePicker(player: player)
+            AirPlayRoutePicker(player: player)
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
                 .glassEffectCompat(.regularInteractive, in: Circle())
@@ -50,14 +50,23 @@
     }
 
     #if canImport(UIKit)
-        private struct RoutePicker: UIViewRepresentable {
+        /// The system AirPlay route picker. With a `rowLabel` it draws no icon
+        /// and is only the tap target over a row that draws its own label;
+        /// VoiceOver reads it as one button with that label.
+        struct AirPlayRoutePicker: UIViewRepresentable {
             var player: AVPlayer?
+            var rowLabel: String?
 
             func makeUIView(context _: Context) -> AVRoutePickerView {
                 let picker = AVRoutePickerView()
                 picker.backgroundColor = .clear
-                picker.tintColor = .white
-                picker.activeTintColor = UIColor(named: "AccentColor") ?? .systemBlue
+                picker.tintColor = rowLabel == nil ? .white : .clear
+                picker.activeTintColor = rowLabel == nil ? UIColor(named: "AccentColor") ?? .systemBlue : .clear
+                if let rowLabel {
+                    picker.isAccessibilityElement = true
+                    picker.accessibilityLabel = rowLabel
+                    picker.accessibilityTraits = .button
+                }
                 // Surface video-capable receivers (Apple TV, AirPlay TVs) first.
                 picker.prioritizesVideoDevices = true
                 return picker
@@ -67,7 +76,7 @@
         }
 
     #elseif canImport(AppKit)
-        private struct RoutePicker: NSViewRepresentable {
+        private struct AirPlayRoutePicker: NSViewRepresentable {
             var player: AVPlayer?
 
             func makeNSView(context _: Context) -> AVRoutePickerView {

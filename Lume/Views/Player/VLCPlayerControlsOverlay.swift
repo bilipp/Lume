@@ -91,7 +91,7 @@ import VLCKit
 
                 Spacer()
 
-                AirPlayRouteButton()
+                PlayerCastButton()
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)

@@ -152,6 +152,7 @@ struct MainTabView: View {
             }
         #if os(iOS)
             .tabBarMinimizeOnScrollDownIfAvailable()
+            .castMiniController { linkedMedia = $0 }
         #endif
             .onOpenURL { url in
                 handleDeepLink(url)
@@ -374,7 +375,7 @@ struct MainTabView: View {
                     }
                 } else {
                     Tab(value: AppTab.search, role: .search) {
-                        SearchView()
+                        SearchView().castMiniControllerInset()
                     } label: {
                         Label("Search", systemImage: "magnifyingglass")
                     }

@@ -49,6 +49,7 @@ struct IdleUnmountingTab<Content: View>: View {
                 Color.clear
             }
         }
+        .castMiniControllerInset()
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
         .task(id: isActive) {
