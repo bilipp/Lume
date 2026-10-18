@@ -342,7 +342,7 @@ struct SeriesDetailView: View {
     private var toolbarContent: some ToolbarContent {
         #if os(iOS)
             ToolbarItem(placement: .topBarLeading) {
-                GlassIconButton(systemImage: "chevron.left", accessibilityLabel: "Back") {
+                GlassIconButton(systemImage: "chevron.backward", accessibilityLabel: "Back") {
                     dismiss()
                 }
             }
@@ -372,7 +372,7 @@ struct SeriesDetailView: View {
         let ratingValue = series.rating.flatMap(Double.init)
         return DetailMetadata(
             genre: series.genre,
-            year: DetailFormat.year(from: series.releaseDate),
+            year: DetailFormat.year(releaseDate: series.releaseDate, name: series.name),
             duration: nil,
             seasonInfo: availableSeasons.isEmpty ? nil : seasonCountLabel,
             rating: (ratingValue ?? 0) > 0 ? ratingValue : nil,

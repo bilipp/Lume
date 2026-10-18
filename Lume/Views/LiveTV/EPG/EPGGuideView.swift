@@ -120,6 +120,7 @@ struct EPGGuideView: View {
                     onDidClaimFocus: onDidClaimFocus,
                     preview: preview
                 )
+                .timelineLayoutDirection()
             }
         }
         // Reload when the channel set changes or a guide import settles. Keyed on

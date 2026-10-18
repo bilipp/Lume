@@ -245,6 +245,7 @@
                     focus: $focus,
                     onToggleScrub: toggleScrub
                 )
+                .timelineLayoutDirection()
             }
         }
 
@@ -322,6 +323,7 @@
                     trailingTransportButton
                 }
             }
+            .timelineLayoutDirection()
         }
 
         /// Leading outer button: previous episode for series, otherwise a longer

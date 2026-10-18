@@ -123,6 +123,7 @@ import VLCKit
                 transportRow(spacing: 32)
                 transportRow(spacing: 12)
             }
+            .timelineLayoutDirection()
         }
 
         private func transportRow(spacing: CGFloat) -> some View {
@@ -192,8 +193,11 @@ import VLCKit
                 if media.isLive {
                     liveIndicator
                 } else {
-                    scrubber
-                    timeLabels
+                    VStack(spacing: 14) {
+                        scrubber
+                        timeLabels
+                    }
+                    .timelineLayoutDirection()
                 }
             }
             .padding(.horizontal, 20)

@@ -145,7 +145,7 @@ struct SportsHomeRail: View {
                         icon: "sportscourt.fill",
                         title: Text("Follow Your Teams"),
                         message: Text("Add leagues and teams to see fixtures, live scores and standings, with one tap to the channel carrying the game."),
-                        accessory: Image(systemName: "chevron.right")
+                        accessory: Image(systemName: "chevron.forward")
                     )
                 }
                 .buttonStyle(.plain)
@@ -182,7 +182,7 @@ struct SportsHomeRail: View {
                     Button(action: seeAll) {
                         HStack(spacing: 2) {
                             Text("See All")
-                            Image(systemName: "chevron.right").font(.caption2.weight(.bold))
+                            Image(systemName: "chevron.forward").font(.caption2.weight(.bold))
                                 .accessibilityHidden(true)
                         }
                         .font(.subheadline)

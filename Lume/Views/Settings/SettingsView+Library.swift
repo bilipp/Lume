@@ -140,7 +140,7 @@ extension PlaylistTab {
                         HStack(spacing: 16) {
                             Text("Categories & Channels")
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.tertiary)
                         }

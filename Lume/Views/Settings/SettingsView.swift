@@ -215,7 +215,7 @@ struct SettingsView: View {
                 } label: {
                     HStack(spacing: 8) {
                         SettingsCategoryRowLabel(category: category, value: Text("Free"))
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.tertiary)
                     }

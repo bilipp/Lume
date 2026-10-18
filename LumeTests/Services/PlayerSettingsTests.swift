@@ -246,7 +246,7 @@ struct PreferredLanguageListTests {
 /// is in the catalog — an English key resolves to itself either way — so the
 /// catalog is read directly.
 struct PreferredLanguageStringsTests {
-    private static let expectedLanguages: Set<String> = ["de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
+    private static let expectedLanguages: Set<String> = ["ar", "de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
 
     /// Keys the preferred-language feature added.
     private static let addedKeys = [

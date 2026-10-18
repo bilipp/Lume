@@ -233,7 +233,7 @@
         private var heroMetaItems: [TVMetaItem] {
             var items: [TVMetaItem] = []
             if let date = DetailFormat.date(from: movie.releaseDate)
-                ?? DetailFormat.year(from: movie.releaseDate)
+                ?? DetailFormat.year(releaseDate: movie.releaseDate, name: movie.name)
             {
                 items.append(TVMetaItem(label: "Released", value: date))
             }

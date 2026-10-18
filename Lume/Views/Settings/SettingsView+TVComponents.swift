@@ -175,7 +175,7 @@ import SwiftUI
                         HStack(spacing: 16) {
                             Label("Manage Teams", systemImage: "person.2.badge.plus")
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.system(size: 22, weight: .semibold))
                         }
                     }

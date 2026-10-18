@@ -230,7 +230,7 @@
 
                     Spacer(minLength: 0)
 
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(tertiaryColor)
                 }

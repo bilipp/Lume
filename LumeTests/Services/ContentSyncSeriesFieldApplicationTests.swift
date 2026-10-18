@@ -132,6 +132,34 @@ struct ContentSyncSeriesFieldTests {
         #expect(!reSync.hasChanges)
     }
 
+    @Test func `an empty provider release date keeps the TMDB one`() async throws {
+        let container = try FieldFixtures.makeContainer()
+        let manager = ContentSyncManager(modelContainer: container)
+        let playlistId = UUID()
+        let prefix = "\(playlistId.uuidString)-series-"
+        let id = "\(playlistId.uuidString)-series-13855"
+        let dto = try FieldFixtures.decodeSeries(FieldFixtures.seriesJSON(releaseDate: "\"\""))
+
+        let firstSync = ModelContext(container)
+        firstSync.autosaveEnabled = false
+        let inserted = Series(id: id, seriesId: 13855, name: "")
+        firstSync.insert(inserted)
+        await manager.applySeriesFields(from: dto, to: inserted, playlistPrefix: prefix)
+        // TMDB enrichment then fills the date the provider left blank.
+        inserted.releaseDate = "2021-10-08"
+        try firstSync.save()
+
+        let reSync = ModelContext(container)
+        reSync.autosaveEnabled = false
+        let stored = try #require(try reSync.fetch(
+            FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
+        ).first)
+        await manager.applySeriesFields(from: dto, to: stored, playlistPrefix: prefix)
+
+        #expect(stored.releaseDate == "2021-10-08", "A blank provider date must not wipe the TMDB one")
+        #expect(!reSync.hasChanges)
+    }
+
     @Test func `series nil and empty string transitions are written`() async throws {
         let container = try FieldFixtures.makeContainer()
         let manager = ContentSyncManager(modelContainer: container)

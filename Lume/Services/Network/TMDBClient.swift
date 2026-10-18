@@ -301,6 +301,8 @@ nonisolated struct TMDBTitleDetails {
     var tagline: String?
     var overview: String?
     var voteAverage: Double?
+    /// `release_date` for movies, `first_air_date` for series ("2010-07-16").
+    var releaseDate: String?
     var runtimeMinutes: Int?
     var genreNames: [String]
     var contentRating: String?
@@ -362,6 +364,8 @@ private nonisolated struct TitleDetailsResponse: Decodable {
     let tagline: String?
     let overview: String?
     let voteAverage: Double?
+    let releaseDate: String? // movies
+    let firstAirDate: String? // tv
     let runtime: Int? // movies
     let episodeRunTime: [Int]? // tv
     let genres: [Genre]?
@@ -384,6 +388,8 @@ private nonisolated struct TitleDetailsResponse: Decodable {
         case tagline, overview, runtime, genres, credits, similar, videos, images
         case backdropPath = "backdrop_path"
         case voteAverage = "vote_average"
+        case releaseDate = "release_date"
+        case firstAirDate = "first_air_date"
         case episodeRunTime = "episode_run_time"
         case releaseDates = "release_dates"
         case contentRatings = "content_ratings"
@@ -500,11 +506,14 @@ nonisolated extension TitleDetailsResponse {
                 )
             }
 
+        let premiere = isMovie ? releaseDate : firstAirDate
+
         return TMDBTitleDetails(
             backdropPath: backdropPath,
             tagline: (tagline?.isEmpty == true) ? nil : tagline,
             overview: (overview?.isEmpty == true) ? nil : overview,
             voteAverage: voteAverage,
+            releaseDate: (premiere?.isEmpty == true) ? nil : premiere,
             runtimeMinutes: isMovie ? runtime : episodeRunTime?.first,
             genreNames: genres?.map(\.name) ?? [],
             contentRating: isMovie ? movieCertification() : tvRating(),

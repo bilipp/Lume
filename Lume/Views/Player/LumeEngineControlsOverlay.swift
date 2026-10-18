@@ -132,6 +132,7 @@ import SwiftUI
                 transportRow(spacing: 32)
                 transportRow(spacing: 12)
             }
+            .timelineLayoutDirection()
         }
 
         private func transportRow(spacing: CGFloat) -> some View {
@@ -208,6 +209,7 @@ import SwiftUI
                         seekPosition: $seekPosition,
                         onEditingChanged: onSliderEditingChanged
                     )
+                    .timelineLayoutDirection()
                 }
             }
             .padding(.horizontal, 20)

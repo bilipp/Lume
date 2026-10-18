@@ -198,7 +198,7 @@ Two separate `ModelContainer`s:
 - The SDK is not configured under unit/UI tests or previews (`LumeApp.isTestOrPreviewHost`), and discovery starts only when the device sheet opens — no Local Network prompt at launch.
 
 ### Localization
-String Catalogs (9 languages: en, de, es, fr, it, ja, ko, pt, zh-Hans; the App Store listing mirrors them — see `ship-release`'s `references/store-metadata.json`). Run `xcstringstool sync` and include the tvOS stringsdata. Normalize `.xcstrings` with `Scripts/normalize-xcstrings.swift` (pre-commit hook) to avoid format churn.
+String Catalogs (10 languages: ar, en, de, es, fr, it, ja, ko, pt, zh-Hans; the App Store listing mirrors them — see `ship-release`'s `references/store-metadata.json`). Run `xcstringstool sync` and include the tvOS stringsdata. Normalize `.xcstrings` with `Scripts/normalize-xcstrings.swift` (pre-commit hook) to avoid format churn.
 
 ### Pre-commit hooks (lefthook)
 SwiftFormat + SwiftLint run as errors. Notable: `String(decoding:)` is banned; `redundantStaticSelf` crashes on `for x in (try? …) ?? []` — avoid that pattern.

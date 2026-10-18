@@ -260,7 +260,7 @@ struct MovieDetailView: View {
     private var metadata: DetailMetadata {
         DetailMetadata(
             genre: movie.genre,
-            year: DetailFormat.year(from: movie.releaseDate),
+            year: DetailFormat.year(releaseDate: movie.releaseDate, name: movie.name),
             duration: DetailFormat.duration(movie.durationSecs),
             seasonInfo: nil,
             rating: movie.rating > 0 ? movie.rating : nil,
@@ -416,7 +416,7 @@ struct MovieDetailView: View {
         var toolbarContent: some ToolbarContent {
             #if os(iOS)
                 ToolbarItem(placement: .topBarLeading) {
-                    GlassIconButton(systemImage: "chevron.left", accessibilityLabel: "Back") {
+                    GlassIconButton(systemImage: "chevron.backward", accessibilityLabel: "Back") {
                         dismiss()
                     }
                 }

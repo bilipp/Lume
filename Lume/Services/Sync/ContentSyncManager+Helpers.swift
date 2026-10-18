@@ -197,7 +197,10 @@ extension ContentSyncManager {
         // TMDB-enriched row on every sync and never settle.
         let genre = GenreParser.providerFallback(current: series.genre, provider: dto.genre)
         if series.genre != genre { series.genre = genre }
-        if series.releaseDate != dto.releaseDate { series.releaseDate = dto.releaseDate }
+        // An empty provider date must not wipe the one TMDB enrichment filled in.
+        if let releaseDate = dto.releaseDate, !releaseDate.isEmpty, series.releaseDate != releaseDate {
+            series.releaseDate = releaseDate
+        }
         if series.lastModified != dto.lastModified { series.lastModified = dto.lastModified }
         if series.rating != dto.rating { series.rating = dto.rating }
         if series.rating5Based != dto.rating5Based { series.rating5Based = dto.rating5Based }

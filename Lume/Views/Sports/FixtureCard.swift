@@ -266,7 +266,7 @@ struct FixtureCard: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("Watch"))
             } else {
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }

@@ -291,7 +291,7 @@
                         NavigationLink(value: drillValue) {
                             HStack(spacing: 10) {
                                 Text("Channels")
-                                Image(systemName: "chevron.right")
+                                Image(systemName: "chevron.forward")
                             }
                         }
                         .buttonStyle(TVContentActionButtonStyle())

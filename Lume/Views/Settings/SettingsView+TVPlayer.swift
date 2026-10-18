@@ -215,7 +215,7 @@ import SwiftUI
                 HStack(spacing: 16) {
                     label
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
@@ -314,7 +314,7 @@ import SwiftUI
                         HStack(spacing: 16) {
                             Text("Add Language")
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.tertiary)
                         }

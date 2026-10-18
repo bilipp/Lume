@@ -17,6 +17,12 @@
       "comment" : "Permission prompt shown when Lume first looks for TVs and Cast devices, or reaches a media server, WebDAV share or recording server, on the local network.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحتاج Lume إلى الوصول إلى شبكتك المحلية للوصول إلى خوادم الوسائط ومجلدات WebDAV المشتركة وخوادم التسجيل التي تعمل عليها."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",

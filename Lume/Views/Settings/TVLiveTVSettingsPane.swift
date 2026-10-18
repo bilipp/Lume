@@ -157,7 +157,7 @@
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
@@ -191,7 +191,7 @@
                     }
                     Text("Recordings")
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }

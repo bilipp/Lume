@@ -5,6 +5,12 @@
       "comment" : "Top Shelf section",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متابعة المشاهدة"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -59,6 +65,12 @@
       "comment" : "Top Shelf section",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المفضلة"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",

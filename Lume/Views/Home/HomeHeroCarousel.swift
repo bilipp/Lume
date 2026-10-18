@@ -206,9 +206,9 @@ struct HomeHeroCarousel: View {
         private var sliderButtons: some View {
             if items.count > 1 {
                 HStack {
-                    sliderButton(systemName: "chevron.compact.left", action: retreat)
+                    sliderButton(systemName: "chevron.compact.backward", action: retreat)
                     Spacer()
-                    sliderButton(systemName: "chevron.compact.right", action: advance)
+                    sliderButton(systemName: "chevron.compact.forward", action: advance)
                 }
                 .padding(.horizontal, 16)
             }

@@ -146,7 +146,7 @@ import SwiftUI
                                 .lineLimit(2)
                         }
                         Spacer(minLength: 12)
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.title3.weight(.bold))
                             .foregroundStyle(.white.opacity(0.6))
                             .accessibilityHidden(true)

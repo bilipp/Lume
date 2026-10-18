@@ -4,6 +4,12 @@
     "%lld Downloads Complete" : {
       "comment" : "Live Activity headline: several downloads finished",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اكتملت التنزيلات: %lld"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -57,6 +63,12 @@
     "%lld Downloads Failed" : {
       "comment" : "Live Activity headline: every download in the batch failed",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشلت التنزيلات: %lld"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -110,6 +122,12 @@
     "%lld failed" : {
       "comment" : "Live Activity caption: downloads that failed alongside ones that finished",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل: %lld"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -163,6 +181,12 @@
     "+%lld more" : {
       "comment" : "Live Activity caption: further downloads behind the visible one",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld أخرى"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -217,6 +241,12 @@
       "comment" : "Widget name",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متابعة المشاهدة"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -270,6 +300,12 @@
     "Download Complete" : {
       "comment" : "Live Activity headline: a single download finished",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اكتمل التنزيل"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -323,6 +359,12 @@
     "Download Failed" : {
       "comment" : "Live Activity headline: the only download in the batch failed",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل التنزيل"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -377,6 +419,12 @@
       "comment" : "Widget name",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المفضلة"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -431,6 +479,12 @@
       "comment" : "Widget description",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انتقل مباشرةً إلى عناوينك وقنواتك المفضلة."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -485,6 +539,12 @@
       "comment" : "Upcoming programme on a channel",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التالي: %@"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -539,6 +599,12 @@
       "comment" : "Empty on-now widget",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد قنوات مفضلة. أضف قنوات إلى المفضلة في Lume لرؤية دليل برامجها هنا."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -593,6 +659,12 @@
       "comment" : "Empty favorites widget",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد عناصر مفضلة بعد. أضف عناوين وقنوات إلى المفضلة في Lume."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -647,6 +719,12 @@
       "comment" : "Shown when a channel has no EPG information",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد بيانات في دليل البرامج"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -701,6 +779,12 @@
       "comment" : "Empty continue-watching widget",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يوجد شيء قيد المشاهدة. افتح Lume وابدأ المشاهدة."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -755,6 +839,12 @@
       "comment" : "Widget name",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يُعرض الآن"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -809,6 +899,12 @@
       "comment" : "Widget description",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تابع من حيث توقفت."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -863,6 +959,12 @@
       "comment" : "Widget description",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ما يُعرض على قنواتك المفضلة."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",

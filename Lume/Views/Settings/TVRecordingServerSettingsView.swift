@@ -235,7 +235,7 @@
                             .font(.system(size: 22, weight: .medium))
                         Text("Enter Address Manually")
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.tertiary)
                     }
@@ -271,7 +271,7 @@
                             .font(.system(size: TVSettingsMetrics.secondaryFontSize))
                             .foregroundStyle(.secondary)
                     }
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
