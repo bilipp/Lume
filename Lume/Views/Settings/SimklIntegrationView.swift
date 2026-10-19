@@ -33,7 +33,7 @@
                 }
             }
             .platformNavigationTitle("Simkl")
-            .paywall(isPresented: $showPaywall, highlight: .simkl)
+            .paywall(isPresented: $showPaywall, highlight: .watchSync)
             .onDisappear {
                 // Stop polling if the user backs out mid-connect.
                 if !simkl.isConnected {

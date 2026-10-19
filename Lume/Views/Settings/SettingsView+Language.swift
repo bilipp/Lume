@@ -29,6 +29,13 @@ import SwiftUI
 
         var body: some View {
             List {
+                #if os(macOS)
+                    // Settings uses an in-content navigation header on Mac,
+                    // which does not display the primary-action toolbar item.
+                    Section {
+                        addLanguageButton
+                    }
+                #endif
                 Section {
                     if codes.isEmpty {
                         Text("No Preferred Languages")
@@ -61,21 +68,26 @@ import SwiftUI
                 }
             }
             .platformNavigationTitle("Audio Languages")
-            // The list is held in edit mode so rows are always draggable, and a
-            // row inside an editing List takes no taps — hence the toolbar
-            // button rather than an "Add Language" row.
+            // iOS and visionOS keep rows in edit mode for reordering, so their
+            // Add button must stay outside the list. Mac has no edit mode.
             .alwaysReorderable()
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isAddingLanguage = true
-                    } label: {
-                        Label("Add Language", systemImage: "plus")
+                #if !os(macOS)
+                    ToolbarItem(placement: .primaryAction) {
+                        addLanguageButton
                     }
-                }
+                #endif
             }
             .navigationDestination(isPresented: $isAddingLanguage) {
                 AddPreferredLanguageView(selected: codes, onAdd: add)
+            }
+        }
+
+        private var addLanguageButton: some View {
+            Button {
+                isAddingLanguage = true
+            } label: {
+                Label("Add Language", systemImage: "plus")
             }
         }
 

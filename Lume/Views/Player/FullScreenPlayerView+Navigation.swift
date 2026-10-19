@@ -151,5 +151,6 @@ extension FullScreenPlayerView {
         if let resolved = resolvedMedia, resolved.id == activeMedia.id {
             resolvedMedia = resolved.resuming(at: position)
         }
+        sourceSession.rebase(activeMedia, at: position)
     }
 }

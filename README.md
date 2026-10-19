@@ -197,7 +197,7 @@ adapted per size class
 - M3U support: URL-based playlists, local file import, URL-tvg EPG auto-detection
 - Stalker portal support: MAC-address authentication (with a generated default MAC), with short-lived stream URLs resolved on demand at playback time
 - Media-server support: enter one URL and Lume auto-detects the kind —
-  - **Jellyfin** and **Emby**: movie and TV-show libraries with artwork, ratings and plot; username + password, session-token auth
+  - **Jellyfin** and **Emby**: movie and TV-show libraries with artwork, ratings and plot; username + password, session-token auth. Titles with several versions (a server's multiple files, or AIOStreams' aggregated streams) open a source picker before playback, and shows that are only listed per show (AIOStreams) load their episodes when opened
   - **Plex**: movie and TV-show sections with artwork, ratings and plot; sign in with your Plex account, paste an `X-Plex-Token`, or connect token-free to a server that allows unauthenticated local access
   - **Silo**: enter the address you open Silo at; Lume signs in, finds Silo's Jellyfin-compatible service and syncs through it like a Jellyfin server (the server's Jellyfin compatibility must be turned on)
   - **WebDAV**: recursive folder walk, filenames parsed into movies and series; Basic auth, anonymous shares welcome

@@ -116,6 +116,26 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
             recordingTimeline: recordingTimeline
         )
     }
+
+    /// Returns a copy playing another version of the same title: a new URL
+    /// and request headers, from `startTime`. Used by `JellyfinSourceResolver`
+    /// for the version the viewer picked. Rebuilds the value field by field,
+    /// so a field missed here is silently dropped exactly on a source switch.
+    nonisolated func replacingStream(url newURL: URL, httpHeaders newHeaders: [String: String]?, startTime newStart: TimeInterval) -> PlayableMedia {
+        PlayableMedia(
+            id: id,
+            url: newURL,
+            title: title,
+            subtitle: subtitle,
+            posterURL: posterURL,
+            kind: kind,
+            startTime: newStart,
+            contentRef: contentRef,
+            channelScope: channelScope,
+            httpHeaders: newHeaders,
+            recordingTimeline: recordingTimeline
+        )
+    }
 }
 
 nonisolated extension PlayableMedia {

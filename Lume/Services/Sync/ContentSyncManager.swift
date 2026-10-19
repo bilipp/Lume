@@ -259,9 +259,13 @@ actor ContentSyncManager {
             // WebDAV episodes are imported alongside the rest of the catalog
             // during sync, so there is nothing to fetch lazily here.
             []
-        case .jellyfin, .emby, .plex, .silo:
-            // Media-server episodes are imported alongside the rest of the
-            // catalog during sync, so there is nothing to fetch lazily here.
+        case .jellyfin, .emby, .silo:
+            // A stock server's episodes arrive with the sync too; this is what
+            // fills in the shows an AIOStreams-style server only lists per show.
+            try await fetchMediaServerEpisodes(seriesElementId: seriesElementId, playlist: playlist)
+        case .plex:
+            // Plex episodes are imported alongside the rest of the catalog
+            // during sync, so there is nothing to fetch lazily here.
             []
         }
     }

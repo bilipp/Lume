@@ -14,8 +14,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     case multiplePlaylists
     case downloads
     case multipleProfiles
-    case trakt
-    case simkl
+    case watchSync
     case playbackControls
     case recommendations
     case multiView
@@ -60,8 +59,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .multiplePlaylists: "Unlimited Playlists"
         case .downloads: "Offline Downloads"
         case .multipleProfiles: "Multiple Profiles"
-        case .trakt: "Trakt Integration"
-        case .simkl: "Simkl Integration"
+        case .watchSync: "Trakt & Simkl Sync"
         case .playbackControls: "Smart Playback"
         case .recommendations: "For You Recommendations"
         case .multiView: "Multi-View"
@@ -82,8 +80,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .multiplePlaylists: "Add as many IPTV playlists as you like and switch between them."
         case .downloads: "Save movies and episodes to watch offline, anywhere."
         case .multipleProfiles: "Give everyone their own watch history, progress and favorites."
-        case .trakt: "Scrobble what you watch and surface your Trakt watchlist on Home."
-        case .simkl: "Scrobble what you watch to Simkl, import your Simkl history and surface your Simkl watchlist on Home."
+        case .watchSync: "Scrobble what you watch to Trakt or Simkl, import your history and surface your watchlist on Home."
         case .playbackControls: "Autoplay the next episode, skip intros, and jump ahead with one tap."
         case .recommendations: "Get an on-device \"For You\" row tuned to your taste from your library and what you watch."
         case .multiView: "Watch up to four live channels side by side. Each tile can come from a different playlist, which helps if your provider allows only one connection per account."
@@ -104,8 +101,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .multiplePlaylists: "rectangle.stack.badge.plus"
         case .downloads: "arrow.down.circle"
         case .multipleProfiles: "person.2.crop.square.stack"
-        case .trakt: "arrow.trianglehead.2.clockwise.rotate.90.circle"
-        case .simkl: "arrow.trianglehead.2.clockwise.rotate.90.circle"
+        case .watchSync: "arrow.trianglehead.2.clockwise.rotate.90.circle"
         case .playbackControls: "forward.end.alt"
         case .recommendations: "sparkles"
         case .multiView: "rectangle.split.2x2"

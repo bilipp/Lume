@@ -370,12 +370,13 @@
             .disabled(!enabled)
         }
 
-        // MARK: - Trailing controls (audio / subtitles / favorite / record)
+        // MARK: - Trailing controls (audio / subtitles / sources / favorite / record)
 
         private var trailingControls: some View {
             HStack(spacing: 16) {
                 audioTrackMenu
                 subtitleMenu
+                sourcesButton
                 if PlayerFavorites.supportsFavorites(media.contentRef) {
                     favoriteButton
                 }

@@ -9049,6 +9049,64 @@
         }
       }
     },
+    "Cached" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مخزَّن مؤقتًا"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwischengespeichert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En caché"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cache"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In cache"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャッシュ済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캐시됨"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em cache"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已缓存"
+          }
+        }
+      }
+    },
     "Cached artwork and metadata are re-downloaded automatically when needed. Your playlists, downloads, watch history and favorites are not affected." : {
       "localizations" : {
         "ar" : {
@@ -11191,6 +11249,64 @@
         }
       }
     },
+    "Choose a source · %lld available" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر مصدرًا · المتاح: %lld"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelle wählen · %lld verfügbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige una fuente · %lld disponibles"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez une source · %lld disponibles"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli una fonte · %lld disponibili"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースを選択 · %lld件"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소스 선택 · %lld개 사용 가능"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha uma fonte · %lld disponíveis"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择来源 · 共 %lld 个"
+          }
+        }
+      }
+    },
     "Choose how long to record." : {
       "comment" : "Record now: the channel has no guide data, so the user must pick a duration.",
       "localizations" : {
@@ -11312,6 +11428,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择本地文件…"
+          }
+        }
+      }
+    },
+    "Choose Source Before Playing" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختيار المصدر قبل التشغيل"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelle vor dem Abspielen wählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir fuente antes de reproducir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir la source avant la lecture"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli la fonte prima della riproduzione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生前にソースを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생 전에 소스 선택"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher fonte antes de reproduzir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放前选择来源"
           }
         }
       }
@@ -16400,6 +16574,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "诊断信息始终记录在此设备上。详细日志会添加更详尽的条目——仅在被要求时开启，重现问题后再发送报告。"
+          }
+        }
+      }
+    },
+    "Didn't play" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يُشغَّل"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht abspielbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se reprodujo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture impossible"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non riprodotta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생 실패"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não reproduziu"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法播放"
           }
         }
       }
@@ -22931,6 +23163,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在查找推荐…"
+          }
+        }
+      }
+    },
+    "Finding sources…" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البحث عن مصادر…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quellen werden gesucht …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscando fuentes…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche de sources…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricerca delle fonti…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースを検索中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소스 찾는 중…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procurando fontes…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在查找来源…"
           }
         }
       }
@@ -30808,6 +31098,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上次同步%@"
+          }
+        }
+      }
+    },
+    "Last Used" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "آخر استخدام"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuletzt verwendet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Última utilizada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière utilisée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ultima utilizzata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前回使用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마지막 사용"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Última utilizada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次使用"
           }
         }
       }
@@ -40156,6 +40504,64 @@
         }
       }
     },
+    "Not cached" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "غير مخزَّن مؤقتًا"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht zwischengespeichert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin caché"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas en cache"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non in cache"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未キャッシュ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캐시되지 않음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem cache"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未缓存"
+          }
+        }
+      }
+    },
     "Not connected" : {
       "comment" : "Recording Server settings: accessibility label of the warning icon when the paired server is unreachable.",
       "localizations" : {
@@ -46212,6 +46618,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音量"
+          }
+        }
+      }
+    },
+    "Playing" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قيد التشغيل"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird abgespielt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproduciendo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En lecture"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In riproduzione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생 중"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproduzindo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在播放"
           }
         }
       }
@@ -55227,118 +55691,60 @@
         }
       }
     },
-    "Scrobble what you watch and surface your Trakt watchlist on Home." : {
+    "Scrobble what you watch to Trakt or Simkl, import your history and surface your watchlist on Home." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "سجّل ما تشاهده واعرض قائمة مشاهدة Trakt في الرئيسية."
+            "value" : "سجّل ما تشاهده في Trakt أو Simkl، واستورد سجلّك، واعرض قائمة مشاهدتك في الرئيسية."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Übertrage, was du ansiehst, und zeige deine Trakt-Merkliste auf der Startseite."
+            "value" : "Übertrage, was du ansiehst, an Trakt oder Simkl, importiere deinen Verlauf und zeige deine Watchlist auf der Startseite."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Registra lo que ves y muestra tu lista de seguimiento de Trakt en Inicio."
+            "value" : "Registra lo que ves en Trakt o Simkl, importa tu historial y muestra tu lista de seguimiento en Inicio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scrobblez ce que vous regardez et affichez votre liste de suivi Trakt sur l’écran d’accueil."
+            "value" : "Scrobblez ce que vous regardez vers Trakt ou Simkl, importez votre historique et affichez votre liste de suivi sur l’écran d’accueil."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esegui lo scrobble di ciò che guardi e mostra la tua watchlist di Trakt nella Home."
+            "value" : "Esegui lo scrobble di ciò che guardi su Trakt o Simkl, importa la tua cronologia e mostra la tua watchlist nella Home."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "視聴した内容をスクロブルし、Traktのウォッチリストをホームに表示します。"
+            "value" : "視聴した内容をTraktまたはSimklにスクロブルし、履歴をインポートして、ウォッチリストをホームに表示します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시청 내역을 스크로블하고 홈에 Trakt 시청 목록을 표시하세요."
+            "value" : "시청 내역을 Trakt 또는 Simkl에 스크로블하고, 기록을 가져오며, 홈에 시청 목록을 표시하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Faça scrobble do que você assiste e mostre sua lista do Trakt na Tela Inicial."
+            "value" : "Faça scrobble do que você assiste no Trakt ou no Simkl, importe seu histórico e mostre sua lista na Tela Inicial."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "记录您观看的内容，并在主页上展示您的Trakt待看列表。"
-          }
-        }
-      }
-    },
-    "Scrobble what you watch to Simkl, import your Simkl history and surface your Simkl watchlist on Home." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "سجّل ما تشاهده في Simkl، واستورد سجلّك من Simkl، واعرض قائمة مشاهدة Simkl في الرئيسية."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Übertrage, was du ansiehst, an Simkl, importiere deinen Simkl-Verlauf und zeige deine Simkl-Watchlist auf der Startseite."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registra lo que ves en Simkl, importa tu historial de Simkl y muestra tu lista de seguimiento de Simkl en Inicio."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scrobblez ce que vous regardez vers Simkl, importez votre historique Simkl et affichez votre liste de suivi Simkl sur l’écran d’accueil."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esegui lo scrobble di ciò che guardi su Simkl, importa la tua cronologia di Simkl e mostra la tua watchlist di Simkl nella Home."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "視聴した内容をSimklにスクロブルし、Simklの履歴をインポートして、Simklのウォッチリストをホームに表示します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "시청 내역을 Simkl에 스크로블하고, Simkl 기록을 가져오며, 홈에 Simkl 시청 목록을 표시하세요."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faça scrobble do que você assiste no Simkl, importe seu histórico do Simkl e mostre sua lista do Simkl na Tela Inicial."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将您观看的内容记录到Simkl，导入您的Simkl历史记录，并在主页上展示您的Simkl待看列表。"
+            "value" : "将您观看的内容记录到Trakt或Simkl，导入您的历史记录，并在主页上展示您的待看列表。"
           }
         }
       }
@@ -60042,64 +60448,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Simkl"
-          }
-        }
-      }
-    },
-    "Simkl Integration" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "التكامل مع Simkl"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Simkl-Integration"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integración con Simkl"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intégration Simkl"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integrazione Simkl"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Simkl連携"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Simkl 연동"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integração com o Simkl"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Simkl集成"
           }
         }
       }
@@ -66996,6 +67344,64 @@
         }
       }
     },
+    "That source didn't play. Choose another one." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر تشغيل هذا المصدر. اختر مصدرًا آخر."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Quelle ließ sich nicht abspielen. Wähle eine andere."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esa fuente no se pudo reproducir. Elige otra."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette source n’a pas pu être lue. Choisissez-en une autre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa fonte non è stata riprodotta. Scegline un’altra."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このソースは再生できませんでした。別のソースを選択してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 소스를 재생할 수 없습니다. 다른 소스를 선택하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essa fonte não foi reproduzida. Escolha outra."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该来源无法播放。请选择其他来源。"
+          }
+        }
+      }
+    },
     "That URL doesn't answer as a Jellyfin or Emby server. Enter the server's base address, e.g. http://192.168.1.10:8096." : {
       "comment" : "Error message when the entered address does not answer as a Jellyfin or Emby server.",
       "localizations" : {
@@ -68654,6 +69060,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务器会通过自己的 IP 地址获取视频流，因此如果您的服务商同时只允许一个连接，在您观看时录制可能会失败。"
+          }
+        }
+      }
+    },
+    "The server found no playable sources for this title." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يعثر الخادم على أي مصادر قابلة للتشغيل لهذا العنوان."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server hat für diesen Titel keine abspielbaren Quellen gefunden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El servidor no encontró fuentes reproducibles para este título."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur n’a trouvé aucune source lisible pour ce titre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il server non ha trovato fonti riproducibili per questo titolo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーはこのタイトルの再生可能なソースを見つけられませんでした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서버에서 이 타이틀의 재생 가능한 소스를 찾지 못했습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O servidor não encontrou fontes reproduzíveis para este título."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器未找到此影片可播放的来源。"
           }
         }
       }
@@ -72367,60 +72831,60 @@
         }
       }
     },
-    "Trakt Integration" : {
+    "Trakt & Simkl Sync" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "التكامل مع Trakt"
+            "value" : "مزامنة Trakt وSimkl"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trakt-Integration"
+            "value" : "Trakt- & Simkl-Sync"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Integración con Trakt"
+            "value" : "Sincronización con Trakt y Simkl"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intégration Trakt"
+            "value" : "Synchro Trakt et Simkl"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Integrazione Trakt"
+            "value" : "Sincronizzazione Trakt e Simkl"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trakt連携"
+            "value" : "Trakt・Simkl同期"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trakt 연동"
+            "value" : "Trakt 및 Simkl 동기화"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Integração com o Trakt"
+            "value" : "Sincronização com Trakt e Simkl"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trakt集成"
+            "value" : "Trakt和Simkl同步"
           }
         }
       }
@@ -76788,6 +77252,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "出问题时你正在做什么？"
+          }
+        }
+      }
+    },
+    "When a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the server's first version." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عندما يتوفر لعنوان من Jellyfin أو Emby عدة إصدارات، اختر واحدًا قبل التشغيل. عند الإيقاف يُشغَّل الإصدار الأول من الخادم."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bietet ein Jellyfin- oder Emby-Titel mehrere Versionen an, wählst du vor dem Abspielen eine aus. Aus spielt die erste Version des Servers ab."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando un título de Jellyfin o Emby ofrece varias versiones, elige una antes de reproducirlo. Desactivado reproduce la primera versión del servidor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lorsqu’un titre Jellyfin ou Emby propose plusieurs versions, choisissez-en une avant la lecture. Désactivé lit la première version du serveur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando un titolo Jellyfin o Emby offre più versioni, scegline una prima della riproduzione. Se disattivato, viene riprodotta la prima versione del server."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JellyfinやEmbyのタイトルに複数のバージョンがある場合、再生前に選択します。オフにするとサーバーの最初のバージョンを再生します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jellyfin 또는 Emby 타이틀에 여러 버전이 있으면 재생 전에 하나를 선택합니다. 끄면 서버의 첫 번째 버전을 재생합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando um título do Jellyfin ou Emby oferece várias versões, escolha uma antes de reproduzir. Desativado reproduz a primeira versão do servidor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当 Jellyfin 或 Emby 影片提供多个版本时，在播放前选择一个。关闭后将播放服务器的第一个版本。"
           }
         }
       }

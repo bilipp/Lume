@@ -250,6 +250,7 @@ import SwiftUI
                 if PlayerFavorites.supportsFavorites(media.contentRef) {
                     favoriteButton
                 }
+                PlayerSourcesButton(onResetHideTimer: onResetHideTimer)
                 PlayerRecordButton(media: media, onResetHideTimer: onResetHideTimer)
                 PlayerVolumeControl(onResetHideTimer: onResetHideTimer)
             }
