@@ -94,9 +94,6 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
             #if !os(visionOS)
                 player.allowsExternalPlayback = !isEmbedded
             #endif
-            #if os(iOS)
-                player.usesExternalPlaybackWhileExternalScreenIsActive = !isEmbedded
-            #endif
         }
     }
 
@@ -165,7 +162,10 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
         // AVPlayer is the engine that delivers full-screen AirPlay video (#103).
         player.allowsExternalPlayback = true
         #if os(iOS)
-            player.usesExternalPlaybackWhileExternalScreenIsActive = true
+            // While the screen is mirrored, keep drawing on the device so the
+            // mirror carries the video. Switching to external playback hands
+            // the URL to the receiver, which many IPTV streams can't play.
+            player.usesExternalPlaybackWhileExternalScreenIsActive = false
         #endif
         super.init()
     }
