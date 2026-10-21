@@ -32,6 +32,19 @@ struct CastServiceTests {
         #expect(CastService.activeAirPlayName(in: outputs) == "Apple TV")
     }
 
+    @Test func `an AirPlay route without screen capture is a cast`() {
+        #expect(CastService.isAirPlayCasting(routeName: "Apple TV", isScreenCaptured: false))
+    }
+
+    @Test func `screen mirroring over AirPlay is not a cast`() {
+        #expect(!CastService.isAirPlayCasting(routeName: "Apple TV", isScreenCaptured: true))
+    }
+
+    @Test func `no AirPlay route is never a cast`() {
+        #expect(!CastService.isAirPlayCasting(routeName: nil, isScreenCaptured: false))
+        #expect(!CastService.isAirPlayCasting(routeName: nil, isScreenCaptured: true))
+    }
+
     @Test func `shared service starts without a cast provider`() {
         // The Chromecast seam is empty until the Google Cast SDK is integrated.
         #expect(CastService.shared.castProvider == nil)

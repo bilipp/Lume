@@ -1,6 +1,9 @@
 import AVFoundation
 import Foundation
 import OSLog
+#if os(iOS)
+    import UIKit
+#endif
 
 /// Coordinates "casting" — sending playback to an external device — for the
 /// player overlay, independent of which playback engine is active.
@@ -19,6 +22,12 @@ import OSLog
 /// stream through the AVPlayer engine for the duration of the cast. The route
 /// state tracked here is engine-agnostic because AirPlay always reshapes the
 /// shared audio route.
+///
+/// Screen Mirroring also routes audio over AirPlay, but there the receiver
+/// already shows whatever the device draws, so every engine works as is.
+/// Forcing AVPlayer there made it hand the stream URL to the Apple TV, which
+/// many IPTV streams can't play, leaving only sound. `isAirPlayCasting`
+/// excludes a captured screen so mirroring keeps the user's engine.
 ///
 /// macOS has no `AVAudioSession`, so route observation — and with it the
 /// engine handoff — doesn't exist there: `isAirPlayActive` stays `false` and
@@ -40,21 +49,33 @@ final class CastService {
     /// Display name of the active AirPlay route, when the system reports one.
     private(set) var airPlayRouteName: String?
 
+    /// Whether a screen is being captured: AirPlay Screen Mirroring, or a
+    /// screen recording, which the system doesn't tell apart. Always `false`
+    /// on visionOS, which has no `UIScreen`.
+    private(set) var isScreenCaptured = false
+
+    /// Whether AirPlay is carrying a cast that needs the AVPlayer engine,
+    /// rather than mirroring the screen.
+    var isAirPlayCasting: Bool {
+        Self.isAirPlayCasting(routeName: airPlayRouteName, isScreenCaptured: isScreenCaptured)
+    }
+
     /// A registered casting provider (e.g. a future Chromecast backend). `nil`
     /// until the Google Cast SDK is integrated — see `CastProvider` and #103.
     var castProvider: (any CastProvider)?
 
     /// Touched from the nonisolated `deinit`; `removeObserver` is thread-safe.
-    private nonisolated(unsafe) var routeObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private nonisolated(unsafe) var observers: [any NSObjectProtocol] = []
 
     private init() {
         refreshAirPlayRoute()
+        refreshScreenCapture()
         observeRouteChanges()
     }
 
     deinit {
-        if let routeObserver {
-            NotificationCenter.default.removeObserver(routeObserver)
+        for observer in observers {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
 
@@ -70,6 +91,11 @@ final class CastService {
     /// `nil` when none is AirPlay. Pure, so it can be exercised in tests.
     static func activeAirPlayName(in outputs: [RouteOutput]) -> String? {
         outputs.first(where: \.isAirPlay)?.name
+    }
+
+    /// Pure, so it can be exercised in tests.
+    static func isAirPlayCasting(routeName: String?, isScreenCaptured: Bool) -> Bool {
+        routeName != nil && !isScreenCaptured
     }
 
     private func refreshAirPlayRoute() {
@@ -90,16 +116,41 @@ final class CastService {
         #endif
     }
 
-    private func observeRouteChanges() {
-        #if os(iOS) || os(visionOS)
-            routeObserver = NotificationCenter.default.addObserver(
-                forName: AVAudioSession.routeChangeNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.refreshAirPlayRoute() }
+    private func refreshScreenCapture() {
+        #if os(iOS)
+            let captured = UIApplication.shared.connectedScenes
+                .compactMap { ($0 as? UIWindowScene)?.screen }
+                .contains(where: \.isCaptured)
+            if captured != isScreenCaptured {
+                isScreenCaptured = captured
+                Logger.player.log("Screen capture changed: captured=\(captured, privacy: .public)")
             }
         #endif
+    }
+
+    private func observeRouteChanges() {
+        #if os(iOS) || os(visionOS)
+            observe(AVAudioSession.routeChangeNotification)
+        #endif
+        #if os(iOS)
+            observe(UIScreen.capturedDidChangeNotification)
+            // The service can start before any scene connects, so a launch
+            // while already mirroring is only seen once a scene activates.
+            observe(UIScene.didActivateNotification)
+        #endif
+    }
+
+    private func observe(_ name: Notification.Name) {
+        observers.append(NotificationCenter.default.addObserver(
+            forName: name,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.refreshAirPlayRoute()
+                self?.refreshScreenCapture()
+            }
+        })
     }
 }
 

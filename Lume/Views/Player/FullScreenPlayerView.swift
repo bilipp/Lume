@@ -152,7 +152,7 @@ struct FullScreenPlayerView: View {
                 ?? PlayerEngineKind.defaultValue.rawValue
         )
         let adoption = handle == nil ? nil : Self.previewAdoption(
-            of: handle, for: media, enginePriority: enginePriority, airPlayActive: CastService.shared.isAirPlayActive
+            of: handle, for: media, enginePriority: enginePriority, airPlayActive: CastService.shared.isAirPlayCasting
         )
         _adoption = State(initialValue: adoption)
         if let adoption {
@@ -168,19 +168,20 @@ struct FullScreenPlayerView: View {
         return enginePriority[engineAttempt]
     }
 
-    /// The engine driving the current playback attempt. While an AirPlay route is
-    /// active, this forces `.avPlayer` — the only engine that can hand full-screen
+    /// The engine driving the current playback attempt. While AirPlay is
+    /// casting, this forces `.avPlayer` — the only engine that can hand full-screen
     /// video to an AirPlay receiver (see `castService`).
     private var engine: PlayerEngineKind {
         isAirPlayOverride ? .avPlayer : priorityEngine
     }
 
-    /// True when AirPlay is active and the user's engine isn't already AVPlayer,
-    /// so the stream is being force-routed through AVPlayer for the cast. Drops
-    /// back to the user's engine once AVPlayer has proven it can't play the
-    /// current stream (`airPlayVideoUnsupported`).
+    /// True when AirPlay is casting (not mirroring the screen) and the user's
+    /// engine isn't already AVPlayer, so the stream is being force-routed
+    /// through AVPlayer for the cast. Drops back to the user's engine once
+    /// AVPlayer has proven it can't play the current stream
+    /// (`airPlayVideoUnsupported`).
     private var isAirPlayOverride: Bool {
-        castService.isAirPlayActive
+        castService.isAirPlayCasting
             && priorityEngine != .avPlayer
             && !airPlayVideoUnsupported.contains(activeMedia.id)
     }
@@ -361,7 +362,7 @@ struct FullScreenPlayerView: View {
                 if phase == .background { closePlayer() }
             #endif
         }
-        .onChange(of: castService.isAirPlayActive) { _, isActive in
+        .onChange(of: castService.isAirPlayCasting) { _, isActive in
             // While the audio-only sentinel is set the engine stays on the
             // user's choice for both route directions — reassigning the media
             // would only restart a stream that is already playing locally.

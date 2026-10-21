@@ -38,7 +38,7 @@ final class GuidePreviewController {
     /// full screen opens, and the full player's own retry and fallback absorb
     /// the provider still freeing that connection.
     func prepareToPresent(_ media: PlayableMedia) {
-        if handle.canAdopt(media, airPlayActive: CastService.shared.isAirPlayActive) {
+        if handle.canAdopt(media, airPlayActive: CastService.shared.isAirPlayCasting) {
             handle.handOffToFullScreen()
         } else {
             handle.stopPreview()
