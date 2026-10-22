@@ -413,6 +413,37 @@ import SwiftUI
             }
             .buttonStyle(TVSettingsRowButtonStyle())
         }
+
+        /// Menu's step out of the Player pane's innermost sub-page; see
+        /// `closeInnermostDrillIn`. Not `private`: SettingsView calls it.
+        func closeInnermostPlayerDrillIn() -> TVSettingsDrillIn? {
+            if showingOpenSubtitles {
+                showingOpenSubtitles = false
+                return .openSubtitles
+            }
+            if showingSubtitleStyle {
+                showingSubtitleStyle = false
+                return .subtitleStyle
+            }
+            if let engine = selectedEngineOptions {
+                selectedEngineOptions = nil
+                return .engineOptions(engine)
+            }
+            if showingEngines {
+                showingEngines = false
+                return .engines
+            }
+            switch preferredLanguagePane {
+            case .add:
+                preferredLanguagePane = .list
+                return .addLanguage
+            case .list:
+                preferredLanguagePane = nil
+                return .audioLanguages
+            case nil:
+                return nil
+            }
+        }
     }
 
     /// The Sources toggle, holding its own setting so `SettingsView` stays

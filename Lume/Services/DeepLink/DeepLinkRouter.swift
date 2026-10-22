@@ -25,6 +25,60 @@ final class DeepLinkRouter {
     /// Live TV's selected rail section, and the playlist it was seeded for.
     var liveTVSection: LiveTVSection?
     var liveTVSeededPrefix: String?
+    /// A `lume://cloud/pair` link asked to add a device to Lume Cloud, and the
+    /// add-device sheet hasn't come up for it yet. It waits here while
+    /// something the sheet can't be presented over is on screen.
+    private(set) var cloudPairingRequest: LumeCloudPairingRequest?
+    /// The request the add-device sheet is showing.
+    var presentedCloudPairing: LumeCloudPairingRequest?
+    /// Whether the sheet for `presentedCloudPairing` actually came up. SwiftUI
+    /// drops a sheet without a word when its host is already presenting one it
+    /// can't see — a detail screen's own sheet, say — so an attempt that never
+    /// appears goes back to waiting instead of being lost.
+    private(set) var cloudPairingSheetAppeared = false
+    /// How many attempts in a row SwiftUI dropped; each one doubles the wait
+    /// before the next, so a sheet that can't come up doesn't retry every second.
+    private(set) var cloudPairingMissedAttempts = 0
+
+    /// Whether a pairing link is waiting for, or showing, the add-device sheet.
+    var hasCloudPairing: Bool {
+        cloudPairingRequest != nil || presentedCloudPairing != nil
+    }
+
+    /// Queues the add-device flow for a pairing link. A newer link replaces
+    /// one still waiting; one already on screen finishes first.
+    func requestCloudPairing(code: String) {
+        cloudPairingRequest = LumeCloudPairingRequest(code: code)
+        cloudPairingMissedAttempts = 0
+    }
+
+    /// Moves the waiting request onto the sheet once `screenIsClear`.
+    /// - Returns: whether the sheet was asked to come up.
+    @discardableResult
+    func presentPendingCloudPairing(screenIsClear: Bool) -> Bool {
+        guard screenIsClear, presentedCloudPairing == nil, let request = cloudPairingRequest else { return false }
+        cloudPairingRequest = nil
+        cloudPairingSheetAppeared = false
+        presentedCloudPairing = request
+        return true
+    }
+
+    func noteCloudPairingSheetAppeared() {
+        cloudPairingSheetAppeared = true
+        cloudPairingMissedAttempts = 0
+    }
+
+    /// Puts a presentation that never appeared back in the queue, unless a
+    /// newer link already took its place.
+    func requeueCloudPairingIfNotShown() {
+        guard let request = presentedCloudPairing, !cloudPairingSheetAppeared else { return }
+        presentedCloudPairing = nil
+        cloudPairingMissedAttempts += 1
+        if cloudPairingRequest == nil {
+            cloudPairingRequest = request
+        }
+    }
+
     #if os(tvOS)
         /// Whether Multi-View is covering the app. It is presented from
         /// `MainTabView` — above the tab bar — as a plain overlay rather than a
@@ -49,4 +103,10 @@ final class DeepLinkRouter {
         /// pad nested over it can consume the press first.
         var isQuickSwitchPresented = false
     #endif
+}
+
+/// Opens the Lume Cloud add-device flow with `code` filled in. Never log the code.
+struct LumeCloudPairingRequest: Identifiable, Equatable {
+    let id = UUID()
+    let code: String
 }

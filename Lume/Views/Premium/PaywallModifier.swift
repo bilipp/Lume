@@ -17,12 +17,15 @@ extension View {
         // the user just closed.
         sheet(
             isPresented: isPresented,
-            onDismiss: { AppStoreReviewPrompt.shared.notePaywallDismissed() },
+            onDismiss: {
+                ScreenOccupancy.shared.notePaywallDismissed()
+                AppStoreReviewPrompt.shared.notePaywallDismissed()
+            },
             content: {
                 PaywallView(highlight: highlight)
-                    // Paired with `onDismiss` above so the review prompt knows
-                    // a paywall is on screen, not merely that one has closed.
-                    .onAppear { AppStoreReviewPrompt.shared.notePaywallAppeared() }
+                    // Paired with `onDismiss` above so the root knows a paywall
+                    // is on screen, not merely that one has closed.
+                    .onAppear { ScreenOccupancy.shared.notePaywallAppeared() }
             }
         )
     }

@@ -18,6 +18,7 @@ import SwiftUI
     struct TVProfilesSettingsView: View {
         @Environment(ProfileManager.self) private var profileManager: ProfileManager?
         @Environment(ParentalControls.self) private var parental: ParentalControls?
+        @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
         /// The roster comes from `ProfileManager` — `UserProfile` lives in the
         /// cloud store (a separate container this view's env context doesn't bind
         /// to) — and which row is active is resolved the same way every other
@@ -72,7 +73,7 @@ import SwiftUI
                 }
                 .buttonStyle(TVSettingsRowButtonStyle())
 
-                Text("Each profile keeps its own watch history, progress and favorites, synced across your devices.")
+                Text((cloudSync?.status.backend ?? .icloud).profileRosterFooter)
                     .font(.system(size: 20))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)

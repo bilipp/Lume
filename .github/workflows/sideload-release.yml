@@ -18,6 +18,9 @@ on:
       recorder_ref:
         description: LumeRecorder ref to build against (defaults to the pinned version)
         required: false
+      cloud_ref:
+        description: LumeCloud ref to build against (defaults to the pinned version)
+        required: false
 
 # The build jobs attach assets to the release, which requires write access to
 # repo contents. The default GITHUB_TOKEN is read-only when the repo's default
@@ -42,6 +45,9 @@ env:
   # LumeRecorderKit (the DVR client) is the same story: a local package at
   # ../LumeRecorder/Kit, pinned to the LumeRecorder tag the app was built with.
   RECORDER_REF: ${{ github.event.inputs.recorder_ref || 'v0.1.1' }}
+  # LumeCloudKit (the Lume Cloud sync client) likewise: a local package at
+  # ../LumeCloud/LumeCloudKit. Tracks main until LumeCloud cuts its first tag.
+  CLOUD_REF: ${{ github.event.inputs.cloud_ref || 'main' }}
 
 jobs:
   build:
@@ -73,11 +79,12 @@ jobs:
         working-directory: Lume
 
     steps:
-      # Lume, LumeEngine and LumeRecorder are checked out as *siblings* rather
-      # than the app sitting at the workspace root, because the project references
-      # the engine and the recorder kit by relative path (../LumeEngine,
-      # ../LumeRecorder/Kit) and actions/checkout refuses any `path` outside
-      # $GITHUB_WORKSPACE. All three therefore live one level down inside it.
+      # Lume, LumeEngine, LumeRecorder and LumeCloud are checked out as
+      # *siblings* rather than the app sitting at the workspace root, because the
+      # project references the engine and the two kits by relative path
+      # (../LumeEngine, ../LumeRecorder/Kit, ../LumeCloud/LumeCloudKit) and
+      # actions/checkout refuses any `path` outside $GITHUB_WORKSPACE. All four
+      # therefore live one level down inside it.
       - name: Checkout Lume
         uses: actions/checkout@v5
         with:
@@ -100,6 +107,13 @@ jobs:
           repository: bilipp/LumeRecorder
           ref: ${{ env.RECORDER_REF }}
           path: LumeRecorder
+
+      - name: Checkout LumeCloud
+        uses: actions/checkout@v5
+        with:
+          repository: bilipp/LumeCloud
+          ref: ${{ env.CLOUD_REF }}
+          path: LumeCloud
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
