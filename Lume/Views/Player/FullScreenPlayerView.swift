@@ -343,16 +343,16 @@ struct FullScreenPlayerView: View {
             // periodic main-thread work is reading two clock values. The buffer
             // is flushed to SwiftData at safe boundaries (see `persistProgressDetached`).
             progressWriter = WatchProgressWriter(container: modelContext.container)
-            // while !Task.isCancelled {
-            //     try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
-            //     guard !Task.isCancelled else { break }
-            //     bufferProgress()
-            // }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
+                guard !Task.isCancelled else { break }
+                bufferProgress()
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             // Leaving the foreground is a safe moment to flush; covers the user
             // backgrounding the app mid-playback without closing the player.
-            if phase != .active { persistProgressDetached(force: true) }
+            if phase != .active { persistProgressDetached(force: true, leavingForeground: true) }
             #if os(tvOS)
                 // tvOS has no background playback for any engine, so a stream
                 // left running behind the Home screen just keeps buffering and
@@ -544,7 +544,13 @@ struct FullScreenPlayerView: View {
     /// resulting store merge can't disturb playback. Captures the clock
     /// synchronously *before* awaiting, so a subsequent `clock.reset()` can't
     /// race the read; clears the buffer entry once the write lands.
-    func persistProgressDetached(force: Bool, holdingLive: Bool = false) {
+    ///
+    /// `leavingForeground` covers the app being sent away mid-playback, where
+    /// the process may be suspended and then killed before the actor's save
+    /// runs: the position is stashed in the buffer first, so the next launch
+    /// recovers it. The save itself always runs under a background-task
+    /// assertion, so a suspension right after a flush doesn't strand it.
+    func persistProgressDetached(force: Bool, holdingLive: Bool = false, leavingForeground: Bool = false) {
         if persistRecordingProgress() { return }
         if activeMedia.isLive, !force { return }
         let ref = activeMedia.historyRef
@@ -552,9 +558,12 @@ struct FullScreenPlayerView: View {
         // duration. Recording the position it was skipped from would walk that
         // back to unwatched, so the completion stands and this flush stands down.
         if ref == completedRef { return }
-        enqueueProgressWrite(
-            ref: ref, progress: clock.current, duration: clock.duration, force: force, holdLive: holdingLive
-        )
+        let now = clock.current
+        let total = clock.duration
+        if leavingForeground {
+            WatchProgressBuffer.record(ref: ref, progress: now, duration: total, waitUntilWritten: true)
+        }
+        enqueueProgressWrite(ref: ref, progress: now, duration: total, force: force, holdLive: holdingLive)
     }
 }
 

@@ -60,6 +60,8 @@ struct HomeView: View {
     /// a progress placeholder rather than an empty state on launch.
     @State private var recommendationsLoaded = false
     @State var heroItems: [HeroItem] = []
+    /// The home scroll view's height, which sizes the hero (re-measured on a fold or rotation).
+    @State private var viewportHeight: CGFloat = 0
     @State var trendingState: HomeLoadState = .idle
     @State var trakt = TraktService.shared
     @State var simkl = SimklService.shared
@@ -172,7 +174,10 @@ struct HomeView: View {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 28) {
                                 if !heroItems.isEmpty {
-                                    HomeHeroCarousel(items: heroItems)
+                                    HomeHeroCarousel(
+                                        items: heroItems,
+                                        heroHeight: HomeHeroCarousel.height(forViewport: viewportHeight)
+                                    )
                                 }
                                 homeRows
                             }
@@ -180,6 +185,7 @@ struct HomeView: View {
                         }
                         .browseActivity()
                         .scrollIndicators(.hidden)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
                         // Only let content run under the nav bar when the hero
                         // backdrop is there to fill it; otherwise the first row
                         // would sit hidden behind the bar.

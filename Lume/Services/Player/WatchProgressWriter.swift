@@ -206,7 +206,9 @@ extension WatchProgressWriter {
 
     /// Records after `previous` has landed, so one caller's writes keep their
     /// order, then drops the item's buffered copy. `onCompleted` runs when this
-    /// write is the one that finished the item.
+    /// write is the one that finished the item. The save runs under a
+    /// background-task assertion, so a suspension right after a flush doesn't
+    /// strand it.
     @MainActor
     static func enqueue(
         _ write: Write,
@@ -216,13 +218,15 @@ extension WatchProgressWriter {
     ) -> Task<Void, Never> {
         Task { @MainActor in
             await previous?.value
-            let completion = await writer.record(
-                ref: write.ref,
-                progress: write.progress,
-                duration: write.duration,
-                force: write.force,
-                holdLive: write.holdLive
-            )
+            let completion = await BackgroundActivity.perform("Watch progress") {
+                await writer.record(
+                    ref: write.ref,
+                    progress: write.progress,
+                    duration: write.duration,
+                    force: write.force,
+                    holdLive: write.holdLive
+                )
+            }
             WatchProgressBuffer.remove(ref: write.ref)
             if let completion {
                 onCompleted(completion.ref)

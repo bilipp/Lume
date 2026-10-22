@@ -1,7 +1,11 @@
 import Foundation
 @testable import Lume
+import SwiftData
 import Testing
 
+/// Serialized: every test shares `UserDefaults.standard`, so a parallel
+/// `drain()` would sweep up another test's entries.
+@Suite(.serialized)
 struct WatchProgressBufferTests {
     init() {
         let defaults = UserDefaults.standard
@@ -63,6 +67,23 @@ struct WatchProgressBufferTests {
         #expect(entries[0].progress == 25)
     }
 
+    @Test func `record waiting until written lands before returning`() {
+        let ref = PlayableMedia.ContentRef.episode("e-3")
+        WatchProgressBuffer.record(ref: ref, progress: 42, duration: 900, waitUntilWritten: true)
+        let stored = UserDefaults.standard.array(forKey: "watchProgress.episode:e-3") as? [Double]
+        #expect(stored == [42, 900])
+        _ = WatchProgressBuffer.drain()
+    }
+
+    @Test func `waited record after a queued sample keeps the latest position`() {
+        let ref = PlayableMedia.ContentRef.movie("m-7")
+        WatchProgressBuffer.record(ref: ref, progress: 300, duration: 5400)
+        WatchProgressBuffer.record(ref: ref, progress: 312, duration: 5400, waitUntilWritten: true)
+        let entries = WatchProgressBuffer.drain()
+        #expect(entries.count == 1)
+        #expect(entries.first?.progress == 312)
+    }
+
     // MARK: - remove
 
     @Test func `remove clears buffered entry`() {
@@ -98,6 +119,26 @@ struct WatchProgressBufferTests {
     @Test func `drain on empty buffer returns empty`() {
         let entries = WatchProgressBuffer.drain()
         #expect(entries.isEmpty)
+    }
+
+    // MARK: - launch recovery
+
+    @MainActor @Test func `a killed session's buffered position is committed on the next launch`() async throws {
+        let container = try makeTestContainer()
+        let id = "\(UUID().uuidString)-movie"
+        let context = ModelContext(container)
+        context.insert(Movie(id: id, streamId: 1, name: "Film"))
+        try context.save()
+
+        // What the player leaves behind when it's sent away and never comes back.
+        WatchProgressBuffer.record(ref: .movie(id), progress: 1830, duration: 5400, waitUntilWritten: true)
+        await WatchProgressWriter.reconcilePending(container: container)
+
+        let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
+        let movie = try #require(try ModelContext(container).fetch(descriptor).first)
+        #expect(movie.watchProgress == 1830)
+        #expect(!movie.isWatched)
+        #expect(WatchProgressBuffer.drain().isEmpty)
     }
 
     // MARK: - contentRef
