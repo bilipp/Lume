@@ -189,7 +189,7 @@ adapted per size class
 #### 👤 Profiles
 - Multiple **user profiles**, each with its own watch history, progress, and favorites
 - Switch profiles from the top-left of Home (iOS / macOS), on tvOS with the Siri Remote's **Play/Pause** button, which opens a quick-switch overlay for playlists and profiles, or from Settings on visionOS — Settings stays the place to add, edit and delete them
-- Profiles and their state **sync across your devices** via iCloud, or via **Lume Cloud** — our own free, end-to-end encrypted sync backend (stored in the EU), chosen in Settings › Sync
+- Profiles and their state **sync across your devices** via iCloud, or via **Lume Cloud** — our own free, end-to-end encrypted sync backend, chosen in Settings › Sync
 - **Parental controls**: mark profiles as child profiles, restrict categories (hidden from browsing and search), and protect them with a PIN required to leave a child profile or open Content Management
 
 #### ⚙️ Library management

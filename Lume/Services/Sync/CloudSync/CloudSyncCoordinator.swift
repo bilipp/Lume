@@ -51,6 +51,8 @@ final class CloudSyncCoordinator {
     /// `pendingReconcile` instead of overlapping, then runs once afterwards.
     private var isReconciling = false
     private var pendingReconcile = false
+    /// True while a Sync Now from Settings is running (`syncNow()`).
+    var isSyncingNow = false
     /// The queued pass is a background flush, so it runs without the debounce.
     private var pendingReconcileIsFlush = false
     /// The in-flight pass, so an engine swap can wait it out.
@@ -251,7 +253,7 @@ final class CloudSyncCoordinator {
     /// backgrounds, even if every foreground / remote-change pass was skipped.
     private func shouldRun(_ reason: ReconcileReason) -> Bool {
         switch reason {
-        case .launch, .backgroundFlush, .contentSync, .queued:
+        case .launch, .backgroundFlush, .contentSync, .queued, .manual:
             true
         case .foreground, .remoteChange:
             backend.hasPendingChanges
@@ -377,7 +379,7 @@ final class CloudSyncCoordinator {
         }
     }
 
-    private func waitForPass() async {
+    func waitForPass() async {
         while let pass = passTask {
             await pass.value
         }

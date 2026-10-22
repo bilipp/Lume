@@ -38,7 +38,7 @@ struct LumeCloudLocalizationTests {
         "Devices",
         "Recovery Key",
         "Recovery key not viewed",
-        "End-to-end encrypted · Stored in the EU",
+        "End-to-end encrypted",
         "Enter your PIN to change sync settings.",
         "Enter your PIN to add a device to Lume Cloud.",
         "Your profiles, playlists and viewing on this device are merged with what’s in iCloud. Nothing is deleted.",
