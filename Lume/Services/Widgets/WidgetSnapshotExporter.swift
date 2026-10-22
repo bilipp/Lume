@@ -104,15 +104,15 @@ enum WidgetSnapshotExporter {
     // MARK: - Continue Watching
 
     /// Resumable titles, most recently watched first: partially-watched movies
-    /// plus the in-progress episode of recently-watched series (the same resume
-    /// resolution as the Home rail, see `HomeMediaItem.progress`).
+    /// plus the series of the Home rail's Recently Watched, each resuming its
+    /// in-progress episode when it has one (see `HomeMediaItem.progress`).
     private nonisolated static func continueWatching(
         in context: ModelContext,
         prefix: String,
         restriction: ContentRestriction
     ) -> [WidgetMediaItem] {
         let entries = resumableMovies(in: context, prefix: prefix, restriction: restriction)
-            + resumableEpisodes(in: context, prefix: prefix, restriction: restriction)
+            + recentlyWatchedSeries(in: context, prefix: prefix, restriction: restriction)
         return entries
             .sorted { $0.lastWatched > $1.lastWatched }
             .prefix(continueWatchingLimit)
@@ -154,14 +154,50 @@ enum WidgetSnapshotExporter {
         return entries
     }
 
-    /// The most recently watched in-progress episode of each show, found the
-    /// way `SeriesResumeLoader` finds it: one fetch over the indexed watch-state
-    /// columns rather than faulting every recently watched show's `episodes`.
-    private nonisolated static func resumableEpisodes(
+    /// Series by their own `lastWatchedDate`, as the Home rail lists them — so a
+    /// show whose last episode was finished still appears, and one removed from
+    /// Recently Watched (which clears that stamp) drops out even though its
+    /// episodes keep their progress.
+    private nonisolated static func recentlyWatchedSeries(
         in context: ModelContext,
         prefix: String,
         restriction: ContentRestriction
     ) -> [(lastWatched: Date, item: WidgetMediaItem)] {
+        var descriptor = FetchDescriptor<Series>(
+            predicate: #Predicate { $0.lastWatchedDate != nil },
+            sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = 30
+        let shows = ((try? context.fetch(descriptor)) ?? [])
+            .filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.categoryId) }
+        guard !shows.isEmpty else { return [] }
+
+        let inProgress = inProgressEpisodes(in: context)
+        return shows.compactMap { show in
+            guard let lastWatched = show.lastWatchedDate else { return nil }
+            if let episode = inProgress[show.id], let item = resumeItem(for: episode, of: show) {
+                return (lastWatched, item)
+            }
+            guard let link = WidgetDeepLink.openSeries(id: show.id) else { return nil }
+            return (lastWatched, WidgetMediaItem(
+                id: "series-\(show.id)",
+                kind: .series,
+                title: show.name,
+                subtitle: nil,
+                imageURL: URL(string: show.cover ?? ""),
+                backdropURL: TMDBClient.backdropURL(show.backdropPath),
+                progress: nil,
+                deepLink: link,
+                detailLink: link
+            ))
+        }
+    }
+
+    /// The most recently watched in-progress episode of each show, keyed by
+    /// series id and found the way `SeriesResumeLoader` finds it: one fetch over
+    /// the indexed watch-state columns rather than faulting every recently
+    /// watched show's `episodes`.
+    private nonisolated static func inProgressEpisodes(in context: ModelContext) -> [String: Episode] {
         var descriptor = FetchDescriptor<Episode>(
             predicate: #Predicate { $0.watchProgress > 0 && $0.isWatched == false }
         )
@@ -170,24 +206,21 @@ enum WidgetSnapshotExporter {
 
         var newest: [String: Episode] = [:]
         for episode in episodes {
-            guard let show = episode.series, show.id.hasPrefix(prefix),
-                  !restriction.hides(categoryID: show.categoryId) else { continue }
+            guard let seriesID = episode.series?.id else { continue }
             let watched = episode.lastWatchedDate ?? .distantPast
-            if let seen = newest[show.id], (seen.lastWatchedDate ?? .distantPast) >= watched { continue }
-            newest[show.id] = episode
+            if let seen = newest[seriesID], (seen.lastWatchedDate ?? .distantPast) >= watched { continue }
+            newest[seriesID] = episode
         }
-        return newest.values.compactMap(resumeEntry)
+        return newest
     }
 
-    private nonisolated static func resumeEntry(for episode: Episode) -> (lastWatched: Date, item: WidgetMediaItem)? {
-        guard let show = episode.series,
-              let lastWatched = show.lastWatchedDate ?? episode.lastWatchedDate,
-              let deepLink = WidgetDeepLink.play(kind: .episode, id: episode.id) else { return nil }
+    private nonisolated static func resumeItem(for episode: Episode, of show: Series) -> WidgetMediaItem? {
+        guard let deepLink = WidgetDeepLink.play(kind: .episode, id: episode.id) else { return nil }
         var progress: Double?
         if let duration = episode.durationSecs, duration > 0 {
             progress = min(episode.watchProgress / Double(duration), 1)
         }
-        return (lastWatched, WidgetMediaItem(
+        return WidgetMediaItem(
             id: "episode-\(episode.id)",
             kind: .episode,
             title: show.name,
@@ -197,7 +230,7 @@ enum WidgetSnapshotExporter {
             progress: progress,
             deepLink: deepLink,
             detailLink: WidgetDeepLink.openSeries(id: show.id)
-        ))
+        )
     }
 
     // MARK: - Favorites

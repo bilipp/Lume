@@ -21,6 +21,8 @@
         private var chooseSourceBeforePlaying = PlayerSettings.Playback.chooseSourceBeforePlayingDefault
         @AppStorage(PlayerSettings.Playback.rotateToLandscapeKey)
         private var rotateToLandscape = PlayerSettings.Playback.rotateToLandscapeDefault
+        @AppStorage(PlayerSettings.Playback.liveQualitySwitchKey)
+        private var liveQualitySwitch = PlayerSettings.Playback.liveQualitySwitchDefault
         @AppStorage(PlayerSettings.StreamInfo.enabledKey)
         private var streamInfoEnabled = PlayerSettings.StreamInfo.enabledDefault
         @AppStorage(PlayerSettings.StreamInfo.detailLevelKey)
@@ -104,6 +106,14 @@
                     if openSubtitles.isConfigured {
                         Text("Download subtitles for anything that ships without them.")
                     }
+                }
+
+                Section {
+                    Toggle("Show Quality Switch", isOn: $liveQualitySwitch)
+                } header: {
+                    Text("Live TV")
+                } footer: {
+                    Text("While watching a live channel, switch to the same channel in another quality, such as HD, FHD or 4K, when your playlist lists it more than once.")
                 }
 
                 // Free for everyone — deliberately not premium-gated like the

@@ -251,6 +251,7 @@ import SwiftUI
                     favoriteButton
                 }
                 PlayerSourcesButton(onResetHideTimer: onResetHideTimer)
+                PlayerQualityButton(onResetHideTimer: onResetHideTimer)
                 PlayerRecordButton(media: media, onResetHideTimer: onResetHideTimer)
                 PlayerVolumeControl(onResetHideTimer: onResetHideTimer)
             }
@@ -275,20 +276,23 @@ import SwiftUI
             let tracks = coordinator.textTrackOptions
             let hasSelection = tracks.contains(where: \.isSelected)
             Menu {
-                Button {
-                    coordinator.selectTextTrack(id: nil)
-                    onResetHideTimer()
-                } label: {
-                    playerCheckmarkLabel("Off", checked: !hasSelection)
-                }
-                ForEach(tracks) { track in
+                Group {
                     Button {
-                        coordinator.selectTextTrack(id: track.id)
+                        coordinator.selectTextTrack(id: nil)
                         onResetHideTimer()
                     } label: {
-                        playerCheckmarkLabel(verbatim: track.label, checked: track.isSelected)
+                        playerCheckmarkLabel("Off", checked: !hasSelection)
+                    }
+                    ForEach(tracks) { track in
+                        Button {
+                            coordinator.selectTextTrack(id: track.id)
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: track.label, checked: track.isSelected)
+                        }
                     }
                 }
+                .holdsPlayerControls()
             } label: {
                 pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
             }
@@ -300,14 +304,17 @@ import SwiftUI
         private var audioTrackMenu: some View {
             let tracks = coordinator.audioTrackOptions
             Menu {
-                ForEach(tracks) { track in
-                    Button {
-                        coordinator.selectAudioTrack(id: track.id)
-                        onResetHideTimer()
-                    } label: {
-                        playerCheckmarkLabel(verbatim: track.label, checked: track.isSelected)
+                Group {
+                    ForEach(tracks) { track in
+                        Button {
+                            coordinator.selectAudioTrack(id: track.id)
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: track.label, checked: track.isSelected)
+                        }
                     }
                 }
+                .holdsPlayerControls()
             } label: {
                 pillGlyph("waveform")
             }
@@ -317,14 +324,17 @@ import SwiftUI
 
         private var playbackRateMenu: some View {
             Menu {
-                ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
-                    Button {
-                        coordinator.playbackRate = rate
-                        onResetHideTimer()
-                    } label: {
-                        playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                Group {
+                    ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
+                        Button {
+                            coordinator.playbackRate = rate
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                        }
                     }
                 }
+                .holdsPlayerControls()
             } label: {
                 Text(verbatim: rateString(coordinator.playbackRate))
                     .font(.subheadline.weight(.semibold).monospacedDigit())

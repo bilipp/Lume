@@ -16,20 +16,25 @@ import Testing
 
 struct SportsQualityBadgeTests {
     @Test func `reports the most specific token first`() {
-        #expect(sportsQualityBadge(from: "Sky Sport 4K UHD") == "4K")
-        #expect(sportsQualityBadge(from: "DAZN 1 UHD") == "UHD")
-        #expect(sportsQualityBadge(from: "DAZN 1 FHD") == "FHD")
-        #expect(sportsQualityBadge(from: "BT Sport HD") == "HD")
+        #expect(sportsQualityBadge(from: "Lume Sport 4K UHD") == "4K")
+        #expect(sportsQualityBadge(from: "Fieldcast 1 UHD") == "UHD")
+        #expect(sportsQualityBadge(from: "Fieldcast 1 FHD") == "FHD")
+        #expect(sportsQualityBadge(from: "Pitchside HD") == "HD")
     }
 
     @Test func `is case insensitive`() {
-        #expect(sportsQualityBadge(from: "canal+ fhd") == "FHD")
-        #expect(sportsQualityBadge(from: "sky 4k") == "4K")
+        #expect(sportsQualityBadge(from: "lume+ fhd") == "FHD")
+        #expect(sportsQualityBadge(from: "lume 4k") == "4K")
     }
 
     @Test func `returns nil when no quality token is present`() {
-        #expect(sportsQualityBadge(from: "Sky Bundesliga") == nil)
+        #expect(sportsQualityBadge(from: "Lume Liga") == nil)
         #expect(sportsQualityBadge(from: "") == nil)
+    }
+
+    @Test func `shows no badge for resolution-only tags`() {
+        #expect(sportsQualityBadge(from: "Lume Sport 1080p") == nil)
+        #expect(sportsQualityBadge(from: "Fieldcast 8K") == nil)
     }
 }
 

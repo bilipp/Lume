@@ -168,6 +168,10 @@ nonisolated struct OpenSubtitlesSession: Codable, Equatable {
     /// own host, and using the wrong one costs a redirect on every call.
     var host: String
     var allowedDownloads: Int
+    /// Kept so an expired token can be renewed without asking again: `/login`
+    /// tokens only last about a day, and there is no refresh endpoint. Nil for
+    /// sessions saved before it was stored.
+    var password: String?
 }
 
 /// The outcome of a `/download` request: where to fetch the file, and how much

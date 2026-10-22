@@ -504,7 +504,7 @@ nonisolated struct PlayerLanguageOptions {
 /// to the supplied default when the key is absent, matching `@AppStorage`'s own
 /// behaviour.
 extension UserDefaults {
-    func bool(_ key: String, default def: Bool) -> Bool {
+    nonisolated func bool(_ key: String, default def: Bool) -> Bool {
         object(forKey: key) == nil ? def : bool(forKey: key)
     }
 

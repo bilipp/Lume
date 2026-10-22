@@ -19,12 +19,12 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     }
 
     let id: String
-    let url: URL
+    private(set) var url: URL
     let title: String
     let subtitle: String?
     let posterURL: URL?
     let kind: Kind
-    let startTime: TimeInterval
+    private(set) var startTime: TimeInterval
     let contentRef: ContentRef
     /// The Live TV list this channel was launched from (Favorites, Recently
     /// Watched, or a category). `nil` where playback started outside a channel
@@ -38,10 +38,16 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     /// which is exactly why the credential lives here and not in `url`: `url`
     /// and `id` stay clean, and a restored window carries no credential-bearing
     /// MRL into a deep link, a Cast payload or a download task description.
-    let httpHeaders: [String: String]?
+    private(set) var httpHeaders: [String: String]?
     /// For a recording still being captured, how far its growing playlist
     /// reaches, which the engines don't report. `nil` for everything else.
     let recordingTimeline: RecordingTimeline?
+    /// Set on a channel reached through the player's Quality menu: the
+    /// `LiveStream.id` of the channel the viewer actually tuned to. History and
+    /// channel surfing key off that channel rather than the variant on screen,
+    /// because the variant can sit in another category (a provider's "4K" one)
+    /// and a quality change is not a channel change. `nil` everywhere else.
+    private(set) var qualityAnchorID: String?
 
     nonisolated init(
         id: String,
@@ -54,7 +60,8 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         contentRef: ContentRef,
         channelScope: LiveChannelScope? = nil,
         httpHeaders: [String: String]? = nil,
-        recordingTimeline: RecordingTimeline? = nil
+        recordingTimeline: RecordingTimeline? = nil,
+        qualityAnchorID: String? = nil
     ) {
         self.id = id
         self.url = url
@@ -67,6 +74,7 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         self.channelScope = channelScope
         self.httpHeaders = httpHeaders
         self.recordingTimeline = recordingTimeline
+        self.qualityAnchorID = qualityAnchorID
     }
 
     var isLive: Bool {
@@ -77,64 +85,46 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     /// so it's the same title for progress/NextUp — used when handing the stream
     /// to a different engine mid-playback (e.g. switching to AVPlayer to route
     /// full-screen video over AirPlay). See `FullScreenPlayerView`.
-    /// Rebuilds the value field by field, so a field missed here is silently
-    /// dropped exactly on the AirPlay engine swap.
     func resuming(at position: TimeInterval) -> PlayableMedia {
-        PlayableMedia(
-            id: id,
-            url: url,
-            title: title,
-            subtitle: subtitle,
-            posterURL: posterURL,
-            kind: kind,
-            startTime: position,
-            contentRef: contentRef,
-            channelScope: channelScope,
-            httpHeaders: httpHeaders,
-            recordingTimeline: recordingTimeline
-        )
+        var copy = self
+        copy.startTime = position
+        return copy
     }
 
     /// Returns a copy with the playback URL replaced. Used by
     /// `StalkerStreamResolver` to swap a deferred `lumestalker://` placeholder for
     /// the real, freshly resolved stream URL while keeping the same identity.
-    /// `nonisolated` so the resolver can call it off the main actor. Rebuilds the
-    /// value field by field, so a field missed here is silently dropped exactly
-    /// on the Stalker URL replacement.
+    /// `nonisolated` so the resolver can call it off the main actor.
     nonisolated func replacingURL(_ newURL: URL) -> PlayableMedia {
-        PlayableMedia(
-            id: id,
-            url: newURL,
-            title: title,
-            subtitle: subtitle,
-            posterURL: posterURL,
-            kind: kind,
-            startTime: startTime,
-            contentRef: contentRef,
-            channelScope: channelScope,
-            httpHeaders: httpHeaders,
-            recordingTimeline: recordingTimeline
-        )
+        var copy = self
+        copy.url = newURL
+        return copy
     }
 
     /// Returns a copy playing another version of the same title: a new URL
     /// and request headers, from `startTime`. Used by `JellyfinSourceResolver`
-    /// for the version the viewer picked. Rebuilds the value field by field,
-    /// so a field missed here is silently dropped exactly on a source switch.
+    /// for the version the viewer picked.
     nonisolated func replacingStream(url newURL: URL, httpHeaders newHeaders: [String: String]?, startTime newStart: TimeInterval) -> PlayableMedia {
-        PlayableMedia(
-            id: id,
-            url: newURL,
-            title: title,
-            subtitle: subtitle,
-            posterURL: posterURL,
-            kind: kind,
-            startTime: newStart,
-            contentRef: contentRef,
-            channelScope: channelScope,
-            httpHeaders: newHeaders,
-            recordingTimeline: recordingTimeline
-        )
+        var copy = self
+        copy.url = newURL
+        copy.httpHeaders = newHeaders
+        copy.startTime = newStart
+        return copy
+    }
+
+    /// This channel as a quality variant of the channel `id`, which keeps the
+    /// Recall pair, Recently Watched and up/down surfing on `id`. The channel
+    /// `id` itself comes back unanchored.
+    nonisolated func asQualityVariant(anchoredAt id: String) -> PlayableMedia {
+        var copy = self
+        copy.qualityAnchorID = contentRef == .live(id) ? nil : id
+        return copy
+    }
+
+    /// The item history and surfing attribute this playback to: the channel a
+    /// quality variant was switched from, otherwise `contentRef` itself.
+    nonisolated var historyRef: ContentRef {
+        qualityAnchorID.map(ContentRef.live) ?? contentRef
     }
 }
 

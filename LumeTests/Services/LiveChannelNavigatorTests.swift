@@ -266,6 +266,47 @@ struct LiveChannelNavigatorTests {
         #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
     }
 
+    // MARK: - Quality variants
+
+    /// Bravo's 4K copy sits in a category of its own, as providers file them.
+    private let channelsWithVariant: [StreamSpec] = [
+        StreamSpec(num: 1, name: "Alpha", category: "cat-a"),
+        StreamSpec(num: 2, name: "Bravo", category: "cat-a"),
+        StreamSpec(num: 3, name: "Charlie", category: "cat-a"),
+        StreamSpec(num: 4, name: "Bravo 4K", category: "cat-4k"),
+        StreamSpec(num: 5, name: "Delta 4K", category: "cat-4k")
+    ]
+
+    @Test func `a quality variant surfs the original channel's launch list`() throws {
+        let (context, playlist) = try makeWorld(streams: channelsWithVariant)
+        let bravoID = "\(playlist.id.uuidString)-live-101"
+        let variant = try media(forStreamId: 103, playlist: playlist, scope: .category("cat-a"), in: context)
+            .asQualityVariant(anchoredAt: bravoID)
+
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: variant, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        let previous = LiveChannelNavigator.adjacentMedia(
+            for: variant, offset: -1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie, not Delta 4K
+        #expect(previous?.contentRef == liveRef(100, playlist)) // Alpha
+        #expect(next?.channelScope == .category("cat-a"))
+        #expect(next?.qualityAnchorID == nil)
+    }
+
+    @Test func `a quality variant without a launch scope surfs the original's category`() throws {
+        let (context, playlist) = try makeWorld(streams: channelsWithVariant)
+        let bravoID = "\(playlist.id.uuidString)-live-101"
+        let variant = try media(forStreamId: 103, playlist: playlist, in: context)
+            .asQualityVariant(anchoredAt: bravoID)
+
+        let next = LiveChannelNavigator.adjacentMedia(
+            for: variant, offset: 1, sort: .playlist, restriction: ContentRestriction(), in: context
+        )
+        #expect(next?.contentRef == liveRef(102, playlist)) // Charlie
+    }
+
     // MARK: - Hidden channels
 
     @Test func `hidden channels are skipped`() throws {

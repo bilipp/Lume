@@ -241,9 +241,17 @@ struct LumeApp: App {
     /// fetches. Held under a background-task assertion so a backgrounding
     /// export finishes instead of being suspended mid-write. A no-op on macOS
     /// and visionOS, which ship no extension to read it.
+    ///
+    /// The export reads the store through its own context, so the main
+    /// context's pending edits are saved first: the favorites manager removes
+    /// and reorders without saving, and autosave may not have run by the time
+    /// the app backgrounds — the shelf would keep an unfavorited title.
     private func exportWidgetSnapshot() {
         #if os(iOS) || os(tvOS)
             let container = catalogContainer
+            if container.mainContext.hasChanges {
+                try? container.mainContext.save()
+            }
             let isChild = profileManager.activeProfileIsChild
             Task {
                 await BackgroundActivity.perform("Widget snapshot") {
@@ -381,6 +389,10 @@ struct LumeApp: App {
                     SportsFollowService.shared.reload()
                     // Or pulled/deduped the paired recording server.
                     RecordingServerConfigService.shared.reload()
+                    // Or merged favorites and watch state from another device —
+                    // the background flush's pass lands after that phase's own
+                    // export, so the widgets and Top Shelf need another one.
+                    exportWidgetSnapshot()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     DiagnosticSession.scenePhaseChanged(to: phase)

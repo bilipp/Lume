@@ -104,6 +104,8 @@ import SwiftUI
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                         .padding(.top, 6)
+
+                    TVLiveQualitySwitchRow()
                 }
 
                 // Its own section rather than a row under Live TV: it governs
@@ -431,6 +433,23 @@ import SwiftUI
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                     .padding(.top, 6)
             }
+        }
+    }
+
+    /// The Show Quality Switch toggle, holding its own setting so `SettingsView`
+    /// stays within the line-count cap.
+    private struct TVLiveQualitySwitchRow: View {
+        @AppStorage(PlayerSettings.Playback.liveQualitySwitchKey)
+        private var liveQualitySwitch = PlayerSettings.Playback.liveQualitySwitchDefault
+
+        var body: some View {
+            TVOptionToggleRow(title: "Show Quality Switch", isOn: $liveQualitySwitch)
+
+            Text("While watching a live channel, switch to the same channel in another quality, such as HD, FHD or 4K, when your playlist lists it more than once.")
+                .font(.system(size: 20))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                .padding(.top, 6)
         }
     }
 

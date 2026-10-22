@@ -73,6 +73,11 @@ struct PlayerSettingsTests {
         #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .small)
     }
 
+    @Test func `live quality switch storage key and default`() {
+        #expect(PlayerSettings.Playback.liveQualitySwitchKey == "player.liveQualitySwitch")
+        #expect(PlayerSettings.Playback.liveQualitySwitchDefault == false)
+    }
+
     @Test func `volume reads the default until a value is stored, clamped`() {
         #expect(PlayerSettings.volumeKey == "player.volume")
         withIsolatedDefaults { defaults in

@@ -45,6 +45,10 @@
         @State private var playingMedia: PlayableMedia?
         /// Playback queued behind the dismissing detail cover; see `watch`.
         @State private var pendingMedia: PlayableMedia?
+        /// The card to reopen when the player closes; see `reopenGame`.
+        @State private var watchReturn: SportsWatchReturn?
+        /// The channel the reopened card lands focus on.
+        @State private var returnChannelID: String?
 
         @FocusState private var focus: TVSportsFocus?
 
@@ -58,9 +62,14 @@
             }
             .sheet(isPresented: $showManageTeams) { TVManageTeamsPane() }
             .fullScreenCover(item: $selectedFixture, onDismiss: presentPendingMedia) { fixture in
-                TVGameDetailSheet(fixture: fixture, resolved: resolved[fixture.id] ?? [], onWatch: watch)
+                TVGameDetailSheet(
+                    fixture: fixture,
+                    resolved: resolved[fixture.id] ?? [],
+                    onWatch: watch,
+                    focusChannelID: returnChannelID
+                )
             }
-            .fullScreenCover(item: $playingMedia) { media in
+            .fullScreenCover(item: $playingMedia, onDismiss: reopenGame) { media in
                 FullScreenPlayerView(media: media)
             }
             .paywall(isPresented: $showPaywall, highlight: .sportsHub)
@@ -373,22 +382,36 @@
         private func watch(_ channel: ResolvedChannel) {
             guard let media = SportsPlayback.media(for: channel, in: modelContext) else { return }
 
-            if selectedFixture != nil {
+            if let selectedFixture {
+                watchReturn = SportsWatchReturn(fixture: selectedFixture, card: .detail, channelID: channel.id)
                 // Presented from the detail cover's `onDismiss`: a cover put up
                 // while another is still animating out is torn down and
                 // re-presented, opening the stream twice and tripping the
                 // provider's connection cap. See `presentPendingMedia`.
                 pendingMedia = media
-                selectedFixture = nil
+                self.selectedFixture = nil
             } else {
                 playingMedia = media
             }
         }
 
         private func presentPendingMedia() {
+            returnChannelID = nil
             guard let media = pendingMedia else { return }
             pendingMedia = nil
             playingMedia = media
+        }
+
+        /// Back from the player lands on the game it was started from, focused
+        /// on the channel just watched, so the next source is one press away.
+        /// Presented from the player cover's `onDismiss` for the same reason
+        /// the player is presented from the card's.
+        private func reopenGame() {
+            guard let watchReturn else { return }
+            self.watchReturn = nil
+            let fixture = watchReturn.currentFixture(in: store)
+            returnChannelID = watchReturn.channelToMark(among: resolved[fixture.id] ?? [])
+            selectedFixture = fixture
         }
     }
 

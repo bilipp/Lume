@@ -477,3 +477,54 @@ struct PlayableMediaTests {
         #expect(set.count == 3)
     }
 }
+
+// MARK: - Quality variants
+
+extension PlayableMediaTests {
+    private func liveMedia(_ ref: String) throws -> PlayableMedia {
+        try PlayableMedia(
+            id: "live-\(ref)",
+            url: #require(URL(string: "http://example.com/\(ref).m3u8")),
+            title: "Live",
+            subtitle: nil,
+            posterURL: nil,
+            kind: .live,
+            startTime: 0,
+            contentRef: .live(ref),
+            channelScope: .favorites
+        )
+    }
+
+    @Test func `a quality anchor survives stream hand-offs and a round trip`() throws {
+        let variant = try liveMedia("l-4k").asQualityVariant(anchoredAt: "l-hd")
+        let other = try #require(URL(string: "http://example.com/other.m3u8"))
+
+        #expect(variant.qualityAnchorID == "l-hd")
+        #expect(variant.contentRef == .live("l-4k"))
+        #expect(variant.channelScope == .favorites)
+        #expect(variant.resuming(at: 30).qualityAnchorID == "l-hd")
+        #expect(variant.replacingURL(other).qualityAnchorID == "l-hd")
+        #expect(variant.replacingStream(url: other, httpHeaders: nil, startTime: 0).qualityAnchorID == "l-hd")
+        let decoded = try JSONDecoder().decode(PlayableMedia.self, from: JSONEncoder().encode(variant))
+        #expect(decoded.qualityAnchorID == "l-hd")
+    }
+
+    @Test func `media persisted before quality anchors decodes without one`() throws {
+        let media = try liveMedia("l-1")
+        var object = try #require(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(media)) as? [String: Any]
+        )
+        object.removeValue(forKey: "qualityAnchorID")
+        let data = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder().decode(PlayableMedia.self, from: data)
+        #expect(decoded.qualityAnchorID == nil)
+        #expect(decoded.contentRef == .live("l-1"))
+    }
+
+    @Test func `history ref names the anchor of a quality variant`() throws {
+        let plain = try liveMedia("l-hd")
+        #expect(plain.historyRef == .live("l-hd"))
+        #expect(plain.asQualityVariant(anchoredAt: "l-sd").historyRef == .live("l-sd"))
+    }
+}

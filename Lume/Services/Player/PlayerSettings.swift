@@ -243,12 +243,16 @@ enum PlayerSettings {
         /// `PlayerOrientationLock`. Unrelated to `KSPlayer.autoRotateKey`, which
         /// rotates the picture by the stream's rotation metadata.
         static let rotateToLandscapeKey = "player.rotateToLandscape"
+        /// Offer the same live channel in its other qualities (HD, FHD, 4K …)
+        /// from the player when the playlist lists several. Device-local.
+        static let liveQualitySwitchKey = "player.liveQualitySwitch"
 
         static let autoPlayNextDefault = true
         static let showNextEpisodeButtonDefault = true
         static let showSkipIntroButtonDefault = true
         static let chooseSourceBeforePlayingDefault = true
         static let rotateToLandscapeDefault = false
+        static let liveQualitySwitchDefault = false
 
         /// Whether the player turns the iPhone to landscape, read off
         /// `UserDefaults` directly for the same reason as `showSkipIntroButton`.

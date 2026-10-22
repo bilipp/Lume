@@ -278,6 +278,7 @@ import SwiftUI
                     favoriteButton
                 }
                 PlayerSourcesButton(onResetHideTimer: onResetHideTimer)
+                PlayerQualityButton(onResetHideTimer: onResetHideTimer)
                 PlayerRecordButton(media: media, onResetHideTimer: onResetHideTimer)
                 PlayerVolumeControl(onResetHideTimer: onResetHideTimer)
             }
@@ -301,29 +302,32 @@ import SwiftUI
         private var subtitleMenu: some View {
             let hasSelection = selectedSubtitle != nil
             Menu {
-                Button {
-                    coordinator.subtitleModel.selectedSubtitleInfo = nil
-                    onResetHideTimer()
-                } label: {
-                    playerCheckmarkLabel("Off", checked: !hasSelection)
-                }
-                ForEach(subtitleTracks, id: \.subtitleID) { track in
+                Group {
                     Button {
-                        coordinator.subtitleModel.selectedSubtitleInfo = track
+                        coordinator.subtitleModel.selectedSubtitleInfo = nil
                         onResetHideTimer()
                     } label: {
-                        playerCheckmarkLabel(verbatim: track.name, checked: selectedSubtitle?.subtitleID == track.subtitleID)
+                        playerCheckmarkLabel("Off", checked: !hasSelection)
+                    }
+                    ForEach(subtitleTracks, id: \.subtitleID) { track in
+                        Button {
+                            coordinator.subtitleModel.selectedSubtitleInfo = track
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: track.name, checked: selectedSubtitle?.subtitleID == track.subtitleID)
+                        }
+                    }
+                    if let onSearchSubtitles {
+                        Divider()
+                        Button {
+                            onSearchSubtitles()
+                            onResetHideTimer()
+                        } label: {
+                            Label("Search Online…", systemImage: "magnifyingglass")
+                        }
                     }
                 }
-                if let onSearchSubtitles {
-                    Divider()
-                    Button {
-                        onSearchSubtitles()
-                        onResetHideTimer()
-                    } label: {
-                        Label("Search Online…", systemImage: "magnifyingglass")
-                    }
-                }
+                .holdsPlayerControls()
             } label: {
                 pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
             }
@@ -344,15 +348,18 @@ import SwiftUI
         private var audioTrackMenu: some View {
             let tracks = audioTracks
             Menu {
-                ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
-                    Button {
-                        coordinator.selectAudioTrack(track)
-                        coordinator.objectWillChange.send()
-                        onResetHideTimer()
-                    } label: {
-                        playerCheckmarkLabel(verbatim: track.name, checked: track.isEnabled)
+                Group {
+                    ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                        Button {
+                            coordinator.selectAudioTrack(track)
+                            coordinator.objectWillChange.send()
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: track.name, checked: track.isEnabled)
+                        }
                     }
                 }
+                .holdsPlayerControls()
             } label: {
                 pillGlyph("waveform")
             }
@@ -362,14 +369,17 @@ import SwiftUI
 
         private var playbackRateMenu: some View {
             Menu {
-                ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
-                    Button {
-                        coordinator.playbackRate = rate
-                        onResetHideTimer()
-                    } label: {
-                        playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                Group {
+                    ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
+                        Button {
+                            coordinator.playbackRate = rate
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                        }
                     }
                 }
+                .holdsPlayerControls()
             } label: {
                 Text(verbatim: rateString(coordinator.playbackRate))
                     .font(.subheadline.weight(.semibold).monospacedDigit())

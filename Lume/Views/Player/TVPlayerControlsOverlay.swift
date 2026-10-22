@@ -143,9 +143,11 @@
                 // play/pause button explicitly once the buttons have mounted.
                 Task { @MainActor in focus = .transport }
             }
-            .onChange(of: focus) {
+            .onChange(of: focus) { old, new in
                 // Moving between controls counts as activity — keep them up.
                 onResetHideTimer()
+                // A menu takes focus along; hold the chrome until it comes back.
+                if new == nil, let old, [TVPlayerFocus.audio, .subtitles, .quality].contains(old) { PlayerControlsAutoHide.menuOpened() }
             }
         }
 
@@ -370,24 +372,24 @@
             .disabled(!enabled)
         }
 
-        // MARK: - Trailing controls (audio / subtitles / sources / favorite / record)
+        // MARK: - Trailing controls (audio / subtitles / sources / quality / favorite / record)
 
         private var trailingControls: some View {
             HStack(spacing: 16) {
                 audioTrackMenu
                 subtitleMenu
                 sourcesButton
+                qualityButton
                 if PlayerFavorites.supportsFavorites(media.contentRef) {
                     favoriteButton
                 }
                 recordButton
             }
             .tvPlayerRecordFocusHandoff(media: media, focus: $focus)
+            .tvPlayerQualityFocusHandoff(media: media, focus: $focus)
         }
 
-        /// Icon-only heart sitting alongside the track menus, rendered in the
-        /// same glass circle. Always available (favoriting needs no tracks);
-        /// works for live, series and movies via the resolved content.
+        /// Icon-only heart in the track menus' glass circle; needs no tracks.
         private var favoriteButton: some View {
             Button(action: toggleFavorite) {
                 Image(systemName: isFavorite ? "heart.fill" : "heart")

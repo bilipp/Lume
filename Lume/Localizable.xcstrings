@@ -31160,6 +31160,64 @@
         }
       }
     },
+    "Last watched" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "آخر ما شاهدته"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuletzt gesehen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visto por última vez"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière chaîne regardée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visto per ultimo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最後に視聴"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마지막으로 시청"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visto por último"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次观看"
+          }
+        }
+      }
+    },
     "Layout" : {
       "localizations" : {
         "ar" : {
@@ -49616,6 +49674,71 @@
         }
       }
     },
+    "Quality" : {
+      "comment" : "Live TV player menu button and its accessibility label: switches to the same channel in another video quality. Quality tags like SD, HD, FHD, UHD and 4K stay untranslated.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الجودة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualität"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quality"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualità"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画質"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화질"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualidade"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画质"
+          }
+        }
+      }
+    },
     "Queue depths trade memory for smoothness: decoded 4K video frames are large, so raise the video queue cautiously. Applied the next time playback starts." : {
       "localizations" : {
         "ar" : {
@@ -59266,6 +59389,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示“下一集”按钮"
+          }
+        }
+      }
+    },
+    "Show Quality Switch" : {
+      "comment" : "Player settings toggle in the Live TV section that shows the Quality menu in the player. Quality tags like SD, HD, FHD, UHD and 4K stay untranslated.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار مبدّل الجودة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualitätswechsel anzeigen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Quality Switch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar cambio de calidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le changement de qualité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra cambio qualità"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画質切り替えを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화질 전환 표시"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar troca de qualidade"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示画质切换"
           }
         }
       }
@@ -77368,6 +77556,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭时，搜索仅查找当前播放列表中的内容。开启此项可在您所有的播放列表中搜索。"
+          }
+        }
+      }
+    },
+    "While watching a live channel, switch to the same channel in another quality, such as HD, FHD or 4K, when your playlist lists it more than once." : {
+      "comment" : "Footer under the Show Quality Switch toggle. HD, FHD and 4K are quality tags and stay untranslated, like SD and UHD.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أثناء مشاهدة قناة مباشرة، انتقل إلى القناة نفسها بجودة أخرى، مثل HD أو FHD أو 4K، عندما تتضمّنها قائمة التشغيل أكثر من مرة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wechsle beim Ansehen eines Live-Senders zum selben Sender in einer anderen Qualität, etwa HD, FHD oder 4K, wenn deine Playlist ihn mehrfach enthält."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While watching a live channel, switch to the same channel in another quality, such as HD, FHD or 4K, when your playlist lists it more than once."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mientras ves un canal en directo, cambia al mismo canal en otra calidad, como HD, FHD o 4K, cuando tu lista lo incluya más de una vez."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant la lecture d’une chaîne en direct, passez à la même chaîne dans une autre qualité, comme HD, FHD ou 4K, lorsque votre playlist la propose plusieurs fois."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durante la visione di un canale in diretta, passa allo stesso canale in un’altra qualità, come HD, FHD o 4K, quando la tua playlist lo elenca più di una volta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブチャンネルの視聴中に、プレイリストに同じチャンネルが複数ある場合、HD、FHD、4K など別の画質に切り替えられます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 채널을 보는 동안 재생목록에 같은 채널이 여러 개 있으면 HD, FHD, 4K 등 다른 화질로 전환할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ao assistir a um canal ao vivo, mude para o mesmo canal em outra qualidade, como HD, FHD ou 4K, quando sua playlist o listar mais de uma vez."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "观看直播频道时，如果播放列表中多次列出同一频道，可切换到该频道的其他画质，例如 HD、FHD 或 4K。"
           }
         }
       }

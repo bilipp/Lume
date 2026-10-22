@@ -36,31 +36,44 @@ enum LiveChannelHistory {
     /// and the channel moves to the front of the most-recently-watched list.
     /// Non-live media is ignored, so a detour through a movie never clobbers
     /// the recall pair or the recents rail.
+    ///
+    /// Another quality of the same channel (a `PlayableMedia` carrying
+    /// `qualityAnchorID`) is not a channel change: it records as the channel
+    /// the viewer tuned to, so the recall pair and the recents rail stay put.
     static func record(
         _ media: PlayableMedia,
         profileID: UUID? = ActiveProfileStore.current,
         defaults: UserDefaults = .standard
     ) {
-        guard case let .live(id) = media.contentRef else { return }
+        guard case let .live(id) = media.historyRef else { return }
 
         let recentsKey = key(recentsKeyBase, profileID)
         let currentKey = key(currentKeyBase, profileID)
         let previousKey = key(previousKeyBase, profileID)
 
-        // Move-to-front in the recents list (deduplicated, capped). Re-selecting
-        // the current channel simply keeps it at the front — harmless to rerun.
         var recents = defaults.stringArray(forKey: recentsKey) ?? []
+        let current = defaults.string(forKey: currentKey)
+        guard recents.first != id || current != id else { return }
+
+        // Move-to-front in the recents list (deduplicated, capped).
         recents.removeAll { $0 == id }
         recents.insert(id, at: 0)
         defaults.set(Array(recents.prefix(recentsLimit)), forKey: recentsKey)
 
         // Re-selecting the channel already current leaves the recall pair alone.
-        let current = defaults.string(forKey: currentKey)
         guard current != id else { return }
         if let current {
             defaults.set(current, forKey: previousKey)
         }
         defaults.set(id, forKey: currentKey)
+    }
+
+    /// The live channel `id` playing now, or last played — `nil` before any.
+    static func currentChannelId(
+        profileID: UUID? = ActiveProfileStore.current,
+        defaults: UserDefaults = .standard
+    ) -> String? {
+        defaults.string(forKey: key(currentKeyBase, profileID))
     }
 
     /// The most-recently-watched live channel `id`s for the profile, current

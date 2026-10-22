@@ -104,11 +104,9 @@ final class OpenSubtitlesService {
         defer { isSigningIn = false }
 
         do {
-            let newSession = try await client.login(username: trimmed, password: password)
-            OpenSubtitlesSessionStore.save(newSession)
-            session = newSession
-            username = newSession.username
-            allowedDownloads = newSession.allowedDownloads
+            var newSession = try await client.login(username: trimmed, password: password)
+            newSession.password = password
+            adopt(newSession)
             remainingDownloads = nil
         } catch let error as OpenSubtitlesError {
             signInError = String(localized: error.message)
@@ -122,13 +120,70 @@ final class OpenSubtitlesService {
             // Best-effort: the local session is dropped regardless.
             try? await client.logout(session: session)
         }
+        endSession()
+        signInError = nil
+        OnlineSubtitleCache.clear()
+    }
+
+    private func adopt(_ newSession: OpenSubtitlesSession) {
+        OpenSubtitlesSessionStore.save(newSession)
+        session = newSession
+        username = newSession.username
+        allowedDownloads = newSession.allowedDownloads
+    }
+
+    private func endSession() {
         OpenSubtitlesSessionStore.clear()
         session = nil
         username = nil
         allowedDownloads = nil
         remainingDownloads = nil
-        signInError = nil
-        OnlineSubtitleCache.clear()
+    }
+
+    /// Runs `request` with the current session. An expired token is renewed
+    /// once from the stored credentials; when that isn't possible the session
+    /// is dropped, so the UI stops claiming a sign-in the server no longer
+    /// honours.
+    private func withSession<T>(_ request: (OpenSubtitlesSession) async throws -> T) async throws -> T {
+        guard let session else { throw OpenSubtitlesError.notAuthenticated }
+        do {
+            let result = try await Self.performRenewing(
+                session: session,
+                login: { try await self.client.login(username: $0, password: $1) },
+                request: request
+            )
+            if let renewed = result.renewed {
+                adopt(renewed)
+            }
+            return result.value
+        } catch OpenSubtitlesError.notAuthenticated {
+            endSession()
+            throw OpenSubtitlesError.notAuthenticated
+        }
+    }
+
+    /// `request` against `session`, retried once on a fresh token when the
+    /// server rejects the stored one. Returns the renewed session, if any, for
+    /// the caller to persist. Throws `.notAuthenticated` when the token can't
+    /// be renewed: no stored password, or the account no longer accepts it.
+    static func performRenewing<T>(
+        session: OpenSubtitlesSession,
+        login: (String, String) async throws -> OpenSubtitlesSession,
+        request: (OpenSubtitlesSession) async throws -> T
+    ) async throws -> (value: T, renewed: OpenSubtitlesSession?) {
+        do {
+            return try await (request(session), nil)
+        } catch OpenSubtitlesError.notAuthenticated {
+            guard let password = session.password else { throw OpenSubtitlesError.notAuthenticated }
+            var renewed: OpenSubtitlesSession
+            do {
+                renewed = try await login(session.username, password)
+            } catch OpenSubtitlesError.invalidCredentials {
+                throw OpenSubtitlesError.notAuthenticated
+            }
+            renewed.password = password
+            return try await (request(renewed), renewed)
+        }
     }
 
     // MARK: - Search
@@ -138,14 +193,27 @@ final class OpenSubtitlesService {
     func search(_ query: OpenSubtitlesQuery) async throws -> [OnlineSubtitle] {
         var query = query
         query.languages = preferredLanguages
-        let results = try await client.search(query, host: host, token: session?.token)
+        let results: [OnlineSubtitle]
+        if session == nil {
+            results = try await client.search(query)
+        } else {
+            do {
+                results = try await withSession { try await self.client.search(query, host: $0.host, token: $0.token) }
+            } catch OpenSubtitlesError.notAuthenticated {
+                // Searching doesn't need an account, so a session that couldn't
+                // be renewed falls back to an anonymous search.
+                results = try await client.search(query)
+            }
+        }
         return results.sorted { $0.downloadCount > $1.downloadCount }
     }
 
     /// The full language list for the search sheet's filter, fetched once per
     /// app run.
     func languages() async -> [OpenSubtitlesLanguage] {
-        if !cachedLanguages.isEmpty { return cachedLanguages }
+        if !cachedLanguages.isEmpty {
+            return cachedLanguages
+        }
         cachedLanguages = await (try? client.languages(host: host)) ?? []
         return cachedLanguages
     }
@@ -156,10 +224,10 @@ final class OpenSubtitlesService {
     /// on disk, so re-picking the same track inside a session costs nothing
     /// against the daily allowance.
     func download(_ subtitle: OnlineSubtitle) async throws -> URL {
-        if let cached = OnlineSubtitleCache.cachedFile(for: subtitle) { return cached }
-        guard let session else { throw OpenSubtitlesError.notAuthenticated }
-
-        let download = try await client.downloadLink(for: subtitle, session: session)
+        if let cached = OnlineSubtitleCache.cachedFile(for: subtitle) {
+            return cached
+        }
+        let download = try await withSession { try await self.client.downloadLink(for: subtitle, session: $0) }
         let data = try await client.fetch(download)
         remainingDownloads = download.remainingDownloads
         Logger.player.info("OpenSubtitles: downloaded subtitle, \(download.remainingDownloads) left today")

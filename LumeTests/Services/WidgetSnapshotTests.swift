@@ -158,6 +158,46 @@ struct WidgetSnapshotExporterTests {
         #expect(!snapshot.continueWatching.contains { $0.title == "Watched" })
     }
 
+    @Test func `a recently watched series without an episode in progress still appears`() throws {
+        let (container, playlist) = try seedContainer()
+        let context = container.mainContext
+        let prefix = playlist.id.uuidString
+        let show = Series(id: "\(prefix)-s2", seriesId: 20, name: "Caught Up", cover: "https://img/s2.jpg")
+        show.lastWatchedDate = Date(timeIntervalSinceNow: -1800)
+        context.insert(show)
+        let finished = Episode(id: "\(prefix)-s2-1-1", episodeId: "e21", title: "Finale", containerExtension: "mp4", seasonNum: 1, episodeNum: 1, series: show)
+        finished.setWatched(true)
+        context.insert(finished)
+        try context.save()
+
+        let snapshot = WidgetSnapshotExporter.makeSnapshot(
+            container: container, storedPlaylistID: playlist.id.uuidString, isChildProfile: false
+        )
+
+        // Ordered by the show's own stamp, between the series and the movie.
+        #expect(snapshot.continueWatching.map(\.title) == ["Show", "Caught Up", "Resumable"])
+        let item = try #require(snapshot.continueWatching.first { $0.title == "Caught Up" })
+        #expect(item.kind == .series)
+        #expect(item.progress == nil)
+        #expect(item.imageURL == URL(string: "https://img/s2.jpg"))
+        #expect(item.deepLink == WidgetDeepLink.openSeries(id: "\(prefix)-s2"))
+    }
+
+    @Test func `a series removed from recently watched drops out despite episode progress`() throws {
+        let (container, playlist) = try seedContainer()
+        let context = container.mainContext
+        let show = try #require(try context.fetch(FetchDescriptor<Series>()).first)
+        // What Home's "Remove from Recently Watched" does: the episodes keep
+        // their resume points, only the show's stamp goes.
+        show.lastWatchedDate = nil
+        try context.save()
+
+        let snapshot = WidgetSnapshotExporter.makeSnapshot(
+            container: container, storedPlaylistID: playlist.id.uuidString, isChildProfile: false
+        )
+        #expect(snapshot.continueWatching.map(\.title) == ["Resumable"])
+    }
+
     @Test func `favorites interleave kinds in unified order`() throws {
         let (container, playlist) = try seedContainer()
         let snapshot = WidgetSnapshotExporter.makeSnapshot(

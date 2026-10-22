@@ -40,17 +40,15 @@ extension View {
 
     extension View {
         /// Pushes the full-screen player's `PlayerVolumeStore` into an engine on
-        /// appear and whenever its level or mute changes, and handles the
-        /// volume shortcuts. Applied in the engine views' key chains ahead of
-        /// `liveChannelKeyNavigation`. Without a store in the environment
+        /// appear and whenever its level or mute changes. The volume keys live
+        /// in `playerKeyboardShortcuts`. Without a store in the environment
         /// (Multi-View tiles, previews) it does nothing. Engine fallback
         /// rebuilds the engine view, whose appear re-applies the surviving
         /// store.
-        func playerVolume(_ engine: some PlayerVolumeApplying, onReveal: @escaping () -> Void) -> some View {
+        func playerVolume(_ engine: some PlayerVolumeApplying) -> some View {
             modifier(PlayerVolumeEngineLink(
                 apply: engine.applyUserVolume,
-                isRoutedExternally: engine.isVolumeRoutedExternally,
-                onReveal: onReveal
+                isRoutedExternally: engine.isVolumeRoutedExternally
             ))
         }
     }
@@ -60,7 +58,6 @@ extension View {
     private struct PlayerVolumeEngineLink: ViewModifier {
         let apply: (Float, Bool) -> Void
         let isRoutedExternally: Bool
-        let onReveal: () -> Void
 
         @Environment(PlayerVolumeStore.self) private var playerVolume: PlayerVolumeStore?
 
@@ -71,25 +68,6 @@ extension View {
                 .onChange(of: playerVolume?.isMuted) { _, _ in push() }
                 .onChange(of: isRoutedExternally, initial: true) { _, routed in
                     playerVolume?.isRoutedExternally = routed
-                }
-                // A focused text field consumes its own arrow keys before they
-                // reach here.
-                .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
-                    guard let playerVolume, !playerVolume.isRoutedExternally,
-                          let command = PlayerVolumeKeyCommand(key: press.key, modifiers: press.modifiers)
-                    else { return .ignored }
-                    switch command {
-                    case .stepUp:
-                        playerVolume.step(up: true)
-                    case .stepDown:
-                        playerVolume.step(up: false)
-                    case .toggleMute:
-                        // A held chord would flip mute at the key-repeat rate.
-                        guard press.phase == .down else { return .handled }
-                        playerVolume.toggleMute()
-                    }
-                    onReveal()
-                    return .handled
                 }
         }
 

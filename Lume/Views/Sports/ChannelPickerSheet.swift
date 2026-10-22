@@ -18,6 +18,9 @@ struct ChannelPickerSheet: View {
     let fixture: SportsFixture
     let resolved: [ResolvedChannel]
     var onWatch: (ResolvedChannel) -> Void
+    /// The channel just watched, marked when closing the player reopens this
+    /// picker.
+    var lastWatchedChannelID: String?
     /// Device-local picks store; injectable for tests, `.standard` otherwise.
     var picks = SportsChannelPicks()
 
@@ -34,7 +37,7 @@ struct ChannelPickerSheet: View {
                             Button {
                                 select(channel)
                             } label: {
-                                SportsChannelRow(channel: channel)
+                                SportsChannelRow(channel: channel, isLastWatched: channel.id == lastWatchedChannelID)
                             }
                             .buttonStyle(.plain)
                         }
@@ -91,11 +94,12 @@ struct ChannelPickerSheet: View {
 /// the picker; the trailing play glyph signals that a tap starts playback.
 struct SportsChannelRow: View {
     let channel: ResolvedChannel
+    var isLastWatched = false
 
     var body: some View {
         HStack(spacing: 12) {
             ChannelLogo(urlString: channel.stream.streamIcon, size: 36)
-            SportsChannelLabel(channel: channel)
+            SportsChannelLabel(channel: channel, isLastWatched: isLastWatched)
             Spacer(minLength: 8)
             Image(systemName: "play.circle.fill")
                 .font(.title2)
@@ -103,6 +107,15 @@ struct SportsChannelRow: View {
                 .accessibilityHidden(true)
         }
         .contentShape(Rectangle())
+        // Drawn past the row's bounds so the mark doesn't shift it against
+        // the unmarked rows around it.
+        .background {
+            if isLastWatched {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(.tint.opacity(0.15))
+                    .padding(-6)
+            }
+        }
     }
 }
 
@@ -111,11 +124,17 @@ struct SportsChannelRow: View {
 /// so the two never drift.
 struct SportsChannelLabel: View {
     let channel: ResolvedChannel
+    var isLastWatched = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             nameLine
             subtitleLine
+            if isLastWatched {
+                Text("Last watched")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -145,14 +164,10 @@ struct SportsChannelLabel: View {
     }
 }
 
-/// Pulls a quality tag out of a channel name — "DAZN 1 FHD", "Sky 4K UHD".
-/// Checks the most specific tokens first so "4K UHD" reports "4K".
+/// Pulls a quality tag out of a channel name — "Fieldcast 1 FHD", "Lume 4K UHD".
+/// Only the badges the picker has always shown; "1080p" or "8K" get none.
 nonisolated func sportsQualityBadge(from name: String) -> String? {
-    let haystack = name.uppercased()
-    for token in ["4K", "UHD", "FHD", "HD"] where haystack.contains(token) {
-        return token
-    }
-    return nil
+    ChannelQuality.badge(for: name).flatMap { ["4K", "UHD", "FHD", "HD"].contains($0) ? $0 : nil }
 }
 
 extension ResolvedChannel {

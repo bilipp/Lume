@@ -30,6 +30,22 @@
         ) -> some View {
             modifier(TVPlayerRecordFocusHandoff(media: media, focus: focus))
         }
+
+        /// Moves focus from `control` to `target` when `isShown` turns false
+        /// while `control` holds focus.
+        func tvPlayerFocusHandoff(
+            isShown: Bool,
+            leaving control: TVPlayerFocus,
+            to target: TVPlayerFocus,
+            focus: FocusState<TVPlayerFocus?>.Binding
+        ) -> some View {
+            onChange(of: isShown) { wasShown, isShown in
+                guard wasShown, !isShown, focus.wrappedValue == control else { return }
+                // Deferred: a focus write inside the update that removes
+                // the focused view is dropped by the focus engine.
+                Task { @MainActor in focus.wrappedValue = target }
+            }
+        }
     }
 
     private struct TVPlayerRecordFocusHandoff: ViewModifier {
@@ -46,12 +62,7 @@
 
         func body(content: Content) -> some View {
             content
-                .onChange(of: showsRecordButton) { wasShown, isShown in
-                    guard wasShown, !isShown, focus.wrappedValue == .record else { return }
-                    // Deferred: a focus write inside the update that removes
-                    // the focused view is dropped by the focus engine.
-                    Task { @MainActor in focus.wrappedValue = .favorite }
-                }
+                .tvPlayerFocusHandoff(isShown: showsRecordButton, leaving: .record, to: .favorite, focus: focus)
         }
     }
 

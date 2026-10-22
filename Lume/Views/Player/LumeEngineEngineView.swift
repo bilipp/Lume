@@ -278,16 +278,13 @@ struct LumeEngineEngineView: View {
                     }
                 }
             }
-            .onKeyPress(.leftArrow) { coordinator.skip(by: -15); resetHideTimer(); return .handled }
-            .onKeyPress(.rightArrow) { coordinator.skip(by: 15); resetHideTimer(); return .handled }
-            .playerVolume(coordinator, onReveal: showControls)
-            .liveChannelKeyNavigation(
-                neighbours: itemNeighbours, swapper: mediaSwapper,
-                onSelect: { onSelectMedia?($0) }, onResetHideTimer: resetHideTimer
-            )
-            .onKeyPress(.space) { togglePlay(); return .handled }
-            .onKeyPress(.escape) { closePlayer(); return .handled }
+            .playerVolume(coordinator)
         #endif
+            .playerKeyboardShortcuts(PlayerKeyActions(
+                togglePlay: togglePlay, skip: { coordinator.skip(by: $0) }, close: closePlayer,
+                resetHideTimer: resetHideTimer, showControls: showControls,
+                neighbours: itemNeighbours, swapper: mediaSwapper, selectMedia: { onSelectMedia?($0) }
+            ))
     }
 
     // MARK: - Coordinator wiring
@@ -353,7 +350,7 @@ struct LumeEngineEngineView: View {
                 clock: clock,
                 panelCloseToken: panelCloseToken,
                 onTogglePlay: { togglePlay() },
-                onResetHideTimer: { resetHideTimer() },
+                onResetHideTimer: { PlayerControlsAutoHide.menuClosed(); resetHideTimer() },
                 onSelectMedia: { onSelectMedia?($0) },
                 onPanelOpenChange: { setPanelOpen($0) },
                 onSwitchChannel: { switchLiveChannel($0) },
@@ -370,7 +367,7 @@ struct LumeEngineEngineView: View {
                 hideTask: $hideTask,
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
-                onResetHideTimer: { resetHideTimer() },
+                onResetHideTimer: { PlayerControlsAutoHide.menuClosed(); resetHideTimer() },
                 onScheduleHide: { scheduleHide() },
                 onSearchSubtitles: subtitleSearchAction,
                 itemNeighbours: itemNeighbours,
@@ -501,6 +498,9 @@ struct LumeEngineEngineView: View {
         guard coordinator.isPlaying, !isPanelOpen, !PlayerControlsAutoHide.isSuppressed else { return }
         hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
+            if await PlayerControlsAutoHide.waitWhileMenuOpen() {
+                try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
+            }
             guard !Task.isCancelled, coordinator.isPlaying else { return }
             withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
         }

@@ -29,6 +29,7 @@
         case audio
         case subtitles
         case sources
+        case quality
         case favorite
         case record
         case panelClose
