@@ -145,7 +145,7 @@ adapted per size class
 - **Live scores, standings, and full game detail** — timeline, team-stat bars, lineups, and F1 sessions with driver/constructor standings — from **ESPN**
 - **EPG-based channel matching** resolves each fixture to a channel already in *your* playlists, so one tap starts playback; when several channels carry a match you get a picker, and your pick is remembered
 - Clean, Apple Sports / Strand-style cards tinted with each team's colours
-- Followed teams and leagues **sync across your devices** via iCloud, per profile
+- Followed teams and leagues **sync across your devices** via iCloud or Lume Cloud, per profile
 - A **Lume Pro** feature; available on every platform and hideable from Settings
 
 #### 🎬 Movies & Series
@@ -160,7 +160,7 @@ adapted per size class
 - Personalized dashboard with a hero carousel
 - **Immersive full-screen tvOS home** with TMDB backdrop, crossfading hero, and fold-based scroll snapping
 - Continue Watching, Favorites, Recently Watched, and Trending rails
-- **For You** rail — on-device recommendations from your watch history and favorites; thumbs-up / thumbs-down a suggestion to tune what you see next, with your votes syncing across devices via iCloud (can be turned off in Settings)
+- **For You** rail — on-device recommendations from your watch history and favorites; thumbs-up / thumbs-down a suggestion to tune what you see next, with your votes syncing across devices via iCloud or Lume Cloud (can be turned off in Settings)
 - **Home Screen widgets** (iPhone/iPad) — Continue Watching, Favorites, and On Now (EPG for favorite channels), each deep-linking straight into playback
 - **tvOS Top Shelf** — Continue Watching and Favorites above the app icon, as poster rows or a backdrop carousel, configurable in Settings › Home
 
@@ -189,7 +189,7 @@ adapted per size class
 #### 👤 Profiles
 - Multiple **user profiles**, each with its own watch history, progress, and favorites
 - Switch profiles from the top-left of Home (iOS / macOS), on tvOS with the Siri Remote's **Play/Pause** button, which opens a quick-switch overlay for playlists and profiles, or from Settings on visionOS — Settings stays the place to add, edit and delete them
-- Profiles and their state **sync across your devices** via iCloud
+- Profiles and their state **sync across your devices** via iCloud, or via **Lume Cloud** — our own free, end-to-end encrypted sync backend, chosen in Settings › Sync
 - **Parental controls**: mark profiles as child profiles, restrict categories (hidden from browsing and search), and protect them with a PIN required to leave a child profile or open Content Management
 
 #### ⚙️ Library management

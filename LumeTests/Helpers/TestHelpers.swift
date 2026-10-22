@@ -22,6 +22,19 @@ func makeTestContainer() throws -> ModelContainer {
     return try ModelContainer(for: schema, configurations: [config])
 }
 
+/// The in-memory iCloud `CloudUserData` mirror, `extraModels` added to its
+/// schema. `cloudKitDatabase: .none` for the same reason as the catalog.
+func makeICloudMirrorTestContainer(extraModels: [any PersistentModel.Type] = []) throws -> ModelContainer {
+    let schema = Schema(LumeApp.cloudMirrorModels + extraModels)
+    let config = ModelConfiguration(
+        ContentSyncManager.cloudMirrorConfigurationName,
+        schema: schema,
+        isStoredInMemoryOnly: true,
+        cloudKitDatabase: .none
+    )
+    return try ModelContainer(for: schema, configurations: config)
+}
+
 /// A fresh UUID-named `UserDefaults` suite, removed again once `body` returns.
 func withIsolatedDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
     let suiteName = UUID().uuidString

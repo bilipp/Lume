@@ -9,6 +9,8 @@ struct LibraryToolbarModifier: ViewModifier {
     @Binding var showingSettings: Bool
     let activePlaylist: Playlist?
 
+    @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
+
     func body(content: Content) -> some View {
         content
             .toolbar {
@@ -49,18 +51,25 @@ struct LibraryToolbarModifier: ViewModifier {
             .sheet(
                 isPresented: $showingSettings,
                 // Settings is a sheet on this toolbar, invisible to the browse
-                // root that fires the rating prompt — so it reports itself, the
-                // way the paywall and the players do.
-                onDismiss: { AppStoreReviewPrompt.shared.noteBlockingSheetDismissed() },
+                // root that raises the rating prompt and the root notices — so
+                // it reports itself, the way the paywall and the players do.
+                onDismiss: { ScreenOccupancy.shared.noteBlockingSheetDismissed() },
                 content: {
                     SettingsView()
-                        .onAppear { AppStoreReviewPrompt.shared.noteBlockingSheetAppeared() }
+                        .onAppear { ScreenOccupancy.shared.noteBlockingSheetAppeared() }
                 }
             )
             .sheet(isPresented: $showingSync) {
                 if let playlist = activePlaylist {
                     SyncProgressView(playlist: playlist)
                 }
+            }
+            // A pairing link's add-device sheet is presented from the browse
+            // root, which can't present over these.
+            .onChange(of: router?.cloudPairingRequest?.id) { _, request in
+                guard request != nil else { return }
+                showingSettings = false
+                showingSync = false
             }
     }
 }

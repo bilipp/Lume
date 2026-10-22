@@ -26,22 +26,28 @@ struct ContentView: View {
         Group {
             // A populated local store always wins — returning users go straight
             // to the app. On an empty store we wait for the launch-time iCloud
-            // sync to settle first, so cloud playlists aren't yanked in
-            // mid-typing on a fresh device. If sync is unavailable, errors, or
-            // times out, the gate opens and the form shows as a fallback (see
-            // CloudSyncCoordinator).
+            // sync to settle first (or, when another Apple device moved sync to
+            // Lume Cloud, for the first Lume Cloud pull), so cloud playlists
+            // aren't yanked in mid-typing on a fresh device. If sync is
+            // unavailable, errors, or times out, the gate opens and the form
+            // shows as a fallback (see CloudSyncCoordinator).
             if !playlists.isEmpty {
                 if showStartupProfileChooser {
                     ProfileSelectionView(onComplete: dismissStartupProfileChooser)
                 } else {
                     MainTabView()
                 }
-            } else if cloudSync?.status.hasCompletedInitialSync ?? true {
+            } else if cloudSync?.status.isLaunchGateOpen ?? true {
                 LoginView()
             } else {
-                CloudSyncLaunchView(onSkip: { cloudSync?.skipInitialSyncWait() })
+                CloudSyncLaunchView(
+                    checksLumeCloud: cloudSync?.status.backend == .lumecloud || cloudSync?.status.isAwaitingLaunchJoin == true,
+                    onSkip: { cloudSync?.skipInitialSyncWait() }
+                )
             }
         }
+        .lumeCloudMovedNotice()
+        .lumeCloudAccountEndNotice()
         .task {
             if CommandLine.arguments.contains("-ui-testing") {
                 seedTestPlaylist()

@@ -8,7 +8,7 @@
 //  screen, nothing of its own is presented over it, and no player is up. The
 //  last one cannot be read from a presentation binding — the player is opened
 //  from eleven call sites, and on macOS it is a separate window entirely — so
-//  it comes from `AppStoreReviewPrompt.playerIsVisible` instead.
+//  it comes from `ScreenOccupancy.isScreenBusy` instead.
 //
 //  tvOS has no review API at any layer, so this compiles down to `self` there.
 //  The fence is compile-time because `RequestReviewAction` is unavailable on
@@ -50,7 +50,7 @@ extension View {
         /// settle, so the alert doesn't animate in over a closing player.
         private static let settleDelay: Duration = .seconds(1)
 
-        /// Reading the prompt's own state here is what subscribes this view to
+        /// Reading the occupancy here is what subscribes this view to
         /// a player or paywall opening and closing anywhere in the app — none of
         /// which the browse root can see for itself.
         ///
@@ -61,9 +61,7 @@ extension View {
         private var canFire: Bool {
             scenePhase == .active
                 && !isBlocked
-                && !AppStoreReviewPrompt.shared.playerIsVisible
-                && !AppStoreReviewPrompt.shared.paywallIsVisible
-                && !AppStoreReviewPrompt.shared.blockingSheetIsVisible
+                && !ScreenOccupancy.shared.isScreenBusy
                 && AppStoreReviewPrompt.shared.isArmed
         }
 

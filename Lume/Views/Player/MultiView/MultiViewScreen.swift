@@ -216,7 +216,7 @@ struct MultiViewScreen: View {
                 // the grid is its own window with the browse root still visible,
                 // so an armed rating sheet would otherwise animate in over four
                 // running streams.
-                AppStoreReviewPrompt.shared.notePlayerAppeared()
+                ScreenOccupancy.shared.notePlayerAppeared()
                 configureAudioSession()
                 adoptQueuedChannels()
                 landInitialFocus()
@@ -273,7 +273,7 @@ struct MultiViewScreen: View {
                 #endif
                 releaseAudioSession()
                 PlaybackSurfaceHold.set(false, owner: holdOwner)
-                AppStoreReviewPrompt.shared.notePlayerDisappeared()
+                ScreenOccupancy.shared.notePlayerDisappeared()
             }
         #if os(tvOS)
             // Only reached when the picker isn't presented — its own cover handles

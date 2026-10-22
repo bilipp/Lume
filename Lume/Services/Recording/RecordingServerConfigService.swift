@@ -53,6 +53,17 @@ final class RecordingServerConfigService {
         reload()
     }
 
+    /// Follow a backend switch onto `container`'s mirror store.
+    func repoint(container: ModelContainer) {
+        configure(container: container)
+    }
+
+    /// An iCloud remote change doesn't land here: it always runs a reconcile,
+    /// and the app reloads on `lastReconcile`.
+    func mirrorDidChange() {
+        reload()
+    }
+
     private var context: ModelContext? {
         container?.mainContext
     }
@@ -146,10 +157,15 @@ final class RecordingServerConfigService {
 
     // MARK: - Reload
 
-    /// Re-read every row. Called on configure, after each mutation and after
-    /// each iCloud reconcile.
+    /// Re-read every row. Called on configure, after each mutation, after each
+    /// reconcile and when the mirror changes or is swapped. Leaves `servers`
+    /// alone when nothing changed, so CloudKit's remote-change churn doesn't
+    /// re-render the settings screens.
     func reload() {
-        servers = fetchRows().map(Self.snapshot)
+        let latest = fetchRows().map(Self.snapshot)
+        if latest != servers {
+            servers = latest
+        }
     }
 
     private func fetchRows() -> [SyncedRecordingServer] {
@@ -202,3 +218,5 @@ final class RecordingServerConfigService {
         return url
     }
 }
+
+extension RecordingServerConfigService: SyncMirrorConsumer {}

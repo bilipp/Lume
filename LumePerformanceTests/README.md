@@ -38,6 +38,7 @@ Release would change what ships. Debug, Release and Sideload are untouched.
 | Player navigation | `BrowseQueryBenchmarks+Navigation` | A previous/next lookup going back to reading the whole list |
 | End-to-end import | `M3UColdImportBenchmarks` | The whole production cold import, phase by phase |
 | Attribution harnesses | `M3UEpisodeRelationshipBenchmarks`, `M3UExistingRowFetchBenchmarks` | Which part of an import loop the time is actually in |
+| Lume Cloud push | `LumeCloudSyncBenchmarks` | The per-pass push diff or the first push of a large library getting slower |
 | Signpost metrics | `SignpostBenchmarks` | A named production phase getting slower |
 | Field telemetry | `AppPerformanceMetrics` (MetricKit) in the app | What users actually experience |
 | Player QoE | `PlaybackQoE` in the app | Join time, rebuffering, startup failures |
@@ -219,6 +220,63 @@ materializing rows: about 7.5 s for the guide rows in the window and 2 s for the
 can match it, matching scored every channel against every fixture — 11.4M pairs
 here, which does not finish in a benchmark run. A jump back toward that means a
 fixture is being scored against channels the index should have excluded.
+
+## The Lume Cloud push at 100k content rows
+
+Every reconcile pass on Lume Cloud ends in `LumeCloudTransport.push()`. A push
+decides what to send by encoding a row's canonical payload
+(`LumeCloudPayloadCodec.encoded`, merged over the last synced bytes) and comparing
+it with `LumeCloudRecordState.lastSyncedPayload`. `LumeCloudSyncBenchmarks` seeds
+100,000 `UserContentState` rows across three profiles (fixed seed: half episodes,
+a quarter movies, the rest channels, series and categories) into an on-disk Lume
+Cloud store with the app's schema, and pushes into `PerfLumeCloudFeed`, an
+in-process stand-in that accepts every record. There is no network in the
+number, only the diff, the sealing, the 500-record batching and the bookkeeping
+writes.
+
+Once a push has succeeded it stores a history token
+(`LumeCloudSyncMeta.historyToken`). The next push reads persistent history since
+that token and diffs only the rows another author (the engine's reconcile, the
+services) inserted or updated, plus records still dirty from a failed send. A
+missing or expired token, a reset, a resync or a mirror wipe falls back to the
+full diff of every row. The unchanged and 100-row cases first run one full push,
+outside the measured span, so they measure the history path; the 100 rows are
+edited through a plain `ModelContext`, the way the engine writes them.
+
+**WAL Growth** is the store's `-wal` size at the end of the measured span minus
+its size at the start, with the log checkpointed and truncated just before the
+span (`PerfWALGrowthMetric`). Peak RSS is the process high-water mark, so the
+unchanged and 100-row figures include the seeding and the first push that ran
+before them.
+
+iPhone 17 Pro simulator (iOS 26.5), Benchmark configuration, 2026-10-21:
+
+| Benchmark | Clock | `LumeCloudPush` signpost | Peak RSS | WAL Growth |
+|---|---|---|---|---|
+| `testFirstPushOf100kContentRows` (empty bookkeeping, 200 requests) | 64.2-66.8 s | 66.0 s | 1.0 GB | 0-6.8 MB |
+| `testUnchangedPushOf100kContentRows` (nothing changed, 0 requests) | 0.029-0.043 s | 0.034 s | 376 MB | 0 kB (one of 5 runs: 1.2 MB) |
+| `testPushOf100ChangedOf100kContentRows` (100 rows, 1 request) | 0.062-0.106 s | 0.085 s | 378 MB | 0.5-1.9 MB |
+
+Before history-based change detection the unchanged pass read and re-encoded
+every row and rewrote `isDirty` on each bookkeeping row, whether it changed or
+not: **20.6-20.9 s** (signpost 21.1 s) and a WAL of about 19,400 pages
+(**about 76 MB**) per pass, on the same simulator. Two changes took it to
+34 ms: bookkeeping fields are only assigned when their value differs, so an
+unchanged pass leaves the context clean and skips the save, and history narrows
+the diff to the rows that changed. Both cases assert `encodedRows`: 0 for the
+unchanged pass, exactly 100 for the 100-row one. A rise in either means the
+push is diffing rows history did not name, and the clock follows within one
+run.
+
+The first push is the cost of joining with a library this size and remains a
+full diff. It measured 48.2-50.9 s before this change and 64-67 s after; it
+was not profiled across the two runs, so treat that gap as unexplained. A phase
+split taken on a later run: about 13 s building the 100,000 upserts (encode and
+seal), then the 200 requests, where each per-request save of about 0.1 s
+(saved per request so a failure keeps what earlier requests applied) is spent
+on a context holding 200,000 registered models, and the first save also writes
+the 100,000 new bookkeeping rows. The history purge after the first push takes
+about 1.8 s.
 
 ## The parser microbenchmarks, and the offset-less XMLTV win
 

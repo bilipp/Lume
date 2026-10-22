@@ -99,3 +99,11 @@ if [ -n "$SIMKL_CLIENT_ID" ]; then
 else
     echo "warning: SIMKL_CLIENT_ID not set in .env — Simkl integration will be hidden"
 fi
+
+# Optional: without it the per-configuration LUME_CLOUD_URL build setting
+# stays (Debug → staging, Release/Sideload/Benchmark → production).
+LUME_CLOUD_URL="$(read_env LUME_CLOUD_URL)"
+if [ -n "$LUME_CLOUD_URL" ]; then
+    set_plist LumeCloudServerURL "$LUME_CLOUD_URL"
+    echo "Injected LUME_CLOUD_URL into Info.plist"
+fi

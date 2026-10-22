@@ -9,17 +9,23 @@ import Foundation
 /// is ever lost the reconciler degrades gracefully to a one-time union merge
 /// (briefly treating both sides as "changed"), never data loss.
 ///
+/// Namespaced per backend: a baseline describes what local and *one* mirror
+/// agreed on, so reusing it against another backend's mirror reads every item
+/// missing there as a deletion. `.icloud` keeps the original
+/// `cloudsync.shadow.*.v1` keys; `.lumecloud` uses `cloudsync.lumecloud.shadow.*.v1`.
+///
 /// Owned exclusively by `CloudSyncEngine` (an actor), so it needs no internal
 /// locking; `nonisolated` only frees it from the project's default main-actor
 /// isolation so the engine can hold and mutate it off the main thread.
 final nonisolated class CloudSyncShadow {
+    let namespace: SyncBackendKind
     private let defaults: UserDefaults
-    private let playlistsKey = "cloudsync.shadow.playlists.v1"
-    private let contentKey = "cloudsync.shadow.content.v1"
-    private let epgSourcesKey = "cloudsync.shadow.epgsources.v1"
-    private let parentalPINKey = "cloudsync.shadow.parentalpin.v1"
-    private let categoryRestrictionsKey = "cloudsync.shadow.categoryrestrictions.v1"
-    private let liveTVPreferencesKey = "cloudsync.shadow.livetvpreferences.v1"
+    private let playlistsKey: String
+    private let contentKey: String
+    private let epgSourcesKey: String
+    private let parentalPINKey: String
+    private let categoryRestrictionsKey: String
+    private let liveTVPreferencesKey: String
 
     private var playlists: [String: PlaylistConfigValues]
     private var content: [String: ContentStateValues]
@@ -36,8 +42,16 @@ final nonisolated class CloudSyncShadow {
     /// `persist()` then skips re-encoding the entire baseline to JSON for no gain.
     private var isDirty = false
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, namespace: SyncBackendKind = .icloud) {
+        self.namespace = namespace
         self.defaults = defaults
+        let prefix = Self.keyPrefix(for: namespace)
+        playlistsKey = "\(prefix).playlists.v1"
+        contentKey = "\(prefix).content.v1"
+        epgSourcesKey = "\(prefix).epgsources.v1"
+        parentalPINKey = "\(prefix).parentalpin.v1"
+        categoryRestrictionsKey = "\(prefix).categoryrestrictions.v1"
+        liveTVPreferencesKey = "\(prefix).livetvpreferences.v1"
         playlists = Self.decode(defaults.data(forKey: playlistsKey)) ?? [:]
         content = Self.decode(defaults.data(forKey: contentKey)) ?? [:]
         epgSources = Self.decode(defaults.data(forKey: epgSourcesKey)) ?? [:]
@@ -175,6 +189,31 @@ final nonisolated class CloudSyncShadow {
         isDirty = true
     }
 
+    /// Drop every baseline, the parental PIN and Live TV preferences included,
+    /// and remove them from disk. Run on the *target* backend's namespace before
+    /// the first reconcile after a backend switch: against a mirror that may be
+    /// empty, any surviving baseline turns a local value into a pulled deletion,
+    /// while with none at all every local value is pushed.
+    ///
+    /// Removed from disk at once rather than on the next `persist()`, so a
+    /// process killed before that reconcile completes can't reload the stale
+    /// baseline.
+    func resetAll() {
+        playlists.removeAll()
+        content.removeAll()
+        epgSources.removeAll()
+        categoryRestrictions.removeAll()
+        parentalPIN = nil
+        liveTVPreferences = nil
+        for key in [
+            playlistsKey, contentKey, epgSourcesKey, parentalPINKey,
+            categoryRestrictionsKey, liveTVPreferencesKey
+        ] {
+            defaults.removeObject(forKey: key)
+        }
+        isDirty = false
+    }
+
     // MARK: Persistence
 
     /// Flush the in-memory baseline to disk. Called once at the end of a
@@ -201,6 +240,13 @@ final nonisolated class CloudSyncShadow {
             defaults.removeObject(forKey: liveTVPreferencesKey)
         }
         isDirty = false
+    }
+
+    private static func keyPrefix(for namespace: SyncBackendKind) -> String {
+        switch namespace {
+        case .icloud: "cloudsync.shadow"
+        case .lumecloud: "cloudsync.lumecloud.shadow"
+        }
     }
 
     private static func encode(_ value: some Encodable) -> Data? {

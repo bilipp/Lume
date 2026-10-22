@@ -17,6 +17,7 @@
 
 import Foundation
 @testable import Lume
+import LumeCloudKit
 import SwiftData
 import XCTest
 
@@ -130,6 +131,40 @@ final class SignpostBenchmarks: XCTestCase {
         }
     }
 
+    /// The Lume Cloud transport's phases: a push of a small profile mirror into
+    /// an in-memory feed, then a pull of the same records into an empty mirror
+    /// (a fresh device joining). A tripwire on the three names, not a
+    /// throughput number.
+    func testLumeCloudTransportSignposts() {
+        let metrics = [PerfSignpost.lumeCloudPush, .lumeCloudPull, .lumeCloudMerge]
+            .map(M3UColdImportBenchmarks.signpostMetric)
+        let options = XCTMeasureOptions()
+        options.iterationCount = 3
+        let rootKey = LumeCloudKeys.generate().rootKey
+        measure(metrics: metrics, options: options) {
+            let finished = expectation(description: "lume cloud push + pull")
+            Task.detached {
+                do {
+                    let feed = PerfLumeCloudFeed()
+                    let source = try LumeApp.makeLumeCloudContainer(isStoredInMemoryOnly: true)
+                    let context = ModelContext(source)
+                    for index in 0 ..< 200 {
+                        context.insert(UserProfile(name: "Profile \(index)", sortOrder: index))
+                    }
+                    try context.save()
+                    try await LumeCloudTransport(client: feed, container: source, rootKey: rootKey, accountId: "acct-perf").push()
+
+                    let joining = try LumeApp.makeLumeCloudContainer(isStoredInMemoryOnly: true)
+                    try await LumeCloudTransport(client: feed, container: joining, rootKey: rootKey, accountId: "acct-perf").pull()
+                } catch {
+                    XCTFail("Lume Cloud transport failed: \(error)")
+                }
+                finished.fulfill()
+            }
+            wait(for: [finished], timeout: 60)
+        }
+    }
+
     // MARK: - Instrumentation integrity
 
     /// Two milestones sharing a name would silently merge into one metric, so a
@@ -149,6 +184,7 @@ final class SignpostBenchmarks: XCTestCase {
             .epgSourceSync, .epgIngest, .channelEPGLoad, .guideWindowLoad,
             .homeTrendingLoad, .homeRecommendations,
             .sportsChannelResolve, .sportsFixtureRefresh,
+            .lumeCloudPull, .lumeCloudPush, .lumeCloudMerge,
             .playerStartup, .playerRebuffer, .playerEngineFallback, .playerStartupFailure
         ]
         let names = all.map(\.metricName)

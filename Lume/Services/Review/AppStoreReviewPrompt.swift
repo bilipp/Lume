@@ -41,9 +41,8 @@ import OSLog
 
 /// Arms and fires Apple's system rating sheet.
 ///
-/// `@Observable` for one reason: the browse root has to notice the player
-/// closing to know its moment has arrived, and the player is presented from
-/// eleven different call sites, none of which the browse root can see.
+/// `@Observable` so the browse root notices a moment being armed; what is on
+/// screen over it comes from `ScreenOccupancy`.
 @MainActor
 @Observable
 final class AppStoreReviewPrompt {
@@ -64,40 +63,6 @@ final class AppStoreReviewPrompt {
         armedMoment != nil
     }
 
-    /// How many full-screen players are on screen. A count, not a flag: on
-    /// macOS the player is its own `WindowGroup` and on iPadOS the app can run
-    /// several scenes, so two can be open at once and closing one must not
-    /// report the screen as clear while the other is still playing.
-    private var openPlayerCount = 0
-
-    /// Whether any full-screen player is on screen. The fire point can't infer
-    /// this from its own presentation state: on macOS the player is a separate
-    /// `WindowGroup`, so the browse UI stays visible for the whole movie.
-    var playerIsVisible: Bool {
-        openPlayerCount > 0
-    }
-
-    /// How many paywalls are on screen. Counted the same way and for the same
-    /// reason as players: `paywall(isPresented:)` has a dozen call sites, and
-    /// the browse root that fires the prompt can see none of them.
-    private var openPaywallCount = 0
-
-    /// Whether a paywall is on screen right now. Distinct from the policy's
-    /// `recentPaywall` window, which covers the two hours *after* one closes.
-    var paywallIsVisible: Bool {
-        openPaywallCount > 0
-    }
-
-    /// How many blocking sheets that the browse root cannot see are on screen.
-    /// Counted the same way as players and paywalls: Settings is raised from
-    /// the library toolbar, so the tab root has no binding for it.
-    private var openBlockingSheetCount = 0
-
-    /// Whether such a sheet is on screen right now.
-    var blockingSheetIsVisible: Bool {
-        openBlockingSheetCount > 0
-    }
-
     private let store: AppStoreReviewStore
 
     init(defaults: UserDefaults = .standard) {
@@ -105,22 +70,6 @@ final class AppStoreReviewPrompt {
     }
 
     // MARK: - Arming
-
-    /// A full-screen player or Multi-View grid opened. Multi-View reports
-    /// itself too, from inside `MultiViewScreen`: its presentation sites are
-    /// invisible to the browse root, and a rating sheet must not animate in
-    /// over a four-up grid.
-    func notePlayerAppeared() {
-        openPlayerCount += 1
-    }
-
-    /// A full-screen player or Multi-View grid closed. Separate from
-    /// `noteSessionEnded` because Multi-View produces no health verdict to
-    /// judge — and because the screen being clear must be recorded at once,
-    /// while judging the moment can wait for a pending progress write.
-    func notePlayerDisappeared() {
-        openPlayerCount = max(0, openPlayerCount - 1)
-    }
 
     /// Counts a finished movie or episode (the >=90% crossing). Only the count
     /// is taken here: the verdict also needs the session's health, which does
@@ -237,32 +186,11 @@ final class AppStoreReviewPrompt {
         }
     #endif
 
-    // MARK: - Blocking sheets
-
-    /// A sheet the browse root cannot see was presented over it — Settings,
-    /// which presents sheets of its own several levels down (add playlist,
-    /// playlist sync, the debug mail and share sheets) that not even Settings'
-    /// own presenter can see.
-    func noteBlockingSheetAppeared() {
-        openBlockingSheetCount += 1
-    }
-
-    /// That sheet was dismissed.
-    func noteBlockingSheetDismissed() {
-        openBlockingSheetCount = max(0, openBlockingSheetCount - 1)
-    }
-
     // MARK: - Paywall
 
-    /// A paywall was presented.
-    func notePaywallAppeared() {
-        openPaywallCount += 1
-    }
-
-    /// The paywall was dismissed, opening the window the policy keeps clear of
+    /// A paywall was dismissed, opening the window the policy keeps clear of
     /// it.
     func notePaywallDismissed() {
-        openPaywallCount = max(0, openPaywallCount - 1)
         store.recordPaywallDismissal()
     }
 
@@ -293,8 +221,7 @@ final class AppStoreReviewPrompt {
     /// every UI test selects by English literal the failure reads as "gear not
     /// hittable" rather than as an alert.
     private var isAutomatedRun: Bool {
-        CommandLine.arguments.contains("-ui-testing")
-            || ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        LumeApp.isAutomatedRun
     }
 
     /// Read here, never inside the policy: this is `"—"` when

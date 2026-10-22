@@ -3,7 +3,7 @@
 //  Lume
 //
 //  Builds the shareable diagnostic report: a context header (app, device,
-//  network, playlists, settings, iCloud), a digest of recent problems and
+//  network, playlists, settings, sync), a digest of recent problems and
 //  sessions, the performance counters, and the full `DiagnosticJournal` — the
 //  persistent log that survives relaunches and crashes, so a report can be
 //  sent *after* something went wrong without having turned anything on first.
@@ -81,7 +81,7 @@ nonisolated struct DebugLogExporter {
         if let container {
             lines += section("Playlists", Self.catalogLines(container: container, now: now))
         }
-        lines += section("iCloud sync", metadata.cloudSync)
+        lines += section("Sync", metadata.cloudSync)
         lines += section("Settings", metadata.settings)
         lines += section("Recent problems (last 7 days, newest first)", Self.problemDigest(journalText, now: now))
         lines += section("Sessions (newest first)", Self.sessionDigest(journalText))
@@ -377,16 +377,45 @@ nonisolated struct DebugLogExporter {
         )
     }
 
+    /// Backend, state, last sync and last error. The status carries no
+    /// account or device id, key, pairing code or payload, and a custom Lume
+    /// Cloud server appears only as its kind, never its address.
     @MainActor
-    static func cloudSyncLines(_ status: CloudSyncStatus) -> [String] {
-        var lines = ["Account: \(status.account) · syncing: \(status.isSyncing ? "yes" : "no") · initial sync done: \(status.hasCompletedInitialSync ? "yes" : "no")"]
-        if let last = status.lastReconcile {
-            lines.append("Last reconcile: \(DiagnosticDateFormat.entry.string(from: last))")
+    static func cloudSyncLines(
+        _ status: CloudSyncStatus,
+        lumeCloudServer: LumeCloudConfig.ServerKind = LumeCloudConfig.serverKind
+    ) -> [String] {
+        var lines: [String] = []
+        switch status.backend {
+        case .icloud:
+            lines.append("Backend: iCloud")
+            lines.append("Account: \(status.account) · syncing: \(status.isSyncing ? "yes" : "no")")
+        case .lumecloud:
+            lines.append("Backend: Lume Cloud · server: \(lumeCloudServer.rawValue)")
+            lines.append("State: \(lumeCloudStateLabel(status.lumeCloud))")
+        case .off:
+            lines.append("Backend: off")
         }
+        lines.append("Initial sync done: \(status.hasCompletedInitialSync ? "yes" : "no")")
+        lines.append("Last sync: \(status.lastReconcile.map(DiagnosticDateFormat.entry.string(from:)) ?? "never")")
         if let error = status.lastError {
             lines.append("Last error: \(LogRedaction.scrubURLs(in: error))")
         }
         return lines
+    }
+
+    static func lumeCloudStateLabel(_ state: LumeCloudSyncState) -> String {
+        switch state {
+        case .notJoined: "not joined"
+        case .joined: "joined"
+        case .syncing: "syncing"
+        case let .uploading(completed, total): "uploading \(completed) of \(total)"
+        case .revoked: "device removed"
+        case .accountDeleted: "account deleted"
+        case .rateLimited: "rate limited"
+        case .quotaExceeded: "quota exceeded"
+        case .offline: "offline"
+        }
     }
 
     /// Every scalar preference (flags, numbers) plus the player's short string

@@ -6,6 +6,7 @@ import SwiftUI
 struct ManageProfilesView: View {
     @Environment(ProfileManager.self) private var profileManager: ProfileManager?
     @Environment(ParentalControls.self) private var parental: ParentalControls?
+    @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
     /// The roster comes from `ProfileManager` — `UserProfile` lives in the cloud
     /// store (a separate container this view's env context doesn't bind to).
     private var profiles: [UserProfile] {
@@ -41,7 +42,7 @@ struct ManageProfilesView: View {
                     profileRow(profile)
                 }
             } footer: {
-                Text("Each profile keeps its own watch history, progress and favorites. Profiles sync across your devices via iCloud.")
+                Text((cloudSync?.status.backend ?? .icloud).profileRosterFooter)
             }
 
             Section {
@@ -185,5 +186,16 @@ struct ManageProfilesView: View {
             .tint(.indigo)
         }
         #endif
+    }
+}
+
+nonisolated extension SyncBackendSelection {
+    /// The profile roster's footer on every platform: where the profiles sync.
+    var profileRosterFooter: LocalizedStringKey {
+        switch self {
+        case .icloud: "Each profile keeps its own watch history, progress and favorites. Profiles sync across your devices via iCloud."
+        case .lumecloud: "Each profile keeps its own watch history, progress and favorites. Profiles sync across your devices via Lume Cloud."
+        case .off: "Each profile keeps its own watch history, progress and favorites. Sync is off, so profiles stay on this device."
+        }
     }
 }

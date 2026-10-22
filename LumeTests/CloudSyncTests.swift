@@ -571,5 +571,14 @@ struct CloudSyncInitialGateTests {
             cloudKitEnabled: false
         )
         #expect(coordinator.status.hasCompletedInitialSync)
+        #expect(coordinator.backend is ICloudBackend)
+        #expect(coordinator.backend.kind == .icloud)
+        #expect(!coordinator.backend.waitsForInitialSync)
+    }
+
+    @Test func `gate is open from init when sync is Off`() throws {
+        let container = try makeTestContainer()
+        let coordinator = CloudSyncCoordinator(catalogContainer: container, cloudContainer: container, backend: OffBackend())
+        #expect(coordinator.status.hasCompletedInitialSync)
     }
 }
