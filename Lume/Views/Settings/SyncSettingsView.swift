@@ -118,6 +118,7 @@ import SwiftUI
                 CloudSyncStatusText.detail(for: status)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                SyncNowButton(coordinator: coordinator)
             } footer: {
                 Text(CloudSyncStatusText.footer)
             }
@@ -143,6 +144,7 @@ import SwiftUI
                 CloudSyncStatusText.detail(for: status)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                SyncNowButton(coordinator: coordinator)
                 LabeledContent("Device Name") {
                     TextField("Device Name", text: $model.deviceName, prompt: Text(verbatim: LumeCloudSettings.genericModelName))
                         .multilineTextAlignment(.trailing)
@@ -206,6 +208,31 @@ import SwiftUI
 
     /// The confirmation for the prompts `anchors` accepts, attached to the
     /// control that raises them so an iPad popover points at it.
+    /// Runs a sync pass right away on the active backend, with a spinner while
+    /// it runs. Disabled when there is nothing to reach (no iCloud account, or
+    /// no Lume Cloud membership).
+    private struct SyncNowButton: View {
+        let coordinator: CloudSyncCoordinator
+
+        var body: some View {
+            // The button holds only the label, like the other action rows, so
+            // it keeps the tint and dims when disabled; the spinner sits beside it.
+            HStack {
+                Button {
+                    Task { await coordinator.syncNow() }
+                } label: {
+                    Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(coordinator.isSyncingNow || !coordinator.canSyncNow)
+                Spacer()
+                if coordinator.isSyncingNow {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+        }
+    }
+
     private struct SyncPromptDialog: ViewModifier {
         let model: SyncSettingsModel
         let coordinator: CloudSyncCoordinator

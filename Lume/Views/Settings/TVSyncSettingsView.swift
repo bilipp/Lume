@@ -187,6 +187,17 @@
 
                 statusFootnote(CloudSyncStatusText.detail(for: status))
 
+                if coordinator.selectedBackend != .off {
+                    TVLumeCloudActionRow(
+                        "Sync Now",
+                        systemImage: "arrow.triangle.2.circlepath",
+                        isBusy: coordinator.isSyncingNow
+                    ) {
+                        Task { await coordinator.syncNow() }
+                    }
+                    .disabled(coordinator.isSyncingNow || !coordinator.canSyncNow)
+                }
+
                 switch coordinator.selectedBackend {
                 case .icloud:
                     statusFootnote(Text(CloudSyncStatusText.footer))

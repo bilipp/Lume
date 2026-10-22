@@ -80,6 +80,7 @@
       Settings ▸ Sync (focus enters on the ACTIVE backend row)
        ├─ ◉ iCloud / ○ Lume Cloud / ○ Off   ← three full-width rows, Select → confirm alert
        ├─ Status (read-only, not focusable)
+       ├─ Sync Now (iCloud and Lume Cloud; added 2026-10-22)
        └─ when Lume Cloud is active:
            ├─ Add a Device   → code entry → confirm → Menu returns to this row
            ├─ Devices        → list (Select = remove alert, no .contextMenu) → Menu returns here
@@ -118,7 +119,7 @@
 
 23. **No counts in sentences.** List device names instead. No plural variations in the catalog.
 
-24. **Privacy wording:** "End-to-end encrypted · Stored in the EU" in the Lume Cloud section footer and the create/join flow. App Store metadata is NOT changed in this PR.
+24. **Privacy wording:** "End-to-end encrypted" in the Lume Cloud section footer and the create/join flow. Data is stored in the EU, but the app doesn't say so (owner, 2026-10-22). App Store metadata is NOT changed in this PR.
 
 25. **"Lume Cloud" stays in Latin script** in all 10 languages.
 
@@ -226,3 +227,11 @@
   3. `registerDevice` with a FRESH device UUID.
   4. Wipe the Lume Cloud mirror and bookkeeping, then pull from `since=0`.
 - **Revoked device:** 401 `device_revoked` keeps the synchronizable Keychain identity. It belongs to the whole Apple ID, and other Apple devices are still valid members. This device goes Off and rotates its device UUID; rejoining requires pairing or recovery.
+
+## Sync Now (owner, 2026-10-22)
+
+- Settings ▸ Sync has a Sync Now row for iCloud AND Lume Cloud (hidden for Off), right under the status, on every platform.
+- It calls `CloudSyncCoordinator.syncNow()`: that waits for an in-flight pass, then runs one immediately with `ReconcileReason.manual`, which skips the debounce and the "nothing pending" check.
+- It's disabled without an iCloud account or a Lume Cloud membership.
+- CloudKit's own import/export has no public trigger, so for iCloud it reconciles what's local.
+

@@ -21131,67 +21131,67 @@
         }
       }
     },
-    "End-to-end encrypted · Stored in the EU" : {
+    "End-to-end encrypted" : {
       "comment" : "Privacy note in the Lume Cloud section footer and the create/join flow.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "مشفّر من طرف إلى طرف · مخزَّن في الاتحاد الأوروبي"
+            "value" : "مشفّر من طرف إلى طرف"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ende-zu-Ende-verschlüsselt · In der EU gespeichert"
+            "value" : "Ende-zu-Ende-verschlüsselt"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "End-to-end encrypted · Stored in the EU"
+            "value" : "End-to-end encrypted"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cifrado de extremo a extremo · Almacenado en la UE"
+            "value" : "Cifrado de extremo a extremo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chiffré de bout en bout · Stocké dans l’UE"
+            "value" : "Chiffré de bout en bout"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crittografia end-to-end · Archiviato nell’UE"
+            "value" : "Crittografia end-to-end"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エンドツーエンドで暗号化 · EU内に保存"
+            "value" : "エンドツーエンドで暗号化"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "종단 간 암호화 · EU에 저장"
+            "value" : "종단 간 암호화"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Criptografia de ponta a ponta · Armazenado na UE"
+            "value" : "Criptografia de ponta a ponta"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "端到端加密 · 存储在欧盟"
+            "value" : "端到端加密"
           }
         }
       }

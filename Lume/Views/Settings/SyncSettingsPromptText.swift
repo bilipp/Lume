@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Titles and messages of the Sync confirmations, shared with the tvOS pane.
 enum SyncSettingsPromptText {
-    static let privacyNote: LocalizedStringKey = "End-to-end encrypted · Stored in the EU"
+    static let privacyNote: LocalizedStringKey = "End-to-end encrypted"
 
     static func name(of backend: SyncBackendSelection) -> LocalizedStringKey {
         switch backend {

@@ -108,6 +108,19 @@ struct SyncBackendFacadeTests {
         #expect(!backend.hasPendingChanges)
     }
 
+    @Test func `sync now runs a full pass even with nothing pending`() async throws {
+        let container = try makeTestContainer()
+        let backend = StubSyncBackend(mirrorContainer: container)
+        let coordinator = CloudSyncCoordinator(catalogContainer: container, cloudContainer: container, backend: backend)
+        #expect(!backend.hasPendingChanges)
+
+        await coordinator.syncNow()
+
+        #expect(backend.calls == ["pull", "push"])
+        #expect(coordinator.status.lastReconcile != nil)
+        #expect(!coordinator.isSyncingNow)
+    }
+
     @Test func `start is delegated to the backend`() async throws {
         let container = try makeTestContainer()
         let backend = StubSyncBackend(mirrorContainer: container)
