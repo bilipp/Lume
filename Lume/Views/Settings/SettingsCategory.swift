@@ -35,7 +35,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .appearance: "Appearance"
         case .player: "Player"
         case .downloads: "Downloads"
-        case .iCloud: "iCloud"
+        case .iCloud: "Sync"
         case .connectedServices: "Connected Services"
         case .storage: "Storage & Cache"
         case .help: "Help & Feedback"
@@ -138,7 +138,7 @@ enum SettingsCategoryGroup: CaseIterable {
             case .appearance: "circle.lefthalf.filled"
             case .player: "play.circle"
             case .downloads: "arrow.down.circle"
-            case .iCloud: "icloud"
+            case .iCloud: "arrow.trianglehead.2.clockwise.rotate.90.icloud.fill"
             case .connectedServices: "arrow.trianglehead.2.clockwise.rotate.90.circle"
             case .storage: "internaldrive"
             case .help: "questionmark.circle"
@@ -149,15 +149,19 @@ enum SettingsCategoryGroup: CaseIterable {
     }
 
     /// A root row: the icon and title, and — only where the page behind it is a
-    /// single choice, or for the Lume Pro / iCloud status — the current value.
+    /// single choice, or for the Lume Pro / Sync status — the current value.
     struct SettingsCategoryRowLabel: View {
         let category: SettingsCategory
         var value: Text?
+        var showsBadge = false
 
         var body: some View {
             HStack {
                 Label(category.title, systemImage: category.systemImage)
                 Spacer(minLength: 8)
+                if showsBadge {
+                    SyncSettingsBadge()
+                }
                 if let value {
                     value
                         .foregroundStyle(.secondary)

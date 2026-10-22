@@ -1,18 +1,16 @@
-import CloudKit
-import CoreData
 import Foundation
 import OSLog
 import SwiftData
 import SwiftUI
 
-/// Drives iCloud sync: owns the reconcile engine, tracks account/sync status for
-/// the UI, and decides *when* to reconcile.
+/// Drives sync: owns the reconcile engine, fronts the active `SyncBackend`, and
+/// decides *when* to reconcile.
 ///
 /// Reconcile triggers are chosen to never collide with active playback (a
 /// SwiftData save during playback hitches the player — see the project's player
 /// notes): launch, foreground / background transitions, after a content sync
 /// finishes (so a freshly fetched catalog picks up its pending cloud state), and
-/// when CloudKit reports it merged remote changes. There is deliberately no
+/// when the backend reports that remote changes landed. There is deliberately no
 /// per-save trigger.
 ///
 /// Injected into the environment so settings can show status. Created once in
@@ -22,17 +20,46 @@ import SwiftUI
 final class CloudSyncCoordinator {
     let status = CloudSyncStatus()
 
-    private let engine: CloudSyncEngine
-    private let cloudKitContainerIdentifier: String
-    /// False under previews / automated tests, where touching CloudKit
-    /// (`CKContainer`, mirroring) crashes an un-entitled binary. Account checks
-    /// are skipped; the engine still reconciles the local user-data store.
-    private let cloudKitEnabled: Bool
+    private let catalogContainer: ModelContainer
+    private var engine: CloudSyncEngine
+    /// Backs the shadow, the engine and `settings`.
+    let defaults: UserDefaults
+    /// Where the device's backend choice persists.
+    let settings: LumeCloudSettings
+    /// The mirror store the engine reconciles against and its readers follow.
+    /// Off keeps the previous backend's, so profiles stay readable.
+    private(set) var mirrorContainer: ModelContainer
+    /// The shadow namespace the current engine reconciles against.
+    private(set) var engineNamespace: SyncBackendKind
+    /// The transport every pass runs through. Its events are scoped to it: the
+    /// coordinator only hears from the backend it attached.
+    private(set) var backend: any SyncBackend
+    /// Every backend this coordinator has run or can switch to, by selection.
+    /// No `.icloud` entry means this build can't use iCloud.
+    var backends: [SyncBackendSelection: any SyncBackend] = [:]
+    let makeLumeCloudBackend: () throws -> LumeCloudBackend
+    /// The running backend switch, so switches never interleave.
+    var switchTask: Task<Void, Never>?
+    /// Told after each completed backend switch, with the previous and the new
+    /// selection and why it ran. `SyncedBackendChoiceWatcher` mirrors it to iCloud.
+    var onBackendSwitched: ((_ from: SyncBackendSelection, _ to: SyncBackendSelection, _ cause: SyncBackendSwitchCause) -> Void)?
+    /// Set once the server ended this device's Lume Cloud membership and the
+    /// device tried to switch away; the UI shows the notice and clears it.
+    var accountEndNotice: LumeCloudAccountEndNotice?
 
     /// Coalescing guard: a reconcile requested while one is running sets
     /// `pendingReconcile` instead of overlapping, then runs once afterwards.
     private var isReconciling = false
     private var pendingReconcile = false
+    /// The queued pass is a background flush, so it runs without the debounce.
+    private var pendingReconcileIsFlush = false
+    /// The in-flight pass, so an engine swap can wait it out.
+    private var passTask: Task<Void, Never>?
+    /// Engine swaps waiting for the in-flight pass. While non-zero, requested
+    /// passes queue instead of starting on the engine about to be replaced.
+    private var pendingEngineSwaps = 0
+    /// Bumped per `replaceEngine` call; only the latest request is applied.
+    private var engineSwapGeneration = 0
 
     /// Trailing-debounce for notification-driven reconciles. A large CloudKit
     /// import posts a remote-change notification per batch; without this each one
@@ -41,32 +68,97 @@ final class CloudSyncCoordinator {
     private var reconcileDebounceTask: Task<Void, Never>?
     private static let reconcileDebounceDelay: Duration = .milliseconds(600)
 
+    /// How long the launch gate waits on a first sync, from either backend or
+    /// an auto-join into Lume Cloud, before opening anyway.
+    static let initialSyncTimeout: Duration = .seconds(15)
+
     /// Set once the launch-time sync is judged settled; the initial-sync gate
     /// (`status.hasCompletedInitialSync`) then opens after the next reconcile
     /// finishes, so any imported cloud playlists are already materialised into
     /// local `Playlist` records before the UI decides what to show.
     private var shouldOpenInitialSyncGate = false
-
-    /// Set while CloudKit is importing remote data, so a foreground return or a
-    /// bare `.NSPersistentStoreRemoteChange` knows there is actually something new
-    /// to pull. Consumed (reset) when a reconcile pass starts. Export acks and
-    /// setup events don't set it, so pushing our own changes no longer
-    /// self-triggers an empty pass — and a foreground with nothing imported skips
-    /// the catalog scan and the `@Query` refresh that froze the UI on tvOS.
-    private var cloudImportPending = false
+    /// Ends a launch-time Lume Cloud join's hold on the gate when it runs out.
+    var launchJoinWaitTask: Task<Void, Never>?
 
     private var observers: [NSObjectProtocol] = []
+    private var observesContentSync = false
 
-    init(catalogContainer: ModelContainer, cloudContainer: ModelContainer, cloudKitContainerIdentifier: String, cloudKitEnabled: Bool) {
-        engine = CloudSyncEngine(catalogContainer: catalogContainer, cloudContainer: cloudContainer)
-        self.cloudKitContainerIdentifier = cloudKitContainerIdentifier
-        self.cloudKitEnabled = cloudKitEnabled
-        // Nothing to sync under previews / tests: open the launch gate now so an
-        // empty store shows the add-playlist form immediately, as before.
-        status.hasCompletedInitialSync = !cloudKitEnabled
-        guard cloudKitEnabled else { return }
-        observeCloudKitEvents()
-        observeRemoteChanges()
+    /// Readers of the mirror store, repointed when an engine swap changes it.
+    private var mirrorConsumers: [WeakMirrorConsumer] = []
+
+    /// Whether the scene is active. Lume Cloud keeps its socket open only then.
+    private(set) var isSceneActive = false
+
+    /// Starts on the backend this device last chose (`LumeCloudSettings.backend`).
+    convenience init(
+        catalogContainer: ModelContainer,
+        cloudContainer: ModelContainer,
+        cloudKitContainerIdentifier: String,
+        cloudKitEnabled: Bool,
+        defaults: UserDefaults = .standard
+    ) {
+        let iCloud = ICloudBackend(
+            mirrorContainer: cloudContainer,
+            cloudKitContainerIdentifier: cloudKitContainerIdentifier,
+            cloudKitEnabled: cloudKitEnabled
+        )
+        let launchBackend = Self.launchBackend(
+            for: LumeCloudSettings(defaults: defaults).backend,
+            iCloud: iCloud,
+            makeLumeCloudBackend: { try LumeCloudBackend.makeDefault() }
+        )
+        self.init(
+            catalogContainer: catalogContainer,
+            cloudContainer: cloudContainer,
+            backend: launchBackend,
+            iCloudBackend: iCloud,
+            defaults: defaults
+        )
+    }
+
+    /// `cloudContainer` backs the engine when `backend` has no mirror (Off).
+    /// `iCloudBackend` is what a switch to iCloud attaches; nil when this build
+    /// can't use iCloud (unless `backend` is the iCloud one).
+    init(
+        catalogContainer: ModelContainer,
+        cloudContainer: ModelContainer,
+        backend: any SyncBackend,
+        iCloudBackend: (any SyncBackend)? = nil,
+        makeLumeCloudBackend: (() throws -> LumeCloudBackend)? = nil,
+        defaults: UserDefaults = .standard
+    ) {
+        let namespace = backend.kind ?? .icloud
+        let mirror = backend.mirrorContainer ?? cloudContainer
+        self.catalogContainer = catalogContainer
+        self.defaults = defaults
+        settings = LumeCloudSettings(defaults: defaults)
+        mirrorContainer = mirror
+        engine = Self.makeEngine(
+            catalogContainer: catalogContainer,
+            mirrorContainer: mirror,
+            namespace: namespace,
+            defaults: defaults
+        )
+        engineNamespace = namespace
+        self.backend = backend
+        self.makeLumeCloudBackend = makeLumeCloudBackend ?? { try LumeCloudBackend.makeDefault() }
+        status.backend = SyncBackendSelection(backend.kind)
+        if let iCloudBackend {
+            register(iCloudBackend)
+        }
+        register(backend)
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .lumeSyncMirrorDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.notifyMirrorConsumers() }
+        })
+        // Nothing to wait for under previews / tests / Off: open the launch gate
+        // now so an empty store shows the add-playlist form immediately.
+        status.hasCompletedInitialSync = !backend.waitsForInitialSync
+        backend.attach(to: self)
+        guard backend.waitsForInitialSync else { return }
         observeContentSyncCompletion()
     }
 
@@ -76,32 +168,19 @@ final class CloudSyncCoordinator {
 
     // MARK: - Lifecycle entry points
 
-    /// Called once at launch: determine account reachability, run a first
-    /// reconcile, and arm the initial-sync gate that a fresh install waits on
+    /// Called once at launch: the backend checks reachability, requests a first
+    /// reconcile, and settles the initial-sync gate that a fresh install waits on
     /// before showing the add-playlist form.
     func start() async {
-        await refreshAccountStatus()
-        guard cloudKitEnabled else {
-            // Gate already open from `init`; just reconcile the local store.
-            reconcile(reason: .launch)
-            return
-        }
-        guard status.account.canSync else {
-            // No usable iCloud account: nothing will arrive, so don't strand the
-            // user on the launch spinner — reconcile and open the gate so the
-            // add-playlist form shows as a fallback.
-            completeInitialSync()
-            return
-        }
-        // Account is usable: pull anything CloudKit already imported, and arm a
-        // safety-net timeout so an offline launch (or a brand-new empty account
-        // that never reports an import) can't spin forever.
-        reconcile(reason: .launch)
-        scheduleInitialSyncTimeout()
+        isSceneActive = true
+        updateEventListening()
+        await backend.start()
     }
 
     /// Foreground re-checks account + pulls; background flushes local changes.
     func handleScenePhaseChange(to phase: ScenePhase) {
+        isSceneActive = phase == .active
+        updateEventListening()
         switch phase {
         case .active:
             Task { await refreshAccountStatus() }
@@ -117,6 +196,7 @@ final class CloudSyncCoordinator {
             // favorite or watch-progress reaches the cloud, and the safety net that
             // lets foreground / remote-change passes skip freely.
             reconcile(reason: .backgroundFlush, debounced: false)
+            Task { await holdBackgroundTimeForFlush() }
         case .inactive:
             // iOS, tvOS and visionOS pass through `.inactive` on the way to the
             // background *and* on the way back, and for Control Center, the
@@ -142,8 +222,12 @@ final class CloudSyncCoordinator {
     /// concurrent passes coalesce into at most one in-flight pass plus one queued
     /// follow-up.
     func reconcile(reason: ReconcileReason = .queued, debounced: Bool = true) {
+        guard backend.kind != nil else { return }
+        if reason == .backgroundFlush, isReconciling || pendingEngineSwaps > 0 {
+            pendingReconcileIsFlush = true
+        }
         guard shouldRun(reason) else {
-            Logger.sync.debug("Reconcile skipped (\(String(describing: reason), privacy: .public)) — no pending CloudKit import")
+            Logger.sync.debug("Reconcile skipped (\(String(describing: reason), privacy: .public)) — no pending remote changes")
             return
         }
         guard debounced else {
@@ -161,7 +245,7 @@ final class CloudSyncCoordinator {
     }
 
     /// A foreground return or a bare store-change notification only merits a pass
-    /// when CloudKit has imported remote data since the last one; everything else
+    /// when the backend has remote data pending since the last one; everything else
     /// always runs. Keeping the pre-suspension flush unconditional is what makes
     /// skipping safe — a local edit still reaches the cloud when the app
     /// backgrounds, even if every foreground / remote-change pass was skipped.
@@ -170,37 +254,196 @@ final class CloudSyncCoordinator {
         case .launch, .backgroundFlush, .contentSync, .queued:
             true
         case .foreground, .remoteChange:
-            cloudImportPending
+            backend.hasPendingChanges
         }
     }
 
     private func runReconcile() {
-        guard !isReconciling else {
+        guard !isReconciling, pendingEngineSwaps == 0 else {
             pendingReconcile = true
             return
         }
         isReconciling = true
-        // This pass pulls whatever CloudKit imported, so consume the flag now; an
-        // import that lands mid-pass sets it again and queues a follow-up.
-        cloudImportPending = false
+        let backend = backend
+        let engine = engine
 
-        Task {
-            let result = await BackgroundActivity.perform("iCloud reconcile") {
-                await engine.reconcile()
+        passTask = Task {
+            let result = await BackgroundActivity.perform("Sync reconcile") {
+                // Before the pull, which may fail: an emptied mirror against the
+                // old baseline would delete every local item.
+                if await backend.recoverLostMirror() {
+                    await engine.resetShadow()
+                }
+                do {
+                    try await backend.pull()
+                } catch {
+                    Logger.sync.error("Sync pull failed: \(error)")
+                }
+                let result = await engine.reconcile()
+                do {
+                    try await backend.push()
+                } catch {
+                    Logger.sync.error("Sync push failed: \(error)")
+                }
+                return result
             }
             // Back on the main actor (this closure is main-actor isolated).
             status.lastReconcile = Date()
             status.lastResult = result
+            if backend is LumeCloudBackend {
+                endLaunchJoinWait(openingGate: true)
+            }
 
             isReconciling = false
+            passTask = nil
             if pendingReconcile {
-                pendingReconcile = false
-                reconcile()
+                // A waiting engine swap runs the queued pass once it's done.
+                guard pendingEngineSwaps == 0 else { return }
+                runQueuedReconcile()
             } else if shouldOpenInitialSyncGate, !status.hasCompletedInitialSync {
                 // Open the gate only after the last queued pass, so imported
                 // playlists are fully materialised before the form decision.
                 status.hasCompletedInitialSync = true
             }
+        }
+    }
+
+    // MARK: - Engine swap
+
+    /// Rebuild the engine over `mirrorContainer` with the shadow namespace
+    /// `namespace`. Waits for the in-flight pass, so no pass ever runs on the old
+    /// and the new engine at once; passes requested meanwhile run afterwards on
+    /// the new engine. When swaps overlap, the last one requested wins. The
+    /// registered mirror consumers are repointed along with the engine.
+    /// `resettingShadow` empties the new engine's baseline, so its first pass is
+    /// a union merge that can't read anything as deleted.
+    func replaceEngine(
+        mirrorContainer: ModelContainer,
+        namespace: SyncBackendKind,
+        resettingShadow: Bool = false,
+        defaults: UserDefaults? = nil
+    ) async {
+        engineSwapGeneration += 1
+        let generation = engineSwapGeneration
+        pendingEngineSwaps += 1
+        await waitForPass()
+        if generation == engineSwapGeneration {
+            engine = Self.makeEngine(
+                catalogContainer: catalogContainer,
+                mirrorContainer: mirrorContainer,
+                namespace: namespace,
+                resettingShadow: resettingShadow,
+                defaults: defaults ?? self.defaults
+            )
+            engineNamespace = namespace
+            self.mirrorContainer = mirrorContainer
+            repointMirrorConsumers(to: mirrorContainer)
+        }
+        resumePasses()
+    }
+
+    /// Holds new passes back and waits out the in-flight one, so the backend
+    /// and the engine can change under no pass. Pair with `resumePasses()`.
+    func suspendPasses() async {
+        pendingEngineSwaps += 1
+        reconcileDebounceTask?.cancel()
+        reconcileDebounceTask = nil
+        await waitForPass()
+    }
+
+    /// Ends a `suspendPasses()`; runs a pass requested meanwhile.
+    func resumePasses() {
+        pendingEngineSwaps -= 1
+        guard pendingEngineSwaps == 0, pendingReconcile else { return }
+        runQueuedReconcile()
+    }
+
+    /// Runs the pass queued behind a pass or an engine swap; a queued
+    /// background flush skips the debounce, which could outlast the app's
+    /// background time.
+    private func runQueuedReconcile() {
+        pendingReconcile = false
+        let isFlush = pendingReconcileIsFlush
+        pendingReconcileIsFlush = false
+        reconcile(debounced: !isFlush)
+    }
+
+    /// Keeps the app awake until the background flush and any pass queued
+    /// behind it have finished: each pass holds its own assertion, but the
+    /// hand-off between two would otherwise leave a gap to suspend in.
+    private func holdBackgroundTimeForFlush() async {
+        await BackgroundActivity.perform("Sync background flush") {
+            await waitForPass()
+        }
+    }
+
+    private func waitForPass() async {
+        while let pass = passTask {
+            await pass.value
+        }
+    }
+
+    /// Makes `next` the active backend. Only the backend switch calls this,
+    /// between `suspendPasses()` and `resumePasses()`, after stopping the old one.
+    func install(_ next: any SyncBackend) {
+        register(next)
+        backend = next
+        status.backend = SyncBackendSelection(next.kind)
+        status.lastError = nil
+        next.attach(to: self)
+        updateEventListening()
+        if next.kind != nil {
+            observeContentSyncCompletion()
+        }
+    }
+
+    /// Lume Cloud's socket follows the scene: open while active, closed otherwise.
+    private func updateEventListening() {
+        backend.setListensForEvents(isSceneActive)
+    }
+
+    func register(_ backend: any SyncBackend) {
+        backends[SyncBackendSelection(backend.kind)] = backend
+        backend.observeAccountEnd { [weak self] reason in
+            Task { await self?.handleAccountEnded(reason) }
+        }
+    }
+
+    private static func makeEngine(
+        catalogContainer: ModelContainer,
+        mirrorContainer: ModelContainer,
+        namespace: SyncBackendKind,
+        resettingShadow: Bool = false,
+        defaults: UserDefaults
+    ) -> CloudSyncEngine {
+        let shadow = CloudSyncShadow(defaults: defaults, namespace: namespace)
+        if resettingShadow {
+            shadow.resetAll()
+        }
+        return CloudSyncEngine(catalogContainer: catalogContainer, cloudContainer: mirrorContainer, shadow: shadow)
+    }
+
+    // MARK: - Mirror consumers
+
+    /// Register a reader of the mirror store to follow engine swaps. Held weakly.
+    func addMirrorConsumer(_ consumer: any SyncMirrorConsumer) {
+        mirrorConsumers.removeAll { $0.value == nil || $0.value === consumer }
+        mirrorConsumers.append(WeakMirrorConsumer(value: consumer))
+    }
+
+    private func repointMirrorConsumers(to container: ModelContainer) {
+        mirrorConsumers.removeAll { $0.value == nil }
+        for consumer in mirrorConsumers {
+            consumer.value?.repoint(container: container)
+        }
+    }
+
+    /// A backend wrote rows into the mirror itself (`.lumeSyncMirrorDidChange`),
+    /// or a profile was deleted from it.
+    func notifyMirrorConsumers() {
+        mirrorConsumers.removeAll { $0.value == nil }
+        for consumer in mirrorConsumers {
+            consumer.value?.mirrorDidChange()
         }
     }
 
@@ -210,12 +453,21 @@ final class CloudSyncCoordinator {
     /// mirror + shadow + local catalog) as one actor-serialized operation, so
     /// deleting the last playlist can't be misread by the empty-store
     /// integrity gate and resurrected from the surviving mirror (#136).
+    /// Under Lume Cloud the deletion also queues explicit tombstones, the only
+    /// way a deletion reaches the server. With sync Off only the local catalog
+    /// changes: Off writes to no mirror.
     func deletePlaylist(id: UUID) async {
         do {
-            try await engine.deletePlaylist(id: id)
+            if backend.kind == nil {
+                try await engine.deleteCatalogPlaylist(id: id)
+            } else {
+                try await engine.deletePlaylist(id: id)
+            }
         } catch {
             Logger.sync.error("Playlist deletion failed: \(error.localizedDescription)")
+            return
         }
+        await backend.recordPlaylistDeletion(id: id)
     }
 
     // MARK: - Profiles
@@ -244,37 +496,44 @@ final class CloudSyncCoordinator {
         }
     }
 
-    /// Delete a profile's content state.
-    func purgeProfileData(_ id: UUID) async {
+    /// The user deleted a profile: purge its content state and sports follows,
+    /// delete its row on the mirror's main context (the one the profile UI
+    /// reads), refresh the mirror's readers, then, under Lume Cloud, queue
+    /// tombstones for all of it; iCloud exports the deleted rows on its own.
+    func deleteProfile(id: UUID) async {
         do {
             try await engine.purgeProfileData(id)
         } catch {
             Logger.sync.error("Profile purge failed: \(error.localizedDescription)")
         }
+        let context = mirrorContainer.mainContext
+        do {
+            for profile in try context.fetch(FetchDescriptor<UserProfile>(predicate: #Predicate { $0.id == id })) {
+                context.delete(profile)
+            }
+            try context.save()
+        } catch {
+            Logger.sync.error("Profile deletion failed: \(error.localizedDescription)")
+        }
+        notifyMirrorConsumers()
+        await backend.recordProfileDeletion(id: id)
     }
 
     // MARK: - Initial-sync gate
 
-    /// Judge the launch-time iCloud sync settled and open the gate that a fresh
-    /// install waits on. Triggers a reconcile first (so cloud playlists already
-    /// imported become local `Playlist` records), then opens the gate when it
-    /// finishes — letting `ContentView` show the main app if playlists arrived,
-    /// or fall back to the add-playlist form if not. Idempotent: only the first
-    /// call has any effect.
-    private func completeInitialSync() {
-        guard cloudKitEnabled, !status.hasCompletedInitialSync, !shouldOpenInitialSyncGate else { return }
+    /// The backend judged its launch-time sync settled: open the gate that a
+    /// fresh install waits on. Triggers a reconcile first (so cloud playlists
+    /// already imported become local `Playlist` records), then opens the gate
+    /// when it finishes — letting `ContentView` show the main app if playlists
+    /// arrived, or fall back to the add-playlist form if not. Idempotent: only
+    /// the first call has any effect.
+    func backendDidSettleInitialSync() {
+        guard !status.hasCompletedInitialSync, !shouldOpenInitialSyncGate else { return }
         shouldOpenInitialSyncGate = true
+        // Lume Cloud settles after the running pass's pull, which that pass
+        // then reconciles; its completion opens the gate.
+        guard !(isReconciling && backend is LumeCloudBackend) else { return }
         reconcile(reason: .launch)
-    }
-
-    /// Safety net: open the gate after a bounded wait so a brand-new but empty
-    /// account, or an offline launch where CloudKit never reports an import,
-    /// can't leave the user staring at the launch spinner forever.
-    private func scheduleInitialSyncTimeout() {
-        Task {
-            try? await Task.sleep(for: .seconds(15))
-            completeInitialSync()
-        }
     }
 
     /// The user tapped "Continue Without Syncing" on the launch screen: stop
@@ -282,170 +541,22 @@ final class CloudSyncCoordinator {
     /// the background, so cloud playlists still appear if they arrive later.
     func skipInitialSyncWait() {
         status.hasCompletedInitialSync = true
+        endLaunchJoinWait(openingGate: false)
     }
 
     // MARK: - Account status
 
     func refreshAccountStatus() async {
-        guard cloudKitEnabled else { return }
-        let container = CKContainer(identifier: cloudKitContainerIdentifier)
-        do {
-            let status = try await container.accountStatus()
-            self.status.account = Self.map(status)
-        } catch {
-            status.account = .couldNotDetermine
-        }
+        await backend.refreshStatus()
     }
 
-    private static func map(_ status: CKAccountStatus) -> CloudAccountStatus {
-        switch status {
-        case .available: .available
-        case .noAccount: .noAccount
-        case .restricted: .restricted
-        case .temporarilyUnavailable: .temporarilyUnavailable
-        case .couldNotDetermine: .couldNotDetermine
-        @unknown default: .couldNotDetermine
-        }
-    }
-
-    // MARK: - CloudKit / store observers
-
-    /// Mirror `NSPersistentCloudKitContainer` import/export events into the
-    /// observable status so settings can show "Syncing…" and surface errors.
-    private func observeCloudKitEvents() {
-        let observer = NotificationCenter.default.addObserver(
-            forName: NSPersistentCloudKitContainer.eventChangedNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard
-                let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
-                as? NSPersistentCloudKitContainer.Event
-            else { return }
-            // Runs on the main queue; hop to the isolated actor to mutate state.
-            let type = event.type
-            let inProgress = event.endDate == nil
-            let errorText = Self.describe(event.error, eventType: type)
-            MainActor.assumeIsolated {
-                self?.applyCloudKitEvent(type: type, inProgress: inProgress, error: errorText)
-            }
-        }
-        observers.append(observer)
-    }
-
-    private func applyCloudKitEvent(
-        type: NSPersistentCloudKitContainer.EventType,
-        inProgress: Bool,
-        error: String?
-    ) {
-        status.isSyncing = inProgress
-        // Pause background indexing while CloudKit imports/exports: it tears
-        // down and re-adds stores on the shared coordinator, and a catalog
-        // fault during that window throws an uncatchable `no such table`
-        // NSException (see ContentIndexer).
-        ContentIndexingService.shared.isCloudSyncActive = inProgress
-        if let error {
-            status.lastError = error
-        } else if !inProgress {
-            status.lastError = nil
-        }
-        // An import means remote data is actually landing in the local store — arm
-        // the gate so the foreground / remote-change passes know to pull, and run
-        // one when the import finishes. Export acks and `.setup` don't arm it, so
-        // pushing our own edits no longer self-triggers an empty reconcile.
-        if type == .import {
-            cloudImportPending = true
-            if !inProgress {
-                reconcile(reason: .remoteChange)
-            }
-        }
-        // The launch-time fetch from iCloud has settled once the first import
-        // completes (the data has landed) or any event errors (so we fall back
-        // rather than spin). A finished `.setup` is too early — the import that
-        // carries the playlists hasn't run yet.
-        if (type == .import && !inProgress) || error != nil {
-            completeInitialSync()
-        }
-    }
-
-    /// Turn a CloudKit sync-event error into a readable message, logging the full
-    /// detail to `Logger.sync`.
-    ///
-    /// A CloudKit `partialFailure` — the opaque "CKErrorDomain error 2" that
-    /// reaches the user — usually hides the real cause inside
-    /// `partialErrorsByItemID`; `localizedDescription` on its own just repeats
-    /// "error 2". Unwrapping the per-record errors lets the log (and the settings
-    /// screen) name what actually failed — most often a record type that isn't in
-    /// the deployed CloudKit schema yet (e.g. a build pointed at an environment
-    /// whose schema was never deployed: every record is rejected and the batch
-    /// reports `partialFailure`).
-    ///
-    /// When that dictionary is *empty* the failure is above the record level —
-    /// account, zone, or quota — and there is nothing to unwrap, so
-    /// `CloudSyncErrorDescription` carries the diagnosis instead: the log gets
-    /// the domain, code, `CKError` case name and the whole underlying-error
-    /// chain, and the settings row gets a mapped sentence rather than an error
-    /// number (#156).
-    private nonisolated static func describe(
-        _ error: Error?,
-        eventType: NSPersistentCloudKitContainer.EventType
-    ) -> String? {
-        guard let error else { return nil }
-        let phase = eventName(eventType)
-        let ckError = CloudSyncErrorDescription.ckError(in: error)
-
-        if let ckError, ckError.code == .partialFailure,
-           let perItem = ckError.partialErrorsByItemID, !perItem.isEmpty
-        {
-            for (itemID, itemError) in perItem {
-                // CloudSyncErrorDescription, not String(reflecting:): conflict
-                // errors can dump the whole CKRecord, and synced-playlist
-                // records carry server URLs and account credentials.
-                Logger.sync.error(
-                    "CloudKit \(phase, privacy: .public) rejected \(String(describing: itemID), privacy: .public): \(CloudSyncErrorDescription.logDetail(for: itemError), privacy: .public)"
-                )
-            }
-            // Records usually all fail identically; collapse to the distinct
-            // underlying messages so the UI shows the cause, not "error 2".
-            let messages = Set(perItem.values.map { CloudSyncErrorDescription.message(for: $0) })
-            return messages.sorted().joined(separator: "; ")
-        }
-
-        Logger.sync.error(
-            "CloudKit \(phase, privacy: .public) failed: \(CloudSyncErrorDescription.logDetail(for: error), privacy: .public)"
-        )
-        return CloudSyncErrorDescription.message(for: error)
-    }
-
-    private nonisolated static func eventName(_ type: NSPersistentCloudKitContainer.EventType) -> String {
-        switch type {
-        case .setup: "setup"
-        case .import: "import"
-        case .export: "export"
-        @unknown default: "unknown"
-        }
-    }
-
-    /// CloudKit merged remote changes into the local store — pull them through
-    /// the reconciler so they reach the catalog models and the UI. Gated on an
-    /// actual import (`.remoteChange`): this fires for our own export acks too,
-    /// and reconciling on those is the redundant pass we want to avoid.
-    private func observeRemoteChanges() {
-        let observer = NotificationCenter.default.addObserver(
-            forName: .NSPersistentStoreRemoteChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.reconcile(reason: .remoteChange)
-            }
-        }
-        observers.append(observer)
-    }
+    // MARK: - Store observers
 
     /// After a playlist's catalog finishes syncing, run a reconcile so any cloud
     /// user state that was waiting for that catalog gets applied.
     private func observeContentSyncCompletion() {
+        guard !observesContentSync else { return }
+        observesContentSync = true
         let observer = NotificationCenter.default.addObserver(
             forName: .lumeContentSyncDidComplete,
             object: nil,
@@ -459,29 +570,13 @@ final class CloudSyncCoordinator {
     }
 }
 
-/// Why a reconcile was requested — determines whether a pass with nothing to do
-/// can be skipped. A foreground return and a bare `.NSPersistentStoreRemoteChange`
-/// only run when CloudKit actually imported remote data (`cloudImportPending`);
-/// launch, the pre-suspension flush, a finished catalog sync, and a queued
-/// follow-up always run.
-enum ReconcileReason {
-    /// Cold-launch first pass — establishes the baseline and pulls anything
-    /// CloudKit already imported.
-    case launch
-    /// App returned to the foreground.
-    case foreground
-    /// App is suspending — flush local edits to the cloud before it does.
-    case backgroundFlush
-    /// CloudKit reported a store change (import, or our own export ack).
-    case remoteChange
-    /// A playlist's catalog finished syncing, so pending cloud state can apply.
-    case contentSync
-    /// An internal follow-up pass (coalesced overlap, or a post-profile-switch
-    /// re-baseline) — always runs.
-    case queued
-}
+extension CloudSyncCoordinator: SyncBackendHost {}
 
 extension Notification.Name {
     /// Posted by `ContentSyncManager` after a playlist's catalog sync succeeds.
     static let lumeContentSyncDidComplete = Notification.Name("LumeContentSyncDidComplete")
+    /// Posted on the main actor, with no object, after a backend wrote rows
+    /// into the mirror store itself (a pull, a conflict merge or a recorded
+    /// deletion). CloudKit's own writes post `.NSPersistentStoreRemoteChange`.
+    static let lumeSyncMirrorDidChange = Notification.Name("LumeSyncMirrorDidChange")
 }

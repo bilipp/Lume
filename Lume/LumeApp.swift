@@ -24,6 +24,7 @@ struct LumeApp: App {
     /// profile views touch it.
     let cloudContainer: ModelContainer
     @State private var cloudSync: CloudSyncCoordinator
+    @State private var backendChoiceWatcher: SyncedBackendChoiceWatcher
     @State private var profileManager: ProfileManager
     @State private var playlistSwitch = PlaylistSwitchModel()
     @State private var parentalControls: ParentalControls
@@ -44,7 +45,12 @@ struct LumeApp: App {
             cloudKitEnabled: Self.isCloudKitEnvironment
         )
         _cloudSync = State(initialValue: coordinator)
-        let profiles = ProfileManager(catalogContainer: catalog, cloudContainer: cloud, coordinator: coordinator)
+        _backendChoiceWatcher = State(initialValue: SyncedBackendChoiceWatcher(
+            coordinator: coordinator,
+            container: cloud,
+            isEnabled: Self.isCloudKitEnvironment
+        ))
+        let profiles = ProfileManager(catalogContainer: catalog, cloudContainer: coordinator.mirrorContainer, coordinator: coordinator)
         _profileManager = State(initialValue: profiles)
         _parentalControls = State(initialValue: ParentalControls(profileManager: profiles))
     }
@@ -130,25 +136,39 @@ struct LumeApp: App {
         }
     }
 
+    /// The user-data mirror models, shared by both mirrors: the iCloud
+    /// `CloudUserData` store and the Lume Cloud `LumeCloudUserData` store.
+    /// Each mirror adds its own models on top (`makeCloudContainer`,
+    /// `makeLumeCloudContainer`).
+    static let cloudMirrorModels: [any PersistentModel.Type] = [
+        SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
+        // Parental controls. Not profile-scoped, unlike `UserContentState` —
+        // see `CloudSyncEngine+Parental` for why that distinction matters.
+        SyncedParentalPIN.self, SyncedCategoryRestriction.self,
+        // Followed sports leagues/teams — per-profile, ordered, no local
+        // counterpart (read through `SportsFollowService`).
+        SyncedSportsFollow.self,
+        // Paired recording servers — account-wide, no local counterpart,
+        // never bound to a `@Query`.
+        SyncedRecordingServer.self,
+        // Account-wide Live TV rail switches — reconciled into UserDefaults.
+        SyncedLiveTVPreferences.self
+    ]
+
+    /// The Lume Cloud transport's per-record and per-account bookkeeping.
+    /// Local-only, and only ever in the Lume Cloud store.
+    static let lumeCloudBookkeepingModels: [any PersistentModel.Type] = [
+        LumeCloudRecordState.self, LumeCloudSyncMeta.self
+    ]
+
     /// The CloudKit-mirrored user-data container (`SyncedPlaylist`,
     /// `UserContentState`, `UserProfile`, parental controls). Small and
     /// CloudKit-backed; a load failure is unexpected, so fail loudly rather than
     /// risk a silent empty store.
     private static func makeCloudContainer() -> ModelContainer {
-        let cloudSchema = Schema([
-            SyncedPlaylist.self, UserContentState.self, UserProfile.self, SyncedEPGSource.self,
-            // Parental controls. Not profile-scoped, unlike `UserContentState` —
-            // see `CloudSyncEngine+Parental` for why that distinction matters.
-            SyncedParentalPIN.self, SyncedCategoryRestriction.self,
-            // Followed sports leagues/teams — per-profile, ordered, no local
-            // counterpart (read through `SportsFollowService`).
-            SyncedSportsFollow.self,
-            // Paired recording servers — account-wide, no local counterpart,
-            // never bound to a `@Query`.
-            SyncedRecordingServer.self,
-            // Account-wide Live TV rail switches — reconciled into UserDefaults.
-            SyncedLiveTVPreferences.self
-        ])
+        // `SyncedBackendChoice` hands the backend choice between Apple devices
+        // through CloudKit, so it belongs to this store only.
+        let cloudSchema = Schema(cloudMirrorModels + [SyncedBackendChoice.self])
         // Out of the app group for the same reason as the catalog store.
         let cloudConfiguration = ModelConfiguration(
             ContentSyncManager.cloudMirrorConfigurationName,
@@ -169,6 +189,36 @@ struct LumeApp: App {
         } catch {
             fatalError("Could not create cloud ModelContainer: \(error)")
         }
+    }
+
+    /// The Lume Cloud mirror: the same user-data models as the iCloud mirror,
+    /// minus `SyncedBackendChoice`, plus the transport's bookkeeping, in one
+    /// local-only file (`LumeCloudUserData.store`). Never CloudKit-backed —
+    /// the transport syncs it with the Lume Cloud server.
+    ///
+    /// Built only when a device uses Lume Cloud, so an iCloud device never
+    /// creates the file. Throws rather than trapping: the caller can stay on
+    /// its current backend when the store can't open.
+    static func makeLumeCloudContainer(isStoredInMemoryOnly: Bool = false) throws -> ModelContainer {
+        let schema = Schema(cloudMirrorModels + lumeCloudBookkeepingModels)
+        let configuration = ModelConfiguration(
+            ContentSyncManager.lumeCloudMirrorConfigurationName,
+            schema: schema,
+            isStoredInMemoryOnly: isStoredInMemoryOnly,
+            groupContainer: .none,
+            cloudKitDatabase: .none
+        )
+        if !isStoredInMemoryOnly {
+            StoreRelocation.moveOutOfAppGroup(
+                from: ModelConfiguration(
+                    ContentSyncManager.lumeCloudMirrorConfigurationName,
+                    schema: schema,
+                    cloudKitDatabase: .none
+                ).url,
+                to: configuration.url
+            )
+        }
+        return try ModelContainer(for: schema, configurations: configuration)
     }
 
     /// Whether the running binary can use CloudKit at all.
@@ -192,13 +242,16 @@ struct LumeApp: App {
             // sync coordinator skips every `CKContainer`/`accountStatus` call.
             return false
         #else
-            let environment = ProcessInfo.processInfo.environment
-            let isPreview = environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
-            let isUnitTest = environment["XCTestConfigurationFilePath"] != nil
-            let isUITest = CommandLine.arguments.contains("-ui-testing")
-            return !(isPreview || isUnitTest || isUITest)
+            let isUnitTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            return !(isAutomatedRun || isUnitTest)
         #endif
     }()
+
+    /// A UI-test run (`-ui-testing`) or a SwiftUI preview.
+    nonisolated static var isAutomatedRun: Bool {
+        CommandLine.arguments.contains("-ui-testing")
+            || ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    }
 
     private static var cloudKitDatabase: ModelConfiguration.CloudKitDatabase {
         isCloudKitEnvironment ? .private(cloudKitContainerIdentifier) : .none
@@ -303,9 +356,11 @@ struct LumeApp: App {
                     // is visible as an empty Home row, and none of this blocks —
                     // `configure` warms the store from disk and the two triggers
                     // hand off to their own utility Tasks.
-                    SportsFollowService.shared.configure(container: cloudContainer, profileManager: profileManager)
+                    SportsFollowService.shared.configure(container: cloudSync.mirrorContainer, profileManager: profileManager)
                     SportsSyncService.shared.configure(followSource: SportsFollowService.shared)
-                    RecordingServerConfigService.shared.configure(container: cloudContainer)
+                    RecordingServerConfigService.shared.configure(container: cloudSync.mirrorContainer)
+                    cloudSync.addMirrorConsumer(SportsFollowService.shared)
+                    cloudSync.addMirrorConsumer(RecordingServerConfigService.shared)
                     // Re-fetches every followed league whose snapshot is missing
                     // or stale, so the Home rail has current data on first render
                     // even after the system purged Caches/. Hits ESPN, not the
@@ -340,6 +395,9 @@ struct LumeApp: App {
                     // mirrors. Runs after progress reconciliation so a fresh
                     // device's user state lands on a settled local store.
                     await cloudSync.start()
+                    // Follow another Apple device's move to or from Lume Cloud.
+                    // Not awaited: a join waits on the network.
+                    Task { await backendChoiceWatcher.start() }
 
                     // Resume background content indexing for anything still
                     // unindexed (the pass waits on its own while a playlist
@@ -373,6 +431,9 @@ struct LumeApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     DiagnosticSession.scenePhaseChanged(to: phase)
                     cloudSync.handleScenePhaseChange(to: phase)
+                    if phase == .active {
+                        Task { await backendChoiceWatcher.refresh() }
+                    }
                     // Keep the image disk cache inside its size limit. Rate-limited
                     // and run at background priority by the cache itself.
                     if phase == .background { ImageDiskCache.shared.trimInBackground() }

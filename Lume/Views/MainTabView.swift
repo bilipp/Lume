@@ -89,14 +89,15 @@ struct MainTabView: View {
         CommandLine.arguments.contains("-ui-testing")
     }
 
-    /// Whether the browse UI is covered, or the user is somewhere a rating
-    /// sheet has no business appearing — the sync cover, the downloads sheet, or
-    /// a playlist / profile switch. Players, paywalls and Settings are not
-    /// listed: every one of them reports itself, and `appStoreReviewPrompt`
-    /// already holds the fire while any is on screen. Settings has to, because
-    /// on every platform that shows the prompt it is a sheet on the library
-    /// toolbar rather than a tab, and so invisible to this root.
+    /// Whether the browse UI is covered: the sync cover, downloads, the add-device
+    /// sheet (not a link still waiting for it), or a playlist / profile switch.
+    /// Players, paywalls and Settings (a toolbar sheet this root can't see) report themselves.
     private var hasBlockingPresentation: Bool {
+        hasOwnPresentation || router.presentedCloudPairing != nil
+    }
+
+    /// All of the above but the add-device sheet, which waits for these to clear.
+    private var hasOwnPresentation: Bool {
         activeSyncPlaylist != nil
             || showsDownloads
             || playlistSwitch?.isSwitching == true
@@ -196,11 +197,13 @@ struct MainTabView: View {
                 EPGSyncService.shared.setAutoSyncQueued(false)
             }
             .downloadsSheet(isPresented: $showsDownloads)
+            .lumeCloudPairingSheet(router: router, rootIsCovered: hasOwnPresentation)
             .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
             // The one fire point for the rating sheet. Here rather than at the
             // eleven player presentation sites: this view is the browse root,
             // so reaching it *is* the "player gone, nothing over it" condition.
             .appStoreReviewPrompt(isBlocked: hasBlockingPresentation)
+            .reportsBrowseRootCovered(hasBlockingPresentation)
         #if os(tvOS)
             .overlay { tvOverlays }
         #endif
@@ -416,6 +419,12 @@ struct MainTabView: View {
         case .downloads:
             // The download Live Activity was tapped.
             showsDownloads = true
+        case let .cloudPair(code):
+            // Ignored on tvOS: no camera to scan a pairing QR with.
+            #if !os(tvOS)
+                showsDownloads = false
+                router.requestCloudPairing(code: code)
+            #endif
         }
     }
 

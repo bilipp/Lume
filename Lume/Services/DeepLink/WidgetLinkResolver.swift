@@ -35,7 +35,7 @@ enum WidgetLinkResolver {
             guard let movie = first(Movie.self, #Predicate { $0.id == id }, in: context),
                   !restriction.hides(categoryID: movie.categoryId) else { return nil }
             return .openMovie(movie)
-        case .movie, .series, .resume, .downloads:
+        case .movie, .series, .resume, .downloads, .cloudPair:
             return nil
         }
     }
