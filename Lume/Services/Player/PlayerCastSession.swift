@@ -306,6 +306,12 @@ final class PlayerCastSession {
 
     // MARK: - Castability
 
+    /// The audio format to warn about before casting, from the tracks the
+    /// local engine found; `nil` while unknown or when a track would play.
+    var unplayableAudioLabel: String? {
+        CastStreamResolver.unplayableAudioLabel(for: clock.audioCodecs)
+    }
+
     /// Publishes whether `media` can be cast for the device sheet, and returns
     /// the verdict. Call whenever the display media changes.
     @discardableResult

@@ -12,7 +12,8 @@
 //  Chromecast is Lume Pro; AirPlay is free. A free user's receiver rows open
 //  the paywall instead of connecting, and the AirPlay row always works. When
 //  the stream on screen can't be cast, the receiver rows are disabled and the
-//  resolver's reason says why.
+//  resolver's reason says why; when its audio likely won't play there, a
+//  footer warns but casting stays possible.
 //
 
 #if os(iOS)
@@ -92,6 +93,12 @@
             } footer: {
                 if let unsupportedReason {
                     Text(unsupportedReason.message)
+                } else if let audio = castSession.unplayableAudioLabel {
+                    Label {
+                        Text(CastStreamResolver.audioWarning(format: audio))
+                    } icon: {
+                        Image(systemName: "speaker.slash")
+                    }
                 }
             }
         }

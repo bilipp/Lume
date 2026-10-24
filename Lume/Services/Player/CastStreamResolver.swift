@@ -80,6 +80,22 @@ nonisolated enum CastStreamResolver {
         return nil
     }
 
+    /// Audio formats, by FFmpeg codec name, that receivers don't decode
+    /// themselves: they pass them through to an external decoder on some
+    /// setups only, so the picture plays without sound. Labelled with
+    /// technical names only.
+    static let passthroughAudioLabels: [String: String] = [
+        "ac3": "AC-3", "eac3": "E-AC-3", "truehd": "TrueHD", "mlp": "MLP", "dts": "DTS", "ac4": "AC-4"
+    ]
+
+    /// The format to warn about when none of `audioCodecs` would play on a
+    /// receiver, or `nil` when one would or they aren't known yet.
+    static func unplayableAudioLabel(for audioCodecs: [String]) -> String? {
+        let labels = audioCodecs.map { passthroughAudioLabels[$0.lowercased()] }
+        guard !labels.isEmpty, !labels.contains(nil) else { return nil }
+        return labels.first ?? nil
+    }
+
     /// The URL to cast an Xtream live channel at instead of the one the
     /// player opened, or `nil` to cast the played URL unchanged.
     ///
@@ -98,6 +114,17 @@ nonisolated enum CastStreamResolver {
             return nil
         }
         return client.buildLiveStreamURL(for: stream, playlist: playlist, format: .m3u8)
+    }
+}
+
+nonisolated extension CastStreamResolver {
+    /// Shown beside the receivers when the stream's audio likely won't play.
+    static func audioWarning(format: String) -> LocalizedStringResource {
+        LocalizedStringResource(
+            "player.cast.audio-warning",
+            defaultValue: "This video's audio (\(format)) may not play on Cast devices, so it could cast without sound.",
+            comment: "Player › Cast sheet: warning when every audio track of the video uses a format most Chromecasts can't decode. The argument is a technical format name such as E-AC-3 or DTS."
+        )
     }
 }
 

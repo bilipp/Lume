@@ -101,6 +101,20 @@ struct CastStreamResolverTests {
         }
     }
 
+    @Test(arguments: [
+        (["eac3", "eac3"], "E-AC-3"),
+        (["dts"], "DTS"),
+        (["truehd", "ac3"], "TrueHD")
+    ])
+    func `audio no receiver decodes is named`(codecs: [String], label: String) {
+        #expect(CastStreamResolver.unplayableAudioLabel(for: codecs) == label)
+    }
+
+    @Test(arguments: [[], ["aac"], ["eac3", "aac"], ["mp3"]])
+    func `castable or unknown audio raises no warning`(codecs: [String]) {
+        #expect(CastStreamResolver.unplayableAudioLabel(for: codecs) == nil)
+    }
+
     @Test(arguments: CastStreamResolver.Reason.allCases)
     func `every reason has a localized explanation`(reason: CastStreamResolver.Reason) {
         let key = reason.message.key

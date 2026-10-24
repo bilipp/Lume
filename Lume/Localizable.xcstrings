@@ -45360,6 +45360,72 @@
         }
       }
     },
+    "player.cast.audio-warning" : {
+      "comment" : "Player › Cast sheet: warning when every audio track of the video uses a format most Chromecasts can't decode. The argument is a technical format name such as E-AC-3 or DTS.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قد لا يعمل صوت هذا الفيديو (%@) على أجهزة Cast، لذا قد يُبث دون صوت."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Ton dieses Videos (%@) wird auf Cast-Geräten möglicherweise nicht abgespielt – das Bild kann ohne Ton laufen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video's audio (%@) may not play on Cast devices, so it could cast without sound."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es posible que el audio de este vídeo (%@) no se reproduzca en dispositivos Cast, así que podría verse sin sonido."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'audio de cette vidéo (%@) risque de ne pas être lu sur les appareils Cast : l'image pourrait s'afficher sans son."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'audio di questo video (%@) potrebbe non essere riprodotto sui dispositivi Cast, quindi potrebbe essere trasmesso senza suono."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この動画の音声（%@）は Cast デバイスで再生できない場合があり、音声なしでキャストされることがあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 동영상의 오디오(%@)는 Cast 기기에서 재생되지 않을 수 있어 소리 없이 전송될 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O áudio deste vídeo (%@) pode não ser reproduzido em dispositivos Cast, por isso a transmissão pode ficar sem som."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此视频的音频（%@）可能无法在 Cast 设备上播放，投放时可能没有声音。"
+          }
+        }
+      }
+    },
     "player.cast.button" : {
       "comment" : "Player › Controls: accessibility label of the button that sends playback to a Chromecast or AirPlay device.",
       "extractionState" : "manual",
