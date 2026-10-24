@@ -61,7 +61,10 @@ nonisolated enum CastStreamResolver {
             subtitle: media.subtitle,
             posterURL: CastMediaRequest.receiverPosterURL(media.posterURL),
             startTime: media.isLive ? 0 : max(0, position ?? media.startTime),
-            contentRef: media.contentRef
+            contentRef: media.contentRef,
+            // Only an Xtream live channel gets a preferred URL, and Xtream
+            // serves its HLS as MPEG-TS segments.
+            hasMPEGTSSegments: media.isLive && preferredURL != nil
         ))
     }
 

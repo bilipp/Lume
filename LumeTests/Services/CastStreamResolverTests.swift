@@ -82,6 +82,23 @@ struct CastStreamResolverTests {
         }
         #expect(request.contentURL == hls)
         #expect(request.contentType == "application/x-mpegURL")
+        #expect(request.hasMPEGTSSegments)
+    }
+
+    @Test func `only the xtream HLS URL declares MPEG-TS segments`() throws {
+        let hls = try #require(URL(string: "http://example.com/live/u/p/1.m3u8"))
+        let played = Self.media("http://example.com/live/1/index.m3u8", kind: .live, contentRef: .live("l1"))
+        let movie = Self.media("http://example.com/movie/u/p/1.mp4")
+        for verdict in [
+            CastStreamResolver.verdict(for: played),
+            CastStreamResolver.verdict(for: movie, preferredURL: hls)
+        ] {
+            guard case let .castable(request) = verdict else {
+                Issue.record("Expected a castable verdict")
+                continue
+            }
+            #expect(!request.hasMPEGTSSegments)
+        }
     }
 
     @Test(arguments: CastStreamResolver.Reason.allCases)

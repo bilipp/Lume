@@ -20,6 +20,9 @@ nonisolated struct CastMediaRequest: Hashable {
     /// The catalog identity watch progress is committed against when the cast
     /// ends, which can be long after the player that started it has closed.
     let contentRef: PlayableMedia.ContentRef
+    /// Whether the HLS segments are known to be MPEG-TS. Told up front, the
+    /// receiver doesn't have to guess the segment format and re-probe it.
+    var hasMPEGTSSegments = false
 }
 
 nonisolated extension CastMediaRequest {

@@ -387,6 +387,10 @@
             media.contentType = request.contentType
             media.streamType = request.streamType == .live ? .live : .buffered
             media.metadata = metadata
+            if request.hasMPEGTSSegments {
+                media.hlsSegmentFormat = .TS
+                media.hlsVideoSegmentFormat = .MPEG2_TS
+            }
             let load = GCKMediaLoadRequestDataBuilder()
             load.mediaInformation = media.build()
             if let startTime = CastStatusMapping.loadStartTime(for: request) {
