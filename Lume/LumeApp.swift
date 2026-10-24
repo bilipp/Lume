@@ -331,9 +331,11 @@ struct LumeApp: App {
                     // the guide refresh behind the network.
                     Task { await TraktService.shared.restore() }
 
-                    // Same for Simkl (a second tracker integration, AUTH V2
-                    // device flow): refresh stale tokens, restore the username.
+                    // Same for Simkl and MDBList (the other tracker
+                    // integrations, both device-flow OAuth): refresh stale
+                    // tokens, restore the username.
                     Task { await SimklService.shared.restore() }
+                    Task { await MDBListService.shared.restore() }
 
                     // Restore the OpenSubtitles session (a keychain read, no
                     // network) so the in-player subtitle search can download

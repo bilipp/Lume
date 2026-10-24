@@ -85,7 +85,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     }
 
     /// The categories shown, in order. Connected Services needs credentials
-    /// for Trakt or Simkl in this build (OpenSubtitles lives under Player).
+    /// for Trakt, Simkl or MDBList in this build (OpenSubtitles lives under Player).
     static func visible(hasConnectedServices: Bool) -> [SettingsCategory] {
         allCases.filter { category in
             category.isAvailableOnPlatform && (category != .connectedServices || hasConnectedServices)

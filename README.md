@@ -69,7 +69,7 @@ It is built entirely in **SwiftUI** with a single, platform-adaptive codebase th
 runs on iPhone, iPad, Mac, Apple TV, and Apple Vision Pro. Content is enriched with
 artwork, cast, trailers, and ratings from **TMDB** and **MDBList** (IMDb, Rotten Tomatoes,
 Metacritic, Trakt, Letterboxd), and your viewing activity can be scrobbled to
-**Trakt** and **Simkl**.
+**Trakt**, **Simkl** and **MDBList**.
 
 > **Note** — Lume is a player only. It ships with **no channels, streams, or content**
 > of its own. You bring your own Xtream Codes credentials or M3U playlist from a
@@ -182,6 +182,7 @@ adapted per size class
 - **Subtitle styles** — size, font, colour, background box, edge and position, with a live preview in Settings › Player › Subtitle Style (KSPlayer, Lume Engine and AVPlayer; VLCKit follows the size)
 - Optional **Trakt** scrobbling — plus one-tap import of your existing Trakt watched history — and **TMDB** metadata enrichment
 - Optional **Simkl** scrobbling via the OAuth 2.0 device flow, with watched-history import on connect and the manual re-import for later
+- Optional **MDBList** sync via the OAuth 2.0 device flow — watched movies and episodes sync to your MDBList history, your history imports on connect (or on demand), and your MDBList watchlist gets its own Home row
 - **Clear watch history** from Settings to reset progress, watched markers, and last-watched dates across all content
 - **Now Playing integration** — lock-screen / Control Center metadata, artwork, and remote controls on every engine; playback on Apple TV surfaces on your iPhone's Apple TV remote
 - **Live Activity + Dynamic Island** (iOS) — glanceable now & next programme with live progress on the Lock Screen; tap to jump straight back into playback. **Background downloads** get one too: progress, speed and ETA for the file closest to finishing plus how many are behind it, updated while Lume is closed; tap to open the downloads list
@@ -283,6 +284,7 @@ Lume follows a clean, layered SwiftUI architecture:
 │    ├─ MDBListClient       aggregator ratings (IMDb, RT, …)│
 │    ├─ TraktService        OAuth device flow + scrobbling  │
 │    ├─ SimklService        OAuth device flow + scrobbling  │
+│    ├─ MDBListService      OAuth device flow + scrobbling  │
 │    ├─ OpenSubtitlesClient external subtitle search        │
 │    ├─ ContentSyncManager  background catalog indexing     │
 │    └─ ImagePipeline        cached async image loading     │
@@ -354,6 +356,7 @@ The easiest way to use Lume is to [**download it from the App Store**](https://a
 - *(Optional)* a [Trakt](https://trakt.tv/oauth/applications) application for scrobbling
 - *(Optional)* a [Simkl](https://simkl.com/settings/developer/new/) application for scrobbling (OAuth V2 — "TV, devices & command line" registration needs only the client id)
 - *(Optional)* an [MDBList](https://mdblist.com/preferences/) API key for IMDb / Rotten Tomatoes / Metacritic / Trakt / Letterboxd ratings
+- *(Optional)* an [MDBList](https://mdblist.com/developer/) "Device Code App" OAuth application for watched sync and the watchlist row (client id only, no secret)
 - *(Optional)* an [IntroDB](https://introdb.app) API key for intro / recap skip windows
 - *(Optional)* an [OpenSubtitles](https://www.opensubtitles.com/consumers) consumer API key for in-player subtitle search
 
@@ -397,7 +400,7 @@ simulator-only build. Don't commit these personal signing changes back to the re
 
 ## Configuration
 
-Optional integrations (TMDB, MDBList, IntroDB, OpenSubtitles, and Trakt) are configured through a
+Optional integrations (TMDB, MDBList, IntroDB, OpenSubtitles, Trakt, and Simkl) are configured through a
 repo-root `.env` file. The `Scripts/inject-env.sh` build phase reads it and injects the
 values into the built app's `Info.plist` — keeping secrets out of source control. `.env`
 is gitignored, and if it is missing the dependent features simply degrade gracefully
@@ -429,6 +432,9 @@ TRAKT_CLIENT_SECRET=your_trakt_client_secret
 # Simkl — watch scrobbling (OAuth 2.0 device flow, AUTH V2)
 SIMKL_CLIENT_ID=your_simkl_client_id
 SIMKL_CLIENT_SECRET=
+
+# MDBList — watched sync + watchlist (OAuth 2.0 device flow, "Device Code App")
+MDBLIST_CLIENT_ID=your_mdblist_oauth_client_id
 ```
 
 Every key is optional — Lume builds and runs fine with an empty `.env` or none at all.
@@ -441,6 +447,11 @@ so it works on every platform including tvOS, and access tokens are refreshed
 automatically. A "TV, devices & command line" registration has no secret; the secret
 line is only for a "Server apps & services" registration. Tokens are stored in the
 Keychain as well.
+
+MDBList account sync uses the **OAuth 2.0 device flow** too (RFC 8628), so it also
+works on tvOS. Register a "Device Code App" at [mdblist.com/developer](https://mdblist.com/developer/)
+— it has no secret, only `MDBLIST_CLIENT_ID`. That client id is separate from
+`MDBLIST_API_KEY`, which is the app's own key for the ratings lookups.
 
 OpenSubtitles needs both halves: the API key above identifies the build, while
 *downloading* a subtitle needs a free [opensubtitles.com](https://www.opensubtitles.com)
@@ -457,7 +468,7 @@ and UI automation (**XCTest**).
 
 | Target | Framework | Coverage |
 |---|---|---|
-| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt & Simkl token stores + watched importers + Simkl client, content organizing, **M3U parser/classifier/sync**, **MDBList client**, **OpenSubtitles client & subtitle-search query**, **Next Episode resolver**, **Gzip file streaming** |
+| `LumeTests` | Swift Testing | DTO decoding, URL building, API client & retry, models, sort options, sync progress & content sync, playable media, player settings, Trakt & Simkl token stores + watched importers + Simkl client, **MDBList sync client + watched importer**, content organizing, **M3U parser/classifier/sync**, **MDBList client**, **OpenSubtitles client & subtitle-search query**, **Next Episode resolver**, **Gzip file streaming** |
 | `LumeUITests` | XCTest | App launch & performance, login flow, tab navigation, playlist detail, settings, **M3U playlist import flow** |
 
 Run the full suite:

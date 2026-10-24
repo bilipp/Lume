@@ -2,7 +2,7 @@
 //  FullScreenPlayerView+Trackers.swift
 //  Lume
 //
-//  The player's one-time "watched" push to Trakt and Simkl, split out of
+//  The player's one-time "watched" push to Trakt, Simkl and MDBList, split out of
 //  `FullScreenPlayerView` to keep that file inside the 600-line cap.
 //
 
@@ -20,14 +20,12 @@ extension FullScreenPlayerView {
             var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
             descriptor.fetchLimit = 1
             guard let movie = try? modelContext.fetch(descriptor).first else { return }
-            TraktService.shared.syncWatched(movie: movie, watched: true)
-            SimklService.shared.syncWatched(movie: movie, watched: true)
+            WatchedTrackers.sync(movie: movie, watched: true)
         case let .episode(id):
             var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
             descriptor.fetchLimit = 1
             guard let episode = try? modelContext.fetch(descriptor).first else { return }
-            TraktService.shared.syncWatched(episode: episode, watched: true)
-            SimklService.shared.syncWatched(episode: episode, watched: true)
+            WatchedTrackers.sync(episode: episode, watched: true)
         case .live, .recording:
             break
         }
