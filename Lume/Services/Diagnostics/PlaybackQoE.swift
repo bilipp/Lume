@@ -120,8 +120,20 @@ final class PlaybackQoE {
         suspensionHolders.isActive
     }
 
-    func suspend(for owner: String) {
+    /// Bumped by every `suspend(for:)`, so a bracket that spans one — even one
+    /// already resumed — can tell its numbers are incomplete.
+    @ObservationIgnored private(set) var suspensionEpoch = 0
+
+    /// `handingOff`: the open session's engine is torn down because the stream
+    /// moved elsewhere (a Cast receiver), not abandoned — watch time so far
+    /// still counts, and a session without a first frame is dropped rather
+    /// than counted as an exit before video start.
+    func suspend(for owner: String, handingOff: Bool = false) {
+        if handingOff, !isSuspended {
+            closeSession(countingExit: false)
+        }
         suspensionHolders.insert(owner)
+        suspensionEpoch += 1
     }
 
     func resume(for owner: String) {
@@ -219,7 +231,12 @@ final class PlaybackQoE {
     /// any open interval and — if no frame ever arrived — counts an exit before
     /// video start.
     func endSession() {
-        guard !isSuspended, let engine, let startupBegan else { return }
+        guard !isSuspended else { return }
+        closeSession(countingExit: true)
+    }
+
+    private func closeSession(countingExit: Bool) {
+        guard let engine, let startupBegan else { return }
         if let interval {
             Perf.end(interval)
             self.interval = nil
@@ -234,6 +251,8 @@ final class PlaybackQoE {
         if let firstFrameAt {
             let watched = Date().timeIntervalSince(firstFrameAt)
             mutate(engine) { $0.watchedSeconds += watched }
+        } else if !countingExit {
+            mutate(engine) { $0.sessions = max(0, $0.sessions - 1) }
         } else {
             let waited = Date().timeIntervalSince(startupBegan)
             mutate(engine) { $0.exitsBeforeVideoStart += 1 }

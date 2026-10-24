@@ -34,8 +34,8 @@ nonisolated enum PlaybackSessionHealth: Equatable {
     }
 
     nonisolated enum Exclusion: String, Equatable {
-        /// Multi-View holds `PlaybackQoE.isSuspended` for its whole lifetime,
-        /// so those sessions record nothing at all.
+        /// QoE was suspended at some point in the session — Multi-View, or a
+        /// cast — so its numbers are incomplete.
         case suspended
         /// Too little watch time for the rebuffer ratio to mean anything.
         case tooShort
@@ -122,6 +122,7 @@ final class PlaybackHealthTracker {
     /// while QoE was suspended and there was nothing to snapshot.
     private struct Bracket {
         var opening: PlaybackHealthSnapshot?
+        var suspensionEpoch: Int
     }
 
     private var brackets: [Token: Bracket] = [:]
@@ -131,7 +132,10 @@ final class PlaybackHealthTracker {
     func beginSession() -> Token {
         let token = Token()
         let suspended = PlaybackQoE.shared.isSuspended
-        brackets[token] = Bracket(opening: suspended ? nil : PlaybackHealthSnapshot(PlaybackQoE.shared.summary))
+        brackets[token] = Bracket(
+            opening: suspended ? nil : PlaybackHealthSnapshot(PlaybackQoE.shared.summary),
+            suspensionEpoch: PlaybackQoE.shared.suspensionEpoch
+        )
         return token
     }
 
@@ -147,7 +151,9 @@ final class PlaybackHealthTracker {
     /// which is the safe direction: it can cost a prompt, never earn a wrong one.
     func endSession(_ token: Token) -> PlaybackSessionHealth? {
         guard let bracket = brackets.removeValue(forKey: token) else { return nil }
-        guard let opening = bracket.opening, !PlaybackQoE.shared.isSuspended else {
+        guard let opening = bracket.opening, !PlaybackQoE.shared.isSuspended,
+              bracket.suspensionEpoch == PlaybackQoE.shared.suspensionEpoch
+        else {
             return .notMeasured(.suspended)
         }
         return .verdict(from: opening, to: PlaybackHealthSnapshot(PlaybackQoE.shared.summary))
