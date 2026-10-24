@@ -9958,6 +9958,12 @@
       "comment" : "Tab bar › Casting mini-controller: accessibility hint of the bar that shows what a Chromecast is playing.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفتح عناصر التحكم في البث."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45430,6 +45436,12 @@
       "comment" : "Player › Controls: accessibility label of the button that sends playback to a Chromecast or AirPlay device.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بث"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45490,6 +45502,12 @@
       "comment" : "Player › Casting: status shown while a Chromecast that reports no name plays the stream.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البث"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45550,6 +45568,12 @@
       "comment" : "Player › Casting: status shown while a Chromecast plays the stream. The argument is the Chromecast's name.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البث إلى %@"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45610,6 +45634,12 @@
       "comment" : "Player › Cast sheet: name shown for a Chromecast that doesn't report one.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جهاز Cast"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45670,6 +45700,12 @@
       "comment" : "Player › Cast error: the Chromecast refused to load the stream; it now plays on the phone or tablet.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر على جهاز Cast فتحه، لذا يتم تشغيله على هذا الجهاز بدلًا من ذلك."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45730,6 +45766,12 @@
       "comment" : "Player › Cast error: the Chromecast started the stream and then failed; it now plays on the phone or tablet.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل التشغيل على جهاز Cast، لذا يتم تشغيله على هذا الجهاز بدلًا من ذلك."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45790,6 +45832,12 @@
       "comment" : "Player › Cast error: title shown when a Chromecast couldn't play the stream and playback moved back to this device.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن بث هذا البث"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45850,6 +45898,12 @@
       "comment" : "Player › Cast sheet: row that opens the system AirPlay device picker.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45910,6 +45964,12 @@
       "comment" : "Player › Cast sheet: header above the list of Chromecast devices.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45970,6 +46030,12 @@
       "comment" : "Player › Cast sheet: row shown while Lume connects to a Chromecast. The argument is the Chromecast's name.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ الاتصال بـ %@…"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46030,6 +46096,12 @@
       "comment" : "Player › Cast sheet: hint below “No devices found” on how to make a Chromecast show up.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تأكد من أن جهاز Chromecast متصل بشبكة Wi-Fi نفسها التي يتصل بها هذا الجهاز. إذا رفضت وصول Lume إلى الشبكة المحلية، فاسمح به مجددًا من الإعدادات › الخصوصية والأمن › الشبكة المحلية."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46090,6 +46162,12 @@
       "comment" : "Player › Cast sheet: shown when no Chromecast device was found on the network.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على أجهزة"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46150,6 +46228,12 @@
       "comment" : "Player › Cast sheet: shown while Lume looks for Chromecast devices on the network.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البحث عن أجهزة…"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46210,6 +46294,12 @@
       "comment" : "Player › Cast sheet: title of the sheet that lists Chromecast and AirPlay devices to play on.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البث إلى"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46270,6 +46360,12 @@
       "comment" : "Player › Casting: button that stops the Chromecast and plays the stream on this device again.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إيقاف البث"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46330,6 +46426,12 @@
       "comment" : "Player › Cast sheet: why a video in a container a Chromecast can't play (e.g. AVI, FLV) can't be sent to it.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن لأجهزة Cast تشغيل تنسيق الفيديو هذا."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46390,6 +46492,12 @@
       "comment" : "Player › Cast sheet: why a stream from a signed-in media server or network share can't be sent to a Chromecast.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتطلب هذا المصدر تسجيل دخول لا يمكن لأجهزة Cast استخدامه."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46450,6 +46558,12 @@
       "comment" : "Player › Cast sheet: why a downloaded video can't be sent to a Chromecast.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن تشغيل مقاطع الفيديو التي تم تنزيلها إلا على هذا الجهاز."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46510,6 +46624,12 @@
       "comment" : "Player › Cast sheet: why a portal stream whose address isn't known yet can't be sent to a Chromecast.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يزال هذا البث قيد التحميل. حاول مرة أخرى بعد قليل."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46570,6 +46690,12 @@
       "comment" : "Player › Cast sheet: why a stream using a protocol other than HTTP (e.g. RTMP, UDP) can't be sent to a Chromecast.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن لأجهزة Cast فتح هذا النوع من البث."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46630,6 +46756,12 @@
       "comment" : "Player › Cast sheet: why a recording from the recording server can't be sent to a Chromecast.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن بث التسجيلات."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46690,6 +46822,12 @@
       "comment" : "Player › Casting: accessibility label of the slider that sets the Chromecast's volume.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مستوى الصوت"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -48394,6 +48532,12 @@
     "premium.chromecast.subtitle" : {
       "comment" : "Lume Pro feature description: casting from iPhone or iPad to a Chromecast on the same network.",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أرسل البث المباشر والأفلام والحلقات من iPhone أو iPad إلى جهاز Chromecast وتحكم فيها من Lume."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
@@ -48453,6 +48597,12 @@
     "premium.chromecast.title" : {
       "comment" : "Lume Pro feature title: send playback to a Chromecast.",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
