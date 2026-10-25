@@ -16,10 +16,11 @@ extension CloudSyncEngine {
     /// most recently updated and deletes the rest. Keyed on `serverID`, not the
     /// random row `id`: two devices pairing the same server (or a re-pair before
     /// the first row synced) write rows with different ids for one server.
+    /// Scoped by kind so a row of one backend never collapses into another's.
     func reconcileRecordingServers(into result: inout CloudSyncReconcileResult) throws {
         (result.recordingServersKept, result.recordingServersDeduped) = try collapseDuplicates(
             SyncedRecordingServer.self,
-            key: { $0.serverID?.uuidString ?? $0.id.uuidString },
+            key: { "\($0.kindRaw)|\($0.serverID?.uuidString ?? $0.id.uuidString)" },
             updatedAt: \.updatedAt
         )
     }

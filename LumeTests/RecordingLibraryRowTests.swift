@@ -8,7 +8,7 @@
 
 import Foundation
 @testable import Lume
-import LumeRecorderKit
+import SwiftData
 import Testing
 
 @MainActor
@@ -20,16 +20,16 @@ struct RecordingLibraryRowTests {
     }
 
     private func makeRecording(
-        status: RecordingStatus,
+        status: ServerRecordingStatus,
         startedAt: Date? = nil,
         finishedAt: Date? = nil,
-        failureReason: String? = nil
-    ) -> Recording {
-        Recording(
-            id: UUID(), title: "Late Show", channelName: nil, channelLogoURL: nil, programmeDescription: nil,
-            sourceRef: nil, start: start, end: end, status: status, failureReason: failureReason,
-            createdAt: start.addingTimeInterval(-60), startedAt: startedAt, finishedAt: finishedAt,
-            durationSeconds: nil, sizeBytes: nil
+        failureReason: String? = nil,
+        sourceRef: String? = nil
+    ) -> ServerRecording {
+        ServerRecording(
+            id: RecordingID(UUID()), title: "Late Show", sourceRef: sourceRef, start: start, end: end, status: status,
+            failureReason: failureReason, createdAt: start.addingTimeInterval(-60),
+            startedAt: startedAt, finishedAt: finishedAt
         )
     }
 
@@ -43,7 +43,7 @@ struct RecordingLibraryRowTests {
     @Test func `failed and cancelled recordings that captured show the captured span`() {
         let startedAt = start.addingTimeInterval(30)
         let finishedAt = start.addingTimeInterval(90)
-        for status in [RecordingStatus.failed, .cancelled] {
+        for status in [ServerRecordingStatus.failed, .cancelled] {
             let recording = makeRecording(status: status, startedAt: startedAt, finishedAt: finishedAt)
             #expect(recording.displayedTimeRange == startedAt ..< finishedAt)
         }
@@ -71,5 +71,90 @@ struct RecordingLibraryRowTests {
             failureReason: "source_unavailable: Error when loading first segment"
         )
         #expect(recording.failureText == makeRecording(status: .failed, failureReason: "no_segments").failureText)
+    }
+
+    // MARK: Per server
+
+    private func kinds(_ actions: [RecordingLibraryAction]) -> [RecordingLibraryAction.Kind] {
+        actions.map(\.kind)
+    }
+
+    private func actions(
+        for recording: ServerRecording,
+        on kind: RecordingServerKind = .lumeRecorder,
+        capabilities: RecordingServerCapabilities? = nil,
+        now: Date = .now
+    ) -> [RecordingLibraryAction] {
+        RecordingLibraryAction.actions(
+            for: recording,
+            cancels: kind.capabilities.cancelsRatherThanStops(recording, now: now),
+            capabilities: capabilities ?? kind.capabilities
+        )
+    }
+
+    @Test func `dispatcharr cancels a schedule without a separate delete`() {
+        let opened = makeRecording(status: .scheduled)
+        let now = start.addingTimeInterval(60)
+
+        #expect(kinds(actions(for: opened, on: .dispatcharr, now: now)) == [.cancel])
+        #expect(kinds(actions(for: opened, now: now)) == [.stop, .delete])
+        let running = makeRecording(status: .recording, startedAt: start)
+        #expect(kinds(actions(for: running, on: .dispatcharr, now: now)) == [.stop, .delete])
+        #expect(kinds(actions(for: makeRecording(status: .completed), on: .dispatcharr)) == [.delete])
+    }
+
+    @Test func `a view-only account gets no actions`() {
+        var viewOnly = RecordingServerCapabilities.dispatcharr
+        viewOnly.readOnly = true
+        for status in [ServerRecordingStatus.scheduled, .recording, .completed] {
+            #expect(actions(for: makeRecording(status: status), on: .dispatcharr, capabilities: viewOnly).isEmpty)
+        }
+    }
+
+    @Test func `dispatcharr deletes say where the video goes`() throws {
+        let running = makeRecording(status: .recording, startedAt: start)
+        let lume = try #require(actions(for: running).last)
+        let dispatcharr = try #require(actions(for: running, on: .dispatcharr).last)
+        let completed = try #require(actions(for: makeRecording(status: .completed), on: .dispatcharr).last)
+
+        #expect(dispatcharr.kind == .delete)
+        #expect(dispatcharr.message != lume.message)
+        #expect(dispatcharr.message != completed.message)
+    }
+
+    @Test func `failures read by reason code`() {
+        let generic = makeRecording(status: .failed).failureText
+        let interrupted = makeRecording(status: .failed, failureReason: "interrupted")
+        let noData = makeRecording(status: .failed, failureReason: "source_unavailable")
+
+        #expect(makeRecording(status: .failed, failureReason: "missed").failureText != generic)
+        #expect(interrupted.failureText != generic)
+        #expect(noData.failureText == makeRecording(status: .failed, failureReason: "no_segments").failureText)
+        #expect(makeRecording(status: .completed).failureText == nil)
+    }
+
+    @Test func `a child profile hides recordings Lume didn't make when the server says so`() throws {
+        let context = try ModelContext(makeTestContainer())
+        let playlistID = UUID()
+        context.insert(LiveStream(id: "p-live-1", streamId: 1, name: "Cartoon Cove", categoryId: "kids"))
+        context.insert(LiveStream(id: "p-live-2", streamId: 2, name: "Night Owl", categoryId: "late"))
+        let open = makeRecording(
+            status: .completed, sourceRef: RecordingSourceRef(playlistID: playlistID, streamID: "p-live-1").rawValue
+        )
+        let restricted = makeRecording(
+            status: .completed, sourceRef: RecordingSourceRef(playlistID: playlistID, streamID: "p-live-2").rawValue
+        )
+        let external = makeRecording(status: .completed)
+        let child = ContentRestriction(isActive: true, restrictedCategoryIDs: ["late"])
+        let recordings = [open, restricted, external]
+
+        #expect(RecordingsLibrary.hiddenRecordingIDs(recordings, restriction: child, context: context) == [restricted.id])
+        #expect(RecordingsLibrary.hiddenRecordingIDs(
+            recordings, restriction: child, hidesUnattributed: true, context: context
+        ) == [restricted.id, external.id])
+        let adult = ContentRestriction(isActive: false, restrictedCategoryIDs: ["late"])
+        #expect(RecordingsLibrary.hiddenRecordingIDs(
+            recordings, restriction: adult, hidesUnattributed: true, context: context
+        ).isEmpty)
     }
 }

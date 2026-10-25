@@ -136,7 +136,7 @@ adapted per size class
 - **Redesigned Live TV on tvOS**: a now-playing hero above the Guide shows the focused channel's live programme, time left and what's up next, beside a muted live preview of the channel (Lume Pro), over a glow tinted with the channel's logo colour — Small (the default, with two more guide rows), Large, Info Only or Off (the guide takes the full height) in Settings › Live TV; a glass category sidebar sits alongside both layouts
 - **Guide or List** is chosen in Settings › Live TV on every platform (Guide by default on tvOS, List elsewhere)
 - **Hold a channel** in the tvOS Guide to add it to Favorites or start Multi-View with it
-- **Recording server (DVR)** (Lume Pro): pair a self-hosted [LumeRecorder](https://github.com/bilipp/LumeRecorder) server on your network from Settings › Live TV, record the live channel now or schedule a programme from the Guide, and play back finished and in-progress recordings on every device — from the Live TV toolbar, Settings › Live TV, or (optionally) the tvOS Live TV sidebar
+- **Recording server (DVR)** (Lume Pro): pair a self-hosted [LumeRecorder](https://github.com/bilipp/LumeRecorder) server on your network, or sign in to your [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr) server's DVR (API key or username + password; channels from playlists that Dispatcharr serves), from Settings › Live TV, record the live channel now or schedule a programme from the Guide, and play back finished and in-progress recordings on every device — from the Live TV toolbar, Settings › Live TV, or (optionally) the tvOS Live TV sidebar
 - Favorite channels and per-channel management
 
 #### 🏅 Sports Hub

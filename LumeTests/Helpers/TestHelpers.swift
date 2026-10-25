@@ -45,6 +45,13 @@ func exampleDataURL(_ filename: String, filePath: String = #filePath) -> URL {
     repoRootURL(filePath: filePath).appendingPathComponent("ExampleData/\(filename)")
 }
 
+/// A committed Dispatcharr fixture, read from disk (not the test bundle, which
+/// flattens resources).
+func dispatcharrFixture(_ name: String, filePath: String = #filePath) throws -> String {
+    let url = repoRootURL(filePath: filePath).appendingPathComponent("LumeTests/Fixtures/Dispatcharr/\(name)")
+    return try String(contentsOf: url, encoding: .utf8)
+}
+
 func loadExampleJSON<T: Decodable>(_ filename: String, filePath: String = #filePath) throws -> T {
     let url = exampleDataURL(filename, filePath: filePath)
     let data = try Data(contentsOf: url)

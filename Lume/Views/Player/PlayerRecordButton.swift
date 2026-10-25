@@ -10,7 +10,6 @@
 //  installs — never the playback clock, never SwiftData.
 //
 
-import LumeRecorderKit
 import SwiftUI
 
 extension EnvironmentValues {

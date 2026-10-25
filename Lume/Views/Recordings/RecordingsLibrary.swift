@@ -35,7 +35,7 @@ enum RecordingsLibrarySection: CaseIterable, Identifiable {
         }
     }
 
-    init(status: RecordingStatus) {
+    init(status: ServerRecordingStatus) {
         switch status {
         case .recording: self = .inProgress
         case .scheduled: self = .scheduled
@@ -47,7 +47,7 @@ enum RecordingsLibrarySection: CaseIterable, Identifiable {
 
 struct RecordingsLibraryGroup: Identifiable {
     let section: RecordingsLibrarySection
-    let recordings: [Recording]
+    let recordings: [ServerRecording]
 
     var id: RecordingsLibrarySection {
         section
@@ -57,7 +57,7 @@ struct RecordingsLibraryGroup: Identifiable {
 enum RecordingsLibrary {
     /// Non-empty sections in display order. Running and scheduled recordings
     /// read soonest first; finished ones newest first.
-    static func groups(_ recordings: [Recording]) -> [RecordingsLibraryGroup] {
+    static func groups(_ recordings: [ServerRecording]) -> [RecordingsLibraryGroup] {
         let bySection = Dictionary(grouping: recordings) { RecordingsLibrarySection(status: $0.status) }
         return RecordingsLibrarySection.allCases.compactMap { section in
             guard let items = bySection[section], !items.isEmpty else { return nil }
@@ -70,16 +70,28 @@ enum RecordingsLibrary {
     }
 
     /// Recordings of channels in a category restricted for the active profile.
-    /// A recording whose channel isn't in the catalog stays visible.
+    /// A recording whose channel isn't in the catalog stays visible. With
+    /// `hidesUnattributed`, so does none that Lume didn't make: nothing ties a
+    /// recording made on the server itself to a channel the profile may see.
     static func hiddenRecordingIDs(
-        _ recordings: [Recording],
+        _ recordings: [ServerRecording],
+        restriction: ContentRestriction,
+        hidesUnattributed: Bool = false,
+        context: ModelContext
+    ) -> Set<RecordingID> {
+        guard restriction.isActive, !restriction.restrictedCategoryIDs.isEmpty else { return [] }
+        let refs = recordings.map { ($0.id, $0.sourceRef.flatMap(RecordingSourceRef.init(rawValue:))) }
+        let unattributed = hidesUnattributed ? Set(refs.filter { $0.1 == nil }.map(\.0)) : []
+        return unattributed.union(restrictedRecordingIDs(recordings, refs: refs, restriction: restriction, context: context))
+    }
+
+    private static func restrictedRecordingIDs(
+        _ recordings: [ServerRecording],
+        refs: [(RecordingID, RecordingSourceRef?)],
         restriction: ContentRestriction,
         context: ModelContext
-    ) -> Set<UUID> {
-        guard restriction.isActive, !restriction.restrictedCategoryIDs.isEmpty else { return [] }
-        let streamIDs = Array(Set(recordings.compactMap {
-            $0.sourceRef.flatMap(RecordingSourceRef.init(rawValue:))?.streamID
-        }))
+    ) -> Set<RecordingID> {
+        let streamIDs = Array(Set(refs.compactMap(\.1?.streamID)))
         guard !streamIDs.isEmpty else { return [] }
         var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { streamIDs.contains($0.id) })
         descriptor.propertiesToFetch = [\.categoryId]
@@ -94,7 +106,7 @@ enum RecordingsLibrary {
 
 // MARK: - Row text
 
-extension Recording {
+extension ServerRecording {
     /// Running, finished, or failed after capturing something: the server has
     /// segments to hand out. Anything else gets 409 not_playable.
     var isPlayable: Bool {
@@ -205,26 +217,36 @@ struct RecordingLibraryAction: Identifiable {
     }
 
     let kind: Kind
-    let recording: Recording
+    let recording: ServerRecording
+    var deleteWording: RecordingDeleteWording = .allDevices
 
     var id: String {
-        "\(kind)-\(recording.id.uuidString)"
+        "\(kind)-\(recording.id.rawValue)"
     }
 
     var isDelete: Bool {
         kind == .delete
     }
 
-    /// Stop vs Cancel follows `RecordingRequestPlanner.isCapturing`, like the
-    /// channel menu, EPG detail and player: a schedule whose window has opened
-    /// is already capturing, so it reads Stop here too.
-    static func actions(for recording: Recording, now: Date = .now) -> [Self] {
+    /// `cancels` is `RecordingServerStore.cancelsRatherThanStops`, like the
+    /// channel menu, EPG detail and player: on LumeRecorder a schedule whose
+    /// window has opened is already capturing, so it reads Stop here too. A
+    /// server whose cancel deletes offers no separate Delete for a schedule. A
+    /// view-only account gets none.
+    static func actions(
+        for recording: ServerRecording,
+        cancels: Bool,
+        capabilities: RecordingServerCapabilities = .lumeRecorder
+    ) -> [Self] {
+        guard !capabilities.readOnly else { return [] }
+        let wording = capabilities.deleteWording
+        let delete = Self(kind: .delete, recording: recording, deleteWording: wording)
         switch recording.status {
         case .recording, .scheduled:
-            let primary: Kind = RecordingRequestPlanner.isCapturing(recording, now: now) ? .stop : .cancel
-            return [Self(kind: primary, recording: recording), Self(kind: .delete, recording: recording)]
+            let end = Self(kind: cancels ? .cancel : .stop, recording: recording, deleteWording: wording)
+            return capabilities.cancelDeletes && cancels ? [end] : [end, delete]
         case .completed, .failed, .cancelled, .unknown:
-            return [Self(kind: .delete, recording: recording)]
+            return [delete]
         }
     }
 
@@ -273,7 +295,18 @@ struct RecordingLibraryAction: Identifiable {
         case .cancel:
             String(localized: "“\(recording.title)” won't be recorded.")
         case .delete:
+            deleteMessage
+        }
+    }
+
+    private var deleteMessage: String {
+        switch deleteWording {
+        case .allDevices:
             String(localized: "“\(recording.title)” and its video are removed from the recording server for all your devices.")
+        case .dispatcharr where recording.status == .recording:
+            String(localized: "“\(recording.title)” stops recording, and what's been recorded so far is deleted from your Dispatcharr server.")
+        case .dispatcharr:
+            String(localized: "“\(recording.title)” and its video are deleted from your Dispatcharr server.")
         }
     }
 }
@@ -289,7 +322,7 @@ struct RecordingsLibraryParentalKey: Equatable {
     let refs: [String?]
     let restriction: ContentRestriction
 
-    init(recordings: [Recording], restriction: ContentRestriction) {
+    init(recordings: [ServerRecording], restriction: ContentRestriction) {
         refs = recordings.map(\.sourceRef)
         self.restriction = restriction
     }
@@ -305,8 +338,8 @@ final class RecordingsLibraryModel {
     var failure: RecordingLibraryFailure?
     var showingPaywall = false
     /// The recording whose playback grant is being requested.
-    private(set) var loadingID: UUID?
-    private(set) var hiddenIDs: Set<UUID> = []
+    private(set) var loadingID: RecordingID?
+    private(set) var hiddenIDs: Set<RecordingID> = []
 
     @ObservationIgnored let store: RecordingServerStore
 
@@ -314,15 +347,32 @@ final class RecordingsLibraryModel {
         self.store = store ?? .shared
     }
 
-    var visibleRecordings: [Recording] {
+    var visibleRecordings: [ServerRecording] {
         hiddenIDs.isEmpty ? store.recordings : store.recordings.filter { !hiddenIDs.contains($0.id) }
     }
 
-    func updateHiddenIDs(restriction: ContentRestriction, context: ModelContext) {
-        hiddenIDs = RecordingsLibrary.hiddenRecordingIDs(store.recordings, restriction: restriction, context: context)
+    private var capabilities: RecordingServerCapabilities {
+        store.pairedCapabilities ?? .lumeRecorder
     }
 
-    func play(_ recording: Recording) {
+    /// Stop, cancel and delete for `recording` as the paired server and the
+    /// account allow.
+    func actions(for recording: ServerRecording) -> [RecordingLibraryAction] {
+        RecordingLibraryAction.actions(
+            for: recording, cancels: store.cancelsRatherThanStops(recording), capabilities: capabilities
+        )
+    }
+
+    func updateHiddenIDs(restriction: ContentRestriction, context: ModelContext) {
+        hiddenIDs = RecordingsLibrary.hiddenRecordingIDs(
+            store.recordings,
+            restriction: restriction,
+            hidesUnattributed: capabilities.listsExternalRecordings,
+            context: context
+        )
+    }
+
+    func play(_ recording: ServerRecording) {
         guard loadingID == nil else { return }
         loadingID = recording.id
         Task {
@@ -421,7 +471,7 @@ extension View {
     /// anchored to that row. iOS 26 presents a confirmation dialog as a
     /// popover from the view it hangs on, so a library-wide one points at the
     /// top of the list, whichever row asked.
-    func recordingActionConfirmation(_ model: RecordingsLibraryModel, for recording: Recording) -> some View {
+    func recordingActionConfirmation(_ model: RecordingsLibraryModel, for recording: ServerRecording) -> some View {
         modifier(RecordingActionConfirmation(model: model, recordingID: recording.id))
     }
 }
@@ -465,7 +515,7 @@ private struct RecordingsLibraryActions: ViewModifier {
 /// `recordingID` is `nil`, else only that recording's.
 private struct RecordingActionConfirmation: ViewModifier {
     let model: RecordingsLibraryModel
-    let recordingID: UUID?
+    let recordingID: RecordingID?
     var isEnabled = true
 
     private var action: RecordingLibraryAction? {

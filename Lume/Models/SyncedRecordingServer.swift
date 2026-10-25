@@ -2,8 +2,11 @@ import Foundation
 import SwiftData
 
 /// The recording-server backends Lume knows how to talk to.
+/// Append only: the raw value is what syncs, and older builds show an unknown
+/// one as an unsupported row.
 nonisolated enum RecordingServerKind: String, CaseIterable {
     case lumeRecorder
+    case dispatcharr
 }
 
 /// CloudKit-synced configuration of one paired DVR / recording server.
@@ -26,10 +29,13 @@ final class SyncedRecordingServer {
     var kindRaw: String = RecordingServerKind.lumeRecorder.rawValue
     var name: String = ""
     var baseURL: String = ""
-    /// The server's own identity, as reported by its info endpoint.
+    /// The server's own identity, as reported by its info endpoint. Dispatcharr
+    /// reports none, so its rows carry `RecordingServerIdentity.uuid`.
     var serverID: UUID?
     /// The device identity the server issued at pairing; needed to unpair.
     var deviceID: UUID?
+    /// LumeRecorder: the bearer token, verbatim. Dispatcharr: an encoded
+    /// `DispatcharrCredential`.
     @Attribute(.allowsCloudEncryption) var token: String = ""
     var isEnabled: Bool = true
     /// Last time this record changed. Dedupe tie-break only.

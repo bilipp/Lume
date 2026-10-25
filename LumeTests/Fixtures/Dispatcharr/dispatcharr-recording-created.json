@@ -1,0 +1,16 @@
+{
+  "id": 11,
+  "start_time": "2026-10-25T19:55:00Z",
+  "end_time": "2026-10-25T21:05:00Z",
+  "task_id": "3f6c1d2e-0a4b-4c8d-9e1f-a2b3c4d5e6f7",
+  "channel": 2,
+  "custom_properties": {
+    "lume_source_ref": "xtream:7f1c2a90-3b4d-4e5f-8a6b-7c8d9e0f1a2b:2:1792958400",
+    "program": {
+      "title": "Harbour Lights",
+      "description": "A quiet evening on the fictional coast.",
+      "start_time": "2026-10-25T20:00:00Z",
+      "end_time": "2026-10-25T21:00:00Z"
+    }
+  }
+}

@@ -62,7 +62,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .multiView: "Watch up to four live channels side by side. Each tile can come from a different playlist, which helps if your provider allows only one connection per account."
         case .guidePreview: "Preview the focused channel, muted, right in the TV Guide."
         case .sportsHub: "Follow your leagues and teams — fixtures, live scores, standings and one tap to the channel that's carrying the game."
-        case .recordingServer: "Record live TV and schedule shows from the guide on your own LumeRecorder server, then watch them on every device."
+        case .recordingServer: "Record live TV and schedule shows from the guide on your own LumeRecorder or Dispatcharr server, then watch them on every device."
         }
     }
 

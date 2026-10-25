@@ -11,7 +11,6 @@
 
 import Foundation
 @testable import Lume
-import LumeRecorderKit
 import Synchronization
 import Testing
 
@@ -104,12 +103,15 @@ struct RecordingServerStoreTests {
         )
     }
 
-    private func recording(sourceRef: String?, status: RecordingStatus, startOffset: TimeInterval = 0) -> Recording {
-        Recording(
-            id: UUID(), title: "Show", channelName: "News", channelLogoURL: nil, programmeDescription: nil,
+    private func recording(
+        sourceRef: String?,
+        status: ServerRecordingStatus,
+        startOffset: TimeInterval = 0
+    ) -> ServerRecording {
+        ServerRecording(
+            id: RecordingID(UUID()), title: "Show", channelName: "News",
             sourceRef: sourceRef, start: now.addingTimeInterval(startOffset),
-            end: now.addingTimeInterval(startOffset + 3600), status: status,
-            failureReason: nil, createdAt: now, startedAt: nil, finishedAt: nil, durationSeconds: nil, sizeBytes: nil
+            end: now.addingTimeInterval(startOffset + 3600), status: status, createdAt: now
         )
     }
 
@@ -230,7 +232,7 @@ struct RecordingServerStoreTests {
         #expect(created.request.channelName == "News")
         #expect(created.request.programmeDescription == "Headlines")
         #expect(created.request.channelLogoURL?.absoluteString == "http://example.com/logo.png")
-        #expect(created.request.streamURL.absoluteString.hasSuffix("/live/user/pass/42.m3u8"))
+        #expect(created.request.streamURL?.absoluteString.hasSuffix("/live/user/pass/42.m3u8") == true)
         #expect(UUID(uuidString: created.key) != nil)
         #expect(harness.store.recordings.contains { $0.id == recording.id })
     }
@@ -331,8 +333,8 @@ struct RecordingServerStoreTests {
         await #expect(throws: RecordingActionError.unsupportedSource) {
             try await harness.store.recordNow(stream: stream(), playlist: webdav, programme: nil, duration: .oneHour)
         }
-        #expect(!harness.store.supportsScheduling(webdav.sourceType))
-        #expect(harness.store.supportsRecording(xtream().sourceType))
+        #expect(!harness.store.supportsScheduling(stream(), in: RecordingPlaylistSource(playlist: webdav)))
+        #expect(harness.store.supportsRecording(stream(), in: RecordingPlaylistSource(playlist: xtream())))
     }
 
     // MARK: Stop / delete
@@ -359,7 +361,7 @@ struct RecordingServerStoreTests {
         #expect(harness.store.recordings.isEmpty)
 
         harness.backend.state.withLock { $0.failure = .notFound }
-        try await harness.store.delete(id: UUID())
+        try await harness.store.delete(id: RecordingID(UUID()))
     }
 
     // MARK: Errors
@@ -375,7 +377,7 @@ struct RecordingServerStoreTests {
 
         harness.backend.state.withLock { $0.failure = .unauthorized }
         await #expect(throws: RecordingActionError.server(.unauthorized)) {
-            try await harness.store.stop(id: UUID())
+            try await harness.store.stop(id: RecordingID(UUID()))
         }
         #expect(harness.store.reachability.needsRepairing)
 
@@ -406,9 +408,9 @@ struct RecordingServerStoreTests {
         #expect(media.url == harness.backend.state.withLock { $0.grantURL })
         #expect(media.kind == .vod)
         #expect(media.startTime == 0)
-        #expect(media.id == "recording-\(recording.id.uuidString.lowercased())")
+        #expect(media.id == "recording-\(recording.id.rawValue.lowercased())")
         #expect(media.subtitle == "News")
-        #expect(media.contentRef == .recording(recording.id.uuidString.lowercased()))
+        #expect(media.contentRef == .recording(recording.id.rawValue.lowercased()))
         #expect(media.recordingTimeline?.end == recording.end)
     }
 
@@ -416,7 +418,7 @@ struct RecordingServerStoreTests {
         let harness = try await paired()
         let recording = recording(sourceRef: nil, status: .completed)
         RecordingProgressStore.save(
-            recordingID: recording.id.uuidString, progress: 600, duration: 3600, defaults: harness.progressDefaults
+            recordingID: recording.id.rawValue, progress: 600, duration: 3600, defaults: harness.progressDefaults
         )
 
         let media = try await harness.store.playbackMedia(for: recording)
@@ -428,7 +430,7 @@ struct RecordingServerStoreTests {
         let harness = try await paired()
         let recording = recording(sourceRef: nil, status: .recording)
         RecordingProgressStore.save(
-            recordingID: recording.id.uuidString, progress: 600, duration: 3600, defaults: harness.progressDefaults
+            recordingID: recording.id.rawValue, progress: 600, duration: 3600, defaults: harness.progressDefaults
         )
 
         let media = try await harness.store.playbackMedia(for: recording)
@@ -439,7 +441,7 @@ struct RecordingServerStoreTests {
     @Test func `deleting a recording drops its resume point`() async throws {
         let harness = try await paired()
         let recording = recording(sourceRef: nil, status: .completed)
-        let identifier = recording.id.uuidString
+        let identifier = recording.id.rawValue
         RecordingProgressStore.save(recordingID: identifier, progress: 600, duration: 3600, defaults: harness.progressDefaults)
 
         try await harness.store.delete(id: recording.id)
@@ -515,5 +517,12 @@ struct RecordingServerStoreTests {
         #expect(harness.store.activeRecording(forSourceRef: ref)?.status == .recording)
         #expect(harness.store.activeRecording(for: channel, in: playlist)?.status == .recording)
         #expect(harness.store.activeRecording(forSourceRef: RecordingSourceRef(playlistID: UUID(), streamID: "none")) == nil)
+    }
+}
+
+private extension RecordingCreateRequest {
+    var streamURL: URL? {
+        guard case let .streamURL(url) = target else { return nil }
+        return url
     }
 }
