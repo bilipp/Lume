@@ -109,6 +109,21 @@ func playerCheckmarkLabel(verbatim title: String, checked: Bool) -> some View {
     }
 }
 
+/// A track-menu entry with a verbatim second line under the title. The checked
+/// entry lists its pieces flat too: menus drop a second Text nested in a
+/// `Label` title, which would lose the subtitle on exactly the current row.
+@ViewBuilder
+func playerCheckmarkLabel(_ title: Text, verbatimSubtitle subtitle: String, checked: Bool) -> some View {
+    if checked {
+        Image(systemName: "checkmark")
+        title
+        Text(verbatim: subtitle)
+    } else {
+        title
+        Text(verbatim: subtitle)
+    }
+}
+
 extension View {
     /// VoiceOver label and value for a track menu: the enabled track's own
     /// name, or the menu's own no-selection wording.

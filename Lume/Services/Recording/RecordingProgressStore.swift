@@ -4,12 +4,14 @@
 //
 //  Where a recording was left off, per device. Recordings are not catalog
 //  rows, so their resume point lives in UserDefaults under
-//  `recordingProgress.<recordingID>` — written once when a playback session
-//  ends, read when the next one starts.
+//  `recordingProgress.<identifier>` — written once when a playback session
+//  ends, read when the next one starts. A LumeRecorder identifier is the bare
+//  recording UUID (the keys earlier builds wrote); a Dispatcharr id is a small
+//  integer only unique per server, so it is prefixed with its server's
+//  namespace (`dispatcharr-<serverID>-<id>`).
 //
 
 import Foundation
-import LumeRecorderKit
 
 nonisolated enum RecordingProgressStore {
     static let keyPrefix = "recordingProgress."
@@ -22,8 +24,25 @@ nonisolated enum RecordingProgressStore {
         keyPrefix + recordingID.lowercased()
     }
 
-    static func identifier(for recordingID: UUID) -> String {
-        recordingID.uuidString.lowercased()
+    static let dispatcharrNamespacePrefix = "dispatcharr-"
+
+    /// The namespace a server's recording ids are keyed under; `nil` for a
+    /// LumeRecorder server, whose ids are globally unique UUIDs.
+    static func namespace(kind: RecordingServerKind, serverID: UUID) -> String? {
+        switch kind {
+        case .lumeRecorder: nil
+        case .dispatcharr: dispatcharrNamespacePrefix + serverID.uuidString.lowercased()
+        }
+    }
+
+    static func identifier(for recordingID: RecordingID, namespace: String? = nil) -> String {
+        guard let namespace else { return recordingID.rawValue.lowercased() }
+        return "\(namespace)-\(recordingID.rawValue)".lowercased()
+    }
+
+    /// Whether `identifier` names a recording on a Dispatcharr server.
+    static func isDispatcharr(_ identifier: String) -> Bool {
+        identifier.hasPrefix(dispatcharrNamespacePrefix)
     }
 
     /// The stored position for `recordingID`, or 0 when there is none.
@@ -33,9 +52,13 @@ nonisolated enum RecordingProgressStore {
 
     /// Where playback of `recording` should open. A recording still being
     /// written opens at its start, since its duration keeps growing.
-    static func resumePosition(for recording: Recording, defaults: UserDefaults = .standard) -> TimeInterval {
+    static func resumePosition(
+        for recording: ServerRecording,
+        namespace: String? = nil,
+        defaults: UserDefaults = .standard
+    ) -> TimeInterval {
         guard !recording.status.isPending else { return 0 }
-        return position(for: identifier(for: recording.id), defaults: defaults)
+        return position(for: identifier(for: recording.id, namespace: namespace), defaults: defaults)
     }
 
     /// Stores `progress` at the end of a session. A non-positive position is

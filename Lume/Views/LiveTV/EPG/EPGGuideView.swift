@@ -18,8 +18,9 @@ import SwiftUI
 /// The defaults leave the preview off, as every other platform has it.
 struct EPGGuidePreviewInputs {
     var media: (LiveStream) -> PlayableMedia? = { _ in nil }
-    /// The playlists whose content sync or guide refresh pauses the preview:
-    /// the one shown, or every Combined member contributing Live TV.
+    /// The playlists the guide shows: the one selected, or every Combined
+    /// member contributing Live TV. Their content sync or guide refresh pauses
+    /// the preview, and whether any records decides the hint's wording.
     var playlistIDs: [UUID] = []
     /// A reference, so its changes re-render only the preview band.
     var controller: GuidePreviewController?
@@ -121,6 +122,7 @@ struct EPGGuideView: View {
                     onDidClaimFocus: onDidClaimFocus,
                     preview: preview
                 )
+                .timelineLayoutDirection()
             }
         }
         // Reload when the channel set changes or a guide import settles. Keyed on

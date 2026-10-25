@@ -29,6 +29,10 @@ enum RecordingServerSetup {
         String(localized: "To record, Lume sends the recording server the stream address the player uses. For Xtream playlists it includes your provider username and password.")
     }
 
+    static var dispatcharrDisclosure: String {
+        String(localized: "To record from a Dispatcharr server, Lume sends it only the channel's Dispatcharr ID and the programme's details.")
+    }
+
     static var connectionNote: String {
         String(localized: "The server fetches the stream from its own IP address, so if your provider allows only one connection at a time, a recording may fail while you're watching.")
     }
@@ -66,10 +70,10 @@ enum RecordingServerSetup {
         String(localized: "Lume can't search the local network. Allow Local Network access for Lume in the system settings, or enter the server's address manually.")
     }
 
-    static func diskSummary(_ status: ServerStatus?) -> String {
-        guard let status else { return "—" }
-        let free = status.freeDiskBytes.formatted(.byteCount(style: .file))
-        let total = status.totalDiskBytes.formatted(.byteCount(style: .file))
+    static func diskSummary(_ status: RecordingServerStatus?) -> String {
+        guard let freeBytes = status?.freeDiskBytes, let totalBytes = status?.totalDiskBytes else { return "—" }
+        let free = freeBytes.formatted(.byteCount(style: .file))
+        let total = totalBytes.formatted(.byteCount(style: .file))
         return String(
             localized: "\(free) free of \(total)",
             comment: "Recording server disk space: free bytes, then total bytes (e.g. “120 GB free of 500 GB”)."
@@ -126,7 +130,7 @@ final class RecordingServerPairingModel {
 
     var address = ""
     var code = ""
-    private(set) var info: ServerInfo?
+    private(set) var info: ServerIdentity?
     private(set) var checkedURL: URL?
     private(set) var isChecking = false
     private(set) var isPairing = false
@@ -154,8 +158,8 @@ final class RecordingServerPairingModel {
     @discardableResult
     func connectToAddress() async -> Bool {
         errorMessage = nil
-        guard let baseURL = LumeRecorderClient.normalizedBaseURL(from: address) else {
-            errorMessage = RecordingServerError.invalidAddress.localizedDescription
+        guard let baseURL = RecordingServerKind.lumeRecorder.normalizedBaseURL(from: address) else {
+            errorMessage = RecordingServerError.invalidAddress(.lumeRecorder).localizedDescription
             return false
         }
         return await check(baseURL)
@@ -209,7 +213,7 @@ final class RecordingServerConnectionModel {
         case failure(String)
     }
 
-    private(set) var info: ServerInfo?
+    private(set) var info: ServerIdentity?
     private(set) var isTesting = false
     private(set) var testResult: TestResult?
     private(set) var isRemoving = false
@@ -219,17 +223,17 @@ final class RecordingServerConnectionModel {
     }
 
     func loadInfo(for server: RecordingServerConfig) async {
-        guard let baseURL = server.endpoint?.baseURL else { return }
-        info = try? await store.serverInfo(baseURL: baseURL)
+        guard let endpoint = server.endpoint else { return }
+        info = try? await store.serverInfo(for: endpoint)
     }
 
     func testConnection(to server: RecordingServerConfig) async {
-        guard !isTesting, let baseURL = server.endpoint?.baseURL else { return }
+        guard !isTesting, let endpoint = server.endpoint else { return }
         isTesting = true
         testResult = nil
         defer { isTesting = false }
         do {
-            info = try await store.serverInfo(baseURL: baseURL)
+            info = try await store.serverInfo(for: endpoint)
         } catch {
             testResult = .failure(error.localizedDescription)
             return

@@ -154,7 +154,7 @@
                         Spacer(minLength: 0)
                         Text("Teams")
                             .font(.system(size: TVSettingsMetrics.secondaryFontSize, weight: .medium))
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.system(size: 22, weight: .semibold))
                     }
                 }

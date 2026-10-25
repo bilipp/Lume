@@ -63,6 +63,8 @@ import SwiftUI
                     tvPremiumToggleRow("Show Skip Intro Button", isOn: $showSkipIntroButton, feature: .playbackControls)
                 }
 
+                TVSourcesSettingsSection()
+
                 // Second in the pane, right under Playback: this is a
                 // viewer-facing playback preference (and the one that otherwise
                 // costs a menu trip on every zap), where everything under
@@ -70,14 +72,14 @@ import SwiftUI
                 // technical setup touched once.
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Languages")
-                    tvDrillInRow("Audio Languages") { preferredLanguagePane = .list }
+                    tvDrillInRow("Audio Languages", opens: .audioLanguages) { preferredLanguagePane = .list }
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Subtitles")
-                    tvDrillInRow("Subtitle Style") { showingSubtitleStyle = true }
+                    tvDrillInRow("Subtitle Style", opens: .subtitleStyle) { showingSubtitleStyle = true }
                     if OpenSubtitlesService.shared.isConfigured {
-                        tvDrillInRow(label: Text(verbatim: "OpenSubtitles")) { showingOpenSubtitles = true }
+                        tvDrillInRow(label: Text(verbatim: "OpenSubtitles"), opens: .openSubtitles) { showingOpenSubtitles = true }
                     }
                 }
 
@@ -102,6 +104,8 @@ import SwiftUI
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                         .padding(.top, 6)
+
+                    TVLiveQualitySwitchRow()
                 }
 
                 // Its own section rather than a row under Live TV: it governs
@@ -125,7 +129,7 @@ import SwiftUI
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Advanced")
 
-                    tvDrillInRow("Engines") { showingEngines = true }
+                    tvDrillInRow("Engines", opens: .engines) { showingEngines = true }
 
                     TVOptionCycleRow(
                         title: "External Player",
@@ -185,7 +189,9 @@ import SwiftUI
                     TVSettingsSectionLabel("Options")
                     VStack(spacing: 2) {
                         ForEach([PlayerEngineKind.ksPlayer, .vlcKit, .lumeEngine]) { engine in
-                            tvDrillInRow(label: Text(verbatim: engine.displayName)) { selectedEngineOptions = engine }
+                            tvDrillInRow(label: Text(verbatim: engine.displayName), opens: .engineOptions(engine)) {
+                                selectedEngineOptions = engine
+                            }
                         }
                     }
                     Text("AVPlayer has no configurable options.")
@@ -199,22 +205,27 @@ import SwiftUI
         }
 
         /// A row that replaces the current detail with a deeper one in place.
-        /// Returning focus to the sidebar (Menu) restores the top level.
-        private func tvDrillInRow(_ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
-            tvDrillInRow(label: Text(title), action: action)
+        /// Menu there comes back to this row (`opens`).
+        private func tvDrillInRow(
+            _ title: LocalizedStringKey,
+            opens drillIn: TVSettingsDrillIn,
+            action: @escaping () -> Void
+        ) -> some View {
+            tvDrillInRow(label: Text(title), opens: drillIn, action: action)
         }
 
-        private func tvDrillInRow(label: Text, action: @escaping () -> Void) -> some View {
+        private func tvDrillInRow(label: Text, opens drillIn: TVSettingsDrillIn, action: @escaping () -> Void) -> some View {
             Button(action: action) {
                 HStack(spacing: 16) {
                     label
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
             }
             .buttonStyle(TVSettingsRowButtonStyle())
+            .focused($drillInFocus, equals: drillIn)
         }
 
         /// One row of the tvOS engine-priority list: the engine name, a "Primary"
@@ -307,12 +318,13 @@ import SwiftUI
                         HStack(spacing: 16) {
                             Text("Add Language")
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
                     .buttonStyle(TVSettingsRowButtonStyle())
+                    .focused($drillInFocus, equals: .addLanguage)
 
                     Text(tvPreferredLanguageFooter)
                         .font(.system(size: 20))
@@ -400,6 +412,44 @@ import SwiftUI
                 }
             }
             .buttonStyle(TVSettingsRowButtonStyle())
+        }
+    }
+
+    /// The Sources toggle, holding its own setting so `SettingsView` stays
+    /// within the line-count cap.
+    private struct TVSourcesSettingsSection: View {
+        @AppStorage(PlayerSettings.Playback.chooseSourceBeforePlayingKey)
+        private var chooseSourceBeforePlaying = PlayerSettings.Playback.chooseSourceBeforePlayingDefault
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                TVSettingsSectionLabel("Sources")
+
+                TVOptionToggleRow(title: "Choose Source Before Playing", isOn: $chooseSourceBeforePlaying)
+
+                Text("When a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the server's first version.")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.top, 6)
+            }
+        }
+    }
+
+    /// The Show Quality Switch toggle, holding its own setting so `SettingsView`
+    /// stays within the line-count cap.
+    private struct TVLiveQualitySwitchRow: View {
+        @AppStorage(PlayerSettings.Playback.liveQualitySwitchKey)
+        private var liveQualitySwitch = PlayerSettings.Playback.liveQualitySwitchDefault
+
+        var body: some View {
+            TVOptionToggleRow(title: "Show Quality Switch", isOn: $liveQualitySwitch)
+
+            Text("While watching a live channel, switch to the same channel in another quality, such as HD, FHD or 4K, when your playlist lists it more than once.")
+                .font(.system(size: 20))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                .padding(.top, 6)
         }
     }
 

@@ -1,17 +1,18 @@
 //
-//  TVLiveTVBackground.swift
+//  TVAmbientBackground.swift
 //  Lume
 //
-//  The tvOS Live TV backdrop: a near-black fill lit from the top right by a
-//  soft glow in the settled channel's logo colour, darkened towards the
-//  bottom so the guide stays legible. Drawn with gradients rather than a
+//  The tvOS backdrop of Live TV and Settings: a near-black fill lit from the
+//  top right by a soft glow — in the settled channel's logo colour in the
+//  guide, the Live TV accent elsewhere — darkened towards the bottom so the
+//  content stays legible. Drawn with gradients rather than a
 //  runtime blur, so it costs nothing per frame.
 //
 
 #if os(tvOS)
     import SwiftUI
 
-    struct TVLiveTVBackground: View {
+    struct TVAmbientBackground: View {
         /// `nil` paints the Live TV accent; only this view reads its glow.
         let hero: GuideHeroModel?
 

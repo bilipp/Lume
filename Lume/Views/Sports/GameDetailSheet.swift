@@ -22,6 +22,9 @@ struct GameDetailSheet: View {
     /// fixture itself.
     let resolved: [ResolvedChannel]
     var onWatch: (ResolvedChannel) -> Void
+    /// The channel just watched, marked when closing the player reopens this
+    /// game (or, on macOS, while its player window is open).
+    var lastWatchedChannelID: String?
     var provider: any SportsDataProvider = ESPNClient.shared
 
     @Environment(\.dismiss) private var dismiss
@@ -333,7 +336,7 @@ struct GameDetailSheet: View {
         } label: {
             HStack(spacing: 12) {
                 ChannelLogo(urlString: channel.stream.streamIcon, size: 36)
-                SportsChannelLabel(channel: channel)
+                SportsChannelLabel(channel: channel, isLastWatched: channel.id == lastWatchedChannelID)
                 Spacer(minLength: 8)
                 Label("Watch", systemImage: "play.fill")
                     .labelStyle(.titleAndIcon)
@@ -350,7 +353,7 @@ struct GameDetailSheet: View {
         Button {
             onWatch(channel)
         } label: {
-            SportsChannelRow(channel: channel)
+            SportsChannelRow(channel: channel, isLastWatched: channel.id == lastWatchedChannelID)
         }
         .buttonStyle(.plain)
         .accessibilityHint(Text("Watch on \(channel.stream.name)"))

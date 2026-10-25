@@ -4,7 +4,8 @@
 //
 //  The tvOS Home settings pane: each Home row can be switched on or off and
 //  reordered with up / down controls. Mirrors the engine priority pane
-//  (SettingsView+TVPlayer) and the iOS HomeLayoutSettingsView.
+//  (SettingsView+TVPlayer) and the iOS HomeLayoutSettingsView. The Top Shelf
+//  settings follow below (`TVTopShelfSettingsSection`).
 //
 
 import SwiftUI
@@ -90,6 +91,9 @@ import SwiftUI
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                     .padding(.top, 6)
+
+                TVTopShelfSettingsSection()
+                    .padding(.top, 24)
             }
         }
 

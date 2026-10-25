@@ -31,10 +31,10 @@ struct MainTabView: View {
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
     @State private var router = DeepLinkRouter()
 
-    /// The stream a `lume://resume` deep link asked to
-    /// reopen. Presented directly here, independent of any tab's own player
-    /// cover.
-    @State private var resumeMedia: PlayableMedia?
+    /// The stream a `lume://resume` or `lume://play/...` (widget, Top Shelf)
+    /// deep link asked to open. Presented directly here — the link can arrive
+    /// on any tab — independent of any tab's own player cover.
+    @State private var linkedMedia: PlayableMedia?
 
     /// Whether a `lume://downloads` deep link (a download Live Activity tap)
     /// asked for the downloads list. Presented as a sheet from here rather than
@@ -142,12 +142,13 @@ struct MainTabView: View {
             }
         #if os(iOS)
             .tabBarMinimizeOnScrollDownIfAvailable()
+            .castMiniController { linkedMedia = $0 }
         #endif
             .onOpenURL { url in
                 handleDeepLink(url)
             }
         #if !os(macOS)
-            .fullScreenCover(item: $resumeMedia) { media in
+            .fullScreenCover(item: $linkedMedia) { media in
                 FullScreenPlayerView(media: media)
             }
         #endif
@@ -366,7 +367,7 @@ struct MainTabView: View {
                     }
                 } else {
                     Tab(value: AppTab.search, role: .search) {
-                        SearchView()
+                        SearchView().castMiniControllerInset()
                     } label: {
                         Label("Search", systemImage: "magnifyingglass")
                     }
@@ -379,21 +380,21 @@ struct MainTabView: View {
 
     /// Resolves a `lume://movie/{tmdbId}` / `lume://series/{tmdbId}` link to a
     /// catalog item, switches to the matching tab and pushes its detail screen.
-    /// Silently ignores unknown links and titles not present in the catalog
-    /// (e.g. a tmdbId that was never synced or enriched).
+    /// `play`/`open` links (from widgets and the Top Shelf) launch playback or
+    /// a detail screen by catalog id. Silently ignores unknown links and titles
+    /// not present in the catalog (e.g. a tmdbId that was never synced or
+    /// enriched).
     private func handleDeepLink(_ url: URL) {
         guard let link = DeepLink(url: url) else { return }
         switch link {
         case let .movie(tmdbId):
-            guard showsTab(.movies), let movie = resolveMovie(tmdbId: tmdbId) else { return }
-            router.selectedTab = .movies
-            router.moviesPath = NavigationPath()
-            router.moviesPath.append(movie)
+            guard let movie = resolveMovie(tmdbId: tmdbId) else { return }
+            openMovieDetail(movie)
         case let .series(tmdbId):
-            guard showsTab(.series), let series = resolveSeries(tmdbId: tmdbId) else { return }
-            router.selectedTab = .series
-            router.seriesPath = NavigationPath()
-            router.seriesPath.append(series)
+            guard let series = resolveSeries(tmdbId: tmdbId) else { return }
+            openSeriesDetail(series)
+        case .playMovie, .playEpisode, .playLive, .openSeries, .openMovie:
+            handleWidgetLink(link)
         case .resume:
             // When a player session is already up, foregrounding the app is
             // all that's needed; otherwise reopen the last played stream where
@@ -403,12 +404,52 @@ struct MainTabView: View {
             #if os(macOS)
                 MacPlayerWindowRouter.shared.play(media, using: openWindow)
             #else
-                resumeMedia = media
+                linkedMedia = media
             #endif
         case .downloads:
             // The download Live Activity was tapped.
             showsDownloads = true
         }
+    }
+
+    /// Handles a widget / Top Shelf link: `play` launches playback, `open`
+    /// pushes a movie or series detail screen — both by catalog id.
+    private func handleWidgetLink(_ link: DeepLink) {
+        switch WidgetLinkResolver.resolve(link, in: modelContext, restriction: contentRestriction) {
+        case let .play(media):
+            // Mirrors the in-app play paths: external player hand-off first,
+            // then a player window (macOS) or a full-screen cover.
+            if ExternalPlayback.open(media) { return }
+            #if os(macOS)
+                MacPlayerWindowRouter.shared.play(media, using: openWindow)
+            #else
+                linkedMedia = media
+            #endif
+        case let .openSeries(series):
+            openSeriesDetail(series)
+        case let .openMovie(movie):
+            openMovieDetail(movie)
+        case nil:
+            break
+        }
+    }
+
+    /// Pushes a movie detail screen on the Movies tab — a no-op when the
+    /// profile hides that tab.
+    private func openMovieDetail(_ movie: Movie) {
+        guard showsTab(.movies) else { return }
+        router.selectedTab = .movies
+        router.moviesPath = NavigationPath()
+        router.moviesPath.append(movie)
+    }
+
+    /// Pushes a series detail screen on the Series tab — a no-op when the
+    /// profile hides that tab.
+    private func openSeriesDetail(_ series: Series) {
+        guard showsTab(.series) else { return }
+        router.selectedTab = .series
+        router.seriesPath = NavigationPath()
+        router.seriesPath.append(series)
     }
 
     /// Finds a movie by `tmdbId`, preferring a copy from the playlists on

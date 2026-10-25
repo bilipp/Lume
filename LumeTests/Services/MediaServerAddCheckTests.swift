@@ -2,8 +2,8 @@
 //  MediaServerAddCheckTests.swift
 //  LumeTests
 //
-//  The media-server entry point: URL auto-detection (Jellyfin, Emby, Plex and
-//  WebDAV) and the failure copy. Detection probes are stubbed per host; which failure gets
+//  The media-server entry point: URL auto-detection (Jellyfin, Emby, Plex,
+//  Silo and WebDAV) and the failure copy. Detection probes are stubbed per host; which failure gets
 //  which copy is asserted through `MediaServerAddCheck.message`, which
 //  delegates to the per-kind checks for everything they already distinguish.
 //
@@ -361,11 +361,113 @@ struct MediaServerAddCheckTests {
         #expect(error == .missingCredentials)
     }
 
+    // MARK: - Silo
+
+    /// The replies of a Silo server's own API on `host`, with its web app
+    /// answering the Jellyfin probe path the way an SPA does.
+    private func siloReplies(publicURL: String, enabled: Bool = true, pendingRestart: Bool = false) -> [String: MediaServerStubProtocol.Reply] {
+        [
+            "GET /System/Info/Public": .init(status: 200, body: "<!doctype html><title>Silo</title>"),
+            "GET /api/v2/system/info": .init(status: 200, body: """
+            {"server_version": "aa8b53eb", "api_major": 2, "contract_digest": "x",
+             "links": {"openapi": "/api/v2/openapi.json", "capabilities": "/api/v2/capabilities", "identity": "/api/v2/system/identity"}}
+            """),
+            "POST /api/v2/auth/login": .init(status: 200, body: """
+            {"access_token": "native", "refresh_token": "r", "expires_in": 3600, "user": {"id": "1"}}
+            """),
+            "GET /api/v2/compat/connect-info": .init(status: 200, body: """
+            {"jellyfin": {"enabled": \(enabled), "pending_restart": \(pendingRestart), "public_url": "\(publicURL)", "server_name": "Silo"},
+             "account": {"password_login_available": true}}
+            """, requiresAuth: true),
+            "POST /api/v2/auth/logout": .init(status: 204, body: "")
+        ]
+    }
+
+    @Test func `a Silo server is detected and logged into through its Jellyfin compatibility`() async throws {
+        let siloHost = host("silo")
+        let compatHost = host("silocompat")
+        defer {
+            MediaServerStubProtocol.remove(host: siloHost)
+            MediaServerStubProtocol.remove(host: compatHost)
+        }
+        MediaServerStubProtocol.install(host: siloHost, replies: siloReplies(publicURL: "http://\(compatHost):8097"))
+        MediaServerStubProtocol.install(host: compatHost, replies: [
+            "GET /System/Info/Public": .init(status: 200, body: """
+            {"ServerName": "Silo", "Version": "12.1.0", "ProductName": "Jellyfin Server", "Id": "b2d9"}
+            """),
+            "POST /Users/AuthenticateByName": .init(status: 200, body: """
+            {"AccessToken": "tok", "User": {"Id": "user1"}}
+            """)
+        ])
+
+        let verified = try await MediaServerAddCheck.verify(input(url: "http://\(siloHost):8095/"), urlSession: stubSession())
+        guard case let .mediaServer(serverURL, flavor, session) = verified else {
+            Issue.record("Expected .mediaServer, got \(verified)")
+            return
+        }
+        #expect(flavor == .silo)
+        // The compatible service's address is what the sync talks to.
+        #expect(serverURL == "http://\(compatHost):8097")
+        #expect(session.accessToken == "tok")
+        #expect(session.userId == "user1")
+    }
+
+    @Test func `a Silo server with Jellyfin compatibility off says so`() async throws {
+        let siloHost = host("silooff")
+        defer { MediaServerStubProtocol.remove(host: siloHost) }
+        MediaServerStubProtocol.install(host: siloHost, replies: siloReplies(publicURL: "", enabled: false))
+
+        let error = await #expect(throws: SiloError.self) {
+            _ = try await MediaServerAddCheck.verify(input(url: "http://\(siloHost):8095"), urlSession: stubSession())
+        }
+        guard case .compatDisabled = error else {
+            Issue.record("Expected .compatDisabled, got \(String(describing: error))")
+            return
+        }
+    }
+
+    /// A loopback public URL is retried on the entered host; when nothing
+    /// answers there either, the copy points at the public-URL setting.
+    @Test func `an unreachable Silo compatibility service reports it`() async throws {
+        let siloHost = host("silonone")
+        defer { MediaServerStubProtocol.remove(host: siloHost) }
+        MediaServerStubProtocol.install(host: siloHost, replies: siloReplies(publicURL: "http://127.0.0.1:8097"))
+
+        let error = await #expect(throws: SiloError.self) {
+            _ = try await MediaServerAddCheck.verify(input(url: "http://\(siloHost):8095"), urlSession: stubSession())
+        }
+        guard case .compatUnreachable = error else {
+            Issue.record("Expected .compatUnreachable, got \(String(describing: error))")
+            return
+        }
+    }
+
+    @Test func `an unreachable Silo compatibility service points at the public URL setting`() {
+        let copy = MediaServerAddCheck.message(for: SiloError.compatUnreachable, input: input(url: "http://silo.local:8095"), timedOut: false)
+        #expect(copy.localizedCaseInsensitiveContains("public URL"))
+    }
+
+    @Test func `a wrong Silo password is reported before the compatibility lookup`() async throws {
+        let siloHost = host("silobad")
+        defer { MediaServerStubProtocol.remove(host: siloHost) }
+        var replies = siloReplies(publicURL: "")
+        replies["POST /api/v2/auth/login"] = .init(status: 401, body: #"{"title": "Invalid token", "status": 401}"#)
+        MediaServerStubProtocol.install(host: siloHost, replies: replies)
+
+        let error = await #expect(throws: SiloError.self) {
+            _ = try await MediaServerAddCheck.verify(input(url: "http://\(siloHost):8095"), urlSession: stubSession())
+        }
+        guard case .unauthorized = error else {
+            Issue.record("Expected .unauthorized, got \(String(describing: error))")
+            return
+        }
+    }
+
     // MARK: - Copy
 
     @Test func `unsupported names every server kind`() {
         let copy = MediaServerAddCheck.message(for: MediaServerError.unsupported, input: input(url: "http://example.com/"), timedOut: false)
-        for kind in ["Jellyfin", "Emby", "Plex", "WebDAV"] {
+        for kind in ["Jellyfin", "Emby", "Plex", "Silo", "WebDAV"] {
             #expect(copy.localizedCaseInsensitiveContains(kind), "copy should name \(kind): \(copy)")
         }
     }

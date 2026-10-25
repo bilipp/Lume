@@ -30,6 +30,7 @@ struct EPGGrid: View, Equatable {
     let scrollRequest: EPGScrollRequest?
     let virtualFocus: EPGVirtualFocus?
     let onPlay: (EPGChannelRow, EPGProgramCell) -> Void
+    let onWatchFromStart: (EPGChannelRow, EPGProgramCell) -> Void
     let onShowDetails: (EPGChannelRow, EPGProgramCell) -> Void
 
     static func == (lhs: Self, rhs: Self) -> Bool {
@@ -68,6 +69,7 @@ struct EPGGrid: View, Equatable {
                 dataVersion: dataVersion,
                 virtualFocus: virtualFocus,
                 onPlay: onPlay,
+                onWatchFromStart: onWatchFromStart,
                 onShowDetails: onShowDetails
             )
             .equatable()

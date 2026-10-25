@@ -52,6 +52,43 @@ final class ActiveDownload: Identifiable {
     }
 }
 
+/// Where finished downloads live, and how a catalog row's `localFileURL`
+/// resolves to the file on disk.
+nonisolated enum DownloadStorage {
+    static var directory: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Downloads", isDirectory: true)
+    }
+
+    /// The downloaded file a stored `localFileURL` refers to, if it is on disk.
+    ///
+    /// Only the last path component is trusted. Rows written before this fix
+    /// hold an absolute path, and iOS moves the app's data container to a new
+    /// UUID on every app update: the file moves with it, the stored path does
+    /// not. Checking that stale path made every download look missing, and
+    /// playback silently streamed the provider URL instead, which fails offline.
+    /// New rows store just the filename.
+    static func file(forStored stored: String?) -> URL? {
+        guard let stored, !stored.isEmpty else { return nil }
+        let file = directory.appendingPathComponent((stored as NSString).lastPathComponent)
+        return FileManager.default.fileExists(atPath: file.path) ? file : nil
+    }
+}
+
+extension Movie {
+    /// The finished download to play instead of streaming, if it is on disk.
+    var downloadedFile: URL? {
+        downloadStatus == .completed ? DownloadStorage.file(forStored: localFileURL) : nil
+    }
+}
+
+extension Episode {
+    /// The finished download to play instead of streaming, if it is on disk.
+    var downloadedFile: URL? {
+        downloadStatus == .completed ? DownloadStorage.file(forStored: localFileURL) : nil
+    }
+}
+
 struct PendingDownload {
     let id: String
     let title: String

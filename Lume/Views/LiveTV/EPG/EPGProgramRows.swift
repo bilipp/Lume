@@ -28,6 +28,7 @@ struct EPGRows: View, Equatable {
     let dataVersion: Int
     let virtualFocus: EPGVirtualFocus?
     let onPlay: (EPGChannelRow, EPGProgramCell) -> Void
+    let onWatchFromStart: (EPGChannelRow, EPGProgramCell) -> Void
     let onShowDetails: (EPGChannelRow, EPGProgramCell) -> Void
 
     static func == (lhs: Self, rhs: Self) -> Bool {
@@ -68,6 +69,7 @@ struct EPGRows: View, Equatable {
                     now: now,
                     sync: sync,
                     onPlay: { cell in onPlay(entry.row, cell) },
+                    onWatchFromStart: { cell in onWatchFromStart(entry.row, cell) },
                     onShowDetails: { cell in onShowDetails(entry.row, cell) }
                 )
                 .equatable()
@@ -116,7 +118,7 @@ struct EPGRows: View, Equatable {
 /// views — the guide's focusable surface interprets the remote, and `EPGRows`
 /// draws the focused card over them. On touch/pointer platforms each
 /// block is a button: a tap plays, a hold or right-click opens its context
-/// menu — watch, record, details.
+/// menu — watch, watch from start, record, details.
 ///
 /// Cells are placed at their exact timeline offset, and only the ones inside
 /// the shared realization window (plus one neighbour on each side, so
@@ -130,6 +132,7 @@ struct EPGProgramStrip: View, Equatable {
     /// Observed for `window` only (per-property tracking).
     let sync: EPGScrollSync
     let onPlay: (EPGProgramCell) -> Void
+    let onWatchFromStart: (EPGProgramCell) -> Void
     let onShowDetails: (EPGProgramCell) -> Void
 
     static func == (lhs: Self, rhs: Self) -> Bool {
@@ -174,6 +177,13 @@ struct EPGProgramStrip: View, Equatable {
         // Snapshot-based: cell realization runs mid-scroll, where a SwiftData
         // model read could fault to SQLite on the main thread.
         !cell.isGap && cell.isPast(at: now) && row.isReplayable(start: cell.start, now: now)
+    }
+
+    /// The programme on air, restartable from the archive. Kept apart from
+    /// `canReplay`, which marks a finished programme's tile and makes a tap
+    /// replay it; a tap on the one on air still joins live.
+    static func canWatchFromStart(_ cell: EPGProgramCell, in row: EPGChannelRow, now: Date) -> Bool {
+        cell.isLive(at: now) && row.isReplayable(start: cell.start, now: now)
     }
 
     #if os(tvOS)
@@ -221,6 +231,14 @@ struct EPGProgramStrip: View, Equatable {
                     Label("Watch", systemImage: "play.fill")
                 } else {
                     Label("Watch Live", systemImage: "play.fill")
+                }
+            }
+
+            if Self.canWatchFromStart(cell, in: row, now: now) {
+                Button {
+                    onWatchFromStart(cell)
+                } label: {
+                    Label("Watch from Start", systemImage: "gobackward")
                 }
             }
 

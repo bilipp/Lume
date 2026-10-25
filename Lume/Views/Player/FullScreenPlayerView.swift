@@ -54,7 +54,7 @@ struct FullScreenPlayerView: View {
     /// so AirPlay would carry only their audio), so while a route is active the
     /// stream is driven through the AVPlayer engine regardless of the user's
     /// engine preference. See `engine` / `castService`.
-    @State private var castService = CastService.shared
+    @State var castService = CastService.shared
     @State private var indexingHoldOwner = "full-screen-\(UUID().uuidString)"
 
     /// Ids of streams AVPlayer couldn't start while casting over AirPlay (a codec
@@ -72,7 +72,8 @@ struct FullScreenPlayerView: View {
     /// but never reads in its own body, so playback ticks invalidate just the
     /// scrubber/time labels rather than re-rendering the whole player tree. See
     /// `PlaybackClock`.
-    @State var clock = PlaybackClock()
+    @State var clock: PlaybackClock
+    @State var castSession: PlayerCastSession
 
     /// Writes watch progress on a private background `ModelContext`. Saving on
     /// the main context mid-playback hitches KSPlayer's render loop, so the
@@ -95,14 +96,18 @@ struct FullScreenPlayerView: View {
 
     /// Set when Stalker `create_link` resolution fails, so the host shows the
     /// failure overlay instead of an endless spinner.
-    @State private var resolveError: String?
+    @State var resolveError: String?
+
+    /// The Jellyfin/Emby version being looked up, chosen or played — see
+    /// `FullScreenPlayerView+Sources`.
+    @State var sourceSession = PlayerSourceSession()
 
     /// The episode queued to play after `activeMedia`, resolved whenever the
     /// active stream changes. Drives both the in-player Next Episode button and
     /// auto-advance (see `PlayerNextUpOverlay`); `nil` for movies, live channels
     /// and series finales. Read only when the player tree is (re)built, never on
     /// the per-tick clock path.
-    @State private var nextUpMedia: PlayableMedia?
+    @State var nextUpMedia: PlayableMedia?
 
     /// Intro / recap / outro windows for the active episode (from IntroDB). The
     /// openers drive the in-player Skip Intro button; the outro sets when the
@@ -141,11 +146,15 @@ struct FullScreenPlayerView: View {
     init(media: PlayableMedia, adopting handle: PreviewPlayerHandle? = nil) {
         self.media = media
         _activeMedia = State(initialValue: media)
+        (_clock, _castSession) = Self.playbackStates(adopting: media)
         let defaults = UserDefaults.standard
-        enginePriority = PlayerEnginePriority.resolve(
-            priorityRaw: defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? "",
-            legacyEngineRaw: defaults.string(forKey: PlayerSettings.engineKey)
-                ?? PlayerEngineKind.defaultValue.rawValue
+        enginePriority = PlayerEnginePriority.playable(
+            PlayerEnginePriority.resolve(
+                priorityRaw: defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? "",
+                legacyEngineRaw: defaults.string(forKey: PlayerSettings.engineKey)
+                    ?? PlayerEngineKind.defaultValue.rawValue
+            ),
+            for: media
         )
         let adoption = handle == nil ? nil : Self.previewAdoption(
             of: handle, for: media, enginePriority: enginePriority, airPlayActive: CastService.shared.isAirPlayActive
@@ -178,6 +187,7 @@ struct FullScreenPlayerView: View {
     private var isAirPlayOverride: Bool {
         castService.isAirPlayActive
             && priorityEngine != .avPlayer
+            && !activeMedia.unsupportedEngines.contains(.avPlayer)
             && !airPlayVideoUnsupported.contains(activeMedia.id)
     }
 
@@ -185,17 +195,17 @@ struct FullScreenPlayerView: View {
     /// Suppressed during an AirPlay override: the forced AVPlayer either casts or
     /// shows its error overlay, rather than looping through the fallback chain
     /// (which would only land back on engines that can't cast video).
-    private var hasFallbackEngine: Bool {
+    var hasFallbackEngine: Bool {
         !isAirPlayOverride && engineAttempt + 1 < enginePriority.count
     }
 
     /// Called by an engine when it can't start the stream. Advances to the next
     /// engine in the priority list if one is available; the engine view rebuilds
-    /// against the new engine. When the list is exhausted this is never called
-    /// (the last engine shows its own error overlay instead), so there's nothing
-    /// to do here in that case.
+    /// against the new engine. Past the last engine it is only called for a
+    /// Jellyfin/Emby version that has others to try (see `reportsStartupFailure`);
+    /// otherwise the last engine shows its own error overlay instead.
     private func fallBackToNextEngine() {
-        guard hasFallbackEngine else { return }
+        guard hasFallbackEngine else { return recoverWithAnotherSource() }
         let failed = engine
         engineAttempt += 1
         PlaybackQoE.shared.noteEngineFallback(to: engine)
@@ -244,7 +254,7 @@ struct FullScreenPlayerView: View {
             // the user sees duplicate X buttons whenever the controls are
             // visible. Only render our custom close for engines that don't
             // draw their own controls.
-            if !engine.rendersOwnControls {
+            if !engine.rendersOwnControls, !showsCastSurface {
                 closeButton
                     .padding(.top, 4)
                     .padding(.leading, 4)
@@ -258,6 +268,9 @@ struct FullScreenPlayerView: View {
         .playerOrientationLock()
         .macPlayerWindow(activeMedia: activeMedia, launchMedia: media) { switchMedia(to: $0) }
         .playerRecording(for: activeMedia)
+        .modifier(PlayerCastHandoff(host: self))
+        .modifier(PlayerSourceSwitcherHost(session: sourceSession, media: activeMedia, onPick: switchSource))
+        .modifier(PlayerQualityVariantsHost(media: activeMedia, onSelect: switchQuality))
         // Synchronous on purpose, and ahead of the `.task` below: the engine
         // coordinators report `beginStartup` / `noteEngineFallback` from their
         // own appearance, and an async baseline can land after them — which
@@ -271,7 +284,7 @@ struct FullScreenPlayerView: View {
             // Pause background indexing — its periodic saves merge into the
             // main context and hitch KSPlayer's render loop.
             ContentIndexingService.shared.suspend(for: indexingHoldOwner)
-            if adoption == nil {
+            if adoption == nil, !castSession.isCasting {
                 configureAudioSessionForPlayback()
             }
         }
@@ -334,16 +347,16 @@ struct FullScreenPlayerView: View {
             // periodic main-thread work is reading two clock values. The buffer
             // is flushed to SwiftData at safe boundaries (see `persistProgressDetached`).
             progressWriter = WatchProgressWriter(container: modelContext.container)
-            // while !Task.isCancelled {
-            //     try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
-            //     guard !Task.isCancelled else { break }
-            //     bufferProgress()
-            // }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
+                guard !Task.isCancelled else { break }
+                bufferProgress()
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             // Leaving the foreground is a safe moment to flush; covers the user
             // backgrounding the app mid-playback without closing the player.
-            if phase != .active { persistProgressDetached(force: true) }
+            if phase != .active { persistProgressDetached(force: true, leavingForeground: true) }
             #if os(tvOS)
                 // tvOS has no background playback for any engine, so a stream
                 // left running behind the Home screen just keeps buffering and
@@ -389,7 +402,12 @@ struct FullScreenPlayerView: View {
     /// For a Stalker placeholder it is the resolved copy, gated on its identity
     /// matching the active stream so a stale resolution from the previous stream
     /// never reaches the engine during a channel/episode switch.
-    private var displayMedia: PlayableMedia? {
+    var displayMedia: PlayableMedia? {
+        switch sourceSession.display(for: activeMedia) {
+        case let .ready(media): return media
+        case .pending: return nil
+        case .notSourced: break
+        }
         guard StalkerLink.isPlaceholder(activeMedia.url) else { return activeMedia }
         guard let resolvedMedia, resolvedMedia.id == activeMedia.id else { return nil }
         return resolvedMedia
@@ -397,8 +415,12 @@ struct FullScreenPlayerView: View {
 
     @ViewBuilder
     private var playerView: some View {
-        if let media = displayMedia {
+        if showsCastSurface {
+            castingSurface
+        } else if let media = displayMedia {
             engineView(for: media)
+        } else if JellyfinSourceResolver.itemId(for: activeMedia) != nil {
+            sourcePhaseView
         } else if resolveError != nil {
             // Stalker `create_link` failed — surface the failure with a retry
             // rather than spinning forever.
@@ -419,7 +441,7 @@ struct FullScreenPlayerView: View {
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
                 nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
-                reportsStartupFailure: hasFallbackEngine,
+                reportsStartupFailure: reportsStartupFailure,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia,
@@ -437,7 +459,7 @@ struct FullScreenPlayerView: View {
                 // The cast attempt keeps the full startup window: giving up
                 // early would drop slow-to-start streams to audio-only when a
                 // few more seconds would have cast them fine.
-                reportsStartupFailure: isAirPlayOverride || hasFallbackEngine,
+                reportsStartupFailure: isAirPlayOverride || reportsStartupFailure,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: handlePlaybackFailure,
                 onSelectMedia: switchMedia,
@@ -449,7 +471,7 @@ struct FullScreenPlayerView: View {
             KSPlayerEngineView(
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
                 nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours, skipSegments: skipSegments,
-                reportsStartupFailure: hasFallbackEngine,
+                reportsStartupFailure: reportsStartupFailure,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia,
@@ -461,7 +483,7 @@ struct FullScreenPlayerView: View {
                 media: media, clock: clock, mediaSwapper: mediaSwapper,
                 nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours,
                 skipSegments: skipSegments,
-                reportsStartupFailure: hasFallbackEngine,
+                reportsStartupFailure: reportsStartupFailure,
                 usesQuickStartupTimeout: hasFallbackEngine,
                 onPlaybackFailed: fallBackToNextEngine,
                 onSelectMedia: switchMedia,
@@ -469,28 +491,6 @@ struct FullScreenPlayerView: View {
             )
             .id(engineAttempt)
         }
-    }
-
-    /// Resolves the active Stalker placeholder into a playable URL. A no-op for
-    /// directly playable streams. Re-runs whenever the active stream changes
-    /// (open, channel surf, next episode), so each switch resolves a fresh,
-    /// short-lived URL.
-    private func resolveActiveMedia() async {
-        guard StalkerLink.isPlaceholder(activeMedia.url), !keepsAdoptedResolution else { return }
-        resolvedMedia = nil
-        resolveError = nil
-        do {
-            resolvedMedia = try await StalkerStreamResolver.resolve(activeMedia, container: modelContext.container)
-        } catch {
-            resolveError = error.localizedDescription
-            let detail = (error as? StalkerError)?.logDescription ?? LogRedaction.describe(error)
-            Logger.player.error("Stalker stream resolution failed: \(detail, privacy: .public)")
-        }
-    }
-
-    private func retryResolve() {
-        engineAttempt = 0
-        Task { await resolveActiveMedia() }
     }
 
     private var closeButton: some View {
@@ -513,7 +513,7 @@ struct FullScreenPlayerView: View {
         #endif
     }
 
-    private func closePlayer() {
+    func closePlayer() {
         #if os(macOS)
             // Exit fullscreen first so the window animation is graceful, then close.
             if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) {
@@ -548,33 +548,26 @@ struct FullScreenPlayerView: View {
     /// resulting store merge can't disturb playback. Captures the clock
     /// synchronously *before* awaiting, so a subsequent `clock.reset()` can't
     /// race the read; clears the buffer entry once the write lands.
-    func persistProgressDetached(force: Bool, holdingLive: Bool = false) {
+    ///
+    /// `leavingForeground` covers the app being sent away mid-playback, where
+    /// the process may be suspended and then killed before the actor's save
+    /// runs: the position is stashed in the buffer first, so the next launch
+    /// recovers it. The save itself always runs under a background-task
+    /// assertion, so a suspension right after a flush doesn't strand it.
+    func persistProgressDetached(force: Bool, holdingLive: Bool = false, leavingForeground: Bool = false) {
         if persistRecordingProgress() { return }
-        guard let writer = progressWriter else { return }
         if activeMedia.isLive, !force { return }
-        let ref = activeMedia.contentRef
+        let ref = activeMedia.historyRef
         // An explicit "next episode" already settled this stream at its full
         // duration. Recording the position it was skipped from would walk that
         // back to unwatched, so the completion stands and this flush stands down.
         if ref == completedRef { return }
         let now = clock.current
         let total = clock.duration
-        // Held so `endReviewSession` can await it: `writer` is an actor, so the
-        // await below suspends, and without the handle the review policy would
-        // read `completedTitles` before this task increments it — the third
-        // finished title would then only arm the *next* session.
-        let previous = pendingProgressWrite
-        pendingProgressWrite = Task { @MainActor in
-            await previous?.value
-            let completion = await writer.record(
-                ref: ref, progress: now, duration: total, force: force, holdLive: holdingLive
-            )
-            WatchProgressBuffer.remove(ref: ref)
-            if let completion {
-                syncWatchedServices(ref: completion.ref)
-                AppStoreReviewPrompt.shared.noteCompletedTitle()
-            }
+        if leavingForeground {
+            WatchProgressBuffer.record(ref: ref, progress: now, duration: total, waitUntilWritten: true)
         }
+        enqueueProgressWrite(ref: ref, progress: now, duration: total, force: force, holdLive: holdingLive)
     }
 }
 

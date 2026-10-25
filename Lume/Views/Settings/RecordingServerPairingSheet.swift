@@ -65,10 +65,8 @@
                         Button("Cancel") { dismiss() }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Pair") {
-                            Task { await pair() }
-                        }
-                        .disabled(!model.canPair)
+                        Button("Pair") { pair() }
+                            .disabled(!model.canPair)
                     }
                 }
                 .task {
@@ -103,7 +101,7 @@
             }
         }
 
-        private func serverSection(_ info: ServerInfo) -> some View {
+        private func serverSection(_ info: ServerIdentity) -> some View {
             Section {
                 LabeledContent("Server", value: info.name)
                 LabeledContent("Version", value: info.version)
@@ -119,11 +117,7 @@
                     .keyboardType(.numberPad)
                 #endif
                     .onChange(of: model.code) { model.sanitizeCode() }
-                    .onSubmit {
-                        if model.canPair {
-                            Task { await pair() }
-                        }
-                    }
+                    .onSubmit { pair() }
             } header: {
                 Text("Pairing Code")
             } footer: {
@@ -135,9 +129,12 @@
             Task { await model.connectToAddress() }
         }
 
-        private func pair() async {
-            if await model.pair() {
-                dismiss()
+        private func pair() {
+            guard model.canPair else { return }
+            Task {
+                if await model.pair() {
+                    dismiss()
+                }
             }
         }
     }

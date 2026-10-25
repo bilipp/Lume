@@ -234,7 +234,7 @@
         private var heroMetaItems: [TVMetaItem] {
             var items: [TVMetaItem] = []
             if let date = DetailFormat.date(from: movie.releaseDate)
-                ?? DetailFormat.year(from: movie.releaseDate)
+                ?? DetailFormat.year(releaseDate: movie.releaseDate, name: movie.name)
             {
                 items.append(TVMetaItem(label: "Released", value: date))
             }
@@ -375,8 +375,7 @@
             if movie.isWatched {
                 movie.watchProgress = Double(movie.durationSecs ?? 0)
             }
-            TraktService.shared.syncWatched(movie: movie, watched: movie.isWatched)
-            SimklService.shared.syncWatched(movie: movie, watched: movie.isWatched)
+            WatchedTrackers.sync(movie: movie, watched: movie.isWatched)
         }
     }
 

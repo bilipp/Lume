@@ -3,7 +3,7 @@
 //  Lume
 //
 //  Default landing screen: Recently Watched, Favorites, For You (opt-in Pro recommendations),
-//  Trending Movies/Series and the Trakt/Simkl watchlists. Row order and visibility are
+//  Trending Movies/Series and the Trakt/Simkl/MDBList watchlists. Row order and visibility are
 //  user-configurable (Settings › Layout › Home, see HomeLayoutSettings); rows render only with content.
 //
 
@@ -40,8 +40,7 @@ struct HomeView: View {
 
     @State var trendingMovies: [HomeMediaItem] = []
     @State var trendingSeries: [HomeMediaItem] = []
-    @State var watchlist: [HomeMediaItem] = []
-    @State var simklWatchlist: [HomeMediaItem] = []
+    @State var watchlists: [HomeWatchlistSource: [HomeMediaItem]] = [:]
     /// Resume fractions for partially-watched series, keyed by series id and
     /// resolved off the main thread — see `SeriesResumeLoader`.
     @State private var seriesResume: [String: Double] = [:]
@@ -63,9 +62,12 @@ struct HomeView: View {
     /// a progress placeholder rather than an empty state on launch.
     @State private var recommendationsLoaded = false
     @State var heroItems: [HeroItem] = []
+    /// The home scroll view's height, which sizes the hero (re-measured on a fold or rotation).
+    @State private var viewportHeight: CGFloat = 0
     @State var trendingState: HomeLoadState = .idle
     @State var trakt = TraktService.shared
     @State var simkl = SimklService.shared
+    @State var mdblist = MDBListService.shared
     /// "For You" is a Lume Pro feature; observed so the row appears/disappears
     /// when entitlement changes.
     @State var premium = PremiumManager.shared
@@ -176,7 +178,10 @@ struct HomeView: View {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 28) {
                                 if !heroItems.isEmpty {
-                                    HomeHeroCarousel(items: heroItems)
+                                    HomeHeroCarousel(
+                                        items: heroItems,
+                                        heroHeight: HomeHeroCarousel.height(forViewport: viewportHeight)
+                                    )
                                 }
                                 homeRows
                             }
@@ -184,6 +189,7 @@ struct HomeView: View {
                         }
                         .browseActivity()
                         .scrollIndicators(.hidden)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
                         // Only let content run under the nav bar when the hero
                         // backdrop is there to fill it; otherwise the first row
                         // would sit hidden behind the bar.
@@ -217,11 +223,8 @@ struct HomeView: View {
             .task(id: trendingKey) {
                 await loadTrending(cacheKey: trendingKey)
             }
-            .task(id: watchlistKey) {
-                await loadWatchlist(cacheKey: watchlistKey)
-            }
-            .task(id: simklWatchlistKey) {
-                await loadSimklWatchlist(cacheKey: simklWatchlistKey)
+            .task(id: watchlistsKey) {
+                await loadWatchlists(scope: watchlistScope)
             }
             .task(id: recommendationsKey) {
                 await loadRecommendations()
@@ -268,10 +271,10 @@ struct HomeView: View {
                 rail("Trending Movies", trendingMovies)
             case .trendingSeries:
                 rail("Trending Series", trendingSeries)
-            case .traktWatchlist:
-                rail("From Your Trakt Watchlist", watchlist)
-            case .simklWatchlist:
-                rail("From Your Simkl Watchlist", simklWatchlist)
+            case .traktWatchlist, .simklWatchlist, .mdblistWatchlist:
+                if let source = HomeWatchlistSource(section: section) {
+                    rail(source.rowTitle, watchlists[source] ?? [])
+                }
             case .sports:
                 SportsHomeRail(isSyncBusy: isSyncBusy)
             case .downloads:
@@ -322,12 +325,14 @@ struct HomeView: View {
         return "\(playlists.count)-\(scope.token)-\(synced)-\(restriction.visibilityToken)"
     }
 
-    var watchlistKey: String {
-        "watchlist-\(trakt.isConnected)-\(catalogScope.token)-\(restriction.visibilityToken)"
+    /// What the watchlist rows are matched against. Each service caches per
+    /// connection state plus this scope (see `loadWatchlist`).
+    var watchlistScope: String {
+        "\(catalogScope.token)-\(restriction.visibilityToken)"
     }
 
-    var simklWatchlistKey: String {
-        "simkl-watchlist-\(simkl.isConnected)-\(catalogScope.token)-\(restriction.visibilityToken)"
+    var watchlistsKey: String {
+        "watchlists-\(trakt.isConnected)-\(simkl.isConnected)-\(mdblist.isConnected)-\(watchlistScope)"
     }
 
     /// Identity of the series resume lookup. Resuming or finishing an episode
@@ -383,8 +388,7 @@ struct HomeView: View {
             && favorites.isEmpty
             && trendingMovies.isEmpty
             && trendingSeries.isEmpty
-            && watchlist.isEmpty
-            && simklWatchlist.isEmpty
+            && watchlists.values.allSatisfy(\.isEmpty)
             && !sportsRailHasContent
             && trendingState.isSettled
     }

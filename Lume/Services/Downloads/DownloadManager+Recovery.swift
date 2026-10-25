@@ -41,14 +41,14 @@ extension DownloadManager {
             for movie in movies where !liveIDs.contains(movie.id) {
                 let file = downloadedFile(for: movie.id)
                 movie.downloadStatus = file == nil ? .failed : .completed
-                movie.localFileURL = file?.path
+                movie.localFileURL = file?.lastPathComponent
                 movie.downloadedAt = file == nil ? nil : Date()
                 recovered += 1
             }
             for episode in episodes where !liveIDs.contains(episode.id) {
                 let file = downloadedFile(for: episode.id)
                 episode.downloadStatus = file == nil ? .failed : .completed
-                episode.localFileURL = file?.path
+                episode.localFileURL = file?.lastPathComponent
                 episode.downloadedAt = file == nil ? nil : Date()
                 recovered += 1
             }

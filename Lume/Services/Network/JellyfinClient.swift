@@ -107,7 +107,12 @@ nonisolated struct JellyfinItem: Decodable, Hashable {
     let dateCreated: String?
     /// e.g. `{"Primary": "<tag>", "Backdrop": "<tag>"}`.
     let imageTags: [String: String]?
+    /// The show's poster tag on an episode, for one with no still of its own.
+    let seriesPrimaryImageTag: String?
     let providerIds: [String: String]?
+    /// `Virtual` for an episode the server knows of but holds no file for
+    /// (unaired, or missing from disk).
+    let locationType: String?
 
     enum CodingKeys: String, CodingKey {
         case id = "Id"
@@ -128,7 +133,9 @@ nonisolated struct JellyfinItem: Decodable, Hashable {
         case container = "Container"
         case dateCreated = "DateCreated"
         case imageTags = "ImageTags"
+        case seriesPrimaryImageTag = "SeriesPrimaryImageTag"
         case providerIds = "ProviderIds"
+        case locationType = "LocationType"
     }
 
     var primaryImageTag: String? {
@@ -309,14 +316,65 @@ final nonisolated class JellyfinClient: Sendable {
         return try await get(url, session: session)
     }
 
+    /// One page of a show's episodes, every season in order. The per-show
+    /// route is the one AIOStreams-style servers answer: they list a library's
+    /// series but report no episodes under it, so a library-wide episode query
+    /// comes back empty for them.
+    func showEpisodes(
+        server: URL,
+        session: JellyfinSession,
+        seriesId: String,
+        startIndex: Int = 0,
+        limit: Int = 500
+    ) async throws -> JellyfinItemsResponse {
+        var components = URLComponents(
+            url: server.appendingPathComponent("Shows/\(seriesId)/Episodes"),
+            resolvingAgainstBaseURL: false
+        ) ?? URLComponents()
+        components.queryItems = [
+            URLQueryItem(name: "UserId", value: session.userId),
+            URLQueryItem(name: "Fields", value: Self.itemFields),
+            URLQueryItem(name: "StartIndex", value: String(startIndex)),
+            URLQueryItem(name: "Limit", value: String(limit))
+        ]
+        guard let url = components.url else { throw JellyfinError.invalidURL }
+        return try await get(url, session: session)
+    }
+
+    /// The versions an item can play as. On an AIOStreams-style server this
+    /// runs the whole stream lookup, so it is only ever asked at play time.
+    /// `refresh` asks such a server to look again rather than answer from the
+    /// list it keeps for a few minutes; a stock server ignores it.
+    func playbackInfo(server: URL, session: JellyfinSession, itemId: String, refresh: Bool = false) async throws -> JellyfinPlaybackInfo {
+        var components = URLComponents(
+            url: server.appendingPathComponent("Items/\(itemId)/PlaybackInfo"),
+            resolvingAgainstBaseURL: false
+        ) ?? URLComponents()
+        components.queryItems = [URLQueryItem(name: "UserId", value: session.userId)]
+        guard let url = components.url else { throw JellyfinError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // `IsPlayback: false`: the list is for choosing, so the server need not
+        // probe a file before answering. `Fresh` keeps it from handing back a
+        // list older than it would reuse for playback.
+        let body = JellyfinPlaybackInfoRequest(userId: session.userId, isPlayback: false, fresh: true, refresh: refresh)
+        request.httpBody = try JSONEncoder().encode(body)
+        return try await decode(request, session: session)
+    }
+
     // MARK: - URL builders
 
     /// Direct-play stream URL, deliberately token-free: the session token
     /// travels in `httpHeaders` (see `PlayableMedia`), so a persisted or
     /// shared URL never carries a credential.
-    nonisolated static func streamURL(server: URL, itemId: String) -> URL? {
+    nonisolated static func streamURL(server: URL, itemId: String, mediaSourceId: String? = nil) -> URL? {
         var components = URLComponents(url: server.appendingPathComponent("Videos/\(itemId)/stream"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "Static", value: "true")]
+        var query = [URLQueryItem(name: "Static", value: "true")]
+        if let mediaSourceId {
+            query.append(URLQueryItem(name: "MediaSourceId", value: mediaSourceId))
+        }
+        components?.queryItems = query
         return components?.url
     }
 
@@ -350,7 +408,11 @@ final nonisolated class JellyfinClient: Sendable {
     // MARK: - Request plumbing
 
     private func get<T: Decodable>(_ url: URL, session: JellyfinSession) async throws -> T {
-        var request = URLRequest(url: url)
+        try await decode(URLRequest(url: url), session: session)
+    }
+
+    private func decode<T: Decodable>(_ request: URLRequest, session: JellyfinSession) async throws -> T {
+        var request = request
         request.setValue(Self.authorization(token: session.accessToken), forHTTPHeaderField: "Authorization")
         let (data, response) = try await send(request)
         switch response.statusCode {
@@ -444,13 +506,7 @@ nonisolated enum JellyfinPlaybackAuth {
     }
 
     static func authenticatedURL(_ url: URL, headers: [String: String]?) -> URL? {
-        guard let token = token(from: headers),
-              var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        else { return nil }
-        var items = components.queryItems ?? []
-        guard !items.contains(where: { $0.name == "api_key" }) else { return url }
-        items.append(URLQueryItem(name: "api_key", value: token))
-        components.queryItems = items
-        return components.url
+        guard let token = token(from: headers) else { return nil }
+        return url.addingQueryItemIfAbsent(name: "api_key", value: token)
     }
 }

@@ -10,20 +10,19 @@
 
 import Foundation
 @testable import Lume
-import LumeRecorderKit
 import Testing
 
 struct RecordingTimelineTests {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func makeRecording(
-        status: RecordingStatus,
+        status: ServerRecordingStatus,
         startedAgo: TimeInterval? = 600,
         endsIn: TimeInterval = 1800,
         durationSeconds: Double? = nil
-    ) -> Recording {
-        Recording(
-            id: UUID(), title: "Match", channelName: "Sports", channelLogoURL: nil, programmeDescription: nil,
+    ) -> ServerRecording {
+        ServerRecording(
+            id: RecordingID(UUID()), title: "Match", channelName: "Sports", channelLogoURL: nil, programmeDescription: nil,
             sourceRef: nil, start: now.addingTimeInterval(-900), end: now.addingTimeInterval(endsIn), status: status,
             failureReason: nil, createdAt: now.addingTimeInterval(-1000),
             startedAt: startedAgo.map { now.addingTimeInterval(-$0) }, finishedAt: nil,
@@ -31,18 +30,15 @@ struct RecordingTimelineTests {
         )
     }
 
-    private func makeGrant() throws -> PlaybackGrant {
-        try PlaybackGrant(
-            url: #require(URL(string: "http://192.168.1.20:8090/play/abc/1/sig/index.m3u8")),
-            expiresAt: now.addingTimeInterval(3600)
-        )
+    private func makePlayback() throws -> RecordingPlayback {
+        try RecordingPlayback(url: #require(URL(string: "http://192.168.1.20:8090/play/abc/1/sig/index.m3u8")))
     }
 
     // MARK: - Building the timeline
 
     @Test func `only a recording still being captured has a timeline`() {
         #expect(RecordingTimeline(recording: makeRecording(status: .recording), at: now) != nil)
-        for status in [RecordingStatus.completed, .failed, .cancelled, .scheduled] {
+        for status in [ServerRecordingStatus.completed, .failed, .cancelled, .scheduled] {
             #expect(RecordingTimeline(recording: makeRecording(status: status, durationSeconds: 120), at: now) == nil)
         }
     }
@@ -119,7 +115,7 @@ struct RecordingTimelineTests {
 
     @Test func `an in-progress recording's media carries its timeline`() throws {
         let recording = makeRecording(status: .recording, durationSeconds: 540)
-        let media = try PlayableMedia.recording(recording, grant: makeGrant(), startTime: 0, now: now)
+        let media = try PlayableMedia.recording(recording, playback: makePlayback(), startTime: 0, now: now)
 
         let timeline = try #require(media.recordingTimeline)
         #expect(timeline.capturedDuration == 540)
@@ -128,17 +124,74 @@ struct RecordingTimelineTests {
     }
 
     @Test func `a finished recording's media has no timeline`() throws {
-        let media = try PlayableMedia.recording(makeRecording(status: .completed, durationSeconds: 145), grant: makeGrant(), startTime: 86, now: now)
+        let media = try PlayableMedia.recording(makeRecording(status: .completed, durationSeconds: 145), playback: makePlayback(), startTime: 86, now: now)
         #expect(media.recordingTimeline == nil)
     }
 
     @Test func `the timeline survives engine swaps, URL swaps and Codable`() throws {
-        let media = try PlayableMedia.recording(makeRecording(status: .recording), grant: makeGrant(), startTime: 0, now: now)
+        let media = try PlayableMedia.recording(makeRecording(status: .recording), playback: makePlayback(), startTime: 0, now: now)
         let timeline = try #require(media.recordingTimeline)
 
         #expect(media.resuming(at: 42).recordingTimeline == timeline)
         #expect(try media.replacingURL(#require(URL(string: "http://example.com/other.m3u8"))).recordingTimeline == timeline)
         let decoded = try JSONDecoder().decode(PlayableMedia.self, from: JSONEncoder().encode(media))
         #expect(decoded.recordingTimeline == timeline)
+    }
+
+    // MARK: - Dispatcharr
+
+    private static func utc(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) throws -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        return try #require(calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute)))
+    }
+
+    private static func dispatcharrRecording(_ json: String, now: Date) throws -> ServerRecording {
+        let row = try JSONDecoder().decode(DispatcharrRecording.self, from: Data(json.utf8))
+        return DispatcharrBackend.serverRecording(row, channelName: "Aurora One", channelLogoURL: nil, now: now)
+    }
+
+    @Test func `a running Dispatcharr recording grows from when capture started`() throws {
+        let now = try Self.utc(2026, 10, 24, 18, 30)
+        let rows = try JSONDecoder().decode(
+            [DispatcharrRecording].self, from: Data(dispatcharrFixture("dispatcharr-recordings.json").utf8)
+        )
+        let recording = try DispatcharrBackend.serverRecording(
+            #require(rows.first { $0.id == 13 }), channelName: "Aurora One", channelLogoURL: nil, now: now
+        )
+        let startedAt = try #require(recording.startedAt)
+
+        let timeline = try #require(RecordingTimeline(recording: recording, at: now))
+
+        #expect(recording.durationSeconds == nil)
+        #expect(timeline.capturedDuration == now.timeIntervalSince(startedAt))
+        #expect(abs(timeline.capturedDuration - 35 * 60) < 1)
+        // Capture runs to the server's padded end, not the programme's.
+        #expect(timeline.end == recording.end)
+        #expect(try timeline.end == Self.utc(2026, 10, 24, 19, 5))
+    }
+
+    @Test func `a running Dispatcharr recording without a start stamp grows from its padded start`() throws {
+        let now = try Self.utc(2026, 10, 24, 18, 30)
+        let recording = try Self.dispatcharrRecording(
+            #"{"id":7,"channel":1,"start_time":"2026-10-24T17:55:00Z","end_time":"2026-10-24T19:05:00Z","custom_properties":{"status":"recording"}}"#,
+            now: now
+        )
+
+        let timeline = try #require(RecordingTimeline(recording: recording, at: now))
+
+        #expect(timeline.capturedDuration == 35 * 60)
+    }
+
+    @Test func `a stopped Dispatcharr recording plays with the engine's duration`() throws {
+        let now = try Self.utc(2026, 10, 24, 18, 30)
+        let recording = try Self.dispatcharrRecording(
+            #"{"id":8,"channel":1,"start_time":"2026-10-24T09:00:00Z","end_time":"2026-10-24T10:00:00Z","#
+                + #""custom_properties":{"status":"stopped","started_at":"2026-10-24 09:00:00.5","bytes_written":4096}}"#,
+            now: now
+        )
+
+        #expect(recording.isPartial)
+        #expect(RecordingTimeline(recording: recording, at: now) == nil)
     }
 }

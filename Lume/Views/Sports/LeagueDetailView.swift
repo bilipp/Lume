@@ -46,6 +46,10 @@ struct LeagueDetailView: View {
     @State private var playingMedia: PlayableMedia?
     /// Playback queued behind a dismissing sheet; see `present(_:afterSheet:)`.
     @State private var pendingMedia: PlayableMedia?
+    /// The sheet to reopen when the player closes; see `reopenGame`.
+    @State private var watchReturn: SportsWatchReturn?
+    /// The channel the open game sheet marks as just watched.
+    @State private var lastWatchedChannelID: String?
 
     private var isF1: Bool {
         league.sport == "racing"
@@ -67,12 +71,12 @@ struct LeagueDetailView: View {
         .onAppear { SportsSyncService.shared.beginLivePolling() }
         .onDisappear { SportsSyncService.shared.endLivePolling() }
         .sheet(item: $selectedFixture, onDismiss: presentPendingMedia) { fixture in
-            GameDetailSheet(fixture: fixture, resolved: resolved[fixture.id] ?? [], onWatch: watch)
+            GameDetailSheet(fixture: fixture, resolved: resolved[fixture.id] ?? [], onWatch: watch, lastWatchedChannelID: lastWatchedChannelID)
         }
         .sheet(item: $pickerFixture, onDismiss: presentPendingMedia) { fixture in
-            ChannelPickerSheet(fixture: fixture, resolved: resolved[fixture.id] ?? [], onWatch: watch)
+            ChannelPickerSheet(fixture: fixture, resolved: resolved[fixture.id] ?? [], onWatch: watch, lastWatchedChannelID: lastWatchedChannelID)
         }
-        .leagueDetailPlayer(media: $playingMedia)
+        .leagueDetailPlayer(media: $playingMedia, onDismiss: reopenGame)
     }
 
     // MARK: - Range picker
@@ -323,8 +327,15 @@ struct LeagueDetailView: View {
         guard let media = SportsPlayback.media(for: channel, in: modelContext) else { return }
 
         let hadSheet = selectedFixture != nil || pickerFixture != nil
-        selectedFixture = nil
-        pickerFixture = nil
+        #if os(macOS)
+            // The player opens in a window of its own, so the card stays up
+            // behind it, marking the channel playing.
+            if hadSheet { lastWatchedChannelID = channel.id }
+        #else
+            watchReturn = SportsWatchReturn(channel: channel, detail: selectedFixture, picker: pickerFixture)
+            selectedFixture = nil
+            pickerFixture = nil
+        #endif
         present(media, afterSheet: hadSheet)
     }
 
@@ -347,10 +358,28 @@ struct LeagueDetailView: View {
     }
 
     private func presentPendingMedia() {
+        lastWatchedChannelID = nil
         #if os(iOS) || os(visionOS)
             guard let media = pendingMedia else { return }
             pendingMedia = nil
             playingMedia = media
+        #endif
+    }
+
+    /// Closing the player lands back on the sheet it was started from, with
+    /// the channel just watched marked, so the next source is one tap away.
+    /// Presented from the player cover's `onDismiss` for the same reason the
+    /// player is presented from the sheet's.
+    private func reopenGame() {
+        #if os(iOS) || os(visionOS)
+            guard let watchReturn else { return }
+            self.watchReturn = nil
+            let fixture = watchReturn.currentFixture(in: SportsStore.shared)
+            lastWatchedChannelID = watchReturn.channelToMark(among: resolved[fixture.id] ?? [])
+            switch watchReturn.card {
+            case .detail: selectedFixture = fixture
+            case .picker: pickerFixture = fixture
+            }
         #endif
     }
 }
@@ -361,9 +390,9 @@ private extension View {
     /// The full-screen player cover, iOS/visionOS only, kept in one `#if` so
     /// SwiftFormat cannot reindent an adjacent conditional in the modifier chain.
     @ViewBuilder
-    func leagueDetailPlayer(media: Binding<PlayableMedia?>) -> some View {
+    func leagueDetailPlayer(media: Binding<PlayableMedia?>, onDismiss: @escaping () -> Void) -> some View {
         #if os(iOS) || os(visionOS)
-            fullScreenCover(item: media) { media in
+            fullScreenCover(item: media, onDismiss: onDismiss) { media in
                 FullScreenPlayerView(media: media)
             }
         #else

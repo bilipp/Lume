@@ -542,7 +542,7 @@ struct M3USyncTests {
 /// evidence. `Playlist` is excluded: its sync status and `lastSyncDate` are
 /// rewritten by every sync by design. Suites run in parallel against their own
 /// in-memory stores, hence the store filter.
-private final class CatalogWriteRecorder: @unchecked Sendable {
+final class CatalogWriteRecorder: @unchecked Sendable {
     private static let catalogEntities: Set<String> = [
         "LiveStream", "Movie", "Series", "Episode", "Category"
     ]

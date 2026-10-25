@@ -100,13 +100,12 @@ extension ContentSyncManager {
         await progress?.complete(.movies)
 
         await progress?.start(.series)
-        var seenSeries = Set<String>()
-        var seenEpisodes = Set<String>()
+        var shows = JellyfinShowsSeen()
         for view in showViews {
             let viewScope = scope(connection, playlistId: playlistId, view: view, type: .series)
-            try await syncJellyfinShows(scope: viewScope, seenSeries: &seenSeries, seenEpisodes: &seenEpisodes, progress: progress)
+            try await syncJellyfinShows(scope: viewScope, seen: &shows, progress: progress)
         }
-        pruneJellyfinSeries(playlistId: playlistId, flavor: flavor, seenSeries: seenSeries, seenEpisodes: seenEpisodes, fetched: !showViews.isEmpty)
+        pruneJellyfinSeries(playlistId: playlistId, flavor: flavor, seen: shows, fetched: !showViews.isEmpty)
         await progress?.complete(.series)
 
         markPlaylistUpdated(playlistId)
@@ -160,7 +159,8 @@ extension ContentSyncManager {
     /// Stores the fresh session on the playlist so playback and artwork can
     /// authenticate without logging in again. A rotated or revoked token is
     /// simply replaced on the next sync, which always logs in first.
-    private func persistJellyfinSession(_ session: JellyfinSession, playlistId: UUID) {
+    /// Not `private`: the per-show episode fetch signs in again the same way.
+    func persistJellyfinSession(_ session: JellyfinSession, playlistId: UUID) {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
         guard let playlist = try? context.fetch(

@@ -10,7 +10,6 @@
 //
 
 import Foundation
-import LumeRecorderKit
 
 nonisolated struct RecordingTimeline: Hashable, Codable {
     /// The captured length when the recording was last read from the server.
@@ -30,7 +29,7 @@ nonisolated struct RecordingTimeline: Hashable, Codable {
     /// status (a finished recording's playlist has `#EXT-X-ENDLIST`, so every
     /// engine reports its real duration). Prefers the server's measured media
     /// length; without one, the wall-clock time since capture started.
-    init?(recording: Recording, at now: Date) {
+    init?(recording: ServerRecording, at now: Date) {
         guard recording.status == .recording else { return nil }
         let measured = recording.durationSeconds.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         let started = recording.startedAt ?? recording.start

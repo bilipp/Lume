@@ -30,6 +30,9 @@ import SwiftUI
                 tvActionsSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // Menu while editing discards the edits, like Cancel; otherwise
+            // Settings backs out to the playlist list.
+            .onExitCommand(perform: isEditing ? { cancelEditing() } : nil)
             .alert("Delete Playlist", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete", role: .destructive) { deletePlaylist() }

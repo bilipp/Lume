@@ -235,16 +235,24 @@ enum PlayerSettings {
         /// the same response also carries the outro window that sets when the
         /// Next Episode button arms, so either toggle being on triggers it.
         static let showSkipIntroButtonKey = "player.showSkipIntroButton"
+        /// Ask which version to play when a Jellyfin/Emby title offers several.
+        /// Off plays the server's first (top-ranked) one without asking.
+        static let chooseSourceBeforePlayingKey = "player.chooseSourceBeforePlaying"
         /// Turn an iPhone to landscape, and hold it there, while the player is
         /// open; portrait again once it closes. iPhone only — see
         /// `PlayerOrientationLock`. Unrelated to `KSPlayer.autoRotateKey`, which
         /// rotates the picture by the stream's rotation metadata.
         static let rotateToLandscapeKey = "player.rotateToLandscape"
+        /// Offer the same live channel in its other qualities (HD, FHD, 4K …)
+        /// from the player when the playlist lists several. Device-local.
+        static let liveQualitySwitchKey = "player.liveQualitySwitch"
 
         static let autoPlayNextDefault = true
         static let showNextEpisodeButtonDefault = true
         static let showSkipIntroButtonDefault = true
+        static let chooseSourceBeforePlayingDefault = true
         static let rotateToLandscapeDefault = false
+        static let liveQualitySwitchDefault = false
 
         /// Whether the player turns the iPhone to landscape, read off
         /// `UserDefaults` directly for the same reason as `showSkipIntroButton`.
@@ -263,6 +271,10 @@ enum PlayerSettings {
         /// directly for the same reason as `showSkipIntroButton`.
         static var showNextEpisodeButton: Bool {
             UserDefaults.standard.bool(showNextEpisodeButtonKey, default: showNextEpisodeButtonDefault)
+        }
+
+        static var chooseSourceBeforePlaying: Bool {
+            UserDefaults.standard.bool(chooseSourceBeforePlayingKey, default: chooseSourceBeforePlayingDefault)
         }
     }
 

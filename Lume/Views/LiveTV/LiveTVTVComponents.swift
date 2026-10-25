@@ -222,8 +222,8 @@
                                 .foregroundStyle(secondaryColor)
                         }
 
-                        if stream.tvArchive > 0 {
-                            Label("Catchup: \(stream.tvArchiveDuration)d", systemImage: "clock.arrow.circlepath")
+                        if PlayableMedia.isCatchupCapable(stream: stream) {
+                            CatchupBadge(days: PlayableMedia.archiveBadgeDays(for: stream), spacing: 6)
                                 .font(.system(size: 22))
                                 .foregroundStyle(Color.blue)
                         }
@@ -235,7 +235,7 @@
 
                     Spacer(minLength: 0)
 
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(tertiaryColor)
                 }
@@ -300,8 +300,8 @@
     enum TVLiveTVLayout {
         /// The 1920 pt screen inside tvOS's 80 pt horizontal safe area.
         static let contentWidth: CGFloat = 1760
-        static let railWidth: CGFloat = 340
-        static let spacing: CGFloat = 32
+        static let railWidth = TVSidebarRail.width
+        static let spacing = TVSidebarRail.paneSpacing
 
         /// What the rail leaves for the channel list or guide.
         static var paneWidth: CGFloat {

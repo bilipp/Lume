@@ -18,6 +18,8 @@ import SwiftUI
 
 struct HomeHeroCarousel: View {
     let items: [HeroItem]
+    /// The hero's height — see `height(forViewport:)`.
+    var heroHeight: CGFloat = Self.maxHeight
 
     @State private var currentID: String?
     @State private var isInteracting = false
@@ -46,7 +48,18 @@ struct HomeHeroCarousel: View {
     private static let headCloneID = "hero-clone-head"
     private static let tailCloneID = "hero-clone-tail"
 
-    private let heroHeight: CGFloat = 800
+    static let maxHeight: CGFloat = 800
+    /// Below this the overlay's title and buttons no longer fit.
+    static let minHeight: CGFloat = 320
+
+    /// Fills the first screen down to the bottom bar, capped at `maxHeight`.
+    /// A fixed 800 pt ran past a closed iPhone Duo's 678 pt display (and a
+    /// landscape iPhone), pushing the title and Play/Details below the fold.
+    /// `viewportHeight` is 0 until the scroll view has been measured.
+    static func height(forViewport viewportHeight: CGFloat) -> CGFloat {
+        guard viewportHeight > 0 else { return maxHeight }
+        return max(min(viewportHeight, maxHeight), minHeight)
+    }
 
     /// The rendered pages: the real items padded with a clone of the LAST item
     /// at the front and the FIRST at the back. Paging onto a clone is one slide;
@@ -117,8 +130,10 @@ struct HomeHeroCarousel: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #endif
             }
+            // Not clipped: the artwork's background extension has to reach past
+            // this frame into the safe area. The paging scroll view and each
+            // `HeroBackdrop` already clip their own artwork.
             .frame(width: width, height: heroHeight)
-            .clipped()
             .contentShape(Rectangle())
             .animation(.easeInOut(duration: 0.35), value: currentItemID)
         }
@@ -175,6 +190,10 @@ struct HomeHeroCarousel: View {
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: $currentID)
             .scrollIndicators(.hidden)
+            // The scroll content stops at the safe area; extend the artwork
+            // under the trailing status column and vertical bars of an
+            // iPhone Duo (and a landscape iPhone's sensor housing).
+            .backgroundExtensionEffectIfAvailable()
             .onScrollPhaseChange { _, newPhase, _ in
                 // Only user-driven scrolling pauses auto-advance; `.animating` is
                 // our own programmatic paging, which once latched this `true` forever.
@@ -206,9 +225,9 @@ struct HomeHeroCarousel: View {
         private var sliderButtons: some View {
             if items.count > 1 {
                 HStack {
-                    sliderButton(systemName: "chevron.compact.left", action: retreat)
+                    sliderButton(systemName: "chevron.compact.backward", action: retreat)
                     Spacer()
-                    sliderButton(systemName: "chevron.compact.right", action: advance)
+                    sliderButton(systemName: "chevron.compact.forward", action: advance)
                 }
                 .padding(.horizontal, 16)
             }

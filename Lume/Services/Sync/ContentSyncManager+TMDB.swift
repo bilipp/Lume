@@ -91,6 +91,11 @@ nonisolated func applyMovieDetails(
     if (movie.plot ?? "").isEmpty, let overview = details.overview {
         movie.plot = overview
     }
+    // Xtream and M3U VOD lists carry no release date, so TMDB is usually the
+    // only source; a provider date that does hold a year is kept.
+    if ContentIndexText.year(fromReleaseDate: movie.releaseDate) == nil, let releaseDate = details.releaseDate {
+        movie.releaseDate = releaseDate
+    }
     // TMDB is the primary genre source: its normalized genre names overwrite any
     // provider-supplied genre once enrichment runs. The provider value is only a
     // fallback shown until then (see `applySeriesFields`; VOD lists carry no genre).
@@ -145,6 +150,9 @@ nonisolated func applySeriesDetails(
 
     if (series.plot ?? "").isEmpty, let overview = details.overview {
         series.plot = overview
+    }
+    if ContentIndexText.year(fromReleaseDate: series.releaseDate) == nil, let releaseDate = details.releaseDate {
+        series.releaseDate = releaseDate
     }
     // TMDB is the primary genre source: it overwrites the provider genre seeded
     // at sync (see `applySeriesFields`), which serves only as the fallback.

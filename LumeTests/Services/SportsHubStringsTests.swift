@@ -12,7 +12,7 @@ import Foundation
 import Testing
 
 struct SportsHubStringsTests {
-    private static let expectedLanguages: Set<String> = ["de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
+    private static let expectedLanguages: Set<String> = ["ar", "de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
 
     /// Keys the Sports Hub feature added across its views, settings pane,
     /// premium entry, Home section and sync error states.

@@ -15,9 +15,12 @@
     import SwiftUI
 
     struct TVLiveTVSettingsPane: View {
-        /// Owned by SettingsView, which clears it when focus returns to the
-        /// sidebar, like its other drill-ins.
+        /// Owned by SettingsView, which clears it on Menu or when a rail
+        /// category is activated, like its other drill-ins.
         @Binding var showingRecordingServer: Bool
+        /// SettingsView's handle on its drill-in rows, so Menu from the
+        /// Recording Server pane lands back on its row.
+        let drillInFocus: FocusState<TVSettingsDrillIn?>.Binding
         /// SettingsView's paywall, so the pane never stacks a second one.
         let presentPaywall: (PremiumFeature) -> Void
 
@@ -55,8 +58,8 @@
                 categoriesSection
                 recordingSection
             }
-            // Entry from the sidebar lands on the first row, not the one
-            // nearest the sidebar row it came from.
+            // Entry from the rail lands on the first row, not the one
+            // nearest the rail row it came from.
             .defaultFocus($focus, .layout, priority: .userInitiated)
             .fullScreenCover(isPresented: $showingRecordings) {
                 recordingsLibrary
@@ -118,6 +121,7 @@
 
                 recordingServerRow
                     .focused($focus, equals: .recordingServer)
+                    .focused(drillInFocus, equals: .recordingServer)
 
                 if access.showsRecordingsRow {
                     recordingsRow
@@ -153,7 +157,7 @@
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
@@ -187,7 +191,7 @@
                     }
                     Text("Recordings")
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }

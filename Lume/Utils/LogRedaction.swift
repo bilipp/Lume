@@ -147,3 +147,4 @@ nonisolated extension StalkerError: DiagnosticErrorDescribing {}
 nonisolated extension WebDAVError: DiagnosticErrorDescribing {}
 nonisolated extension JellyfinError: DiagnosticErrorDescribing {}
 nonisolated extension PlexError: DiagnosticErrorDescribing {}
+nonisolated extension SiloError: DiagnosticErrorDescribing {}

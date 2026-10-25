@@ -12,6 +12,8 @@
 		C6AA10042FDD00010000AA04 /* LumeEngine in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C6AA310B2FDD00020000AB0B /* LumeWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C6BB20012FDE00030000BB01 /* LumeRecorderKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6BB20022FDE00030000BB02 /* LumeRecorderKit */; };
+		C6BD5701000000000000F003 /* LumeTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6BD5701000000000000A002 /* LumeTopShelf.appex */; platformFilters = (tvos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C6CC40012FE000040000CC01 /* GoogleCastDynamic in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = C6CC40022FE000040000CC02 /* GoogleCastDynamic */; };
 		C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKit */; };
 /* End PBXBuildFile section */
 
@@ -36,6 +38,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = C6AA31032FDD00020000AB03;
 			remoteInfo = LumeWidgets;
+		};
+		C6BD5701000000000000F005 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C67C02B82F880F2200842DBA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C6BD5701000000000000E001;
+			remoteInfo = LumeTopShelf;
 		};
 		C6BE110000000000000000A7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +74,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				C6AA310B2FDD00020000AB0B /* LumeWidgets.appex in Embed Foundation Extensions */,
+				C6BD5701000000000000F003 /* LumeTopShelf.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -77,6 +87,7 @@
 		C67C02D12F880F2400842DBA /* LumeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C67C02DB2F880F2400842DBA /* LumeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6AA31012FDD00020000AB01 /* LumeWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LumeWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C6BD5701000000000000A002 /* LumeTopShelf.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LumeTopShelf.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6BE110000000000000000A1 /* LumePerformanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumePerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -101,6 +112,13 @@
 				DownloadActivityAttributes.swift,
 			);
 			target = C67C02BF2F880F2200842DBA /* Lume */;
+		};
+		C6BD5701000000000000C002 /* Exceptions for "LumeTopShelf" folder in "LumeTopShelf" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C6BD5701000000000000E001 /* LumeTopShelf */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -132,6 +150,19 @@
 			path = LumeWidgets;
 			sourceTree = "<group>";
 		};
+		C6BD5701000000000000B001 /* LumeShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LumeShared;
+			sourceTree = "<group>";
+		};
+		C6BD5701000000000000B003 /* LumeTopShelf */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C6BD5701000000000000C002 /* Exceptions for "LumeTopShelf" folder in "LumeTopShelf" target */,
+			);
+			path = LumeTopShelf;
+			sourceTree = "<group>";
+		};
 		C6BE110000000000000000A2 /* LumePerformanceTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LumePerformanceTests;
@@ -144,6 +175,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C6CC40012FE000040000CC01 /* GoogleCastDynamic in Frameworks */,
 				C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */,
 				C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */,
 				C6BB20012FDE00030000BB01 /* LumeRecorderKit in Frameworks */,
@@ -172,6 +204,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C6BD5701000000000000E004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C6BE110000000000000000A3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -191,6 +230,8 @@
 				C67C02D42F880F2400842DBA /* LumeTests */,
 				C67C02DE2F880F2400842DBA /* LumeUITests */,
 				C6BE110000000000000000A2 /* LumePerformanceTests */,
+				C6BD5701000000000000B001 /* LumeShared */,
+				C6BD5701000000000000B003 /* LumeTopShelf */,
 				C67C02C12F880F2200842DBA /* Products */,
 			);
 			sourceTree = "<group>";
@@ -203,6 +244,7 @@
 				C67C02D12F880F2400842DBA /* LumeTests.xctest */,
 				C67C02DB2F880F2400842DBA /* LumeUITests.xctest */,
 				C6BE110000000000000000A1 /* LumePerformanceTests.xctest */,
+				C6BD5701000000000000A002 /* LumeTopShelf.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -226,12 +268,15 @@
 			);
 			dependencies = (
 				C6AA310E2FDD00020000AB0E /* PBXTargetDependency */,
+				C6BD5701000000000000F007 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C67C02C22F880F2200842DBA /* Lume */,
+				C6BD5701000000000000B001 /* LumeShared */,
 			);
 			name = Lume;
 			packageProductDependencies = (
+				C6CC40022FE000040000CC02 /* GoogleCastDynamic */,
 				C66C81682FC5A59D0048468D /* KSPlayer */,
 				C6AA10022FDD00010000AA02 /* LumeEngine */,
 				C6BB20022FDE00030000BB02 /* LumeRecorderKit */,
@@ -301,12 +346,36 @@
 			);
 			fileSystemSynchronizedGroups = (
 				C6AA31022FDD00020000AB02 /* LumeWidgets */,
+				C6BD5701000000000000B001 /* LumeShared */,
 			);
 			name = LumeWidgets;
 			packageProductDependencies = (
 			);
 			productName = LumeWidgets;
 			productReference = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		C6BD5701000000000000E001 /* LumeTopShelf */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C6BD5701000000000000E002 /* Build configuration list for PBXNativeTarget "LumeTopShelf" */;
+			buildPhases = (
+				C6BD5701000000000000E003 /* Sources */,
+				C6BD5701000000000000E004 /* Frameworks */,
+				C6BD5701000000000000E005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C6BD5701000000000000B001 /* LumeShared */,
+				C6BD5701000000000000B003 /* LumeTopShelf */,
+			);
+			name = LumeTopShelf;
+			packageProductDependencies = (
+			);
+			productName = LumeTopShelf;
+			productReference = C6BD5701000000000000A002 /* LumeTopShelf.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 		C6BE110000000000000000A6 /* LumePerformanceTests */ = {
@@ -356,6 +425,9 @@
 					C6AA31032FDD00020000AB03 = {
 						CreatedOnToolsVersion = 26.4;
 					};
+					C6BD5701000000000000E001 = {
+						CreatedOnToolsVersion = 26.4;
+					};
 					C6BE110000000000000000A6 = {
 						TestTargetID = C67C02BF2F880F2200842DBA;
 					};
@@ -375,6 +447,7 @@
 				ja,
 				ko,
 				"zh-Hans",
+				ar,
 			);
 			mainGroup = C67C02B72F880F2200842DBA;
 			minimizedProjectReferenceProxies = 1;
@@ -383,6 +456,7 @@
 				C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "VLCKit" */,
 				C6AA10032FDD00010000AA03 /* XCLocalSwiftPackageReference "../LumeEngine" */,
 				C6BB20032FDE00030000BB03 /* XCLocalSwiftPackageReference "../LumeRecorder/Kit" */,
+				C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C67C02C12F880F2200842DBA /* Products */;
@@ -394,6 +468,7 @@
 				C67C02D02F880F2400842DBA /* LumeTests */,
 				C67C02DA2F880F2400842DBA /* LumeUITests */,
 				C6BE110000000000000000A6 /* LumePerformanceTests */,
+				C6BD5701000000000000E001 /* LumeTopShelf */,
 			);
 		};
 /* End PBXProject section */
@@ -421,6 +496,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C6AA31062FDD00020000AB06 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C6BD5701000000000000E005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -508,6 +590,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C6BD5701000000000000E003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C6BE110000000000000000A4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -534,6 +623,14 @@
 			target = C6AA31032FDD00020000AB03 /* LumeWidgets */;
 			targetProxy = C6AA310D2FDD00020000AB0D /* PBXContainerItemProxy */;
 		};
+		C6BD5701000000000000F007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				tvos,
+			);
+			target = C6BD5701000000000000E001 /* LumeTopShelf */;
+			targetProxy = C6BD5701000000000000F005 /* PBXContainerItemProxy */;
+		};
 		C6BE110000000000000000A8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C67C02BF2F880F2200842DBA /* Lume */;
@@ -549,10 +646,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=appletvos*]" = "Lume/Lume-tvOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=appletvsimulator*]" = "Lume/Lume-tvOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Lume/Lume-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
@@ -562,7 +661,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -582,7 +681,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -608,10 +707,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=appletvos*]" = "Lume/Lume-tvOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=appletvsimulator*]" = "Lume/Lume-tvOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Lume/Lume-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
@@ -621,7 +722,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -641,7 +742,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -781,12 +882,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -807,12 +908,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -832,12 +933,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -857,12 +958,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -940,10 +1041,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=appletvos*]" = "Lume/Lume-tvOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=appletvsimulator*]" = "Lume/Lume-tvOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Lume/Lume-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = NO;
@@ -953,7 +1056,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -973,7 +1076,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -997,12 +1100,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1022,12 +1125,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1048,7 +1151,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LumeWidgets/Info.plist;
@@ -1058,7 +1161,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1080,7 +1183,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LumeWidgets/Info.plist;
@@ -1090,7 +1193,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1112,7 +1215,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LumeWidgets/Info.plist;
@@ -1122,7 +1225,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1139,17 +1242,141 @@
 			};
 			name = Sideload;
 		};
+		C6BD5701000000000000E006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeTopShelf/LumeTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 34;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeTopShelf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.topshelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Debug;
+		};
+		C6BD5701000000000000E007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeTopShelf/LumeTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 34;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeTopShelf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.topshelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Release;
+		};
+		C6BD5701000000000000E008 /* Sideload */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeTopShelf/LumeTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 34;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeTopShelf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.topshelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Sideload;
+		};
+		C6BD5701000000000000E009 /* Benchmark */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = LumeTopShelf/LumeTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 34;
+				DEVELOPMENT_TEAM = CHG45F8MCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LumeTopShelf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lume;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.topshelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Benchmark;
+		};
 		C6BE110000000000000000AA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumePerformanceTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1170,12 +1397,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumePerformanceTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1196,12 +1423,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumePerformanceTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1222,12 +1449,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumePerformanceTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1307,7 +1534,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Lume/Lume.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
@@ -1317,7 +1544,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1337,7 +1564,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1361,12 +1588,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1386,12 +1613,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = bilipp.LumeUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -1412,7 +1639,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = LumeWidgets/LumeWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_TEAM = CHG45F8MCL;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LumeWidgets/Info.plist;
@@ -1422,7 +1649,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.5.0;
+				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume.LumeWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1497,6 +1724,17 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		C6BD5701000000000000E002 /* Build configuration list for PBXNativeTarget "LumeTopShelf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C6BD5701000000000000E006 /* Debug */,
+				C6BD5701000000000000E007 /* Release */,
+				C6BD5701000000000000E008 /* Sideload */,
+				C6BD5701000000000000E009 /* Benchmark */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		C6BE110000000000000000A9 /* Build configuration list for PBXNativeTarget "LumePerformanceTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1530,6 +1768,14 @@
 				minimumVersion = 2.3.4;
 			};
 		};
+		C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlecast/google-cast-ios-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 4.8.6;
+			};
+		};
 		C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "VLCKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://code.videolan.org/videolan/VLCKit.git";
@@ -1553,6 +1799,11 @@
 		C6BB20022FDE00030000BB02 /* LumeRecorderKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LumeRecorderKit;
+		};
+		C6CC40022FE000040000CC02 /* GoogleCastDynamic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */;
+			productName = GoogleCastDynamic;
 		};
 		C6FF000B2FC5A59D00484602 /* VLCKit */ = {
 			isa = XCSwiftPackageProductDependency;

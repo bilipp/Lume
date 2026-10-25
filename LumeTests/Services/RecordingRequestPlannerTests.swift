@@ -1,6 +1,5 @@
 import Foundation
 @testable import Lume
-import LumeRecorderKit
 import Testing
 
 /// The pure recording rules: windows and padding, `sourceRef` round-trips,
@@ -37,12 +36,12 @@ struct RecordingRequestPlannerTests {
     }
 
     private func recording(
-        status: RecordingStatus,
+        status: ServerRecordingStatus,
         sourceRef: String?,
         id: UUID = UUID()
-    ) -> Recording {
-        Recording(
-            id: id,
+    ) -> ServerRecording {
+        ServerRecording(
+            id: RecordingID(id),
             title: "Show",
             sourceRef: sourceRef,
             start: now,
@@ -66,7 +65,7 @@ struct RecordingRequestPlannerTests {
     @Test func `record now runs from now to programme end plus five minutes`() throws {
         let airing = programme(startOffset: -1200, endOffset: 1800)
         let plan = try #require(RecordingRequestPlanner.recordNow(
-            streamURL: streamURL, channel: channel, programme: airing, now: now
+            target: .streamURL(streamURL), channel: channel, programme: airing, now: now
         ))
         #expect(plan.request.start == now)
         #expect(plan.request.end == airing.end.addingTimeInterval(5 * 60))
@@ -74,14 +73,14 @@ struct RecordingRequestPlannerTests {
         #expect(plan.request.programmeDescription == "Headlines.")
         #expect(plan.request.channelName == "News 24")
         #expect(plan.request.channelLogoURL == URL(string: "http://example.com/logo.png"))
-        #expect(plan.request.streamURL == streamURL)
+        #expect(plan.request.target == .streamURL(streamURL))
         #expect(plan.request.sourceRef == sourceRef.rawValue)
     }
 
     @Test func `record now without EPG asks for a duration`() {
         #expect(RecordingRequestPlanner.recordNowWindow(programme: nil, now: now) == nil)
         #expect(RecordingRequestPlanner.recordNow(
-            streamURL: streamURL, channel: channel, programme: nil, now: now
+            target: .streamURL(streamURL), channel: channel, programme: nil, now: now
         ) == nil)
     }
 
@@ -92,7 +91,7 @@ struct RecordingRequestPlannerTests {
 
     @Test(arguments: RecordingRequestPlanner.FallbackDuration.allCases)
     func `fallback duration runs from now for the chosen length`(duration: RecordingRequestPlanner.FallbackDuration) {
-        let plan = RecordingRequestPlanner.recordNow(streamURL: streamURL, channel: channel, duration: duration, now: now)
+        let plan = RecordingRequestPlanner.recordNow(target: .streamURL(streamURL), channel: channel, duration: duration, now: now)
         #expect(plan.request.start == now)
         #expect(plan.request.end == now.addingTimeInterval(TimeInterval(duration.rawValue) * 60))
         #expect(plan.request.title == "News 24")
@@ -108,7 +107,7 @@ struct RecordingRequestPlannerTests {
     @Test func `schedule pads two minutes before and five after`() throws {
         let upcoming = programme(startOffset: 3600, endOffset: 7200)
         let plan = try #require(RecordingRequestPlanner.schedule(
-            streamURL: streamURL, channel: channel, programme: upcoming, now: now
+            target: .streamURL(streamURL), channel: channel, programme: upcoming, now: now
         ))
         #expect(plan.request.start == upcoming.start.addingTimeInterval(-2 * 60))
         #expect(plan.request.end == upcoming.end.addingTimeInterval(5 * 60))
@@ -117,17 +116,17 @@ struct RecordingRequestPlannerTests {
 
     @Test func `schedule refuses a programme already on air or over`() {
         #expect(RecordingRequestPlanner.schedule(
-            streamURL: streamURL, channel: channel, programme: programme(startOffset: -60, endOffset: 600), now: now
+            target: .streamURL(streamURL), channel: channel, programme: programme(startOffset: -60, endOffset: 600), now: now
         ) == nil)
         #expect(RecordingRequestPlanner.schedule(
-            streamURL: streamURL, channel: channel, programme: programme(startOffset: -600, endOffset: -60), now: now
+            target: .streamURL(streamURL), channel: channel, programme: programme(startOffset: -600, endOffset: -60), now: now
         ) == nil)
     }
 
     @Test func `blank programme title falls back to the channel name`() throws {
         let untitled = programme(startOffset: -60, endOffset: 600, title: "  ", description: "   ")
         let plan = try #require(RecordingRequestPlanner.recordNow(
-            streamURL: streamURL, channel: channel, programme: untitled, now: now
+            target: .streamURL(streamURL), channel: channel, programme: untitled, now: now
         ))
         #expect(plan.request.title == "News 24")
         #expect(plan.request.programmeDescription == nil)
@@ -180,13 +179,13 @@ struct RecordingRequestPlannerTests {
         let action = UUID()
         let airing = programme(startOffset: -60, endOffset: 600)
         let first = try #require(RecordingRequestPlanner.recordNow(
-            streamURL: streamURL, channel: channel, programme: airing, now: now, actionID: action
+            target: .streamURL(streamURL), channel: channel, programme: airing, now: now, actionID: action
         ))
         let again = try #require(RecordingRequestPlanner.recordNow(
-            streamURL: streamURL, channel: channel, programme: airing, now: now, actionID: action
+            target: .streamURL(streamURL), channel: channel, programme: airing, now: now, actionID: action
         ))
         let other = try #require(RecordingRequestPlanner.recordNow(
-            streamURL: streamURL, channel: channel, programme: airing, now: now
+            target: .streamURL(streamURL), channel: channel, programme: airing, now: now
         ))
         #expect(first.idempotencyKey == RecordingRequestPlanner.idempotencyKey(for: action))
         #expect(first.idempotencyKey == again.idempotencyKey)
@@ -218,9 +217,9 @@ struct RecordingRequestPlannerTests {
         #expect(!RecordingRequestPlanner.isCapturing(windowed(.completed, start: -60, end: 3600), now: now))
     }
 
-    private func windowed(_ status: RecordingStatus, start: TimeInterval, end: TimeInterval) -> Recording {
-        Recording(
-            id: UUID(),
+    private func windowed(_ status: ServerRecordingStatus, start: TimeInterval, end: TimeInterval) -> ServerRecording {
+        ServerRecording(
+            id: RecordingID(UUID()),
             title: "Show",
             sourceRef: sourceRef.rawValue,
             start: now.addingTimeInterval(start),
@@ -232,8 +231,8 @@ struct RecordingRequestPlannerTests {
 
     private func pending(
         for programme: RecordingRequestPlanner.Programme?,
-        in recordings: [Recording]
-    ) -> Recording? {
+        in recordings: [ServerRecording]
+    ) -> ServerRecording? {
         RecordingRequestPlanner.pendingRecording(for: sourceRef, programme: programme, now: now, in: recordings)
     }
 
@@ -289,6 +288,59 @@ struct RecordingRequestPlannerTests {
         #expect(match.map { RecordingRequestPlanner.isCapturing($0, now: now) } == true)
     }
 
+    @Test func `server padding sends the programme's own times`() throws {
+        let airing = programme(startOffset: -600, endOffset: 1200)
+        let upcoming = programme(startOffset: 1800, endOffset: 5400)
+        let target = RecordingCreateTarget.dispatcharrChannel(7)
+
+        let recordNow = try #require(RecordingRequestPlanner.recordNow(
+            target: target, channel: channel, programme: airing, now: now, padding: .server
+        ))
+        #expect(recordNow.request.target == target)
+        #expect(recordNow.request.start == airing.start)
+        #expect(recordNow.request.end == airing.end)
+
+        let scheduled = try #require(RecordingRequestPlanner.schedule(
+            target: target, channel: channel, programme: upcoming, now: now, padding: .server
+        ))
+        #expect(scheduled.request.start == upcoming.start)
+        #expect(scheduled.request.end == upcoming.end)
+    }
+
+    @Test func `only a request with an EPG programme carries it`() throws {
+        let airing = programme(startOffset: -600, endOffset: 1200)
+        let target = RecordingCreateTarget.dispatcharrChannel(7)
+
+        let fromProgramme = try #require(RecordingRequestPlanner.recordNow(
+            target: target, channel: channel, programme: airing, now: now, padding: .server
+        ))
+        #expect(fromProgramme.request.programme == DateInterval(start: airing.start, end: airing.end))
+
+        let fixed = RecordingRequestPlanner.recordNow(target: target, channel: channel, duration: .thirtyMinutes, now: now)
+        #expect(fixed.request.programme == nil)
+    }
+
+    @Test func `a server-padded schedule matches its programme, not its neighbours`() {
+        let onAir = programme(startOffset: -1800, endOffset: 600)
+        let next = programme(startOffset: 600, endOffset: 4200)
+        let later = programme(startOffset: 4200, endOffset: 7800)
+        // The server added 10 minutes either side and kept the programme's end.
+        var scheduled = windowed(.scheduled, start: 0, end: 4800)
+        scheduled.programmeEnd = next.end
+        #expect(pending(for: next, in: [scheduled])?.id == scheduled.id)
+        #expect(pending(for: later, in: [scheduled]) == nil)
+        // Opened early by the server's pre-roll: it's capturing, so the
+        // programme on air counts it too, as with Lume's own padding.
+        #expect(pending(for: onAir, in: [scheduled])?.id == scheduled.id)
+
+        let upcoming = programme(startOffset: 3600, endOffset: 7200)
+        var notYet = windowed(.scheduled, start: 3000, end: 7800)
+        notYet.programmeEnd = upcoming.end
+        #expect(pending(for: upcoming, in: [notYet])?.id == notYet.id)
+        #expect(pending(for: programme(startOffset: 7200, endOffset: 9000), in: [notYet]) == nil)
+        #expect(pending(for: programme(startOffset: -600, endOffset: 3600), in: [notYet]) == nil)
+    }
+
     @Test func `a running capture covers the programme on air and a live gap`() {
         let fallback = windowed(.recording, start: -600, end: 6600)
         #expect(pending(for: programme(startOffset: -300, endOffset: 1500), in: [fallback])?.id == fallback.id)
@@ -331,7 +383,7 @@ struct RecordingRequestPlannerTests {
 
     // MARK: - Source support
 
-    private static let allSourceTypes: [PlaylistSourceType] = [.xtream, .m3u, .stalker, .webdav, .jellyfin, .plex, .emby]
+    private static let allSourceTypes: [PlaylistSourceType] = [.xtream, .m3u, .stalker, .webdav, .jellyfin, .plex, .emby, .silo]
 
     /// Exhaustive on purpose: a new source type fails to compile here until its
     /// recording support is decided.
@@ -339,7 +391,7 @@ struct RecordingRequestPlannerTests {
         switch type {
         case .xtream, .m3u: (true, true)
         case .stalker: (true, false)
-        case .webdav, .jellyfin, .plex, .emby: (false, false)
+        case .webdav, .jellyfin, .plex, .emby, .silo: (false, false)
         }
     }
 

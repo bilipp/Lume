@@ -80,8 +80,8 @@ nonisolated enum EPGSourceReconciler {
             // ever be created for one — an orphan source would be retried by
             // the EPG scheduler forever.
             return nil
-        case .jellyfin, .emby, .plex:
-            // A Jellyfin, Emby or Plex server exposes no XMLTV guide URL
+        case .jellyfin, .emby, .plex, .silo:
+            // A Jellyfin, Emby, Plex or Silo server exposes no XMLTV guide URL
             // either (their Live TV guides, if any, are not synced), so the
             // same applies here.
             return nil

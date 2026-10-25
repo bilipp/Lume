@@ -31,7 +31,7 @@
                     connect
                 }
             }
-            .paywall(isPresented: $showPaywall, highlight: .trakt)
+            .paywall(isPresented: $showPaywall, highlight: .watchSync)
         }
 
         private var connect: some View {

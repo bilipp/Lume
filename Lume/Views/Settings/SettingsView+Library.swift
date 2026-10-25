@@ -232,12 +232,13 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
                         HStack(spacing: 16) {
                             Text("Categories & Channels")
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
                     .buttonStyle(TVSettingsRowButtonStyle())
+                    .focused($drillInFocus, equals: .contentManagement)
                     .disabled(activePlaylist == nil)
                     Text("Hide and reorder categories and channels for the active playlist.")
                         .font(.system(size: 20))

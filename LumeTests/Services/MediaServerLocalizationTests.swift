@@ -4,7 +4,7 @@
 //
 //  Every user-facing literal the media-server source types added — the shared
 //  form chrome plus the Jellyfin/Emby and Plex halves of the copy — asserted
-//  present and translated in all nine shipping locales. The WebDAV half is
+//  present and translated in every shipping locale. The WebDAV half is
 //  covered by `WebDAVLocalizationTests`.
 //
 
@@ -76,7 +76,7 @@ struct MediaServerLocalizationTests {
         formKeys + errorKeys + plexErrorKeys + browseKeys
     }
 
-    @Test func `every media server string is translated in all nine locales`() throws {
+    @Test func `every media server string is translated in every shipping locale`() throws {
         let catalog = try StringCatalog.localizable()
         for key in Self.allKeys {
             expectTranslatedEverywhere(key, in: catalog)

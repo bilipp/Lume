@@ -238,4 +238,35 @@ private func insertLiveStreams(into container: ModelContainer, categories: [Cate
     liveArchive.isFavorite = true
     liveArchive.categoryId = categories[2].id
     container.mainContext.insert(liveArchive)
+
+    // An m3u channel: catch-up is decided from the dialect plus the raw live
+    // URL, not from the absence of a `directURL`, so the previews have to carry
+    // a channel that only passes the gate through `catchupTypeRaw`.
+    let liveM3UArchive = PreviewData.sampleLiveStream
+    liveM3UArchive.id = "\(PreviewData.samplePlaylistID)-live-3"
+    liveM3UArchive.streamId = 102
+    liveM3UArchive.name = "Sky News (m3u)"
+    liveM3UArchive.epgChannelId = "SKYNEWS"
+    liveM3UArchive.directURL = "http://example.com:8080/skynews/video.m3u8"
+    liveM3UArchive.catchupType = .flussonic
+    liveM3UArchive.tvArchive = 1
+    liveM3UArchive.tvArchiveDuration = 3
+    liveM3UArchive.categoryId = categories[2].id
+    container.mainContext.insert(liveM3UArchive)
+
+    // Declared catch-up with no day count (`catchup="fs"` on its own): a stored
+    // duration of 0 means "depth unknown" and every badge must render its
+    // day-less variant instead of claiming a zero-day archive.
+    let liveM3UUnknownDepth = PreviewData.sampleLiveStream
+    liveM3UUnknownDepth.id = "\(PreviewData.samplePlaylistID)-live-4"
+    liveM3UUnknownDepth.streamId = 103
+    liveM3UUnknownDepth.name = "Euronews (m3u)"
+    liveM3UUnknownDepth.epgChannelId = "EURONEWS"
+    liveM3UUnknownDepth.directURL = "http://example.com:8080/live/euronews.m3u8"
+    liveM3UUnknownDepth.catchupType = .default
+    liveM3UUnknownDepth.catchupSource = "http://example.com:8080/live/euronews.m3u8?utc={utc}&lutc={now}"
+    liveM3UUnknownDepth.tvArchive = 1
+    liveM3UUnknownDepth.tvArchiveDuration = 0
+    liveM3UUnknownDepth.categoryId = categories[2].id
+    container.mainContext.insert(liveM3UUnknownDepth)
 }

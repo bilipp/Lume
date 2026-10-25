@@ -327,7 +327,7 @@
         private var heroMetaItems: [TVMetaItem] {
             var items: [TVMetaItem] = []
             if let date = DetailFormat.date(from: series.releaseDate)
-                ?? DetailFormat.year(from: series.releaseDate)
+                ?? DetailFormat.year(releaseDate: series.releaseDate, name: series.name)
             {
                 items.append(TVMetaItem(label: "Released", value: date))
             }
@@ -496,8 +496,7 @@
 
         func toggleWatched(_ episode: Episode) {
             episode.setWatched(!episode.isWatched)
-            TraktService.shared.syncWatched(episode: episode, watched: episode.isWatched)
-            SimklService.shared.syncWatched(episode: episode, watched: episode.isWatched)
+            WatchedTrackers.sync(episode: episode, watched: episode.isWatched)
             try? modelContext.save()
         }
 

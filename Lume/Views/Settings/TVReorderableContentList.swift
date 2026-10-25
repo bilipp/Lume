@@ -56,6 +56,9 @@
         /// When set, each row gains a trailing pencil that opens it (the
         /// Combined View member list); Select still lifts the row.
         var onEdit: ((Item) -> Void)?
+        /// The row to focus once the list appears — the Combined View member
+        /// whose detail just closed, so Menu lands back on it.
+        var focusOnAppear: String?
         /// Lets the host disable its type picker / Reset while a row is lifted,
         /// so they can't steal focus mid-move.
         @Binding var isReordering: Bool
@@ -83,6 +86,7 @@
             isRestricted: ((Item) -> Bool)? = nil,
             onToggleRestricted: ((Item) -> Void)? = nil,
             onEdit: ((Item) -> Void)? = nil,
+            focusOnAppear: String? = nil,
             toggleImage: @escaping (Bool) -> String = { $0 ? "eye.slash" : "eye" },
             toggleAccessibility: @escaping (Bool, String) -> String = { $0 ? "Show \($1)" : "Hide \($1)" }
         ) {
@@ -97,6 +101,7 @@
             self.isRestricted = isRestricted
             self.onToggleRestricted = onToggleRestricted
             self.onEdit = onEdit
+            self.focusOnAppear = focusOnAppear
             self.toggleImage = toggleImage
             self.toggleAccessibility = toggleAccessibility
         }
@@ -160,6 +165,20 @@
             .onChange(of: focusedID) { _, newValue in
                 guard let liftedID, newValue != liftedID else { return }
                 focusedID = liftedID
+            }
+            .onAppear(perform: focusRequestedRow)
+        }
+
+        /// Deferred: the rows only exist a render later. Asserted again once
+        /// the host's pane swap has handed focus into the list, which lands
+        /// on the first row.
+        private func focusRequestedRow() {
+            guard let target = focusOnAppear else { return }
+            Task { @MainActor in
+                focusedID = target
+                try? await Task.sleep(for: .milliseconds(150))
+                guard liftedID == nil, focusedID != target else { return }
+                focusedID = target
             }
         }
 
@@ -321,7 +340,7 @@
                         NavigationLink(value: drillValue) {
                             HStack(spacing: 10) {
                                 Text("Channels")
-                                Image(systemName: "chevron.right")
+                                Image(systemName: "chevron.forward")
                             }
                         }
                         .buttonStyle(TVContentActionButtonStyle())

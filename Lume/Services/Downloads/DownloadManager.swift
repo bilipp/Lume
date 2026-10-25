@@ -183,7 +183,7 @@ final class DownloadManager: NSObject {
         // m3u and media-server episodes carry their playback URL on the row;
         // the Xtream/Stalker builders have nothing to build from.
         let carriesDirectURL = switch playlist.sourceType {
-        case .m3u, .jellyfin, .emby, .plex: true
+        case .m3u, .jellyfin, .emby, .plex, .silo: true
         case .xtream, .stalker, .webdav: false
         }
         let directURL = carriesDirectURL ? episode.directSource.flatMap(URL.init(string:)) : nil
@@ -239,8 +239,7 @@ final class DownloadManager: NSObject {
     /// `nonisolated` so `didFinishDownloadingTo` can resolve the destination and
     /// move the file before returning, without hopping to the main actor first.
     nonisolated var downloadsDirectory: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Downloads", isDirectory: true)
+        DownloadStorage.directory
     }
 
     // MARK: - Private
@@ -445,7 +444,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         }
         Logger.downloads.info("Download complete: \(info.id)")
         Task { @MainActor in
-            self.finalizeDownload(taskID: taskID, info: info, destination: destination)
+            self.finalizeDownload(taskID: taskID, info: info)
         }
     }
 
@@ -509,8 +508,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
             Logger.downloads.info("Download complete: \(id)")
             self.finalizeDownload(
                 taskID: taskID,
-                info: DownloadTaskInfo(id: id, title: id, filename: filename),
-                destination: destination
+                info: DownloadTaskInfo(id: id, title: id, filename: filename)
             )
         }
     }
@@ -518,13 +516,15 @@ extension DownloadManager: URLSessionDownloadDelegate {
     /// Main-actor bookkeeping once the file is already in place: clear the live
     /// maps and persist the completed status.
     @MainActor
-    private func finalizeDownload(taskID: Int, info: DownloadTaskInfo, destination: URL) {
+    private func finalizeDownload(taskID: Int, info: DownloadTaskInfo) {
         _ = progressPublishGate.withLock { $0.removeValue(forKey: taskID) }
         idToFilename[info.id] = info.filename
         activeDownloads.removeValue(forKey: info.id)
         taskMap.removeValue(forKey: taskID)
         idToTask.removeValue(forKey: info.id)
-        scheduleModelUpdate(id: info.id, status: .completed, localURL: destination.path)
+        // The filename, not the path: the container path changes on every app
+        // update (see `DownloadStorage.file(forStored:)`).
+        scheduleModelUpdate(id: info.id, status: .completed, localURL: info.filename)
         noteLiveActivityCompleted()
         promoteIfNeeded()
     }

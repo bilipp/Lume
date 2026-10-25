@@ -66,7 +66,7 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         // full-catalog download walks everything.
         case .stalker: full ? xtreamSteps : stalkerDynamicSteps
         case .webdav: webdavSteps
-        case .jellyfin, .emby, .plex: mediaServerSteps
+        case .jellyfin, .emby, .plex, .silo: mediaServerSteps
         }
     }
 

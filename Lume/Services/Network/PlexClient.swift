@@ -468,13 +468,7 @@ nonisolated enum PlexPlaybackAuth {
     }
 
     static func authenticatedURL(_ url: URL, headers: [String: String]?) -> URL? {
-        guard let token = token(from: headers),
-              var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        else { return nil }
-        var items = components.queryItems ?? []
-        guard !items.contains(where: { $0.name == PlexClient.tokenQueryItem }) else { return url }
-        items.append(URLQueryItem(name: PlexClient.tokenQueryItem, value: token))
-        components.queryItems = items
-        return components.url
+        guard let token = token(from: headers) else { return nil }
+        return url.addingQueryItemIfAbsent(name: PlexClient.tokenQueryItem, value: token)
     }
 }

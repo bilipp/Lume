@@ -37,6 +37,11 @@ struct LumeApp: App {
         let (catalog, cloud) = Self.makeModelContainers()
         catalogContainer = catalog
         cloudContainer = cloud
+        #if os(iOS) && canImport(GoogleCast)
+            // Here rather than in the launch task: the app delegate's launch hook
+            // can resume a Cast session, which may end before that task runs.
+            CastService.shared.progressCommitter = CastProgressCommitter(container: catalog)
+        #endif
         let coordinator = CloudSyncCoordinator(
             catalogContainer: catalog,
             cloudContainer: cloud,
@@ -192,12 +197,19 @@ struct LumeApp: App {
             // sync coordinator skips every `CKContainer`/`accountStatus` call.
             return false
         #else
-            let environment = ProcessInfo.processInfo.environment
-            let isPreview = environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
-            let isUnitTest = environment["XCTestConfigurationFilePath"] != nil
-            let isUITest = CommandLine.arguments.contains("-ui-testing")
-            return !(isPreview || isUnitTest || isUITest)
+            return !isTestOrPreviewHost
         #endif
+    }()
+
+    /// Whether this process is a SwiftUI preview, a unit-test host or a UI-test
+    /// run — contexts that are unsigned for CloudKit and must not reach out to
+    /// real devices.
+    static let isTestOrPreviewHost: Bool = {
+        let environment = ProcessInfo.processInfo.environment
+        let isPreview = environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        let isUnitTest = environment["XCTestConfigurationFilePath"] != nil
+        let isUITest = CommandLine.arguments.contains("-ui-testing")
+        return isPreview || isUnitTest || isUITest
     }()
 
     private static var cloudKitDatabase: ModelConfiguration.CloudKitDatabase {
@@ -223,6 +235,34 @@ struct LumeApp: App {
     /// `.preferredColorScheme` can't do this. The players stay unaffected —
     /// they force dark themselves.
     @AppStorage(AppAppearance.storageKey) private var appearanceRaw = AppAppearance.defaultValue.rawValue
+
+    /// Rebuilds the shared widget / Top Shelf snapshot off the main actor. Cheap
+    /// enough to run on every launch and backgrounding: a handful of bounded
+    /// fetches. Held under a background-task assertion so a backgrounding
+    /// export finishes instead of being suspended mid-write. A no-op on macOS
+    /// and visionOS, which ship no extension to read it.
+    ///
+    /// The export reads the store through its own context, so the main
+    /// context's pending edits are saved first: the favorites manager removes
+    /// and reorders without saving, and autosave may not have run by the time
+    /// the app backgrounds — the shelf would keep an unfavorited title.
+    private func exportWidgetSnapshot() {
+        #if os(iOS) || os(tvOS)
+            let container = catalogContainer
+            if container.mainContext.hasChanges {
+                try? container.mainContext.save()
+            }
+            let isChild = profileManager.activeProfileIsChild
+            let isPremium = PremiumManager.shared.isPremium
+            Task {
+                await BackgroundActivity.perform("Widget snapshot") {
+                    await Task.detached(priority: .utility) {
+                        WidgetSnapshotExporter.export(container: container, isChildProfile: isChild, isPremium: isPremium)
+                    }.value
+                }
+            }
+        #endif
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -304,9 +344,11 @@ struct LumeApp: App {
                     // the guide refresh behind the network.
                     Task { await TraktService.shared.restore() }
 
-                    // Same for Simkl (a second tracker integration, AUTH V2
-                    // device flow): refresh stale tokens, restore the username.
+                    // Same for Simkl and MDBList (the other tracker
+                    // integrations, both device-flow OAuth): refresh stale
+                    // tokens, restore the username.
                     Task { await SimklService.shared.restore() }
+                    Task { await MDBListService.shared.restore() }
 
                     // Restore the OpenSubtitles session (a keychain read, no
                     // network) so the in-player subtitle search can download
@@ -340,6 +382,10 @@ struct LumeApp: App {
                     // nothing is pending (see `EPGRefreshGate`).
                     EPGSyncService.shared.configure(container: catalogContainer)
                     EPGSyncService.shared.syncIfDue()
+
+                    // Seed the widget / Top Shelf snapshot once services are up
+                    // (after profile bootstrap, so the catalog is profile-scoped).
+                    exportWidgetSnapshot()
                 }
                 .onChange(of: cloudSync.status.lastReconcile) {
                     // A reconcile may have pulled a PIN this device didn't have
@@ -352,6 +398,10 @@ struct LumeApp: App {
                     SportsFollowService.shared.reload()
                     // Or pulled/deduped the paired recording server.
                     RecordingServerConfigService.shared.reload()
+                    // Or merged favorites and watch state from another device —
+                    // the background flush's pass lands after that phase's own
+                    // export, so the widgets and Top Shelf need another one.
+                    exportWidgetSnapshot()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     DiagnosticSession.scenePhaseChanged(to: phase)
@@ -370,6 +420,11 @@ struct LumeApp: App {
                             ImageMemoryCache.shared.purge(reason: "app backgrounded")
                         }
                     #endif
+                    // Leaving the foreground is the natural refresh point for
+                    // widgets: progress/favorites changed while the app was open.
+                    if phase == .background {
+                        exportWidgetSnapshot()
+                    }
                 }
                 .appAppearance(AppAppearance.resolve(appearanceRaw))
         }

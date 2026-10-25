@@ -114,7 +114,7 @@ import SwiftUI
                     } label: {
                         HStack(spacing: 8) {
                             combinedLabel
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.tertiary)
                         }
@@ -215,12 +215,13 @@ import SwiftUI
                             PremiumBadge()
                         }
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.tertiary)
                     }
                 }
                 .buttonStyle(TVSettingsRowButtonStyle())
+                .focused($drillInFocus, equals: .combinedView)
                 Text("Browse Live TV, Movies and Series from several playlists together.")
                     .font(.system(size: 20))
                     .foregroundStyle(.secondary)
@@ -306,6 +307,7 @@ import SwiftUI
                     Image(systemName: "pencil")
                 }
                 .buttonStyle(TVContentIconButtonStyle())
+                .focused($drillInFocus, equals: .playlist(playlist.id))
                 .accessibilityLabel("Edit \(playlist.name)")
             }
         }

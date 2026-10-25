@@ -3,9 +3,10 @@
 //  Lume
 //
 //  The Media Server half of the add-playlist form: one URL field whose server
-//  kind — Jellyfin, Emby, Plex or WebDAV — is detected, not picked. Detection
-//  lives here; the per-kind connection tests stay in `WebDAVAddCheck` /
-//  `JellyfinAddCheck` / `PlexAddCheck`, which this delegates to.
+//  kind — Jellyfin, Emby, Plex, Silo or WebDAV — is detected, not picked.
+//  Detection lives here; the per-kind connection tests stay in
+//  `WebDAVAddCheck` / `JellyfinAddCheck` / `PlexAddCheck` / `SiloAddCheck`,
+//  which this delegates to.
 //
 
 import SwiftUI
@@ -48,7 +49,7 @@ import SwiftUI
                 Text("Media Server")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Enter your server address — Lume recognizes Jellyfin, Emby and Plex servers and WebDAV shares automatically.")
+                    Text("Enter your server address — Lume recognizes Jellyfin, Emby, Plex and Silo servers and WebDAV shares automatically.")
                     Text("For a WebDAV share, enter the full path of the folder that holds your media — a server's root address usually isn't browsable.")
                     Text("Leave the username and password empty for an anonymous share. For Plex, enter your Plex account — or paste an X-Plex-Token in the password field.")
                     Text("The first connection asks permission to find devices on your local network. If you decline it, only the system Settings app can allow it again.")
@@ -142,13 +143,16 @@ enum MediaServerType: Equatable {
     /// flavour only decides which product the copy and the rows name.
     case mediaServer(MediaServerFlavor)
     case plex
+    /// Recognized by its own API; verified and stored as a Jellyfin-flavoured
+    /// server once `SiloAddCheck` has found its compatible service.
+    case silo
     case webdav
 }
 
 enum MediaServerError: Error, Equatable {
     /// No probe recognized the address.
     case unsupported
-    /// A Jellyfin or Emby server was detected but no username was entered.
+    /// A Jellyfin, Emby or Silo server was detected but no username was entered.
     case missingCredentials
 }
 
@@ -195,6 +199,13 @@ enum MediaServerAddCheck {
             let user = input.username.trimmingCharacters(in: .whitespacesAndNewlines)
             let verified = try await PlexAddCheck.verify(.init(url: input.url, username: user, password: input.password), urlSession: urlSession)
             return .plex(serverURL: verified.serverURL, token: verified.token)
+        case .silo:
+            let user = input.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !user.isEmpty else {
+                throw MediaServerError.missingCredentials
+            }
+            let verified = try await SiloAddCheck.verify(.init(url: input.url, username: user, password: input.password), urlSession: urlSession)
+            return .mediaServer(serverURL: verified.serverURL, flavor: verified.flavor, session: verified.session)
         case .webdav:
             let user = input.username.trimmingCharacters(in: .whitespacesAndNewlines)
             let url = try await WebDAVAddCheck.verify(.init(url: input.url, username: user, password: input.password), urlSession: urlSession)
@@ -203,9 +214,11 @@ enum MediaServerAddCheck {
     }
 
     /// Runs the probes in order, cheapest and most specific first: the
-    /// Jellyfin/Emby public endpoint and Plex's `/identity` both answer
-    /// without credentials, so either is recognized before any login attempt,
-    /// and WebDAV — the one kind with no identifying endpoint — is left last.
+    /// Jellyfin/Emby public endpoint, Silo's `/api/v2/system/info` and Plex's
+    /// `/identity` all answer without credentials, so each is recognized
+    /// before any login attempt, and WebDAV — the one kind with no
+    /// identifying endpoint — is left last. Silo goes before Plex because its
+    /// web app answers every unknown path with its HTML shell.
     /// A `401` to the WebDAV probe still means WebDAV: a share demanding
     /// credentials.
     ///
@@ -220,6 +233,14 @@ enum MediaServerAddCheck {
             return try await .mediaServer(JellyfinClient(urlSession: urlSession).probe(server: server))
         } catch let error as JellyfinError {
             if case .networkError = error {
+                networkError = error
+            }
+        }
+        do {
+            try await SiloClient(urlSession: urlSession).probe(server: server)
+            return .silo
+        } catch let error as SiloError {
+            if case .networkError = error, networkError == nil {
                 networkError = error
             }
         }
@@ -260,6 +281,13 @@ enum MediaServerAddCheck {
                 timedOut: false
             )
         }
+        if error is SiloError {
+            return SiloAddCheck.message(
+                for: error,
+                input: .init(url: input.url, username: input.username, password: input.password),
+                timedOut: false
+            )
+        }
         if error is PlexError {
             return PlexAddCheck.message(
                 for: error,
@@ -279,7 +307,7 @@ enum MediaServerAddCheck {
         }
         switch serverError {
         case .unsupported:
-            return String(localized: "Lume couldn't recognize a media server at that address. Enter your Jellyfin, Emby or Plex server's base address, or the full path of a WebDAV folder.")
+            return String(localized: "Lume couldn't recognize a media server at that address. Enter your Jellyfin, Emby, Plex or Silo server's base address, or the full path of a WebDAV folder.")
         case .missingCredentials:
             return String(localized: "This server needs a username and password. Enter them and try again.")
         }
@@ -288,7 +316,7 @@ enum MediaServerAddCheck {
     /// tvOS hint copy. One line, because the tvOS form shows a single hint
     /// under the fields.
     static var hint: LocalizedStringKey {
-        "Enter your server address — Jellyfin, Emby, Plex and WebDAV are detected automatically. A declined local network prompt can only be allowed again in Settings."
+        "Enter your server address — Jellyfin, Emby, Plex, Silo and WebDAV are detected automatically. A declined local network prompt can only be allowed again in Settings."
     }
 }
 

@@ -17,8 +17,12 @@
         private var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
         @AppStorage(PlayerSettings.Playback.showSkipIntroButtonKey)
         private var showSkipIntroButton = PlayerSettings.Playback.showSkipIntroButtonDefault
+        @AppStorage(PlayerSettings.Playback.chooseSourceBeforePlayingKey)
+        private var chooseSourceBeforePlaying = PlayerSettings.Playback.chooseSourceBeforePlayingDefault
         @AppStorage(PlayerSettings.Playback.rotateToLandscapeKey)
         private var rotateToLandscape = PlayerSettings.Playback.rotateToLandscapeDefault
+        @AppStorage(PlayerSettings.Playback.liveQualitySwitchKey)
+        private var liveQualitySwitch = PlayerSettings.Playback.liveQualitySwitchDefault
         @AppStorage(PlayerSettings.StreamInfo.enabledKey)
         private var streamInfoEnabled = PlayerSettings.StreamInfo.enabledDefault
         @AppStorage(PlayerSettings.StreamInfo.detailLevelKey)
@@ -64,6 +68,15 @@
                     }
                 }
 
+                // Free, like the stream caption below.
+                Section {
+                    Toggle("Choose Source Before Playing", isOn: $chooseSourceBeforePlaying)
+                } header: {
+                    Text("Sources")
+                } footer: {
+                    Text("When a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the server's first version.")
+                }
+
                 Section {
                     NavigationLink("Audio Languages") { PreferredLanguageListView() }
                 } header: {
@@ -93,6 +106,14 @@
                     if openSubtitles.isConfigured {
                         Text("Download subtitles for anything that ships without them.")
                     }
+                }
+
+                Section {
+                    Toggle("Show Quality Switch", isOn: $liveQualitySwitch)
+                } header: {
+                    Text("Live TV")
+                } footer: {
+                    Text("While watching a live channel, switch to the same channel in another quality, such as HD, FHD or 4K, when your playlist lists it more than once.")
                 }
 
                 // Free for everyone — deliberately not premium-gated like the
@@ -233,7 +254,7 @@
                             HStack {
                                 Text(kind.displayName)
                                 Spacer()
-                                Image(systemName: "chevron.right")
+                                Image(systemName: "chevron.forward")
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(.tertiary)
                             }

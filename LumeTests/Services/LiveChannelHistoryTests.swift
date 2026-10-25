@@ -177,6 +177,28 @@ struct LiveChannelHistoryTests {
             .contentRef == alpha.contentRef)
     }
 
+    @Test func `a quality switch leaves recall and recents on the tuned channel`() throws {
+        let (context, playlist) = try makeWorld(streams: threeChannels + [
+            (num: 4, name: "Bravo 4K", category: "cat-4k")
+        ])
+        let defaults = try makeDefaults()
+        let alpha = try media(forStreamId: 100, playlist: playlist, in: context)
+        let bravo = try media(forStreamId: 101, playlist: playlist, in: context)
+        LiveChannelHistory.record(alpha, defaults: defaults)
+        LiveChannelHistory.record(bravo, defaults: defaults)
+        let recentsBefore = LiveChannelHistory.recentChannelIds(defaults: defaults)
+
+        // Recording the variant (a window restored onto it) records Bravo.
+        let variant = try media(forStreamId: 103, playlist: playlist, in: context)
+            .asQualityVariant(anchoredAt: channelId(forStreamId: 101, playlist: playlist))
+        LiveChannelHistory.record(variant, defaults: defaults)
+
+        #expect(variant.historyRef == bravo.contentRef)
+        #expect(LiveChannelHistory.recallMedia(in: context, restriction: unrestricted, defaults: defaults)?
+            .contentRef == alpha.contentRef)
+        #expect(LiveChannelHistory.recentChannelIds(defaults: defaults) == recentsBefore)
+    }
+
     /// Hides a channel in Content Management, as the settings screen would.
     private func hide(streamId: Int, playlist: Playlist, in context: ModelContext) throws {
         let id = "\(playlist.id.uuidString)-live-\(streamId)"

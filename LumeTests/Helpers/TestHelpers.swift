@@ -45,6 +45,13 @@ func exampleDataURL(_ filename: String, filePath: String = #filePath) -> URL {
     repoRootURL(filePath: filePath).appendingPathComponent("ExampleData/\(filename)")
 }
 
+/// A committed Dispatcharr fixture, read from disk (not the test bundle, which
+/// flattens resources).
+func dispatcharrFixture(_ name: String, filePath: String = #filePath) throws -> String {
+    let url = repoRootURL(filePath: filePath).appendingPathComponent("LumeTests/Fixtures/Dispatcharr/\(name)")
+    return try String(contentsOf: url, encoding: .utf8)
+}
+
 func loadExampleJSON<T: Decodable>(_ filename: String, filePath: String = #filePath) throws -> T {
     let url = exampleDataURL(filename, filePath: filePath)
     let data = try Data(contentsOf: url)
@@ -125,9 +132,22 @@ struct StringCatalog {
 /// The locales Lume ships. `en` is the catalog's source language and carries no
 /// `stringUnit` of its own for all but a handful of entries, so its value is the
 /// key itself.
-let shippingLocales: Set<String> = ["en", "de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
+let shippingLocales: Set<String> = ["ar", "en", "de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
 
 extension StringCatalog {
+    /// Every key in the catalog.
+    var keys: [String] {
+        Array(strings.keys)
+    }
+
+    /// The English text of `key`: its own `en` unit where one exists, otherwise
+    /// the key itself.
+    func sourceValue(for key: String) -> String {
+        let localizations = rawEntry(for: key)?["localizations"] as? [String: Any]
+        let unit = (localizations?[sourceLanguage] as? [String: Any])?["stringUnit"] as? [String: Any]
+        return unit?["value"] as? String ?? key
+    }
+
     /// The languages whose translation of `key` is present, non-empty *and* in
     /// the `translated` state, plus the source language when the key exists at
     /// all. State is part of the answer: a `new` or `needs_review` unit still

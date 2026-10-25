@@ -69,6 +69,7 @@ extension Series {
         // materialize for Xtream and Stalker.
         TraktWatchedImporter.applyPending(to: self)
         SimklWatchedImporter.applyPending(to: self)
+        MDBListWatchedImporter.applyPending(to: self)
         episodesFetchedAt = Date()
         episodesFetchedLastModified = lastModified
         try? context.save()

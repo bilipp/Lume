@@ -37,6 +37,10 @@
         /// remote's up/down move it, and nothing is written until it's placed.
         @State private var isReordering = false
         @State private var detailID: UUID?
+        /// The playlist whose detail just closed, focused again in the list —
+        /// among the members or, once excluded, under Not Included.
+        @State private var returnFocusID: UUID?
+        @FocusState private var focusedNonMember: UUID?
 
         /// Hands focus across a swap between the list and a detail, which
         /// removes the focused row (`SettingsView.beginContentManagementHandoff`).
@@ -62,13 +66,9 @@
                             list(proxy: proxy)
                         }
                     }
-                    .frame(maxWidth: TVSettingsMetrics.detailMaxWidth, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 48)
-                    .padding(.vertical, 72)
+                    .tvSettingsPaneContent()
                 }
             }
-            .tvSettingsBackground()
         }
 
         // MARK: - List
@@ -123,7 +123,8 @@
                     onCommitOrder: commitOrder,
                     isReordering: $isReordering,
                     scrollProxy: proxy,
-                    onEdit: { open($0.playlist) }
+                    onEdit: { open($0.playlist) },
+                    focusOnAppear: returnFocusID?.uuidString
                 )
             }
         }
@@ -139,12 +140,13 @@
                             Text(verbatim: playlist.name)
                                 .lineLimit(1)
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
                     .buttonStyle(TVSettingsRowButtonStyle())
+                    .focused($focusedNonMember, equals: playlist.id)
                 }
             }
             .disabled(isReordering)
@@ -185,7 +187,15 @@
 
         private func closeDetail() {
             beginHandoff()
+            returnFocusID = detailID
             detailID = nil
+            guard let id = returnFocusID, nonMembers.contains(where: { $0.id == id }) else { return }
+            // Same deferral and re-assert as the member list's.
+            Task { @MainActor in
+                focusedNonMember = id
+                try? await Task.sleep(for: .milliseconds(150))
+                if focusedNonMember != id { focusedNonMember = id }
+            }
         }
 
         // MARK: - Writes

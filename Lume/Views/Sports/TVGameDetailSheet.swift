@@ -31,6 +31,9 @@
         /// one fixture itself (see `GameDetailSheet`).
         let resolved: [ResolvedChannel]
         var onWatch: (ResolvedChannel) -> Void
+        /// The channel to land focus on — the one just watched, when Back from
+        /// the player reopens this game.
+        var focusChannelID: String?
         var provider: any SportsDataProvider = ESPNClient.shared
 
         @Environment(\.dismiss) private var dismiss
@@ -44,6 +47,7 @@
         @State private var tab: GameDetailTab = .timeline
         @State private var selfResolved: [ResolvedChannel] = []
         @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
+        @FocusState private var focusedChannel: String?
 
         private var channels: [ResolvedChannel] {
             resolved.isEmpty ? selfResolved : resolved
@@ -65,8 +69,11 @@
                 .padding(.vertical, 70)
             }
             .scrollClipDisabled()
+            .defaultFocus($focusedChannel, focusChannelID, priority: .userInitiated)
             .background(background.ignoresSafeArea())
             .onExitCommand { dismiss() }
+            .onAppear(perform: restoreChannelFocus)
+            .onChange(of: selfResolved) { restoreChannelFocus() }
             .task(id: fixture.id) { await loadDetail() }
             .onAppear { SportsSyncService.shared.beginLivePolling() }
             .onDisappear { SportsSyncService.shared.endLivePolling() }
@@ -310,12 +317,23 @@
                 .padding(.vertical, 24)
             }
             .buttonStyle(TVGlassButtonStyle())
+            .focused($focusedChannel, equals: channel.id)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text("Watch on \(channel.stream.name)"))
         }
 
         private func channelRow(_ channel: ResolvedChannel) -> some View {
             TVSportsChannelRow(channel: channel, onPlay: { onWatch(channel) })
+                .focused($focusedChannel, equals: channel.id)
+        }
+
+        /// `defaultFocus` alone doesn't take in a freshly presented cover, and
+        /// a self-resolved list only fills in after appearance; place focus
+        /// once the row exists, deferred out of the presentation transaction.
+        private func restoreChannelFocus() {
+            guard let focusChannelID, focusedChannel == nil,
+                  channels.contains(where: { $0.id == focusChannelID }) else { return }
+            Task { @MainActor in focusedChannel = focusChannelID }
         }
 
         private func channelName(_ channel: ResolvedChannel, size: CGFloat) -> some View {

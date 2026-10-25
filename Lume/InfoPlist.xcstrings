@@ -14,61 +14,67 @@
       }
     },
     "NSLocalNetworkUsageDescription" : {
-      "comment" : "Permission prompt shown when Lume first reaches a media server, WebDAV share or recording server on the local network.",
+      "comment" : "Permission prompt shown when Lume first looks for TVs and Cast devices, or reaches a media server, WebDAV share or recording server, on the local network.",
       "extractionState" : "manual",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحتاج Lume إلى الوصول إلى شبكتك المحلية للوصول إلى خوادم الوسائط ومجلدات WebDAV المشتركة وخوادم التسجيل التي تعمل عليها."
+          }
+        },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume benötigt Zugriff auf dein lokales Netzwerk, um darin laufende Medienserver, WebDAV-Freigaben und Aufnahmeserver zu erreichen."
+            "value" : "Lume benötigt Zugriff auf dein lokales Netzwerk, um Fernseher und Cast-Geräte zu finden und darin laufende Medienserver, WebDAV-Freigaben und Aufnahmeserver zu erreichen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it."
+            "value" : "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume necesita acceso a tu red local para conectarse a los servidores multimedia, recursos compartidos WebDAV y servidores de grabación que se ejecutan en ella."
+            "value" : "Lume necesita acceso a tu red local para encontrar televisores y dispositivos Cast, y para conectarse a los servidores multimedia, recursos compartidos WebDAV y servidores de grabación que se ejecutan en ella."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume a besoin d’accéder à votre réseau local pour atteindre les serveurs multimédias, les partages WebDAV et les serveurs d’enregistrement qui s’y trouvent."
+            "value" : "Lume a besoin d’accéder à votre réseau local pour trouver les téléviseurs et les appareils Cast, et pour atteindre les serveurs multimédias, les partages WebDAV et les serveurs d’enregistrement qui s’y trouvent."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume ha bisogno di accedere alla rete locale per raggiungere i server multimediali, le condivisioni WebDAV e i server di registrazione presenti su di essa."
+            "value" : "Lume ha bisogno di accedere alla rete locale per trovare TV e dispositivi Cast e per raggiungere i server multimediali, le condivisioni WebDAV e i server di registrazione presenti su di essa."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume は、ローカルネットワーク上のメディアサーバー、WebDAV 共有、録画サーバーに接続するためにアクセス権が必要です。"
+            "value" : "Lume は、テレビや Cast デバイスを見つけたり、ローカルネットワーク上のメディアサーバー、WebDAV 共有、録画サーバーに接続したりするためにアクセス権が必要です。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume가 로컬 네트워크에서 실행 중인 미디어 서버, WebDAV 공유 및 녹화 서버에 연결하려면 접근 권한이 필요합니다."
+            "value" : "Lume가 TV와 Cast 기기를 찾고 로컬 네트워크에서 실행 중인 미디어 서버, WebDAV 공유 및 녹화 서버에 연결하려면 접근 권한이 필요합니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Lume precisa de acesso à sua rede local para alcançar servidores de mídia, compartilhamentos WebDAV e servidores de gravação em execução nela."
+            "value" : "O Lume precisa de acesso à sua rede local para encontrar TVs e dispositivos Cast e para alcançar servidores de mídia, compartilhamentos WebDAV e servidores de gravação em execução nela."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lume 需要访问您的本地网络，以连接其中运行的媒体服务器、WebDAV 共享和录制服务器。"
+            "value" : "Lume 需要访问您的本地网络，以查找电视和 Cast 设备，并连接其中运行的媒体服务器、WebDAV 共享和录制服务器。"
           }
         }
       }

@@ -247,7 +247,7 @@ struct ContentManagementView: View {
                                     Image(systemName: "heart.fill")
                                     Text("Favorites")
                                     Spacer()
-                                    Image(systemName: "chevron.right")
+                                    Image(systemName: "chevron.forward")
                                 }
                             }
                             .buttonStyle(TVContentActionButtonStyle())
@@ -262,13 +262,9 @@ struct ContentManagementView: View {
 
                         tvCategoryList(proxy: proxy)
                     }
-                    .frame(maxWidth: TVSettingsMetrics.detailMaxWidth, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 48)
-                    .padding(.vertical, 72)
+                    .tvSettingsPaneContent()
                 }
             }
-            .tvSettingsBackground()
         }
 
         private var tvMemberPicker: some View {
@@ -352,7 +348,7 @@ struct ContentManagementView: View {
                             Text("Favorites")
                                 .foregroundStyle(.primary)
                             Spacer()
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
@@ -494,7 +490,7 @@ struct ContentManagementView: View {
                         HStack(spacing: 4) {
                             Text("Channels")
                                 .font(.callout)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.caption2)
                                 .fontWeight(.semibold)
                         }

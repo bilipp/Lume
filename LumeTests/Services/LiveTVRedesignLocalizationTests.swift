@@ -3,7 +3,7 @@
 //  LumeTests
 //
 //  Every user-facing literal the tvOS Live TV redesign added, asserted present
-//  and translated in all nine shipping locales, with the printf arguments of
+//  and translated in every shipping locale, with the printf arguments of
 //  each translation matching its key. The catalog is read directly: an English
 //  key resolves to itself whether or not it is catalogued.
 //
@@ -39,7 +39,7 @@ struct LiveTVRedesignLocalizationTests {
         "Remove from Favorites"
     ]
 
-    @Test func `every Live TV redesign string is translated in all nine locales`() throws {
+    @Test func `every Live TV redesign string is translated in every shipping locale`() throws {
         let catalog = try StringCatalog.localizable()
         for key in Self.newKeys + Self.reusedKeys {
             expectTranslatedEverywhere(key, in: catalog)

@@ -3,7 +3,7 @@
 //  LumeTests
 //
 //  Every user-facing literal Combined playlists (#204) added, asserted present
-//  and translated in all nine shipping locales with the English printf
+//  and translated in every shipping locale with the English printf
 //  specifiers intact.
 //
 
@@ -57,7 +57,7 @@ struct CombinedPlaylistsLocalizationTests {
         selectionKeys + settingsKeys + footerKeys + browseKeys
     }
 
-    @Test func `every Combined playlists string is translated in all nine locales`() throws {
+    @Test func `every Combined playlists string is translated in every shipping locale`() throws {
         let catalog = try StringCatalog.localizable()
         for key in Self.allKeys {
             expectTranslatedEverywhere(key, in: catalog)

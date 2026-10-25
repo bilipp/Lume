@@ -3,7 +3,7 @@
 //  LumeTests
 //
 //  Every user-facing literal the macOS player volume control added, asserted
-//  present and translated in all nine shipping locales. The control only
+//  present and translated in every shipping locale. The control only
 //  compiles on macOS, so the catalog is read directly rather than resolved.
 //
 
@@ -21,7 +21,7 @@ struct PlayerVolumeLocalizationTests {
         "Volume"
     ]
 
-    @Test func `every player volume string is translated in all nine locales`() throws {
+    @Test func `every player volume string is translated in every shipping locale`() throws {
         let catalog = try StringCatalog.localizable()
         for key in Self.newKeys {
             expectTranslatedEverywhere(key, in: catalog)

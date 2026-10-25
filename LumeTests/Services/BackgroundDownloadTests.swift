@@ -100,7 +100,7 @@ struct DownloadRecoveryTests {
 
         let movie = try #require(try ModelContext(container).fetch(FetchDescriptor<Movie>()).first)
         #expect(movie.downloadStatus == .completed)
-        #expect(movie.localFileURL == file.path)
+        #expect(movie.localFileURL == "landed.mp4")
         #expect(movie.downloadedAt != nil)
     }
 
@@ -141,5 +141,65 @@ struct DownloadRecoveryTests {
         let movie = try #require(try ModelContext(container).fetch(FetchDescriptor<Movie>()).first)
         #expect(movie.downloadStatus == .completed)
         #expect(movie.localFileURL == "/some/path/done.mp4")
+    }
+}
+
+@Suite("Downloaded file resolution", .serialized)
+struct DownloadedFileResolutionTests {
+    /// Writes a file into the real downloads directory, as a finished download would.
+    private func plantDownload(named filename: String) throws -> URL {
+        try FileManager.default.createDirectory(at: DownloadStorage.directory, withIntermediateDirectories: true)
+        let file = DownloadStorage.directory.appendingPathComponent(filename)
+        try Data("video".utf8).write(to: file)
+        return file
+    }
+
+    @Test
+    func `a stored filename resolves into the downloads directory`() throws {
+        let filename = "resolve-\(UUID().uuidString).mp4"
+        let file = try plantDownload(named: filename)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        #expect(DownloadStorage.file(forStored: filename)?.path == file.path)
+    }
+
+    @Test
+    func `a legacy absolute path from a moved container still resolves`() throws {
+        // iOS moves the data container to a new UUID on every app update, so a
+        // path stored by an older build points into a container that no longer
+        // exists, while the file itself sits in the current one.
+        let filename = "legacy-\(UUID().uuidString).mp4"
+        let file = try plantDownload(named: filename)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let stale = "/var/mobile/Containers/Data/Application/\(UUID().uuidString)/Documents/Downloads/\(filename)"
+
+        #expect(DownloadStorage.file(forStored: stale)?.path == file.path)
+    }
+
+    @Test
+    func `nothing resolves when the file is gone`() {
+        #expect(DownloadStorage.file(forStored: nil) == nil)
+        #expect(DownloadStorage.file(forStored: "") == nil)
+        #expect(DownloadStorage.file(forStored: "missing-\(UUID().uuidString).mp4") == nil)
+    }
+
+    @Test
+    func `a completed movie with a stale path plays the local file, not the stream`() throws {
+        let filename = "offline-\(UUID().uuidString).mp4"
+        let file = try plantDownload(named: filename)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let playlist = Playlist(name: "P", serverURL: "http://provider.example:8080", username: "u", password: "p")
+        let movie = Movie(id: "\(playlist.id.uuidString)-movie-1", streamId: 1, name: "Offline")
+        movie.downloadStatus = .completed
+        movie.localFileURL = "/var/mobile/Containers/Data/Application/OLD/Documents/Downloads/\(filename)"
+
+        let media = try #require(PlayableMedia.from(movie: movie, playlist: playlist))
+        #expect(media.url.isFileURL)
+        #expect(media.url.path == file.path)
+
+        // Not completed: the stream, even though a file with that name exists.
+        movie.downloadStatus = .downloading
+        #expect(movie.downloadedFile == nil)
     }
 }

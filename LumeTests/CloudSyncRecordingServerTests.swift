@@ -130,4 +130,50 @@ struct CloudSyncRecordingServerTests {
         #expect(remaining.first?.token == "secret")
         #expect(result.recordingServersKept == 1)
     }
+
+    @Test func `rows of different kinds sharing a server id are not duplicates`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let serverID = UUID()
+        ctx.insert(SyncedRecordingServer(
+            kind: .lumeRecorder, name: "Recorder", baseURL: "http://10.0.0.2:8090", serverID: serverID,
+            token: "recorder", updatedAt: Date(timeIntervalSince1970: 1000)
+        ))
+        ctx.insert(SyncedRecordingServer(
+            kind: .dispatcharr, name: "Dispatcharr", baseURL: "http://10.0.0.2:9191", serverID: serverID,
+            token: DispatcharrCredential.apiKey("k").token, updatedAt: Date(timeIntervalSince1970: 2000)
+        ))
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        #expect(try ctx.fetch(FetchDescriptor<SyncedRecordingServer>()).count == 2)
+        #expect(result.recordingServersDeduped == 0)
+    }
+
+    @Test func `signing in to Dispatcharr from two devices collapses on reconcile`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let credential = DispatcharrCredential.login(username: "viewer", password: "pw")
+        let serverID = RecordingServerIdentity.uuid(
+            kind: .dispatcharr, host: "10.0.0.2", port: 9191, user: credential.identityUser
+        )
+        for (name, stamp) in [("Phone", 1000.0), ("TV", 2000.0)] {
+            ctx.insert(SyncedRecordingServer(
+                kind: .dispatcharr, name: name, baseURL: "http://10.0.0.2:9191", serverID: serverID,
+                token: credential.token, updatedAt: Date(timeIntervalSince1970: stamp)
+            ))
+        }
+        try ctx.save()
+
+        let engine = CloudSyncEngine(container: container, shadow: freshShadow())
+        let result = await engine.reconcile()
+
+        let remaining = try ctx.fetch(FetchDescriptor<SyncedRecordingServer>())
+        #expect(remaining.count == 1)
+        #expect(remaining.first?.name == "TV")
+        #expect(remaining.first?.kind == .dispatcharr)
+        #expect(result.recordingServersDeduped == 1)
+    }
 }

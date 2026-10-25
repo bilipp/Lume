@@ -21,7 +21,7 @@ import SwiftUI
 ///
 /// One per player, owned by `FullScreenPlayerView` and handed to the engine
 /// view, so every surface that can change stream — the transport buttons, a
-/// macOS arrow key, the Siri Remote, the lock screen — shares one cooldown.
+/// keyboard shortcut, the Siri Remote, the lock screen — shares one cooldown.
 /// A swapper per surface would let two of them start a decoder teardown apiece
 /// inside the same window, which is the shape this guards against.
 ///
@@ -72,6 +72,13 @@ final class PlayerMediaSwapper {
         // video and the title that changed sits outside the focused element.
         AccessibilityNotification.Announcement(target.title).post()
         return true
+    }
+
+    /// Runs `perform`, a swap to a stream the viewer picked directly (a
+    /// Quality menu row), unless the previous swap is still settling.
+    func swap(_ perform: () -> Void) {
+        guard accept() else { return }
+        perform()
     }
 
     /// Whether a swap may start now. Recorded only for swaps that go through,
@@ -144,50 +151,6 @@ final class PlayerMediaSwapper {
             select(target)
             showControls()
         }
-    }
-
-#endif
-
-#if os(macOS)
-
-    extension View {
-        /// Up/Down arrow steps one channel along the list, beside the Left/Right
-        /// arrows that seek. It asks for the same swap the on-screen transport
-        /// buttons do — the host-resolved neighbour through the shared swapper,
-        /// debounce included — rather than resolving a channel of its own.
-        ///
-        /// Live TV only: `.channel` is the axis a live stream (and not a
-        /// catch-up recording) carries, so during a movie or an episode the
-        /// press is left to the responder chain instead of silently stepping the
-        /// series, which no arrow key on this platform is labelled to do.
-        func liveChannelKeyNavigation(
-            neighbours: PlayerItemNavigation.Neighbours,
-            swapper: PlayerMediaSwapper,
-            onSelect: @escaping (PlayableMedia) -> Void,
-            onResetHideTimer: @escaping () -> Void
-        ) -> some View {
-            onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
-                guard press.modifiers.isBare else { return .ignored }
-                let step: PlayerMediaSwapper.Step = press.key == .upArrow ? .next : .previous
-                return channelKeyStep(step, neighbours, swapper, onSelect, onResetHideTimer)
-            }
-        }
-    }
-
-    /// A press over live TV is consumed whether or not it produced a swap: the
-    /// debounce drops presses that land on the heels of the last one, and
-    /// letting those through to AppKit would move focus out of the video.
-    private func channelKeyStep(
-        _ step: PlayerMediaSwapper.Step,
-        _ neighbours: PlayerItemNavigation.Neighbours,
-        _ swapper: PlayerMediaSwapper,
-        _ onSelect: (PlayableMedia) -> Void,
-        _ onResetHideTimer: () -> Void
-    ) -> KeyPress.Result {
-        guard neighbours.axis == .channel else { return .ignored }
-        swapper.step(step, in: neighbours, select: onSelect)
-        onResetHideTimer()
-        return .handled
     }
 
 #endif

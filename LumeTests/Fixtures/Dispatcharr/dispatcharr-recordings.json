@@ -1,0 +1,184 @@
+[
+  {
+    "id": 11,
+    "start_time": "2026-10-25T19:55:00Z",
+    "end_time": "2026-10-25T21:05:00Z",
+    "task_id": "3f6c1d2e-0a4b-4c8d-9e1f-a2b3c4d5e6f7",
+    "channel": 2,
+    "custom_properties": {
+      "lume_source_ref": "xtream:7f1c2a90-3b4d-4e5f-8a6b-7c8d9e0f1a2b:2:1792958400",
+      "program": {
+        "title": "Harbour Lights",
+        "description": "A quiet evening on the fictional coast.",
+        "start_time": "2026-10-25T20:00:00Z",
+        "end_time": "2026-10-25T21:00:00Z"
+      }
+    }
+  },
+  {
+    "id": 12,
+    "start_time": "2026-10-26T06:00:00Z",
+    "end_time": "2026-10-26T07:00:00Z",
+    "task_id": "4a7d2e3f-1b5c-4d9e-8f2a-b3c4d5e6f7a8",
+    "channel": 1,
+    "custom_properties": {
+      "rule": {
+        "type": "recurring",
+        "id": 1,
+        "days_of_week": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "name": "Morning Bulletin"
+      },
+      "status": "scheduled",
+      "description": "Morning Bulletin",
+      "program": {
+        "title": "Morning Bulletin",
+        "description": "Morning Bulletin",
+        "start_time": "2026-10-26T06:00:00+00:00",
+        "end_time": "2026-10-26T07:00:00+00:00"
+      }
+    }
+  },
+  {
+    "id": 13,
+    "start_time": "2026-10-24T17:55:00Z",
+    "end_time": "2026-10-24T19:05:00Z",
+    "task_id": "5b8e3f4a-2c6d-4e0f-9a3b-c4d5e6f7a8b9",
+    "channel": 1,
+    "custom_properties": {
+      "lume_source_ref": "m3u:0d9e8f7a-6b5c-4d3e-2f1a-0b9c8d7e6f5a:aurora:1792951200",
+      "program": {
+        "title": "Evening Report",
+        "description": "Headlines from nowhere in particular.",
+        "start_time": "2026-10-24T18:00:00Z",
+        "end_time": "2026-10-24T19:00:00Z"
+      },
+      "status": "recording",
+      "started_at": "2026-10-24 17:55:00.412233",
+      "file_url": "/api/channels/recordings/13/hls/index.m3u8",
+      "output_file_url": "/api/channels/recordings/13/hls/index.m3u8",
+      "file_name": "Evening Report - 2026-10-24.mkv",
+      "file_path": "/data/recordings/TV_Shows/Evening Report/Evening Report - 2026-10-24.mkv",
+      "_hls_dir": "/data/recordings/TV_Shows/Evening Report/.dvr_13_hls",
+      "poster_logo_id": 1
+    }
+  },
+  {
+    "id": 14,
+    "start_time": "2026-10-23T20:00:00Z",
+    "end_time": "2026-10-23T21:00:00Z",
+    "task_id": "6c9f4a5b-3d7e-4f1a-8b4c-d5e6f7a8b9c0",
+    "channel": 2,
+    "custom_properties": {
+      "program": {
+        "title": "Garden Patrol",
+        "sub_title": "The Lost Trowel",
+        "description": "Two neighbours and one very large hedge.",
+        "start_time": "2026-10-23T20:00:00Z",
+        "end_time": "2026-10-23T21:00:00Z",
+        "season": 2,
+        "episode": 5
+      },
+      "status": "completed",
+      "started_at": "2026-10-23 20:00:01.002311",
+      "ended_at": "2026-10-23 21:00:03.551870",
+      "file_url": "/api/channels/recordings/14/file/",
+      "output_file_url": "/api/channels/recordings/14/file/",
+      "file_name": "Garden Patrol S02E05 The Lost Trowel.mkv",
+      "file_path": "/data/recordings/TV_Shows/Garden Patrol/Season 02/Garden Patrol S02E05 The Lost Trowel.mkv",
+      "_hls_dir": "/data/recordings/TV_Shows/Garden Patrol/Season 02/.dvr_14_hls",
+      "poster_url": "https://example.invalid/posters/garden-patrol.jpg",
+      "bytes_written": 734003200,
+      "remux_success": true,
+      "stream_info": {
+        "resolution": "1280x720",
+        "source_fps": 25.0,
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "audio_channels": "stereo"
+      }
+    }
+  },
+  {
+    "id": 15,
+    "start_time": "2026-10-24T09:00:00Z",
+    "end_time": "2026-10-24T10:00:00Z",
+    "task_id": "7d0a5b6c-4e8f-4a2b-9c5d-e6f7a8b9c0d1",
+    "channel": 1,
+    "custom_properties": {
+      "lume_source_ref": "xtream:7f1c2a90-3b4d-4e5f-8a6b-7c8d9e0f1a2b:1:1792832400",
+      "program": {
+        "title": "Market Hour",
+        "description": "Numbers, mostly.",
+        "start_time": "2026-10-24T09:00:00Z",
+        "end_time": "2026-10-24T10:00:00Z"
+      },
+      "status": "stopped",
+      "stopped_at": "2026-10-24 09:21:40.118502+00:00",
+      "started_at": "2026-10-24 09:00:00.731044",
+      "ended_at": "2026-10-24 09:21:44.902117",
+      "file_url": "/api/channels/recordings/15/file/",
+      "output_file_url": "/api/channels/recordings/15/file/",
+      "file_name": "Market Hour - 2026-10-24.mkv",
+      "file_path": "/data/recordings/TV_Shows/Market Hour/Market Hour - 2026-10-24.mkv",
+      "_hls_dir": "/data/recordings/TV_Shows/Market Hour/.dvr_15_hls",
+      "bytes_written": 251658240,
+      "remux_success": true
+    }
+  },
+  {
+    "id": 16,
+    "start_time": "2026-10-24T12:00:00Z",
+    "end_time": "2026-10-24T12:30:00Z",
+    "task_id": "8e1b6c7d-5f9a-4b3c-8d6e-f7a8b9c0d1e2",
+    "channel": 3,
+    "custom_properties": {
+      "lume_source_ref": "m3u:0d9e8f7a-6b5c-4d3e-2f1a-0b9c8d7e6f5a:cobalt:1792843200",
+      "program": {
+        "title": "Puzzle Pals",
+        "start_time": "2026-10-24T12:00:00Z",
+        "end_time": "2026-10-24T12:30:00Z"
+      },
+      "status": "interrupted",
+      "started_at": "2026-10-24 12:00:00.220981",
+      "ended_at": "2026-10-24 12:00:31.774410",
+      "interrupted_reason": "no_stream_data: ffmpeg_failed",
+      "file_url": "/api/channels/recordings/16/file/",
+      "output_file_url": "/api/channels/recordings/16/file/",
+      "file_name": "Puzzle Pals - 2026-10-24.mkv",
+      "file_path": "/data/recordings/TV_Shows/Puzzle Pals/Puzzle Pals - 2026-10-24.mkv",
+      "_hls_dir": "/data/recordings/TV_Shows/Puzzle Pals/.dvr_16_hls",
+      "bytes_written": 0,
+      "remux_success": false
+    }
+  },
+  {
+    "id": 17,
+    "start_time": "2026-10-22T15:00:00Z",
+    "end_time": "2026-10-22T16:00:00Z",
+    "task_id": null,
+    "channel": 3,
+    "custom_properties": {
+      "program": {
+        "title": "Paper Boats",
+        "start_time": "2026-10-22T15:00:00Z",
+        "end_time": "2026-10-22T16:00:00Z"
+      },
+      "status": "failed",
+      "error": "Synthetic lenient-decoding case: v0.33.0 never writes this status from run_recording."
+    }
+  },
+  {
+    "id": 18,
+    "start_time": "2026-10-21T08:00:00Z",
+    "end_time": "2026-10-21T08:30:00Z",
+    "task_id": null,
+    "channel": 2,
+    "custom_properties": null
+  }
+]

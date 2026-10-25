@@ -299,7 +299,7 @@ struct LiveTVView: View {
             .guidePreviewSuspension(guidePreview, playingMedia: $playingMedia)
             // The list has no settled channel to tint the glow from.
             .background {
-                TVLiveTVBackground(hero: layoutMode == .guide ? guideHero : nil)
+                TVAmbientBackground(hero: layoutMode == .guide ? guideHero : nil)
                     .ignoresSafeArea()
             }
         }

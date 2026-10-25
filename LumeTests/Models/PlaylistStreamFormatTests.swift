@@ -117,7 +117,7 @@ struct PlaylistStreamFormatTests {
             for: stream,
             playlist: makePlaylist(allowed: ["m3u8"]),
             start: Date(timeIntervalSince1970: 1_700_000_000),
-            durationMinutes: 90
+            end: Date(timeIntervalSince1970: 1_700_005_400)
         ))
         #expect(url.absoluteString.hasSuffix("/777.m3u8"))
     }
@@ -138,7 +138,7 @@ struct PlaylistStreamFormatTests {
             for: stream,
             playlist: makePlaylist(),
             start: Date(timeIntervalSince1970: 1_700_000_000),
-            durationMinutes: 90
+            end: Date(timeIntervalSince1970: 1_700_005_400)
         ))
         #expect(url.absoluteString.hasSuffix("/777.ts"))
     }
@@ -149,13 +149,13 @@ struct PlaylistStreamFormatTests {
             for: stream,
             playlist: makePlaylist(format: .mpegTS),
             start: Date(timeIntervalSince1970: 1_700_000_000),
-            durationMinutes: 90
+            end: Date(timeIntervalSince1970: 1_700_005_400)
         ))
         let hlsURL = try #require(makeClient().buildCatchupURL(
             for: stream,
             playlist: makePlaylist(format: .hls),
             start: Date(timeIntervalSince1970: 1_700_000_000),
-            durationMinutes: 90
+            end: Date(timeIntervalSince1970: 1_700_005_400)
         ))
         #expect(tsURL.absoluteString.hasSuffix("/777.ts"))
         #expect(hlsURL.absoluteString.hasSuffix("/777.m3u8"))

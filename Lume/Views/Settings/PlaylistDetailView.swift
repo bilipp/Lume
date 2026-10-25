@@ -61,9 +61,9 @@ struct PlaylistDetailView: View {
         playlist.sourceType == .webdav
     }
 
-    /// Jellyfin and Emby: one login form, one stored session.
+    /// Jellyfin, Emby and Silo: one login form, one stored session.
     var isMediaServer: Bool {
-        playlist.sourceType == .jellyfin || playlist.sourceType == .emby
+        MediaServerFlavor(sourceType: playlist.sourceType) != nil
     }
 
     var isPlex: Bool {
@@ -80,6 +80,7 @@ struct PlaylistDetailView: View {
         case .jellyfin: "Jellyfin Server"
         case .emby: "Emby Server"
         case .plex: "Plex Server"
+        case .silo: "Silo Server"
         }
     }
 
@@ -364,7 +365,7 @@ struct PlaylistDetailView: View {
         case .m3u: "Playlist URL"
         case .stalker: "Portal URL"
         case .webdav: "Share URL"
-        case .jellyfin, .emby, .plex: "Server URL"
+        case .jellyfin, .emby, .plex, .silo: "Server URL"
         }
     }
 }

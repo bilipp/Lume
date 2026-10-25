@@ -5,7 +5,8 @@
 //  Programme detail presented when a guide cell is selected: channel, title,
 //  airing time, live progress, synopsis, and a watch action that hands back to
 //  the caller to start playback — live for the current programme, catch-up for
-//  a past one still inside the channel's archive.
+//  a past one still inside the channel's archive. The current programme can
+//  also restart from its beginning when the archive reaches back to its start.
 //
 
 import SwiftUI
@@ -23,9 +24,24 @@ struct EPGProgramDetailView: View {
         cell.isLive(at: now)
     }
 
+    /// The programme on air, played from its start out of the same archive a
+    /// finished one replays from.
+    private var canWatchFromStart: Bool {
+        isLive && PlayableMedia.isCatchupAvailable(stream: stream, start: cell.start, now: now)
+    }
+
     private var canPlayCatchup: Bool {
         !cell.isGap && cell.isPast(at: now)
             && PlayableMedia.isCatchupAvailable(stream: stream, start: cell.start, now: now)
+    }
+
+    @ViewBuilder
+    private var catchupLabel: some View {
+        if let days = PlayableMedia.archiveBadgeDays(for: stream) {
+            Label("Catch-up available for \(days) days", systemImage: "clock.arrow.circlepath")
+        } else {
+            Label("Catch-up available", systemImage: "clock.arrow.circlepath")
+        }
     }
 
     var body: some View {
@@ -70,8 +86,8 @@ struct EPGProgramDetailView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        if stream.tvArchive > 0 {
-                            Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
+                        if PlayableMedia.isCatchupCapable(stream: stream) {
+                            catchupLabel
                                 .font(.subheadline)
                                 .foregroundStyle(.blue)
                         }
@@ -132,8 +148,8 @@ struct EPGProgramDetailView: View {
                                 .frame(maxWidth: 520)
                         }
 
-                        if stream.tvArchive > 0 {
-                            Label("Catch-up available for \(stream.tvArchiveDuration) days", systemImage: "clock.arrow.circlepath")
+                        if PlayableMedia.isCatchupCapable(stream: stream) {
+                            catchupLabel
                                 .font(.system(size: 26))
                                 .foregroundStyle(.blue)
                         }
@@ -157,6 +173,13 @@ struct EPGProgramDetailView: View {
                                 TVPlayButton(title: "Watch Live", systemImage: "play.fill") {
                                     onPlay()
                                     dismiss()
+                                }
+
+                                if canWatchFromStart {
+                                    TVPlayButton(title: "Watch from Start", systemImage: "gobackward") {
+                                        onPlayCatchup()
+                                        dismiss()
+                                    }
                                 }
                             }
 
@@ -284,7 +307,8 @@ struct EPGProgramDetailView: View {
     }
 
     /// The primary action: catch-up for a replayable past programme (with a
-    /// secondary "Watch Live" escape hatch to the channel), live otherwise.
+    /// secondary "Watch Live" escape hatch to the channel), live otherwise —
+    /// with a secondary "Watch from Start" while the programme can restart.
     @ViewBuilder
     private var watchButton: some View {
         if canPlayCatchup {
@@ -312,15 +336,29 @@ struct EPGProgramDetailView: View {
             .controlSize(.large)
             .padding(.top, 4)
         } else {
-            Button {
-                onPlay()
-                dismiss()
-            } label: {
-                Label("Watch Live", systemImage: "play.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+            VStack(spacing: 10) {
+                Button {
+                    onPlay()
+                    dismiss()
+                } label: {
+                    Label("Watch Live", systemImage: "play.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+
+                if canWatchFromStart {
+                    Button {
+                        onPlayCatchup()
+                        dismiss()
+                    } label: {
+                        Label("Watch from Start", systemImage: "gobackward")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
-            .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .padding(.top, 4)
         }

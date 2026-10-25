@@ -27,7 +27,7 @@ import SwiftUI
                 onClose: { closePlayer() },
                 onTogglePlay: { togglePlay() },
                 onTogglePip: { togglePip() },
-                onResetHideTimer: { resetHideTimer() },
+                onResetHideTimer: { PlayerControlsAutoHide.menuClosed(); resetHideTimer() },
                 onScheduleHide: { scheduleHide() },
                 onSearchSubtitles: subtitleSearchAction,
                 videoInfo: videoInfo,

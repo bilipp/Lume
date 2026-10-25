@@ -519,7 +519,7 @@ final nonisolated class XtreamClient: Sendable {
     /// is used unless the account's `allowed_output_formats` exclude it — panels
     /// answer a disallowed container with a 405 on every engine, so the other
     /// container is the only one that can play.
-    private nonisolated static func resolvedFormat(
+    nonisolated static func resolvedFormat(
         _ requested: StreamFormat?,
         playlist: Playlist,
         fallback: StreamFormat
@@ -527,41 +527,6 @@ final nonisolated class XtreamClient: Sendable {
         if let chosen = requested ?? playlist.streamFormat.xtreamFormat { return chosen }
         guard let allowed = playlist.allowedOutputFormats, !allowed.contains(fallback.rawValue) else { return fallback }
         return [StreamFormat.m3u8, .tsStream].first { allowed.contains($0.rawValue) } ?? fallback
-    }
-
-    /// `Y-m-d:H-i` is the start format Xtream Codes panels expect in a timeshift
-    /// path. The value is wall-clock time in the timezone advertised by the
-    /// account. Fall back to the device timezone for older panels that omit it,
-    /// preserving Lume's historical behaviour for those providers.
-    private nonisolated static func timeshiftStartString(for start: Date, playlist: Playlist) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd:HH-mm"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = playlist.serverTimezone.flatMap(TimeZone.init(identifier:)) ?? .current
-        return formatter.string(from: start)
-    }
-
-    /// Builds a catch-up / timeshift URL for a past programme on a live stream.
-    ///
-    /// Uses the Xtream Codes timeshift path
-    /// `…/timeshift/user/pass/{durationMinutes}/{Y-m-d:H-i}/{streamId}.{ext}`,
-    /// where the duration is the programme length in minutes and the start is the
-    /// programme's air time. Only meaningful for Xtream streams (m3u channels
-    /// carry no credentials).
-    nonisolated func buildCatchupURL(
-        for stream: LiveStream,
-        playlist: Playlist,
-        start: Date,
-        durationMinutes: Int,
-        format: StreamFormat? = nil
-    ) -> URL? {
-        guard durationMinutes > 0 else { return nil }
-        // Xtream-compatible panels commonly expose catch-up as an MPEG-TS
-        // resource even when normal live playback defaults to HLS. Respect an
-        // explicit playlist/argument choice, but prefer TS when it is unknown.
-        let ext = Self.resolvedFormat(format, playlist: playlist, fallback: .tsStream).rawValue
-        let startString = Self.timeshiftStartString(for: start, playlist: playlist)
-        return URL(string: "\(playlist.serverURL)/timeshift/\(playlist.username)/\(playlist.password)/\(durationMinutes)/\(startString)/\(stream.streamId).\(ext)")
     }
 }
 

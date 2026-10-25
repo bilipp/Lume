@@ -10,7 +10,6 @@
 //
 
 import Foundation
-import LumeRecorderKit
 
 /// Identifies the catalog channel a recording was made from. Travels to the
 /// server as the opaque `sourceRef` string `"<playlistUUID>:live:<streamID>"`,
@@ -53,6 +52,16 @@ nonisolated enum RecordingRequestPlanner {
     static let schedulePreRoll: TimeInterval = 2 * 60
     /// Tail after a programme's listed end, for record-now and scheduled alike.
     static let postRoll: TimeInterval = 5 * 60
+
+    /// Who pads a recording around its programme.
+    enum Padding: Hashable {
+        /// Lume adds `schedulePreRoll` and `postRoll`.
+        case lume
+        /// The server pads from the programme times it is sent, so Lume sends
+        /// them exactly: record-now starts at the programme's own start, which
+        /// the server moves up to now.
+        case server
+    }
 
     /// What record-now offers when the channel has no guide data.
     enum FallbackDuration: Int, CaseIterable, Identifiable {
@@ -109,7 +118,7 @@ nonisolated enum RecordingRequestPlanner {
     /// A ready-to-send request plus the key that makes re-sending it safe.
     /// Built once per user action and reused for any re-send of that action.
     struct Plan: Hashable {
-        let request: CreateRecordingRequest
+        let request: RecordingCreateRequest
         let idempotencyKey: String
     }
 
@@ -123,45 +132,54 @@ nonisolated enum RecordingRequestPlanner {
     /// Record-now from the airing programme: now until its end plus the
     /// post-roll. `nil` when there is no programme on air, which is the
     /// caller's cue to offer a `FallbackDuration`.
-    static func recordNowWindow(programme: Programme?, now: Date) -> DateInterval? {
+    static func recordNowWindow(programme: Programme?, now: Date, padding: Padding = .lume) -> DateInterval? {
         guard let programme, timing(of: programme, now: now) == .live else { return nil }
-        return DateInterval(start: now, end: programme.end.addingTimeInterval(postRoll))
+        return switch padding {
+        case .lume: DateInterval(start: now, end: programme.end.addingTimeInterval(postRoll))
+        case .server: DateInterval(start: programme.start, end: programme.end)
+        }
     }
 
     static func recordNowWindow(duration: FallbackDuration, now: Date) -> DateInterval {
         DateInterval(start: now, duration: duration.interval)
     }
 
-    static func scheduleWindow(programme: Programme) -> DateInterval {
-        DateInterval(
-            start: programme.start.addingTimeInterval(-schedulePreRoll),
-            end: programme.end.addingTimeInterval(postRoll)
-        )
+    static func scheduleWindow(programme: Programme, padding: Padding = .lume) -> DateInterval {
+        switch padding {
+        case .lume:
+            DateInterval(
+                start: programme.start.addingTimeInterval(-schedulePreRoll),
+                end: programme.end.addingTimeInterval(postRoll)
+            )
+        case .server:
+            DateInterval(start: programme.start, end: programme.end)
+        }
     }
 
     // MARK: - Requests
 
     /// `nil` when no programme is on air; ask for a `FallbackDuration` instead.
     static func recordNow(
-        streamURL: URL,
+        target: RecordingCreateTarget,
         channel: Channel,
         programme: Programme?,
         now: Date,
+        padding: Padding = .lume,
         actionID: UUID = UUID()
     ) -> Plan? {
-        guard let window = recordNowWindow(programme: programme, now: now) else { return nil }
-        return plan(streamURL: streamURL, channel: channel, programme: programme, window: window, actionID: actionID)
+        guard let window = recordNowWindow(programme: programme, now: now, padding: padding) else { return nil }
+        return plan(target: target, channel: channel, programme: programme, window: window, actionID: actionID)
     }
 
     static func recordNow(
-        streamURL: URL,
+        target: RecordingCreateTarget,
         channel: Channel,
         duration: FallbackDuration,
         now: Date,
         actionID: UUID = UUID()
     ) -> Plan {
         plan(
-            streamURL: streamURL,
+            target: target,
             channel: channel,
             programme: nil,
             window: recordNowWindow(duration: duration, now: now),
@@ -172,18 +190,19 @@ nonisolated enum RecordingRequestPlanner {
     /// `nil` unless the programme is still upcoming — an airing one is
     /// recorded now instead.
     static func schedule(
-        streamURL: URL,
+        target: RecordingCreateTarget,
         channel: Channel,
         programme: Programme,
         now: Date,
+        padding: Padding = .lume,
         actionID: UUID = UUID()
     ) -> Plan? {
         guard timing(of: programme, now: now) == .upcoming else { return nil }
         return plan(
-            streamURL: streamURL,
+            target: target,
             channel: channel,
             programme: programme,
-            window: scheduleWindow(programme: programme),
+            window: scheduleWindow(programme: programme, padding: padding),
             actionID: actionID
         )
     }
@@ -201,22 +220,23 @@ nonisolated enum RecordingRequestPlanner {
     }
 
     private static func plan(
-        streamURL: URL,
+        target: RecordingCreateTarget,
         channel: Channel,
         programme: Programme?,
         window: DateInterval,
         actionID: UUID
     ) -> Plan {
         let description = programme?.description?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let request = CreateRecordingRequest(
-            streamURL: streamURL,
+        let request = RecordingCreateRequest(
+            target: target,
             title: title(programme: programme, channel: channel),
             channelName: channel.name,
             channelLogoURL: channel.logoURL,
             programmeDescription: description?.isEmpty == false ? description : nil,
             start: window.start,
             end: window.end,
-            sourceRef: channel.sourceRef.rawValue
+            sourceRef: channel.sourceRef.rawValue,
+            programme: programme.map { DateInterval(start: $0.start, end: max($0.start, $0.end)) }
         )
         return Plan(request: request, idempotencyKey: idempotencyKey(for: actionID))
     }
@@ -227,7 +247,7 @@ nonisolated enum RecordingRequestPlanner {
     /// whose window has opened (the server flips it to recording on its next
     /// tick). A schedule that hasn't started yet is not — it's cancelled from
     /// its programme, never stopped from the channel.
-    static func isCapturing(_ recording: Recording, now: Date) -> Bool {
+    static func isCapturing(_ recording: ServerRecording, now: Date) -> Bool {
         switch recording.status {
         case .recording:
             true
@@ -241,28 +261,29 @@ nonisolated enum RecordingRequestPlanner {
     /// The recording capturing a channel right now, if any — what turns the
     /// channel's Record into Stop Recording. A later schedule of the same
     /// channel never does: Record still records what's on air.
-    static func activeRecording(for sourceRef: RecordingSourceRef, now: Date, in recordings: [Recording]) -> Recording? {
+    static func activeRecording(for sourceRef: RecordingSourceRef, now: Date, in recordings: [ServerRecording]) -> ServerRecording? {
         let raw = sourceRef.rawValue
         return recordings.first { $0.sourceRef == raw && isCapturing($0, now: now) }
     }
 
-    /// The channel's pending recording of one guide programme. A recording
-    /// planned from a programme ends `postRoll` after it, so its unpadded end
-    /// identifies the programme, and the next programme's pre-roll never
-    /// matches the one before it. On air (or in a live gap, `programme ==
+    /// The channel's pending recording of one guide programme, identified by
+    /// the end of the programme it was planned from: the one the server kept
+    /// (`programmeEnd`, whatever padding it added), else its own end less
+    /// Lume's `postRoll`. So the next programme's pre-roll never matches the
+    /// one before it. On air (or in a live gap, `programme ==
     /// nil`) a recording capturing the channel right now also counts: Record
     /// would only start a second capture of the same feed.
     static func pendingRecording(
         for sourceRef: RecordingSourceRef,
         programme: Programme?,
         now: Date,
-        in recordings: [Recording]
-    ) -> Recording? {
+        in recordings: [ServerRecording]
+    ) -> ServerRecording? {
         let raw = sourceRef.rawValue
         return recordings.first { recording in
             guard recording.status.isPending, recording.sourceRef == raw else { return false }
             if let programme {
-                let unpaddedEnd = recording.end.addingTimeInterval(-postRoll)
+                let unpaddedEnd = recording.programmeEnd ?? recording.end.addingTimeInterval(-postRoll)
                 if unpaddedEnd > programme.start, unpaddedEnd <= programme.end { return true }
                 guard timing(of: programme, now: now) == .live else { return false }
             }
@@ -276,10 +297,10 @@ nonisolated enum RecordingRequestPlanner {
     /// can't be matched stay visible. Categories hidden in Content Management
     /// are a browsing preference and don't hide recordings.
     static func visibleRecordings(
-        _ recordings: [Recording],
+        _ recordings: [ServerRecording],
         restriction: ContentRestriction,
         categoryID: (RecordingSourceRef) -> String?
-    ) -> [Recording] {
+    ) -> [ServerRecording] {
         guard restriction.isActive, !restriction.restrictedCategoryIDs.isEmpty else { return recordings }
         return recordings.filter { recording in
             guard let ref = recording.sourceRef.flatMap(RecordingSourceRef.init(rawValue:)),
@@ -287,5 +308,16 @@ nonisolated enum RecordingRequestPlanner {
             else { return true }
             return !restriction.restrictedCategoryIDs.contains(category)
         }
+    }
+}
+
+extension RecordingRequestPlanner.Programme {
+    init(listing: EPGListing) {
+        self.init(
+            title: listing.title,
+            description: listing.listingDescription,
+            start: listing.start,
+            end: listing.end
+        )
     }
 }

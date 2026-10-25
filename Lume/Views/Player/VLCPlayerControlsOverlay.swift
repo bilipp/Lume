@@ -91,7 +91,7 @@ import VLCKit
 
                 Spacer()
 
-                AirPlayRouteButton()
+                PlayerCastButton()
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -123,6 +123,7 @@ import VLCKit
                 transportRow(spacing: 32)
                 transportRow(spacing: 12)
             }
+            .timelineLayoutDirection()
         }
 
         private func transportRow(spacing: CGFloat) -> some View {
@@ -192,8 +193,11 @@ import VLCKit
                 if media.isLive {
                     liveIndicator
                 } else {
-                    scrubber
-                    timeLabels
+                    VStack(spacing: 14) {
+                        scrubber
+                        timeLabels
+                    }
+                    .timelineLayoutDirection()
                 }
             }
             .padding(.horizontal, 20)
@@ -254,6 +258,8 @@ import VLCKit
                 if PlayerFavorites.supportsFavorites(media.contentRef) {
                     favoriteButton
                 }
+                PlayerSourcesButton(onResetHideTimer: onResetHideTimer)
+                PlayerQualityButton(onResetHideTimer: onResetHideTimer)
                 PlayerRecordButton(media: media, onResetHideTimer: onResetHideTimer)
                 PlayerVolumeControl(onResetHideTimer: onResetHideTimer)
             }
@@ -278,29 +284,32 @@ import VLCKit
             let tracks = coordinator.textTracks
             let hasSelection = tracks.contains(where: \.isSelectedExclusively)
             Menu {
-                Button {
-                    coordinator.selectTextTrack(nil)
-                    onResetHideTimer()
-                } label: {
-                    playerCheckmarkLabel("Off", checked: !hasSelection)
-                }
-                ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                Group {
                     Button {
-                        coordinator.selectTextTrack(track)
+                        coordinator.selectTextTrack(nil)
                         onResetHideTimer()
                     } label: {
-                        playerCheckmarkLabel(verbatim: track.trackName, checked: track.isSelectedExclusively)
+                        playerCheckmarkLabel("Off", checked: !hasSelection)
+                    }
+                    ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                        Button {
+                            coordinator.selectTextTrack(track)
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: track.trackName, checked: track.isSelectedExclusively)
+                        }
+                    }
+                    if let onSearchSubtitles {
+                        Divider()
+                        Button {
+                            onSearchSubtitles()
+                            onResetHideTimer()
+                        } label: {
+                            Label("Search Online…", systemImage: "magnifyingglass")
+                        }
                     }
                 }
-                if let onSearchSubtitles {
-                    Divider()
-                    Button {
-                        onSearchSubtitles()
-                        onResetHideTimer()
-                    } label: {
-                        Label("Search Online…", systemImage: "magnifyingglass")
-                    }
-                }
+                .holdsPlayerControls()
             } label: {
                 pillGlyph("captions.bubble.fill", dimmed: !hasSelection)
             }
@@ -312,14 +321,17 @@ import VLCKit
         private var audioTrackMenu: some View {
             let tracks = coordinator.audioTracks
             Menu {
-                ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
-                    Button {
-                        coordinator.selectAudioTrack(track)
-                        onResetHideTimer()
-                    } label: {
-                        playerCheckmarkLabel(verbatim: track.trackName, checked: track.isSelectedExclusively)
+                Group {
+                    ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                        Button {
+                            coordinator.selectAudioTrack(track)
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: track.trackName, checked: track.isSelectedExclusively)
+                        }
                     }
                 }
+                .holdsPlayerControls()
             } label: {
                 pillGlyph("waveform")
             }
@@ -329,14 +341,17 @@ import VLCKit
 
         private var playbackRateMenu: some View {
             Menu {
-                ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
-                    Button {
-                        coordinator.playbackRate = rate
-                        onResetHideTimer()
-                    } label: {
-                        playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                Group {
+                    ForEach([0.5, 1.0, 1.25, 1.5, 2.0] as [Float], id: \.self) { rate in
+                        Button {
+                            coordinator.playbackRate = rate
+                            onResetHideTimer()
+                        } label: {
+                            playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                        }
                     }
                 }
+                .holdsPlayerControls()
             } label: {
                 Text(verbatim: rateString(coordinator.playbackRate))
                     .font(.subheadline.weight(.semibold).monospacedDigit())

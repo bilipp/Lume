@@ -153,6 +153,32 @@ struct M3UDigestSkipTests {
         #expect(try hasNewsOne(in: container), "Without a stored digest the import must run")
     }
 
+    @Test func `a fingerprint from an older importer imports`() async throws {
+        let container = try makeTestContainer()
+        let fileURL = try writeTempFile(playlist, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let entry = try makePlaylist(container: container, fileURL: fileURL)
+        let playlistId = entry.id
+        defer { clearDefaults(playlistId: playlistId) }
+
+        let manager = ContentSyncManager(modelContainer: container)
+        try await manager.syncPlaylist(entry)
+
+        // What an install upgrading from a build whose importer wrote fewer
+        // columns has stored: the same file's hash, without the current
+        // revision. Skipping on it would leave those columns empty until the
+        // provider's bytes happened to change.
+        let digest = try #require(M3UDigestStore.digest(playlistId: playlistId))
+        UserDefaults.standard.set(digest, forKey: M3UDigestStore.key(playlistId: playlistId))
+        #expect(M3UDigestStore.digest(playlistId: playlistId) == nil)
+
+        try deleteNewsOne(in: container)
+        try await manager.syncPlaylist(entry)
+
+        #expect(try hasNewsOne(in: container), "An older importer's fingerprint must not skip the import")
+        #expect(M3UDigestStore.digest(playlistId: playlistId) == digest, "The re-import must re-fingerprint")
+    }
+
     @Test func `a skipped sync still advances the playlist dates`() async throws {
         let container = try makeTestContainer()
         let fileURL = try writeTempFile(playlist, ext: "m3u")

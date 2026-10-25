@@ -134,7 +134,7 @@
                 }
                 .buttonStyle(TVSettingsRowButtonStyle())
                 // Not disabled while pairing: focus would have to leave the
-                // button, and reaching the sidebar tears this step down.
+                // button mid-pairing.
                 .disabled(model.code.count != RecordingServerPairingModel.codeLength)
             }
         }

@@ -189,7 +189,7 @@ struct RecordingSettingsAccessTests {
         #expect(LiveTVToolbarSettings.showsMultiViewDefault == false)
     }
 
-    @Test func `the Live TV settings strings are translated in all nine locales`() throws {
+    @Test func `the Live TV settings strings are translated in every shipping locale`() throws {
         let catalog = try StringCatalog.localizable()
         for key in [
             "Show in Live TV Sidebar",
@@ -208,7 +208,7 @@ struct RecordingSettingsAccessTests {
         }
     }
 
-    @Test func `the Remove Server strings are translated in all nine locales`() throws {
+    @Test func `the Remove Server strings are translated in every shipping locale`() throws {
         let catalog = try StringCatalog.localizable()
         for key in [
             "Remove Server",

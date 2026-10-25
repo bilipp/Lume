@@ -56,13 +56,31 @@ enum WatchProgressBuffer {
     /// Stash the latest progress for `ref`, overwriting any earlier value.
     /// Returns immediately; the (deduped) write lands on `queue`. Live streams
     /// carry no resumable progress and are ignored.
-    static func record(ref: PlayableMedia.ContentRef, progress: TimeInterval, duration: TimeInterval) {
+    ///
+    /// `waitUntilWritten` blocks until the value has reached `UserDefaults`.
+    /// Only for the moment the app leaves the foreground: tvOS can suspend the
+    /// process before a `.background` queue gets a turn, and a kill from the app
+    /// switcher would then take the position with it. Never during playback.
+    static func record(
+        ref: PlayableMedia.ContentRef,
+        progress: TimeInterval,
+        duration: TimeInterval,
+        waitUntilWritten: Bool = false
+    ) {
         guard progress > 0, let (kind, id) = decompose(ref) else { return }
         let storageKey = prefix + key(kind, id)
-        queue.async {
-            guard lastProgress[storageKey] != progress else { return }
-            lastProgress[storageKey] = progress
-            UserDefaults.standard.set([progress, duration], forKey: storageKey)
+        if waitUntilWritten {
+            queue.sync {
+                guard lastProgress[storageKey] != progress else { return }
+                lastProgress[storageKey] = progress
+                UserDefaults.standard.set([progress, duration], forKey: storageKey)
+            }
+        } else {
+            queue.async {
+                guard lastProgress[storageKey] != progress else { return }
+                lastProgress[storageKey] = progress
+                UserDefaults.standard.set([progress, duration], forKey: storageKey)
+            }
         }
     }
 

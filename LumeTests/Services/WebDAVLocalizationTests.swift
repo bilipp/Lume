@@ -3,7 +3,7 @@
 //  LumeTests
 //
 //  Every user-facing literal the WebDAV source type added, asserted present and
-//  translated in all nine shipping locales.
+//  translated in every shipping locale.
 //
 
 import Foundation
@@ -57,7 +57,7 @@ struct WebDAVLocalizationTests {
         formKeys + errorKeys + browseKeys
     }
 
-    @Test func `every WebDAV string is translated in all nine locales`() throws {
+    @Test func `every WebDAV string is translated in every shipping locale`() throws {
         let catalog = try StringCatalog.localizable()
         for key in Self.allKeys {
             expectTranslatedEverywhere(key, in: catalog)
@@ -74,7 +74,7 @@ struct WebDAVLocalizationTests {
     /// The local-network prompt lives in `InfoPlist.xcstrings`, not
     /// `Localizable.xcstrings`: a usage description is read from the bundle's
     /// Info.plist by the system, never through `String(localized:)`.
-    @Test func `the local network usage description is translated in all nine locales`() throws {
+    @Test func `the local network usage description is translated in every shipping locale`() throws {
         let url = repoRootURL().appendingPathComponent("Lume/InfoPlist.xcstrings")
         let root = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         let strings = try #require(root?["strings"] as? [String: Any])

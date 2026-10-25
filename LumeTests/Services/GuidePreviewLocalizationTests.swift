@@ -3,7 +3,7 @@
 //  LumeTests
 //
 //  Every user-facing literal the tvOS Guide preview added, asserted present and
-//  translated in all nine shipping locales. String(localized:) can't prove a
+//  translated in every shipping locale. String(localized:) can't prove a
 //  key is in the catalog — an English key resolves to itself either way — so
 //  the catalog is read directly.
 //
@@ -31,7 +31,7 @@ struct GuidePreviewLocalizationTests {
         "Off"
     ]
 
-    @Test func `every Guide preview string is translated in all nine locales`() throws {
+    @Test func `every Guide preview string is translated in every shipping locale`() throws {
         let catalog = try StringCatalog.localizable()
         for key in Self.newKeys + Self.reusedKeys {
             expectTranslatedEverywhere(key, in: catalog)

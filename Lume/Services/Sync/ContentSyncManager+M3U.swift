@@ -366,6 +366,7 @@ extension ContentSyncManager {
                 to: stream,
                 categoryId: categoryId(for: entry.group, type: .live, playlistId: playlistId)
             )
+            Self.applyM3UCatchupFields(from: entry, to: stream)
         }
         state.importedLive += entries.count
     }

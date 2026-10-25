@@ -8,17 +8,23 @@
 //  endpoints. One client and one sync pipeline therefore cover both; this is
 //  the small amount that genuinely differs between them.
 //
+//  Silo joins them through the Jellyfin-compatible service it runs for
+//  third-party clients: once `SiloAddCheck` has found that service, a Silo
+//  playlist stores its address and syncs exactly like a Jellyfin one.
+//
 
 import Foundation
 
 nonisolated enum MediaServerFlavor: String, CaseIterable, Hashable {
     case jellyfin
     case emby
+    case silo
 
     var sourceType: PlaylistSourceType {
         switch self {
         case .jellyfin: .jellyfin
         case .emby: .emby
+        case .silo: .silo
         }
     }
 
@@ -27,6 +33,7 @@ nonisolated enum MediaServerFlavor: String, CaseIterable, Hashable {
         switch self {
         case .jellyfin: "Jellyfin"
         case .emby: "Emby"
+        case .silo: "Silo"
         }
     }
 
@@ -43,6 +50,7 @@ nonisolated enum MediaServerFlavor: String, CaseIterable, Hashable {
         switch sourceType {
         case .jellyfin: self = .jellyfin
         case .emby: self = .emby
+        case .silo: self = .silo
         case .xtream, .m3u, .stalker, .webdav, .plex: return nil
         }
     }

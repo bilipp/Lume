@@ -38,7 +38,7 @@ env:
   # Pinned rather than tracking the engine's main: app↔engine commits are paired
   # by hand, so a drifting engine would break this archive with no change on
   # Lume's side. Bump this when a release needs newer engine code.
-  ENGINE_REF: ${{ github.event.inputs.engine_ref || 'v0.3.2' }}
+  ENGINE_REF: ${{ github.event.inputs.engine_ref || 'v0.4.0' }}
   # LumeRecorderKit (the DVR client) is the same story: a local package at
   # ../LumeRecorder/Kit, pinned to the LumeRecorder tag the app was built with.
   RECORDER_REF: ${{ github.event.inputs.recorder_ref || 'v0.1.1' }}

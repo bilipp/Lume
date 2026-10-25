@@ -68,7 +68,7 @@ struct HomeRow: View {
                 Button(action: onSeeAll) {
                     HStack(spacing: 2) {
                         Text("See All")
-                        Image(systemName: "chevron.right").font(.caption2.weight(.bold))
+                        Image(systemName: "chevron.forward").font(.caption2.weight(.bold))
                             .accessibilityHidden(true)
                     }
                     .font(.subheadline)

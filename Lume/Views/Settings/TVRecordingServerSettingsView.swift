@@ -10,25 +10,25 @@
 //  the tab bar and strand remote focus.
 //
 //  Each step a button opens hands focus to the new step's first control with a
-//  deferred `@FocusState` write. Focus is never moved on appear: the pane
-//  renders while the sidebar holds focus, and taking it there would pull focus
-//  out of the sidebar as the user scrolls past this category.
+//  deferred `@FocusState` write. Menu in the pairing step backs out to the
+//  pane's top level, as Cancel does; at the top level SettingsView takes it.
 //
 
 #if os(tvOS)
 
-    import LumeRecorderKit
     import SwiftUI
 
     /// Where the pane is drilled in to; `nil` is its top level. Owned by
-    /// SettingsView, which clears it when focus returns to the sidebar, like
-    /// its other drill-ins.
+    /// SettingsView, which clears it with its other drill-ins.
     enum TVRecordingServerRoute: Hashable {
         /// Typing the address of a server Bonjour didn't find.
         case manualAddress
         /// Pairing with the server at this address: a discovered one, or the
         /// paired one after it revoked the token.
         case server(URL)
+        /// Signing in to a Dispatcharr server: a new one, or the paired one
+        /// again.
+        case dispatcharr(RecordingServerConfig?)
 
         var baseURL: URL? {
             if case let .server(url) = self { url } else { nil }
@@ -41,6 +41,8 @@
         case lockedPair
         case acknowledge
         case manualAddress
+        case addDispatcharr
+        case signInAgain
         case testConnection
     }
 
@@ -74,18 +76,15 @@
                 }
 
                 if let route, store.isUnlocked {
-                    TVRecordingServerPairingStep(baseURL: route.baseURL) {
-                        self.route = nil
-                        moveFocus(to: .testConnection)
-                    } onCancel: {
-                        self.route = nil
-                        moveFocus(to: configService.activeServer == nil ? setupFocus : .testConnection)
-                    }
+                    pairingStep(route)
+                        .onExitCommand(perform: cancelPairing)
                 } else if let server = configService.activeServer {
                     // Also for a lapsed subscriber, who must still be able to
                     // remove it.
                     TVRecordingServerPairedSection(server: server, isLocked: !store.isUnlocked, focus: $focus) { baseURL in
                         route = .server(baseURL)
+                    } signInAgain: {
+                        route = .dispatcharr(server.kind == .dispatcharr ? server : nil)
                     } onRemoved: { removal in
                         removalNote = removal == .revokeFailed ? RecordingServerSetup.revokeFailedNote : nil
                         moveFocus(to: setupFocus)
@@ -120,8 +119,34 @@
             return disclosureAcknowledged ? .manualAddress : .acknowledge
         }
 
+        @ViewBuilder
+        private func pairingStep(_ route: TVRecordingServerRoute) -> some View {
+            switch route {
+            case let .dispatcharr(server):
+                TVDispatcharrPairingStep(server: server, onPaired: pairingFinished, onCancel: cancelPairing)
+            case .manualAddress, .server:
+                TVRecordingServerPairingStep(baseURL: route.baseURL, onPaired: pairingFinished, onCancel: cancelPairing)
+            }
+        }
+
+        private func pairingFinished() {
+            route = nil
+            moveFocus(to: .testConnection)
+        }
+
         /// Defers the write past the render that inserts the target, which
-        /// would otherwise drop it.
+        /// would otherwise drop it. Backing out of a Dispatcharr sign-in lands
+        /// on the row that opened it.
+        private func cancelPairing() {
+            let signsInToDispatcharr = if case .dispatcharr = route { true } else { false }
+            route = nil
+            if configService.activeServer != nil {
+                moveFocus(to: signsInToDispatcharr ? .signInAgain : .testConnection)
+            } else {
+                moveFocus(to: signsInToDispatcharr && store.isUnlocked && disclosureAcknowledged ? .addDispatcharr : setupFocus)
+            }
+        }
+
         private func moveFocus(to target: TVRecordingServerFocus) {
             Task { @MainActor in focus = target }
         }
@@ -189,6 +214,7 @@
                     Text(RecordingServerSetup.intro)
                     Text(RecordingServerSetup.disclosure)
                     Text(RecordingServerSetup.connectionNote)
+                    Text(RecordingServerSetup.dispatcharrDisclosure)
                     Text(RecordingServerSetup.disclaimer)
                         .foregroundStyle(.secondary)
                 }
@@ -224,21 +250,15 @@
                     discoveryStatus
                 }
 
-                Button {
+                navigationRow("Enter Address Manually", systemImage: "keyboard") {
                     route = .manualAddress
-                } label: {
-                    HStack(spacing: 16) {
-                        Image(systemName: "keyboard")
-                            .font(.system(size: 22, weight: .medium))
-                        Text("Enter Address Manually")
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                    }
                 }
-                .buttonStyle(TVSettingsRowButtonStyle())
                 .focused($focus, equals: .manualAddress)
+
+                navigationRow("Add Dispatcharr Server", systemImage: "plus.circle") {
+                    route = .dispatcharr(nil)
+                }
+                .focused($focus, equals: .addDispatcharr)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(RecordingServerSetup.intro)
@@ -249,6 +269,25 @@
                 .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 .padding(.top, 8)
             }
+        }
+
+        private func navigationRow(
+            _ title: LocalizedStringKey,
+            systemImage: String,
+            action: @escaping () -> Void
+        ) -> some View {
+            Button(action: action) {
+                HStack(spacing: 16) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 22, weight: .medium))
+                    Text(title)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.forward")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(TVSettingsRowButtonStyle())
         }
 
         private func discoveredServerRow(_ server: DiscoveredRecordingServer) -> some View {
@@ -268,7 +307,7 @@
                             .font(.system(size: TVSettingsMetrics.secondaryFontSize))
                             .foregroundStyle(.secondary)
                     }
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
@@ -349,6 +388,8 @@
         var focus: FocusState<TVRecordingServerFocus?>.Binding
         /// Re-pairs with the same server once its token was revoked.
         let repair: (_ baseURL: URL) -> Void
+        /// Opens the Dispatcharr sign-in for this server, its address prefilled.
+        let signInAgain: () -> Void
         /// The server is gone on every device, and the pane falls back to its
         /// unpaired state; says whether the server itself revoked the pairing.
         let onRemoved: (RecordingServerStore.Removal) -> Void
@@ -360,6 +401,10 @@
         private var serverName: String {
             let name = connection.info?.name ?? server.name
             return name.isEmpty ? String(localized: "Recording Server") : name
+        }
+
+        private var codePairing: Bool {
+            store.pairedCapabilities?.codePairing ?? true
         }
 
         var body: some View {
@@ -385,8 +430,13 @@
                 }
                 TVSettingsValueRow("Version", value: connection.info?.version ?? "—")
                 if !isLocked {
-                    TVSettingsValueRow("Free Disk Space", value: RecordingServerSetup.diskSummary(store.status))
+                    if store.pairedCapabilities?.diskStatus ?? true {
+                        TVSettingsValueRow("Free Disk Space", value: RecordingServerSetup.diskSummary(store.status))
+                    }
                     TVSettingsValueRow("Active Recordings", value: store.status.map { "\($0.activeRecordings)" } ?? "—")
+                    if server.kind == .dispatcharr {
+                        TVSettingsValueRow("Scheduled Recordings", value: store.status.map { "\($0.scheduledRecordings)" } ?? "—")
+                    }
                     TVSettingsValueRow("Status") { reachability }
                 }
 
@@ -416,14 +466,14 @@
 
         private var actions: some View {
             VStack(alignment: .leading, spacing: 8) {
-                if !isLocked, store.reachability.needsRepairing, let baseURL = server.endpoint?.baseURL {
-                    actionRow("Pair Again", systemImage: "key") {
+                if !isLocked, codePairing, store.reachability.needsRepairing, let baseURL = server.endpoint?.baseURL {
+                    TVSettingsActionRow("Pair Again", systemImage: "key") {
                         repair(baseURL)
                     }
                 }
 
                 if !isLocked {
-                    actionRow("Test Connection", systemImage: "antenna.radiowaves.left.and.right", isBusy: connection.isTesting) {
+                    TVSettingsActionRow("Test Connection", systemImage: "antenna.radiowaves.left.and.right", isBusy: connection.isTesting) {
                         Task { await connection.testConnection(to: server) }
                     }
                     .focused(focus, equals: .testConnection)
@@ -438,9 +488,16 @@
                     EmptyView()
                 }
 
+                // Below Test Connection, the pane's landing row (approved
+                // focus map); LumeRecorder's Pair Again keeps its place above.
+                if !isLocked, !codePairing {
+                    TVSettingsActionRow("Sign In Again", systemImage: "key", action: signInAgain)
+                        .focused(focus, equals: .signInAgain)
+                }
+
                 // Stays enabled while removing: disabling the focused row would
                 // throw focus elsewhere. The model ignores a second press.
-                actionRow("Remove Server", systemImage: "trash", isDestructive: true, isBusy: connection.isRemoving) {
+                TVSettingsActionRow("Remove Server", systemImage: "trash", isDestructive: true, isBusy: connection.isRemoving) {
                     confirmsRemove = true
                 }
                 .alert(RecordingServerSetup.removeConfirmationTitle(serverName), isPresented: $confirmsRemove) {
@@ -465,25 +522,6 @@
                 .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 .padding(.top, 8)
             }
-        }
-
-        private func actionRow(
-            _ title: LocalizedStringKey,
-            systemImage: String,
-            isDestructive: Bool = false,
-            isBusy: Bool = false,
-            action: @escaping () -> Void
-        ) -> some View {
-            Button(action: action) {
-                HStack(spacing: 16) {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 22, weight: .medium))
-                    Text(title)
-                    Spacer(minLength: 0)
-                    if isBusy { ProgressView() }
-                }
-            }
-            .buttonStyle(TVSettingsRowButtonStyle(isDestructive: isDestructive))
         }
 
         private func statusText(_ message: String, color: Color) -> some View {

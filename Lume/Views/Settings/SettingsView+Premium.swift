@@ -150,86 +150,110 @@ extension SettingsView {
 #if os(tvOS)
 
     extension SettingsView {
-        /// The tvOS Lume Pro pane: status, the full benefits list, and upgrade /
-        /// restore actions for free users.
+        /// The tvOS Lume Pro pane, across the pane's full width: status and
+        /// the upgrade / restore actions side by side, then the benefits in
+        /// two columns. Nothing below the actions can take focus, so focus
+        /// never scrolls the pane: it all has to fit on one screen.
         var tvPremiumDetail: some View {
             VStack(alignment: .leading, spacing: 28) {
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Lume Pro")
-
-                    HStack(spacing: 18) {
-                        Image(systemName: "crown")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.tint)
-                            .frame(width: 60, height: 60)
-                            .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(premium.isPremium ? "Lume Pro" : "Free Plan")
-                                .font(.system(size: 26, weight: .semibold))
-                            Text(premium.isPremium
-                                ? premium.statusDetail
-                                : String(localized: "Upgrade to unlock the features below"))
-                                .font(.system(size: 20))
-                                .foregroundStyle(.secondary)
-                        }
+                    HStack(alignment: .center, spacing: 32) {
+                        tvPremiumStatus
                         Spacer(minLength: 0)
+                        tvPremiumActions
                     }
-                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                    .padding(.vertical, 8)
                 }
 
                 VStack(alignment: .leading, spacing: 16) {
                     TVSettingsSectionLabel(premium.isPremium ? "Included" : "Premium Features")
-                    ForEach(PremiumFeature.available) { feature in
-                        HStack(alignment: .top, spacing: 18) {
-                            Image(systemName: feature.systemImage)
-                                .font(.system(size: 26))
-                                .foregroundStyle(.tint)
-                                .frame(width: 40)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(feature.title).font(.system(size: 24, weight: .semibold))
-                                Text(feature.subtitle)
-                                    .font(.system(size: 20))
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                    }
+                    tvPremiumFeatureGrid
                 }
+            }
+        }
 
-                if premium.hasManageableSubscription {
-                    ManageSubscriptionRow()
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+        private var tvPremiumStatus: some View {
+            HStack(spacing: 18) {
+                Image(systemName: "crown")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.tint)
+                    .frame(width: 60, height: 60)
+                    .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(premium.isPremium ? "Lume Pro" : "Free Plan")
+                        .font(.system(size: 26, weight: .semibold))
+                    Text(premium.isPremium
+                        ? premium.statusDetail
+                        : String(localized: "Upgrade to unlock the features below"))
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
                 }
+            }
+            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            .padding(.vertical, 8)
+        }
 
-                if !premium.isPremium {
+        @ViewBuilder
+        private var tvPremiumActions: some View {
+            if !premium.isPremium {
+                HStack(spacing: 16) {
                     Button {
                         presentPaywall(nil)
                     } label: {
-                        HStack(spacing: 16) {
-                            Image(systemName: "crown")
-                                .font(.system(size: 22, weight: .medium))
-                            Text("Upgrade to Premium")
-                            Spacer(minLength: 0)
-                        }
+                        Label("Upgrade to Premium", systemImage: "crown")
                     }
-                    .buttonStyle(TVSettingsRowButtonStyle())
+                    .buttonStyle(TVSettingsActionButtonStyle(prominent: true))
 
                     Button {
                         Task { await premium.restore() }
                     } label: {
-                        HStack(spacing: 16) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 22, weight: .medium))
-                            Text("Restore Purchases")
-                            Spacer(minLength: 0)
+                        Label("Restore Purchases", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(TVSettingsActionButtonStyle())
+                }
+            } else if premium.hasManageableSubscription {
+                ManageSubscriptionRow()
+                    .frame(maxWidth: 620)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            }
+        }
+
+        /// The benefits two to a row, so every row is as tall as its taller
+        /// entry and the columns stay aligned.
+        private var tvPremiumFeatureGrid: some View {
+            let features = PremiumFeature.available
+            return Grid(alignment: .topLeading, horizontalSpacing: 40, verticalSpacing: 22) {
+                ForEach(Array(stride(from: 0, to: features.count, by: 2)), id: \.self) { index in
+                    GridRow {
+                        tvPremiumFeatureRow(features[index])
+                        if index + 1 < features.count {
+                            tvPremiumFeatureRow(features[index + 1])
+                        } else {
+                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                         }
                     }
-                    .buttonStyle(TVSettingsRowButtonStyle())
                 }
             }
+            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+        }
+
+        private func tvPremiumFeatureRow(_ feature: PremiumFeature) -> some View {
+            HStack(alignment: .top, spacing: 18) {
+                Image(systemName: feature.systemImage)
+                    .font(.system(size: 26))
+                    .foregroundStyle(.tint)
+                    .frame(width: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(feature.title).font(.system(size: 24, weight: .semibold))
+                    Text(feature.subtitle)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

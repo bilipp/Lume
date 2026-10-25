@@ -346,6 +346,40 @@ struct MediaServerSyncTests {
         #expect(stored.jellyfinUserId == "user1")
     }
 
+    /// Silo is synced through its Jellyfin-compatible service, so like Emby
+    /// the flavour only changes the id infix — and plays with the same
+    /// session header.
+    @Test func `a Silo sync imports through the Jellyfin pipeline under its own id infix`() async throws {
+        let host = uniqueHost()
+        defer { JellyfinServerStubProtocol.remove(host: host) }
+        installFullServer(
+            host: host,
+            movies: [jellyfinMovie(id: "m1", name: "Arrival")],
+            series: [jellyfinSeries(id: "s1", name: "Harbor Lights")],
+            episodes: [
+                jellyfinEpisode(id: "e1", name: "Pilot", seriesId: "s1", seriesName: "Harbor Lights", season: 1, number: 1)
+            ]
+        )
+
+        let container = try makeTestContainer()
+        let playlist = try makePlaylist(container: container, host: host, flavor: .silo)
+        let playlistId = playlist.id
+        try await makeManager(container: container).syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let movie = try #require(try context.fetch(FetchDescriptor<Movie>()).first)
+        #expect(movie.id == "\(playlistId.uuidString)-silo-m1")
+        #expect(movie.directURL == "http://\(host):8096/Videos/m1/stream?Static=true")
+
+        let show = try #require(try context.fetch(FetchDescriptor<Series>()).first)
+        #expect(show.episodes.map(\.id) == ["\(playlistId.uuidString)-silo-episode-e1"])
+
+        let stored = try #require(try context.fetch(FetchDescriptor<Playlist>()).first)
+        #expect(stored.sourceType == .silo)
+        let media = try #require(PlayableMedia.from(movie: movie, playlist: stored))
+        #expect(media.httpHeaders == JellyfinClient.playbackHeaders(token: "sess"))
+    }
+
     /// A mixed-content library reports no `CollectionType`. Skipping it — the
     /// old behaviour — imported nothing at all from a server whose only
     /// library is one, which is the default on a fresh Emby install.

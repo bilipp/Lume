@@ -123,7 +123,7 @@
                 } label: {
                     HStack(spacing: 8) {
                         recordingServerLabel
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.tertiary)
                     }
@@ -176,7 +176,7 @@
                 HStack(spacing: 8) {
                     Label("Recordings", systemImage: access.recordingsRowOpensPaywall ? "crown" : "recordingtape")
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }

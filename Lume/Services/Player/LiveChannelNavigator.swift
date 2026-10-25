@@ -152,6 +152,10 @@ nonisolated enum LiveChannelNavigator {
     /// category runs to thousands of channels and this resolves on the main
     /// actor, once per stream, for both directions. Recently Watched is the
     /// exception, and `recentsRing(…)` says why.
+    ///
+    /// A quality variant surfs from the channel it was switched from
+    /// (`qualityAnchorID`), so up/down leaves a "4K" category's copy for the
+    /// original's neighbours in the launch list.
     static func adjacentMedia(
         for media: PlayableMedia,
         offset: Int,
@@ -159,7 +163,7 @@ nonisolated enum LiveChannelNavigator {
         restriction: ContentRestriction,
         in context: ModelContext
     ) -> PlayableMedia? {
-        guard case let .live(id) = media.contentRef else { return nil }
+        guard case let .live(id) = media.historyRef else { return nil }
         var currentDescriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
         currentDescriptor.fetchLimit = 1
         guard let current = try? context.fetch(currentDescriptor).first,

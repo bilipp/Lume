@@ -414,6 +414,11 @@ final class PersistenceBenchmarks: XCTestCase {
         if stream.tvArchive != tvArchive { stream.tvArchive = tvArchive }
         let tvArchiveDuration = index % 4 == 0 ? 7 : 0
         if stream.tvArchiveDuration != tvArchiveDuration { stream.tvArchiveDuration = tvArchiveDuration }
+        // The catch-up columns are deliberately absent: only the m3u importer
+        // writes them (`ContentSyncManager.applyM3UCatchupFields`), and these
+        // benchmarks stand in for the Xtream path, whose `applyLiveStreamFields`
+        // never touches them. Writing them here would inflate the per-row cost
+        // against production.
         if stream.num != index { stream.num = index }
         let categoryId = "\(playlistId.uuidString)-live-\(index % 900)"
         if stream.categoryId != categoryId { stream.categoryId = categoryId }
