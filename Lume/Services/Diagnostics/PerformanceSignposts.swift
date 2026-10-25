@@ -122,6 +122,14 @@ nonisolated extension PerfSignpost {
     static let playerRebuffer = PerfSignpost("PlayerRebuffer")
     static let playerEngineFallback = PerfSignpost("PlayerEngineFallback")
     static let playerStartupFailure = PerfSignpost("PlayerStartupFailure")
+
+    /// Chromecast. Field traces only: they time a receiver on the user's
+    /// network, which no benchmark can stand in for, so `SignpostBenchmarks`
+    /// deliberately has no test for them.
+    /// Device picked → session connected (or given up).
+    static let castSessionStart = PerfSignpost("CastSessionStart")
+    /// Load sent → receiver accepted or rejected the media.
+    static let castMediaLoad = PerfSignpost("CastMediaLoad")
 }
 
 // MARK: - Interval handle

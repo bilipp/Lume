@@ -13,6 +13,7 @@
 		C6AA310B2FDD00020000AB0B /* LumeWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C6BB20012FDE00030000BB01 /* LumeRecorderKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6BB20022FDE00030000BB02 /* LumeRecorderKit */; };
 		C6BD5701000000000000F003 /* LumeTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6BD5701000000000000A002 /* LumeTopShelf.appex */; platformFilters = (tvos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C6CC40012FE000040000CC01 /* GoogleCastDynamic in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = C6CC40022FE000040000CC02 /* GoogleCastDynamic */; };
 		C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKit */; };
 /* End PBXBuildFile section */
 
@@ -174,6 +175,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C6CC40012FE000040000CC01 /* GoogleCastDynamic in Frameworks */,
 				C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */,
 				C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */,
 				C6BB20012FDE00030000BB01 /* LumeRecorderKit in Frameworks */,
@@ -274,6 +276,7 @@
 			);
 			name = Lume;
 			packageProductDependencies = (
+				C6CC40022FE000040000CC02 /* GoogleCastDynamic */,
 				C66C81682FC5A59D0048468D /* KSPlayer */,
 				C6AA10022FDD00010000AA02 /* LumeEngine */,
 				C6BB20022FDE00030000BB02 /* LumeRecorderKit */,
@@ -453,6 +456,7 @@
 				C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "VLCKit" */,
 				C6AA10032FDD00010000AA03 /* XCLocalSwiftPackageReference "../LumeEngine" */,
 				C6BB20032FDE00030000BB03 /* XCLocalSwiftPackageReference "../LumeRecorder/Kit" */,
+				C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C67C02C12F880F2200842DBA /* Products */;
@@ -657,7 +661,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -718,7 +722,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1052,7 +1056,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1540,7 +1544,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1764,6 +1768,14 @@
 				minimumVersion = 2.3.4;
 			};
 		};
+		C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlecast/google-cast-ios-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 4.8.6;
+			};
+		};
 		C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "VLCKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://code.videolan.org/videolan/VLCKit.git";
@@ -1787,6 +1799,11 @@
 		C6BB20022FDE00030000BB02 /* LumeRecorderKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LumeRecorderKit;
+		};
+		C6CC40022FE000040000CC02 /* GoogleCastDynamic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */;
+			productName = GoogleCastDynamic;
 		};
 		C6FF000B2FC5A59D00484602 /* VLCKit */ = {
 			isa = XCSwiftPackageProductDependency;

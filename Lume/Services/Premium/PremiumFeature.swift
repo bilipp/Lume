@@ -21,20 +21,38 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     case guidePreview
     case sportsHub
     case recordingServer
+    case chromecast
 
     var id: String {
         rawValue
     }
 
     /// The features this platform offers. Guide Preview only exists in the
-    /// tvOS Guide, so other platforms never advertise it.
+    /// tvOS Guide and Chromecast only on iPhone and iPad, so other platforms
+    /// never advertise them.
     static var available: [PremiumFeature] {
-        #if os(tvOS)
-            allCases
-        #else
-            allCases.filter { $0 != .guidePreview }
-        #endif
+        allCases.filter(\.isOnThisPlatform)
     }
+
+    private var isOnThisPlatform: Bool {
+        switch self {
+        case .guidePreview: Self.isTV
+        case .chromecast: Self.isIOS
+        default: true
+        }
+    }
+
+    #if os(tvOS)
+        private static let isTV = true
+    #else
+        private static let isTV = false
+    #endif
+
+    #if os(iOS)
+        private static let isIOS = true
+    #else
+        private static let isIOS = false
+    #endif
 
     var title: LocalizedStringResource {
         switch self {
@@ -48,6 +66,12 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .guidePreview: "Guide Preview"
         case .sportsHub: "Sports Hub"
         case .recordingServer: "Recording Server"
+        case .chromecast:
+            LocalizedStringResource(
+                "premium.chromecast.title",
+                defaultValue: "Chromecast",
+                comment: "Lume Pro feature title: send playback to a Chromecast."
+            )
         }
     }
 
@@ -63,6 +87,12 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .guidePreview: "Preview the focused channel, muted, right in the TV Guide."
         case .sportsHub: "Follow your leagues and teams — fixtures, live scores, standings and one tap to the channel that's carrying the game."
         case .recordingServer: "Record live TV and schedule shows from the guide on your own LumeRecorder server, then watch them on every device."
+        case .chromecast:
+            LocalizedStringResource(
+                "premium.chromecast.subtitle",
+                defaultValue: "Send live TV, movies and episodes from your iPhone or iPad to a Chromecast and control them from Lume.",
+                comment: "Lume Pro feature description: casting from iPhone or iPad to a Chromecast on the same network."
+            )
         }
     }
 
@@ -78,6 +108,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .guidePreview: "play.rectangle"
         case .sportsHub: "sportscourt"
         case .recordingServer: "record.circle"
+        case .chromecast: "tv.badge.wifi"
         }
     }
 }

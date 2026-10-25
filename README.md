@@ -260,7 +260,17 @@ Full-screen video is delivered through Apple's AVPlayer: on iOS and iPadOS, pick
 receiver while on the KSPlayer or VLCKit engine hands the current stream to AVPlayer
 for the cast and resumes where it left off (formats AVPlayer can't decode fall back to
 audio-only). On macOS the picker appears on the AVPlayer engine, which routes the
-picked receiver directly. (Chromecast support is on the [roadmap](#roadmap).)
+picked receiver directly.
+
+On iPhone and iPad, the same player button also casts to **Chromecast** (Lume Pro;
+AirPlay stays free). Pick a Google Cast device from Lume's device sheet and the stream
+plays on Google's Default Media Receiver while the phone becomes a remote — play/pause,
+skip, scrubbing, volume, and previous/next item. Xtream streams are sent as HLS when
+the provider allows it. Xtream, M3U and Stalker sources can be cast; local downloads,
+recordings and sources that sign in with request headers (WebDAV, Jellyfin, Emby,
+Plex, Silo) can't, and the sheet says why. Closing the player keeps the TV playing,
+with a mini-controller above the tab bar to pause, stop or reopen the remote. If the
+receiver can't play a stream, Lume ends the cast and resumes on the device.
 
 ---
 
