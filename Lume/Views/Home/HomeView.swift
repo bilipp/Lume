@@ -3,7 +3,7 @@
 //  Lume
 //
 //  Default landing screen: Recently Watched, Favorites, For You (opt-in Pro recommendations),
-//  Trending Movies/Series and the Trakt/Simkl watchlists. Row order and visibility are
+//  Trending Movies/Series and the Trakt/Simkl/MDBList watchlists. Row order and visibility are
 //  user-configurable (Settings › Layout › Home, see HomeLayoutSettings); rows render only with content.
 //
 
@@ -37,8 +37,7 @@ struct HomeView: View {
 
     @State var trendingMovies: [HomeMediaItem] = []
     @State var trendingSeries: [HomeMediaItem] = []
-    @State var watchlist: [HomeMediaItem] = []
-    @State var simklWatchlist: [HomeMediaItem] = []
+    @State var watchlists: [HomeWatchlistSource: [HomeMediaItem]] = [:]
     /// Resume fractions for partially-watched series, keyed by series id and
     /// resolved off the main thread — see `SeriesResumeLoader`.
     @State private var seriesResume: [String: Double] = [:]
@@ -65,6 +64,7 @@ struct HomeView: View {
     @State var trendingState: HomeLoadState = .idle
     @State var trakt = TraktService.shared
     @State var simkl = SimklService.shared
+    @State var mdblist = MDBListService.shared
     /// "For You" is a Lume Pro feature; observed so the row appears/disappears
     /// when entitlement changes.
     @State var premium = PremiumManager.shared
@@ -228,11 +228,8 @@ struct HomeView: View {
                 .task(id: trendingKey) {
                     await loadTrending(cacheKey: trendingKey)
                 }
-                .task(id: watchlistKey) {
-                    await loadWatchlist(cacheKey: watchlistKey)
-                }
-                .task(id: simklWatchlistKey) {
-                    await loadSimklWatchlist(cacheKey: simklWatchlistKey)
+                .task(id: watchlistsKey) {
+                    await loadWatchlists(scope: watchlistScope)
                 }
                 .task(id: recommendationsKey) {
                     await loadRecommendations()
@@ -288,10 +285,10 @@ struct HomeView: View {
                 rail("Trending Movies", trendingMovies)
             case .trendingSeries:
                 rail("Trending Series", trendingSeries)
-            case .traktWatchlist:
-                rail("From Your Trakt Watchlist", watchlist)
-            case .simklWatchlist:
-                rail("From Your Simkl Watchlist", simklWatchlist)
+            case .traktWatchlist, .simklWatchlist, .mdblistWatchlist:
+                if let source = HomeWatchlistSource(section: section) {
+                    rail(source.rowTitle, watchlists[source] ?? [])
+                }
             case .sports:
                 SportsHomeRail(isSyncBusy: isSyncBusy)
             case .downloads:
@@ -339,12 +336,14 @@ struct HomeView: View {
         return "\(playlists.count)-\(selectedPlaylistID)-\(synced)-\(restriction.visibilityToken)"
     }
 
-    var watchlistKey: String {
-        "watchlist-\(trakt.isConnected)-\(selectedPlaylistID)-\(restriction.visibilityToken)"
+    /// What the watchlist rows are matched against. Each service caches per
+    /// connection state plus this scope (see `loadWatchlist`).
+    var watchlistScope: String {
+        "\(selectedPlaylistID)-\(restriction.visibilityToken)"
     }
 
-    var simklWatchlistKey: String {
-        "simkl-watchlist-\(simkl.isConnected)-\(selectedPlaylistID)-\(restriction.visibilityToken)"
+    var watchlistsKey: String {
+        "watchlists-\(trakt.isConnected)-\(simkl.isConnected)-\(mdblist.isConnected)-\(watchlistScope)"
     }
 
     /// Identity of the series resume lookup. Resuming or finishing an episode
@@ -417,8 +416,7 @@ struct HomeView: View {
             && favorites.isEmpty
             && trendingMovies.isEmpty
             && trendingSeries.isEmpty
-            && watchlist.isEmpty
-            && simklWatchlist.isEmpty
+            && watchlists.values.allSatisfy(\.isEmpty)
             && !sportsRailHasContent
             && trendingState.isSettled
     }

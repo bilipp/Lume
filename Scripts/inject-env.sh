@@ -99,3 +99,13 @@ if [ -n "$SIMKL_CLIENT_ID" ]; then
 else
     echo "warning: SIMKL_CLIENT_ID not set in .env — Simkl integration will be hidden"
 fi
+
+# MDBList account sync uses a "Device Code App" OAuth registration, which has no
+# secret. Separate from MDBLIST_API_KEY, the app's own key for ratings lookups.
+MDBLIST_CLIENT_ID="$(read_env MDBLIST_CLIENT_ID)"
+if [ -n "$MDBLIST_CLIENT_ID" ]; then
+    set_plist MDBListClientID "$MDBLIST_CLIENT_ID"
+    echo "Injected MDBLIST_CLIENT_ID into Info.plist"
+else
+    echo "warning: MDBLIST_CLIENT_ID not set in .env — MDBList account sync will be hidden"
+fi

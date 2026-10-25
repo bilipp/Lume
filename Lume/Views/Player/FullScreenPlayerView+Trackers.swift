@@ -2,9 +2,9 @@
 //  FullScreenPlayerView+Trackers.swift
 //  Lume
 //
-//  The player's progress writes and its one-time "watched" push to Trakt and
-//  Simkl, split out of `FullScreenPlayerView` to keep that file inside the
-//  600-line cap.
+//  The player's progress writes and its one-time "watched" push to Trakt,
+//  Simkl and MDBList, split out of `FullScreenPlayerView` to keep that file
+//  inside the 600-line cap.
 //
 
 import SwiftUI

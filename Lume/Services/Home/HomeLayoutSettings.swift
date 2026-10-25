@@ -20,6 +20,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
     case trendingSeries
     case traktWatchlist
     case simklWatchlist
+    case mdblistWatchlist
     case sports
     case downloads
 
@@ -28,8 +29,8 @@ enum HomeSection: String, CaseIterable, Identifiable {
     }
 
     /// The label shown in the Home layout settings. Mirrors the row's own header
-    /// on Home (the watchlist rows are shortened from "From Your Trakt/Simkl
-    /// Watchlist").
+    /// on Home (the watchlist rows are shortened from "From Your Trakt/Simkl/
+    /// MDBList Watchlist").
     var title: LocalizedStringKey {
         switch self {
         case .recentlyWatched: "Recently Watched"
@@ -39,6 +40,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .trendingSeries: "Trending Series"
         case .traktWatchlist: "Trakt Watchlist"
         case .simklWatchlist: "Simkl Watchlist"
+        case .mdblistWatchlist: "MDBList Watchlist"
         case .sports: "Sports"
         case .downloads: "Downloads"
         }
@@ -56,6 +58,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .trendingSeries: String(localized: "Trending Series")
         case .traktWatchlist: String(localized: "Trakt Watchlist")
         case .simklWatchlist: String(localized: "Simkl Watchlist")
+        case .mdblistWatchlist: String(localized: "MDBList Watchlist")
         case .sports: String(localized: "Sports")
         case .downloads: String(localized: "Downloads")
         }
@@ -68,7 +71,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .forYou: "sparkles"
         case .trendingMovies: "film"
         case .trendingSeries: "tv"
-        case .traktWatchlist, .simklWatchlist: "rectangle.stack.badge.play"
+        case .traktWatchlist, .simklWatchlist, .mdblistWatchlist: "rectangle.stack.badge.play"
         case .sports: "sportscourt"
         case .downloads: "arrow.down.circle"
         }

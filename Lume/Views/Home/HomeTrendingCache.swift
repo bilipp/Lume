@@ -2,7 +2,7 @@
 //  HomeTrendingCache.swift
 //  Lume
 //
-//  Session-lived memo of Home's TMDB trending and Trakt/Simkl watchlist results.
+//  Session-lived memo of Home's TMDB trending and Trakt/Simkl/MDBList watchlist results.
 //  tvOS renders only the selected tab, so `HomeView` (and its `@State`) is
 //  torn down on every tab switch — without this cache the hero carousel
 //  refetched and visibly popped in on each return to Home. Entries are keyed
@@ -53,4 +53,5 @@ final class HomeTrendingCache {
 enum HomeWatchlistSource {
     case trakt
     case simkl
+    case mdblist
 }
