@@ -178,6 +178,71 @@
         }
       }
     },
+    "“%@” and its video are deleted from your Dispatcharr server." : {
+      "comment" : "Confirmation message before deleting a recording on a Dispatcharr server. %@ is the recording title.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيتم حذف “%@” والفيديو الخاص به من خادم Dispatcharr."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ und das zugehörige Video werden von deinem Dispatcharr-Server gelöscht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” and its video are deleted from your Dispatcharr server."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» y su vídeo se eliminarán de tu servidor Dispatcharr."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » et sa vidéo seront supprimés de votre serveur Dispatcharr."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» e il relativo video verranno eliminati dal tuo server Dispatcharr."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」とその動画が Dispatcharr サーバーから削除されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘%@’ 및 해당 동영상이 Dispatcharr 서버에서 삭제됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” e o vídeo serão apagados do seu servidor Dispatcharr."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”及其视频将从您的 Dispatcharr 服务器中删除。"
+          }
+        }
+      }
+    },
     "“%@” and its video are removed from the recording server for all your devices." : {
       "comment" : "Confirmation message before deleting a recording. %@ is the recording title.",
       "localizations" : {
@@ -304,6 +369,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”将立即停止录制。已录制的内容会保留。"
+          }
+        }
+      }
+    },
+    "“%@” stops recording, and what's been recorded so far is deleted from your Dispatcharr server." : {
+      "comment" : "Confirmation message before deleting a recording that is still running on a Dispatcharr server. %@ is the recording title.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيتوقف تسجيل “%@”، وسيتم حذف ما تم تسجيله حتى الآن من خادم Dispatcharr."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Aufnahme von „%@“ wird beendet und das bisher Aufgenommene von deinem Dispatcharr-Server gelöscht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” stops recording, and what's been recorded so far is deleted from your Dispatcharr server."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» dejará de grabarse y lo grabado hasta ahora se eliminará de tu servidor Dispatcharr."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’enregistrement de « %@ » s’arrête, et ce qui a déjà été enregistré est supprimé de votre serveur Dispatcharr."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La registrazione di «%@» si interrompe e quanto registrato finora verrà eliminato dal tuo server Dispatcharr."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の録画を停止し、ここまでに録画された部分を Dispatcharr サーバーから削除します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘%@’ 녹화가 중지되고, 지금까지 녹화된 내용은 Dispatcharr 서버에서 삭제됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A gravação de “%@” será interrompida e o que já foi gravado será apagado do seu servidor Dispatcharr."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”将停止录制，已录制的内容将从您的 Dispatcharr 服务器中删除。"
           }
         }
       }
@@ -4489,6 +4619,71 @@
         }
       }
     },
+    "Add Dispatcharr Server" : {
+      "comment" : "Recording Server settings: row and sheet title for signing in to a Dispatcharr server. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إضافة خادم Dispatcharr"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr-Server hinzufügen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Dispatcharr Server"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir servidor Dispatcharr"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un serveur Dispatcharr"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi server Dispatcharr"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr サーバーを追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr 서버 추가"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar servidor Dispatcharr"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加 Dispatcharr 服务器"
+          }
+        }
+      }
+    },
     "Add EPG Source" : {
       "localizations" : {
         "ar" : {
@@ -6352,6 +6547,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部"
+          }
+        }
+      }
+    },
+    "API Key" : {
+      "comment" : "Dispatcharr sign-in sheet: picker option and secure field label for a Dispatcharr API key.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مفتاح API"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API-Schlüssel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API Key"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clave de API"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé d’API"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiave API"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API キー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 키"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chave de API"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥"
           }
         }
       }
@@ -20352,6 +20612,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "手动输入地址"
+          }
+        }
+      }
+    },
+    "Enter an API key you generated in Dispatcharr. You can type it with your iPhone's keyboard. Lume never creates or replaces keys." : {
+      "comment" : "Apple TV Dispatcharr sign-in step: footer below the API key field. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أدخل مفتاح API أنشأته في Dispatcharr. يمكنك كتابته بلوحة مفاتيح iPhone. لا ينشئ Lume المفاتيح ولا يستبدلها أبدًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib einen API-Schlüssel ein, den du in Dispatcharr erstellt hast. Du kannst ihn mit der Tastatur deines iPhone eingeben. Lume erstellt oder ersetzt nie Schlüssel."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter an API key you generated in Dispatcharr. You can type it with your iPhone's keyboard. Lume never creates or replaces keys."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce una clave de API que hayas generado en Dispatcharr. Puedes escribirla con el teclado de tu iPhone. Lume nunca crea ni sustituye claves."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez une clé d’API générée dans Dispatcharr. Vous pouvez la taper avec le clavier de votre iPhone. Lume ne crée ni ne remplace jamais de clés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci una chiave API che hai generato in Dispatcharr. Puoi digitarla con la tastiera del tuo iPhone. Lume non crea né sostituisce mai le chiavi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr で生成した API キーを入力してください。iPhone のキーボードで入力できます。Lume がキーを作成したり置き換えたりすることはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr에서 생성한 API 키를 입력하세요. iPhone 키보드로 입력할 수 있습니다. Lume은 키를 생성하거나 교체하지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite uma chave de API gerada no Dispatcharr. Você pode digitá-la com o teclado do seu iPhone. O Lume nunca cria nem substitui chaves."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入您在 Dispatcharr 中生成的 API 密钥。您可以使用 iPhone 键盘输入。Lume 从不创建或替换密钥。"
           }
         }
       }
@@ -34477,6 +34802,71 @@
         }
       }
     },
+    "Lume keeps your sign-in details encrypted in iCloud so your other devices can use this server too." : {
+      "comment" : "Dispatcharr sign-in sheet: footer below the username and password fields.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحتفظ Lume ببيانات تسجيل الدخول مشفّرة في iCloud لتتمكن أجهزتك الأخرى من استخدام هذا الخادم أيضًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume speichert deine Anmeldedaten verschlüsselt in iCloud, damit deine anderen Geräte diesen Server ebenfalls nutzen können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume keeps your sign-in details encrypted in iCloud so your other devices can use this server too."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume guarda tus datos de inicio de sesión cifrados en iCloud para que tus otros dispositivos también puedan usar este servidor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume conserve vos identifiants chiffrés dans iCloud pour que vos autres appareils puissent aussi utiliser ce serveur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume conserva i tuoi dati di accesso crittografati in iCloud, così anche gli altri tuoi dispositivi possono usare questo server."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume はサインイン情報を暗号化して iCloud に保存するため、ほかのデバイスでもこのサーバーを使用できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume은 로그인 정보를 암호화하여 iCloud에 보관하므로 다른 기기에서도 이 서버를 사용할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Lume guarda seus dados de acesso criptografados no iCloud para que seus outros dispositivos também possam usar este servidor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 会将您的登录信息加密保存在 iCloud 中，以便您的其他设备也能使用此服务器。"
+          }
+        }
+      }
+    },
     "Lume plays each stream with the first engine and automatically falls back to the next if it can't be played. Drag to reorder." : {
       "localizations" : {
         "ar" : {
@@ -44545,6 +44935,71 @@
         }
       }
     },
+    "Paste an API key you generated in Dispatcharr. Lume never creates or replaces keys." : {
+      "comment" : "Dispatcharr sign-in sheet: footer below the API key field. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الصق مفتاح API أنشأته في Dispatcharr. لا ينشئ Lume المفاتيح ولا يستبدلها أبدًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen API-Schlüssel ein, den du in Dispatcharr erstellt hast. Lume erstellt oder ersetzt nie Schlüssel."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste an API key you generated in Dispatcharr. Lume never creates or replaces keys."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega una clave de API que hayas generado en Dispatcharr. Lume nunca crea ni sustituye claves."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collez une clé d’API générée dans Dispatcharr. Lume ne crée ni ne remplace jamais de clés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incolla una chiave API che hai generato in Dispatcharr. Lume non crea né sostituisce mai le chiavi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr で生成した API キーを貼り付けてください。Lume がキーを作成したり置き換えたりすることはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr에서 생성한 API 키를 붙여 넣으세요. Lume은 키를 생성하거나 교체하지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole uma chave de API gerada no Dispatcharr. O Lume nunca cria nem substitui chaves."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴您在 Dispatcharr 中生成的 API 密钥。Lume 从不创建或替换密钥。"
+          }
+        }
+      }
+    },
     "Pause" : {
       "comment" : "A button that pauses playback.",
       "isCommentAutoGenerated" : true,
@@ -51661,67 +52116,67 @@
         }
       }
     },
-    "Record live TV and schedule shows from the guide on your own LumeRecorder server, then watch them on every device." : {
-      "comment" : "Lume Pro feature subtitle for the recording server.",
+    "Record live TV and schedule shows from the guide on your own LumeRecorder or Dispatcharr server, then watch them on every device." : {
+      "comment" : "Lume Pro feature subtitle for the recording server. LumeRecorder and Dispatcharr are product names.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "سجّل البث المباشر وجدول البرامج من دليل البرامج على خادم LumeRecorder الخاص بك، ثم شاهدها على كل أجهزتك."
+            "value" : "سجّل البث المباشر وجدول البرامج من دليل البرامج على خادم LumeRecorder أو Dispatcharr الخاص بك، ثم شاهدها على كل أجهزتك."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nimm Live-TV auf und plane Sendungen aus dem Programmführer auf deinem eigenen LumeRecorder-Server – und sieh sie dir auf jedem Gerät an."
+            "value" : "Nimm Live-TV auf und plane Sendungen aus dem Programmführer auf deinem eigenen LumeRecorder- oder Dispatcharr-Server – und sieh sie dir auf jedem Gerät an."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Record live TV and schedule shows from the guide on your own LumeRecorder server, then watch them on every device."
+            "value" : "Record live TV and schedule shows from the guide on your own LumeRecorder or Dispatcharr server, then watch them on every device."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Graba TV en directo y programa grabaciones desde la guía en tu propio servidor LumeRecorder, y míralas en cualquier dispositivo."
+            "value" : "Graba TV en directo y programa grabaciones desde la guía en tu propio servidor LumeRecorder o Dispatcharr, y míralas en cualquier dispositivo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistrez la TV en direct et programmez des émissions depuis le guide sur votre propre serveur LumeRecorder, puis regardez-les sur tous vos appareils."
+            "value" : "Enregistrez la TV en direct et programmez des émissions depuis le guide sur votre propre serveur LumeRecorder ou Dispatcharr, puis regardez-les sur tous vos appareils."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Registra la TV in diretta e pianifica le trasmissioni dalla guida sul tuo server LumeRecorder, poi guardale su ogni dispositivo."
+            "value" : "Registra la TV in diretta e pianifica le trasmissioni dalla guida sul tuo server LumeRecorder o Dispatcharr, poi guardale su ogni dispositivo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自分の LumeRecorder サーバーでライブTVを録画したり、番組表から番組を予約したりして、どのデバイスでも視聴できます。"
+            "value" : "自分の LumeRecorder または Dispatcharr サーバーでライブTVを録画したり、番組表から番組を予約したりして、どのデバイスでも視聴できます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "자체 LumeRecorder 서버에서 라이브 TV를 녹화하고 편성표에서 프로그램을 예약한 다음, 모든 기기에서 시청하세요."
+            "value" : "자체 LumeRecorder 또는 Dispatcharr 서버에서 라이브 TV를 녹화하고 편성표에서 프로그램을 예약한 다음, 모든 기기에서 시청하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Grave TV ao vivo e agende programas pelo guia no seu próprio servidor LumeRecorder, depois assista em qualquer dispositivo."
+            "value" : "Grave TV ao vivo e agende programas pelo guia no seu próprio servidor LumeRecorder ou Dispatcharr, depois assista em qualquer dispositivo."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在您自己的 LumeRecorder 服务器上录制直播电视、从指南中预约节目，然后在任意设备上观看。"
+            "value" : "在您自己的 LumeRecorder 或 Dispatcharr 服务器上录制直播电视、从指南中预约节目，然后在任意设备上观看。"
           }
         }
       }
@@ -56494,6 +56949,71 @@
         }
       }
     },
+    "Scheduled Recordings" : {
+      "comment" : "Recording Server settings: number of recordings scheduled on the paired Dispatcharr server.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التسجيلات المجدولة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geplante Aufnahmen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scheduled Recordings"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grabaciones programadas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrements programmés"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrazioni programmate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予約済みの録画"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예약된 녹화"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravações agendadas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已预约的录制"
+          }
+        }
+      }
+    },
     "Scope" : {
       "localizations" : {
         "ar" : {
@@ -60912,6 +61432,71 @@
         }
       }
     },
+    "Sign In Again" : {
+      "comment" : "Recording Server settings: button that reopens the Dispatcharr sign-in for the paired server; also the sheet's title then.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تسجيل الدخول مرة أخرى"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut anmelden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign In Again"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a iniciar sesión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se reconnecter"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi di nuovo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再度サインイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 로그인"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar novamente"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登录"
+          }
+        }
+      }
+    },
     "Sign in to iCloud in Settings to sync your playlists and viewing across devices." : {
       "localizations" : {
         "ar" : {
@@ -61082,6 +61667,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "登录你的 OpenSubtitles 账户以下载字幕。"
+          }
+        }
+      }
+    },
+    "Sign In With" : {
+      "comment" : "Dispatcharr sign-in sheet: picker label choosing between an API key and a username and password.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تسجيل الدخول باستخدام"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anmelden mit"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign In With"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar sesión con"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se connecter avec"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi con"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインイン方法"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그인 방법"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar com"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录方式"
           }
         }
       }
@@ -68743,6 +69393,71 @@
         }
       }
     },
+    "The address of your Dispatcharr server. Without a port, Lume uses %@." : {
+      "comment" : "Dispatcharr sign-in sheet: address footer; the placeholder is the default port number. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عنوان خادم Dispatcharr الخاص بك. بدون منفذ، يستخدم Lume المنفذ %@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Adresse deines Dispatcharr-Servers. Ohne Port verwendet Lume %@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The address of your Dispatcharr server. Without a port, Lume uses %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La dirección de tu servidor Dispatcharr. Sin puerto, Lume usa el %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adresse de votre serveur Dispatcharr. Sans port, Lume utilise %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’indirizzo del tuo server Dispatcharr. Senza porta, Lume usa la %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr サーバーのアドレスです。ポートを省略すると、Lume はポート %@ を使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr 서버의 주소입니다. 포트를 생략하면 Lume은 %@ 포트를 사용합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O endereço do seu servidor Dispatcharr. Sem porta, o Lume usa a %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您的 Dispatcharr 服务器地址。如未指定端口，Lume 将使用 %@ 端口。"
+          }
+        }
+      }
+    },
     "The buffers set how much decoded media is held before playback starts or resumes — raise them if high-bitrate 4K streams stutter. " : {
       "localizations" : {
         "ar" : {
@@ -69514,6 +70229,71 @@
         }
       }
     },
+    "The recording server didn't accept these sign-in details. Check them and try again." : {
+      "comment" : "Recording server sign-in error: Dispatcharr rejected the API key or the username and password.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يقبل خادم التسجيل بيانات تسجيل الدخول هذه. تحقّق منها وحاول مرة أخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Aufnahmeserver hat diese Anmeldedaten nicht akzeptiert. Überprüfe sie und versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording server didn't accept these sign-in details. Check them and try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El servidor de grabación no ha aceptado estos datos de inicio de sesión. Revísalos e inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur d’enregistrement n’a pas accepté ces identifiants. Vérifiez-les et réessayez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il server di registrazione non ha accettato questi dati di accesso. Controllali e riprova."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画サーバーがこのサインイン情報を受け付けませんでした。内容を確認してもう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화 서버가 이 로그인 정보를 허용하지 않았습니다. 확인한 후 다시 시도하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O servidor de gravação não aceitou esses dados de acesso. Verifique-os e tente novamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制服务器未接受这些登录信息。请检查后重试。"
+          }
+        }
+      }
+    },
     "The recording server is already recording as many streams as it allows. Stop another recording and try again." : {
       "comment" : "Recording server error: concurrent-recording limit reached.",
       "localizations" : {
@@ -69705,6 +70485,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "录制服务器可以连接。"
+          }
+        }
+      }
+    },
+    "The recording server no longer accepts this device. Pair it or sign in again in Settings." : {
+      "comment" : "Recording server error: the server rejected this device's pairing token or sign-in details (HTTP 401).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يعد خادم التسجيل يقبل هذا الجهاز. أعد إقرانه أو سجّل الدخول مرة أخرى من الإعدادات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Aufnahmeserver akzeptiert dieses Gerät nicht mehr. Kopple es oder melde dich in den Einstellungen erneut an."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording server no longer accepts this device. Pair it or sign in again in Settings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El servidor de grabación ya no acepta este dispositivo. Vuelve a vincularlo o a iniciar sesión en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur d’enregistrement n’accepte plus cet appareil. Jumelez-le ou reconnectez-vous dans Réglages."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il server di registrazione non accetta più questo dispositivo. Abbinalo o accedi di nuovo in Impostazioni."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画サーバーがこのデバイスを受け付けなくなりました。設定でもう一度ペアリングするか、サインインし直してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화 서버가 더 이상 이 기기를 허용하지 않습니다. 설정에서 다시 페어링하거나 다시 로그인하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O servidor de gravação não aceita mais este dispositivo. Pareie-o ou entre novamente em Ajustes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制服务器不再接受此设备。请在“设置”中重新配对或重新登录。"
           }
         }
       }
@@ -71415,71 +72260,6 @@
         }
       }
     },
-    "This device is no longer paired with the recording server. Pair it again in Settings." : {
-      "comment" : "Recording server error: the stored pairing token was rejected.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "لم يعد هذا الجهاز مقترنًا بخادم التسجيل. أعد إقرانه من الإعدادات."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Gerät ist nicht mehr mit dem Aufnahmeserver gekoppelt. Kopple es in den Einstellungen erneut."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device is no longer paired with the recording server. Pair it again in Settings."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este dispositivo ya no está vinculado al servidor de grabación. Vuelve a vincularlo en Ajustes."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’est plus jumelé avec le serveur d’enregistrement. Jumelez-le à nouveau dans Réglages."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questo dispositivo non è più abbinato al server di registrazione. Abbinalo di nuovo in Impostazioni."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このデバイスは録画サーバーとのペアリングが解除されています。設定でもう一度ペアリングしてください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 기기는 더 이상 녹화 서버와 페어링되어 있지 않습니다. 설정에서 다시 페어링하세요."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este dispositivo não está mais pareado com o servidor de gravação. Pareie-o novamente em Ajustes."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此设备已不再与录制服务器配对。请在“设置”中重新配对。"
-          }
-        }
-      }
-    },
     "This iCloud account isn’t permitted to sync." : {
       "localizations" : {
         "ar" : {
@@ -73146,6 +73926,71 @@
         }
       }
     },
+    "To record from a Dispatcharr server, Lume sends it only the channel's Dispatcharr ID and the programme's details." : {
+      "comment" : "Recording Server settings: privacy disclosure for Dispatcharr servers. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "للتسجيل من خادم Dispatcharr، يرسل إليه Lume فقط معرّف القناة في Dispatcharr وتفاصيل البرنامج."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für Aufnahmen auf einem Dispatcharr-Server sendet Lume ihm nur die Dispatcharr-ID des Senders und die Details der Sendung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To record from a Dispatcharr server, Lume sends it only the channel's Dispatcharr ID and the programme's details."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para grabar desde un servidor Dispatcharr, Lume solo le envía el ID de Dispatcharr del canal y los detalles del programa."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour enregistrer depuis un serveur Dispatcharr, Lume ne lui envoie que l’identifiant Dispatcharr de la chaîne et les détails du programme."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per registrare da un server Dispatcharr, Lume gli invia solo l’ID Dispatcharr del canale e i dettagli del programma."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr サーバーで録画するとき、Lume が送信するのはチャンネルの Dispatcharr ID と番組の詳細だけです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr 서버에서 녹화할 때 Lume은 채널의 Dispatcharr ID와 프로그램 정보만 전송합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para gravar em um servidor Dispatcharr, o Lume envia apenas o ID do canal no Dispatcharr e os detalhes do programa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过 Dispatcharr 服务器录制时，Lume 只会向其发送频道的 Dispatcharr ID 和节目详情。"
+          }
+        }
+      }
+    },
     "To record, Lume sends the recording server the stream address the player uses. For Xtream playlists it includes your provider username and password." : {
       "comment" : "Recording Server settings: one-time disclosure that the provider stream URL (with Xtream credentials) is sent to the user's recording server.",
       "localizations" : {
@@ -73453,67 +74298,67 @@
         }
       }
     },
-    "Too many pairing attempts. Try again in a minute." : {
-      "comment" : "Recording server pairing: rate limited after failed attempts.",
+    "Too many attempts. Try again in a minute." : {
+      "comment" : "Recording server error: the server rate-limited pairing, sign-in or other requests (HTTP 429).",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "محاولات إقران كثيرة جدًا. حاول مرة أخرى بعد دقيقة."
+            "value" : "محاولات كثيرة جدًا. حاول مرة أخرى بعد دقيقة."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zu viele Kopplungsversuche. Versuche es in einer Minute erneut."
+            "value" : "Zu viele Versuche. Versuche es in einer Minute erneut."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Too many pairing attempts. Try again in a minute."
+            "value" : "Too many attempts. Try again in a minute."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Demasiados intentos de vinculación. Inténtalo de nuevo dentro de un minuto."
+            "value" : "Demasiados intentos. Inténtalo de nuevo dentro de un minuto."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trop de tentatives de jumelage. Réessayez dans une minute."
+            "value" : "Trop de tentatives. Réessayez dans une minute."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Troppi tentativi di abbinamento. Riprova tra un minuto."
+            "value" : "Troppi tentativi. Riprova tra un minuto."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ペアリングの試行回数が多すぎます。1 分後にもう一度お試しください。"
+            "value" : "試行回数が多すぎます。1 分後にもう一度お試しください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "페어링 시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요."
+            "value" : "시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muitas tentativas de pareamento. Tente novamente em um minuto."
+            "value" : "Muitas tentativas. Tente novamente em um minuto."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "配对尝试次数过多。请一分钟后重试。"
+            "value" : "尝试次数过多。请一分钟后重试。"
           }
         }
       }
@@ -76341,6 +77186,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用户名（可选）"
+          }
+        }
+      }
+    },
+    "Username & Password" : {
+      "comment" : "Dispatcharr sign-in sheet: picker option for signing in with a username and password.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اسم المستخدم وكلمة السر"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benutzername & Passwort"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Username & Password"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usuario y contraseña"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom d’utilisateur et mot de passe"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome utente e password"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザ名とパスワード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 이름 및 암호"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome de usuário e senha"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名和密码"
           }
         }
       }
@@ -79705,6 +80615,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的账户每天可下载 %lld 个字幕。"
+          }
+        }
+      }
+    },
+    "Your account on the recording server isn't allowed to do that." : {
+      "comment" : "Recording server error: the signed-in account lacks permission (for example a view-only DVR account trying to record, stop or delete).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حسابك على خادم التسجيل غير مسموح له بذلك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto auf dem Aufnahmeserver darf das nicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account on the recording server isn't allowed to do that."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu cuenta en el servidor de grabación no tiene permiso para hacer eso."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre compte sur le serveur d’enregistrement n’est pas autorisé à faire cela."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il tuo account sul server di registrazione non è autorizzato a farlo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画サーバーのあなたのアカウントには、この操作を行う権限がありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화 서버의 계정에 이 작업을 수행할 권한이 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua conta no servidor de gravação não tem permissão para fazer isso."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您在录制服务器上的账户无权执行此操作。"
           }
         }
       }

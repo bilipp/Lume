@@ -118,6 +118,45 @@
         }
     }
 
+    // MARK: - Action row
+
+    /// A full-width row that runs an action: icon, title, and a spinner while
+    /// `isBusy`.
+    struct TVSettingsActionRow: View {
+        private let title: LocalizedStringKey
+        private let systemImage: String
+        private let isDestructive: Bool
+        private let isBusy: Bool
+        private let action: () -> Void
+
+        init(
+            _ title: LocalizedStringKey,
+            systemImage: String,
+            isDestructive: Bool = false,
+            isBusy: Bool = false,
+            action: @escaping () -> Void
+        ) {
+            self.title = title
+            self.systemImage = systemImage
+            self.isDestructive = isDestructive
+            self.isBusy = isBusy
+            self.action = action
+        }
+
+        var body: some View {
+            Button(action: action) {
+                HStack(spacing: 16) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 22, weight: .medium))
+                    Text(title)
+                    Spacer(minLength: 0)
+                    if isBusy { ProgressView() }
+                }
+            }
+            .buttonStyle(TVSettingsRowButtonStyle(isDestructive: isDestructive))
+        }
+    }
+
     // MARK: - Labelled text field
 
     /// A labelled input row. The field itself keeps the native tvOS appearance

@@ -34,8 +34,14 @@ final nonisolated class StubURLProtocol: URLProtocol {
         var pathSuffix: String?
     }
 
+    /// Answers every request to one host, for clients whose calls differ by
+    /// method and path rather than by query.
+    typealias Handler = @Sendable (URLRequest) -> Response
+
     private static let lock = NSLock()
     private nonisolated(unsafe) static var routes: [RouteKey: Response] = [:]
+    private nonisolated(unsafe) static var handlers: [String: Handler] = [:]
+    private nonisolated(unsafe) static var recorded: [String: [URLRequest]] = [:]
 
     /// Registers `response` for requests to `host` carrying `query`, which is
     /// how tests sharing a host stay isolated from each other.
@@ -49,6 +55,20 @@ final nonisolated class StubURLProtocol: URLProtocol {
     static func register(host: String, pathSuffix: String, response: Response) {
         let key = RouteKey(host: host, queryName: "", queryValue: "", pathSuffix: pathSuffix)
         lock.withLock { routes[key] = response }
+    }
+
+    /// Routes every request to `host` through `handler` and records it for
+    /// `requests(host:)`. The recorded request carries its body in `httpBody`.
+    static func register(host: String, handler: @escaping Handler) {
+        lock.withLock {
+            handlers[host] = handler
+            recorded[host] = []
+        }
+    }
+
+    /// Requests a `register(host:handler:)` host received, in arrival order.
+    static func requests(host: String) -> [URLRequest] {
+        lock.withLock { recorded[host] ?? [] }
     }
 
     static func makeSession() -> URLSession {
@@ -79,7 +99,17 @@ final nonisolated class StubURLProtocol: URLProtocol {
         let host = components.host ?? ""
         let items = components.queryItems ?? []
 
-        let match = Self.lock.withLock {
+        var captured = request
+        if captured.httpBody == nil, let stream = captured.httpBodyStream {
+            captured.httpBody = Self.read(stream)
+        }
+        let handler = Self.lock.withLock {
+            let handler = Self.handlers[host]
+            if handler != nil { Self.recorded[host, default: []].append(captured) }
+            return handler
+        }
+
+        let match = handler.map { $0(captured) } ?? Self.lock.withLock {
             Self.routes.first { key, _ in
                 guard key.host == host else { return false }
                 if let suffix = key.pathSuffix { return components.path.hasSuffix(suffix) }
@@ -99,4 +129,17 @@ final nonisolated class StubURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+
+    private static func read(_ stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else { break }
+            data.append(buffer, count: count)
+        }
+        return data
+    }
 }

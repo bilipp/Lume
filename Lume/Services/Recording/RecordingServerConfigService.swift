@@ -13,7 +13,6 @@
 //
 
 import Foundation
-import LumeRecorderKit
 import Observation
 import os
 import SwiftData
@@ -34,6 +33,11 @@ nonisolated struct RecordingServerConfig: Identifiable, Hashable {
 
     var kind: RecordingServerKind? {
         RecordingServerKind(rawValue: kindRaw)
+    }
+
+    /// The `RecordingProgressStore` namespace of this server's recordings.
+    var progressNamespace: String? {
+        kind.flatMap { RecordingProgressStore.namespace(kind: $0, serverID: serverID ?? id) }
     }
 }
 
@@ -82,28 +86,55 @@ final class RecordingServerConfigService {
 
     // MARK: - Mutations
 
-    /// Store a fresh pairing. Re-pairing a server already on file (same
-    /// `serverID`) updates that row instead of adding a second one.
+    /// Store a fresh LumeRecorder pairing.
     @discardableResult
     func savePairing(
-        _ pairing: PairResponse,
+        _ pairing: RecordingServerPairing,
         kind: RecordingServerKind,
         baseURL: URL
     ) -> RecordingServerConfig? {
+        savePairing(
+            serverID: pairing.server.id,
+            name: pairing.server.name,
+            kind: kind,
+            baseURL: baseURL,
+            token: pairing.token,
+            deviceID: pairing.deviceID
+        )
+    }
+
+    /// Store a fresh pairing. Re-pairing a server already on file (same kind
+    /// and `serverID`) updates that row instead of adding a second one.
+    ///
+    /// Lume talks to one recording server at a time, so this forgets every
+    /// other server of a kind this build knows — without contacting it. Rows of
+    /// an unknown kind belong to a newer build and are left untouched.
+    @discardableResult
+    // swiftlint:disable:next function_parameter_count
+    func savePairing(
+        serverID: UUID,
+        name: String,
+        kind: RecordingServerKind,
+        baseURL: URL,
+        token: String,
+        deviceID: UUID?
+    ) -> RecordingServerConfig? {
         guard let context else { return nil }
-        let serverID = pairing.server.id
-        let name = pairing.server.name
-        let row = fetchRows().first { $0.serverID == serverID } ?? {
+        let rows = fetchRows()
+        let row = rows.first { $0.kindRaw == kind.rawValue && $0.serverID == serverID } ?? {
             let inserted = SyncedRecordingServer(kind: kind, name: name, baseURL: baseURL.absoluteString)
             context.insert(inserted)
             return inserted
         }()
+        for other in rows where other !== row && other.kind != nil {
+            context.delete(other)
+        }
         row.kindRaw = kind.rawValue
         row.name = name
         row.baseURL = baseURL.absoluteString
         row.serverID = serverID
-        row.deviceID = pairing.deviceID
-        row.token = pairing.token
+        row.deviceID = deviceID
+        row.token = token
         row.isEnabled = true
         row.updatedAt = Date()
         let id = row.id
@@ -171,14 +202,10 @@ final class RecordingServerConfigService {
     }
 
     private static func snapshot(_ row: SyncedRecordingServer) -> RecordingServerConfig {
-        let endpoint: RecordingServerEndpoint? = if let kind = row.kind,
-                                                    !row.token.isEmpty,
-                                                    let url = storedBaseURL(row.baseURL)
-        {
-            RecordingServerEndpoint(kind: kind, baseURL: url, token: row.token)
-        } else {
-            nil
+        let endpoint = row.kind.flatMap { kind in
+            storedBaseURL(row.baseURL).map { RecordingServerEndpoint(kind: kind, baseURL: $0, token: row.token) }
         }
+        .flatMap { $0.hasUsableCredential ? $0 : nil }
         return RecordingServerConfig(
             id: row.id,
             kindRaw: row.kindRaw,

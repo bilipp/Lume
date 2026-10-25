@@ -11,14 +11,13 @@
 //  never get one.
 //
 
-import LumeRecorderKit
 import SwiftData
 import SwiftUI
 
 /// What a channel's Record control shows, or why it opens the paywall.
 enum RecordChannelState: Equatable {
     case record
-    case stop(Recording)
+    case stop(ServerRecording)
     /// Paired, but Lume Pro has lapsed: the control carries the crown.
     case locked
 }
@@ -27,8 +26,8 @@ enum RecordChannelState: Equatable {
 enum RecordProgrammeState: Equatable {
     case record
     case schedule
-    case cancel(Recording)
-    case stop(Recording)
+    case cancel(ServerRecording)
+    case stop(ServerRecording)
     /// Paired, but Lume Pro has lapsed: Record or Schedule Recording behind
     /// the crown.
     case locked(RecordingRequestPlanner.ProgrammeTiming)
@@ -39,13 +38,14 @@ struct RecordChannelAction: Equatable {
     fileprivate let model: RecordActionFlowModel
     fileprivate let context: ModelContext
 
-    /// `nil` when the channel can't be recorded at all: no paired server, or a
-    /// playlist kind without standalone stream URLs. Reads the store, so the
+    /// `nil` when the channel can't be recorded at all: no paired server, a
+    /// playlist kind without standalone stream URLs, a channel the paired
+    /// Dispatcharr doesn't serve, or a view-only account. Reads the store, so the
     /// view that calls it follows pairing, Pro and recording changes.
     func channelState(for stream: LiveStream) -> RecordChannelState? {
         let store = model.store
-        guard let owner = model.owner(of: stream, in: context),
-              store.supportsRecording(owner.sourceType)
+        guard let owner = model.recordableOwner(of: stream, in: context),
+              store.supportsRecording(stream, in: owner, playlistServed: true)
         else { return nil }
         guard store.isUnlocked else { return .locked }
         let ref = RecordingSourceRef(playlistID: owner.id, streamID: stream.id)
@@ -64,23 +64,31 @@ struct RecordChannelAction: Equatable {
         timing: RecordingRequestPlanner.ProgrammeTiming
     ) -> RecordProgrammeState? {
         let store = model.store
-        guard let owner = model.owner(of: stream, in: context),
-              store.supportsRecording(owner.sourceType)
+        guard let owner = model.recordableOwner(of: stream, in: context),
+              store.supportsRecording(stream, in: owner, playlistServed: true)
         else { return nil }
         switch timing {
         case .ended:
             return nil
         case .upcoming:
-            guard programme != nil, store.supportsScheduling(owner.sourceType) else { return nil }
+            guard programme != nil, store.supportsScheduling(stream, in: owner, playlistServed: true) else { return nil }
         case .live:
             break
         }
         guard store.isUnlocked else { return .locked(timing) }
         let ref = RecordingSourceRef(playlistID: owner.id, streamID: stream.id)
         if let pending = store.pendingRecording(forSourceRef: ref, programme: programme) {
-            return store.isCapturing(pending) ? .stop(pending) : .cancel(pending)
+            return store.cancelsRatherThanStops(pending) ? .cancel(pending) : .stop(pending)
         }
         return timing == .live ? .record : .schedule
+    }
+
+    /// Whether channels of the playlist can be recorded at all, for a hint
+    /// that speaks for the whole list. Locked still counts, so Pro doesn't
+    /// change it.
+    func offersRecording(inPlaylist playlistID: UUID) -> Bool {
+        model.recordableOwner(ofPlaylist: playlistID, in: context) != nil
+            && model.store.pairedCapabilities?.readOnly != true
     }
 
     func showPaywall() {
@@ -109,7 +117,7 @@ struct RecordChannelAction: Equatable {
     }
 
     /// Cancels a scheduled recording or ends a running one.
-    func stop(_ recording: Recording) {
+    func stop(_ recording: ServerRecording) {
         model.stop(recording)
     }
 
@@ -247,10 +255,7 @@ final class RecordActionFlowModel {
     /// playlist serves every row and every menu after it.
     @ObservationIgnored private var owners: [String: Owner] = [:]
 
-    struct Owner {
-        let id: UUID
-        let sourceType: PlaylistSourceType
-    }
+    typealias Owner = RecordingPlaylistSource
 
     init(store: RecordingServerStore? = nil) {
         self.store = store ?? .shared
@@ -263,9 +268,34 @@ final class RecordActionFlowModel {
         let key = String(stream.id.prefix(36))
         if let cached = owners[key] { return cached }
         guard let playlist = playlist(for: stream, in: context) else { return nil }
-        let owner = Owner(id: playlist.id, sourceType: playlist.sourceType)
+        let owner = Owner(playlist: playlist)
         owners[key] = owner
         return owner
+    }
+
+    private func owner(ofPlaylist id: UUID, in context: ModelContext) -> Owner? {
+        let key = id.uuidString
+        if let cached = owners[key] { return cached }
+        var descriptor = FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let playlist = try? context.fetch(descriptor).first else { return nil }
+        let owner = Owner(playlist: playlist)
+        owners[key] = owner
+        return owner
+    }
+
+    /// `stream`'s playlist when the paired server could record its channels,
+    /// so a playlist it doesn't serve skips every per-channel check. Reads the
+    /// store's pairing, so a caller follows pairing changes.
+    func recordableOwner(of stream: LiveStream, in context: ModelContext) -> Owner? {
+        guard let endpoint = store.pairedEndpoint, let owner = owner(of: stream, in: context) else { return nil }
+        return store.supportsRecording(in: owner, on: endpoint) ? owner : nil
+    }
+
+    /// `recordableOwner(of:in:)` for a whole playlist.
+    func recordableOwner(ofPlaylist id: UUID, in context: ModelContext) -> Owner? {
+        guard let endpoint = store.pairedEndpoint, let owner = owner(ofPlaylist: id, in: context) else { return nil }
+        return store.supportsRecording(in: owner, on: endpoint) ? owner : nil
     }
 
     private func playlist(for stream: LiveStream, in context: ModelContext) -> Playlist? {
@@ -348,12 +378,14 @@ final class RecordActionFlowModel {
         }
     }
 
-    func stop(_ recording: Recording) {
+    func stop(_ recording: ServerRecording) {
         let id = recording.id
-        let isCancel = !store.isCapturing(recording)
-        run(key: id.uuidString, failure: isCancel ? .cancel : .stop) { [store] () async throws(RecordingActionError) in
+        let isCancel = store.cancelsRatherThanStops(recording)
+        run(key: id.rawValue, failure: isCancel ? .cancel : .stop) { [store] () async throws(RecordingActionError) in
             let stopped = try await store.stop(id: id)
-            let message = isCancel
+            // The server decides on its own current state, which may have
+            // moved on since the label was drawn.
+            let message = stopped.status == .cancelled
                 ? String(localized: "Cancelled “\(stopped.title)”")
                 : String(localized: "Stopped recording “\(stopped.title)”")
             return RecordActionToast(message: message, systemImage: "stop.circle")

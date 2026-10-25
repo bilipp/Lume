@@ -9,7 +9,6 @@
 //
 
 #if os(tvOS)
-    import LumeRecorderKit
     import SwiftUI
 
     struct TVRecordingsView: View {
@@ -73,12 +72,12 @@
             .clipped()
         }
 
-        private func card(for recording: Recording) -> some View {
+        private func card(for recording: ServerRecording) -> some View {
             TVRecordingCard(recording: recording, isLoading: model.loadingID == recording.id) {
                 if recording.isPlayable {
                     model.play(recording)
                 } else {
-                    model.pendingAction = RecordingLibraryAction.actions(for: recording).first
+                    model.pendingAction = model.actions(for: recording).first
                 }
             }
             .contextMenu {
@@ -89,7 +88,7 @@
                         Label("Play", systemImage: "play.fill")
                     }
                 }
-                ForEach(RecordingLibraryAction.actions(for: recording)) { action in
+                ForEach(model.actions(for: recording)) { action in
                     Button(role: action.isDelete ? .destructive : nil) {
                         model.pendingAction = action
                     } label: {
@@ -113,9 +112,9 @@
     /// spans the pane, so Up / Down from any card lands in the next band.
     private struct TVRecordingsBand<Card: View>: View {
         let group: RecordingsLibraryGroup
-        @ViewBuilder var card: (Recording) -> Card
+        @ViewBuilder var card: (ServerRecording) -> Card
 
-        @FocusState private var focusedID: UUID?
+        @FocusState private var focusedID: RecordingID?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -147,7 +146,7 @@
     // MARK: - Card
 
     private struct TVRecordingCard: View {
-        let recording: Recording
+        let recording: ServerRecording
         let isLoading: Bool
         let onSelect: () -> Void
 

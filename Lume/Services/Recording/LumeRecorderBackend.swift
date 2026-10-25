@@ -2,15 +2,14 @@
 //  LumeRecorderBackend.swift
 //  Lume
 //
-//  `RecordingServerBackend` over the LumeRecorderKit client. Uses its own
-//  URLSession — never XtreamClient's single-connection session, whose one slot
-//  belongs to the provider.
+//  `RecordingServerBackend` over the LumeRecorderKit client, on the shared
+//  `URLSession.recordingServer`.
 //
 
 import Foundation
 import LumeRecorderKit
 
-nonisolated struct LumeRecorderBackend: RecordingServerBackend {
+nonisolated struct LumeRecorderBackend: RecordingServerDevicePairing {
     let client: LumeRecorderClient
 
     var kind: RecordingServerKind {
@@ -18,29 +17,16 @@ nonisolated struct LumeRecorderBackend: RecordingServerBackend {
     }
 
     init(baseURL: URL, token: String?) {
-        client = LumeRecorderClient(baseURL: baseURL, token: token, session: Self.session)
+        client = LumeRecorderClient(baseURL: baseURL, token: token, session: .recordingServer)
     }
 
-    /// A LAN server answers in milliseconds or not at all, so fail fast instead of
-    /// letting an unreachable host hold a UI action for the default minute.
-    static let session: URLSession = {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 15
-        configuration.timeoutIntervalForResource = 30
-        configuration.waitsForConnectivity = false
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        return URLSession(configuration: configuration)
-    }()
-
-    func serverInfo() async throws(RecordingServerError) -> ServerInfo {
-        try await run { try await client.info() }
+    func serverInfo() async throws(RecordingServerError) -> ServerIdentity {
+        try await ServerIdentity(run { try await client.info() })
     }
 
-    func pair(code: String, deviceName: String) async throws(RecordingServerError) -> PairResponse {
+    func pair(code: String, deviceName: String) async throws(RecordingServerError) -> RecordingServerPairing {
         do {
-            return try await client.pair(code: code, deviceName: deviceName)
+            return try await RecordingServerPairing(client.pair(code: code, deviceName: deviceName))
         } catch LumeRecorderError.unauthorized {
             throw .invalidPairingCode
         } catch {
@@ -48,35 +34,45 @@ nonisolated struct LumeRecorderBackend: RecordingServerBackend {
         }
     }
 
-    func status() async throws(RecordingServerError) -> ServerStatus {
-        try await run { try await client.status() }
+    func status() async throws(RecordingServerError) -> RecordingServerStatus? {
+        try await RecordingServerStatus(run { try await client.status() })
     }
 
-    func recordings() async throws(RecordingServerError) -> [Recording] {
-        try await run { try await client.recordings() }
+    func recordings() async throws(RecordingServerError) -> [ServerRecording] {
+        try await run { try await client.recordings() }.map(ServerRecording.init)
     }
 
     func createRecording(
-        _ request: CreateRecordingRequest,
+        _ request: RecordingCreateRequest,
         idempotencyKey: String
-    ) async throws(RecordingServerError) -> Recording {
-        try await run { try await client.createRecording(request, idempotencyKey: idempotencyKey) }
+    ) async throws(RecordingServerError) -> ServerRecording {
+        guard let kitRequest = CreateRecordingRequest(request) else { throw .invalidRequest }
+        return try await ServerRecording(run { try await client.createRecording(kitRequest, idempotencyKey: idempotencyKey) })
     }
 
-    func stopRecording(id: UUID) async throws(RecordingServerError) -> Recording {
-        try await run { try await client.stopRecording(id: id) }
+    func stopRecording(id: RecordingID) async throws(RecordingServerError) -> ServerRecording {
+        let uuid = try Self.uuid(id)
+        return try await ServerRecording(run { try await client.stopRecording(id: uuid) })
     }
 
-    func deleteRecording(id: UUID) async throws(RecordingServerError) {
-        try await run { try await client.deleteRecording(id: id) }
+    func deleteRecording(id: RecordingID) async throws(RecordingServerError) {
+        let uuid = try Self.uuid(id)
+        try await run { try await client.deleteRecording(id: uuid) }
     }
 
-    func playbackGrant(id: UUID) async throws(RecordingServerError) -> PlaybackGrant {
-        try await run { try await client.playback(id: id) }
+    func playback(id: RecordingID) async throws(RecordingServerError) -> RecordingPlayback {
+        let uuid = try Self.uuid(id)
+        return try await RecordingPlayback(run { try await client.playback(id: uuid) })
     }
 
     func unpair(deviceID: UUID) async throws(RecordingServerError) {
         try await run { try await client.unpair(deviceID: deviceID) }
+    }
+
+    /// An id LumeRecorder can't have minted reads as a recording it doesn't have.
+    private static func uuid(_ id: RecordingID) throws(RecordingServerError) -> UUID {
+        guard let uuid = id.uuid else { throw .notFound }
+        return uuid
     }
 
     private func run<T: Sendable>(

@@ -148,10 +148,13 @@ struct FullScreenPlayerView: View {
         _activeMedia = State(initialValue: media)
         (_clock, _castSession) = Self.playbackStates(adopting: media)
         let defaults = UserDefaults.standard
-        enginePriority = PlayerEnginePriority.resolve(
-            priorityRaw: defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? "",
-            legacyEngineRaw: defaults.string(forKey: PlayerSettings.engineKey)
-                ?? PlayerEngineKind.defaultValue.rawValue
+        enginePriority = PlayerEnginePriority.playable(
+            PlayerEnginePriority.resolve(
+                priorityRaw: defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? "",
+                legacyEngineRaw: defaults.string(forKey: PlayerSettings.engineKey)
+                    ?? PlayerEngineKind.defaultValue.rawValue
+            ),
+            for: media
         )
         let adoption = handle == nil ? nil : Self.previewAdoption(
             of: handle, for: media, enginePriority: enginePriority, airPlayActive: CastService.shared.isAirPlayActive
@@ -184,6 +187,7 @@ struct FullScreenPlayerView: View {
     private var isAirPlayOverride: Bool {
         castService.isAirPlayActive
             && priorityEngine != .avPlayer
+            && !activeMedia.unsupportedEngines.contains(.avPlayer)
             && !airPlayVideoUnsupported.contains(activeMedia.id)
     }
 

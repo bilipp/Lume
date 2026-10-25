@@ -19,10 +19,11 @@ extension VLCPlayerCoordinator {
         // payload, a download task description or window-restoration state.
         // VLCKit sends no headers, so every header-carrying source is folded
         // into the URL here: WebDAV's Basic userinfo, Jellyfin/Emby's api_key,
-        // Plex's X-Plex-Token.
+        // Plex's X-Plex-Token, a Dispatcharr recording's JWT.
         let media = VLCMedia(url: HTTPBasicCredentials.authenticatedURL(url, headers: httpHeaders)
             ?? JellyfinPlaybackAuth.authenticatedURL(url, headers: httpHeaders)
-            ?? PlexPlaybackAuth.authenticatedURL(url, headers: httpHeaders) ?? url)
+            ?? PlexPlaybackAuth.authenticatedURL(url, headers: httpHeaders)
+            ?? DispatcharrPlaybackAuth.authenticatedURL(url, headers: httpHeaders) ?? url)
         applyMediaOptions(to: media, isLive: isLive)
         mediaPlayer.media = media
         // libvlc draws VLC's subtitles itself; size is the one part of the

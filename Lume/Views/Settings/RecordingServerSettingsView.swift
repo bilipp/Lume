@@ -4,8 +4,8 @@
 //
 //  The iOS / macOS / visionOS Recording Server page, behind Settings › Live
 //  TV: find a LumeRecorder server
-//  on the network (or type its address), pair with the code it prints, and,
-//  once paired, its status with Test Connection and Remove Server. The pairing
+//  on the network (or type its address) and pair with the code it prints, or
+//  sign in to a Dispatcharr server; once paired, its status with Test Connection and Remove Server. The pairing
 //  is a synced `SyncedRecordingServer` row, so one pairing serves every device
 //  on the account.
 //
@@ -19,7 +19,6 @@
 
 #if !os(tvOS)
 
-    import LumeRecorderKit
     import SwiftUI
 
     struct RecordingServerSettingsView: View {
@@ -27,6 +26,7 @@
         @State private var store = RecordingServerStore.shared
         @State private var discovery = RecordingServerDiscovery()
         @State private var pairingTarget: RecordingServerPairingTarget?
+        @State private var dispatcharrTarget: DispatcharrPairingTarget?
         @State private var showsPaywall = false
         /// Set after a removal whose revoke didn't reach the server.
         @State private var removalNote: String?
@@ -47,6 +47,8 @@
                 if let server = configService.activeServer {
                     RecordingServerPairedSection(server: server, isLocked: !store.isUnlocked) { baseURL in
                         pairingTarget = RecordingServerPairingTarget(baseURL: baseURL)
+                    } signInAgain: {
+                        dispatcharrTarget = DispatcharrPairingTarget(server: server)
                     } onRemoved: { removal in
                         removalNote = removal == .revokeFailed ? RecordingServerSetup.revokeFailedNote : nil
                     }
@@ -67,6 +69,9 @@
             .platformNavigationTitle("Recording Server")
             .sheet(item: $pairingTarget) { target in
                 RecordingServerPairingSheet(target: target)
+            }
+            .sheet(item: $dispatcharrTarget) { target in
+                DispatcharrPairingSheet(target: target)
             }
             .paywall(isPresented: $showsPaywall, highlight: .recordingServer)
             .task(id: browsesForServers) {
@@ -103,6 +108,7 @@
                         .font(.headline)
                     Text(RecordingServerSetup.disclosure)
                     Text(RecordingServerSetup.connectionNote)
+                    Text(RecordingServerSetup.dispatcharrDisclosure)
                     Text(RecordingServerSetup.disclaimer)
                         .foregroundStyle(.secondary)
                 }
@@ -132,6 +138,11 @@
                     pairingTarget = .manual
                 } label: {
                     Label("Enter Address Manually", systemImage: "keyboard")
+                }
+                Button {
+                    dispatcharrTarget = .new
+                } label: {
+                    Label("Add Dispatcharr Server", systemImage: "plus.circle")
                 }
             } header: {
                 Text("Servers on This Network")
@@ -242,6 +253,8 @@
         let isLocked: Bool
         /// Re-pairs with the same server once its token was revoked.
         let repair: (_ baseURL: URL) -> Void
+        /// Opens the Dispatcharr sign-in for this server, its address prefilled.
+        let signInAgain: () -> Void
         /// The server is gone on every device; says whether the server itself
         /// revoked the pairing.
         let onRemoved: (RecordingServerStore.Removal) -> Void
@@ -255,6 +268,10 @@
             return name.isEmpty ? String(localized: "Recording Server") : name
         }
 
+        private var codePairing: Bool {
+            store.pairedCapabilities?.codePairing ?? true
+        }
+
         var body: some View {
             Section {
                 identityRow
@@ -266,10 +283,19 @@
                     }
                 LabeledContent("Version", value: connection.info?.version ?? "—")
                 if !isLocked {
-                    LabeledContent("Free Disk Space", value: RecordingServerSetup.diskSummary(store.status))
+                    if store.pairedCapabilities?.diskStatus ?? true {
+                        LabeledContent("Free Disk Space", value: RecordingServerSetup.diskSummary(store.status))
+                    }
                     LabeledContent("Active Recordings", value: store.status.map { "\($0.activeRecordings)" } ?? "—")
+                    if server.kind == .dispatcharr {
+                        LabeledContent("Scheduled Recordings", value: store.status.map { "\($0.scheduledRecordings)" } ?? "—")
+                    }
                 }
-                if !isLocked, store.reachability.needsRepairing, let baseURL = server.endpoint?.baseURL {
+                if !isLocked, !codePairing {
+                    Button(action: signInAgain) {
+                        Label("Sign In Again", systemImage: "key")
+                    }
+                } else if !isLocked, store.reachability.needsRepairing, let baseURL = server.endpoint?.baseURL {
                     Button {
                         repair(baseURL)
                     } label: {
