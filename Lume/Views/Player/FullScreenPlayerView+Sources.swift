@@ -20,7 +20,7 @@ extension FullScreenPlayerView {
     /// short-lived URL.
     func resolveActiveMedia() async {
         if await resolveSources() { return }
-        guard StalkerLink.isPlaceholder(activeMedia.url), !keepsAdoptedResolution else { return }
+        guard StalkerLink.isPlaceholder(activeMedia.url), !keepsAdoptedResolution, !castKeepsResolution else { return }
         resolvedMedia = nil
         resolveError = nil
         do {

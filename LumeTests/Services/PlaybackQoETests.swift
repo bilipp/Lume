@@ -222,4 +222,88 @@ struct PlaybackQoETests {
 
         #expect(qoe.summary.totalSessions == 0)
     }
+
+    // MARK: - Cast handoff
+
+    @Test
+    func `handing off before the first frame drops the session instead of counting an exit`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+
+        qoe.beginStartup(engine: .ksPlayer, isLive: true)
+        qoe.suspend(for: "cast", handingOff: true)
+
+        let stats = qoe.summary.engines[PlayerEngineKind.ksPlayer.rawValue]
+        #expect(stats?.sessions == 0)
+        #expect(stats?.exitsBeforeVideoStart == 0)
+        #expect(stats?.startupFailures == 0)
+    }
+
+    @Test
+    func `handing off after the first frame keeps the session and its watch time`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+
+        qoe.beginStartup(engine: .avPlayer, isLive: false)
+        qoe.noteFirstFrame()
+        qoe.noteStallBegan()
+        qoe.suspend(for: "cast", handingOff: true)
+
+        let stats = qoe.summary.engines[PlayerEngineKind.avPlayer.rawValue]
+        #expect(stats?.sessions == 1)
+        #expect(stats?.firstFrames == 1)
+        #expect(stats?.rebuffers == 1)
+        #expect(stats?.exitsBeforeVideoStart == 0)
+        #expect((stats?.watchedSeconds ?? -1) >= 0)
+    }
+
+    @Test
+    func `the engine torn down for a cast is neither an exit nor a startup failure`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+
+        qoe.beginStartup(engine: .ksPlayer, isLive: true)
+        qoe.suspend(for: "cast", handingOff: true)
+        #expect(qoe.isSuspended)
+        // The engine view's teardown and its startup watchdog, mid-cast.
+        qoe.noteStartupFailure()
+        qoe.endSession()
+        qoe.resume(for: "cast")
+        #expect(!qoe.isSuspended)
+
+        // Local playback resumes once the cast ends.
+        qoe.beginStartup(engine: .ksPlayer, isLive: true)
+        qoe.noteFirstFrame()
+        qoe.endSession()
+
+        let stats = qoe.summary.engines[PlayerEngineKind.ksPlayer.rawValue]
+        #expect(stats?.sessions == 1)
+        #expect(stats?.firstFrames == 1)
+        #expect(stats?.exitsBeforeVideoStart == 0)
+        #expect(stats?.startupFailures == 0)
+    }
+
+    @Test
+    func `a handoff under another owner's suspension leaves the session open`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+
+        qoe.suspend(for: "multi-view")
+        qoe.suspend(for: "cast", handingOff: true)
+        qoe.resume(for: "cast")
+
+        #expect(qoe.isSuspended)
+    }
+
+    @Test
+    func `every suspension advances the epoch`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+        let start = qoe.suspensionEpoch
+
+        qoe.suspend(for: "cast", handingOff: true)
+        qoe.resume(for: "cast")
+
+        #expect(qoe.suspensionEpoch == start + 1)
+    }
 }

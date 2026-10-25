@@ -118,6 +118,7 @@ extension KSPlayerEngineView {
         case .readyToPlay:
             hasSeenReadyToPlay = true
             reconnector.reset()
+            logAudioTracks()
         case .bufferFinished:
             // Guard: KSPlayerLayer.play() immediately sets state = .bufferFinished
             // if the previous session's loadState is still .playable (it isn't reset
@@ -158,6 +159,19 @@ extension KSPlayerEngineView {
         }
         reconnector.scheduleRetry { reconnect() }
         if reconnector.hasGivenUp { failPlayback() }
+    }
+
+    /// Records each audio track's codec, which the track menu doesn't show,
+    /// and hands the names to the clock: a Cast receiver plays only some of
+    /// them, and a movie it can't decode casts silent.
+    private func logAudioTracks() {
+        guard let player = coordinator.playerLayer?.player else { return }
+        let tracks = player.tracks(mediaType: .audio)
+        let summary = tracks.map(\.description).joined(separator: " | ")
+        Logger.player.notice("KSPlayer audio tracks: \(summary, privacy: .public)")
+        // Only the FFmpeg backend names codecs the way the Cast check expects.
+        let codecs = tracks.compactMap { ($0 as? FFmpegAssetTrack)?.codecName }
+        if codecs != clock.audioCodecs { clock.audioCodecs = codecs }
     }
 
     // MARK: - Mid-stream stall watchdog

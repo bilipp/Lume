@@ -37,6 +37,11 @@ struct LumeApp: App {
         let (catalog, cloud) = Self.makeModelContainers()
         catalogContainer = catalog
         cloudContainer = cloud
+        #if os(iOS) && canImport(GoogleCast)
+            // Here rather than in the launch task: the app delegate's launch hook
+            // can resume a Cast session, which may end before that task runs.
+            CastService.shared.progressCommitter = CastProgressCommitter(container: catalog)
+        #endif
         let coordinator = CloudSyncCoordinator(
             catalogContainer: catalog,
             cloudContainer: cloud,
@@ -192,12 +197,19 @@ struct LumeApp: App {
             // sync coordinator skips every `CKContainer`/`accountStatus` call.
             return false
         #else
-            let environment = ProcessInfo.processInfo.environment
-            let isPreview = environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
-            let isUnitTest = environment["XCTestConfigurationFilePath"] != nil
-            let isUITest = CommandLine.arguments.contains("-ui-testing")
-            return !(isPreview || isUnitTest || isUITest)
+            return !isTestOrPreviewHost
         #endif
+    }()
+
+    /// Whether this process is a SwiftUI preview, a unit-test host or a UI-test
+    /// run — contexts that are unsigned for CloudKit and must not reach out to
+    /// real devices.
+    static let isTestOrPreviewHost: Bool = {
+        let environment = ProcessInfo.processInfo.environment
+        let isPreview = environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        let isUnitTest = environment["XCTestConfigurationFilePath"] != nil
+        let isUITest = CommandLine.arguments.contains("-ui-testing")
+        return isPreview || isUnitTest || isUITest
     }()
 
     private static var cloudKitDatabase: ModelConfiguration.CloudKitDatabase {

@@ -302,6 +302,9 @@ struct LumeEngineEngineView: View {
         coordinator.onPlaybackFailure = { reportFailure($0) }
         coordinator.onStalled = { reconnect(after: $0) }
         coordinator.onRecovered = { reconnector.reset() }
+        coordinator.onAudioCodecs = { codecs in
+            if codecs != clock.audioCodecs { clock.audioCodecs = codecs }
+        }
     }
 
     // MARK: - Tap Catcher
