@@ -54,7 +54,7 @@ struct FullScreenPlayerView: View {
     /// so AirPlay would carry only their audio), so while a route is active the
     /// stream is driven through the AVPlayer engine regardless of the user's
     /// engine preference. See `engine` / `castService`.
-    @State private var castService = CastService.shared
+    @State var castService = CastService.shared
     @State private var indexingHoldOwner = "full-screen-\(UUID().uuidString)"
 
     /// Ids of streams AVPlayer couldn't start while casting over AirPlay (a codec
@@ -72,7 +72,8 @@ struct FullScreenPlayerView: View {
     /// but never reads in its own body, so playback ticks invalidate just the
     /// scrubber/time labels rather than re-rendering the whole player tree. See
     /// `PlaybackClock`.
-    @State var clock = PlaybackClock()
+    @State var clock: PlaybackClock
+    @State var castSession: PlayerCastSession
 
     /// Writes watch progress on a private background `ModelContext`. Saving on
     /// the main context mid-playback hitches KSPlayer's render loop, so the
@@ -106,7 +107,7 @@ struct FullScreenPlayerView: View {
     /// auto-advance (see `PlayerNextUpOverlay`); `nil` for movies, live channels
     /// and series finales. Read only when the player tree is (re)built, never on
     /// the per-tick clock path.
-    @State private var nextUpMedia: PlayableMedia?
+    @State var nextUpMedia: PlayableMedia?
 
     /// Intro / recap / outro windows for the active episode (from IntroDB). The
     /// openers drive the in-player Skip Intro button; the outro sets when the
@@ -145,6 +146,7 @@ struct FullScreenPlayerView: View {
     init(media: PlayableMedia, adopting handle: PreviewPlayerHandle? = nil) {
         self.media = media
         _activeMedia = State(initialValue: media)
+        (_clock, _castSession) = Self.playbackStates(adopting: media)
         let defaults = UserDefaults.standard
         enginePriority = PlayerEnginePriority.playable(
             PlayerEnginePriority.resolve(
@@ -252,7 +254,7 @@ struct FullScreenPlayerView: View {
             // the user sees duplicate X buttons whenever the controls are
             // visible. Only render our custom close for engines that don't
             // draw their own controls.
-            if !engine.rendersOwnControls {
+            if !engine.rendersOwnControls, !showsCastSurface {
                 closeButton
                     .padding(.top, 4)
                     .padding(.leading, 4)
@@ -266,6 +268,7 @@ struct FullScreenPlayerView: View {
         .playerOrientationLock()
         .macPlayerWindow(activeMedia: activeMedia, launchMedia: media) { switchMedia(to: $0) }
         .playerRecording(for: activeMedia)
+        .modifier(PlayerCastHandoff(host: self))
         .modifier(PlayerSourceSwitcherHost(session: sourceSession, media: activeMedia, onPick: switchSource))
         .modifier(PlayerQualityVariantsHost(media: activeMedia, onSelect: switchQuality))
         // Synchronous on purpose, and ahead of the `.task` below: the engine
@@ -281,7 +284,7 @@ struct FullScreenPlayerView: View {
             // Pause background indexing — its periodic saves merge into the
             // main context and hitch KSPlayer's render loop.
             ContentIndexingService.shared.suspend(for: indexingHoldOwner)
-            if adoption == nil {
+            if adoption == nil, !castSession.isCasting {
                 configureAudioSessionForPlayback()
             }
         }
@@ -399,7 +402,7 @@ struct FullScreenPlayerView: View {
     /// For a Stalker placeholder it is the resolved copy, gated on its identity
     /// matching the active stream so a stale resolution from the previous stream
     /// never reaches the engine during a channel/episode switch.
-    private var displayMedia: PlayableMedia? {
+    var displayMedia: PlayableMedia? {
         switch sourceSession.display(for: activeMedia) {
         case let .ready(media): return media
         case .pending: return nil
@@ -412,7 +415,9 @@ struct FullScreenPlayerView: View {
 
     @ViewBuilder
     private var playerView: some View {
-        if let media = displayMedia {
+        if showsCastSurface {
+            castingSurface
+        } else if let media = displayMedia {
             engineView(for: media)
         } else if JellyfinSourceResolver.itemId(for: activeMedia) != nil {
             sourcePhaseView
@@ -551,7 +556,6 @@ struct FullScreenPlayerView: View {
     /// assertion, so a suspension right after a flush doesn't strand it.
     func persistProgressDetached(force: Bool, holdingLive: Bool = false, leavingForeground: Bool = false) {
         if persistRecordingProgress() { return }
-        guard let writer = progressWriter else { return }
         if activeMedia.isLive, !force { return }
         let ref = activeMedia.historyRef
         // An explicit "next episode" already settled this stream at its full
@@ -563,24 +567,7 @@ struct FullScreenPlayerView: View {
         if leavingForeground {
             WatchProgressBuffer.record(ref: ref, progress: now, duration: total, waitUntilWritten: true)
         }
-        // Held so `endReviewSession` can await it: `writer` is an actor, so the
-        // await below suspends, and without the handle the review policy would
-        // read `completedTitles` before this task increments it — the third
-        // finished title would then only arm the *next* session.
-        let previous = pendingProgressWrite
-        pendingProgressWrite = Task { @MainActor in
-            await previous?.value
-            let completion = await BackgroundActivity.perform("Watch progress") {
-                await writer.record(
-                    ref: ref, progress: now, duration: total, force: force, holdLive: holdingLive
-                )
-            }
-            WatchProgressBuffer.remove(ref: ref)
-            if let completion {
-                syncWatchedServices(ref: completion.ref)
-                AppStoreReviewPrompt.shared.noteCompletedTitle()
-            }
-        }
+        enqueueProgressWrite(ref: ref, progress: now, duration: total, force: force, holdLive: holdingLive)
     }
 }
 

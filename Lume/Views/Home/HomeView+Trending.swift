@@ -2,7 +2,7 @@
 //  HomeView+Trending.swift
 //  Lume
 //
-//  Home's TMDB trending and Trakt/Simkl watchlist loading, split from `HomeView` to
+//  Home's TMDB trending and Trakt/Simkl/MDBList watchlist loading, split from `HomeView` to
 //  keep the view file within size limits. Trending/watchlist titles are matched
 //  against the local catalog in batched queries keyed by `tmdbId`.
 //
@@ -130,48 +130,69 @@ extension HomeView {
 
     // MARK: - Watchlist
 
-    /// Loads the connected user's Trakt watchlist and keeps only the titles the
-    /// user actually owns in the active playlist — matched by TMDB id, the same
-    /// way the trending rows work.
-    func loadWatchlist(cacheKey: String) async {
-        if let cached = HomeTrendingCache.shared.watchlistEntry(.trakt, for: cacheKey) {
-            watchlist = cached
-            return
-        }
-        guard trakt.isConnected else {
-            watchlist = []
-            return
-        }
-        let items = await trakt.fetchWatchlist()
-        watchlist = matchWatchlist(items.compactMap { item in
-            switch item.type {
-            case "movie": item.movie?.ids.tmdb.map(WatchlistTitle.movie)
-            case "show": item.show?.ids.tmdb.map(WatchlistTitle.show)
-            default: nil
-            }
-        })
-        HomeTrendingCache.shared.storeWatchlist(.trakt, key: cacheKey, items: watchlist)
+    /// Loads every service's watchlist row, concurrently, keeping only the
+    /// titles the user actually owns in the active playlist — matched by TMDB
+    /// id, the same way the trending rows work.
+    func loadWatchlists(scope: String) async {
+        async let trakt: Void = loadWatchlist(.trakt, scope: scope)
+        async let simkl: Void = loadWatchlist(.simkl, scope: scope)
+        async let mdblist: Void = loadWatchlist(.mdblist, scope: scope)
+        _ = await (trakt, simkl, mdblist)
     }
 
-    /// The Simkl counterpart of `loadWatchlist`, built from the account's
-    /// "Plan to Watch" list.
-    func loadSimklWatchlist(cacheKey: String) async {
-        if let cached = HomeTrendingCache.shared.watchlistEntry(.simkl, for: cacheKey) {
-            simklWatchlist = cached
+    /// One service's row. Its cache entry is keyed by that service's own
+    /// connection state, so connecting another service doesn't refetch it.
+    private func loadWatchlist(_ source: HomeWatchlistSource, scope: String) async {
+        let connected = isConnected(source)
+        let cacheKey = "\(source)-\(connected)-\(scope)"
+        if let cached = HomeTrendingCache.shared.watchlistEntry(source, for: cacheKey) {
+            watchlists[source] = cached
             return
         }
-        guard simkl.isConnected else {
-            simklWatchlist = []
+        guard connected else {
+            watchlists[source] = []
             return
         }
-        let entries = await simkl.fetchWatchlist()
-        simklWatchlist = matchWatchlist(entries.map { entry in
-            switch entry.kind {
-            case .movie: .movie(entry.tmdbID)
-            case .show: .show(entry.tmdbID)
+        let items = await matchWatchlist(watchlistTitles(from: source))
+        watchlists[source] = items
+        HomeTrendingCache.shared.storeWatchlist(source, key: cacheKey, items: items)
+    }
+
+    private func isConnected(_ source: HomeWatchlistSource) -> Bool {
+        switch source {
+        case .trakt: trakt.isConnected
+        case .simkl: simkl.isConnected
+        case .mdblist: mdblist.isConnected
+        }
+    }
+
+    /// The service's watchlist, in its own order. Simkl's is its "Plan to
+    /// Watch" list.
+    private func watchlistTitles(from source: HomeWatchlistSource) async -> [WatchlistTitle] {
+        switch source {
+        case .trakt:
+            await trakt.fetchWatchlist().compactMap { item in
+                switch item.type {
+                case "movie": item.movie?.ids.tmdb.map(WatchlistTitle.movie)
+                case "show": item.show?.ids.tmdb.map(WatchlistTitle.show)
+                default: nil
+                }
             }
-        })
-        HomeTrendingCache.shared.storeWatchlist(.simkl, key: cacheKey, items: simklWatchlist)
+        case .simkl:
+            await simkl.fetchWatchlist().map { entry in
+                switch entry.kind {
+                case .movie: .movie(entry.tmdbID)
+                case .show: .show(entry.tmdbID)
+                }
+            }
+        case .mdblist:
+            await mdblist.fetchWatchlist().map { entry in
+                switch entry.kind {
+                case .movie: .movie(entry.tmdbID)
+                case .show: .show(entry.tmdbID)
+                }
+            }
+        }
     }
 
     /// The first 20 watchlist titles the active playlist carries, in watchlist
@@ -231,7 +252,27 @@ extension HomeView {
     }
 }
 
-/// A watchlist title from either service, by TMDB id.
+extension HomeWatchlistSource {
+    /// The service whose row `section` shows; nil for every other section.
+    init?(section: HomeSection) {
+        switch section {
+        case .traktWatchlist: self = .trakt
+        case .simklWatchlist: self = .simkl
+        case .mdblistWatchlist: self = .mdblist
+        default: return nil
+        }
+    }
+
+    var rowTitle: LocalizedStringKey {
+        switch self {
+        case .trakt: "From Your Trakt Watchlist"
+        case .simkl: "From Your Simkl Watchlist"
+        case .mdblist: "From Your MDBList Watchlist"
+        }
+    }
+}
+
+/// A watchlist title from any service, by TMDB id.
 private enum WatchlistTitle {
     case movie(Int)
     case show(Int)

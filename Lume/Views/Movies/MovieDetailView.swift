@@ -403,8 +403,7 @@ struct MovieDetailView: View {
                 downloads.checkAutoDelete(id: movie.id)
             #endif
         }
-        TraktService.shared.syncWatched(movie: movie, watched: movie.isWatched)
-        SimklService.shared.syncWatched(movie: movie, watched: movie.isWatched)
+        WatchedTrackers.sync(movie: movie, watched: movie.isWatched)
     }
 }
 

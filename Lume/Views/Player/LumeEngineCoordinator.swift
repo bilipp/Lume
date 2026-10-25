@@ -141,6 +141,12 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     /// engine's sidecar loader is a one-shot parse, so re-selecting means
     /// re-reading the file.
     private var externalSubtitle: ExternalSubtitle?
+    /// The audio codecs last logged, so a republish of the same tracks
+    /// doesn't log them again. Not `private`: written by `logAudioCodecs` in
+    /// LumeEngineCoordinator+AudioCodecs.swift.
+    var loggedAudioCodecs: String?
+    /// The FFmpeg codec names of the audio tracks, on every track publish.
+    var onAudioCodecs: (([String]) -> Void)?
 
     // MARK: Lifecycle
 
@@ -486,6 +492,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         // first row while it is still nil keeps the menu from rendering with no
         // checkmark at all.
         let audioFallsBackToFirst = selectedAudioID == nil
+        logAudioCodecs(info.audioTracks)
         audioTrackOptions = info.audioTracks.enumerated().map { position, track in
             let id = String(track.index)
             return PlayerTrackOption(

@@ -127,7 +127,7 @@ Lume/
 └── Views/                   SwiftUI, platform-adaptive
     ├── Home/                Hero carousel, rails, tvOS fold
     ├── Player/              Engine wrappers + unified overlay
-    ├── Components/          Shared building blocks, grouped: Cards, Compat, Detail, Images, Library, Playlists, Status
+    ├── Components/          Shared building blocks, grouped: Cards, Cast, Compat, Detail, Images, Library, Playlists, Status
     └── …
 ```
 
@@ -201,6 +201,14 @@ Two separate `ModelContainer`s:
 - View-only accounts (from `users/me` `user_level`/`dvr_access`) are read-only: library + playback, no write actions. Unattributed recordings (no `lume_source_ref`) show in the library but are hidden from restricted profiles.
 - Engine policy (`PlayableMedia.unsupportedEngines`): Dispatcharr recordings skip AVPlayer (finished files are MKV), and skip VLC unless the playback carries a Bearer JWT that `DispatcharrPlaybackAuth` folds into `?token=` (password sign-in only — the endpoints never take an API key in the query). Excluded engines are filtered before playback, not counted as QoE fallbacks. Progress keys are `dispatcharr-<serverID>-<id>`.
 - `users/me` returns the user's API key in plain text — never log or export that body, nor keys, JWTs, passwords or playback URLs.
+
+### Chromecast (Google Cast)
+- iOS/iPadOS only. `GoogleCastDynamic` (google-cast-ios-sdk, exact version) is linked into the Lume app target with `platformFilter = ios` — never into LumeTopShelf/LumeWidgets. macOS/tvOS/visionOS must still build without it.
+- `GoogleCastProvider.swift` is the only file that imports GoogleCast, wrapped in `#if os(iOS) && canImport(GoogleCast)` (never `canImport(UIKit)` — true on visionOS); `LumeAppDelegate` registers it under the same guard. Everything else talks to the `CastProvider` seam in `CastService.swift`, so cast logic stays pure and testable (`StubCastProvider`).
+- Not a `PlayerEngineKind`: casting is a host state of `FullScreenPlayerView` (`+Cast.swift`, `PlayerCastSession`). The local engine is torn down at cast start and rebuilt via `resumeActiveMedia(at:)` when the cast ends or the receiver fails. Closing the player keeps the receiver playing; `CastProgressCommitter` commits progress headlessly when no host is attached.
+- Header-auth sources (`PlayableMedia.httpHeaders != nil`), local files and recordings are never cast — `CastStreamResolver` rejects them; never move a token into a URL to make one castable.
+- Receiver/content URLs, tokens and device names are never logged public; SDK text goes through `LogRedaction` (`CastStatusMapping.redactedErrorDetail`).
+- The SDK is not configured under unit/UI tests or previews (`LumeApp.isTestOrPreviewHost`), and discovery starts only when the device sheet opens — no Local Network prompt at launch.
 
 ### Localization
 String Catalogs (10 languages: ar, en, de, es, fr, it, ja, ko, pt, zh-Hans; the App Store listing mirrors them — see `ship-release`'s `references/store-metadata.json`). Run `xcstringstool sync` and include the tvOS stringsdata. Normalize `.xcstrings` with `Scripts/normalize-xcstrings.swift` (pre-commit hook) to avoid format churn.
