@@ -46,6 +46,10 @@ final class CloudSyncCoordinator {
     /// Set once the server ended this device's Lume Cloud membership and the
     /// device tried to switch away; the UI shows the notice and clears it.
     var accountEndNotice: LumeCloudAccountEndNotice?
+    /// The Lume Cloud account the user's other Apple devices sync with, for the
+    /// first-run sync choice to offer. Set by `SyncedBackendChoiceWatcher`
+    /// while the choice is up. Never log it.
+    var offeredLumeCloudAccount: LumeCloudIdentity?
 
     /// Coalescing guard: a reconcile requested while one is running sets
     /// `pendingReconcile` instead of overlapping, then runs once afterwards.
@@ -91,12 +95,14 @@ final class CloudSyncCoordinator {
     /// Whether the scene is active. Lume Cloud keeps its socket open only then.
     private(set) var isSceneActive = false
 
-    /// Starts on the backend this device last chose (`LumeCloudSettings.backend`).
+    /// Starts on the backend this device last chose (`LumeCloudSettings.backend`),
+    /// or Off behind the first-run sync choice when `backendChoice` asks for it.
     convenience init(
         catalogContainer: ModelContainer,
         cloudContainer: ModelContainer,
         cloudKitContainerIdentifier: String,
         cloudKitEnabled: Bool,
+        backendChoice: BackendChoiceOffer = .never,
         defaults: UserDefaults = .standard
     ) {
         let iCloud = ICloudBackend(
@@ -104,8 +110,10 @@ final class CloudSyncCoordinator {
             cloudKitContainerIdentifier: cloudKitContainerIdentifier,
             cloudKitEnabled: cloudKitEnabled
         )
-        let launchBackend = Self.launchBackend(
-            for: LumeCloudSettings(defaults: defaults).backend,
+        let settings = LumeCloudSettings(defaults: defaults)
+        let awaitsChoice = backendChoice.applies(to: settings, catalogContainer: catalogContainer)
+        let launchBackend: any SyncBackend = awaitsChoice ? OffBackend() : Self.launchBackend(
+            for: settings.backend,
             iCloud: iCloud,
             makeLumeCloudBackend: { try LumeCloudBackend.makeDefault() }
         )
@@ -114,6 +122,7 @@ final class CloudSyncCoordinator {
             cloudContainer: cloudContainer,
             backend: launchBackend,
             iCloudBackend: iCloud,
+            awaitingBackendChoice: awaitsChoice,
             defaults: defaults
         )
     }
@@ -121,12 +130,14 @@ final class CloudSyncCoordinator {
     /// `cloudContainer` backs the engine when `backend` has no mirror (Off).
     /// `iCloudBackend` is what a switch to iCloud attaches; nil when this build
     /// can't use iCloud (unless `backend` is the iCloud one).
+    /// `awaitingBackendChoice` puts up the first-run sync choice.
     init(
         catalogContainer: ModelContainer,
         cloudContainer: ModelContainer,
         backend: any SyncBackend,
         iCloudBackend: (any SyncBackend)? = nil,
         makeLumeCloudBackend: (() throws -> LumeCloudBackend)? = nil,
+        awaitingBackendChoice: Bool = false,
         defaults: UserDefaults = .standard
     ) {
         let namespace = backend.kind ?? .icloud
@@ -157,8 +168,11 @@ final class CloudSyncCoordinator {
             MainActor.assumeIsolated { self?.notifyMirrorConsumers() }
         })
         // Nothing to wait for under previews / tests / Off: open the launch gate
-        // now so an empty store shows the add-playlist form immediately.
-        status.hasCompletedInitialSync = !backend.waitsForInitialSync
+        // now so an empty store shows the add-playlist form immediately. Behind
+        // the first-run choice it stays closed for the chosen backend's first
+        // sync (see `finishBackendChoice()`).
+        status.isAwaitingBackendChoice = awaitingBackendChoice
+        status.hasCompletedInitialSync = !backend.waitsForInitialSync && !awaitingBackendChoice
         backend.attach(to: self)
         guard backend.waitsForInitialSync else { return }
         observeContentSyncCompletion()

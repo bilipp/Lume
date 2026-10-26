@@ -14077,6 +14077,71 @@
         }
       }
     },
+    "Continue" : {
+      "comment" : "Button that commits the first-run sync choice.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متابعة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weiter"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continua"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "続ける"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계속"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
+          }
+        }
+      }
+    },
     "Continue Watching" : {
       "localizations" : {
         "ar" : {
@@ -14690,6 +14755,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法从Trakt导入。请重试。"
+          }
+        }
+      }
+    },
+    "Couldn’t Join Lume Cloud" : {
+      "comment" : "Alert title when joining the Lume Cloud account of the user's other Apple devices fails. Lume Cloud is a product name; keep it in Latin script.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر الانضمام إلى Lume Cloud"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beitritt zu Lume Cloud fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t Join Lume Cloud"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo unir a Lume Cloud"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de rejoindre Lume Cloud"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile unirsi a Lume Cloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume Cloud に参加できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume Cloud에 참여할 수 없음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível entrar no Lume Cloud"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加入 Lume Cloud"
           }
         }
       }
@@ -18174,6 +18304,71 @@
         }
       }
     },
+    "Don’t Sync" : {
+      "comment" : "First-run sync choice: keep all data on this device only.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عدم المزامنة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht synchronisieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don’t Sync"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No sincronizar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne pas synchroniser"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non sincronizzare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期しない"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화 안 함"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não sincronizar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不同步"
+          }
+        }
+      }
+    },
     "Done" : {
       "localizations" : {
         "ar" : {
@@ -21196,6 +21391,136 @@
         }
       }
     },
+    "End-to-end encrypted. Only your devices can read what you sync." : {
+      "comment" : "Subtitle of the first-run Lume Cloud step (create, join or restore an account).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مشفّر من طرف إلى طرف. لا يمكن لأحد سوى أجهزتك قراءة ما تزامنه."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ende-zu-Ende-verschlüsselt. Nur deine Geräte können lesen, was du synchronisierst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End-to-end encrypted. Only your devices can read what you sync."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cifrado de extremo a extremo. Solo tus dispositivos pueden leer lo que sincronizas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiffré de bout en bout. Seuls vos appareils peuvent lire ce que vous synchronisez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crittografia end-to-end. Solo i tuoi dispositivi possono leggere ciò che sincronizzi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エンドツーエンドで暗号化。同期した内容を読めるのはあなたのデバイスだけです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "종단 간 암호화. 동기화한 내용은 내 기기에서만 읽을 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criptografia de ponta a ponta. Só seus dispositivos podem ler o que você sincroniza."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端到端加密。只有你的设备能读取你同步的内容。"
+          }
+        }
+      }
+    },
+    "End-to-end encrypted. Syncs across Apple and Android devices." : {
+      "comment" : "Detail under the Lume Cloud option of the first-run sync choice. Lume Cloud is a product name; keep it in Latin script.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مشفّر من طرف إلى طرف. تتم المزامنة بين أجهزة Apple وAndroid."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ende-zu-Ende-verschlüsselt. Synchronisiert zwischen Apple- und Android-Geräten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End-to-end encrypted. Syncs across Apple and Android devices."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cifrado de extremo a extremo. Sincroniza entre dispositivos Apple y Android."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiffré de bout en bout. Synchronise entre appareils Apple et Android."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crittografia end-to-end. Sincronizza tra dispositivi Apple e Android."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エンドツーエンドで暗号化。Apple と Android のデバイス間で同期します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "종단 간 암호화. Apple 및 Android 기기 간에 동기화합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criptografia de ponta a ponta. Sincroniza entre dispositivos Apple e Android."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端到端加密。可在 Apple 和 Android 设备之间同步。"
+          }
+        }
+      }
+    },
     "Ends %@" : {
       "localizations" : {
         "ar" : {
@@ -23752,6 +24077,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当前列出的所有内容都将在浏览时隐藏。使用“显示全部”可恢复。"
+          }
+        }
+      }
+    },
+    "Everything stays on this device." : {
+      "comment" : "Detail under the Don’t Sync option of the first-run sync choice.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يبقى كل شيء على هذا الجهاز."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles bleibt auf diesem Gerät."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everything stays on this device."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo se queda en este dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout reste sur cet appareil."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutto resta su questo dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてこのデバイスに保存されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 데이터가 이 기기에만 저장됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tudo fica neste dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有内容都保留在此设备上。"
           }
         }
       }
@@ -32130,6 +32520,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用代码加入"
+          }
+        }
+      }
+    },
+    "Keep your profiles, playlists and viewing progress in step across your devices." : {
+      "comment" : "Subtitle of the first-run sync choice screen.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حافظ على تطابق ملفاتك الشخصية وقوائم التشغيل وتقدّم المشاهدة عبر أجهزتك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte deine Profile, Playlists und deinen Wiedergabefortschritt auf all deinen Geräten auf dem gleichen Stand."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep your profiles, playlists and viewing progress in step across your devices."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén tus perfiles, listas de reproducción y progreso de visualización al día en todos tus dispositivos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gardez vos profils, playlists et votre progression de visionnage à jour sur tous vos appareils."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantieni profili, playlist e avanzamento della visione allineati su tutti i tuoi dispositivi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロファイル、プレイリスト、視聴の進行状況をすべてのデバイスで最新の状態に保ちます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로필, 재생목록, 시청 진행 상황을 모든 기기에서 최신 상태로 유지합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantenha seus perfis, playlists e progresso de visualização em dia em todos os seus dispositivos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让你的个人资料、播放列表和观看进度在所有设备上保持同步。"
           }
         }
       }
@@ -46957,6 +47412,71 @@
         }
       }
     },
+    "Pair with a device that already uses Lume Cloud." : {
+      "comment" : "Detail under “Join with a Code” in the first-run Lume Cloud step. Lume Cloud is a product name; keep it in Latin script.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اقترن بجهاز يستخدم Lume Cloud بالفعل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit einem Gerät koppeln, das Lume Cloud bereits nutzt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pair with a device that already uses Lume Cloud."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vincula este dispositivo con uno que ya use Lume Cloud."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jumelez avec un appareil qui utilise déjà Lume Cloud."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbina un dispositivo che usa già Lume Cloud."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すでに Lume Cloud を使用しているデバイスとペアリングします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 Lume Cloud를 사용 중인 기기와 페어링합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pareie com um dispositivo que já usa o Lume Cloud."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与已在使用 Lume Cloud 的设备配对。"
+          }
+        }
+      }
+    },
     "Paired Server" : {
       "comment" : "Recording Server settings: section header for the paired recording server.",
       "localizations" : {
@@ -53076,6 +53596,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近观看"
+          }
+        }
+      }
+    },
+    "Recommended" : {
+      "comment" : "Badge on the iCloud option of the first-run sync choice.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مُوصى به"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfohlen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommandé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consigliato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おすすめ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "권장"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推荐"
           }
         }
       }
@@ -66076,6 +66661,71 @@
         }
       }
     },
+    "Start fresh. You’ll get a recovery key to keep safe." : {
+      "comment" : "Detail under “Create New Account” in the first-run Lume Cloud step.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ابدأ من جديد. ستحصل على مفتاح استرداد لتحتفظ به في مكان آمن."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starte neu. Du erhältst einen Wiederherstellungsschlüssel, den du sicher aufbewahren solltest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start fresh. You’ll get a recovery key to keep safe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empieza desde cero. Recibirás una clave de recuperación que debes guardar en un lugar seguro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repartez de zéro. Vous recevrez une clé de récupération à conserver en lieu sûr."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inizia da zero. Riceverai una chiave di recupero da conservare al sicuro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく始めます。安全に保管する復旧キーが発行されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새로 시작합니다. 안전하게 보관할 복구 키를 받게 됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comece do zero. Você receberá uma chave de recuperação para guardar em segurança."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全新开始。你将获得一个需妥善保管的恢复密钥。"
+          }
+        }
+      }
+    },
     "Start Multi-View" : {
       "localizations" : {
         "ar" : {
@@ -69582,6 +70232,71 @@
         }
       }
     },
+    "Sync Your Library" : {
+      "comment" : "Title of the first-run screen that asks how this device syncs (iCloud, Lume Cloud or not at all).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مزامنة مكتبتك"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mediathek synchronisieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync Your Library"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincroniza tu biblioteca"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisez votre bibliothèque"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizza la tua libreria"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリを同期"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브러리 동기화"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronize sua biblioteca"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步你的媒体库"
+          }
+        }
+      }
+    },
     "Sync your playlist to load live TV channels" : {
       "localizations" : {
         "ar" : {
@@ -69984,6 +70699,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在同步…"
+          }
+        }
+      }
+    },
+    "Syncs through your Apple Account." : {
+      "comment" : "Detail under the iCloud option of the first-run sync choice.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تتم المزامنة عبر حساب Apple الخاص بك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisiert über deinen Apple-Account."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Syncs through your Apple Account."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincroniza a través de tu cuenta de Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronise via votre compte Apple."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizza tramite il tuo account Apple."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple アカウントを通じて同期します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 계정을 통해 동기화합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincroniza pela sua conta Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过你的 Apple 账户同步。"
           }
         }
       }
@@ -80195,6 +80975,136 @@
         }
       }
     },
+    "Use the key you saved when you created your account." : {
+      "comment" : "Detail under “Restore from Recovery Key” in the first-run Lume Cloud step.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استخدم المفتاح الذي حفظته عند إنشاء حسابك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwende den Schlüssel, den du beim Erstellen deines Accounts gespeichert hast."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the key you saved when you created your account."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa la clave que guardaste al crear tu cuenta."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilisez la clé enregistrée lors de la création de votre compte."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa la chiave che hai salvato quando hai creato l’account."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウント作成時に保存したキーを使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정을 만들 때 저장한 키를 사용합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use a chave que você salvou ao criar sua conta."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你创建账户时保存的密钥。"
+          }
+        }
+      }
+    },
+    "Use Your Existing Account" : {
+      "comment" : "First-run Lume Cloud option: join the Lume Cloud account the user's other Apple devices already use, without a pairing code.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استخدام حسابك الحالي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorhandenen Account verwenden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Your Existing Account"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar tu cuenta existente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser votre compte existant"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa il tuo account esistente"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既存のアカウントを使用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기존 계정 사용"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar sua conta existente"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用现有账户"
+          }
+        }
+      }
+    },
     "Username" : {
       "localizations" : {
         "ar" : {
@@ -83575,6 +84485,71 @@
         }
       }
     },
+    "You can change this anytime in Settings ▸ Sync." : {
+      "comment" : "Footnote on the first-run sync choice screen.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك تغيير ذلك في أي وقت من الإعدادات ▸ المزامنة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du kannst das jederzeit unter Einstellungen ▸ Synchronisieren ändern."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can change this anytime in Settings ▸ Sync."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puedes cambiarlo cuando quieras en Ajustes ▸ Sincronizar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pouvez modifier ce choix à tout moment dans Réglages ▸ Synchroniser."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puoi cambiarlo in qualsiasi momento in Impostazioni ▸ Sincronizza."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これは 設定 ▸ 同期 でいつでも変更できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정 ▸ 동기화에서 언제든지 변경할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você pode mudar isso a qualquer momento em Ajustes ▸ Sincronizar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你可以随时在“设置” ▸ “同步”中更改此选项。"
+          }
+        }
+      }
+    },
     "You can find this key later in Settings ▸ Sync." : {
       "comment" : "Footer under the buttons after creating a Lume Cloud account.",
       "localizations" : {
@@ -84302,6 +85277,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Lume Cloud 账户已被删除。你的数据会保留在此设备上。"
+          }
+        }
+      }
+    },
+    "Your other Apple devices already sync with Lume Cloud. No code needed." : {
+      "comment" : "Detail under “Use Your Existing Account”. Lume Cloud is a product name; keep it in Latin script.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أجهزة Apple الأخرى لديك تتم مزامنتها بالفعل مع Lume Cloud. لا حاجة إلى رمز."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine anderen Apple-Geräte synchronisieren bereits mit Lume Cloud. Kein Code nötig."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your other Apple devices already sync with Lume Cloud. No code needed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tus otros dispositivos Apple ya se sincronizan con Lume Cloud. No necesitas ningún código."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos autres appareils Apple se synchronisent déjà avec Lume Cloud. Aucun code nécessaire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gli altri tuoi dispositivi Apple si sincronizzano già con Lume Cloud. Non serve alcun codice."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの Apple デバイスはすでに Lume Cloud と同期しています。コードは不要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 Apple 기기가 이미 Lume Cloud와 동기화하고 있습니다. 코드가 필요하지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus outros dispositivos Apple já sincronizam com o Lume Cloud. Nenhum código necessário."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的其他 Apple 设备已在与 Lume Cloud 同步。无需代码。"
           }
         }
       }

@@ -51,6 +51,12 @@ nonisolated struct LumeCloudSettings {
         nonmutating set { defaults.set(newValue.rawValue, forKey: Key.backend) }
     }
 
+    /// Whether a backend was ever stored on this device: by a switch, the
+    /// first-run sync choice, or an install that predates that choice.
+    var hasStoredBackend: Bool {
+        defaults.object(forKey: Key.backend) != nil
+    }
+
     /// This device's id on the server (`X-Lume-Device`). Generated and persisted
     /// on first read.
     var deviceID: UUID {

@@ -30,8 +30,11 @@ struct ContentView: View {
             // Lume Cloud, for the first Lume Cloud pull), so cloud playlists
             // aren't yanked in mid-typing on a fresh device. If sync is
             // unavailable, errors, or times out, the gate opens and the form
-            // shows as a fallback (see CloudSyncCoordinator).
-            if !playlists.isEmpty {
+            // shows as a fallback (see CloudSyncCoordinator). Before all of it,
+            // a fresh install picks how to sync; sync stays Off until then.
+            if let cloudSync, cloudSync.status.isAwaitingBackendChoice {
+                SyncSetupView(coordinator: cloudSync)
+            } else if !playlists.isEmpty {
                 if showStartupProfileChooser {
                     ProfileSelectionView(onComplete: dismissStartupProfileChooser)
                 } else {

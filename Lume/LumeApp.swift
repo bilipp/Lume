@@ -42,7 +42,8 @@ struct LumeApp: App {
             catalogContainer: catalog,
             cloudContainer: cloud,
             cloudKitContainerIdentifier: Self.cloudKitContainerIdentifier,
-            cloudKitEnabled: Self.isCloudKitEnvironment
+            cloudKitEnabled: Self.isCloudKitEnvironment,
+            backendChoice: Self.backendChoiceOffer
         )
         _cloudSync = State(initialValue: coordinator)
         _backendChoiceWatcher = State(initialValue: SyncedBackendChoiceWatcher(
@@ -253,6 +254,14 @@ struct LumeApp: App {
             || ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
     }
 
+    /// A fresh install asks how to sync before anything else. Automated runs
+    /// skip the question unless a UI test asks for it with `-sync-setup`.
+    private static var backendChoiceOffer: CloudSyncCoordinator.BackendChoiceOffer {
+        if CommandLine.arguments.contains("-sync-setup") { return .always }
+        let isUnitTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        return isAutomatedRun || isUnitTest ? .never : .freshInstall
+    }
+
     private static var cloudKitDatabase: ModelConfiguration.CloudKitDatabase {
         isCloudKitEnvironment ? .private(cloudKitContainerIdentifier) : .none
     }
@@ -427,6 +436,12 @@ struct LumeApp: App {
                     SportsFollowService.shared.reload()
                     // Or pulled/deduped the paired recording server.
                     RecordingServerConfigService.shared.reload()
+                }
+                .onChange(of: cloudSync.status.isAwaitingBackendChoice) { _, awaiting in
+                    // Held back while the first-run choice was up: a device
+                    // that chose iCloud now follows its Apple ID's choice.
+                    guard !awaiting else { return }
+                    Task { await backendChoiceWatcher.refresh() }
                 }
                 .onChange(of: scenePhase) { _, phase in
                     DiagnosticSession.scenePhaseChanged(to: phase)

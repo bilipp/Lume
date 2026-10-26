@@ -18,6 +18,9 @@ import SwiftData
 /// first Lume Cloud pass lands, and queues the one-time "Sync moved to Lume
 /// Cloud" alert.
 ///
+/// While a fresh install shows the first-run sync choice, a `lumecloud`
+/// record is only offered there (`CloudSyncCoordinator.offeredLumeCloudAccount`).
+///
 /// A device set to Off is never moved. Writes the record after this device
 /// switches into Lume Cloud, or from Lume Cloud back to iCloud; Off is never
 /// written. Inert unless `isEnabled` (`LumeApp.isCloudKitEnvironment`), so
@@ -132,6 +135,10 @@ final class SyncedBackendChoiceWatcher {
             Logger.sync.error("Backend choice couldn't be read: \(error.localizedDescription)")
             return
         }
+        if coordinator.status.isAwaitingBackendChoice {
+            coordinator.offeredLumeCloudAccount = choice.flatMap(offeredAccount(in:))
+            return
+        }
         guard let choice, isOnThisServer(choice) else { return }
         let current = coordinator.selectedBackend
         switch SyncedBackendChoice.Backend(rawValue: choice.backend) {
@@ -147,6 +154,13 @@ final class SyncedBackendChoiceWatcher {
             // Written by a newer build; leave the device where it is.
             return
         }
+    }
+
+    /// The account a `lumecloud` record on this build's server names, for the
+    /// first-run sync choice to offer: while it's up the device follows nothing.
+    private func offeredAccount(in choice: Choice) -> LumeCloudIdentity? {
+        guard isOnThisServer(choice), SyncedBackendChoice.Backend(rawValue: choice.backend) == .lumecloud else { return nil }
+        return identity(of: choice, keychain: keyStore.load())
     }
 
     /// Nil while the keychain is locked: that says nothing about the identity,

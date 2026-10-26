@@ -68,10 +68,14 @@ final class CloudSyncStatus {
     /// lands or `CloudSyncCoordinator.initialSyncTimeout` runs out.
     var isAwaitingLaunchJoin: Bool = false
 
+    /// True while a fresh install shows the first-run sync choice (iCloud,
+    /// Lume Cloud or Off). Sync stays Off until the user picks one.
+    var isAwaitingBackendChoice: Bool = false
+
     /// Whether a fresh install may decide between the add-playlist form and
     /// the app.
     var isLaunchGateOpen: Bool {
-        hasCompletedInitialSync && !isAwaitingLaunchJoin
+        hasCompletedInitialSync && !isAwaitingLaunchJoin && !isAwaitingBackendChoice
     }
 
     /// When the local reconcile last completed successfully.
