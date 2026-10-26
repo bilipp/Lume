@@ -52,7 +52,10 @@ struct MovieCardView: View {
             // Title
             Text(movie.name)
                 .font(PosterCardMetrics.titleFont)
-                .lineLimit(2)
+                // Reserve both lines so a one-line title keeps the card as tall
+                // as a wrapped one: the rails and grids centre cards vertically,
+                // so a shorter card shifted its poster out of line (#269).
+                .lineLimit(2, reservesSpace: true)
                 .posterTitleFrame(fillsWidth: fillsWidth)
         }
     }
