@@ -101,7 +101,7 @@ else
 fi
 
 # Optional: without it the per-configuration LUME_CLOUD_URL build setting
-# stays (Debug → staging, Release/Sideload/Benchmark → production).
+# stays (production in every configuration).
 LUME_CLOUD_URL="$(read_env LUME_CLOUD_URL)"
 if [ -n "$LUME_CLOUD_URL" ]; then
     set_plist LumeCloudServerURL "$LUME_CLOUD_URL"

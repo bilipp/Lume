@@ -10,11 +10,7 @@ nonisolated enum LumeCloudConfig {
     static let serverURL: URL = resolve(Bundle.main.object(forInfoDictionaryKey: infoPlistKey) as? String)
 
     static var defaultURL: URL {
-        #if DEBUG
-            LumeCloudAPI.stagingURL
-        #else
-            LumeCloudAPI.officialURL
-        #endif
+        LumeCloudAPI.officialURL
     }
 
     static func resolve(_ raw: String?) -> URL {
