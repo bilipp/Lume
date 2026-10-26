@@ -13,6 +13,9 @@ struct SeriesCardView: View {
     /// than the fixed rail width — see `View.posterArtworkFrame(fillsWidth:)`.
     var fillsWidth: Bool = false
 
+    @Environment(\.modelContext) private var modelContext
+    @State private var isFullyWatched = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: PosterCardMetrics.titleSpacing) {
             // Cover
@@ -41,6 +44,12 @@ struct SeriesCardView: View {
                 }
             }
             .posterArtworkFrame(fillsWidth: fillsWidth)
+            .watchedBadge(isFullyWatched)
+            // `.task` restarts on every appear, so the badge catches up after
+            // episodes are marked watched on the detail screen.
+            .task(id: series.id) {
+                isFullyWatched = SeriesEpisodeProgress.allEpisodesWatched(seriesID: series.id, in: modelContext)
+            }
             .clipShape(RoundedRectangle(cornerRadius: PosterCardMetrics.cornerRadius))
             // A shadow applied after clipShape forces an offscreen render pass per
             // card every frame. On tvOS the focus style already supplies depth and
