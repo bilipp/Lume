@@ -35,6 +35,7 @@
 
         /// A profile awaiting PIN entry before the switch goes through.
         @State private var pendingSwitch: UserProfile?
+        @State private var showPaywall = false
 
         @FocusState private var focus: FocusTarget?
 
@@ -79,6 +80,7 @@
             .defaultFocus($focus, focusTarget, priority: .userInitiated)
             .onAppear { landInitialFocus(focusTarget) }
             .onExitCommand(perform: close)
+            .paywall(isPresented: $showPaywall, highlight: .multiplePlaylists)
             .pinPrompt(target: $pendingSwitch) { profile in
                 guard let profileManager else { return }
                 close()
@@ -99,7 +101,7 @@
                     )
                 } else {
                     ForEach(rows) { row in
-                        TVPlaylistSwitchRow(playlist: row.item, isActive: row.isCurrent) {
+                        TVPlaylistSwitchRow(playlist: row.item, isActive: row.isCurrent, isLocked: row.isLocked) {
                             select(playlist: row)
                         }
                         .focused($focus, equals: .playlist(row.id))
@@ -210,10 +212,15 @@
             router.isQuickSwitchPresented = false
         }
 
-        /// Picking the active row just closes the modal.
+        /// Picking the active row just closes the modal; a locked one opens the
+        /// paywall over it, so the modal is still there when the paywall closes.
         private func select(playlist row: QuickSwitchRow<Playlist>) {
             guard !row.isCurrent else {
                 close()
+                return
+            }
+            guard !row.isLocked else {
+                showPaywall = true
                 return
             }
             let id = row.item.id.uuidString

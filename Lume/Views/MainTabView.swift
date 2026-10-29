@@ -469,13 +469,13 @@ struct MainTabView: View {
     }
 
     /// Finds a movie by `tmdbId`, preferring the active playlist but falling back
-    /// to any other playlist's copy. Restricted categories stay hidden for a
-    /// child profile.
+    /// to any other playlist's copy the plan unlocks. Restricted categories stay
+    /// hidden for a child profile.
     private func resolveMovie(tmdbId: Int) -> Movie? {
         let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let restriction = contentRestriction
         let matches = ((try? modelContext.fetch(descriptor)) ?? [])
-            .filter { !restriction.hides(categoryID: $0.categoryId) }
+            .filter { !restriction.hides(categoryID: $0.categoryId) && !playlists.isLocked(contentID: $0.id) }
         return matches.first { belongsToActivePlaylist($0.id) } ?? matches.first
     }
 
@@ -483,7 +483,7 @@ struct MainTabView: View {
         let descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let restriction = contentRestriction
         let matches = ((try? modelContext.fetch(descriptor)) ?? [])
-            .filter { !restriction.hides(categoryID: $0.categoryId) }
+            .filter { !restriction.hides(categoryID: $0.categoryId) && !playlists.isLocked(contentID: $0.id) }
         return matches.first { belongsToActivePlaylist($0.id) } ?? matches.first
     }
 
@@ -498,11 +498,11 @@ struct MainTabView: View {
     /// presents the first one — the playlist on screen, plus any the viewer
     /// just added (see `AutoSync.shouldSync`). Covers the never-synced first
     /// launch (where `lastSyncDate == nil` makes a playlist due) as well as
-    /// periodic refreshes.
+    /// periodic refreshes. A playlist the free plan locks never syncs.
     private func enqueueDueSyncs(_ candidates: [Playlist]) {
         guard !isUITesting else { return }
 
-        for playlist in candidates where shouldAutoSync(playlist) {
+        for playlist in candidates where !playlists.isLocked(playlist) && shouldAutoSync(playlist) {
             autoSyncAttempted.insert(playlist.id)
             syncQueue.append(playlist)
         }
