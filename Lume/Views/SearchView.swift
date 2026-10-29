@@ -15,7 +15,13 @@ struct SearchView: View {
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
-    @Query private var playlists: [Playlist]
+    @Query private var allPlaylists: [Playlist]
+
+    /// The playlists search may reach. Without Pro that is the free one only,
+    /// so "Search All Playlists" never surfaces a locked playlist's catalog.
+    private var playlists: [Playlist] {
+        allPlaylists.unlocked()
+    }
 
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @AppStorage(SearchSettings.searchAllPlaylistsKey)

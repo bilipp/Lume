@@ -34,9 +34,13 @@ actor EPGSyncManager {
 
     /// Refreshes the guide from every enabled source. Returns `true` when at
     /// least one source synced successfully.
+    ///
+    /// - Parameter lockedPlaylistIDs: playlists the free plan locks (see
+    ///   `[Playlist].isLocked`). Their linked sources are skipped — the guide
+    ///   is fetched from the provider with that playlist's credentials.
     @discardableResult
-    func syncAllSources() async -> Bool {
-        let sources = enabledSources()
+    func syncAllSources(lockedPlaylistIDs: Set<UUID> = []) async -> Bool {
+        let sources = enabledSources(lockedPlaylistIDs: lockedPlaylistIDs)
         guard !sources.isEmpty else {
             Logger.database.info("No enabled EPG sources, skipping EPG sync")
             return false
@@ -153,7 +157,7 @@ actor EPGSyncManager {
         let url: String
     }
 
-    private func enabledSources() -> [SourceInfo] {
+    private func enabledSources(lockedPlaylistIDs: Set<UUID>) -> [SourceInfo] {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
         let descriptor = FetchDescriptor<EPGSource>(
@@ -161,7 +165,9 @@ actor EPGSyncManager {
             sortBy: [SortDescriptor(\.addedAt)]
         )
         let sources = (try? context.fetch(descriptor)) ?? []
-        return sources.map { SourceInfo(id: $0.id, url: $0.url) }
+        return sources
+            .filter { source in source.playlistID.map { !lockedPlaylistIDs.contains($0) } ?? true }
+            .map { SourceInfo(id: $0.id, url: $0.url) }
     }
 
     /// The set of EPG channel IDs any live stream references, or nil when there

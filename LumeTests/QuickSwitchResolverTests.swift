@@ -4,7 +4,8 @@
 //
 //  Covers the shared quick-switch seam every switch surface reads its "which
 //  row is current" answer from: the stored-selection fallbacks of
-//  `[Playlist].active(for:)`, row ordering, and the `isCurrent` tag. Also
+//  `[Playlist].active(for:)`, row ordering, the `isCurrent` tag, and the free
+//  plan's one-playlist limit (`unlocked` / `isLocked`). Also
 //  `owner(ofContentID:)`, which answers the other question — not which
 //  playlist is current, but which one a given row came from.
 //
@@ -98,7 +99,7 @@ struct QuickSwitchResolverTests {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["First", "Second", "Third"], in: container.mainContext)
 
-        #expect(playlists.active(for: playlists[2].id.uuidString)?.id == playlists[2].id)
+        #expect(playlists.active(for: playlists[2].id.uuidString, isPremium: true)?.id == playlists[2].id)
     }
 
     @Test func `no playlists resolves to nothing`() {
@@ -111,10 +112,11 @@ struct QuickSwitchResolverTests {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["First", "Second", "Third"], in: container.mainContext)
 
-        let rows = QuickSwitchResolver.playlistRows(playlists, storedID: playlists[1].id.uuidString)
+        let rows = QuickSwitchResolver.playlistRows(playlists, storedID: playlists[1].id.uuidString, isPremium: true)
 
         #expect(rows.map(\.item.name) == ["First", "Second", "Third"])
         #expect(rows.filter(\.isCurrent).map(\.item.name) == ["Second"])
+        #expect(rows.allSatisfy { !$0.isLocked })
     }
 
     @Test func `playlist rows mark the first row current when the stored selection is stale`() throws {
@@ -143,7 +145,70 @@ struct QuickSwitchResolverTests {
         UserDefaults.standard.set(playlists[1].id.uuidString, forKey: PlaylistSelectionStore.key)
         let stored = UserDefaults.standard.string(forKey: PlaylistSelectionStore.key) ?? ""
 
-        #expect(playlists.active(for: stored)?.id == playlists[1].id)
+        #expect(playlists.active(for: stored, isPremium: true)?.id == playlists[1].id)
+    }
+
+    // MARK: - Free plan
+
+    @Test func `without Pro only the oldest playlist is unlocked`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second", "Third"], in: container.mainContext)
+        let shuffled = [playlists[2], playlists[0], playlists[1]]
+
+        #expect(shuffled.unlocked(isPremium: false).map(\.id) == [playlists[0].id])
+        #expect(shuffled.filter { shuffled.isLocked($0, isPremium: false) }.map(\.name) == ["Third", "Second"])
+        #expect(shuffled.unlocked(isPremium: true).map(\.id) == shuffled.map(\.id))
+        #expect(!shuffled.contains { shuffled.isLocked($0, isPremium: true) })
+    }
+
+    @Test func `without Pro a stored selection naming a locked playlist resolves to the oldest`() throws {
+        // Typically a playlist Lume Cloud brought over from Lume for Android, or
+        // the one picked before a subscription ran out.
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
+        let stored = playlists[1].id.uuidString
+
+        #expect(playlists.active(for: stored, isPremium: false)?.id == playlists[0].id)
+        #expect(playlists.activeID(for: stored, isPremium: false) == playlists[0].id.uuidString)
+        // Pro brings the stored pick straight back — nothing overwrote it.
+        #expect(playlists.active(for: stored, isPremium: true)?.id == playlists[1].id)
+    }
+
+    @Test func `without Pro content is locked by the playlist prefix on its id`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
+
+        #expect(!playlists.isLocked(contentID: "\(playlists[0].id.uuidString)-movie-1", isPremium: false))
+        #expect(playlists.isLocked(contentID: "\(playlists[1].id.uuidString)-movie-1", isPremium: false))
+        #expect(!playlists.isLocked(contentID: "\(playlists[1].id.uuidString)-movie-1", isPremium: true))
+        #expect(!playlists.isLocked(contentID: "\(UUID().uuidString)-movie-1", isPremium: false))
+    }
+
+    @Test func `without Pro the only playlist is never locked`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["Only"], in: container.mainContext)
+
+        #expect(!playlists.isLocked(playlists[0], isPremium: false))
+        #expect(playlists.active(for: "", isPremium: false)?.id == playlists[0].id)
+        #expect([Playlist]().unlocked(isPremium: false).isEmpty)
+    }
+
+    @Test func `without Pro playlist rows mark every playlist but the oldest locked`() throws {
+        let container = try makeProfileTestContainer()
+        let playlists = try makePlaylists(["First", "Second", "Third"], in: container.mainContext)
+
+        let rows = QuickSwitchResolver.playlistRows(playlists, storedID: playlists[2].id.uuidString, isPremium: false)
+
+        #expect(rows.map(\.item.name) == ["First", "Second", "Third"])
+        #expect(rows.filter(\.isCurrent).map(\.item.name) == ["First"])
+        #expect(rows.filter(\.isLocked).map(\.item.name) == ["Second", "Third"])
+    }
+
+    @Test func `profile rows are never locked`() throws {
+        let container = try makeProfileTestContainer()
+        let profiles = try makeProfiles(["Me", "Kids"], in: container.mainContext)
+
+        #expect(QuickSwitchResolver.profileRows(profiles, activeProfileID: profiles[0].id).allSatisfy { !$0.isLocked })
     }
 
     // MARK: - Profile rows
