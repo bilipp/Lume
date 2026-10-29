@@ -11,7 +11,27 @@
 //  with no sorting and no intermediate arrays.
 //
 
+import Foundation
+import SwiftData
+
 enum SeriesEpisodeProgress {
+    /// Whether every known episode of the series is watched, for the poster
+    /// card's watched badge. Two indexed counts instead of faulting the
+    /// `episodes` relationship, which on a grid of long-running shows would
+    /// load thousands of episodes just to draw a checkmark. A series whose
+    /// episodes haven't been fetched yet (lazy Xtream/Stalker) reads as not
+    /// watched.
+    static func allEpisodesWatched(seriesID: String, in context: ModelContext) -> Bool {
+        let total = (try? context.fetchCount(FetchDescriptor<Episode>(
+            predicate: #Predicate { $0.series?.id == seriesID }
+        ))) ?? 0
+        guard total > 0 else { return false }
+        let unwatched = (try? context.fetchCount(FetchDescriptor<Episode>(
+            predicate: #Predicate { $0.series?.id == seriesID && $0.isWatched == false }
+        ))) ?? 1
+        return unwatched == 0
+    }
+
     /// The furthest episodes by watch state, in (season, episode) order.
     struct Markers {
         /// Furthest partially-watched (not completed) episode.

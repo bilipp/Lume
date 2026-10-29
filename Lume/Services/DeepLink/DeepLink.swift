@@ -8,7 +8,8 @@
 //  `lume://open/{series|movie}/{catalogId}` are emitted by the widgets / Top Shelf
 //  (built in `WidgetDeepLink`) and launch playback or a detail screen;
 //  `lume://resume` reopens the last played stream and `lume://downloads` is
-//  the download Live Activity's tap target.
+//  the download Live Activity's tap target. `lume://cloud/pair?code=` is the
+//  Lume Cloud pairing QR a new device shows.
 //
 
 import Foundation
@@ -30,6 +31,9 @@ nonisolated enum DeepLink: Equatable {
     /// Opens the downloads list — the download Live Activity's tap target
     /// (see `DownloadLiveActivity`).
     case downloads
+    /// Opens the Lume Cloud add-device flow with the six-digit code a new
+    /// device shows in its pairing QR. Never log the code.
+    case cloudPair(code: String)
 
     /// The app's registered URL scheme (see `CFBundleURLTypes` in Info.plist).
     static let scheme = "lume"
@@ -46,6 +50,10 @@ nonisolated enum DeepLink: Equatable {
         // path component; `pathComponents` includes the leading "/" and returns
         // components percent-decoded (widget links encode their catalog ids).
         let components = url.pathComponents.filter { $0 != "/" }
+        if let link = Self.cloud(host: url.host(), components: components, url: url) {
+            self = link
+            return
+        }
         guard let link = Self.catalog(host: url.host(), components: components) else { return nil }
         self = link
     }
@@ -57,6 +65,15 @@ nonisolated enum DeepLink: Equatable {
         case "downloads": .downloads
         default: nil
         }
+    }
+
+    /// `cloud/pair?code={6 digits}`, built by `LumeCloudPairingCode.deepLink`.
+    private static func cloud(host: String?, components: [String], url: URL) -> DeepLink? {
+        guard host?.lowercased() == "cloud", components.map({ $0.lowercased() }) == ["pair"] else { return nil }
+        let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first { $0.name == "code" }?.value
+        guard let code = code.flatMap({ try? LumeCloudBackend.normalizedPairingCode($0) }) else { return nil }
+        return .cloudPair(code: code)
     }
 
     /// The catalog links: `movie/` and `series/` by TMDB id, `play/` and

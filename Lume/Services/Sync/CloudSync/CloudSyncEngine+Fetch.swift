@@ -82,15 +82,12 @@ extension CloudSyncEngine {
     }
 
     /// Defensive de-duplication: CloudKit can momentarily surface two records for
-    /// one key — keep the most recently updated and delete the loser.
+    /// one key — keep the `MirrorDuplicates` survivor and delete the loser.
     func dedupe<T: PersistentModel>(_ candidate: T, against existing: T?, updatedAt: (T) -> Date) -> T {
         guard let existing else { return candidate }
-        if updatedAt(candidate) > updatedAt(existing) {
-            cloudContext.delete(existing)
-            return candidate
-        }
-        cloudContext.delete(candidate)
-        return existing
+        let survivor = MirrorDuplicates.survivor(of: [existing, candidate], updatedAt: updatedAt) ?? existing
+        cloudContext.delete(survivor === existing ? candidate : existing)
+        return survivor
     }
 
     /// Collapse every `T` row sharing a `key` down to the most recently updated
@@ -329,5 +326,14 @@ extension CloudSyncEngine {
         var descriptor = FetchDescriptor<Category>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try catalogContext.fetch(descriptor).first
+    }
+}
+
+/// Which of the mirror rows sharing a logical key survives: the most recently
+/// updated, the one met first on a tie. The one rule for the engine's dedupe
+/// and Lume Cloud's push, so both converge on the same row.
+nonisolated enum MirrorDuplicates {
+    static func survivor<T>(of rows: [T], updatedAt: (T) -> Date) -> T? {
+        rows.max { updatedAt($0) < updatedAt($1) }
     }
 }

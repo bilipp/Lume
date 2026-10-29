@@ -28,6 +28,13 @@ extension CloudSyncEngine {
         case emptiedButHadData
     }
 
+    /// Drops the whole reconcile baseline, so the next pass is a union merge of
+    /// catalog and mirror that can't read anything as deleted. For a mirror
+    /// store that was lost and comes back empty.
+    func resetShadow() {
+        shadow.resetAll()
+    }
+
     func localCatalogReadiness() -> LocalCatalogReadiness {
         let catalogCount: Int
         do {

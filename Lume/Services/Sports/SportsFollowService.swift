@@ -80,6 +80,18 @@ final class SportsFollowService {
         observeProfileSwitch()
     }
 
+    /// Follow a backend switch onto `container`'s mirror store.
+    func repoint(container: ModelContainer) {
+        self.container = container
+        reload()
+    }
+
+    /// An iCloud remote change doesn't land here: it always runs a reconcile,
+    /// and the app reloads on `lastReconcile`.
+    func mirrorDidChange() {
+        reload()
+    }
+
     private var context: ModelContext? {
         container?.mainContext
     }
@@ -178,7 +190,9 @@ final class SportsFollowService {
 
     /// Re-read the active profile's follows from the cloud store and republish the
     /// observable array and the off-main snapshot. Called on configure, on profile
-    /// switch, and after each reconcile.
+    /// switch, after each reconcile and when the mirror changes or is swapped.
+    /// Leaves `follows` alone when nothing changed, so CloudKit's remote-change
+    /// churn doesn't re-render the hub.
     func reload() {
         guard container != nil else { return }
         bootstrapPreFollowsIfNeeded()
@@ -189,6 +203,7 @@ final class SportsFollowService {
                 sortOrder: $0.sortOrder
             )
         }
+        guard loaded != follows else { return }
         let gained = Set(loaded.map(\.key)).subtracting(follows.map(\.key))
         follows = loaded
         publishSnapshot(loaded)
@@ -269,6 +284,8 @@ final class SportsFollowService {
 }
 
 // MARK: - SportsFollowSource
+
+extension SportsFollowService: SyncMirrorConsumer {}
 
 extension SportsFollowService: SportsFollowSource {
     nonisolated var followedLeagueIds: [String] {

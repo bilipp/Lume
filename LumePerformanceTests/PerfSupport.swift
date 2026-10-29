@@ -63,16 +63,21 @@ enum PerfStore {
     /// `cloudKitDatabase: .none` is mandatory — the catalog's
     /// `@Attribute(.unique)` models crash container load when CloudKit mirroring
     /// is left at `.automatic` on an entitled host.
-    static func makeOnDiskContainer() throws -> (container: ModelContainer, directory: URL) {
+    static func makeOnDiskContainer(
+        schema: Schema = PerfStore.catalogSchema,
+        configurationName: String? = nil,
+        fileName: String = "perf.store"
+    ) throws -> (container: ModelContainer, directory: URL) {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("LumePerf-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let configuration = ModelConfiguration(
-            schema: catalogSchema,
-            url: directory.appendingPathComponent("perf.store"),
+            configurationName,
+            schema: schema,
+            url: directory.appendingPathComponent(fileName),
             cloudKitDatabase: .none
         )
-        let container = try ModelContainer(for: catalogSchema, configurations: configuration)
+        let container = try ModelContainer(for: schema, configurations: configuration)
         return (container, directory)
     }
 

@@ -15,6 +15,8 @@ struct LibraryToolbarModifier: ViewModifier {
     @State private var showPaywall = false
     @State private var paywallHighlight: PremiumFeature?
 
+    @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
+
     func body(content: Content) -> some View {
         content
             .toolbar {
@@ -49,15 +51,15 @@ struct LibraryToolbarModifier: ViewModifier {
             .sheet(
                 isPresented: $showingSettings,
                 // Settings is a sheet on this toolbar, invisible to the browse
-                // root that fires the rating prompt — so it reports itself, the
-                // way the paywall and the players do.
+                // root that raises the rating prompt and the root notices — so
+                // it reports itself, the way the paywall and the players do.
                 onDismiss: {
                     settingsRoute = nil
-                    AppStoreReviewPrompt.shared.noteBlockingSheetDismissed()
+                    ScreenOccupancy.shared.noteBlockingSheetDismissed()
                 },
                 content: {
                     SettingsView(opening: settingsRoute)
-                        .onAppear { AppStoreReviewPrompt.shared.noteBlockingSheetAppeared() }
+                        .onAppear { ScreenOccupancy.shared.noteBlockingSheetAppeared() }
                 }
             )
             .paywall(isPresented: $showPaywall, highlight: paywallHighlight)
@@ -67,6 +69,13 @@ struct LibraryToolbarModifier: ViewModifier {
                 if let playlist = playlists.primaryMember(of: catalogScope) {
                     SyncProgressView(playlist: playlist)
                 }
+            }
+            // A pairing link's add-device sheet is presented from the browse
+            // root, which can't present over these.
+            .onChange(of: router?.cloudPairingRequest?.id) { _, request in
+                guard request != nil else { return }
+                showingSettings = false
+                showingSync = false
             }
     }
 

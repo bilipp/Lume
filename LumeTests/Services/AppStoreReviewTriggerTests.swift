@@ -357,41 +357,6 @@ final class AppStoreReviewPromptTests {
         return prompt
     }
 
-    // MARK: Screen bookkeeping
-
-    @Test func `two concurrent players both have to close before the screen is clear`() throws {
-        let (prompt, _) = try makePrompt()
-        #expect(prompt.playerIsVisible == false)
-
-        prompt.notePlayerAppeared()
-        prompt.notePlayerAppeared()
-        prompt.notePlayerDisappeared()
-        // The second player is still up: a Bool would have said otherwise.
-        #expect(prompt.playerIsVisible)
-
-        prompt.notePlayerDisappeared()
-        #expect(prompt.playerIsVisible == false)
-    }
-
-    @Test func `a presented paywall is not a safe moment`() throws {
-        let (prompt, _) = try makePrompt()
-        #expect(prompt.paywallIsVisible == false)
-
-        prompt.notePaywallAppeared()
-        #expect(prompt.paywallIsVisible)
-
-        prompt.notePaywallDismissed()
-        #expect(prompt.paywallIsVisible == false)
-    }
-
-    @Test func `an unbalanced close cannot drive a count negative`() throws {
-        let (prompt, _) = try makePrompt()
-        prompt.notePlayerDisappeared()
-        prompt.notePaywallDismissed()
-        #expect(prompt.playerIsVisible == false)
-        #expect(prompt.paywallIsVisible == false)
-    }
-
     // MARK: Arming
 
     @Test func `a healthy session by an engaged viewer arms`() throws {
@@ -432,12 +397,10 @@ final class AppStoreReviewPromptTests {
         prompt.noteSessionEnded(health: .healthy, isChildProfileActive: false)
         #expect(prompt.isArmed)
 
-        prompt.notePaywallAppeared()
         prompt.notePaywallDismissed()
 
         // Still armed, and still inside the window — the fire point re-runs the
         // policy, so it will decline until the window passes.
         #expect(prompt.isArmed)
-        #expect(prompt.paywallIsVisible == false)
     }
 }

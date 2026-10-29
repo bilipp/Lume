@@ -10,6 +10,7 @@
 
 import Foundation
 @testable import Lume
+import LumeCloudKit
 import Testing
 
 struct LogRedactionTests {
@@ -77,5 +78,46 @@ struct LogRedactionTests {
             userInfo: [NSLocalizedDescriptionKey: "could not load http://iptv.example.com/live/u/p/9.m3u8"]
         )
         #expect(LogRedaction.describe(error) == "TestDomain 7: could not load http://<redacted>")
+    }
+
+    @Test func `strips a lume cloud bearer header`() {
+        let keys = LumeCloudKeys.generate()
+        // The Kit's `Credentials.authorizationHeader` format (PROTOCOL.md §2).
+        let header = "Bearer acct_fictional01.\(keys.authToken)"
+        let scrubbed = LogRedaction.scrubURLs(in: "request headers: Authorization: \(header)")
+        #expect(scrubbed == "request headers: Authorization: Bearer <redacted>")
+        #expect(!scrubbed.contains(keys.authToken))
+        #expect(!scrubbed.contains("acct_fictional01"))
+    }
+
+    @Test func `strips bearer tokens in any casing`() {
+        let scrubbed = LogRedaction.scrubURLs(in: "authorization: bearer eyJhbGciOiJIUzI1NiJ9.e30.c2lnbmF0dXJl -> 401")
+        #expect(scrubbed == "authorization: Bearer <redacted> -> 401")
+    }
+
+    @Test func `strips bearer alongside a URL`() {
+        let message = "GET https://cloud.example.test/v1/changes?since=0 Bearer abcdefgh.ijklmnop"
+        #expect(LogRedaction.scrubURLs(in: message) == "GET https://<redacted> Bearer <redacted>")
+    }
+
+    @Test func `leaves bearer prose untouched`() {
+        let message = "Bearer token missing"
+        #expect(LogRedaction.scrubURLs(in: message) == message)
+    }
+
+    @Test func `strips a pairing deep link`() {
+        let scrubbed = LogRedaction.scrubURLs(in: "opened lume://cloud/pair?code=482913")
+        #expect(scrubbed == "opened lume://<redacted>")
+    }
+
+    @Test func `describe renders lume cloud errors without the server message`() {
+        let error = LumeCloudError.badRequest(message: "rid 7f3a rejected for acct_fictional01")
+        let described = LogRedaction.describe(error)
+        #expect(described == "LumeCloudError: badRequest")
+    }
+
+    @Test func `describe follows a lume cloud transport error`() {
+        let described = LogRedaction.describe(LumeCloudError.transport(URLError(.notConnectedToInternet)))
+        #expect(described.hasPrefix("LumeCloudError: transport(NSURLErrorDomain -1009) ← NSURLErrorDomain -1009"))
     }
 }

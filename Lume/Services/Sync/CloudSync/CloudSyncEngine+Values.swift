@@ -63,6 +63,35 @@ extension CloudSyncEngine {
             customOrder: mirror.customOrder
         )
     }
+
+    static func values(from profile: UserProfile) -> ProfileValues {
+        ProfileValues(
+            name: profile.name,
+            symbolName: profile.symbolName,
+            colorRaw: profile.colorRaw,
+            createdAt: profile.createdAt,
+            sortOrder: profile.sortOrder,
+            isChild: profile.isChild,
+            updatedAt: profile.updatedAt
+        )
+    }
+
+    static func values(from follow: SyncedSportsFollow) -> SportsFollowValues {
+        SportsFollowValues(kindRaw: follow.kindRaw, sortOrder: follow.sortOrder, updatedAt: follow.updatedAt)
+    }
+
+    static func values(from server: SyncedRecordingServer) -> RecordingServerValues {
+        RecordingServerValues(
+            kindRaw: server.kindRaw,
+            name: server.name,
+            baseURL: server.baseURL,
+            serverID: server.serverID,
+            deviceID: server.deviceID,
+            token: server.token,
+            isEnabled: server.isEnabled,
+            updatedAt: server.updatedAt
+        )
+    }
 }
 
 // MARK: - Value application

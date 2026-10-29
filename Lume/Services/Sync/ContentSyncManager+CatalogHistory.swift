@@ -12,16 +12,28 @@ import OSLog
 import SwiftData
 
 extension ContentSyncManager {
-    /// Name of the CloudKit mirror's `ModelConfiguration` — the app's only named
-    /// configuration, stamped in `LumeApp.makeCloudContainer()`.
+    /// Name of the CloudKit mirror's `ModelConfiguration`, stamped in
+    /// `LumeApp.makeCloudContainer()`.
     static let cloudMirrorConfigurationName = "CloudUserData"
 
+    /// Name of the Lume Cloud mirror's `ModelConfiguration`, stamped in
+    /// `LumeApp.makeLumeCloudContainer()`.
+    static let lumeCloudMirrorConfigurationName = "LumeCloudUserData"
+
+    /// Every user-data mirror configuration — the app's only named ones. Anything
+    /// that looks for the catalog store or purges history must skip all of them.
+    static let mirrorConfigurationNames: Set<String> = [
+        cloudMirrorConfigurationName, lumeCloudMirrorConfigurationName
+    ]
+
     /// Whether persistent history may be deleted from a container holding
-    /// `configurations`. False for the CloudKit mirror, which tracks what it
-    /// still owes the server through exactly that history.
+    /// `configurations`. False for both mirrors: the CloudKit mirror tracks what
+    /// it still owes the server through exactly that history, the Lume Cloud
+    /// transport finds local changes to push through it (and purges only what
+    /// it has diffed), and neither mirror is the catalog this purge exists for.
     nonisolated static func historyPurgeIsSafe(for configurations: some Collection<ModelConfiguration>) -> Bool {
         configurations.allSatisfy {
-            $0.name != cloudMirrorConfigurationName && $0.cloudKitContainerIdentifier == nil
+            !mirrorConfigurationNames.contains($0.name) && $0.cloudKitContainerIdentifier == nil
         }
     }
 
@@ -32,8 +44,8 @@ extension ContentSyncManager {
     /// `isStoredInMemoryOnly`, `groupContainer` and `cloudKitDatabase`), so a
     /// cold catalog import — m3u, Xtream or Stalker — writes one indexed
     /// `ACHANGE` row per catalog row inside the very `save()` calls the import
-    /// cost is concentrated in. Nothing in Lume ever reads it back — there is no `HistoryDescriptor`,
-    /// `HistoryToken` or `fetchHistory` anywhere in the app.
+    /// cost is concentrated in. Nothing in Lume ever reads the catalog's history
+    /// back; the only history reader is the Lume Cloud transport, on its own store.
     ///
     /// IRREVERSIBLE. A future catalog change-history feature (an
     /// extension-driven incremental refresh, a "what changed since" view)
@@ -50,7 +62,7 @@ extension ContentSyncManager {
     /// which is always the catalog container (`CloudUserData.store` is reached
     /// only through `CloudSyncEngine`, never through a `ContentSyncManager`).
     /// `historyPurgeIsSafe(for:)` is the belt to that braces, and it keys on the
-    /// mirror's configuration name rather than on `cloudKitContainerIdentifier`
+    /// mirrors' configuration names rather than on `cloudKitContainerIdentifier`
     /// alone: that identifier is nil for the mirror too in every un-entitled
     /// build (tests, previews, sideload), so on its own it proves nothing.
     ///

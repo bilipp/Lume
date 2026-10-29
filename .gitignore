@@ -25,3 +25,6 @@ lefthook-local.yml
 .opencode/
 
 .xcodebuildmcp/
+
+# Local planning notes, never committed
+/docs/

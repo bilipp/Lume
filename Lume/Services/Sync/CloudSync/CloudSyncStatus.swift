@@ -17,11 +17,37 @@ enum CloudAccountStatus: Equatable {
     }
 }
 
-/// Observable, user-facing iCloud sync status read by the settings screens.
-/// Lives on the main actor; mutated only by `CloudSyncCoordinator`.
+/// Where Lume Cloud stands on this device. Meaningful only while Lume Cloud is
+/// the active backend; iCloud keeps reporting through `CloudAccountStatus`.
+nonisolated enum LumeCloudSyncState: Equatable {
+    case notJoined
+    case joined
+    case syncing
+    /// The first multi-batch upload: `completed` of `total` batches sent.
+    case uploading(completed: Int, total: Int)
+    /// 401 `device_revoked`: this device was removed and went Off.
+    case revoked
+    /// 404 `account_deleted`: the account is gone.
+    case accountDeleted
+    /// 429: backing off per `Retry-After`.
+    case rateLimited
+    /// 507: pushing stopped, pulling continues.
+    case quotaExceeded
+    case offline
+}
+
+/// Observable, user-facing sync status read by the settings screens.
+/// Lives on the main actor; mutated only by `CloudSyncCoordinator` and the
+/// active `SyncBackend`.
 @MainActor
 @Observable
 final class CloudSyncStatus {
+    /// The backend this device syncs through.
+    var backend: SyncBackendSelection = .icloud
+
+    /// Lume Cloud's state; read only while `backend == .lumecloud`.
+    var lumeCloud: LumeCloudSyncState = .notJoined
+
     /// iCloud account reachability.
     var account: CloudAccountStatus = .unknown
 
@@ -36,6 +62,21 @@ final class CloudSyncStatus {
     /// instead of it flashing up and then vanishing mid-typing. Set by
     /// `CloudSyncCoordinator` (immediately when CloudKit is disabled).
     var hasCompletedInitialSync: Bool = false
+
+    /// True while another Apple device's move to Lume Cloud, picked up at
+    /// launch, holds the launch gate until this device's first Lume Cloud pass
+    /// lands or `CloudSyncCoordinator.initialSyncTimeout` runs out.
+    var isAwaitingLaunchJoin: Bool = false
+
+    /// True while a fresh install shows the first-run sync choice (iCloud,
+    /// Lume Cloud or Off). Sync stays Off until the user picks one.
+    var isAwaitingBackendChoice: Bool = false
+
+    /// Whether a fresh install may decide between the add-playlist form and
+    /// the app.
+    var isLaunchGateOpen: Bool {
+        hasCompletedInitialSync && !isAwaitingLaunchJoin && !isAwaitingBackendChoice
+    }
 
     /// When the local reconcile last completed successfully.
     var lastReconcile: Date?

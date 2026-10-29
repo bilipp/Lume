@@ -117,6 +117,16 @@ nonisolated extension PerfSignpost {
     /// league.
     static let sportsFixtureRefresh = PerfSignpost("SportsFixtureRefresh")
 
+    // Lume Cloud
+
+    /// One transport pull: the `/changes` walk plus applying it to the mirror.
+    static let lumeCloudPull = PerfSignpost("LumeCloudPull")
+    /// One transport push pass: diffing, sealing, every batch and conflict round.
+    static let lumeCloudPush = PerfSignpost("LumeCloudPush")
+    /// The three-way merge of server records into the mirror. Nested inside
+    /// `LumeCloudPull`, and inside `LumeCloudPush` once per conflict round.
+    static let lumeCloudMerge = PerfSignpost("LumeCloudMerge")
+
     // Player
     static let playerStartup = PerfSignpost("PlayerStartup")
     static let playerRebuffer = PerfSignpost("PlayerRebuffer")

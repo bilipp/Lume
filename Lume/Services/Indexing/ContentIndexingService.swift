@@ -56,7 +56,7 @@ final class ContentIndexingService {
         playbackHolders.remove(owner)
     }
 
-    /// Set by `CloudSyncCoordinator` while `NSPersistentCloudKitContainer` is
+    /// Set by `ICloudBackend` while `NSPersistentCloudKitContainer` is
     /// mid import/export. The indexer pauses then: CloudKit tears down and
     /// re-adds stores on the coordinator shared by the multi-store container,
     /// and faulting a catalog object during that window throws an uncatchable

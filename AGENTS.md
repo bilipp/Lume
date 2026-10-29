@@ -144,9 +144,10 @@ Lume/
   is a review concern. Moves are free: no imports to fix, and `Lume/` is a
   synchronized folder, so the pbxproj doesn't change.
 
-Two separate `ModelContainer`s:
+Three separate `ModelContainer`s:
 - **Catalog** (`default.store`) — local-only, what all `@Query` bindings target
 - **CloudKit mirror** (`CloudUserData.store`) — user state (profiles, watch progress, favorites); never bind `@Query` against this container
+- **Lume Cloud mirror** (`LumeCloudUserData.store`) — the same mirror models (minus `SyncedBackendChoice`) plus the transport's bookkeeping (`LumeCloudRecordState`, `LumeCloudSyncMeta`); local-only (`cloudKitDatabase: .none`, outside the app group), never bind `@Query` against it either
 
 ---
 
@@ -209,6 +210,22 @@ Two separate `ModelContainer`s:
 - Header-auth sources (`PlayableMedia.httpHeaders != nil`), local files and recordings are never cast — `CastStreamResolver` rejects them; never move a token into a URL to make one castable.
 - Receiver/content URLs, tokens and device names are never logged public; SDK text goes through `LogRedaction` (`CastStatusMapping.redactedErrorDetail`).
 - The SDK is not configured under unit/UI tests or previews (`LumeApp.isTestOrPreviewHost`), and discovery starts only when the device sheet opens — no Local Network prompt at launch.
+
+### LumeCloud (sync backend)
+- Lume Cloud is the optional, end-to-end encrypted alternative to iCloud, developed in the sibling repo [`bilipp/LumeCloud`](https://github.com/bilipp/LumeCloud). Its client is referenced as a **local** SPM package at `../LumeCloud/LumeCloudKit` (product `LumeCloudKit`) — a clone without that sibling will not resolve. `../LumeCloud/spec/PROTOCOL.md` is normative for the wire format, logical keys and payload fields.
+- Never edit the Kit from this repo. If its API is insufficient, change it in LumeCloud and pair the app↔Kit commits. The only files written there from here are the generated `spec/vectors/` (`LumeCloudVectorExportTests`, `LUME_EXPORT_VECTORS=1`).
+- The client never retries — backoff (429 `retryAfter`), reconnect and resync stay in `LumeCloudTransport`/`LumeCloudBackend` (`Lume/Services/Sync/LumeCloud/`). Don't wrap Kit calls in retry helpers.
+- The server URL comes only from build config: `LUME_CLOUD_URL` in `.env` → `LumeCloudServerURL` in Info.plist (`Scripts/inject-env.sh`), read by `LumeCloudConfig`. Unset, every configuration (Debug included) talks to production (`cloud.getlume.org`). There is no UI for it.
+- The `accountId` is **derived from the root key** (`LumeCloudKeys.accountId`): create with `createAccount(keys:)` (409 → `.accountExists`) and authenticate with `Credentials(keys:deviceID:)`. A recovery-key restore derives it, registers a **fresh** device UUID and wipes the Lume Cloud mirror + bookkeeping so the next pull runs from `since=0`.
+- iCloud stays the default; switching (iCloud / Lume Cloud / Off) only goes through `CloudSyncCoordinator.switchBackend`, which also covers auto-join, Leave, Delete and revoke. Its mirror is the `LumeCloudUserData` container above.
+- A fresh install (no stored `sync.backend`, empty catalog) runs **Off** behind the first-run sync choice (`SyncSetupView`, `status.isAwaitingBackendChoice`), with the launch gate closed; the Apple-wide record is only offered there, never followed. Automated runs skip it unless a UI test passes `-sync-setup`.
+- Off writes to no mirror: a playlist deleted while Off leaves the catalog only, so it can come back from the mirror when the device rejoins iCloud or Lume Cloud (the first reconcile after a switch is a union merge).
+- The `CloudSyncShadow` is **per backend**: legacy `cloudsync.shadow.*` keys are iCloud, `cloudsync.lumecloud.shadow.*` are Lume Cloud. The switch procedure calls `resetAll()` on the **target** namespace before the first reconcile against the target mirror — skip it and the stale baseline mass-deletes the user's data.
+- **Push change detection is history-based.** Every transport `ModelContext` writes as `LumeCloudTransport.contextAuthor`; a push diffs only mirror rows other authors changed since `LumeCloudSyncMeta.historyToken`, plus dirty/pending-deletion states. A nil or expired token (first pass, `resetBookkeeping`, resync, backend switch, mirror wipe) falls back to a full diff. The token is stored only after the push succeeds. Bookkeeping writes are if-different, so an unchanged push saves nothing. The transport owns this store's history; `purgeCatalogHistory` never touches it.
+- **Empty Lume Cloud mirror ≠ always store loss.** An empty mirror with synced records behind it resets the bookkeeping and pulls from 0, and pushes no tombstones for it. The exception is a mirror the user's own recorded deletions emptied (`isDeletionPending`): its tombstones push normally. A store-loss reset keeps unpushed recorded deletions, so the pull can't bring them back.
+- **Undecodable records are held, never lost.** A pulled record that doesn't open (unknown type, unsupported envelope version, undecodable payload, rid mismatch) is kept on its `LumeCloudRecordState` (`isUndecodable` + raw ciphertext, version, seq) while the cursor advances; every pull retries them first, so they apply after an app update. Pushes never overwrite or delete a held rid.
+- The Apple-wide handoff record is `SyncedBackendChoice` in the **CloudKit** schema (`rootKey` is `.allowsCloudEncryption`). `CD_SyncedBackendChoice` must be deployed to CloudKit **Production** before release. `SIDE_LOAD` builds never touch it (or CloudKit at all).
+- No account IDs, device IDs, keys, recovery keys, pairing codes, payloads or `Bearer` credentials in logs or diagnostic exports — `LogRedaction` scrubs `Bearer`, and `DebugLogExporter` reports only backend, state, last sync/error and server type.
 
 ### Localization
 String Catalogs (10 languages: ar, en, de, es, fr, it, ja, ko, pt, zh-Hans; the App Store listing mirrors them — see `ship-release`'s `references/store-metadata.json`). Run `xcstringstool sync` and include the tvOS stringsdata. Normalize `.xcstrings` with `Scripts/normalize-xcstrings.swift` (pre-commit hook) to avoid format churn.

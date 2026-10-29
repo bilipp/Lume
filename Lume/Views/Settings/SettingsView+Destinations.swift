@@ -39,7 +39,7 @@ import SwiftUI
             case .appearance: AppearanceSettingsView()
             case .player: PlayerSettingsView()
             case .downloads: DownloadsSettingsView()
-            case .iCloud: CloudSyncSettingsView()
+            case .iCloud: SyncSettingsView()
             case .connectedServices: ConnectedServicesView()
             case .storage: StorageManagementView()
             case .help, .about: EmptyView() // inline sections on the root

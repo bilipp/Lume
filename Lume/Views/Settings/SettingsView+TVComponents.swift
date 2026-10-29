@@ -242,6 +242,8 @@ import SwiftUI
         case subtitleStyle, openSubtitles
         case engines
         case engineOptions(PlayerEngineKind)
+        case syncBackend(SyncBackendSelection)
+        case lumeCloudDeviceName, lumeCloudAddDevice, lumeCloudDevices, lumeCloudRecoveryKey
     }
 #endif
 

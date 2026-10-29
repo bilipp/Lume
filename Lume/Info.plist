@@ -40,6 +40,8 @@
 		<string>vlc-x-callback</string>
 		<string>open-vidhub</string>
 	</array>
+	<key>LumeCloudServerURL</key>
+	<string>$(LUME_CLOUD_URL)</string>
 	<key>MDBListAPIKey</key>
 	<string></string>
 	<key>NSAppTransportSecurity</key>

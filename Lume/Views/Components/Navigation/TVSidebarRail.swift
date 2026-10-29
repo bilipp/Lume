@@ -19,6 +19,9 @@
         /// A group title drawn above the row — a Combined member's name over
         /// its first category. Plain text, so focus steps over it.
         var header: String?
+        /// Replaces the symbol's default VoiceOver name when the icon carries
+        /// meaning of its own, such as a warning badge.
+        var iconAccessibilityLabel: Text?
         let action: () -> Void
     }
 
@@ -246,9 +249,7 @@
                         .truncationMode(.tail)
                     Spacer(minLength: 0)
                     if let icon = item.icon {
-                        Image(systemName: icon)
-                            .font(.system(size: iconSize, weight: .semibold))
-                            .frame(width: iconSize)
+                        railIcon(icon, accessibilityLabel: item.iconAccessibilityLabel)
                     }
                 }
                 .foregroundStyle(textColor(isFocused: isItemFocused, isSelected: isSelected))
@@ -260,6 +261,18 @@
             .buttonStyle(TVCardButtonStyle(focusScale: 1.03, suppressFocusEffects: suppressed))
             .focused($focused, equals: item.id)
             .animation(.easeOut(duration: 0.18), value: isItemFocused)
+        }
+
+        @ViewBuilder
+        private func railIcon(_ icon: String, accessibilityLabel: Text?) -> some View {
+            let image = Image(systemName: icon)
+                .font(.system(size: iconSize, weight: .semibold))
+                .frame(width: iconSize)
+            if let accessibilityLabel {
+                image.accessibilityLabel(accessibilityLabel)
+            } else {
+                image
+            }
         }
 
         private func textColor(isFocused: Bool, isSelected: Bool) -> Color {

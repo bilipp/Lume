@@ -283,10 +283,12 @@ enum StorageManager {
 
     // MARK: - Disk sizing (off the main actor)
 
-    /// The URL of the local catalog store (the configuration that isn't the
-    /// CloudKit user-data store).
+    /// The URL of the local catalog store (the configuration that isn't a
+    /// user-data mirror).
     private static func catalogStoreURL(for context: ModelContext) -> URL? {
-        context.container.configurations.first { $0.name != "CloudUserData" }?.url
+        context.container.configurations.first {
+            !ContentSyncManager.mirrorConfigurationNames.contains($0.name)
+        }?.url
     }
 
     /// Total bytes of a SQLite store including its `-wal`/`-shm` sidecar files.
