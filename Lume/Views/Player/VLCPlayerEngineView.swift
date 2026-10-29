@@ -85,6 +85,7 @@ struct VLCPlayerEngineView: View {
     @State private var isPanelOpen = false
     /// Bumped to ask the overlay to close its open panel (Menu/back press).
     @State private var panelCloseToken = 0
+    @State private var episodeOverlayLink = PlayerEpisodeOverlayLink()
     // Serialises stream changes for this session — the Siri remote's channel
     // surfing and the on-screen transport controls share it, so two swaps can
     // never be in flight at once. `internal` so the transport step in
@@ -153,6 +154,7 @@ struct VLCPlayerEngineView: View {
                 nextUpMedia: nextUpMedia,
                 clock: clock,
                 controlsVisible: isControlsVisible,
+                link: episodeOverlayLink,
                 onSeek: { time in
                     coordinator.seek(to: time)
                     #if os(tvOS)
@@ -241,9 +243,10 @@ struct VLCPlayerEngineView: View {
             #if os(tvOS)
                 // Hand focus to the tap-catcher once the controls vanish so the
                 // remote can bring them back.
-                if !visible { Task { @MainActor in catcherFocused = true } }
+                if !visible { episodeOverlayLink.controlsDidHide { catcherFocused = true } }
             #endif
         }
+        .onPreferenceChange(PlayerControlsBarHeightKey.self) { episodeOverlayLink.reportControlsBarHeight($0) }
         // Handle the Menu/back button at the player root — the always-present
         // ancestor of both the tap-catcher and the controls overlay — so it
         // reliably overrides the fullScreenCover's default dismiss-on-Menu.

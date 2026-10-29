@@ -19,10 +19,16 @@ struct PlayerSkipIntroOverlay: View {
     /// The shared playback clock. Read here (and only here) so ticking it
     /// invalidates just this overlay, not the engine view above it.
     let clock: PlaybackClock
-    /// Whether the engine's own controls overlay is currently showing. The
-    /// button hides while the controls are up, so the two don't fight for focus
-    /// (tvOS) or overlap the scrubber (iOS/macOS).
+    /// Whether the engine's own controls overlay is currently showing. On tvOS
+    /// the button hides while the controls are up, so the two don't fight for
+    /// focus. Elsewhere it stays and moves up above the controls' bottom bar:
+    /// macOS raises the controls whenever the pointer moves, so a button that
+    /// hid with them could never be clicked.
     let controlsVisible: Bool
+    /// Carries the controls' bottom-bar height the button clears (iOS / macOS
+    /// / visionOS), and tells the tvOS host the button wants focus, so hiding
+    /// the controls hands it here rather than to the tap-catcher underneath.
+    let link: PlayerEpisodeOverlayLink
     /// Seeks the underlying player to an absolute time, in seconds.
     let onSeek: (TimeInterval) -> Void
 
@@ -64,11 +70,14 @@ struct PlayerSkipIntroOverlay: View {
         .allowsHitTesting(visibleSegment != nil)
         .animation(.easeInOut(duration: 0.25), value: visibleSegment)
         #if os(tvOS)
-            .onChange(of: visibleSegment) { _, value in
-                // Pull focus onto the button the moment it appears so the viewer can
-                // skip with a single Select.
+            .onChange(of: visibleSegment, initial: true) { _, value in
+                link.claimFocus(.skipIntro, value != nil)
+                // Pull focus onto the button the moment it appears — including
+                // when the controls hide over it — so the viewer can skip with a
+                // single Select.
                 if value != nil { Task { @MainActor in buttonFocused = true } }
             }
+            .onDisappear { link.claimFocus(.skipIntro, false) }
             .onChange(of: segments) { _, _ in
                 dismissedSegment = nil
             }
@@ -108,10 +117,11 @@ struct PlayerSkipIntroOverlay: View {
     private func showsButton(for active: ActiveSegment) -> Bool {
         #if os(tvOS)
             if dismissedSegment == active { return false }
+            // Hide while the controls own focus; they hand it back on hiding.
+            return !controlsVisible
+        #else
+            return true
         #endif
-        // Hide while the controls own the screen — their scrubber covers the
-        // same bottom-trailing space (iOS/macOS) and focus (tvOS).
-        return !controlsVisible
     }
 
     private func label(for kind: Kind) -> LocalizedStringKey {
@@ -123,6 +133,16 @@ struct PlayerSkipIntroOverlay: View {
     }
 
     // MARK: - Button
+
+    #if !os(tvOS)
+        /// Clear of the controls' bottom bar while it shows, otherwise the
+        /// usual inset from the bottom edge.
+        private var bottomInset: CGFloat {
+            let resting: CGFloat = 40
+            guard controlsVisible else { return resting }
+            return max(resting, link.controlsBarHeight + 12)
+        }
+    #endif
 
     @ViewBuilder
     private func skipButton(for active: ActiveSegment) -> some View {
@@ -164,7 +184,8 @@ struct PlayerSkipIntroOverlay: View {
             }
             .buttonStyle(.plain)
             .padding(.trailing, 20)
-            .padding(.bottom, 40)
+            .padding(.bottom, bottomInset)
+            .animation(.easeInOut(duration: 0.2), value: bottomInset)
         #endif
     }
 }

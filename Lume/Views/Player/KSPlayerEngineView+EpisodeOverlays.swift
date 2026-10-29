@@ -16,6 +16,7 @@ extension KSPlayerEngineView {
             nextUpMedia: nextUpMedia,
             clock: clock,
             controlsVisible: controlsVisible,
+            link: episodeOverlayLink,
             onSeek: onSeek,
             onSelectMedia: { selectMedia($0) }
         )

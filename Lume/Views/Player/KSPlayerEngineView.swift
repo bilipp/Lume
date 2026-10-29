@@ -125,6 +125,7 @@ struct KSPlayerEngineView: View {
     @State var hideTask: Task<Void, Never>?
     @State private var hoverHideTask: Task<Void, Never>?
     @State var pipObservationTask: Task<Void, Never>?
+    @State var episodeOverlayLink = PlayerEpisodeOverlayLink()
     #if os(iOS)
         /// Whether the stream was playing as the app left the foreground, so
         /// automatic PiP can resume it if the handoff paused it.
@@ -361,9 +362,7 @@ struct KSPlayerEngineView: View {
             .onChange(of: isControlsVisible) { _, visible in
                 // Hand focus to the tap-catcher once the controls vanish so the
                 // remote can bring them back.
-                if !visible {
-                    Task { @MainActor in catcherFocused = true }
-                }
+                if !visible { episodeOverlayLink.controlsDidHide { catcherFocused = true } }
             }
             // Handle Menu/back at the player root so it reliably overrides the
             // cover's default dismiss-on-Menu.
@@ -540,36 +539,37 @@ struct KSPlayerEngineView: View {
             .onTapGesture {
                 toggleControls()
             }
+            .onPreferenceChange(PlayerControlsBarHeightKey.self) { episodeOverlayLink.reportControlsBarHeight($0) }
             #if os(macOS)
-            .onChange(of: macPip.isActive) { _, active in isPipActive = active }
-            .onContinuousHover(coordinateSpace: .local) { phase in
-                switch phase {
-                case .active:
-                    if !isControlsVisible {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isControlsVisible = true
+                .onChange(of: macPip.isActive) { _, active in isPipActive = active }
+                .onContinuousHover(coordinateSpace: .local) { phase in
+                    switch phase {
+                    case .active:
+                        if !isControlsVisible {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isControlsVisible = true
+                            }
                         }
-                    }
-                    resetHideTimer()
-                    hoverHideTask?.cancel()
-                case .ended:
-                    hoverHideTask?.cancel()
-                    hoverHideTask = Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 600_000_000)
-                        guard !Task.isCancelled else { return }
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isControlsVisible = false
+                        resetHideTimer()
+                        hoverHideTask?.cancel()
+                    case .ended:
+                        hoverHideTask?.cancel()
+                        hoverHideTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 600_000_000)
+                            guard !Task.isCancelled else { return }
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isControlsVisible = false
+                            }
                         }
                     }
                 }
-            }
-            .playerVolume(coordinator)
+                .playerVolume(coordinator)
             #endif
-            .playerKeyboardShortcuts(PlayerKeyActions(
-                togglePlay: togglePlay, skip: { coordinator.skip(interval: Int($0)) }, close: closePlayer,
-                resetHideTimer: resetHideTimer, showControls: showControls,
-                neighbours: itemNeighbours, swapper: mediaSwapper, selectMedia: { selectMedia($0) }
-            ))
+                .playerKeyboardShortcuts(PlayerKeyActions(
+                    togglePlay: togglePlay, skip: { coordinator.skip(interval: Int($0)) }, close: closePlayer,
+                    resetHideTimer: resetHideTimer, showControls: showControls,
+                    neighbours: itemNeighbours, swapper: mediaSwapper, selectMedia: { selectMedia($0) }
+                ))
         }
 
     #endif

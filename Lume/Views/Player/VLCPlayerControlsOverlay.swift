@@ -202,6 +202,7 @@ import VLCKit
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 28)
+            .reportsPlayerControlsBarHeight()
         }
 
         private var titleBlock: some View {

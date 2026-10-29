@@ -78,6 +78,7 @@ struct AVPlayerEngineView: View {
     @State private var isPanelOpen = false
     /// Bumped to ask the overlay to close its open panel (Menu/back press).
     @State private var panelCloseToken = 0
+    @State private var episodeOverlayLink = PlayerEpisodeOverlayLink()
     // Serialises stream changes for this session — the Siri remote's channel
     // surfing and the on-screen transport controls share it, so two swaps can
     // never be in flight at once. `internal` so the transport step in
@@ -139,6 +140,7 @@ struct AVPlayerEngineView: View {
                 nextUpMedia: nextUpMedia,
                 clock: clock,
                 controlsVisible: isControlsVisible,
+                link: episodeOverlayLink,
                 onSeek: { time in
                     coordinator.seek(to: time)
                     #if os(tvOS)
@@ -226,9 +228,10 @@ struct AVPlayerEngineView: View {
         }
         .onChange(of: isControlsVisible) { _, visible in
             #if os(tvOS)
-                if !visible { Task { @MainActor in catcherFocused = true } }
+                if !visible { episodeOverlayLink.controlsDidHide { catcherFocused = true } }
             #endif
         }
+        .onPreferenceChange(PlayerControlsBarHeightKey.self) { episodeOverlayLink.reportControlsBarHeight($0) }
         .onMenuPress { handleMenuPress() }
         .onPlayPausePress { togglePlay() }
         #if os(macOS)
