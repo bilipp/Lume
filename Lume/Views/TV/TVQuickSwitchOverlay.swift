@@ -24,6 +24,9 @@
         /// this fetch — a `@Query` here would register a second store observer
         /// for the identical result.
         let playlists: [Playlist]
+        /// The resolved scope `MainTabView` publishes to the tabs, which this
+        /// overlay sits outside of.
+        let scope: CatalogScope
 
         /// The roster comes from `ProfileManager` — `UserProfile` lives in the
         /// CloudKit-mirrored store, a separate container the browse `@Query`s
@@ -32,21 +35,31 @@
         @Environment(ParentalControls.self) private var parental: ParentalControls?
         @Environment(PlaylistSwitchModel.self) private var playlistSwitch: PlaylistSwitchModel?
         @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+        @State private var premium = PremiumManager.shared
 
         /// A profile awaiting PIN entry before the switch goes through.
         @State private var pendingSwitch: UserProfile?
+        /// Presented from here rather than after closing: the modal is a plain
+        /// overlay, and when the paywall closes focus comes back to the
+        /// Combined row it left — unlocked, if the viewer just subscribed.
+        @State private var showsPaywall = false
 
         @FocusState private var focus: FocusTarget?
 
         private enum FocusTarget: Hashable {
+            case combined
             case playlist(UUID)
             case profile(UUID)
         }
 
         var body: some View {
-            let playlistRows = QuickSwitchResolver.playlistRows(playlists, storedID: selectedPlaylistID)
+            let switchColumn = QuickSwitchResolver.playlistColumn(
+                playlists,
+                scope: scope,
+                isPremium: premium.isPremium
+            )
             let profileRows = resolvedProfileRows
-            let focusTarget = initialFocus(playlists: playlistRows, profiles: profileRows)
+            let focusTarget = initialFocus(playlists: switchColumn, profiles: profileRows)
 
             return ZStack {
                 Color.black.opacity(0.92)
@@ -61,7 +74,7 @@
                     .foregroundStyle(.white)
 
                     HStack(alignment: .top, spacing: 60) {
-                        playlistColumn(playlistRows)
+                        playlistColumn(switchColumn)
                         profileColumn(profileRows)
                     }
 
@@ -79,6 +92,7 @@
             .defaultFocus($focus, focusTarget, priority: .userInitiated)
             .onAppear { landInitialFocus(focusTarget) }
             .onExitCommand(perform: close)
+            .paywall(isPresented: $showsPaywall, highlight: .multiplePlaylists)
             .pinPrompt(target: $pendingSwitch) { profile in
                 guard let profileManager else { return }
                 close()
@@ -88,8 +102,9 @@
 
         // MARK: - Columns
 
-        private func playlistColumn(_ rows: [QuickSwitchRow<Playlist>]) -> some View {
-            column("Playlists", width: TVSettingsMetrics.contentMaxWidth) {
+        private func playlistColumn(_ entries: QuickSwitchPlaylistColumn) -> some View {
+            let rows = entries.rows
+            return column("Playlists", width: TVSettingsMetrics.contentMaxWidth) {
                 if rows.isEmpty {
                     emptyLabel(
                         Text(
@@ -98,8 +113,21 @@
                         )
                     )
                 } else {
+                    TVCombinedSwitchRow(
+                        memberNames: entries.combinedMemberNames,
+                        isActive: entries.isCombinedCurrent,
+                        isLocked: entries.combinedAction == .paywall
+                    ) {
+                        selectCombined(entries.combinedAction)
+                    }
+                    .focused($focus, equals: .combined)
+
                     ForEach(rows) { row in
-                        TVPlaylistSwitchRow(playlist: row.item, isActive: row.isCurrent) {
+                        TVPlaylistSwitchRow(
+                            playlist: row.item,
+                            isActive: row.isCurrent,
+                            isInScope: row.isInScope
+                        ) {
                             select(playlist: row)
                         }
                         .focused($focus, equals: .playlist(row.id))
@@ -179,14 +207,19 @@
 
         // MARK: - Focus
 
+        /// The selection in effect: the Combined row, or the current playlist.
+        /// The first row only stands in when nothing is marked current.
         private func initialFocus(
-            playlists: [QuickSwitchRow<Playlist>],
+            playlists column: QuickSwitchPlaylistColumn,
             profiles: [QuickSwitchRow<UserProfile>]
         ) -> FocusTarget? {
-            if let first = playlists.first {
-                return .playlist(first.id)
+            if column.isCombinedCurrent {
+                return .combined
             }
-            return profiles.first.map { .profile($0.id) }
+            if let row = column.rows.first(where: \.isCurrent) ?? column.rows.first {
+                return .playlist(row.id)
+            }
+            return (profiles.first(where: \.isCurrent) ?? profiles.first).map { .profile($0.id) }
         }
 
         /// Asserts the initial focus once the tree has mounted: the engine picks
@@ -216,16 +249,28 @@
                 close()
                 return
             }
-            let id = row.item.id.uuidString
-            let name = row.item.name
             close()
-            if let playlistSwitch {
-                // The viewer asked to be somewhere else now: land in the cached
-                // catalog and leave the due sync to the next launch / foreground.
-                playlistSwitch.deferNextDueSync()
-                playlistSwitch.switchTo(name: name) { selectedPlaylistID = id }
-            } else {
-                selectedPlaylistID = id
+            // The viewer asked to be somewhere else now: land in the cached
+            // catalog and leave the due sync to the next launch / foreground.
+            playlistSwitch?.deferNextDueSync()
+            playlistSwitch.select(row.item.id.uuidString, name: row.item.name, into: $selectedPlaylistID)
+        }
+
+        private func selectCombined(_ action: CombinedSwitchAction) {
+            switch action {
+            case .paywall:
+                showsPaywall = true
+            case .configure:
+                close()
+                router.pendingSettingsRoute = .combinedView
+                router.selectedTab = .settings
+            case .alreadyCurrent:
+                close()
+            case .switchToCombined:
+                // No deferred sync, unlike a playlist row: a member that has
+                // never synced would otherwise contribute nothing.
+                close()
+                playlistSwitch.selectCombined(into: $selectedPlaylistID)
             }
         }
 

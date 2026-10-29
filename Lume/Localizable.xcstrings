@@ -9692,6 +9692,71 @@
         }
       }
     },
+    "Browse Live TV, Movies and Series from several playlists together." : {
+      "comment" : "Footer under the Combined View row in Playlists settings",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تصفّح البث المباشر والأفلام والمسلسلات من عدة قوائم تشغيل معًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live-TV, Filme und Serien aus mehreren Playlists gemeinsam durchsuchen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browse Live TV, Movies and Series from several playlists together."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explora TV en directo, películas y series de varias listas a la vez."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parcourez la TV en direct, les films et les séries de plusieurs playlists à la fois."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sfoglia TV in diretta, film e serie da più playlist insieme."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複数のプレイリストのライブTV、映画、シリーズをまとめて閲覧できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여러 재생목록의 라이브 TV, 영화, 시리즈를 한곳에서 둘러봅니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navegue por TV ao vivo, filmes e séries de várias playlists ao mesmo tempo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时浏览多个播放列表中的直播电视、电影和剧集。"
+          }
+        }
+      }
+    },
     "Busy" : {
       "comment" : "One-word sync status on the Settings row: the sync server is rate-limiting.",
       "localizations" : {
@@ -12276,6 +12341,71 @@
         }
       }
     },
+    "Choose playlists to combine in Settings" : {
+      "comment" : "Subtitle of the Combined row in the tvOS quick-switch modal while fewer than two playlists are combined",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر قوائم التشغيل المراد دمجها في الإعدادات"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlists zum Kombinieren in den Einstellungen wählen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose playlists to combine in Settings"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige en Ajustes las listas que quieres combinar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez les playlists à combiner dans Réglages"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli le playlist da combinare in Impostazioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定で統合するプレイリストを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정에서 통합할 재생목록 선택"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha as playlists a combinar em Ajustes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在设置中选择要合并的播放列表"
+          }
+        }
+      }
+    },
     "Choose Source Before Playing" : {
       "localizations" : {
         "ar" : {
@@ -13558,6 +13688,395 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "格斗运动"
+          }
+        }
+      }
+    },
+    "Combined" : {
+      "comment" : "Name of the Combined selection, which merges content from several playlists",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مدمج"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kombiniert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "統合"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并"
+          }
+        }
+      }
+    },
+    "Combined orders your favorites across every playlist. Pick a playlist to arrange only its favorites." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يرتّب \"مدمج\" مفضلاتك عبر كل قوائم التشغيل. اختر قائمة تشغيل لترتيب مفضلاتها فقط."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Kombiniert“ ordnet deine Favoriten über alle Playlists hinweg. Wähle eine Playlist, um nur ihre Favoriten anzuordnen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined orders your favorites across every playlist. Pick a playlist to arrange only its favorites."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinada ordena tus favoritos de todas las listas. Elige una lista para ordenar solo sus favoritos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinée ordonne vos favoris de toutes les playlists. Choisissez une playlist pour n’ordonner que ses favoris."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinata ordina i preferiti di tutte le playlist. Scegli una playlist per ordinare solo i suoi preferiti."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「統合」ではすべてのプレイリストのお気に入りをまとめて並べ替えます。プレイリストを選ぶと、そのお気に入りだけを並べ替えられます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합은 모든 재생목록의 즐겨찾기를 함께 정렬합니다. 재생목록을 선택하면 해당 재생목록의 즐겨찾기만 정렬할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combinada ordena seus favoritos de todas as playlists. Escolha uma playlist para organizar só os favoritos dela."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“合并”会对所有播放列表中的收藏统一排序。选择一个播放列表可仅排列其收藏。"
+          }
+        }
+      }
+    },
+    "Combined View" : {
+      "comment" : "Title of the Settings page that configures which playlists the Combined selection merges",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "العرض المدمج"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kombinierte Ansicht"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined View"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vista combinada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vue combinée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vista combinata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "統合ビュー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합 보기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visualização combinada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并视图"
+          }
+        }
+      }
+    },
+    "Combined View is part of Lume Pro. Your choices here are kept." : {
+      "comment" : "Footer on the Combined View settings page for users without Lume Pro",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "العرض المدمج جزء من Lume Pro. تُحفظ اختياراتك هنا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die kombinierte Ansicht ist Teil von Lume Pro. Deine Auswahl hier bleibt erhalten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined View is part of Lume Pro. Your choices here are kept."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vista combinada forma parte de Lume Pro. Tus elecciones aquí se conservan."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vue combinée fait partie de Lume Pro. Vos choix ici sont conservés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vista combinata fa parte di Lume Pro. Le tue scelte qui vengono mantenute."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "統合ビューはLume Proの機能です。ここでの選択は保持されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합 보기는 Lume Pro 기능입니다. 여기서 선택한 내용은 유지됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A visualização combinada faz parte do Lume Pro. Suas escolhas aqui são mantidas."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并视图是 Lume Pro 的功能。你在此处的选择会被保留。"
+          }
+        }
+      }
+    },
+    "Combined View merges the content types you choose from each playlist into one library, grouped by playlist. Include at least two playlists, then choose Combined in Quick Switch (Play/Pause)." : {
+      "comment" : "tvOS Settings › Combined View footer",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يدمج العرض المدمج أنواع المحتوى التي تختارها من كل قائمة تشغيل في مكتبة واحدة، مجمّعة حسب قائمة التشغيل. ضمّن قائمتَي تشغيل على الأقل، ثم اختر \"مدمج\" في التبديل السريع (تشغيل/إيقاف مؤقت)."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die kombinierte Ansicht führt die gewählten Inhaltsarten jeder Playlist in einer Mediathek zusammen, nach Playlist gruppiert. Nimm mindestens zwei Playlists auf und wähle dann „Kombiniert“ im Schnellwechsel (Play/Pause)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined View merges the content types you choose from each playlist into one library, grouped by playlist. Include at least two playlists, then choose Combined in Quick Switch (Play/Pause)."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vista combinada reúne en una sola biblioteca los tipos de contenido que elijas de cada lista, agrupados por lista. Incluye al menos dos listas y elige Combinada en Cambio rápido (Reproducir/Pausa)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vue combinée réunit dans une seule bibliothèque les types de contenu choisis pour chaque playlist, regroupés par playlist. Incluez au moins deux playlists, puis choisissez Combinée dans Changement rapide (Lecture/Pause)."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vista combinata unisce in un’unica libreria i tipi di contenuto scelti da ogni playlist, raggruppati per playlist. Includi almeno due playlist, poi scegli Combinata in Cambio rapido (Play/Pausa)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "統合ビューは、各プレイリストで選んだコンテンツの種類を1つのライブラリにまとめ、プレイリストごとにグループ化して表示します。2つ以上のプレイリストを含めてから、クイック切り替え（再生/一時停止）で「統合」を選択してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합 보기는 각 재생목록에서 선택한 콘텐츠 유형을 재생목록별로 묶어 하나의 라이브러리로 합칩니다. 재생목록을 두 개 이상 포함한 다음 빠른 전환(재생/일시 정지)에서 통합을 선택하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A visualização combinada reúne em uma só biblioteca os tipos de conteúdo que você escolher de cada playlist, agrupados por playlist. Inclua pelo menos duas playlists e escolha Combinada na Troca rápida (Reproduzir/Pausar)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并视图会将你从各播放列表中选择的内容类型汇集到一个媒体库中，并按播放列表分组。请至少包含两个播放列表，然后在快速切换（播放/暂停）中选择“合并”。"
+          }
+        }
+      }
+    },
+    "Combined View merges the content types you choose from each playlist into one library, grouped by playlist. Include at least two playlists, then choose Combined in the playlist switcher." : {
+      "comment" : "Footer of the Combined View settings page",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يدمج العرض المدمج أنواع المحتوى التي تختارها من كل قائمة تشغيل في مكتبة واحدة، مجمّعة حسب قائمة التشغيل. ضمّن قائمتَي تشغيل على الأقل، ثم اختر \"مدمج\" في مبدّل قوائم التشغيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die kombinierte Ansicht führt die gewählten Inhaltsarten jeder Playlist in einer Mediathek zusammen, nach Playlist gruppiert. Nimm mindestens zwei Playlists auf und wähle dann „Kombiniert“ in der Playlist-Auswahl."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined View merges the content types you choose from each playlist into one library, grouped by playlist. Include at least two playlists, then choose Combined in the playlist switcher."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vista combinada reúne en una sola biblioteca los tipos de contenido que elijas de cada lista, agrupados por lista. Incluye al menos dos listas y elige Combinada en el selector de listas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vue combinée réunit dans une seule bibliothèque les types de contenu choisis pour chaque playlist, regroupés par playlist. Incluez au moins deux playlists, puis choisissez Combinée dans le sélecteur de playlists."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vista combinata unisce in un’unica libreria i tipi di contenuto scelti da ogni playlist, raggruppati per playlist. Includi almeno due playlist, poi scegli Combinata nel selettore delle playlist."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "統合ビューは、各プレイリストで選んだコンテンツの種類を1つのライブラリにまとめ、プレイリストごとにグループ化して表示します。2つ以上のプレイリストを含めてから、プレイリストの切り替えで「統合」を選択してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합 보기는 각 재생목록에서 선택한 콘텐츠 유형을 재생목록별로 묶어 하나의 라이브러리로 합칩니다. 재생목록을 두 개 이상 포함한 다음 재생목록 선택기에서 통합을 선택하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A visualização combinada reúne em uma só biblioteca os tipos de conteúdo que você escolher de cada playlist, agrupados por playlist. Inclua pelo menos duas playlists e escolha Combinada no seletor de playlists."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并视图会将你从各播放列表中选择的内容类型汇集到一个媒体库中，并按播放列表分组。请至少包含两个播放列表，然后在播放列表切换器中选择“合并”。"
           }
         }
       }
@@ -20583,6 +21102,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第%lld集"
+          }
+        }
+      }
+    },
+    "Each playlist's categories appear in this order. Drag to reorder." : {
+      "comment" : "Footer under the draggable priority list on the Combined View settings page",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تظهر فئات كل قائمة تشغيل بهذا الترتيب. اسحب لإعادة الترتيب."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Kategorien der Playlists erscheinen in dieser Reihenfolge. Zum Umsortieren ziehen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each playlist's categories appear in this order. Drag to reorder."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las categorías de cada lista aparecen en este orden. Arrastra para reordenar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les catégories de chaque playlist apparaissent dans cet ordre. Faites glisser pour réorganiser."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le categorie di ogni playlist appaiono in quest’ordine. Trascina per riordinare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各プレイリストのカテゴリはこの順に表示されます。ドラッグして並べ替えます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "각 재생목록의 카테고리가 이 순서로 표시됩니다. 드래그하여 순서를 변경하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As categorias de cada playlist aparecem nesta ordem. Arraste para reordenar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各播放列表的类别按此顺序显示。拖动以重新排序。"
           }
         }
       }
@@ -28160,6 +28744,71 @@
         }
       }
     },
+    "from %@" : {
+      "comment" : "VoiceOver label for the badge naming the playlist a Combined View item comes from",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "من %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aus %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "from %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "da %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@から"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에서"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 %@"
+          }
+        }
+      }
+    },
     "From playlist" : {
       "localizations" : {
         "ar" : {
@@ -31948,6 +32597,134 @@
         }
       }
     },
+    "In Combined View, hidden and reordered categories still belong to each playlist. Pick the playlist to manage." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في العرض المدمج، تبقى الفئات المخفية والمعاد ترتيبها تابعة لقائمة التشغيل الخاصة بها. اختر قائمة التشغيل التي تريد إدارتها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In der kombinierten Ansicht gehören ausgeblendete und umsortierte Kategorien weiterhin zur jeweiligen Playlist. Wähle die Playlist, die du verwalten möchtest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Combined View, hidden and reordered categories still belong to each playlist. Pick the playlist to manage."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En la vista combinada, las categorías ocultas y reordenadas siguen perteneciendo a cada lista. Elige la lista que quieres gestionar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans la vue combinée, les catégories masquées et réorganisées restent propres à chaque playlist. Choisissez la playlist à gérer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nella vista combinata, le categorie nascoste e riordinate restano legate a ogni playlist. Scegli la playlist da gestire."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "統合ビューでも、非表示にしたカテゴリや並べ替えたカテゴリは各プレイリストに属します。管理するプレイリストを選んでください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합 보기에서도 숨기거나 순서를 바꾼 카테고리는 각 재생목록에 속합니다. 관리할 재생목록을 선택하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na visualização combinada, as categorias ocultas e reordenadas continuam pertencendo a cada playlist. Escolha a playlist que deseja gerenciar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在合并视图中，隐藏和重新排序的类别仍属于各自的播放列表。请选择要管理的播放列表。"
+          }
+        }
+      }
+    },
+    "In Combined View, Movies, Series and Live TV follow each playlist's content types. Sports applies to every playlist." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في العرض المدمج، تتبع الأفلام والمسلسلات والبث المباشر أنواع المحتوى المختارة لكل قائمة تشغيل. أما الرياضة فتنطبق على كل قوائم التشغيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In der kombinierten Ansicht richten sich Filme, Serien und Live-TV nach den Inhaltsarten jeder Playlist. Sport gilt für alle Playlists."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Combined View, Movies, Series and Live TV follow each playlist's content types. Sports applies to every playlist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En la vista combinada, Películas, Serie y TV en directo siguen los tipos de contenido de cada lista. Deportes se aplica a todas las listas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans la vue combinée, Films, Séries et TV en direct suivent les types de contenu de chaque playlist. Sports s’applique à toutes les playlists."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nella vista combinata, Film, Serie e TV in diretta seguono i tipi di contenuto di ogni playlist. Sport si applica a tutte le playlist."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "統合ビューでは、映画、シリーズ、ライブTVは各プレイリストのコンテンツの種類に従います。スポーツはすべてのプレイリストに適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합 보기에서는 영화, 시리즈, 라이브 TV가 각 재생목록의 콘텐츠 유형을 따릅니다. 스포츠는 모든 재생목록에 적용됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na visualização combinada, Filmes, Séries e TV ao vivo seguem os tipos de conteúdo de cada playlist. Esportes se aplica a todas as playlists."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在合并视图中，电影、剧集和直播电视遵循各播放列表的内容类型。体育适用于所有播放列表。"
+          }
+        }
+      }
+    },
     "In Favorites" : {
       "localizations" : {
         "ar" : {
@@ -32060,6 +32837,201 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "进行中"
+          }
+        }
+      }
+    },
+    "Include %@ from %@" : {
+      "comment" : "VoiceOver label of a content-type toggle: content type (Live TV, Movies, Series), then the playlist name",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تضمين %1$@ من %2$@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ aus %2$@ aufnehmen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Include %1$@ from %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir %1$@ de %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclure %1$@ de %2$@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includi %1$@ da %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@の%1$@を含める"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@의 %1$@ 포함"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir %1$@ de %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含 %2$@ 的%1$@"
+          }
+        }
+      }
+    },
+    "Include %@ in Combined View" : {
+      "comment" : "VoiceOver label of the toggle adding a playlist (name) to the Combined selection",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تضمين %@ في العرض المدمج"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ in kombinierte Ansicht aufnehmen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Include %@ in Combined View"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir %@ en la vista combinada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclure %@ dans la vue combinée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includi %@ nella vista combinata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を統合ビューに含める"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합 보기에 %@ 포함"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir %@ na visualização combinada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %@ 包含在合并视图中"
+          }
+        }
+      }
+    },
+    "Include in Combined View" : {
+      "comment" : "Toggle that adds a playlist to the Combined selection",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التضمين في العرض المدمج"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In kombinierte Ansicht aufnehmen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Include in Combined View"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir en la vista combinada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclure dans la vue combinée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includi nella vista combinata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "統合ビューに含める"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "통합 보기에 포함"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir na visualização combinada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含在合并视图中"
           }
         }
       }
@@ -45620,6 +46592,71 @@
         }
       }
     },
+    "Not Included" : {
+      "comment" : "tvOS Settings › Combined View section header for playlists outside the Combined selection",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "غير مضمّنة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht enthalten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Included"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No incluidas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non incluses"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non incluse"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含まれていない"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "포함되지 않음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não incluídas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未包含"
+          }
+        }
+      }
+    },
     "Not Interested" : {
       "localizations" : {
         "ar" : {
@@ -52693,6 +53730,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放列表 %@"
+          }
+        }
+      }
+    },
+    "Playlist Not Found" : {
+      "comment" : "Alert title when a downloaded item's playlist is no longer installed, so it cannot be streamed.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على قائمة التشغيل"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist nicht gefunden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist Not Found"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista no encontrada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist introuvable"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist non trovata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレイリストが見つかりません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생목록을 찾을 수 없음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist não encontrada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到播放列表"
           }
         }
       }
@@ -63346,6 +64448,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择一个类别"
+          }
+        }
+      }
+    },
+    "Select a playlist to move it. Select its pencil to choose its content types." : {
+      "comment" : "tvOS Settings › Combined View hint above the member list",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر قائمة تشغيل لنقلها. اختر رمز القلم الخاص بها لتحديد أنواع محتواها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle eine Playlist, um sie zu verschieben. Wähle ihren Stift, um ihre Inhaltsarten festzulegen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a playlist to move it. Select its pencil to choose its content types."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecciona una playlist para moverla. Selecciona su lápiz para elegir sus tipos de contenido."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sélectionnez une playlist pour la déplacer. Sélectionnez son crayon pour choisir ses types de contenu."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seleziona una playlist per spostarla. Seleziona la sua matita per scegliere i tipi di contenuto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレイリストを選択すると移動できます。鉛筆を選択するとコンテンツの種類を選べます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생 목록을 선택하면 이동할 수 있습니다. 연필을 선택하면 콘텐츠 유형을 고를 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecione uma playlist para movê-la. Selecione o lápis para escolher os tipos de conteúdo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择播放列表即可移动它。选择其铅笔图标可选择内容类型。"
           }
         }
       }
@@ -79003,6 +80170,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这是一个 Xtream 服务商链接。它可以作为 m3u 播放列表使用，也可以改为将该服务商添加为 Xtream 登录——同样的内容库，Xtream 同步的数据量要少得多。"
+          }
+        }
+      }
+    },
+    "This item's playlist could not be found." : {
+      "comment" : "Shown instead of playback when a movie, series or download belongs to a playlist that is no longer installed.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر العثور على قائمة التشغيل الخاصة بهذا العنصر."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Playlist dieses Eintrags wurde nicht gefunden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This item's playlist could not be found."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontró la lista de este elemento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La playlist de cet élément est introuvable."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile trovare la playlist di questo elemento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この項目のプレイリストが見つかりませんでした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 항목의 재생목록을 찾을 수 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível encontrar a playlist deste item."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到此项目所属的播放列表。"
           }
         }
       }

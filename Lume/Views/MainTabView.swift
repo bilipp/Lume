@@ -45,17 +45,8 @@ struct MainTabView: View {
         @Environment(\.openWindow) private var openWindow
     #endif
 
-    /// Playlists waiting to be auto-synced, and the one currently shown in the
-    /// blocking progress cover. Auto-sync is presented (not silent) so the user
-    /// sees progress and waits for it to finish — most importantly right after
-    /// adding a playlist, when the app would otherwise look empty and broken.
-    @State private var syncQueue: [Playlist] = []
-    @State private var activeSyncPlaylist: Playlist?
-
-    /// Playlists we've already auto-synced (or attempted) this session, so the
-    /// launch / switch / foreground triggers don't re-present the cover for one
-    /// that's already been handled.
-    @State private var autoSyncAttempted: Set<UUID> = []
+    @State private var autoSyncQueue = AutoSyncQueue()
+    @State private var premium = PremiumManager.shared
 
     /// Memo behind `contentRestriction` — see `ContentRestrictionMemo`.
     @State private var restrictionMemo = ContentRestrictionMemo()
@@ -64,29 +55,22 @@ struct MainTabView: View {
         SyncFrequency.resolve(syncFrequencyRaw)
     }
 
-    /// The playlist the content tabs are showing, resolved rather than read raw:
-    /// the stored id can name a deleted playlist, in which case the app falls
-    /// back to the same playlist every other surface does, and auto-sync has to
-    /// follow it there.
-    private var activePlaylistID: String {
-        playlists.activeID(for: selectedPlaylistID)
+    /// The playlists the content tabs are showing, resolved rather than read
+    /// raw: the stored id can name a deleted playlist, or Combined can fall back
+    /// to its priority-1 member, and auto-sync has to follow every surface there.
+    private var catalogScope: CatalogScope {
+        playlists.scope(for: selectedPlaylistID, isPremium: premium.isPremium)
     }
 
-    /// Whether `tab` is in the tab bar: the active playlist can hide Movies,
-    /// Series and Live TV (Settings › Library › Tabs).
+    /// The content tabs in the tab bar: an isolated playlist's own choice
+    /// (Settings › Library › Tabs), or in Combined every type a member
+    /// contributes.
+    private func visibleTabs(in scope: CatalogScope) -> Set<PlaylistTab> {
+        scope.visibleTabs(isolatedHidden: playlists.primaryMember(of: scope)?.hiddenTabs ?? [])
+    }
+
     private func showsTab(_ tab: AppTab) -> Bool {
-        playlists.active(for: selectedPlaylistID).showsTab(tab)
-    }
-
-    /// The tabs the active playlist hides, as a value `onChange` can watch.
-    private var hiddenTabsRaw: String {
-        playlists.active(for: selectedPlaylistID)?.hiddenTabsRaw ?? ""
-    }
-
-    /// UI tests seed a fake playlist; auto-sync would present a blocking cover
-    /// that can never succeed against the stub server, so skip it there.
-    private var isUITesting: Bool {
-        CommandLine.arguments.contains("-ui-testing")
+        visibleTabs(in: catalogScope).showsTab(tab)
     }
 
     /// Whether the browse UI is covered: the sync cover, downloads, the add-device sheet (not a link
@@ -97,7 +81,7 @@ struct MainTabView: View {
 
     /// All of the above but the add-device sheet, which waits for these to clear.
     private var hasOwnPresentation: Bool {
-        activeSyncPlaylist != nil
+        autoSyncQueue.coverPlaylist != nil
             || showsDownloads
             || playlistSwitch?.isSwitching == true
             || profileManager?.isSwitching == true
@@ -121,7 +105,10 @@ struct MainTabView: View {
 
     var body: some View {
         @Bindable var router = router
-        return tabView(selection: $router.selectedTab)
+        @Bindable var autoSyncQueue = autoSyncQueue
+        let scope = catalogScope
+        let tabs = visibleTabs(in: scope)
+        return tabView(selection: $router.selectedTab, tabs: tabs)
         #if os(tvOS)
             .disabled(blockingOverlayOwnsScreen || router.isQuickSwitchPresented)
             // Attached OUTSIDE `.disabled` so the same button closes the modal it
@@ -136,16 +123,19 @@ struct MainTabView: View {
             }
         #endif
             .environment(router)
+            .environment(autoSyncQueue)
             .environment(\.contentRestriction, contentRestriction)
+            .catalogScope(scope, playlists: playlists)
             // A tab switch is the one browse interaction that has no scroll
             // view of its own to stamp from, and it is the moment a merge is
             // most expensive — the incoming tab is re-running its queries.
             .onChange(of: router.selectedTab) {
                 ContentIndexingService.shared.noteUserInteraction()
             }
-            // Hiding the tab on screen, or switching to a playlist that hides
-            // it, would leave the selection pointing at nothing.
-            .onChange(of: hiddenTabsRaw, initial: true) {
+            // Hiding the tab on screen, or switching to a playlist (or a
+            // Combined set) without it, would leave the selection pointing at
+            // nothing.
+            .onChange(of: PlaylistTab.encode(tabs), initial: true) {
                 if !showsTab(router.selectedTab) {
                     router.selectedTab = .home
                 }
@@ -167,15 +157,15 @@ struct MainTabView: View {
                 // playlist if it is due, plus any playlist that has never synced.
                 enqueueDueSyncs(playlists)
             }
-            .onChange(of: selectedPlaylistID) {
-                // On playlist switch, sync the newly selected one if it's due —
-                // unless the switch asked to land in the cached catalog instead.
-                // This is also where a playlist deferred at launch for not being
-                // on screen gets its turn.
-                guard playlistSwitch?.consumeDeferredDueSync() != true else { return }
-                if let playlist = playlists.active(for: selectedPlaylistID) {
-                    enqueueDueSyncs([playlist])
-                }
+            .onChange(of: scope.token) {
+                // On playlist switch, sync the newly selected one — or every due
+                // Combined member — unless the switch asked to land in the
+                // cached catalog instead. This is also where a playlist deferred
+                // at launch for not being on screen gets its turn. Keyed on the
+                // resolved scope rather than the stored selection, so a member
+                // joining Combined, or Pro unlocking it, counts as a switch too.
+                let deferred = playlistSwitch?.consumeDeferredDueSync() == true
+                enqueueDueSyncs(deferred ? [] : playlists.members(of: catalogScope))
             }
             .onChange(of: scenePhase) { _, phase in
                 // Returning to the foreground re-checks staleness — for a long-lived
@@ -186,8 +176,10 @@ struct MainTabView: View {
                 // Coming back to `.active` also refreshes stale sports data.
                 SportsSyncService.shared.isForeground = phase == .active
             }
-            .syncCover(item: $activeSyncPlaylist, onDismiss: promoteNextIfIdle)
-            .onChange(of: isAutoSyncBusy, initial: true) { _, busy in
+            .syncCover(item: $autoSyncQueue.coverPlaylist) {
+                autoSyncQueue.promoteNextIfIdle(scope: catalogScope, context: modelContext)
+            }
+            .onChange(of: autoSyncQueue.isBusy, initial: true) { _, busy in
                 EPGSyncService.shared.setAutoSyncQueued(busy)
             }
             .onDisappear {
@@ -231,14 +223,14 @@ struct MainTabView: View {
                     // Built only while presented: a permanently mounted list of
                     // focusable rows would regrow the focus/AX responder walk
                     // that `activeOnly(_:selection:)` exists to contain.
-                    TVQuickSwitchOverlay(router: router, playlists: playlists)
+                    TVQuickSwitchOverlay(router: router, playlists: playlists, scope: catalogScope)
                         .transition(.opacity)
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: router.isQuickSwitchPresented)
         }
 
-        private func tabView(selection: Binding<AppTab>) -> some View {
+        private func tabView(selection: Binding<AppTab>, tabs: Set<PlaylistTab>) -> some View {
             TabView(selection: selection) {
                 Tab(value: AppTab.search) {
                     activeOnly(.search, selection: selection.wrappedValue) { SearchView() }
@@ -252,7 +244,7 @@ struct MainTabView: View {
                     Text("Home")
                 }
 
-                if showsTab(.movies) {
+                if tabs.showsTab(.movies) {
                     Tab(value: AppTab.movies) {
                         activeOnly(.movies, selection: selection.wrappedValue) { MoviesView() }
                     } label: {
@@ -260,7 +252,7 @@ struct MainTabView: View {
                     }
                 }
 
-                if showsTab(.series) {
+                if tabs.showsTab(.series) {
                     Tab(value: AppTab.series) {
                         activeOnly(.series, selection: selection.wrappedValue) { SeriesView() }
                     } label: {
@@ -268,7 +260,7 @@ struct MainTabView: View {
                     }
                 }
 
-                if showsTab(.liveTV) {
+                if tabs.showsTab(.liveTV) {
                     Tab(value: AppTab.liveTV) {
                         activeOnly(.liveTV, selection: selection.wrappedValue) { LiveTVView() }
                     } label: {
@@ -299,7 +291,7 @@ struct MainTabView: View {
         /// it would move focus and hand it back somewhere else.
         private var blockingOverlayOwnsScreen: Bool {
             router.isMultiViewPresented
-                || activeSyncPlaylist != nil
+                || autoSyncQueue.coverPlaylist != nil
                 || profileManager?.isSwitching == true
         }
 
@@ -335,25 +327,25 @@ struct MainTabView: View {
         /// Search stays mounted: it holds only the query the viewer typed and a
         /// playlist lookup. The content tabs unmount after sitting unshown — see
         /// `IdleUnmountingTab`.
-        private func tabView(selection: Binding<AppTab>) -> some View {
+        private func tabView(selection: Binding<AppTab>, tabs: Set<PlaylistTab>) -> some View {
             TabView(selection: selection) {
                 Tab("Home", systemImage: "house", value: AppTab.home) {
                     IdleUnmountingTab(isSelected: selection.wrappedValue == .home) { HomeView() }
                 }
 
-                if showsTab(.movies) {
+                if tabs.showsTab(.movies) {
                     Tab("Movies", systemImage: "film", value: AppTab.movies) {
                         IdleUnmountingTab(isSelected: selection.wrappedValue == .movies) { MoviesView() }
                     }
                 }
 
-                if showsTab(.series) {
+                if tabs.showsTab(.series) {
                     Tab("Series", systemImage: "tv", value: AppTab.series) {
                         IdleUnmountingTab(isSelected: selection.wrappedValue == .series) { SeriesView() }
                     }
                 }
 
-                if showsTab(.liveTV) {
+                if tabs.showsTab(.liveTV) {
                     Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.liveTV) {
                         IdleUnmountingTab(isSelected: selection.wrappedValue == .liveTV) { LiveTVView() }
                     }
@@ -468,68 +460,31 @@ struct MainTabView: View {
         router.seriesPath.append(series)
     }
 
-    /// Finds a movie by `tmdbId`, preferring the active playlist but falling back
-    /// to any other playlist's copy. Restricted categories stay hidden for a
-    /// child profile.
+    /// Finds a movie by `tmdbId`, preferring a copy from the playlists on
+    /// screen but falling back to any other playlist's. Restricted categories
+    /// stay hidden for a child profile.
     private func resolveMovie(tmdbId: Int) -> Movie? {
         let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let restriction = contentRestriction
+        let matcher = CatalogScope.Matcher(catalogScope)
         let matches = ((try? modelContext.fetch(descriptor)) ?? [])
             .filter { !restriction.hides(categoryID: $0.categoryId) }
-        return matches.first { belongsToActivePlaylist($0.id) } ?? matches.first
+        return matches.first { matcher.contains($0.id, .movies) } ?? matches.first
     }
 
     private func resolveSeries(tmdbId: Int) -> Series? {
         let descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let restriction = contentRestriction
+        let matcher = CatalogScope.Matcher(catalogScope)
         let matches = ((try? modelContext.fetch(descriptor)) ?? [])
             .filter { !restriction.hides(categoryID: $0.categoryId) }
-        return matches.first { belongsToActivePlaylist($0.id) } ?? matches.first
-    }
-
-    private func belongsToActivePlaylist(_ id: String) -> Bool {
-        guard let activePlaylist = playlists.active(for: selectedPlaylistID) else { return true }
-        return id.hasPrefix("\(activePlaylist.id.uuidString)-")
+        return matches.first { matcher.contains($0.id, .series) } ?? matches.first
     }
 
     // MARK: - Automatic sync
 
-    /// Enqueues every due playlist for a blocking, progress-visible sync and
-    /// presents the first one — the playlist on screen, plus any the viewer
-    /// just added (see `AutoSync.shouldSync`). Covers the never-synced first
-    /// launch (where `lastSyncDate == nil` makes a playlist due) as well as
-    /// periodic refreshes.
     private func enqueueDueSyncs(_ candidates: [Playlist]) {
-        guard !isUITesting else { return }
-
-        for playlist in candidates where shouldAutoSync(playlist) {
-            autoSyncAttempted.insert(playlist.id)
-            syncQueue.append(playlist)
-        }
-        promoteNextIfIdle()
-    }
-
-    private func shouldAutoSync(_ playlist: Playlist) -> Bool {
-        AutoSync.shouldSync(
-            playlist.autoSyncCandidate(activeID: activePlaylistID),
-            frequency: syncFrequency,
-            alreadyStarted: autoSyncAttempted.contains(playlist.id)
-        )
-    }
-
-    /// Whether the auto-sync queue holds anything, including the playlist in
-    /// the cover. Reported to `EPGSyncService` so the guide refresh reads the
-    /// queue itself instead of predicting it.
-    private var isAutoSyncBusy: Bool {
-        activeSyncPlaylist != nil || !syncQueue.isEmpty
-    }
-
-    /// Presents the next queued playlist's sync cover when none is showing. The
-    /// `SyncProgressView` auto-starts the sync and dismisses itself on success;
-    /// the cover's `onDismiss` calls back here to advance the queue.
-    private func promoteNextIfIdle() {
-        guard activeSyncPlaylist == nil, !syncQueue.isEmpty else { return }
-        activeSyncPlaylist = syncQueue.removeFirst()
+        autoSyncQueue.enqueueDue(candidates, scope: catalogScope, frequency: syncFrequency, context: modelContext)
     }
 }
 

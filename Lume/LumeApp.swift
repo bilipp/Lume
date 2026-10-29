@@ -315,10 +315,11 @@ struct LumeApp: App {
                 try? container.mainContext.save()
             }
             let isChild = profileManager.activeProfileIsChild
+            let isPremium = PremiumManager.shared.isPremium
             Task {
                 await BackgroundActivity.perform("Widget snapshot") {
                     await Task.detached(priority: .utility) {
-                        WidgetSnapshotExporter.export(container: container, isChildProfile: isChild)
+                        WidgetSnapshotExporter.export(container: container, isChildProfile: isChild, isPremium: isPremium)
                     }.value
                 }
             }
@@ -435,6 +436,12 @@ struct LumeApp: App {
                     // sync is running).
                     ContentIndexingService.shared.configure(container: catalogContainer)
                     ContentIndexingService.shared.kick()
+
+                    // One-time rewrite of "added" stamps stored before every
+                    // importer wrote Unix seconds. After `cloudSync.start()` and
+                    // on its own background context; it waits out playback,
+                    // syncs, iCloud imports and browsing like the indexer.
+                    AddedDateNormalization.runIfNeeded(container: catalogContainer)
 
                     // Refresh the TV guide on its own schedule. No-ops when no
                     // guide is due yet, and stands aside while a playlist sync

@@ -31,6 +31,11 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     /// list — Home, Search, recall — in which case the player surfs the
     /// channel's own category. See `LiveChannelNavigator.adjacentMedia`.
     let channelScope: LiveChannelScope?
+    /// The Combined playlists `channelScope`'s Favorites and Recently Watched
+    /// span. `nil` in isolated mode, and in every snapshot written before
+    /// Combined existed: synthesized `Codable` decodes a missing optional as
+    /// `nil`, which surfs the channel's own playlist as it always did.
+    let surfScope: LiveSurfScope?
     /// Per-request HTTP headers the engine must send to open `url` — today only
     /// WebDAV's `Authorization: Basic`. `nil` for every other source type: a
     /// blanket value would change the open path for every IPTV stream.
@@ -59,6 +64,7 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         startTime: TimeInterval,
         contentRef: ContentRef,
         channelScope: LiveChannelScope? = nil,
+        surfScope: LiveSurfScope? = nil,
         httpHeaders: [String: String]? = nil,
         recordingTimeline: RecordingTimeline? = nil,
         qualityAnchorID: String? = nil
@@ -72,6 +78,7 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         self.startTime = startTime
         self.contentRef = contentRef
         self.channelScope = channelScope
+        self.surfScope = surfScope
         self.httpHeaders = httpHeaders
         self.recordingTimeline = recordingTimeline
         self.qualityAnchorID = qualityAnchorID
@@ -257,11 +264,12 @@ nonisolated extension PlayableMedia {
 
     /// `scope` is the channel list the viewer picked this channel from; pass it
     /// wherever playback starts from a scoped list so in-player surfing stays
-    /// inside that list.
+    /// inside that list. `surfScope` is the Combined membership that list spans.
     static func from(
         stream: LiveStream,
         playlist: Playlist,
         scope: LiveChannelScope? = nil,
+        surfScope: LiveSurfScope? = nil,
         client: XtreamClient = XtreamClient()
     ) -> PlayableMedia? {
         guard let url = LiveStreamURLResolver.playbackURL(for: stream, playlist: playlist, client: client) else { return nil }
@@ -275,8 +283,23 @@ nonisolated extension PlayableMedia {
             startTime: 0,
             contentRef: .live(stream.id),
             channelScope: scope,
+            surfScope: surfScope,
             httpHeaders: authHeaders(for: playlist)
         )
+    }
+
+    /// `stream` built against whichever of `playlists` owns it — the only one
+    /// whose server and credentials can play it. `nil` when none does: the
+    /// stream ids are per-provider integers, so another playlist in its place
+    /// can quietly play whichever channel holds the same id over there.
+    static func from(
+        stream: LiveStream,
+        ownedByOneOf playlists: [Playlist],
+        scope: LiveChannelScope? = nil,
+        surfScope: LiveSurfScope? = nil
+    ) -> PlayableMedia? {
+        guard let owner = playlists.owner(ofContentID: stream.id) else { return nil }
+        return from(stream: stream, playlist: owner, scope: scope, surfScope: surfScope)
     }
 
     /// The single capability rule: whether this channel can serve catch-up at

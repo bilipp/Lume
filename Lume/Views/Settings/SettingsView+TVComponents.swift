@@ -2,9 +2,10 @@
 //  SettingsView+TVComponents.swift
 //  Lume
 //
-//  The tvOS About and Help & Feedback detail panes, the Sports pane, and the
-//  SwiftUI previews, split out of SettingsView to keep that file within the
-//  project's size limit. The categories themselves are `SettingsCategory`.
+//  The tvOS About and Help & Feedback detail panes, the Sports pane, the
+//  panes' drill-in and focus hand-off targets, and the SwiftUI previews,
+//  split out of SettingsView to keep that file within the project's size
+//  limit. The categories themselves are `SettingsCategory`.
 //
 
 import SwiftData
@@ -223,6 +224,27 @@ import SwiftUI
         }
     }
 
+    /// Where focus goes once Content Management has swapped the whole pane in
+    /// or out.
+    enum TVSettingsPaneHandoff {
+        case contentManagement
+        case drillIn(TVSettingsDrillIn)
+    }
+
+    /// A row that opens a sub-page in the Settings pane, focused again when
+    /// Menu backs out of it.
+    enum TVSettingsDrillIn: Hashable {
+        case playlist(UUID)
+        case combinedView
+        case contentManagement
+        case recordingServer
+        case audioLanguages, addLanguage
+        case subtitleStyle, openSubtitles
+        case engines
+        case engineOptions(PlayerEngineKind)
+        case syncBackend(SyncBackendSelection)
+        case lumeCloudDeviceName, lumeCloudAddDevice, lumeCloudDevices, lumeCloudRecoveryKey
+    }
 #endif
 
 #Preview("Empty") {

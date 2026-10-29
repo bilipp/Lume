@@ -17,20 +17,88 @@ struct PlaylistTabTests {
 
     @Test func `a playlist shows every tab until one is hidden`() {
         let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
-        #expect(Optional(playlist).showsTab(.movies))
+        let scope = CatalogScope.isolated(playlist.id)
+        #expect(scope.visibleTabs(isolatedHidden: playlist.hiddenTabs).showsTab(.movies))
 
         playlist.hiddenTabs = [.movies]
         #expect(playlist.hiddenTabsRaw == "movies")
-        #expect(!Optional(playlist).showsTab(.movies))
-        #expect(Optional(playlist).showsTab(.series))
+        let visible = scope.visibleTabs(isolatedHidden: playlist.hiddenTabs)
+        #expect(!visible.showsTab(.movies))
+        #expect(visible.showsTab(.series))
         // Tabs a playlist can't hide always show.
-        #expect(Optional(playlist).showsTab(.home))
-        #expect(Optional(playlist).showsTab(.search))
+        #expect(visible.showsTab(.home))
+        #expect(visible.showsTab(.search))
+        #expect(visible.showsTab(.sports))
+        #expect(visible.showsTab(.settings))
+    }
+
+    @Test func `a playlist is no combined member until it contributes a type`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        #expect(playlist.combinedTabs.isEmpty)
+        #expect(!playlist.isCombinedMember)
+        #expect(playlist.combinedPriority == nil)
+
+        playlist.combinedTabs = [.liveTV, .movies]
+        #expect(playlist.combinedTypesRaw == "movies,liveTV")
+        #expect(playlist.combinedTabs == [.movies, .liveTV])
+        #expect(playlist.isCombinedMember)
+    }
+
+    @Test func `switching off every combined type keeps the priority`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        playlist.combinedTabs = [.series]
+        playlist.combinedPriority = 2
+
+        playlist.combinedTabs = []
+        #expect(playlist.combinedTypesRaw.isEmpty)
+        #expect(!playlist.isCombinedMember)
+        #expect(playlist.combinedPriority == 2)
+    }
+
+    @Test func `combined types read past entries a newer build wrote`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        playlist.combinedTypesRaw = "series,podcasts"
+        #expect(playlist.combinedTabs == [.series])
+        #expect(playlist.isCombinedMember)
     }
 
     @Test func `no active playlist shows every tab`() {
-        let none: Playlist? = nil
-        #expect(none.showsTab(.liveTV))
+        #expect(CatalogScope.empty.visibleTabs(isolatedHidden: []) == Set(PlaylistTab.allCases))
+    }
+
+    @Test func `combined shows a tab when any member contributes it`() {
+        let first = UUID()
+        let second = UUID()
+        let scope = CatalogScope.combined([
+            (id: first, tabs: [.liveTV]),
+            (id: second, tabs: [.liveTV, .movies])
+        ])
+        #expect(scope.visibleTabs(isolatedHidden: []) == [.liveTV, .movies])
+        #expect(!scope.visibleTabs(isolatedHidden: []).showsTab(.series))
+        #expect(scope.visibleTabs(isolatedHidden: []).showsTab(.home))
+    }
+
+    @Test func `combined ignores the hidden tabs of an isolated playlist`() {
+        let scope = CatalogScope.combined([
+            (id: UUID(), tabs: [.series]),
+            (id: UUID(), tabs: [.movies])
+        ])
+        // The priority-1 member's Settings › Library › Tabs choice applies only
+        // while it is selected on its own.
+        #expect(scope.visibleTabs(isolatedHidden: [.series, .movies]) == [.series, .movies])
+    }
+
+    @Test func `the visible-tab token changes only when the union does`() {
+        let first = UUID()
+        let second = UUID()
+        let liveOnly = CatalogScope.combined([(id: first, tabs: [.liveTV]), (id: second, tabs: [.liveTV])])
+        let reordered = CatalogScope.combined([(id: second, tabs: [.liveTV]), (id: first, tabs: [.liveTV])])
+        let withMovies = CatalogScope.combined([(id: first, tabs: [.liveTV]), (id: second, tabs: [.movies])])
+
+        let token = { (scope: CatalogScope) in PlaylistTab.encode(scope.visibleTabs(isolatedHidden: [])) }
+        #expect(token(liveOnly) == "liveTV")
+        #expect(token(reordered) == token(liveOnly))
+        #expect(token(withMovies) == "movies,liveTV")
     }
 }
 

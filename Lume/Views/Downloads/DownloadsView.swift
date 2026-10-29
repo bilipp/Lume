@@ -26,6 +26,7 @@ import SwiftUI
         @State private var downloads = DownloadManager.shared
         @State private var playingMedia: PlayableMedia?
         @State private var itemToDelete: DeletionTarget?
+        @State private var showMissingPlaylist = false
 
         private var isEmpty: Bool {
             downloadedMovies.isEmpty && downloadedEpisodes.isEmpty && downloads.activeDownloads.isEmpty && downloads.pendingIDs.isEmpty
@@ -73,6 +74,11 @@ import SwiftUI
                     Button("Cancel", role: .cancel) { itemToDelete = nil }
                 } message: {
                     Text("The downloaded file will be removed. You can re-download it later.")
+                }
+                .alert("Playlist Not Found", isPresented: $showMissingPlaylist) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("This item's playlist could not be found.")
                 }
         }
 
@@ -146,9 +152,11 @@ import SwiftUI
                 )
                 return
             }
-            guard let playlist = playlists.first(where: { movie.id.hasPrefix($0.id.uuidString) }) ?? playlists.first,
-                  let media = PlayableMedia.from(movie: movie, playlist: playlist)
-            else { return }
+            guard let playlist = playlists.owner(ofContentID: movie.id) else {
+                showMissingPlaylist = true
+                return
+            }
+            guard let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
             playingMedia = media
         }
 
@@ -167,10 +175,12 @@ import SwiftUI
                 )
                 return
             }
-            guard let series = episode.series,
-                  let playlist = playlists.first(where: { series.id.hasPrefix($0.id.uuidString) }) ?? playlists.first,
-                  let media = PlayableMedia.from(episode: episode, playlist: playlist)
-            else { return }
+            guard let series = episode.series else { return }
+            guard let playlist = playlists.owner(ofContentID: series.id) else {
+                showMissingPlaylist = true
+                return
+            }
+            guard let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
             playingMedia = media
         }
     }

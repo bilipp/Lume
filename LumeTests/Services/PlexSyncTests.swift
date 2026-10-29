@@ -210,6 +210,7 @@ struct PlexSyncTests {
         #expect(movie.categoryId == "\(playlistId.uuidString)-vod-1")
         // Token-free stream URL; the image URL carries the token.
         #expect(movie.directURL == "http://\(host):32400/library/parts/1/17/file.mp4")
+        #expect(movie.added == "1789592930")
         #expect(movie.streamIcon?.contains("/library/metadata/1/thumb/17") == true)
         #expect(movie.streamIcon?.contains("X-Plex-Token=tok") == true)
         #expect(movie.rating == 7.8)

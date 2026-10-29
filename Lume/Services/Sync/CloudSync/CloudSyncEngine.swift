@@ -481,29 +481,11 @@ private extension CloudSyncEngine {
             return
         }
         if let mirror {
-            mirror.name = value.name
-            mirror.serverURL = value.serverURL
-            mirror.username = value.username
-            mirror.password = value.password
-            mirror.macAddress = value.macAddress
-            mirror.sourceTypeRaw = value.sourceTypeRaw
-            mirror.epgURL = value.epgURL
-            mirror.syncEnabled = value.syncEnabled
-            mirror.hiddenTabsRaw = value.hiddenTabsRaw
-            mirror.updatedAt = Date()
+            // A re-baseline push the mirror already holds would only re-export it.
+            if Self.values(from: mirror) == value { return }
+            mirror.apply(value)
         } else {
-            cloudContext.insert(SyncedPlaylist(
-                id: id,
-                name: value.name,
-                serverURL: value.serverURL,
-                username: value.username,
-                password: value.password,
-                macAddress: value.macAddress,
-                sourceTypeRaw: value.sourceTypeRaw,
-                epgURL: value.epgURL,
-                syncEnabled: value.syncEnabled,
-                hiddenTabsRaw: value.hiddenTabsRaw
-            ))
+            cloudContext.insert(SyncedPlaylist(id: id, value: value))
         }
     }
 
@@ -517,24 +499,12 @@ private extension CloudSyncEngine {
             return false
         }
         if let local {
-            local.name = value.name
-            local.serverURL = value.serverURL
-            local.username = value.username
-            local.password = value.password
-            local.macAddress = value.macAddress.isEmpty ? nil : value.macAddress
-            local.sourceTypeRaw = value.sourceTypeRaw
-            local.epgURL = value.epgURL
-            local.syncEnabled = value.syncEnabled
-            local.hiddenTabsRaw = value.hiddenTabsRaw
+            local.apply(value)
             return false
         }
         let playlist = Playlist(name: value.name, serverURL: value.serverURL, username: value.username, password: value.password)
         playlist.id = id
-        playlist.macAddress = value.macAddress.isEmpty ? nil : value.macAddress
-        playlist.sourceTypeRaw = value.sourceTypeRaw
-        playlist.epgURL = value.epgURL
-        playlist.syncEnabled = value.syncEnabled
-        playlist.hiddenTabsRaw = value.hiddenTabsRaw
+        playlist.apply(value)
         catalogContext.insert(playlist)
         return true
     }

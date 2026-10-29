@@ -84,7 +84,7 @@ struct LiveChannelRecentsRingTests {
         return LiveChannelQuery.scoped(
             page,
             scope: .recentlyWatched,
-            playlistPrefix: "\(playlist.id.uuidString)-",
+            catalogScope: .isolated(playlist.id),
             restriction: ContentRestriction()
         )
     }

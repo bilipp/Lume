@@ -217,7 +217,7 @@
         func select(channel stream: LiveStream) {
             guard let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext),
                   let newMedia = PlayableMedia.from(
-                      stream: stream, playlist: playlist, scope: media.channelScope
+                      stream: stream, playlist: playlist, scope: media.channelScope, surfScope: media.surfScope
                   ) else { return }
             withAnimation(.easeInOut(duration: 0.2)) { openTab = nil }
             onPanelOpenChange(false)

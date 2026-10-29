@@ -208,6 +208,37 @@ struct WidgetSnapshotExporterTests {
         #expect(snapshot.favorites.map(\.kind) == [.series, .movie, .live])
     }
 
+    @Test func `a Combined selection lists each member's favorites by its content types`() throws {
+        let (container, playlist) = try seedContainer()
+        let context = container.mainContext
+        let other = Playlist(name: "Other", serverURL: "http://other.example", username: "u", password: "p")
+        context.insert(other)
+        let otherMovie = Movie(id: "\(other.id.uuidString)-m9", streamId: 9, name: "Other Movie")
+        otherMovie.isFavorite = true
+        otherMovie.favoriteOrder = 3
+        context.insert(otherMovie)
+        let otherChannel = LiveStream(id: "\(other.id.uuidString)-l9", streamId: 900, name: "Other Channel")
+        otherChannel.isFavorite = true
+        otherChannel.favoriteOrder = 4
+        context.insert(otherChannel)
+        playlist.combinedTabs = Set(PlaylistTab.allCases)
+        playlist.combinedPriority = 1
+        other.combinedTabs = [.movies]
+        other.combinedPriority = 2
+        try context.save()
+
+        let combined = WidgetSnapshotExporter.makeSnapshot(
+            container: container, storedPlaylistID: PlaylistSelectionStore.combined, isChildProfile: false, isPremium: true
+        )
+        #expect(combined.favorites.map(\.title) == ["Show", "Favorite Movie", "News 24", "Other Movie"])
+
+        // Without Pro, Combined falls back to the priority-1 member, as the app does.
+        let lapsed = WidgetSnapshotExporter.makeSnapshot(
+            container: container, storedPlaylistID: PlaylistSelectionStore.combined, isChildProfile: false, isPremium: false
+        )
+        #expect(lapsed.favorites.map(\.title) == ["Show", "Favorite Movie", "News 24"])
+    }
+
     @Test func `on now carries the current and next programme`() throws {
         let (container, playlist) = try seedContainer()
         let snapshot = WidgetSnapshotExporter.makeSnapshot(

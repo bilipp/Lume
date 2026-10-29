@@ -74,6 +74,19 @@ struct SeriesEpisodeCacheTests {
         #expect(series.episodesAreStale(lastSyncedAt: nil))
     }
 
+    @Test func `the same lastModified in another format keeps the cache`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let series = Series(id: "p-series-1", seriesId: 1, name: "Show", lastModified: "2024-01-01 10:00:00")
+        context.insert(series)
+        series.insertEpisodes([parsed(season: 1, number: 1)], into: context)
+
+        // The one-time `added` normalisation rewrites the column, not the stamp.
+        series.lastModified = "1704103200"
+
+        #expect(!series.episodesAreStale(lastSyncedAt: nil))
+    }
+
     @Test func `a sync since the fetch invalidates the cache`() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

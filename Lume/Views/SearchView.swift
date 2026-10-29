@@ -12,12 +12,14 @@ struct SearchView: View {
     @Namespace private var animationNamespace
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
+    /// The playlists searched: one playlist, or the Combined members, which
+    /// replace "Search All Playlists" while Combined is selected.
+    @Environment(\.catalogScope) private var catalogScope
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
     @Query private var playlists: [Playlist]
 
-    @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @AppStorage(SearchSettings.searchAllPlaylistsKey)
     private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
     @State private var searchText = ""
@@ -56,6 +58,8 @@ struct SearchView: View {
     }
 
     var body: some View {
+        let scope = catalogScope
+        let searched = searchedScope
         NavigationStack {
             List {
                 if showsFilter {
@@ -88,7 +92,7 @@ struct SearchView: View {
                                 switch result {
                                 case let .movie(movie):
                                     NavigationLink(value: movie) {
-                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result, in: searched))
                                             .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
                                     }
                                     .mediaFavoriteMenu(
@@ -97,7 +101,7 @@ struct SearchView: View {
                                     )
                                 case let .series(series):
                                     NavigationLink(value: series) {
-                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result, in: searched))
                                             .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
                                     }
                                     .mediaFavoriteMenu(
@@ -108,7 +112,7 @@ struct SearchView: View {
                                     Button {
                                         playChannel(stream)
                                     } label: {
-                                        SearchResultRow(result: result, playlistName: playlistName(for: result))
+                                        SearchResultRow(result: result, playlistName: playlistName(for: result, in: searched))
                                     }
                                     .buttonStyle(.plain)
                                     .liveChannelMenu(
@@ -150,7 +154,12 @@ struct SearchView: View {
                 guard !Task.isCancelled else { return }
                 debouncedSearchText = trimmed
             }
-            .task(id: SearchKey(text: debouncedSearchText, filter: selectedFilter, allPlaylists: searchAllPlaylists)) {
+            .task(id: SearchKey(
+                text: debouncedSearchText,
+                filter: selectedFilter,
+                allPlaylists: searchAllPlaylists,
+                scopeToken: scope.token
+            )) {
                 // Re-run whenever the settled query or the filter changes.
                 // Filter changes are instant (no debounce on the segmented control).
                 await updateResults()
@@ -166,16 +175,19 @@ struct SearchView: View {
 
     // MARK: - Playback
 
-    private var activePlaylist: Playlist? {
-        playlists.active(for: selectedPlaylistID)
+    /// The playlists this search covers (see `SearchRequest.searchedScope`).
+    private var searchedScope: CatalogScope {
+        SearchRequest.searchedScope(
+            catalogScope, allPlaylistIDs: playlists.map(\.id), searchAllPlaylists: searchAllPlaylists
+        )
     }
 
-    /// The owning playlist's name, for rows that could have come from any of
-    /// them. Only while searching across several playlists: with one playlist
-    /// in play it's the same badge on every row, and the point of it is telling
-    /// two identically-named rows from different providers apart.
-    private func playlistName(for result: SearchResult) -> String? {
-        guard searchAllPlaylists, playlists.count > 1 else { return nil }
+    /// The owning playlist's name, only while several playlists contribute the
+    /// row's type: with one in play it's the same badge on every row, and the
+    /// point of it is telling identically-named rows from different providers
+    /// apart.
+    private func playlistName(for result: SearchResult, in searched: CatalogScope) -> String? {
+        guard searched.namesMembers(for: result.tab) else { return nil }
         return playlists.owner(ofContentID: result.contentID)?.name
     }
 
@@ -186,8 +198,7 @@ struct SearchView: View {
         // asks the wrong provider for it. Stream ids are per-provider integers,
         // so that doesn't reliably fail — it can quietly play whichever channel
         // holds the same id over there.
-        guard let playlist = playlists.owner(ofContentID: stream.id) ?? activePlaylist,
-              let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+        guard let media = PlayableMedia.from(stream: stream, ownedByOneOf: playlists) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
             MacPlayerWindowRouter.shared.play(media, using: openWindow)
@@ -212,7 +223,9 @@ struct SearchView: View {
             return
         }
 
-        let playlist = activePlaylist
+        let scope = catalogScope
+        // Outside Combined the scope is the one playlist shown.
+        let playlist = scope.isCombined ? nil : playlists.primaryMember(of: scope)
         let filter = selectedFilter
         let wantMovies = filter == .all || filter == .movies
         let wantSeries = filter == .all || filter == .series
@@ -225,11 +238,12 @@ struct SearchView: View {
         // search. Cross-playlist search still runs the local pass too, so other
         // playlists' synced content is included.
         let usePortalForVODSeries = playlist?.sourceType == .stalker && !searchAllPlaylists
-        let portal = await portalSearch(query: query, wantMovies: wantMovies, wantSeries: wantSeries)
+        let searched = searchedScope
+        let portal = await portalSearch(query: query, scope: searched, wantMovies: wantMovies, wantSeries: wantSeries)
         guard !Task.isCancelled else { return }
 
         let localHits = await localSearch(
-            query: query, playlist: playlist,
+            query: query, scope: searched,
             wantMovies: wantMovies && !usePortalForVODSeries,
             wantSeries: wantSeries && !usePortalForVODSeries,
             wantLive: wantLive
@@ -246,9 +260,9 @@ struct SearchView: View {
     /// "Search All Playlists" was set to, since the local pass has nothing of
     /// its VOD to find.
     private func portalSearch(
-        query: String, wantMovies: Bool, wantSeries: Bool
+        query: String, scope: CatalogScope, wantMovies: Bool, wantSeries: Bool
     ) async -> (movies: [String], series: [String]) {
-        let targets = portalPlaylists
+        let targets = portalPlaylists(in: scope)
         guard !targets.isEmpty, wantMovies || wantSeries else { return ([], []) }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
         var movies: [[String]] = []
@@ -261,7 +275,9 @@ struct SearchView: View {
             guard !Task.isCancelled else { break }
             let hits = await manager.searchStalker(
                 query: query, playlist: playlist,
-                includeMovies: wantMovies, includeSeries: wantSeries, limit: resultLimit
+                includeMovies: wantMovies && scope.contributes(.movies, from: playlist.id),
+                includeSeries: wantSeries && scope.contributes(.series, from: playlist.id),
+                limit: resultLimit
             )
             movies.append(hits.movies)
             series.append(hits.series)
@@ -270,17 +286,17 @@ struct SearchView: View {
         return (interleaved(movies, limit: resultLimit), interleaved(series, limit: resultLimit))
     }
 
-    /// The Stalker playlists this search asks directly: all of them while
-    /// searching across playlists, otherwise the active one if it happens to
-    /// be a portal.
-    private var portalPlaylists: [Playlist] {
-        let candidates = searchAllPlaylists ? playlists : [activePlaylist].compactMap(\.self)
-        return candidates.filter { $0.sourceType == .stalker }
+    /// The Stalker playlists this search asks directly (see
+    /// `SearchRequest.portalCandidateIDs`).
+    private func portalPlaylists(in scope: CatalogScope) -> [Playlist] {
+        SearchRequest.portalCandidateIDs(in: scope)
+            .compactMap { id in playlists.first { $0.id == id } }
+            .filter { $0.sourceType == .stalker }
     }
 
     /// Bounded local predicate search, run off the main thread.
     private func localSearch(
-        query: String, playlist: Playlist?, wantMovies: Bool, wantSeries: Bool, wantLive: Bool
+        query: String, scope: CatalogScope, wantMovies: Bool, wantSeries: Bool, wantLive: Bool
     ) async -> SearchHits {
         // Scope to the active playlist unless cross-playlist search is on, in
         // which case every playlist is named and each gets its own share of the
@@ -290,11 +306,11 @@ struct SearchView: View {
         // prefix test on the indexed `id` limits results to that playlist.
         // Hidden/restricted categories are excluded in the fetch rather than
         // afterwards, so `resultLimit` isn't spent on rows the viewer will
-        // never see.
-        let scoped = searchAllPlaylists ? playlists : [playlist].compactMap(\.self)
+        // never see. In Combined each member is searched only for the types
+        // it contributes.
         let request = SearchRequest(
             query: query,
-            playlistIDs: scoped.map(\.id.uuidString),
+            searching: scope,
             wantMovies: wantMovies,
             wantSeries: wantSeries,
             wantLive: wantLive,
@@ -448,11 +464,13 @@ private struct SearchFieldModifier: ViewModifier {
 // MARK: - Search Key
 
 /// Identity for the fetch task: re-run when the settled query text, the active
-/// content filter, or the cross-playlist search preference changes.
+/// content filter, the cross-playlist search preference or the playlists in
+/// scope change.
 private struct SearchKey: Equatable {
     let text: String
     let filter: ContentFilter
     let allPlaylists: Bool
+    let scopeToken: String
 }
 
 // MARK: - Search Settings
@@ -496,6 +514,14 @@ enum SearchResult: Identifiable, Hashable {
             "series-\(series.id)"
         case let .liveStream(stream):
             "live-\(stream.id)"
+        }
+    }
+
+    var tab: PlaylistTab {
+        switch self {
+        case .movie: .movies
+        case .series: .series
+        case .liveStream: .liveTV
         }
     }
 

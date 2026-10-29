@@ -103,6 +103,7 @@ enum LiveChannelHistory {
     static func recallMedia(
         in context: ModelContext,
         scope: LiveChannelScope? = nil,
+        surfScope: LiveSurfScope? = nil,
         restriction: ContentRestriction,
         profileID: UUID? = ActiveProfileStore.current,
         defaults: UserDefaults = .standard
@@ -115,7 +116,7 @@ enum LiveChannelHistory {
         guard let stream = try? context.fetch(descriptor).first,
               !restriction.hides(categoryID: stream.categoryId),
               let playlist = LiveChannelNavigator.playlist(for: stream, in: context) else { return nil }
-        return PlayableMedia.from(stream: stream, playlist: playlist, scope: scope)
+        return PlayableMedia.from(stream: stream, playlist: playlist, scope: scope, surfScope: surfScope)
     }
 
     /// Drop a profile's live-TV view history. Called when a profile is deleted so

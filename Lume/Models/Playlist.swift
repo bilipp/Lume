@@ -67,6 +67,13 @@ final class Playlist {
     /// The content tabs hidden for this playlist (Settings › Library › Tabs),
     /// encoded by `PlaylistTab`. Synced with the rest of the playlist config.
     var hiddenTabsRaw: String = ""
+    /// The content types this playlist contributes to the Combined selection,
+    /// encoded by `PlaylistTab`. Empty means not a member. Synced with the rest
+    /// of the playlist config.
+    var combinedTypesRaw: String = ""
+    /// The member order in the Combined selection. Kept when every type is
+    /// switched off so re-including a playlist restores its place.
+    var combinedPriority: Int?
     var lastSyncDate: Date?
     var syncStatusRaw: String = "idle"
 
@@ -275,6 +282,17 @@ enum SyncStatus: String, Codable {
     case idle
     case syncing
     case error
+}
+
+extension Playlist {
+    /// Whether any playlist in `container` is mid-sync — background catalog
+    /// writers stand aside until it isn't.
+    nonisolated static func isAnySyncing(in container: ModelContainer) throws -> Bool {
+        let syncing = SyncStatus.syncing.rawValue
+        return try ModelContext(container).fetchCount(
+            FetchDescriptor<Playlist>(predicate: #Predicate { $0.syncStatusRaw == syncing })
+        ) > 0
+    }
 }
 
 extension Playlist {

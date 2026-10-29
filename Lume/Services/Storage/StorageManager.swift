@@ -220,17 +220,18 @@ enum StorageManager {
     /// updates as soon as they land. A live channel's `lastWatchedDate` is
     /// deliberately device-local — it's never projected to the CloudKit mirror
     /// (see `liveEntries()`) — so this is a purely local reset, matching the
-    /// per-channel "remove from recently watched". Scoped in-memory by the
-    /// playlist id prefix — the same approach the virtual collections use, since
-    /// SwiftData can't parameterise a predicate on it.
-    static func clearRecentlyWatchedChannels(playlistPrefix: String, container: ModelContainer) async {
+    /// per-channel "remove from recently watched". Scoped to the Live TV members
+    /// of `catalogScope`.
+    static func clearRecentlyWatchedChannels(catalogScope: CatalogScope, container: ModelContainer) async {
+        guard !catalogScope.isEmpty else { return }
+        let scoped = catalogScope.liveStreamPredicate()
         await Task.detached(priority: .userInitiated) {
             let context = ModelContext(container)
             context.autosaveEnabled = false
             do {
                 let channels = try context.fetch(FetchDescriptor<LiveStream>(
-                    predicate: #Predicate { $0.lastWatchedDate != nil }
-                )).filter { $0.id.hasPrefix(playlistPrefix) }
+                    predicate: #Predicate { $0.lastWatchedDate != nil && scoped.evaluate($0) }
+                ))
                 for (index, channel) in channels.enumerated() {
                     channel.lastWatchedDate = nil
                     if (index + 1).isMultiple(of: clearBatchSize) { try context.save() }

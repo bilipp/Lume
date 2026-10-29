@@ -140,7 +140,8 @@ final class PlayerMediaSwapper {
                 }
             case .right:
                 target = LiveChannelHistory.recallMedia(
-                    in: lookup.context, scope: media.channelScope, restriction: lookup.restriction
+                    in: lookup.context, scope: media.channelScope, surfScope: media.surfScope,
+                    restriction: lookup.restriction
                 )
             default:
                 return

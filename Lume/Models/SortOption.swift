@@ -97,9 +97,9 @@ nonisolated enum ContentSortOption: String, CaseIterable, Identifiable {
 
     //
     // Each model has its own "added" field (Movie/LiveStream: `added`;
-    // Series: `lastModified`). The Xtream API ships these as Unix timestamp
-    // strings, so a lexicographic sort matches numeric order for the 10-digit
-    // range this app will encounter. `comparator: .lexical` is what carries that
+    // Series: `lastModified`). Every importer stores these as 10-digit
+    // zero-padded Unix seconds (`CatalogAddedDate`), so a lexicographic sort
+    // matches chronological order. `comparator: .lexical` is what carries that
     // into SQL: the default for a String key path is `.localizedStandard`, which
     // emits `COLLATE NSCollateFinderlike`, and no b-tree can serve that — the
     // `#Index` on `Movie.added` only pays off while the ordering stays a binary

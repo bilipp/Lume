@@ -2,15 +2,55 @@
 //  MultiViewChannelPicker.swift
 //  Lume
 //
-//  Picks the channel for one Multi-View tile. Unlike the Live TV browser this is
-//  deliberately not scoped to the globally selected playlist: watching two
-//  streams at once is often only possible *across* playlists, because providers
-//  commonly allow a single concurrent connection per account. The playlist a
-//  tile already streams from is flagged for that reason.
+//  Picks the channel for one Multi-View tile. It opens on the device's current
+//  selection, but unlike the Live TV browser it is deliberately free to switch:
+//  watching two streams at once is often only possible *across* playlists,
+//  because providers commonly allow a single concurrent connection per account.
+//  The playlist a tile already streams from is flagged for that reason.
 //
 
 import SwiftData
 import SwiftUI
+
+/// What a Multi-View picker lists channels from: one playlist, or every member
+/// of the Combined selection grouped by playlist.
+enum MultiViewPickerSource: Hashable {
+    case combined
+    case playlist(UUID)
+
+    /// The source matching the device's resolved selection.
+    init?(_ scope: CatalogScope) {
+        if scope.isCombined {
+            self = .combined
+        } else if let id = scope.primaryID {
+            self = .playlist(id)
+        } else {
+            return nil
+        }
+    }
+}
+
+extension [Playlist] {
+    /// The scope a Multi-View picker source reads. Combined resolves exactly as
+    /// the content tabs do, so a lapsed or shrunken config falls back to its
+    /// priority-1 member rather than to nothing.
+    func multiViewScope(for source: MultiViewPickerSource?, isPremium: Bool) -> CatalogScope? {
+        switch source {
+        case .combined:
+            scope(for: PlaylistSelectionStore.combined, isPremium: isPremium)
+        case let .playlist(id):
+            contains { $0.id == id } ? .isolated(id) : nil
+        case nil:
+            nil
+        }
+    }
+
+    /// The Combined scope when it can be entered, for offering the entry.
+    func multiViewCombinedScope(isPremium: Bool) -> CatalogScope? {
+        let scope = scope(for: PlaylistSelectionStore.combined, isPremium: isPremium)
+        return scope.isCombined ? scope : nil
+    }
+}
 
 struct MultiViewChannelPicker: View {
     /// Channels already on screen, so they can be marked rather than offered
@@ -29,8 +69,10 @@ struct MultiViewChannelPicker: View {
     private var categories: [Category]
 
     @AppStorage(SortStorageKey.liveCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
+    @AppStorage(PlaylistSelectionStore.key) private var storedSelection: String = ""
 
-    @State private var playlistID: UUID?
+    @State private var premium = PremiumManager.shared
+    @State private var source: MultiViewPickerSource?
     @State private var search = ""
     /// Search hits across the selected playlist. Empty while not searching.
     @State private var matches: [LiveStream] = []
@@ -38,40 +80,55 @@ struct MultiViewChannelPicker: View {
     /// debounced fetch settles, so "no results" can't flash under the viewer
     /// while they are still typing.
     @State private var settledTerm = ""
+    @State private var categoryMemo = LiveTVCategoryMemo()
 
-    private var selectedPlaylist: Playlist? {
-        playlists.first { $0.id == playlistID } ?? playlists.first
+    private var catalogScope: CatalogScope? {
+        playlists.multiViewScope(for: source, isPremium: premium.isPremium)
+    }
+
+    /// The single playlist feeding the list, flagged as a whole when another
+    /// tile streams it. With several, each member's header carries the flag.
+    private func singleLiveMember(in scope: CatalogScope?) -> UUID? {
+        guard let members = scope?.members(for: .liveTV), members.count == 1 else { return nil }
+        return members[0]
     }
 
     private var searchTerm: String {
         search.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Live categories of the selected playlist, in the user's category order.
-    private var scopedCategories: [Category] {
-        guard let playlist = selectedPlaylist else { return [] }
-        let prefix = "\(playlist.id.uuidString)-"
-        let sort = CategorySortOption(rawValue: categorySortRaw) ?? .playlist
-        return sort.sort(categories.filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) })
+    /// Live categories of the selected source in the user's category order,
+    /// one group per member — titled only when two or more contribute Live TV.
+    private func categoryGroups(in scope: CatalogScope?) -> [LiveTVSectionGroup] {
+        guard let scope else { return [] }
+        return categoryMemo.groups(
+            categories: categories,
+            catalogScope: scope,
+            playlistNames: playlists.namesByID,
+            sort: CategorySortOption(rawValue: categorySortRaw) ?? .playlist,
+            restriction: restriction
+        )
     }
 
     var body: some View {
+        let scope = catalogScope
+        let groups = categoryGroups(in: scope)
         NavigationStack {
             List {
                 if playlists.count > 1 {
-                    playlistSection
+                    playlistSection(singleLiveMember: singleLiveMember(in: scope))
                 }
 
                 if !searchTerm.isEmpty {
-                    searchResultsSection
-                } else if scopedCategories.isEmpty {
+                    searchResultsSection(scope)
+                } else if groups.isEmpty {
                     ContentUnavailableView(
                         "No Channels",
                         systemImage: "antenna.radiowaves.left.and.right",
                         description: Text("Sync this playlist to load live TV channels")
                     )
                 } else {
-                    categorySection
+                    categorySections(groups)
                 }
             }
             .navigationTitle("Add Channel")
@@ -84,27 +141,27 @@ struct MultiViewChannelPicker: View {
                 }
             #endif
                 .task {
-                    if playlistID == nil {
-                        playlistID = playlists.first?.id
+                    if source == nil {
+                        source = MultiViewPickerSource(playlists.scope(for: storedSelection, isPremium: premium.isPremium))
                     }
                 }
-                .task(id: "\(playlistID?.uuidString ?? "")-\(searchTerm)") { await loadMatches() }
+                .task(id: "\(scope?.token ?? "")-\(searchTerm)") { await loadMatches() }
         }
     }
 
     // MARK: - Sections
 
-    private var playlistSection: some View {
+    private func playlistSection(singleLiveMember: UUID?) -> some View {
         Section {
-            Picker("Playlist", selection: Binding(
-                get: { selectedPlaylist?.id },
-                set: { playlistID = $0 }
-            )) {
+            Picker("Playlist", selection: $source) {
+                if playlists.multiViewCombinedScope(isPremium: premium.isPremium) != nil {
+                    Text(verbatim: PlaylistSelectionStore.combinedTitle).tag(Optional(MultiViewPickerSource.combined))
+                }
                 ForEach(playlists) { playlist in
-                    Text(playlist.name).tag(Optional(playlist.id))
+                    Text(playlist.name).tag(Optional(MultiViewPickerSource.playlist(playlist.id)))
                 }
             }
-            if let id = selectedPlaylist?.id, playlistsInUse.contains(id) {
+            if let id = singleLiveMember, playlistsInUse.contains(id) {
                 Label(
                     "Another tile is already streaming this playlist. Many providers allow only one connection at a time — pick a different playlist if the stream won't start.",
                     systemImage: "exclamationmark.triangle"
@@ -115,23 +172,55 @@ struct MultiViewChannelPicker: View {
         }
     }
 
-    private var categorySection: some View {
-        Section("Categories") {
-            ForEach(scopedCategories) { category in
-                NavigationLink(category.name) {
-                    MultiViewPickerCategoryChannels(
-                        category: category,
-                        playlist: selectedPlaylist,
-                        usedMediaIDs: usedMediaIDs,
-                        onPick: pick
-                    )
+    private func categorySections(_ groups: [LiveTVSectionGroup]) -> some View {
+        ForEach(groups) { group in
+            Section {
+                ForEach(group.sections) { section in
+                    if case let .category(category) = section {
+                        NavigationLink(category.name) {
+                            MultiViewPickerCategoryChannels(
+                                category: category,
+                                playlists: playlists,
+                                usedMediaIDs: usedMediaIDs,
+                                onPick: pick
+                            )
+                        }
+                    }
+                }
+            } header: {
+                if let title = group.title {
+                    memberHeader(title, playlistID: group.id)
+                } else {
+                    Text("Categories")
                 }
             }
         }
     }
 
+    private func memberHeader(_ title: String, playlistID: UUID?) -> some View {
+        HStack(spacing: 6) {
+            Text(verbatim: title)
+            if let playlistID, playlistsInUse.contains(playlistID) {
+                Image(systemName: "exclamationmark.triangle")
+                    .accessibilityLabel("Already streaming in another tile")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    /// Search hits split by member in priority order when two or more members
+    /// contribute Live TV; one untitled group otherwise.
+    private func matchGroups(in scope: CatalogScope?) -> [(id: UUID?, title: String?, streams: [LiveStream])] {
+        guard let scope, scope.namesMembers(for: .liveTV) else { return [(id: nil, title: nil, streams: matches)] }
+        let names = playlists.namesByID
+        return scope.groupedByMember(matches, for: .liveTV, id: \.id).map { member, streams in
+            (id: member, title: names[member], streams: streams)
+        }
+    }
+
     @ViewBuilder
-    private var searchResultsSection: some View {
+    private func searchResultsSection(_ scope: CatalogScope?) -> some View {
         if matches.isEmpty {
             // Only once a query has actually been run — the fetch is debounced,
             // and without this the empty state showed for the length of every
@@ -140,14 +229,22 @@ struct MultiViewChannelPicker: View {
                 ContentUnavailableView.search(text: settledTerm)
             }
         } else {
-            Section("Channels") {
-                ForEach(matches) { stream in
-                    MultiViewPickerChannelRow(
-                        stream: stream,
-                        playlist: selectedPlaylist,
-                        usedMediaIDs: usedMediaIDs,
-                        onPick: pick
-                    )
+            ForEach(matchGroups(in: scope), id: \.id) { group in
+                Section {
+                    ForEach(group.streams) { stream in
+                        MultiViewPickerChannelRow(
+                            stream: stream,
+                            playlists: playlists,
+                            usedMediaIDs: usedMediaIDs,
+                            onPick: pick
+                        )
+                    }
+                } header: {
+                    if let title = group.title {
+                        memberHeader(title, playlistID: group.id)
+                    } else {
+                        Text("Channels")
+                    }
                 }
             }
         }
@@ -180,7 +277,7 @@ struct MultiViewChannelPicker: View {
     /// stops at the 200th hit instead of sorting the whole match set. The name
     /// order the list has always shown is applied over those 200 rows instead.
     private func loadMatches() async {
-        guard !searchTerm.isEmpty, let playlist = selectedPlaylist else {
+        guard !searchTerm.isEmpty, let catalogScope, !catalogScope.members(for: .liveTV).isEmpty else {
             settledTerm = ""
             matches = []
             return
@@ -189,10 +286,9 @@ struct MultiViewChannelPicker: View {
         guard !Task.isCancelled else { return }
 
         let term = searchTerm
-        let prefix = "\(playlist.id.uuidString)-"
         let container = modelContext.container
         let ids = await Task.detached(priority: .userInitiated) {
-            MultiViewChannelSearch.hits(container: container, term: term, playlistPrefix: prefix)
+            MultiViewChannelSearch.hits(container: container, term: term, catalogScope: catalogScope)
         }.value
         guard !Task.isCancelled else { return }
 
@@ -215,16 +311,26 @@ private nonisolated enum MultiViewChannelSearch {
     /// walked all 60,093 channels; without one it stops at the 200th hit.
     static let limit = 200
 
-    static func hits(container: ModelContainer, term: String, playlistPrefix: String) -> [PersistentIdentifier] {
-        var descriptor = FetchDescriptor<LiveStream>(
-            predicate: #Predicate { stream in
-                stream.isHidden == false
-                    && stream.name.localizedStandardContains(term)
-                    && stream.id.starts(with: playlistPrefix)
-            }
-        )
+    static func hits(container: ModelContainer, term: String, catalogScope: CatalogScope) -> [PersistentIdentifier] {
+        var descriptor = FetchDescriptor<LiveStream>(predicate: predicate(term: term, catalogScope: catalogScope))
         descriptor.fetchLimit = limit
         return ((try? ModelContext(container).fetch(descriptor)) ?? []).map(\.persistentModelID)
+    }
+
+    private static func predicate(term: String, catalogScope: CatalogScope) -> Predicate<LiveStream> {
+        if let prefix = catalogScope.singlePrefix(for: .liveTV) {
+            return #Predicate { stream in
+                stream.isHidden == false
+                    && stream.name.localizedStandardContains(term)
+                    && stream.id.starts(with: prefix)
+            }
+        }
+        let scoped = catalogScope.liveStreamPredicate()
+        return #Predicate { stream in
+            stream.isHidden == false
+                && stream.name.localizedStandardContains(term)
+                && scoped.evaluate(stream)
+        }
     }
 }
 
@@ -233,7 +339,7 @@ private nonisolated enum MultiViewChannelSearch {
 /// The channels of one category, in the order the viewer sees them in Live TV.
 private struct MultiViewPickerCategoryChannels: View {
     let category: Category
-    let playlist: Playlist?
+    let playlists: [Playlist]
     let usedMediaIDs: Set<String>
     var onPick: (PlayableMedia) -> Void
 
@@ -255,7 +361,7 @@ private struct MultiViewPickerCategoryChannels: View {
                 ForEach(channels) { stream in
                     MultiViewPickerChannelRow(
                         stream: stream,
-                        playlist: playlist,
+                        playlists: playlists,
                         usedMediaIDs: usedMediaIDs,
                         onPick: onPick
                     )
@@ -277,7 +383,7 @@ private struct MultiViewPickerCategoryChannels: View {
 
 private struct MultiViewPickerChannelRow: View {
     let stream: LiveStream
-    let playlist: Playlist?
+    let playlists: [Playlist]
     let usedMediaIDs: Set<String>
     var onPick: (PlayableMedia) -> Void
 
@@ -287,11 +393,12 @@ private struct MultiViewPickerChannelRow: View {
 
     var body: some View {
         Button {
-            guard let playlist, let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+            guard let media = PlayableMedia.from(stream: stream, ownedByOneOf: playlists) else { return }
             onPick(media)
         } label: {
             HStack {
                 LiveStreamCardView(stream: stream, epg: nil)
+                    .environment(\.playlistProvenance, .none)
                 if isPlaying {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.secondary)

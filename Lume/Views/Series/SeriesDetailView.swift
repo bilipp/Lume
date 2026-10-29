@@ -212,6 +212,7 @@ struct SeriesDetailView: View {
             isEnabled: nextEpisode != nil && seriesPlaylist != nil,
             action: { if let episode = nextEpisode { playEpisode(episode) } }
         )
+        .missingPlaylistNotice(seriesPlaylist == nil)
     }
 
     private var episodesSection: some View {
@@ -423,7 +424,7 @@ struct SeriesDetailView: View {
     }
 
     private var seriesPlaylist: Playlist? {
-        playlists.first { series.id.hasPrefix($0.id.uuidString) } ?? playlists.first
+        playlists.owner(ofContentID: series.id)
     }
 
     // MARK: - Loading & enrichment

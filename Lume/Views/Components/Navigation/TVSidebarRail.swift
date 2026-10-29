@@ -16,6 +16,9 @@
         let title: Text
         /// Trails the title; nil leaves the row without one.
         var icon: String?
+        /// A group title drawn above the row — a Combined member's name over
+        /// its first category. Plain text, so focus steps over it.
+        var header: String?
         /// Replaces the symbol's default VoiceOver name when the icon carries
         /// meaning of its own, such as a warning badge.
         var iconAccessibilityLabel: Text?
@@ -215,6 +218,9 @@
 
         private var rows: some View {
             ForEach(items) { item in
+                if let header = item.header {
+                    TVRailGroupHeader(title: header)
+                }
                 railButton(item)
             }
         }

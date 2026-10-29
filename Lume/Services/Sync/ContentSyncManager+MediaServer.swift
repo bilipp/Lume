@@ -313,10 +313,7 @@ extension ContentSyncManager {
         if let imdb = item.providerIds?["Imdb"], movie.imdbId != imdb {
             movie.imdbId = imdb
         }
-        let added = item.dateCreated.map { String($0.prefix(10)) }
-        if movie.added != added {
-            movie.added = added
-        }
+        CatalogAddedDate.assign(item.dateCreated, to: \.added, of: movie)
     }
 
     /// Removes movies the server no longer lists. Gated on `fetched`: an empty

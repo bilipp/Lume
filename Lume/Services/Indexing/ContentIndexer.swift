@@ -153,7 +153,7 @@ actor ContentIndexer {
     /// save forward. Re-checked every `busyPause` rather than continuously —
     /// nobody is waiting on the index, so resuming 20 s late costs nothing.
     private func waitWhileBusy(status: ContentIndexingService) async throws {
-        while try await hasActiveSync() || status.isPlaybackActive || status.isCloudSyncActive || status.isUserBrowsing {
+        while try await Playlist.isAnySyncing(in: modelContainer) || status.isForegroundBusy {
             await status.setWaiting()
             try await Task.sleep(for: busyPause)
         }
@@ -581,13 +581,5 @@ actor ContentIndexer {
             FetchDescriptor<Series>(predicate: Self.indexedSeriesPredicate(excluding: hidden))
         )
         return (indexedMovies + indexedSeries, totalMovies + totalSeries)
-    }
-
-    private func hasActiveSync() throws -> Bool {
-        let context = ModelContext(modelContainer)
-        let syncing = SyncStatus.syncing.rawValue
-        return try context.fetchCount(
-            FetchDescriptor<Playlist>(predicate: #Predicate { $0.syncStatusRaw == syncing })
-        ) > 0
     }
 }

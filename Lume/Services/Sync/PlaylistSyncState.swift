@@ -49,8 +49,9 @@ enum PlaylistSyncState: Equatable {
     /// than taking `Playlist` so it stays testable without a `ModelContext`,
     /// and `now` is injectable for the same reason.
     ///
-    /// - Parameter isActive: whether this is the selected playlist, which
-    ///   decides between `overdue` and `awaitingSelection`.
+    /// - Parameter isActive: whether the playlist is on screen — the selected
+    ///   one, or a member of the resolved Combined scope — which decides
+    ///   between `overdue` and `awaitingSelection`.
     static func resolve(
         syncEnabled: Bool,
         status: SyncStatus,
@@ -133,7 +134,7 @@ enum PlaylistSyncState: Equatable {
 
 extension Playlist {
     /// This playlist's sync state under the stored global frequency, given
-    /// whether it is the selected playlist. The convenience the views actually
+    /// whether it is on screen (a member of the resolved `CatalogScope`). The convenience the views actually
     /// call; `PlaylistSyncState.resolve` stays the testable seam beneath it.
     func syncState(isActive: Bool) -> PlaylistSyncState {
         PlaylistSyncState.resolve(

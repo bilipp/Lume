@@ -180,7 +180,7 @@ struct SeriesCategoryPreview: View {
             hasMore: series.count > limit,
             animationNamespace: animationNamespace,
             emptyMessage: "No series in this category",
-            card: { SeriesCardView(series: $0) }
+            card: { SeriesCardView(series: $0).environment(\.playlistProvenance, .none) }
         )
     }
 }
