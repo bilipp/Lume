@@ -41,6 +41,7 @@ struct MovieCardView: View {
                 }
             }
             .posterArtworkFrame(fillsWidth: fillsWidth)
+            .watchedBadge(movie.isWatched)
             .clipShape(RoundedRectangle(cornerRadius: PosterCardMetrics.cornerRadius))
             // A shadow applied after clipShape forces an offscreen render pass per
             // card every frame. On tvOS the focus style already supplies depth and
