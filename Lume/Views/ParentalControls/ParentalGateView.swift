@@ -15,6 +15,7 @@ import SwiftUI
 
 struct ParentalGateView<Content: View>: View {
     var subtitle: LocalizedStringKey = "Enter your PIN to manage content."
+    var onCancel: (() -> Void)?
     @ViewBuilder let content: () -> Content
 
     @Environment(ParentalControls.self) private var parental: ParentalControls?
@@ -27,7 +28,8 @@ struct ParentalGateView<Content: View>: View {
             PINUnlockView(
                 title: "Enter PIN",
                 subtitle: subtitle,
-                onUnlock: { unlocked = true }
+                onUnlock: { unlocked = true },
+                onCancel: onCancel
             )
         }
     }

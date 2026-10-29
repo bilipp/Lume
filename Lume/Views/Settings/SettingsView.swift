@@ -19,6 +19,8 @@ struct SettingsView: View {
     /// fast path. Not `private`: read by the SettingsView+Playlists / +Library
     /// extensions (separate files).
     @AppStorage(PlaylistSelectionStore.key) var selectedPlaylistID: String = ""
+    /// Badges the Sync row while Lume Cloud's recovery key is unseen.
+    @AppStorage(LumeCloudSettings.Key.recoveryKeyViewed) private var lumeCloudRecoveryKeyViewed = false
     #if !os(tvOS)
         /// The app-wide appearance override (System / Dark / Light), shown as the
         /// Appearance row's value. Not offered on tvOS — the TV UI is designed
@@ -76,7 +78,7 @@ struct SettingsView: View {
         /// pane's top level, or the tab-bar entry catcher.
         @State private var railFocusRequest = 0
         /// Bumped as activating a category sends focus into its pane, so the
-        /// rail keeps it should the pane have nothing to focus (iCloud, About).
+        /// rail keeps it should the pane have nothing to focus (About).
         @State private var paneFocusRequest = 0
         /// Whether focus is settled in the rail, for the tab-bar entry catcher.
         @State private var railFocused = false
@@ -121,6 +123,10 @@ struct SettingsView: View {
         /// How far the Recording Server pane is drilled in, in place. `nil` is
         /// its top level.
         @State private var recordingServerRoute: TVRecordingServerRoute?
+        /// The Sync pane's Lume Cloud drill-in, in place; `nil` is its top level.
+        @State private var syncRoute: TVLumeCloudRoute?
+        /// Bumped by a pane to scroll the detail back to its top.
+        @State private var tvDetailScrollToTopRequest = 0
         /// The engine whose options are drilled into from Engines, replacing it
         /// in place (same reasoning as `selectedPlaylist`). Not `private`: read by
         /// the SettingsView+TVPlayer extension (separate file).
@@ -157,6 +163,10 @@ struct SettingsView: View {
     /// Whether this build has credentials for any Connected Services entry.
     private var hasConnectedServices: Bool {
         TraktService.shared.isConfigured || SimklService.shared.isConfigured || MDBListService.shared.isConfigured
+    }
+
+    private func showsBadge(for category: SettingsCategory) -> Bool {
+        category == .iCloud && LumeCloudSettings.showsRecoveryKeyBadge(backend: cloudSync?.status.backend, viewed: lumeCloudRecoveryKeyViewed)
     }
 
     var body: some View {
@@ -224,13 +234,13 @@ struct SettingsView: View {
                 NavigationLink {
                     SettingsCategoryDestination(category: category)
                 } label: {
-                    SettingsCategoryRowLabel(category: category, value: value(for: category))
+                    SettingsCategoryRowLabel(category: category, value: value(for: category), showsBadge: showsBadge(for: category))
                 }
             }
         }
 
         /// The trailing value: only for single-choice pages, plus the Lume Pro
-        /// and iCloud status.
+        /// and Sync status.
         private func value(for category: SettingsCategory) -> Text? {
             switch category {
             case .premium:
@@ -265,7 +275,7 @@ struct SettingsView: View {
             case .appearance: AppearanceSettingsView()
             case .player: PlayerSettingsView()
             case .downloads: DownloadsSettingsView()
-            case .iCloud: CloudSyncSettingsView()
+            case .iCloud: SyncSettingsView()
             case .connectedServices: ConnectedServicesView()
             case .storage: StorageManagementView()
             case .help, .about: EmptyView() // inline sections on the root
@@ -313,11 +323,11 @@ struct SettingsView: View {
             }
         }
 
-        /// The categories in the iOS root list's order, as one ungrouped list
-        /// without icons.
+        /// The categories in the iOS root list's order, ungrouped and without icons.
         private var railItems: [TVSidebarRailItem] {
             SettingsCategory.visible(hasConnectedServices: hasConnectedServices).map { category in
-                TVSidebarRailItem(id: category.id, title: Text(category.title)) {
+                let badge = showsBadge(for: category)
+                return TVSidebarRailItem(id: category.id, title: Text(category.title), icon: badge ? "exclamationmark.circle" : nil, iconAccessibilityLabel: badge ? Text("Recovery key not viewed") : nil) {
                     activate(category)
                 }
             }
@@ -342,6 +352,7 @@ struct SettingsView: View {
             showingSubtitleStyle = false
             showingRecordingServer = false
             recordingServerRoute = nil
+            syncRoute = nil
             selectedEngineOptions = nil
             preferredLanguagePane = nil
         }
@@ -380,36 +391,11 @@ struct SettingsView: View {
                 return .recordingServer
             case .player:
                 return closeInnermostPlayerDrillIn()
+            case .iCloud:
+                guard let route = syncRoute else { return nil }
+                syncRoute = nil
+                return route.opener
             default:
-                return nil
-            }
-        }
-
-        private func closeInnermostPlayerDrillIn() -> TVSettingsDrillIn? {
-            if showingOpenSubtitles {
-                showingOpenSubtitles = false
-                return .openSubtitles
-            }
-            if showingSubtitleStyle {
-                showingSubtitleStyle = false
-                return .subtitleStyle
-            }
-            if let engine = selectedEngineOptions {
-                selectedEngineOptions = nil
-                return .engineOptions(engine)
-            }
-            if showingEngines {
-                showingEngines = false
-                return .engines
-            }
-            switch preferredLanguagePane {
-            case .add:
-                preferredLanguagePane = .list
-                return .addLanguage
-            case .list:
-                preferredLanguagePane = nil
-                return .audioLanguages
-            case nil:
                 return nil
             }
         }
@@ -495,6 +481,17 @@ struct SettingsView: View {
         }
 
         private var tvDetail: some View {
+            ScrollViewReader { proxy in
+                tvDetailScrollView
+                    .onChange(of: tvDetailScrollToTopRequest) {
+                        withAnimation { proxy.scrollTo(Self.tvDetailTopID, anchor: .top) }
+                    }
+            }
+        }
+
+        private static let tvDetailTopID = "settings.detail.top"
+
+        private var tvDetailScrollView: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 36) {
                     switch selectedCategory {
@@ -542,7 +539,7 @@ struct SettingsView: View {
                             tvPlayerDetail
                         }
                     case .iCloud:
-                        TVCloudSyncSection()
+                        TVSyncSettingsPane(route: $syncRoute, drillInFocus: $drillInFocus) { tvDetailScrollToTopRequest += 1 }
                     case .connectedServices:
                         TVConnectedServicesView()
                     case .storage:
@@ -558,6 +555,7 @@ struct SettingsView: View {
                 // Lume Pro lays its benefits out in two columns across the
                 // whole pane.
                 .tvSettingsPaneContent(maxWidth: selectedCategory == .premium ? .infinity : TVSettingsMetrics.detailMaxWidth)
+                .id(Self.tvDetailTopID)
             }
             // A fresh scroll position per category; sub-pages keep theirs.
             .id(selectedCategory)
@@ -582,6 +580,8 @@ struct SettingsView: View {
         case subtitleStyle, openSubtitles
         case engines
         case engineOptions(PlayerEngineKind)
+        case syncBackend(SyncBackendSelection)
+        case lumeCloudDeviceName, lumeCloudAddDevice, lumeCloudDevices, lumeCloudRecoveryKey
     }
 
 #endif

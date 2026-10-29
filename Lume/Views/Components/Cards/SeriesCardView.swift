@@ -5,6 +5,7 @@
 //  Card view for displaying a series cover and title
 //
 
+import SwiftData
 import SwiftUI
 
 struct SeriesCardView: View {

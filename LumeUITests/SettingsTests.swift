@@ -36,6 +36,25 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Primary"].waitForExistence(timeout: 10), "Engine priority list never appeared")
     }
 
+    /// Settings › Sync lists every backend. `-ui-testing` keeps Lume Cloud inert,
+    /// so nothing here reaches the network; the test only looks, never switches.
+    func testSyncSettingsOffersEveryBackend() {
+        openSettings()
+        // Scoped to the list: the library toolbar behind the sheet has a Sync button too.
+        let syncRow = app.collectionViews.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Sync"))
+            .firstMatch
+        XCTAssertTrue(app.scrollUntilExists(syncRow), "Sync row never appeared")
+        syncRow.tap()
+        XCTAssertTrue(app.navigationBars["Sync"].waitForExistence(timeout: 10), "Settings › Sync did not open")
+        for choice in ["iCloud", "Lume Cloud", "Off"] {
+            XCTAssertTrue(
+                app.collectionViews.buttons[choice].waitForExistence(timeout: 10),
+                "Sync choice \(choice) is missing"
+            )
+        }
+    }
+
     func testAddPlaylistButtonExists() {
         XCTAssertTrue(app.openSettingsPlaylists(), "Settings › Playlists did not open")
         let addButton = app.buttons["Add Playlist"]

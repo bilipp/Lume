@@ -17,11 +17,12 @@
 import Foundation
 
 nonisolated enum LogRedaction {
-    /// Replaces every URL-like substring with `scheme://<redacted>` and every
-    /// `Basic <token>` credential with `Basic <redacted>`, keeping the
-    /// surrounding message intact so the log line stays actionable.
+    /// Replaces every URL-like substring with `scheme://<redacted>`, every
+    /// `Basic <token>` credential with `Basic <redacted>` and every
+    /// `Bearer <token>` with `Bearer <redacted>`, keeping the surrounding
+    /// message intact so the log line stays actionable.
     ///
-    /// The Basic pass lives here rather than behind its own entry point
+    /// The credential passes live here rather than behind its own entry point
     /// because `DebugLogExporter` funnels every exported line through this one
     /// function — a separate function would leave the export unprotected for
     /// any call site that forgot it.
@@ -34,6 +35,9 @@ nonisolated enum LogRedaction {
         }
         if scrubbed.contains("Basic ") {
             scrubbed = scrubbed.replacing(basicAuthPattern, with: "Basic <redacted>")
+        }
+        if scrubbed.range(of: "bearer", options: .caseInsensitive) != nil {
+            scrubbed = scrubbed.replacing(bearerPattern, with: "Bearer <redacted>")
         }
         return scrubbed
     }
@@ -132,6 +136,10 @@ nonisolated enum LogRedaction {
     /// value. The 8-character floor keeps ordinary prose ("Basic auth failed")
     /// readable; anything longer is redacted whether or not it decodes.
     private static let basicAuthPattern = /Basic\s+[A-Za-z0-9+\/=_\-]{8,}/
+
+    /// Matches a Bearer credential in any casing, including Lume Cloud's
+    /// `<accountId>.<authKey>` form, under the same 8-character floor.
+    private static let bearerPattern = /(?i)bearer\s+[A-Za-z0-9+\/=_\-.~]{8,}/
 }
 
 /// An error type with a hand-written, credential-free diagnostic summary.

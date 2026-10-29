@@ -109,3 +109,11 @@ if [ -n "$MDBLIST_CLIENT_ID" ]; then
 else
     echo "warning: MDBLIST_CLIENT_ID not set in .env — MDBList account sync will be hidden"
 fi
+
+# Optional: without it the per-configuration LUME_CLOUD_URL build setting
+# stays (production in every configuration).
+LUME_CLOUD_URL="$(read_env LUME_CLOUD_URL)"
+if [ -n "$LUME_CLOUD_URL" ]; then
+    set_plist LumeCloudServerURL "$LUME_CLOUD_URL"
+    echo "Injected LUME_CLOUD_URL into Info.plist"
+fi

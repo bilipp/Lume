@@ -13,6 +13,7 @@
 		C6AA310B2FDD00020000AB0B /* LumeWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6AA31012FDD00020000AB01 /* LumeWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C6BB20012FDE00030000BB01 /* LumeRecorderKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6BB20022FDE00030000BB02 /* LumeRecorderKit */; };
 		C6BD5701000000000000F003 /* LumeTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6BD5701000000000000A002 /* LumeTopShelf.appex */; platformFilters = (tvos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C6CC30012FDF00040000CC01 /* LumeCloudKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6CC30022FDF00040000CC02 /* LumeCloudKit */; };
 		C6CC40012FE000040000CC01 /* GoogleCastDynamic in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = C6CC40022FE000040000CC02 /* GoogleCastDynamic */; };
 		C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKit */; };
 /* End PBXBuildFile section */
@@ -177,6 +178,7 @@
 			files = (
 				C6CC40012FE000040000CC01 /* GoogleCastDynamic in Frameworks */,
 				C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */,
+				C6CC30012FDF00040000CC01 /* LumeCloudKit in Frameworks */,
 				C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */,
 				C6BB20012FDE00030000BB01 /* LumeRecorderKit in Frameworks */,
 				C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */,
@@ -278,6 +280,7 @@
 			packageProductDependencies = (
 				C6CC40022FE000040000CC02 /* GoogleCastDynamic */,
 				C66C81682FC5A59D0048468D /* KSPlayer */,
+				C6CC30022FDF00040000CC02 /* LumeCloudKit */,
 				C6AA10022FDD00010000AA02 /* LumeEngine */,
 				C6BB20022FDE00030000BB02 /* LumeRecorderKit */,
 				C6FF000B2FC5A59D00484602 /* VLCKit */,
@@ -456,6 +459,7 @@
 				C6FF000C2FC5A59D00484603 /* XCRemoteSwiftPackageReference "VLCKit" */,
 				C6AA10032FDD00010000AA03 /* XCLocalSwiftPackageReference "../LumeEngine" */,
 				C6BB20032FDE00030000BB03 /* XCLocalSwiftPackageReference "../LumeRecorder/Kit" */,
+				C6CC30032FDF00040000CC03 /* XCLocalSwiftPackageReference "../LumeCloud/LumeCloudKit" */,
 				C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -680,6 +684,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LUME_CLOUD_URL = "https://cloud.getlume.org";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
@@ -741,6 +746,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LUME_CLOUD_URL = "https://cloud.getlume.org";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
@@ -1075,6 +1081,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LUME_CLOUD_URL = "https://cloud.getlume.org";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
@@ -1563,6 +1570,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LUME_CLOUD_URL = "https://cloud.getlume.org";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 2.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bilipp.lume;
@@ -1757,6 +1765,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../LumeRecorder/Kit;
 		};
+		C6CC30032FDF00040000CC03 /* XCLocalSwiftPackageReference "../LumeCloud/LumeCloudKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../LumeCloud/LumeCloudKit;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1799,6 +1811,10 @@
 		C6BB20022FDE00030000BB02 /* LumeRecorderKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LumeRecorderKit;
+		};
+		C6CC30022FDF00040000CC02 /* LumeCloudKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LumeCloudKit;
 		};
 		C6CC40022FE000040000CC02 /* GoogleCastDynamic */ = {
 			isa = XCSwiftPackageProductDependency;

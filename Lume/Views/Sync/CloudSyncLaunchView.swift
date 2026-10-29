@@ -3,21 +3,27 @@
 //  Lume
 //
 //  Shown at launch on a fresh install (empty local store) while we wait for the
-//  first iCloud sync to settle, so cloud playlists can land before the
-//  add-playlist form appears. Offers a manual escape hatch — the same "Continue
-//  Without Syncing" affordance as the catalog-sync screen — so the user is never
-//  forced to wait.
+//  first iCloud (or Lume Cloud) sync to settle, so cloud playlists can land
+//  before the add-playlist form appears. Offers a manual escape hatch — the
+//  same "Continue Without Syncing" affordance as the catalog-sync screen — so
+//  the user is never forced to wait.
 //
 
 import SwiftUI
 
 struct CloudSyncLaunchView: View {
+    /// The wait is for Lume Cloud rather than iCloud.
+    var checksLumeCloud = false
     /// Called when the user opts out of the wait and wants the add-playlist form.
     var onSkip: () -> Void
 
     /// The escape-hatch button is revealed after a short delay so it doesn't
     /// flash on a fast sync that resolves in well under a second.
     @State private var showSkip = false
+
+    private var message: LocalizedStringKey {
+        checksLumeCloud ? "Checking Lume Cloud for your playlists…" : "Checking iCloud for your playlists…"
+    }
 
     var body: some View {
         VStack(spacing: 24) {
@@ -26,7 +32,7 @@ struct CloudSyncLaunchView: View {
                 .scaleEffect(1.5)
             #endif
 
-            Text("Checking iCloud for your playlists…")
+            Text(message)
                 .font(.headline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

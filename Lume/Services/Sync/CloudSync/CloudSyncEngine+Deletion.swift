@@ -54,6 +54,12 @@ extension CloudSyncEngine {
         if cloudContext.hasChanges { try cloudContext.save() }
         shadow.persist()
 
+        try deleteCatalogPlaylist(id: id)
+    }
+
+    /// Delete `id`'s playlist from the local catalog only. With sync Off this
+    /// is the whole deletion: no mirror may be written.
+    func deleteCatalogPlaylist(id: UUID) throws {
         // The `Playlist` row gets its own save so the UI's `@Query`s drop it
         // promptly; the orphaned-content sweep below can take minutes on a
         // large catalog. No suspension points separate the two saves, so a

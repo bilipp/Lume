@@ -5,7 +5,8 @@
 //  The playlist and profile rows shared by every tvOS switch surface (the
 //  Settings Playlists/Profiles panes and the quick-switch overlay). They draw the
 //  row itself only — the Settings panes compose their pencil affordance alongside
-//  one, so a surface that must not offer editing simply leaves it out.
+//  one, so a surface that must not offer editing simply leaves it out. Their
+//  checkmark and active state also mark the Sync pane's backend rows.
 //
 
 #if os(tvOS)
@@ -69,7 +70,7 @@
     /// Announces the active row as selected. The checkmark alone is invisible to
     /// VoiceOver as state — it reads as another glyph in the label — so it is
     /// hidden and the state is carried by the value and the trait instead.
-    private struct TVSwitchRowActiveState: ViewModifier {
+    struct TVSwitchRowActiveState: ViewModifier {
         let isActive: Bool
 
         func body(content: Content) -> some View {
@@ -92,7 +93,7 @@
     /// `TVSettingsRowButtonStyle` does — a white glyph would vanish into the
     /// focused row's near-white fill. Always explicit, never `.accentColor`:
     /// that resolves to white on tvOS.
-    private struct TVSwitchRowCheckmark: View {
+    struct TVSwitchRowCheckmark: View {
         @Environment(\.isFocused) private var isFocused
 
         var body: some View {

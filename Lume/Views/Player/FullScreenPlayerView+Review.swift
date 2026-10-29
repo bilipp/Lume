@@ -12,10 +12,11 @@
 //  handler, so a prompt raised there would land on a screen the viewer has
 //  already left, or on an app that is backgrounding.
 //
-//  Both brackets compile down to nothing on tvOS, where there is no review API
-//  to arm for: the verdict they produce has no reader there. The call sites in
-//  `FullScreenPlayerView` stay unfenced so the player body reads the same on
-//  every platform.
+//  Both brackets also report the player to `ScreenOccupancy`, on every
+//  platform: the root alerts wait for it to close. The review halves compile
+//  down to nothing on tvOS, where there is no review API to arm for. The call
+//  sites in `FullScreenPlayerView` stay unfenced so the player body reads the
+//  same on every platform.
 //
 
 import SwiftUI
@@ -29,9 +30,9 @@ extension FullScreenPlayerView {
     /// player opening in another window or scene cannot overwrite this
     /// session's baseline.
     func beginReviewSession() {
+        ScreenOccupancy.shared.notePlayerAppeared()
         #if !os(tvOS)
             healthToken = PlaybackHealthTracker.shared.beginSession()
-            AppStoreReviewPrompt.shared.notePlayerAppeared()
         #endif
     }
 
@@ -44,15 +45,14 @@ extension FullScreenPlayerView {
     /// - Parameter isChildWatching: read at the call site, where the optional
     ///   `ProfileManager` this view holds is still in scope.
     func endReviewSession(isChildWatching: Bool) {
+        // The screen is clear either way, so report that first and
+        // unconditionally — the policy evaluation below can wait, the "is a
+        // player up" answer cannot.
+        ScreenOccupancy.shared.notePlayerDisappeared()
         #if !os(tvOS)
             let token = healthToken
             let pendingWrite = pendingProgressWrite
             healthToken = nil
-
-            // The screen is clear either way, so report that first and
-            // unconditionally — the policy evaluation below can wait, the "is a
-            // player up" answer cannot.
-            AppStoreReviewPrompt.shared.notePlayerDisappeared()
 
             Task {
                 // A finished title is counted by the progress write, which awaits

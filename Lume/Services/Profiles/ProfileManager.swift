@@ -55,14 +55,15 @@ final class ProfileManager {
     /// The profile roster the UI reads (instead of a `@Query`). `UserProfile`
     /// lives in the cloud store — a separate container the browse `@Query`s don't
     /// bind to — so the profile views can't query it directly; they observe this
-    /// instead. Refreshed after each mutation and on CloudKit remote-change. Field
+    /// instead. Refreshed after each mutation, on a remote change and when a pull
+    /// lands rows in the mirror (`.lumeSyncMirrorDidChange`). Field
     /// edits to existing profiles propagate via the `@Model`'s own observation, so
     /// this array only changes when the *set* of profiles does.
     private(set) var profiles: [UserProfile] = []
 
-    /// Holds `UserProfile` (the CloudKit-mirrored store); all profile CRUD runs on
-    /// its main context.
-    private let cloudContainer: ModelContainer
+    /// Holds `UserProfile` (the active backend's mirror store); all profile CRUD
+    /// runs on its main context. Swapped by `repoint(container:)`.
+    private var cloudContainer: ModelContainer
     /// The local-only catalog store. Used only to flush pending catalog edits
     /// before a profile switch, so the engine's background pass reads current state.
     private let catalogContainer: ModelContainer
@@ -83,10 +84,11 @@ final class ProfileManager {
         descriptor.fetchLimit = 1
         activeProfile = (try? cloudContainer.mainContext.fetch(descriptor))?.first
         profiles = allProfiles()
-        // `UserProfile` syncs via CloudKit; refresh the roster when a remote change
-        // (a profile added/removed on another device) lands. Only the cloud store
-        // posts this — the catalog store is local-only. Cheap (a few rows) and
-        // guarded, so the constant import churn doesn't re-render the profile UI.
+        // Refresh the roster when another device's profile changes land: CloudKit
+        // posts a remote change, a Lume Cloud pull reaches `mirrorDidChange()`.
+        // Only the mirror store posts these — the catalog store is local-only.
+        // Cheap (a few rows) and guarded, so the constant import churn doesn't
+        // re-render the profile UI.
         remoteChangeObserver = NotificationCenter.default.addObserver(
             forName: .NSPersistentStoreRemoteChange,
             object: nil,
@@ -94,6 +96,7 @@ final class ProfileManager {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshProfiles() }
         }
+        coordinator.addMirrorConsumer(self)
     }
 
     /// `UserProfile` lives in the cloud store, so all profile CRUD runs on the
@@ -133,7 +136,19 @@ final class ProfileManager {
         let latest = allProfiles()
         if latest.map(\.persistentModelID) != profiles.map(\.persistentModelID) {
             profiles = latest
+            activeProfile = latest.first { $0.id == activeProfileID }
         }
+    }
+
+    /// Follow a backend switch onto `container`'s mirror store.
+    func repoint(container: ModelContainer) {
+        cloudContainer = container
+        profiles = allProfiles()
+        activeProfile = profile(with: activeProfileID)
+    }
+
+    func mirrorDidChange() {
+        refreshProfiles()
     }
 
     func profile(with id: UUID) -> UserProfile? {
@@ -201,10 +216,9 @@ final class ProfileManager {
         if profile.id == activeProfileID {
             await switchProfile(to: fallback.id)
         }
-        await coordinator.purgeProfileData(profile.id)
         LiveChannelHistory.purge(profileID: profile.id)
-        context.delete(profile)
-        try? context.save()
-        refreshProfiles()
+        await coordinator.deleteProfile(id: profile.id)
     }
 }
+
+extension ProfileManager: SyncMirrorConsumer {}
