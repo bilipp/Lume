@@ -28,16 +28,24 @@ enum SyncSettingsPromptText {
         case .switchTo(.icloud):
             Text("Your profiles, playlists and viewing on this device are merged with what’s in iCloud. Nothing is deleted.")
         case .switchTo(.lumecloud):
-            Text("Your profiles, playlists and viewing on this device are merged with your Lume Cloud account. Nothing is deleted.")
+            Text(verbatim: String(localized: "Your profiles, playlists and viewing on this device are merged with your Lume Cloud account. Nothing is deleted.")
+                + "\n\n" + otherAppleDevicesNote)
         case .switchTo(.off):
             Text("Changes stay on this device until you turn sync back on. Nothing is deleted.")
         case .setUpLumeCloud:
-            Text(SyncSettingsPromptText.privacyNote)
+            Text(verbatim: String(localized: "End-to-end encrypted") + "\n\n" + otherAppleDevicesNote)
         case let .leave(otherDeviceNames):
             Text(verbatim: leaveMessage(otherDeviceNames: otherDeviceNames, leaveTarget: leaveTarget))
         case .deleteAccount:
             Text("Your synced data is deleted from Lume Cloud for good, for every device on this account, including Android devices. What’s on this device stays.")
         }
+    }
+
+    /// Entering Lume Cloud writes the Apple-wide choice, but only a build that
+    /// reads it follows: an older one stays on iCloud and stops seeing this
+    /// device's changes.
+    private static var otherAppleDevicesNote: String {
+        String(localized: "Your other Apple devices that sync with iCloud follow once they run the latest version of Lume. Until then, they don’t see changes from this device.")
     }
 
     private static func leaveMessage(otherDeviceNames: [String], leaveTarget: SyncBackendSelection) -> String {
