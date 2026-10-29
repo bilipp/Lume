@@ -5,6 +5,7 @@
 //  Card view for displaying a series cover and title
 //
 
+import SwiftData
 import SwiftUI
 
 struct SeriesCardView: View {
@@ -12,6 +13,9 @@ struct SeriesCardView: View {
     /// Set by the category / genre grids so the card sizes to its cell rather
     /// than the fixed rail width — see `View.posterArtworkFrame(fillsWidth:)`.
     var fillsWidth: Bool = false
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var isFullyWatched = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: PosterCardMetrics.titleSpacing) {
@@ -41,6 +45,12 @@ struct SeriesCardView: View {
                 }
             }
             .posterArtworkFrame(fillsWidth: fillsWidth)
+            .watchedBadge(isFullyWatched)
+            // `.task` restarts on every appear, so the badge catches up after
+            // episodes are marked watched on the detail screen.
+            .task(id: series.id) {
+                isFullyWatched = SeriesEpisodeProgress.allEpisodesWatched(seriesID: series.id, in: modelContext)
+            }
             .clipShape(RoundedRectangle(cornerRadius: PosterCardMetrics.cornerRadius))
             // A shadow applied after clipShape forces an offscreen render pass per
             // card every frame. On tvOS the focus style already supplies depth and
@@ -52,7 +62,10 @@ struct SeriesCardView: View {
             // Title
             Text(series.name)
                 .font(PosterCardMetrics.titleFont)
-                .lineLimit(2)
+                // Reserve both lines so a one-line title keeps the card as tall
+                // as a wrapped one: the rails and grids centre cards vertically,
+                // so a shorter card shifted its poster out of line (#269).
+                .lineLimit(2, reservesSpace: true)
                 .posterTitleFrame(fillsWidth: fillsWidth)
         }
     }

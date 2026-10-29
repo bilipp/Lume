@@ -8,8 +8,6 @@ struct SettingsView: View {
     @Environment(CloudSyncCoordinator.self) var cloudSync: CloudSyncCoordinator?
     /// Not `private`: read by the SettingsView+Playlists / +Library extensions (separate files).
     @Query var playlists: [Playlist]
-    @State private var trakt = TraktService.shared
-    @State private var simkl = SimklService.shared
     /// Premium entitlement + paywall presentation. Not `private`: read by the
     /// SettingsView+Premium / +Playlists / +TVPlayer extensions (separate files).
     @State var premium = PremiumManager.shared
@@ -164,7 +162,7 @@ struct SettingsView: View {
 
     /// Whether this build has credentials for any Connected Services entry.
     private var hasConnectedServices: Bool {
-        trakt.isConfigured || simkl.isConfigured
+        TraktService.shared.isConfigured || SimklService.shared.isConfigured || MDBListService.shared.isConfigured
     }
 
     private func showsBadge(for category: SettingsCategory) -> Bool {
@@ -543,7 +541,7 @@ struct SettingsView: View {
                     case .iCloud:
                         TVSyncSettingsPane(route: $syncRoute, drillInFocus: $drillInFocus) { tvDetailScrollToTopRequest += 1 }
                     case .connectedServices:
-                        tvIntegrationsDetail
+                        TVConnectedServicesView()
                     case .storage:
                         StorageManagementView()
                     case .help:
@@ -562,17 +560,6 @@ struct SettingsView: View {
             // A fresh scroll position per category; sub-pages keep theirs.
             .id(selectedCategory)
             .focusSection()
-        }
-
-        private var tvIntegrationsDetail: some View {
-            VStack(alignment: .leading, spacing: 36) {
-                if trakt.isConfigured {
-                    TVTraktIntegrationView()
-                }
-                if simkl.isConfigured {
-                    TVSimklIntegrationView()
-                }
-            }
         }
     }
 

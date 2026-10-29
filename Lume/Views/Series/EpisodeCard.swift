@@ -102,6 +102,7 @@ struct EpisodeCard: View {
                 }
             }
             .frame(width: 142, height: 80)
+            .watchedBadge(episode.isWatched)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             #if !os(tvOS)

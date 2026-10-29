@@ -44,3 +44,16 @@ nonisolated enum HTTPBasicCredentials {
         return components.url
     }
 }
+
+nonisolated extension URL {
+    /// `self` with `name=value` appended, or unchanged when the query already
+    /// carries `name`. `nil` when the URL can't be split into components.
+    func addingQueryItemIfAbsent(name: String, value: String) -> URL? {
+        guard var components = URLComponents(url: self, resolvingAgainstBaseURL: false) else { return nil }
+        var items = components.queryItems ?? []
+        guard !items.contains(where: { $0.name == name }) else { return self }
+        items.append(URLQueryItem(name: name, value: value))
+        components.queryItems = items
+        return components.url
+    }
+}

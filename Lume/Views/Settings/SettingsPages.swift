@@ -65,11 +65,12 @@
         }
     }
 
-    /// Trakt and Simkl — whichever this build has credentials for. OpenSubtitles
+    /// Trakt, Simkl and MDBList — whichever this build has credentials for. OpenSubtitles
     /// lives under Player.
     struct ConnectedServicesView: View {
         @State private var trakt = TraktService.shared
         @State private var simkl = SimklService.shared
+        @State private var mdblist = MDBListService.shared
 
         var body: some View {
             List {
@@ -98,8 +99,20 @@
                         }
                     }
 
+                    if mdblist.isConfigured {
+                        NavigationLink {
+                            MDBListIntegrationView()
+                        } label: {
+                            serviceLabel(
+                                "MDBList",
+                                systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle",
+                                status: mdblist.isConnected ? mdblist.username.map { "@\($0)" } ?? String(localized: "Connected") : nil
+                            )
+                        }
+                    }
+
                 } footer: {
-                    Text("Sync watched movies and episodes and show your Trakt or Simkl watchlist on Home.")
+                    Text("Sync watched movies and episodes and show your Trakt, Simkl or MDBList watchlist on Home.")
                 }
             }
             .platformNavigationTitle("Connected Services")

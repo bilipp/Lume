@@ -14,7 +14,6 @@
 //
 
 import Foundation
-import LumeRecorderKit
 import Observation
 import os
 #if os(macOS)
@@ -42,16 +41,19 @@ final class RecordingServerStore {
         }
     }
 
-    private(set) var recordings: [Recording] = []
-    private(set) var status: ServerStatus?
+    private(set) var recordings: [ServerRecording] = []
+    private(set) var status: RecordingServerStatus?
     private(set) var reachability: Reachability = .unknown
     private(set) var isRefreshing = false
+    /// What the signed-in account may do, once read from the server; `nil`
+    /// until then, when the backend kind's own capabilities apply.
+    private(set) var accountCapabilities: RecordingServerCapabilities?
 
-    @ObservationIgnored private let configService: RecordingServerConfigService
-    @ObservationIgnored private let makeBackend: BackendFactory
+    @ObservationIgnored let configService: RecordingServerConfigService
+    @ObservationIgnored let makeBackend: BackendFactory
     @ObservationIgnored private let isFeatureUnlocked: @MainActor (PremiumFeature) -> Bool
-    @ObservationIgnored private let resolveStalkerLink: StalkerLinkResolver
-    @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored let resolveStalkerLink: StalkerLinkResolver
+    @ObservationIgnored let now: () -> Date
     @ObservationIgnored private let pendingPollInterval: Duration
     @ObservationIgnored private let idlePollInterval: Duration
     @ObservationIgnored private let revokeTimeout: Duration
@@ -93,18 +95,13 @@ final class RecordingServerStore {
         configService.isPaired
     }
 
+    /// The paired server, whether or not Lume Pro is active.
+    var pairedEndpoint: RecordingServerEndpoint? {
+        configService.activeServer?.endpoint
+    }
+
     var isUnlocked: Bool {
         isFeatureUnlocked(.recordingServer)
-    }
-
-    /// Whether a Record action belongs on this playlist's channels at all.
-    /// Paired-but-lapsed still shows it, behind the crown.
-    func supportsRecording(_ sourceType: PlaylistSourceType) -> Bool {
-        isPaired && sourceType.supportsRecording
-    }
-
-    func supportsScheduling(_ sourceType: PlaylistSourceType) -> Bool {
-        isPaired && sourceType.supportsRecordingSchedule
     }
 
     var isPolling: Bool {
@@ -115,17 +112,12 @@ final class RecordingServerStore {
 
     /// The recording capturing a channel right now — what turns the channel's
     /// Record into Stop Recording. A schedule for later tonight doesn't.
-    func activeRecording(forSourceRef sourceRef: RecordingSourceRef) -> Recording? {
+    func activeRecording(forSourceRef sourceRef: RecordingSourceRef) -> ServerRecording? {
         RecordingRequestPlanner.activeRecording(for: sourceRef, now: now(), in: recordings)
     }
 
-    func activeRecording(for stream: LiveStream, in playlist: Playlist) -> Recording? {
+    func activeRecording(for stream: LiveStream, in playlist: Playlist) -> ServerRecording? {
         activeRecording(forSourceRef: RecordingSourceRef(stream: stream, playlist: playlist))
-    }
-
-    /// Running, or a schedule whose window has opened: Stop rather than Cancel.
-    func isCapturing(_ recording: Recording) -> Bool {
-        RecordingRequestPlanner.isCapturing(recording, now: now())
     }
 
     /// The pending recording of one guide programme on a channel — what turns
@@ -133,7 +125,7 @@ final class RecordingServerStore {
     func pendingRecording(
         forSourceRef sourceRef: RecordingSourceRef,
         programme: RecordingRequestPlanner.Programme?
-    ) -> Recording? {
+    ) -> ServerRecording? {
         RecordingRequestPlanner.pendingRecording(for: sourceRef, programme: programme, now: now(), in: recordings)
     }
 
@@ -141,8 +133,13 @@ final class RecordingServerStore {
 
     /// Unauthenticated identity check of the server at `baseURL`: before
     /// pairing, and for the paired server's version line.
-    func serverInfo(baseURL: URL) async throws(RecordingServerError) -> ServerInfo {
-        let backend = makeBackend(RecordingServerEndpoint(kind: .lumeRecorder, baseURL: baseURL, token: nil))
+    func serverInfo(baseURL: URL) async throws(RecordingServerError) -> ServerIdentity {
+        try await serverInfo(for: RecordingServerEndpoint(kind: .lumeRecorder, baseURL: baseURL, token: nil))
+    }
+
+    /// The identity of a paired server, through its own kind of backend.
+    func serverInfo(for endpoint: RecordingServerEndpoint) async throws(RecordingServerError) -> ServerIdentity {
+        let backend = makeBackend(endpoint)
         return try await Self.offMain { () async throws(RecordingServerError) in try await backend.serverInfo() }
     }
 
@@ -151,10 +148,12 @@ final class RecordingServerStore {
     @discardableResult
     func pair(baseURL: URL, code: String) async throws(RecordingServerError) -> RecordingServerConfig {
         let kind = RecordingServerKind.lumeRecorder
-        let backend = makeBackend(RecordingServerEndpoint(kind: kind, baseURL: baseURL, token: nil))
+        guard let backend = makeBackend(RecordingServerEndpoint(kind: kind, baseURL: baseURL, token: nil))
+            as? any RecordingServerDevicePairing
+        else { throw .unsupportedBackend }
         let deviceName = Self.pairingDeviceName
         let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        let response: PairResponse
+        let response: RecordingServerPairing
         do {
             response = try await Self.offMain { () async throws(RecordingServerError) in
                 try await backend.pair(code: trimmedCode, deviceName: deviceName)
@@ -167,9 +166,17 @@ final class RecordingServerStore {
             throw .invalidResponse
         }
         Logger.recording.log("Paired with a recording server")
-        resetMirroredState()
-        await reload()
+        await adoptPairing(config, capabilities: nil)
         return config
+    }
+
+    /// Starts mirroring a pairing just saved, keeping the account capabilities
+    /// read while pairing instead of asking the server again.
+    func adoptPairing(_ config: RecordingServerConfig, capabilities: RecordingServerCapabilities?) async {
+        resetMirroredState()
+        loadedEndpoint = config.endpoint
+        accountCapabilities = capabilities
+        await reload()
     }
 
     // MARK: - Polling
@@ -230,7 +237,7 @@ final class RecordingServerStore {
     /// Restarts the poll cadence at the fast interval, so a just-created
     /// pending recording is followed closely. The action already upserted the
     /// server's answer, so the first refresh waits one interval.
-    private func pollSoon() {
+    func pollSoon() {
         if observerCount > 0 {
             startPolling(initialDelay: pendingPollInterval)
         }
@@ -254,9 +261,12 @@ final class RecordingServerStore {
     }
 
     /// Re-reads the disk status, which only the Recording Server settings show.
+    /// A server without a status endpoint gets its counts from every reload
+    /// of the recordings instead, so its status can never fail on its own.
     func refreshStatus() async {
         guard let endpoint = prepareEndpoint() else { return }
         let backend = makeBackend(endpoint)
+        guard backend.capabilities.hasStatusEndpoint else { return }
         do {
             let newStatus = try await Self.offMain { () async throws(RecordingServerError) in
                 try await backend.status()
@@ -273,17 +283,29 @@ final class RecordingServerStore {
     private func reload() async {
         guard let endpoint = prepareEndpoint() else { return }
         let backend = makeBackend(endpoint)
+        let readCapabilities = accountCapabilities == nil
+        let newRecordings: [ServerRecording]
+        let capabilities: RecordingServerCapabilities?
         do {
-            let newRecordings = try await Self.offMain { () async throws(RecordingServerError) in
-                try await backend.recordings()
+            (newRecordings, capabilities) = try await Self.offMain { () async throws(RecordingServerError) in
+                // A failed read is retried on the next refresh.
+                async let capabilities = readCapabilities ? try? backend.accountCapabilities() : nil
+                let recordings = try await backend.recordings()
+                return await (recordings, capabilities)
             }
             guard loadedEndpoint == endpoint else { return }
             lastRefresh = .now
             if recordings != newRecordings { recordings = newRecordings }
             if reachability != .reachable { reachability = .reachable }
+            if !backend.capabilities.hasStatusEndpoint {
+                let counted = RecordingServerStatus(counting: newRecordings)
+                if status != counted { status = counted }
+            }
         } catch {
             noteRefreshFailure(error, endpoint: endpoint)
+            return
         }
+        if let capabilities, accountCapabilities == nil { accountCapabilities = capabilities }
     }
 
     /// The active server's endpoint, resetting the mirrored state when it
@@ -308,75 +330,11 @@ final class RecordingServerStore {
         Logger.recording.error("Recording server refresh failed: \(mapped.logDescription, privacy: .public)")
     }
 
-    // MARK: - Record
-
-    /// Starts recording `stream` now: until the airing `programme` ends plus
-    /// the post-roll, or for `duration` when no programme is on air.
-    @discardableResult
-    func recordNow(
-        stream: LiveStream,
-        playlist: Playlist,
-        programme: RecordingRequestPlanner.Programme?,
-        duration: RecordingRequestPlanner.FallbackDuration? = nil
-    ) async throws(RecordingActionError) -> Recording {
-        let endpoint = try activeEndpoint()
-        guard playlist.sourceType.supportsRecording else { throw .unsupportedSource }
-        let date = now()
-        let liveProgramme = programme.flatMap {
-            RecordingRequestPlanner.timing(of: $0, now: date) == .live ? $0 : nil
-        }
-        guard liveProgramme != nil || duration != nil else { throw .durationRequired }
-        let channel = Self.channel(stream: stream, playlist: playlist)
-        let streamURL = try await resolveStreamURL(stream: stream, playlist: playlist)
-        let plan: RecordingRequestPlanner.Plan? = if let duration, liveProgramme == nil {
-            RecordingRequestPlanner.recordNow(streamURL: streamURL, channel: channel, duration: duration, now: date)
-        } else {
-            RecordingRequestPlanner.recordNow(streamURL: streamURL, channel: channel, programme: liveProgramme, now: date)
-        }
-        guard let plan else { throw .durationRequired }
-        return try await create(plan, endpoint: endpoint)
-    }
-
-    /// Schedules an upcoming `programme` with the fixed pre- and post-roll.
-    @discardableResult
-    func schedule(
-        stream: LiveStream,
-        playlist: Playlist,
-        programme: RecordingRequestPlanner.Programme
-    ) async throws(RecordingActionError) -> Recording {
-        let endpoint = try activeEndpoint()
-        guard playlist.sourceType.supportsRecording else { throw .unsupportedSource }
-        guard playlist.sourceType.supportsRecordingSchedule else { throw .scheduleUnsupported }
-        let date = now()
-        guard RecordingRequestPlanner.timing(of: programme, now: date) == .upcoming else {
-            throw .programmeNotUpcoming
-        }
-        let channel = Self.channel(stream: stream, playlist: playlist)
-        let streamURL = try await resolveStreamURL(stream: stream, playlist: playlist)
-        guard let plan = RecordingRequestPlanner.schedule(
-            streamURL: streamURL, channel: channel, programme: programme, now: date
-        ) else { throw .programmeNotUpcoming }
-        return try await create(plan, endpoint: endpoint)
-    }
-
-    private func create(
-        _ plan: RecordingRequestPlanner.Plan,
-        endpoint: RecordingServerEndpoint
-    ) async throws(RecordingActionError) -> Recording {
-        let backend = makeBackend(endpoint)
-        let recording = try await perform("create") { () async throws(RecordingServerError) in
-            try await backend.createRecording(plan.request, idempotencyKey: plan.idempotencyKey)
-        }
-        upsert(recording)
-        pollSoon()
-        return recording
-    }
-
     // MARK: - Stop / delete
 
     /// Cancels a scheduled recording or ends a running one.
     @discardableResult
-    func stop(id: UUID) async throws(RecordingActionError) -> Recording {
+    func stop(id: RecordingID) async throws(RecordingActionError) -> ServerRecording {
         let backend = try makeBackend(activeEndpoint())
         let recording = try await perform("stop") { () async throws(RecordingServerError) in
             try await backend.stopRecording(id: id)
@@ -388,7 +346,7 @@ final class RecordingServerStore {
 
     /// Deletes a recording and its media. One the server no longer has counts
     /// as deleted.
-    func delete(id: UUID) async throws(RecordingActionError) {
+    func delete(id: RecordingID) async throws(RecordingActionError) {
         let backend = try makeBackend(activeEndpoint())
         do {
             try await perform("delete") { () async throws(RecordingServerError) in
@@ -398,30 +356,34 @@ final class RecordingServerStore {
             // Already gone.
         }
         recordings.removeAll { $0.id == id }
-        RecordingProgressStore.remove(recordingID: RecordingProgressStore.identifier(for: id), defaults: progressDefaults)
+        RecordingProgressStore.remove(
+            recordingID: RecordingProgressStore.identifier(for: id, namespace: configService.activeServer?.progressNamespace),
+            defaults: progressDefaults
+        )
     }
 
     // MARK: - Playback
 
-    /// A playable item for `recording`, backed by a short-lived signed URL. An
+    /// A playable item for `recording`, backed by a short-lived URL. An
     /// in-progress recording plays from its start; a finished one resumes
     /// where this device left it.
-    func playbackMedia(for recording: Recording) async throws(RecordingActionError) -> PlayableMedia {
+    func playbackMedia(for recording: ServerRecording) async throws(RecordingActionError) -> PlayableMedia {
         let backend = try makeBackend(activeEndpoint())
-        let id = recording.id
-        let grant = try await perform("playback") { () async throws(RecordingServerError) in
-            try await backend.playbackGrant(id: id)
+        let namespace = configService.activeServer?.progressNamespace
+        let recordingID = recording.id
+        let playback = try await perform("playback") { () async throws(RecordingServerError) in
+            try await backend.playback(id: recordingID)
         }
         return .recording(
-            recording, grant: grant,
-            startTime: RecordingProgressStore.resumePosition(for: recording, defaults: progressDefaults),
+            recording, playback: playback, progressNamespace: namespace,
+            startTime: RecordingProgressStore.resumePosition(for: recording, namespace: namespace, defaults: progressDefaults),
             now: now()
         )
     }
 
     // MARK: - Helpers
 
-    private func activeEndpoint() throws(RecordingActionError) -> RecordingServerEndpoint {
+    func activeEndpoint() throws(RecordingActionError) -> RecordingServerEndpoint {
         guard isUnlocked else { throw .premiumRequired }
         guard let endpoint = configService.activeServer?.endpoint else { throw .notPaired }
         return endpoint
@@ -429,7 +391,7 @@ final class RecordingServerStore {
 
     /// Runs one server call off the main actor and folds its failure into the
     /// store's reachability.
-    private func perform<T: Sendable>(
+    func perform<T: Sendable>(
         _ action: StaticString,
         _ operation: @Sendable () async throws(RecordingServerError) -> T
     ) async throws(RecordingActionError) -> T {
@@ -451,40 +413,13 @@ final class RecordingServerStore {
     }
 
     @concurrent
-    private nonisolated static func offMain<T: Sendable>(
+    nonisolated static func offMain<T: Sendable>(
         _ operation: @Sendable () async throws(RecordingServerError) -> T
     ) async throws(RecordingServerError) -> T {
         try await operation()
     }
 
-    /// Exactly the URL Play would open. A Stalker placeholder is swapped for a
-    /// fresh `create_link` URL here, at tap time — never sent as-is.
-    private func resolveStreamURL(stream: LiveStream, playlist: Playlist) async throws(RecordingActionError) -> URL {
-        guard let url = LiveStreamURLResolver.playbackURL(for: stream, playlist: playlist) else {
-            throw .streamUnavailable
-        }
-        guard LiveStreamURLResolver.needsTapTimeResolution(url) else { return url }
-        let resolved: URL?
-        do {
-            resolved = try await StalkerStreamResolver.resolve(url: url, playlist: playlist, using: resolveStalkerLink)
-        } catch {
-            let detail = (error as? StalkerError)?.logDescription ?? LogRedaction.describe(error)
-            Logger.recording.error("Stalker create_link for a recording failed: \(detail, privacy: .public)")
-            throw .streamUnavailable
-        }
-        guard let resolved else { throw .streamUnavailable }
-        return resolved
-    }
-
-    private static func channel(stream: LiveStream, playlist: Playlist) -> RecordingRequestPlanner.Channel {
-        RecordingRequestPlanner.Channel(
-            name: stream.name,
-            logoURL: stream.streamIcon.flatMap { $0.isEmpty ? nil : URL(string: $0) },
-            sourceRef: RecordingSourceRef(stream: stream, playlist: playlist)
-        )
-    }
-
-    private func upsert(_ recording: Recording) {
+    func upsert(_ recording: ServerRecording) {
         if let index = recordings.firstIndex(where: { $0.id == recording.id }) {
             recordings[index] = recording
         } else {
@@ -498,6 +433,7 @@ final class RecordingServerStore {
         recordings = []
         status = nil
         reachability = .unknown
+        accountCapabilities = nil
     }
 
     /// How this device appears in the server's device list. The token syncs,
@@ -546,7 +482,9 @@ extension RecordingServerStore {
 
     private func revoke(_ config: RecordingServerConfig) async -> Removal {
         guard let endpoint = config.endpoint, let deviceID = config.deviceID else { return .revoked }
-        let backend = makeBackend(endpoint)
+        guard let backend = makeBackend(endpoint) as? any RecordingServerDevicePairing,
+              backend.capabilities.deviceRevoke
+        else { return .revoked }
         let timeout = revokeTimeout
         do {
             try await Self.offMain { () async throws(RecordingServerError) in
@@ -583,16 +521,5 @@ extension RecordingServerStore {
         } catch {
             throw RecordingServerError(error)
         }
-    }
-}
-
-extension RecordingRequestPlanner.Programme {
-    init(listing: EPGListing) {
-        self.init(
-            title: listing.title,
-            description: listing.listingDescription,
-            start: listing.start,
-            end: listing.end
-        )
     }
 }

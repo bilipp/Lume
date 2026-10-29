@@ -8,7 +8,6 @@
 //  from Settings › Live TV.
 //
 
-import LumeRecorderKit
 import SwiftUI
 
 #if !os(tvOS)
@@ -68,7 +67,7 @@ import SwiftUI
         // MARK: - Rows
 
         @ViewBuilder
-        private func row(for recording: Recording) -> some View {
+        private func row(for recording: ServerRecording) -> some View {
             let content = RecordingRow(recording: recording, isLoading: model.loadingID == recording.id)
             Group {
                 if recording.isPlayable {
@@ -83,7 +82,7 @@ import SwiftUI
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                ForEach(RecordingLibraryAction.actions(for: recording)) { action in
+                ForEach(model.actions(for: recording)) { action in
                     Button {
                         model.pendingAction = action
                     } label: {
@@ -100,7 +99,7 @@ import SwiftUI
                         Label("Play", systemImage: "play.fill")
                     }
                 }
-                ForEach(RecordingLibraryAction.actions(for: recording)) { action in
+                ForEach(model.actions(for: recording)) { action in
                     Button(role: action.isDelete ? .destructive : nil) {
                         model.pendingAction = action
                     } label: {
@@ -132,7 +131,7 @@ import SwiftUI
     // MARK: - Row
 
     private struct RecordingRow: View {
-        let recording: Recording
+        let recording: ServerRecording
         let isLoading: Bool
 
         var body: some View {

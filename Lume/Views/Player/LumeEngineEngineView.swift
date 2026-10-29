@@ -278,16 +278,13 @@ struct LumeEngineEngineView: View {
                     }
                 }
             }
-            .onKeyPress(.leftArrow) { coordinator.skip(by: -15); resetHideTimer(); return .handled }
-            .onKeyPress(.rightArrow) { coordinator.skip(by: 15); resetHideTimer(); return .handled }
-            .playerVolume(coordinator, onReveal: showControls)
-            .liveChannelKeyNavigation(
-                neighbours: itemNeighbours, swapper: mediaSwapper,
-                onSelect: { onSelectMedia?($0) }, onResetHideTimer: resetHideTimer
-            )
-            .onKeyPress(.space) { togglePlay(); return .handled }
-            .onKeyPress(.escape) { closePlayer(); return .handled }
+            .playerVolume(coordinator)
         #endif
+            .playerKeyboardShortcuts(PlayerKeyActions(
+                togglePlay: togglePlay, skip: { coordinator.skip(by: $0) }, close: closePlayer,
+                resetHideTimer: resetHideTimer, showControls: showControls,
+                neighbours: itemNeighbours, swapper: mediaSwapper, selectMedia: { onSelectMedia?($0) }
+            ))
     }
 
     // MARK: - Coordinator wiring
@@ -305,6 +302,9 @@ struct LumeEngineEngineView: View {
         coordinator.onPlaybackFailure = { reportFailure($0) }
         coordinator.onStalled = { reconnect(after: $0) }
         coordinator.onRecovered = { reconnector.reset() }
+        coordinator.onAudioCodecs = { codecs in
+            if codecs != clock.audioCodecs { clock.audioCodecs = codecs }
+        }
     }
 
     // MARK: - Tap Catcher

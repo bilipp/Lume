@@ -2,7 +2,8 @@
 //  RecordingServerErrorTests.swift
 //  LumeTests
 //
-//  Kit errors map to the app's backend-agnostic cases, and `logDescription`
+//  Kit errors map to the app's backend-agnostic cases (Dispatcharr's DRF
+//  statuses are covered in DispatcharrClientTests), and `logDescription`
 //  never carries a token, pairing code, URL or server-supplied prose.
 //
 
@@ -41,10 +42,11 @@ struct RecordingServerErrorTests {
 
     @Test func `every case has a user-facing message`() {
         let cases: [RecordingServerError] = [
-            .unreachable(.timedOut), .unauthorized, .invalidPairingCode, .rateLimited, .notFound,
+            .unreachable(.timedOut), .unauthorized, .forbidden, .invalidPairingCode, .invalidCredentials, .rateLimited, .notFound,
             .concurrencyLimit, .insufficientStorage, .notPlayableYet, .conflict(code: "x"),
             .invalidRequest, .server(status: 500, code: nil), .invalidResponse,
-            .unsupportedAPIVersion(2), .unsupportedBackend, .invalidAddress, .cancelled
+            .unsupportedAPIVersion(2), .unsupportedBackend, .invalidAddress(.lumeRecorder),
+            .invalidAddress(.dispatcharr), .cancelled
         ]
         for error in cases {
             #expect(error.errorDescription?.isEmpty == false)
@@ -67,6 +69,19 @@ struct RecordingServerErrorTests {
         }
         #expect(RecordingServerError.server(status: 500, code: LumeRecorderErrorCode.internalError)
             .logDescription == "HTTP 500 internal_error")
+    }
+
+    @Test func `invalid address suggests the kind's default port`() {
+        #expect(RecordingServerError.invalidAddress(.lumeRecorder).errorDescription?
+            .contains(String(LumeRecorderClient.defaultPort)) == true)
+        #expect(RecordingServerError.invalidAddress(.dispatcharr).errorDescription?.contains("9191") == true)
+        #expect(RecordingServerKind.dispatcharr.defaultPort == DispatcharrClient.defaultPort)
+    }
+
+    @Test func `the finished-stop conflict code from Dispatcharr is logged by name`() {
+        #expect(RecordingServerError.conflict(code: DispatcharrClient.recordingFinishedCode).logDescription
+            == "HTTP 409 \(DispatcharrClient.recordingFinishedCode)")
+        #expect(RecordingServerError.forbidden.logDescription == "HTTP 403")
     }
 
     @Test func `log redaction uses the credential-free summary`() {

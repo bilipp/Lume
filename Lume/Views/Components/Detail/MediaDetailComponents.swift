@@ -109,6 +109,9 @@ struct DetailHero: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             BackdropImage(url: backdropURL ?? posterFallbackURL, fallbackSymbol: fallbackSymbol)
+                // Bleed the artwork into a horizontal safe area (an iPhone
+                // Duo's trailing status column) rather than leaving it blank.
+                .backgroundExtensionEffectIfAvailable()
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.35), .black.opacity(0.92)],
@@ -144,9 +147,10 @@ struct DetailHero: View {
             .padding(.horizontal, DetailMetrics.contentPadding)
             .padding(.bottom, 16)
         }
+        // Not clipped: the backdrop's extension effect has to reach past this
+        // frame. `BackdropImage` already clips its own artwork.
         .frame(maxWidth: .infinity)
         .frame(height: height)
-        .clipped()
     }
 }
 

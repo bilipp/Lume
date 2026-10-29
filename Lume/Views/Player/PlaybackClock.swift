@@ -16,11 +16,16 @@ import Observation
 final class PlaybackClock {
     var current: TimeInterval = 0
     var duration: TimeInterval = 0
+    /// FFmpeg codec names of the stream's audio tracks, once the engine has
+    /// opened it; empty when unknown. The Cast sheet warns from these when no
+    /// track would play on a receiver.
+    var audioCodecs: [String] = []
 
     /// Reset to zero when the host swaps to a different stream.
     func reset() {
         current = 0
         duration = 0
+        if !audioCodecs.isEmpty { audioCodecs = [] }
     }
 }
 

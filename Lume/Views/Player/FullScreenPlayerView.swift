@@ -54,7 +54,7 @@ struct FullScreenPlayerView: View {
     /// so AirPlay would carry only their audio), so while a route is active the
     /// stream is driven through the AVPlayer engine regardless of the user's
     /// engine preference. See `engine` / `castService`.
-    @State private var castService = CastService.shared
+    @State var castService = CastService.shared
     @State private var indexingHoldOwner = "full-screen-\(UUID().uuidString)"
 
     /// Ids of streams AVPlayer couldn't start while casting over AirPlay (a codec
@@ -72,7 +72,8 @@ struct FullScreenPlayerView: View {
     /// but never reads in its own body, so playback ticks invalidate just the
     /// scrubber/time labels rather than re-rendering the whole player tree. See
     /// `PlaybackClock`.
-    @State var clock = PlaybackClock()
+    @State var clock: PlaybackClock
+    @State var castSession: PlayerCastSession
 
     /// Writes watch progress on a private background `ModelContext`. Saving on
     /// the main context mid-playback hitches KSPlayer's render loop, so the
@@ -106,7 +107,7 @@ struct FullScreenPlayerView: View {
     /// auto-advance (see `PlayerNextUpOverlay`); `nil` for movies, live channels
     /// and series finales. Read only when the player tree is (re)built, never on
     /// the per-tick clock path.
-    @State private var nextUpMedia: PlayableMedia?
+    @State var nextUpMedia: PlayableMedia?
 
     /// Intro / recap / outro windows for the active episode (from IntroDB). The
     /// openers drive the in-player Skip Intro button; the outro sets when the
@@ -145,11 +146,15 @@ struct FullScreenPlayerView: View {
     init(media: PlayableMedia, adopting handle: PreviewPlayerHandle? = nil) {
         self.media = media
         _activeMedia = State(initialValue: media)
+        (_clock, _castSession) = Self.playbackStates(adopting: media)
         let defaults = UserDefaults.standard
-        enginePriority = PlayerEnginePriority.resolve(
-            priorityRaw: defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? "",
-            legacyEngineRaw: defaults.string(forKey: PlayerSettings.engineKey)
-                ?? PlayerEngineKind.defaultValue.rawValue
+        enginePriority = PlayerEnginePriority.playable(
+            PlayerEnginePriority.resolve(
+                priorityRaw: defaults.string(forKey: PlayerSettings.enginePriorityKey) ?? "",
+                legacyEngineRaw: defaults.string(forKey: PlayerSettings.engineKey)
+                    ?? PlayerEngineKind.defaultValue.rawValue
+            ),
+            for: media
         )
         let adoption = handle == nil ? nil : Self.previewAdoption(
             of: handle, for: media, enginePriority: enginePriority, airPlayActive: CastService.shared.isAirPlayActive
@@ -182,6 +187,7 @@ struct FullScreenPlayerView: View {
     private var isAirPlayOverride: Bool {
         castService.isAirPlayActive
             && priorityEngine != .avPlayer
+            && !activeMedia.unsupportedEngines.contains(.avPlayer)
             && !airPlayVideoUnsupported.contains(activeMedia.id)
     }
 
@@ -248,7 +254,7 @@ struct FullScreenPlayerView: View {
             // the user sees duplicate X buttons whenever the controls are
             // visible. Only render our custom close for engines that don't
             // draw their own controls.
-            if !engine.rendersOwnControls {
+            if !engine.rendersOwnControls, !showsCastSurface {
                 closeButton
                     .padding(.top, 4)
                     .padding(.leading, 4)
@@ -262,6 +268,7 @@ struct FullScreenPlayerView: View {
         .playerOrientationLock()
         .macPlayerWindow(activeMedia: activeMedia, launchMedia: media) { switchMedia(to: $0) }
         .playerRecording(for: activeMedia)
+        .modifier(PlayerCastHandoff(host: self))
         .modifier(PlayerSourceSwitcherHost(session: sourceSession, media: activeMedia, onPick: switchSource))
         .modifier(PlayerQualityVariantsHost(media: activeMedia, onSelect: switchQuality))
         // Synchronous on purpose, and ahead of the `.task` below: the engine
@@ -277,7 +284,7 @@ struct FullScreenPlayerView: View {
             // Pause background indexing — its periodic saves merge into the
             // main context and hitch KSPlayer's render loop.
             ContentIndexingService.shared.suspend(for: indexingHoldOwner)
-            if adoption == nil {
+            if adoption == nil, !castSession.isCasting {
                 configureAudioSessionForPlayback()
             }
         }
@@ -340,16 +347,16 @@ struct FullScreenPlayerView: View {
             // periodic main-thread work is reading two clock values. The buffer
             // is flushed to SwiftData at safe boundaries (see `persistProgressDetached`).
             progressWriter = WatchProgressWriter(container: modelContext.container)
-            // while !Task.isCancelled {
-            //     try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
-            //     guard !Task.isCancelled else { break }
-            //     bufferProgress()
-            // }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Self.progressSampleInterval))
+                guard !Task.isCancelled else { break }
+                bufferProgress()
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             // Leaving the foreground is a safe moment to flush; covers the user
             // backgrounding the app mid-playback without closing the player.
-            if phase != .active { persistProgressDetached(force: true) }
+            if phase != .active { persistProgressDetached(force: true, leavingForeground: true) }
             #if os(tvOS)
                 // tvOS has no background playback for any engine, so a stream
                 // left running behind the Home screen just keeps buffering and
@@ -395,7 +402,7 @@ struct FullScreenPlayerView: View {
     /// For a Stalker placeholder it is the resolved copy, gated on its identity
     /// matching the active stream so a stale resolution from the previous stream
     /// never reaches the engine during a channel/episode switch.
-    private var displayMedia: PlayableMedia? {
+    var displayMedia: PlayableMedia? {
         switch sourceSession.display(for: activeMedia) {
         case let .ready(media): return media
         case .pending: return nil
@@ -408,7 +415,9 @@ struct FullScreenPlayerView: View {
 
     @ViewBuilder
     private var playerView: some View {
-        if let media = displayMedia {
+        if showsCastSurface {
+            castingSurface
+        } else if let media = displayMedia {
             engineView(for: media)
         } else if JellyfinSourceResolver.itemId(for: activeMedia) != nil {
             sourcePhaseView
@@ -539,9 +548,14 @@ struct FullScreenPlayerView: View {
     /// resulting store merge can't disturb playback. Captures the clock
     /// synchronously *before* awaiting, so a subsequent `clock.reset()` can't
     /// race the read; clears the buffer entry once the write lands.
-    func persistProgressDetached(force: Bool, holdingLive: Bool = false) {
+    ///
+    /// `leavingForeground` covers the app being sent away mid-playback, where
+    /// the process may be suspended and then killed before the actor's save
+    /// runs: the position is stashed in the buffer first, so the next launch
+    /// recovers it. The save itself always runs under a background-task
+    /// assertion, so a suspension right after a flush doesn't strand it.
+    func persistProgressDetached(force: Bool, holdingLive: Bool = false, leavingForeground: Bool = false) {
         if persistRecordingProgress() { return }
-        guard let writer = progressWriter else { return }
         if activeMedia.isLive, !force { return }
         let ref = activeMedia.historyRef
         // An explicit "next episode" already settled this stream at its full
@@ -550,22 +564,10 @@ struct FullScreenPlayerView: View {
         if ref == completedRef { return }
         let now = clock.current
         let total = clock.duration
-        // Held so `endReviewSession` can await it: `writer` is an actor, so the
-        // await below suspends, and without the handle the review policy would
-        // read `completedTitles` before this task increments it — the third
-        // finished title would then only arm the *next* session.
-        let previous = pendingProgressWrite
-        pendingProgressWrite = Task { @MainActor in
-            await previous?.value
-            let completion = await writer.record(
-                ref: ref, progress: now, duration: total, force: force, holdLive: holdingLive
-            )
-            WatchProgressBuffer.remove(ref: ref)
-            if let completion {
-                syncWatchedServices(ref: completion.ref)
-                AppStoreReviewPrompt.shared.noteCompletedTitle()
-            }
+        if leavingForeground {
+            WatchProgressBuffer.record(ref: ref, progress: now, duration: total, waitUntilWritten: true)
         }
+        enqueueProgressWrite(ref: ref, progress: now, duration: total, force: force, holdLive: holdingLive)
     }
 }
 

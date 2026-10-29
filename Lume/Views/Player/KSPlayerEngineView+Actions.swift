@@ -55,13 +55,11 @@ extension KSPlayerEngineView {
         }
     }
 
-    #if os(tvOS) || os(macOS)
-        func showControls() {
-            guard !isControlsVisible else { resetHideTimer(); return }
-            withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
-            scheduleHide()
-        }
-    #endif
+    func showControls() {
+        guard !isControlsVisible else { resetHideTimer(); return }
+        withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
+        scheduleHide()
+    }
 
     func scheduleHide() {
         hideTask?.cancel()

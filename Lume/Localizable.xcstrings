@@ -178,6 +178,71 @@
         }
       }
     },
+    "“%@” and its video are deleted from your Dispatcharr server." : {
+      "comment" : "Confirmation message before deleting a recording on a Dispatcharr server. %@ is the recording title.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيتم حذف “%@” والفيديو الخاص به من خادم Dispatcharr."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ und das zugehörige Video werden von deinem Dispatcharr-Server gelöscht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” and its video are deleted from your Dispatcharr server."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» y su vídeo se eliminarán de tu servidor Dispatcharr."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » et sa vidéo seront supprimés de votre serveur Dispatcharr."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» e il relativo video verranno eliminati dal tuo server Dispatcharr."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」とその動画が Dispatcharr サーバーから削除されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘%@’ 및 해당 동영상이 Dispatcharr 서버에서 삭제됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” e o vídeo serão apagados do seu servidor Dispatcharr."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”及其视频将从您的 Dispatcharr 服务器中删除。"
+          }
+        }
+      }
+    },
     "“%@” and its video are removed from the recording server for all your devices." : {
       "comment" : "Confirmation message before deleting a recording. %@ is the recording title.",
       "localizations" : {
@@ -304,6 +369,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”将立即停止录制。已录制的内容会保留。"
+          }
+        }
+      }
+    },
+    "“%@” stops recording, and what's been recorded so far is deleted from your Dispatcharr server." : {
+      "comment" : "Confirmation message before deleting a recording that is still running on a Dispatcharr server. %@ is the recording title.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيتوقف تسجيل “%@”، وسيتم حذف ما تم تسجيله حتى الآن من خادم Dispatcharr."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Aufnahme von „%@“ wird beendet und das bisher Aufgenommene von deinem Dispatcharr-Server gelöscht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” stops recording, and what's been recorded so far is deleted from your Dispatcharr server."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» dejará de grabarse y lo grabado hasta ahora se eliminará de tu servidor Dispatcharr."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’enregistrement de « %@ » s’arrête, et ce qui a déjà été enregistré est supprimé de votre serveur Dispatcharr."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La registrazione di «%@» si interrompe e quanto registrato finora verrà eliminato dal tuo server Dispatcharr."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の録画を停止し、ここまでに録画された部分を Dispatcharr サーバーから削除します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘%@’ 녹화가 중지되고, 지금까지 녹화된 내용은 Dispatcharr 서버에서 삭제됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A gravação de “%@” será interrompida e o que já foi gravado será apagado do seu servidor Dispatcharr."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”将停止录制，已录制的内容将从您的 Dispatcharr 服务器中删除。"
           }
         }
       }
@@ -4684,6 +4814,71 @@
         }
       }
     },
+    "Add Dispatcharr Server" : {
+      "comment" : "Recording Server settings: row and sheet title for signing in to a Dispatcharr server. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إضافة خادم Dispatcharr"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr-Server hinzufügen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Dispatcharr Server"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir servidor Dispatcharr"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un serveur Dispatcharr"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi server Dispatcharr"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr サーバーを追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr 서버 추가"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar servidor Dispatcharr"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加 Dispatcharr 服务器"
+          }
+        }
+      }
+    },
     "Add EPG Source" : {
       "localizations" : {
         "ar" : {
@@ -6681,6 +6876,71 @@
         }
       }
     },
+    "API Key" : {
+      "comment" : "Dispatcharr sign-in sheet: picker option and secure field label for a Dispatcharr API key.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مفتاح API"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API-Schlüssel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API Key"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clave de API"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé d’API"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiave API"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API キー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 키"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chave de API"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥"
+          }
+        }
+      }
+    },
     "Appearance" : {
       "localizations" : {
         "ar" : {
@@ -7435,6 +7695,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在认证"
+          }
+        }
+      }
+    },
+    "Authorization was declined on MDBList." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم رفض التفويض على MDBList."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Autorisierung wurde auf MDBList abgelehnt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se rechazó la autorización en MDBList."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’autorisation a été refusée sur MDBList."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’autorizzazione è stata rifiutata su MDBList."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListで認証が拒否されました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList에서 승인이 거부되었습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A autorização foi recusada no MDBList."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在MDBList上拒绝授权。"
           }
         }
       }
@@ -10340,6 +10658,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "演员"
+          }
+        }
+      }
+    },
+    "cast.mini-controller.open-hint" : {
+      "comment" : "Tab bar › Casting mini-controller: accessibility hint of the bar that shows what a Chromecast is playing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفتح عناصر التحكم في البث."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnet die Übertragungssteuerung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the casting controls."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre los controles de envío."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre les commandes de diffusion."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apre i controlli di trasmissione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャストのコントロールを開きます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전송 컨트롤을 엽니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre os controles de transmissão."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开投放控制。"
           }
         }
       }
@@ -13482,6 +13866,64 @@
         }
       }
     },
+    "Connect MDBList Account" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ربط حساب MDBList"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList-Konto verbinden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar cuenta de MDBList"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecter un compte MDBList"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collega account MDBList"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListアカウントを接続"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList 계정 연결"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar Conta do MDBList"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接MDBList账户"
+          }
+        }
+      }
+    },
     "Connect Simkl Account" : {
       "localizations" : {
         "ar" : {
@@ -14643,6 +15085,64 @@
         }
       }
     },
+    "Couldn't import from MDBList. Please try again." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر الاستيراد من MDBList. يُرجى المحاولة مرة أخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import von MDBList fehlgeschlagen. Bitte versuche es erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido importar desde MDBList. Inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’importer depuis MDBList. Veuillez réessayer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile importare da MDBList. Riprova."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListからインポートできませんでした。もう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList에서 가져올 수 없습니다. 다시 시도하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível importar do MDBList. Tente novamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从MDBList导入。请重试。"
+          }
+        }
+      }
+    },
     "Couldn't import from Simkl. Please try again." : {
       "localizations" : {
         "ar" : {
@@ -15008,6 +15508,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法准备报告"
+          }
+        }
+      }
+    },
+    "Couldn't reach MDBList. Check your connection and try again." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر الوصول إلى MDBList. تحقّق من اتصالك وحاول مرة أخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo conectar con MDBList. Comprueba tu conexión y vuelve a intentarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de joindre MDBList. Vérifiez votre connexion et réessayez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile raggiungere MDBList. Controlla la connessione e riprova."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListに接続できませんでした。接続を確認して、もう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList에 연결할 수 없습니다. 연결 상태를 확인하고 다시 시도하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível acessar o MDBList. Verifique sua conexão e tente novamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接MDBList。请检查网络连接后重试。"
           }
         }
       }
@@ -21944,6 +22502,71 @@
         }
       }
     },
+    "Enter an API key you generated in Dispatcharr. You can type it with your iPhone's keyboard. Lume never creates or replaces keys." : {
+      "comment" : "Apple TV Dispatcharr sign-in step: footer below the API key field. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أدخل مفتاح API أنشأته في Dispatcharr. يمكنك كتابته بلوحة مفاتيح iPhone. لا ينشئ Lume المفاتيح ولا يستبدلها أبدًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib einen API-Schlüssel ein, den du in Dispatcharr erstellt hast. Du kannst ihn mit der Tastatur deines iPhone eingeben. Lume erstellt oder ersetzt nie Schlüssel."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter an API key you generated in Dispatcharr. You can type it with your iPhone's keyboard. Lume never creates or replaces keys."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce una clave de API que hayas generado en Dispatcharr. Puedes escribirla con el teclado de tu iPhone. Lume nunca crea ni sustituye claves."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez une clé d’API générée dans Dispatcharr. Vous pouvez la taper avec le clavier de votre iPhone. Lume ne crée ni ne remplace jamais de clés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci una chiave API che hai generato in Dispatcharr. Puoi digitarla con la tastiera del tuo iPhone. Lume non crea né sostituisce mai le chiavi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr で生成した API キーを入力してください。iPhone のキーボードで入力できます。Lume がキーを作成したり置き換えたりすることはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr에서 생성한 API 키를 입력하세요. iPhone 키보드로 입력할 수 있습니다. Lume은 키를 생성하거나 교체하지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite uma chave de API gerada no Dispatcharr. Você pode digitá-la com o teclado do seu iPhone. O Lume nunca cria nem substitui chaves."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入您在 Dispatcharr 中生成的 API 密钥。您可以使用 iPhone 键盘输入。Lume 从不创建或替换密钥。"
+          }
+        }
+      }
+    },
     "Enter Current PIN" : {
       "localizations" : {
         "ar" : {
@@ -22605,6 +23228,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入此代码"
+          }
+        }
+      }
+    },
+    "Enter this code at %@" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أدخل هذا الرمز على %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib diesen Code auf %@ ein"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce este código en %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez ce code sur %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci questo codice su %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@でこのコードを入力"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에서 이 코드를 입력하세요"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insira este código em %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在%@输入此代码"
           }
         }
       }
@@ -27537,6 +28218,64 @@
         }
       }
     },
+    "From Your MDBList Watchlist" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "من قائمة مشاهدة MDBList"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus deiner MDBList-Watchlist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De tu lista de seguimiento de MDBList"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depuis votre liste de suivi MDBList"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dalla tua watchlist di MDBList"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListのウォッチリストから"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList 시청 목록에서"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da Sua Lista do MDBList"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自您的MDBList待看列表"
+          }
+        }
+      }
+    },
     "From Your Simkl Watchlist" : {
       "localizations" : {
         "ar" : {
@@ -30913,6 +31652,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图片缓存"
+          }
+        }
+      }
+    },
+    "Import Watched from MDBList" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استيراد ما تمت مشاهدته من MDBList"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angesehenes von MDBList importieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar lo visto de MDBList"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer les contenus vus depuis MDBList"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa i contenuti visti da MDBList"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListから視聴済みをインポート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList에서 시청함 가져오기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar Assistidos do MDBList"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从MDBList导入已观看记录"
           }
         }
       }
@@ -37776,6 +38573,71 @@
         }
       }
     },
+    "Lume keeps your sign-in details encrypted in iCloud so your other devices can use this server too." : {
+      "comment" : "Dispatcharr sign-in sheet: footer below the username and password fields.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحتفظ Lume ببيانات تسجيل الدخول مشفّرة في iCloud لتتمكن أجهزتك الأخرى من استخدام هذا الخادم أيضًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume speichert deine Anmeldedaten verschlüsselt in iCloud, damit deine anderen Geräte diesen Server ebenfalls nutzen können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume keeps your sign-in details encrypted in iCloud so your other devices can use this server too."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume guarda tus datos de inicio de sesión cifrados en iCloud para que tus otros dispositivos también puedan usar este servidor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume conserve vos identifiants chiffrés dans iCloud pour que vos autres appareils puissent aussi utiliser ce serveur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume conserva i tuoi dati di accesso crittografati in iCloud, così anche gli altri tuoi dispositivi possono usare questo server."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume はサインイン情報を暗号化して iCloud に保存するため、ほかのデバイスでもこのサーバーを使用できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume은 로그인 정보를 암호화하여 iCloud에 보관하므로 다른 기기에서도 이 서버를 사용할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Lume guarda seus dados de acesso criptografados no iCloud para que seus outros dispositivos também possam usar este servidor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume 会将您的登录信息加密保存在 iCloud 中，以便您的其他设备也能使用此服务器。"
+          }
+        }
+      }
+    },
     "Lume plays each stream with the first engine and automatically falls back to the next if it can't be played. Drag to reorder." : {
       "localizations" : {
         "ar" : {
@@ -39356,6 +40218,180 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最大缓冲"
+          }
+        }
+      }
+    },
+    "MDBList" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList"
+          }
+        }
+      }
+    },
+    "MDBList rejected this app's credentials." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رفض MDBList بيانات اعتماد هذا التطبيق."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList hat die Zugangsdaten dieser App abgelehnt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList rechazó las credenciales de esta app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList a refusé les identifiants de cette app."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList ha rifiutato le credenziali di questa app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListがこのアプリの認証情報を拒否しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList가 이 앱의 자격 증명을 거부했습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O MDBList recusou as credenciais deste app."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList拒绝了此应用的凭据。"
+          }
+        }
+      }
+    },
+    "MDBList Watchlist" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قائمة مشاهدة MDBList"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList-Watchlist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista de seguimiento de MDBList"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liste de suivi MDBList"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watchlist di MDBList"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListウォッチリスト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList 시청 목록"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista do MDBList"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList待看列表"
           }
         }
       }
@@ -46268,6 +47304,64 @@
         }
       }
     },
+    "Open MDBList" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح MDBList"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir MDBList"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir MDBList"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri MDBList"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBListを開く"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MDBList 열기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir MDBList"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开MDBList"
+          }
+        }
+      }
+    },
     "Open simkl.com/pin" : {
       "localizations" : {
         "ar" : {
@@ -48262,6 +49356,71 @@
         }
       }
     },
+    "Paste an API key you generated in Dispatcharr. Lume never creates or replaces keys." : {
+      "comment" : "Dispatcharr sign-in sheet: footer below the API key field. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الصق مفتاح API أنشأته في Dispatcharr. لا ينشئ Lume المفاتيح ولا يستبدلها أبدًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen API-Schlüssel ein, den du in Dispatcharr erstellt hast. Lume erstellt oder ersetzt nie Schlüssel."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste an API key you generated in Dispatcharr. Lume never creates or replaces keys."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega una clave de API que hayas generado en Dispatcharr. Lume nunca crea ni sustituye claves."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collez une clé d’API générée dans Dispatcharr. Lume ne crée ni ne remplace jamais de clés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incolla una chiave API che hai generato in Dispatcharr. Lume non crea né sostituisce mai le chiavi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr で生成した API キーを貼り付けてください。Lume がキーを作成したり置き換えたりすることはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr에서 생성한 API 키를 붙여 넣으세요. Lume은 키를 생성하거나 교체하지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole uma chave de API gerada no Dispatcharr. O Lume nunca cria nem substitui chaves."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴您在 Dispatcharr 中生成的 API 密钥。Lume 从不创建或替换密钥。"
+          }
+        }
+      }
+    },
     "Pause" : {
       "comment" : "A button that pauses playback.",
       "isCommentAutoGenerated" : true,
@@ -49782,6 +50941,1524 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放器引擎"
+          }
+        }
+      }
+    },
+    "player.cast.audio-warning" : {
+      "comment" : "Player › Cast sheet: warning when every audio track of the video uses a format most Chromecasts can't decode. The argument is a technical format name such as E-AC-3 or DTS.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قد لا يعمل صوت هذا الفيديو (%@) على أجهزة Cast، لذا قد يُبث دون صوت."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Ton dieses Videos (%@) wird auf Cast-Geräten möglicherweise nicht abgespielt – das Bild kann ohne Ton laufen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video's audio (%@) may not play on Cast devices, so it could cast without sound."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es posible que el audio de este vídeo (%@) no se reproduzca en dispositivos Cast, así que podría verse sin sonido."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'audio de cette vidéo (%@) risque de ne pas être lu sur les appareils Cast : l'image pourrait s'afficher sans son."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'audio di questo video (%@) potrebbe non essere riprodotto sui dispositivi Cast, quindi potrebbe essere trasmesso senza suono."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この動画の音声（%@）は Cast デバイスで再生できない場合があり、音声なしでキャストされることがあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 동영상의 오디오(%@)는 Cast 기기에서 재생되지 않을 수 있어 소리 없이 전송될 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O áudio deste vídeo (%@) pode não ser reproduzido em dispositivos Cast, por isso a transmissão pode ficar sem som."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此视频的音频（%@）可能无法在 Cast 设备上播放，投放时可能没有声音。"
+          }
+        }
+      }
+    },
+    "player.cast.button" : {
+      "comment" : "Player › Controls: accessibility label of the button that sends playback to a Chromecast or AirPlay device.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übertragen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caster"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trasmetti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャスト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전송"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "投放"
+          }
+        }
+      }
+    },
+    "player.cast.casting" : {
+      "comment" : "Player › Casting: status shown while a Chromecast that reports no name plays the stream.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird übertragen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Casting"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diffusion en cours"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trasmissione in corso"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャスト中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전송 중"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitindo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在投放"
+          }
+        }
+      }
+    },
+    "player.cast.casting-to" : {
+      "comment" : "Player › Casting: status shown while a Chromecast plays the stream. The argument is the Chromecast's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البث إلى %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird auf %@ übertragen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Casting to %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviando a %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diffusion sur %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trasmissione su %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ にキャスト中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@(으)로 전송 중"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitindo para %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在投放到 %@"
+          }
+        }
+      }
+    },
+    "player.cast.device.unnamed" : {
+      "comment" : "Player › Cast sheet: name shown for a Chromecast that doesn't report one.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جهاز Cast"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast-Gerät"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast Device"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispositivo Cast"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil Cast"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispositivo Cast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast デバイス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 기기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispositivo Cast"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 设备"
+          }
+        }
+      }
+    },
+    "player.cast.error.load-failed" : {
+      "comment" : "Player › Cast error: the Chromecast refused to load the stream; it now plays on the phone or tablet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر على جهاز Cast فتحه، لذا يتم تشغيله على هذا الجهاز بدلًا من ذلك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Cast-Gerät konnte ihn nicht öffnen, daher wird er jetzt auf diesem Gerät abgespielt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Cast device couldn't open it, so it's playing on this device instead."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo Cast no pudo abrirla, así que se está reproduciendo en este dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’appareil Cast n’a pas pu l’ouvrir ; la lecture se poursuit donc sur cet appareil."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il dispositivo Cast non è riuscito ad aprirlo, quindi viene riprodotto su questo dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast デバイスで開けなかったため、このデバイスで再生しています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 기기에서 열 수 없어 이 기기에서 재생 중입니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O dispositivo Cast não conseguiu abri-lo, então ele está sendo reproduzido neste dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 设备无法打开此内容，因此改为在本设备上播放。"
+          }
+        }
+      }
+    },
+    "player.cast.error.playback-failed" : {
+      "comment" : "Player › Cast error: the Chromecast started the stream and then failed; it now plays on the phone or tablet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل التشغيل على جهاز Cast، لذا يتم تشغيله على هذا الجهاز بدلًا من ذلك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Wiedergabe auf dem Cast-Gerät ist fehlgeschlagen, daher wird er jetzt auf diesem Gerät abgespielt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback failed on the Cast device, so it's playing on this device instead."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La reproducción falló en el dispositivo Cast, así que se está reproduciendo en este dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La lecture a échoué sur l’appareil Cast ; elle se poursuit donc sur cet appareil."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La riproduzione sul dispositivo Cast non è riuscita, quindi viene riprodotto su questo dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast デバイスでの再生に失敗したため、このデバイスで再生しています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 기기에서 재생에 실패하여 이 기기에서 재생 중입니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A reprodução falhou no dispositivo Cast, então ele está sendo reproduzido neste dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Cast 设备上播放失败，因此改为在本设备上播放。"
+          }
+        }
+      }
+    },
+    "player.cast.error.title" : {
+      "comment" : "Player › Cast error: title shown when a Chromecast couldn't play the stream and playback moved back to this device.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن بث هذا البث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Stream kann nicht übertragen werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This stream can't be cast"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta emisión no se puede enviar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de caster ce flux"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile trasmettere questo stream"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このストリームはキャストできません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 스트림은 전송할 수 없습니다"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não é possível transmitir este stream"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法投放此串流"
+          }
+        }
+      }
+    },
+    "player.cast.sheet.airplay" : {
+      "comment" : "Player › Cast sheet: row that opens the system AirPlay device picker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPlay…"
+          }
+        }
+      }
+    },
+    "player.cast.sheet.chromecast" : {
+      "comment" : "Player › Cast sheet: header above the list of Chromecast devices.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        }
+      }
+    },
+    "player.cast.sheet.connecting" : {
+      "comment" : "Player › Cast sheet: row shown while Lume connects to a Chromecast. The argument is the Chromecast's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ الاتصال بـ %@…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinden mit %@ …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecting to %@…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectando con %@…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion à %@…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connessione a %@…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ に接続中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에 연결 중…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectando a %@…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在连接到 %@…"
+          }
+        }
+      }
+    },
+    "player.cast.sheet.local-network-hint" : {
+      "comment" : "Player › Cast sheet: hint below “No devices found” on how to make a Chromecast show up.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تأكد من أن جهاز Chromecast متصل بشبكة Wi-Fi نفسها التي يتصل بها هذا الجهاز. إذا رفضت وصول Lume إلى الشبكة المحلية، فاسمح به مجددًا من الإعدادات › الخصوصية والأمن › الشبكة المحلية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Achte darauf, dass dein Chromecast im selben WLAN ist wie dieses Gerät. Falls du Lume den Zugriff auf das lokale Netzwerk verweigert hast, erlaube ihn unter Einstellungen › Datenschutz & Sicherheit › Lokales Netzwerk."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make sure your Chromecast is on the same Wi-Fi network as this device. If you declined Local Network access for Lume, allow it again in Settings › Privacy & Security › Local Network."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Asegúrate de que tu Chromecast esté en la misma red Wi‑Fi que este dispositivo. Si denegaste el acceso a la red local a Lume, vuelve a permitirlo en Ajustes › Privacidad y seguridad › Red local."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez que votre Chromecast est sur le même réseau Wi‑Fi que cet appareil. Si vous avez refusé l’accès au réseau local à Lume, autorisez-le à nouveau dans Réglages › Confidentialité et sécurité › Réseau local."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assicurati che il Chromecast sia sulla stessa rete Wi‑Fi di questo dispositivo. Se hai negato a Lume l’accesso alla rete locale, consentilo di nuovo in Impostazioni › Privacy e sicurezza › Rete locale."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast がこのデバイスと同じ Wi‑Fi ネットワークに接続されていることを確認してください。Lume にローカルネットワークへのアクセスを許可しなかった場合は、「設定」›「プライバシーとセキュリティ」›「ローカルネットワーク」で再度許可してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast가 이 기기와 같은 Wi‑Fi 네트워크에 연결되어 있는지 확인하세요. Lume의 로컬 네트워크 접근을 거부했다면 설정 › 개인정보 보호 및 보안 › 로컬 네트워크에서 다시 허용하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifique se o seu Chromecast está na mesma rede Wi‑Fi que este dispositivo. Se você negou o acesso à rede local para o Lume, permita-o novamente em Ajustes › Privacidade e Segurança › Rede Local."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请确保你的 Chromecast 与本设备连接到同一 Wi‑Fi 网络。如果你曾拒绝 Lume 访问本地网络，请前往“设置”›“隐私与安全性”›“本地网络”重新允许。"
+          }
+        }
+      }
+    },
+    "player.cast.sheet.no-devices" : {
+      "comment" : "Player › Cast sheet: shown when no Chromecast device was found on the network.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على أجهزة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Geräte gefunden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No devices found"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se han encontrado dispositivos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun appareil trouvé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun dispositivo trovato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デバイスが見つかりません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기를 찾을 수 없음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum dispositivo encontrado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到设备"
+          }
+        }
+      }
+    },
+    "player.cast.sheet.searching" : {
+      "comment" : "Player › Cast sheet: shown while Lume looks for Chromecast devices on the network.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البحث عن أجهزة…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suche nach Geräten …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searching for devices…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscando dispositivos…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche d’appareils…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricerca di dispositivi…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デバイスを検索中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 검색 중…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procurando dispositivos…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在搜索设备…"
+          }
+        }
+      }
+    },
+    "player.cast.sheet.title" : {
+      "comment" : "Player › Cast sheet: title of the sheet that lists Chromecast and AirPlay devices to play on.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البث إلى"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übertragen auf"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast To"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar a"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caster sur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trasmetti su"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャスト先"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전송 대상"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitir para"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "投放到"
+          }
+        }
+      }
+    },
+    "player.cast.stop" : {
+      "comment" : "Player › Casting: button that stops the Chromecast and plays the stream on this device again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إيقاف البث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übertragung beenden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop Casting"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dejar de enviar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêter la diffusion"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompi trasmissione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャストを停止"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전송 중지"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar transmissão"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止投放"
+          }
+        }
+      }
+    },
+    "player.cast.unavailable.format" : {
+      "comment" : "Player › Cast sheet: why a video in a container a Chromecast can't play (e.g. AVI, FLV) can't be sent to it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن لأجهزة Cast تشغيل تنسيق الفيديو هذا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast-Geräte können dieses Videoformat nicht abspielen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast devices can't play this video format."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los dispositivos Cast no pueden reproducir este formato de vídeo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les appareils Cast ne peuvent pas lire ce format vidéo."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I dispositivi Cast non possono riprodurre questo formato video."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast デバイスはこのビデオ形式を再生できません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 기기는 이 동영상 형식을 재생할 수 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispositivos Cast não conseguem reproduzir este formato de vídeo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 设备无法播放此视频格式。"
+          }
+        }
+      }
+    },
+    "player.cast.unavailable.header-auth" : {
+      "comment" : "Player › Cast sheet: why a stream from a signed-in media server or network share can't be sent to a Chromecast.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتطلب هذا المصدر تسجيل دخول لا يمكن لأجهزة Cast استخدامه."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Quelle erfordert eine Anmeldung, die Cast-Geräte nicht nutzen können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This source needs a sign-in that Cast devices can't use."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta fuente requiere un inicio de sesión que los dispositivos Cast no pueden usar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette source nécessite une connexion que les appareils Cast ne peuvent pas utiliser."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa sorgente richiede un accesso che i dispositivi Cast non possono usare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このソースには、Cast デバイスでは使用できないサインインが必要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 소스는 Cast 기기에서 사용할 수 없는 로그인이 필요합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta fonte exige um login que dispositivos Cast não conseguem usar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此来源需要 Cast 设备无法使用的登录信息。"
+          }
+        }
+      }
+    },
+    "player.cast.unavailable.local-file" : {
+      "comment" : "Player › Cast sheet: why a downloaded video can't be sent to a Chromecast.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن تشغيل مقاطع الفيديو التي تم تنزيلها إلا على هذا الجهاز."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heruntergeladene Videos können nur auf diesem Gerät abgespielt werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaded videos can only play on this device."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los vídeos descargados solo se pueden reproducir en este dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les vidéos téléchargées ne peuvent être lues que sur cet appareil."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I video scaricati possono essere riprodotti solo su questo dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロードしたビデオはこのデバイスでのみ再生できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드한 동영상은 이 기기에서만 재생할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vídeos baixados só podem ser reproduzidos neste dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下载的视频只能在本设备上播放。"
+          }
+        }
+      }
+    },
+    "player.cast.unavailable.needs-resolution" : {
+      "comment" : "Player › Cast sheet: why a portal stream whose address isn't known yet can't be sent to a Chromecast.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يزال هذا البث قيد التحميل. حاول مرة أخرى بعد قليل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Stream wird noch geladen. Versuche es gleich noch einmal."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This stream is still loading. Try again in a moment."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta emisión aún se está cargando. Inténtalo de nuevo en un momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce flux est encore en cours de chargement. Réessayez dans un instant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo stream è ancora in caricamento. Riprova tra un momento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このストリームはまだ読み込み中です。しばらくしてからもう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 스트림은 아직 로드 중입니다. 잠시 후 다시 시도하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este stream ainda está carregando. Tente novamente em instantes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此串流仍在加载。请稍后再试。"
+          }
+        }
+      }
+    },
+    "player.cast.unavailable.protocol" : {
+      "comment" : "Player › Cast sheet: why a stream using a protocol other than HTTP (e.g. RTMP, UDP) can't be sent to a Chromecast.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن لأجهزة Cast فتح هذا النوع من البث."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast-Geräte können diese Art von Stream nicht öffnen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast devices can't open this kind of stream."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los dispositivos Cast no pueden abrir este tipo de emisión."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les appareils Cast ne peuvent pas ouvrir ce type de flux."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I dispositivi Cast non possono aprire questo tipo di stream."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast デバイスはこの種類のストリームを開けません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 기기는 이 유형의 스트림을 열 수 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispositivos Cast não conseguem abrir este tipo de stream."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cast 设备无法打开此类串流。"
+          }
+        }
+      }
+    },
+    "player.cast.unavailable.recording" : {
+      "comment" : "Player › Cast sheet: why a recording from the recording server can't be sent to a Chromecast.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن بث التسجيلات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufnahmen können nicht übertragen werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordings can't be cast."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las grabaciones no se pueden enviar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les enregistrements ne peuvent pas être castés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le registrazioni non possono essere trasmesse."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画はキャストできません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화물은 전송할 수 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não é possível transmitir gravações."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法投放录制内容。"
+          }
+        }
+      }
+    },
+    "player.cast.volume" : {
+      "comment" : "Player › Casting: accessibility label of the slider that sets the Chromecast's volume.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مستوى الصوت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lautstärke"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volumen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音量"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "음량"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音量"
           }
         }
       }
@@ -51427,6 +54104,136 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "高级版功能"
+          }
+        }
+      }
+    },
+    "premium.chromecast.subtitle" : {
+      "comment" : "Lume Pro feature description: casting from iPhone or iPad to a Chromecast on the same network.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أرسل البث المباشر والأفلام والحلقات من iPhone أو iPad إلى جهاز Chromecast وتحكم فيها من Lume."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sende Live-TV, Filme und Folgen von deinem iPhone oder iPad an einen Chromecast und steuere sie in Lume."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send live TV, movies and episodes from your iPhone or iPad to a Chromecast and control them from Lume."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envía TV en directo, películas y episodios desde tu iPhone o iPad a un Chromecast y contrólalos desde Lume."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyez la TV en direct, des films et des épisodes de votre iPhone ou iPad vers un Chromecast et contrôlez-les depuis Lume."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia TV in diretta, film ed episodi dal tuo iPhone o iPad a un Chromecast e controllali da Lume."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone や iPad からライブ TV、映画、エピソードを Chromecast に送信し、Lume で操作できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 또는 iPad에서 실시간 TV, 영화, 에피소드를 Chromecast로 보내고 Lume에서 제어하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envie TV ao vivo, filmes e episódios do seu iPhone ou iPad para um Chromecast e controle tudo pelo Lume."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将直播电视、电影和剧集从 iPhone 或 iPad 发送到 Chromecast，并在 Lume 中控制播放。"
+          }
+        }
+      }
+    },
+    "premium.chromecast.title" : {
+      "comment" : "Lume Pro feature title: send playback to a Chromecast.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chromecast"
           }
         }
       }
@@ -53860,67 +56667,67 @@
         }
       }
     },
-    "Record live TV and schedule shows from the guide on your own LumeRecorder server, then watch them on every device." : {
-      "comment" : "Lume Pro feature subtitle for the recording server.",
+    "Record live TV and schedule shows from the guide on your own LumeRecorder or Dispatcharr server, then watch them on every device." : {
+      "comment" : "Lume Pro feature subtitle for the recording server. LumeRecorder and Dispatcharr are product names.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "سجّل البث المباشر وجدول البرامج من دليل البرامج على خادم LumeRecorder الخاص بك، ثم شاهدها على كل أجهزتك."
+            "value" : "سجّل البث المباشر وجدول البرامج من دليل البرامج على خادم LumeRecorder أو Dispatcharr الخاص بك، ثم شاهدها على كل أجهزتك."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nimm Live-TV auf und plane Sendungen aus dem Programmführer auf deinem eigenen LumeRecorder-Server – und sieh sie dir auf jedem Gerät an."
+            "value" : "Nimm Live-TV auf und plane Sendungen aus dem Programmführer auf deinem eigenen LumeRecorder- oder Dispatcharr-Server – und sieh sie dir auf jedem Gerät an."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Record live TV and schedule shows from the guide on your own LumeRecorder server, then watch them on every device."
+            "value" : "Record live TV and schedule shows from the guide on your own LumeRecorder or Dispatcharr server, then watch them on every device."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Graba TV en directo y programa grabaciones desde la guía en tu propio servidor LumeRecorder, y míralas en cualquier dispositivo."
+            "value" : "Graba TV en directo y programa grabaciones desde la guía en tu propio servidor LumeRecorder o Dispatcharr, y míralas en cualquier dispositivo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistrez la TV en direct et programmez des émissions depuis le guide sur votre propre serveur LumeRecorder, puis regardez-les sur tous vos appareils."
+            "value" : "Enregistrez la TV en direct et programmez des émissions depuis le guide sur votre propre serveur LumeRecorder ou Dispatcharr, puis regardez-les sur tous vos appareils."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Registra la TV in diretta e pianifica le trasmissioni dalla guida sul tuo server LumeRecorder, poi guardale su ogni dispositivo."
+            "value" : "Registra la TV in diretta e pianifica le trasmissioni dalla guida sul tuo server LumeRecorder o Dispatcharr, poi guardale su ogni dispositivo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自分の LumeRecorder サーバーでライブTVを録画したり、番組表から番組を予約したりして、どのデバイスでも視聴できます。"
+            "value" : "自分の LumeRecorder または Dispatcharr サーバーでライブTVを録画したり、番組表から番組を予約したりして、どのデバイスでも視聴できます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "자체 LumeRecorder 서버에서 라이브 TV를 녹화하고 편성표에서 프로그램을 예약한 다음, 모든 기기에서 시청하세요."
+            "value" : "자체 LumeRecorder 또는 Dispatcharr 서버에서 라이브 TV를 녹화하고 편성표에서 프로그램을 예약한 다음, 모든 기기에서 시청하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Grave TV ao vivo e agende programas pelo guia no seu próprio servidor LumeRecorder, depois assista em qualquer dispositivo."
+            "value" : "Grave TV ao vivo e agende programas pelo guia no seu próprio servidor LumeRecorder ou Dispatcharr, depois assista em qualquer dispositivo."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在您自己的 LumeRecorder 服务器上录制直播电视、从指南中预约节目，然后在任意设备上观看。"
+            "value" : "在您自己的 LumeRecorder 或 Dispatcharr 服务器上录制直播电视、从指南中预约节目，然后在任意设备上观看。"
           }
         }
       }
@@ -59018,6 +61825,71 @@
         }
       }
     },
+    "Scheduled Recordings" : {
+      "comment" : "Recording Server settings: number of recordings scheduled on the paired Dispatcharr server.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التسجيلات المجدولة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geplante Aufnahmen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scheduled Recordings"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grabaciones programadas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrements programmés"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrazioni programmate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予約済みの録画"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예약된 녹화"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravações agendadas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已预约的录制"
+          }
+        }
+      }
+    },
     "Scope" : {
       "localizations" : {
         "ar" : {
@@ -59192,60 +62064,60 @@
         }
       }
     },
-    "Scrobble what you watch to Trakt or Simkl, import your history and surface your watchlist on Home." : {
+    "Scrobble what you watch to Trakt, Simkl or MDBList, import your history and surface your watchlist on Home." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "سجّل ما تشاهده في Trakt أو Simkl، واستورد سجلّك، واعرض قائمة مشاهدتك في الرئيسية."
+            "value" : "سجّل ما تشاهده في Trakt أو Simkl أو MDBList، واستورد سجلّك، واعرض قائمة مشاهدتك في الرئيسية."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Übertrage, was du ansiehst, an Trakt oder Simkl, importiere deinen Verlauf und zeige deine Watchlist auf der Startseite."
+            "value" : "Übertrage, was du ansiehst, an Trakt, Simkl oder MDBList, importiere deinen Verlauf und zeige deine Watchlist auf der Startseite."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Registra lo que ves en Trakt o Simkl, importa tu historial y muestra tu lista de seguimiento en Inicio."
+            "value" : "Registra lo que ves en Trakt, Simkl o MDBList, importa tu historial y muestra tu lista de seguimiento en Inicio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scrobblez ce que vous regardez vers Trakt ou Simkl, importez votre historique et affichez votre liste de suivi sur l’écran d’accueil."
+            "value" : "Scrobblez ce que vous regardez vers Trakt, Simkl ou MDBList, importez votre historique et affichez votre liste de suivi sur l’écran d’accueil."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esegui lo scrobble di ciò che guardi su Trakt o Simkl, importa la tua cronologia e mostra la tua watchlist nella Home."
+            "value" : "Esegui lo scrobble di ciò che guardi su Trakt, Simkl o MDBList, importa la tua cronologia e mostra la tua watchlist nella Home."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "視聴した内容をTraktまたはSimklにスクロブルし、履歴をインポートして、ウォッチリストをホームに表示します。"
+            "value" : "視聴した内容をTrakt、Simkl、またはMDBListにスクロブルし、履歴をインポートして、ウォッチリストをホームに表示します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시청 내역을 Trakt 또는 Simkl에 스크로블하고, 기록을 가져오며, 홈에 시청 목록을 표시하세요."
+            "value" : "시청 내역을 Trakt, Simkl 또는 MDBList에 스크로블하고, 기록을 가져오며, 홈에 시청 목록을 표시하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Faça scrobble do que você assiste no Trakt ou no Simkl, importe seu histórico e mostre sua lista na Tela Inicial."
+            "value" : "Faça scrobble do que você assiste no Trakt, no Simkl ou no MDBList, importe seu histórico e mostre sua lista na Tela Inicial."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将您观看的内容记录到Trakt或Simkl，导入您的历史记录，并在主页上展示您的待看列表。"
+            "value" : "将您观看的内容记录到Trakt、Simkl或MDBList，导入您的历史记录，并在主页上展示您的待看列表。"
           }
         }
       }
@@ -63761,6 +66633,71 @@
         }
       }
     },
+    "Sign In Again" : {
+      "comment" : "Recording Server settings: button that reopens the Dispatcharr sign-in for the paired server; also the sheet's title then.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تسجيل الدخول مرة أخرى"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut anmelden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign In Again"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a iniciar sesión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se reconnecter"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi di nuovo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再度サインイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 로그인"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar novamente"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登录"
+          }
+        }
+      }
+    },
     "Sign in to iCloud in Settings to sync your playlists and viewing across devices." : {
       "localizations" : {
         "ar" : {
@@ -63931,6 +66868,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "登录你的 OpenSubtitles 账户以下载字幕。"
+          }
+        }
+      }
+    },
+    "Sign In With" : {
+      "comment" : "Dispatcharr sign-in sheet: picker label choosing between an API key and a username and password.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تسجيل الدخول باستخدام"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anmelden mit"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign In With"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar sesión con"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se connecter avec"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi con"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインイン方法"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그인 방법"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar com"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录方式"
           }
         }
       }
@@ -69817,6 +72819,64 @@
         }
       }
     },
+    "Sync the movies and episodes you watch to MDBList, and surface your MDBList watchlist on Home." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "زامِن الأفلام والحلقات التي تشاهدها مع MDBList، واعرض قائمة مشاهدة MDBList في الرئيسية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisiere die Filme und Episoden, die du ansiehst, mit MDBList und zeige deine MDBList-Watchlist auf dem Startbildschirm."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincroniza con MDBList las películas y los episodios que ves, y muestra tu lista de seguimiento de MDBList en Inicio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisez les films et les épisodes que vous regardez avec MDBList, et affichez votre liste de suivi MDBList sur l’écran d’accueil."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizza i film e gli episodi che guardi con MDBList e mostra la tua watchlist di MDBList nella Home."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "視聴した映画やエピソードをMDBListに同期し、MDBListのウォッチリストをホームに表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시청한 영화와 에피소드를 MDBList에 동기화하고, 홈에 MDBList 시청 목록을 표시하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronize os filmes e episódios que você assiste com o MDBList e mostre sua lista do MDBList na Tela Inicial."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将您观看的电影和剧集同步到MDBList，并在主页上展示您的MDBList待看列表。"
+          }
+        }
+      }
+    },
     "Sync the movies and episodes you watch to Simkl, and surface your Simkl watchlist on Home." : {
       "localizations" : {
         "ar" : {
@@ -69991,60 +73051,60 @@
         }
       }
     },
-    "Sync watched movies and episodes and show your Trakt or Simkl watchlist on Home." : {
+    "Sync watched movies and episodes and show your Trakt, Simkl or MDBList watchlist on Home." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "زامِن الأفلام والحلقات التي شاهدتها واعرض قائمة مشاهدة Trakt أو Simkl في الرئيسية."
+            "value" : "زامِن الأفلام والحلقات التي شاهدتها واعرض قائمة مشاهدة Trakt أو Simkl أو MDBList في الرئيسية."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synchronisiere gesehene Filme und Episoden und zeige deine Trakt- oder Simkl-Watchlist auf dem Startbildschirm."
+            "value" : "Synchronisiere gesehene Filme und Episoden und zeige deine Trakt-, Simkl- oder MDBList-Watchlist auf dem Startbildschirm."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincroniza las películas y los episodios vistos y muestra tu lista de seguimiento de Trakt o Simkl en Inicio."
+            "value" : "Sincroniza las películas y los episodios vistos y muestra tu lista de seguimiento de Trakt, Simkl o MDBList en Inicio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synchronisez les films et épisodes vus et affichez votre liste de suivi Trakt ou Simkl sur l’écran d’accueil."
+            "value" : "Synchronisez les films et épisodes vus et affichez votre liste de suivi Trakt, Simkl ou MDBList sur l’écran d’accueil."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincronizza i film e gli episodi visti e mostra la tua watchlist di Trakt o Simkl nella Home."
+            "value" : "Sincronizza i film e gli episodi visti e mostra la tua watchlist di Trakt, Simkl o MDBList nella Home."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "視聴済みの映画やエピソードを同期し、TraktまたはSimklのウォッチリストをホームに表示します。"
+            "value" : "視聴済みの映画やエピソードを同期し、Trakt、Simkl、またはMDBListのウォッチリストをホームに表示します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시청한 영화와 에피소드를 동기화하고 홈에 Trakt 또는 Simkl 시청 목록을 표시하세요."
+            "value" : "시청한 영화와 에피소드를 동기화하고 홈에 Trakt, Simkl 또는 MDBList 시청 목록을 표시하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sincronize filmes e episódios assistidos e mostre sua lista do Trakt ou do Simkl na Tela Inicial."
+            "value" : "Sincronize filmes e episódios assistidos e mostre sua lista do Trakt, do Simkl ou do MDBList na Tela Inicial."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同步已观看的电影和剧集，并在主页上显示您的 Trakt 或 Simkl 待看列表。"
+            "value" : "同步已观看的电影和剧集，并在主页上显示您的 Trakt、Simkl 或 MDBList 待看列表。"
           }
         }
       }
@@ -72379,6 +75439,71 @@
         }
       }
     },
+    "The address of your Dispatcharr server. Without a port, Lume uses %@." : {
+      "comment" : "Dispatcharr sign-in sheet: address footer; the placeholder is the default port number. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عنوان خادم Dispatcharr الخاص بك. بدون منفذ، يستخدم Lume المنفذ %@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Adresse deines Dispatcharr-Servers. Ohne Port verwendet Lume %@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The address of your Dispatcharr server. Without a port, Lume uses %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La dirección de tu servidor Dispatcharr. Sin puerto, Lume usa el %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adresse de votre serveur Dispatcharr. Sans port, Lume utilise %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’indirizzo del tuo server Dispatcharr. Senza porta, Lume usa la %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr サーバーのアドレスです。ポートを省略すると、Lume はポート %@ を使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr 서버의 주소입니다. 포트를 생략하면 Lume은 %@ 포트를 사용합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O endereço do seu servidor Dispatcharr. Sem porta, o Lume usa a %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您的 Dispatcharr 服务器地址。如未指定端口，Lume 将使用 %@ 端口。"
+          }
+        }
+      }
+    },
     "The buffers set how much decoded media is held before playback starts or resumes — raise them if high-bitrate 4K streams stutter. " : {
       "localizations" : {
         "ar" : {
@@ -72491,6 +75616,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "轮播显示电影和剧集。频道没有宽幅图片，因此只在“行”布局中显示。"
+          }
+        }
+      }
+    },
+    "The code expired. Please try connecting again." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انتهت صلاحية الرمز. يُرجى محاولة الاتصال مرة أخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Code ist abgelaufen. Bitte versuche erneut, dich zu verbinden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El código ha caducado. Vuelve a intentar conectarte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le code a expiré. Veuillez réessayer de vous connecter."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il codice è scaduto. Riprova a connetterti."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コードの有効期限が切れました。もう一度接続してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "코드가 만료되었습니다. 다시 연결해 보세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O código expirou. Tente conectar novamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代码已过期。请重新尝试连接。"
           }
         }
       }
@@ -73157,6 +76340,71 @@
         }
       }
     },
+    "The recording server didn't accept these sign-in details. Check them and try again." : {
+      "comment" : "Recording server sign-in error: Dispatcharr rejected the API key or the username and password.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يقبل خادم التسجيل بيانات تسجيل الدخول هذه. تحقّق منها وحاول مرة أخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Aufnahmeserver hat diese Anmeldedaten nicht akzeptiert. Überprüfe sie und versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording server didn't accept these sign-in details. Check them and try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El servidor de grabación no ha aceptado estos datos de inicio de sesión. Revísalos e inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur d’enregistrement n’a pas accepté ces identifiants. Vérifiez-les et réessayez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il server di registrazione non ha accettato questi dati di accesso. Controllali e riprova."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画サーバーがこのサインイン情報を受け付けませんでした。内容を確認してもう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화 서버가 이 로그인 정보를 허용하지 않았습니다. 확인한 후 다시 시도하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O servidor de gravação não aceitou esses dados de acesso. Verifique-os e tente novamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制服务器未接受这些登录信息。请检查后重试。"
+          }
+        }
+      }
+    },
     "The recording server is already recording as many streams as it allows. Stop another recording and try again." : {
       "comment" : "Recording server error: concurrent-recording limit reached.",
       "localizations" : {
@@ -73348,6 +76596,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "录制服务器可以连接。"
+          }
+        }
+      }
+    },
+    "The recording server no longer accepts this device. Pair it or sign in again in Settings." : {
+      "comment" : "Recording server error: the server rejected this device's pairing token or sign-in details (HTTP 401).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يعد خادم التسجيل يقبل هذا الجهاز. أعد إقرانه أو سجّل الدخول مرة أخرى من الإعدادات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Aufnahmeserver akzeptiert dieses Gerät nicht mehr. Kopple es oder melde dich in den Einstellungen erneut an."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording server no longer accepts this device. Pair it or sign in again in Settings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El servidor de grabación ya no acepta este dispositivo. Vuelve a vincularlo o a iniciar sesión en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur d’enregistrement n’accepte plus cet appareil. Jumelez-le ou reconnectez-vous dans Réglages."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il server di registrazione non accetta più questo dispositivo. Abbinalo o accedi di nuovo in Impostazioni."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画サーバーがこのデバイスを受け付けなくなりました。設定でもう一度ペアリングするか、サインインし直してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화 서버가 더 이상 이 기기를 허용하지 않습니다. 설정에서 다시 페어링하거나 다시 로그인하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O servidor de gravação não aceita mais este dispositivo. Pareie-o ou entre novamente em Ajustes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制服务器不再接受此设备。请在“设置”中重新配对或重新登录。"
           }
         }
       }
@@ -75379,71 +78692,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此设备已在与 Lume Cloud 同步。"
-          }
-        }
-      }
-    },
-    "This device is no longer paired with the recording server. Pair it again in Settings." : {
-      "comment" : "Recording server error: the stored pairing token was rejected.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "لم يعد هذا الجهاز مقترنًا بخادم التسجيل. أعد إقرانه من الإعدادات."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Gerät ist nicht mehr mit dem Aufnahmeserver gekoppelt. Kopple es in den Einstellungen erneut."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device is no longer paired with the recording server. Pair it again in Settings."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este dispositivo ya no está vinculado al servidor de grabación. Vuelve a vincularlo en Ajustes."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’est plus jumelé avec le serveur d’enregistrement. Jumelez-le à nouveau dans Réglages."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questo dispositivo non è più abbinato al server di registrazione. Abbinalo di nuovo in Impostazioni."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このデバイスは録画サーバーとのペアリングが解除されています。設定でもう一度ペアリングしてください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 기기는 더 이상 녹화 서버와 페어링되어 있지 않습니다. 설정에서 다시 페어링하세요."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este dispositivo não está mais pareado com o servidor de gravação. Pareie-o novamente em Ajustes."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此设备已不再与录制服务器配对。请在“设置”中重新配对。"
           }
         }
       }
@@ -77504,6 +80752,71 @@
         }
       }
     },
+    "To record from a Dispatcharr server, Lume sends it only the channel's Dispatcharr ID and the programme's details." : {
+      "comment" : "Recording Server settings: privacy disclosure for Dispatcharr servers. Dispatcharr is a product name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "للتسجيل من خادم Dispatcharr، يرسل إليه Lume فقط معرّف القناة في Dispatcharr وتفاصيل البرنامج."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für Aufnahmen auf einem Dispatcharr-Server sendet Lume ihm nur die Dispatcharr-ID des Senders und die Details der Sendung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To record from a Dispatcharr server, Lume sends it only the channel's Dispatcharr ID and the programme's details."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para grabar desde un servidor Dispatcharr, Lume solo le envía el ID de Dispatcharr del canal y los detalles del programa."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour enregistrer depuis un serveur Dispatcharr, Lume ne lui envoie que l’identifiant Dispatcharr de la chaîne et les détails du programme."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per registrare da un server Dispatcharr, Lume gli invia solo l’ID Dispatcharr del canale e i dettagli del programma."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr サーバーで録画するとき、Lume が送信するのはチャンネルの Dispatcharr ID と番組の詳細だけです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispatcharr 서버에서 녹화할 때 Lume은 채널의 Dispatcharr ID와 프로그램 정보만 전송합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para gravar em um servidor Dispatcharr, o Lume envia apenas o ID do canal no Dispatcharr e os detalhes do programa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过 Dispatcharr 服务器录制时，Lume 只会向其发送频道的 Dispatcharr ID 和节目详情。"
+          }
+        }
+      }
+    },
     "To record, Lume sends the recording server the stream address the player uses. For Xtream playlists it includes your provider username and password." : {
       "comment" : "Recording Server settings: one-time disclosure that the provider stream URL (with Xtream credentials) is sent to the user's recording server.",
       "localizations" : {
@@ -77876,67 +81189,67 @@
         }
       }
     },
-    "Too many pairing attempts. Try again in a minute." : {
-      "comment" : "Recording server pairing: rate limited after failed attempts.",
+    "Too many attempts. Try again in a minute." : {
+      "comment" : "Recording server error: the server rate-limited pairing, sign-in or other requests (HTTP 429).",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "محاولات إقران كثيرة جدًا. حاول مرة أخرى بعد دقيقة."
+            "value" : "محاولات كثيرة جدًا. حاول مرة أخرى بعد دقيقة."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zu viele Kopplungsversuche. Versuche es in einer Minute erneut."
+            "value" : "Zu viele Versuche. Versuche es in einer Minute erneut."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Too many pairing attempts. Try again in a minute."
+            "value" : "Too many attempts. Try again in a minute."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Demasiados intentos de vinculación. Inténtalo de nuevo dentro de un minuto."
+            "value" : "Demasiados intentos. Inténtalo de nuevo dentro de un minuto."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trop de tentatives de jumelage. Réessayez dans une minute."
+            "value" : "Trop de tentatives. Réessayez dans une minute."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Troppi tentativi di abbinamento. Riprova tra un minuto."
+            "value" : "Troppi tentativi. Riprova tra un minuto."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ペアリングの試行回数が多すぎます。1 分後にもう一度お試しください。"
+            "value" : "試行回数が多すぎます。1 分後にもう一度お試しください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "페어링 시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요."
+            "value" : "시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muitas tentativas de pareamento. Tente novamente em um minuto."
+            "value" : "Muitas tentativas. Tente novamente em um minuto."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "配对尝试次数过多。请一分钟后重试。"
+            "value" : "尝试次数过多。请一分钟后重试。"
           }
         }
       }
@@ -78412,64 +81725,6 @@
         }
       }
     },
-    "Trakt & Simkl Sync" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "مزامنة Trakt وSimkl"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trakt- & Simkl-Sync"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronización con Trakt y Simkl"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchro Trakt et Simkl"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronizzazione Trakt e Simkl"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trakt・Simkl同期"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trakt 및 Simkl 동기화"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronização com Trakt e Simkl"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trakt和Simkl同步"
-          }
-        }
-      }
-    },
     "Trakt Watchlist" : {
       "localizations" : {
         "ar" : {
@@ -78524,6 +81779,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trakt待看列表"
+          }
+        }
+      }
+    },
+    "Trakt, Simkl & MDBList Sync" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مزامنة Trakt وSimkl وMDBList"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trakt-, Simkl- & MDBList-Sync"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronización con Trakt, Simkl y MDBList"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchro Trakt, Simkl et MDBList"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizzazione Trakt, Simkl e MDBList"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trakt・Simkl・MDBList同期"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trakt, Simkl 및 MDBList 동기화"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronização com Trakt, Simkl e MDBList"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trakt、Simkl和MDBList同步"
           }
         }
       }
@@ -81223,6 +84536,71 @@
         }
       }
     },
+    "Username & Password" : {
+      "comment" : "Dispatcharr sign-in sheet: picker option for signing in with a username and password.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اسم المستخدم وكلمة السر"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benutzername & Passwort"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Username & Password"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usuario y contraseña"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom d’utilisateur et mot de passe"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome utente e password"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザ名とパスワード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 이름 및 암호"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome de usuário e senha"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名和密码"
+          }
+        }
+      }
+    },
     "Version" : {
       "comment" : "Recording Server settings: label for the recording server's software version.",
       "localizations" : {
@@ -82887,6 +86265,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已观看"
+          }
+        }
+      }
+    },
+    "Watched movies and episodes sync to your MDBList history. Import marks titles you've already watched on MDBList as watched here." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تتم مزامنة الأفلام والحلقات التي شاهدتها مع سجلك في MDBList. ويؤدي الاستيراد إلى تعليم العناوين التي شاهدتها بالفعل على MDBList كمشاهَدة هنا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesehene Filme und Episoden werden mit deinem MDBList-Verlauf synchronisiert. Beim Import werden Titel, die du auf MDBList bereits gesehen hast, hier als gesehen markiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las películas y los episodios vistos se sincronizan con tu historial de MDBList. La importación marca aquí como vistos los títulos que ya has visto en MDBList."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les films et épisodes vus se synchronisent avec votre historique MDBList. L’importation marque ici comme vus les titres que vous avez déjà regardés sur MDBList."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I film e gli episodi visti si sincronizzano con la tua cronologia di MDBList. L'importazione contrassegna come visti qui i titoli che hai già visto su MDBList."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "視聴済みの映画やエピソードがMDBListの履歴に同期されます。インポートすると、MDBListですでに視聴済みのタイトルがここでも視聴済みになります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시청한 영화와 에피소드가 MDBList 기록에 동기화됩니다. 가져오기를 하면 MDBList에서 이미 시청한 제목이 여기에서도 시청함으로 표시됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmes e episódios assistidos são sincronizados com seu histórico do MDBList. A importação marca como assistidos aqui os títulos que você já assistiu no MDBList."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已观看的电影和剧集会同步到您的MDBList历史记录。导入会将您已在MDBList上观看的标题在此处标为已观看。"
           }
         }
       }
@@ -84785,6 +88221,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的账户每天可下载 %lld 个字幕。"
+          }
+        }
+      }
+    },
+    "Your account on the recording server isn't allowed to do that." : {
+      "comment" : "Recording server error: the signed-in account lacks permission (for example a view-only DVR account trying to record, stop or delete).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حسابك على خادم التسجيل غير مسموح له بذلك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto auf dem Aufnahmeserver darf das nicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account on the recording server isn't allowed to do that."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu cuenta en el servidor de grabación no tiene permiso para hacer eso."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre compte sur le serveur d’enregistrement n’est pas autorisé à faire cela."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il tuo account sul server di registrazione non è autorizzato a farlo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画サーバーのあなたのアカウントには、この操作を行う権限がありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화 서버의 계정에 이 작업을 수행할 권한이 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua conta no servidor de gravação não tem permissão para fazer isso."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您在录制服务器上的账户无权执行此操作。"
           }
         }
       }

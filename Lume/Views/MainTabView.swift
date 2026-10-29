@@ -89,9 +89,8 @@ struct MainTabView: View {
         CommandLine.arguments.contains("-ui-testing")
     }
 
-    /// Whether the browse UI is covered: the sync cover, downloads, the add-device
-    /// sheet (not a link still waiting for it), or a playlist / profile switch.
-    /// Players, paywalls and Settings (a toolbar sheet this root can't see) report themselves.
+    /// Whether the browse UI is covered: the sync cover, downloads, the add-device sheet (not a link
+    /// still waiting for it), or a playlist / profile switch. Players, paywalls and Settings (a toolbar sheet this root can't see) report themselves.
     private var hasBlockingPresentation: Bool {
         hasOwnPresentation || router.presentedCloudPairing != nil
     }
@@ -153,6 +152,7 @@ struct MainTabView: View {
             }
         #if os(iOS)
             .tabBarMinimizeOnScrollDownIfAvailable()
+            .castMiniController { linkedMedia = $0 }
         #endif
             .onOpenURL { url in
                 handleDeepLink(url)
@@ -377,7 +377,7 @@ struct MainTabView: View {
                     }
                 } else {
                     Tab(value: AppTab.search, role: .search) {
-                        SearchView()
+                        SearchView().castMiniControllerInset()
                     } label: {
                         Label("Search", systemImage: "magnifyingglass")
                     }

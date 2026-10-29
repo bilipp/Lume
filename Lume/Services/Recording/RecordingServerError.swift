@@ -16,7 +16,13 @@ nonisolated enum RecordingServerError: LocalizedError, Equatable {
     case unreachable(URLError.Code)
     /// The stored token was revoked or never valid; the device must pair again.
     case unauthorized
+    /// The account is signed in but may not do this (a view-only DVR account
+    /// writing, or a recording hidden from it).
+    case forbidden
     case invalidPairingCode
+    /// Signing in to a server that takes an account (Dispatcharr) failed: a
+    /// wrong API key, username or password.
+    case invalidCredentials
     case rateLimited
     case notFound
     case concurrencyLimit
@@ -30,8 +36,9 @@ nonisolated enum RecordingServerError: LocalizedError, Equatable {
     case unsupportedAPIVersion(Int)
     /// A synced config whose backend kind this build doesn't know.
     case unsupportedBackend
-    /// A typed address that isn't a plausible http(s) host.
-    case invalidAddress
+    /// A typed address that isn't a plausible http(s) host for this kind of
+    /// server.
+    case invalidAddress(RecordingServerKind)
     case cancelled
 
     init(_ error: any Error) {
@@ -92,11 +99,15 @@ nonisolated enum RecordingServerError: LocalizedError, Equatable {
         case .unreachable:
             String(localized: "Couldn't reach the recording server. Check that it's running and on the same network.")
         case .unauthorized:
-            String(localized: "This device is no longer paired with the recording server. Pair it again in Settings.")
+            String(localized: "The recording server no longer accepts this device. Pair it or sign in again in Settings.")
+        case .forbidden:
+            String(localized: "Your account on the recording server isn't allowed to do that.")
         case .invalidPairingCode:
             String(localized: "That pairing code is wrong or has expired. Check the code the recording server shows.")
+        case .invalidCredentials:
+            String(localized: "The recording server didn't accept these sign-in details. Check them and try again.")
         case .rateLimited:
-            String(localized: "Too many pairing attempts. Try again in a minute.")
+            String(localized: "Too many attempts. Try again in a minute.")
         case .notFound:
             String(localized: "This recording no longer exists on the server.")
         case .concurrencyLimit:
@@ -117,8 +128,8 @@ nonisolated enum RecordingServerError: LocalizedError, Equatable {
             String(localized: "This recording server uses a different API version. Update Lume and the server to their latest versions.")
         case .unsupportedBackend:
             String(localized: "This version of Lume doesn't support this type of recording server.")
-        case .invalidAddress:
-            String(localized: "Enter a valid server address, such as 192.168.1.20:\(String(LumeRecorderClient.defaultPort)).")
+        case let .invalidAddress(kind):
+            String(localized: "Enter a valid server address, such as 192.168.1.20:\(String(kind.defaultPort)).")
         case .cancelled:
             String(localized: "The request was cancelled.")
         }
@@ -133,10 +144,14 @@ nonisolated enum RecordingServerError: LocalizedError, Equatable {
             "unreachable (\(NSURLErrorDomain) \(code.rawValue))"
         case .unauthorized:
             "HTTP 401 (token rejected)"
+        case .forbidden:
+            "HTTP 403"
         case .invalidPairingCode:
             "HTTP 401 (pairing code rejected)"
+        case .invalidCredentials:
+            "HTTP 401 (sign-in rejected)"
         case .rateLimited:
-            "HTTP 429 (pairing rate limited)"
+            "HTTP 429 (rate limited)"
         case .notFound:
             "HTTP 404"
         case .concurrencyLimit:
@@ -157,8 +172,8 @@ nonisolated enum RecordingServerError: LocalizedError, Equatable {
             "unsupported API version \(version)"
         case .unsupportedBackend:
             "unsupported backend kind"
-        case .invalidAddress:
-            "invalid server address"
+        case let .invalidAddress(kind):
+            "invalid server address (\(kind.rawValue))"
         case .cancelled:
             "cancelled"
         }
@@ -169,7 +184,8 @@ nonisolated enum RecordingServerError: LocalizedError, Equatable {
         LumeRecorderErrorCode.rateLimited, LumeRecorderErrorCode.invalidRequest,
         LumeRecorderErrorCode.notFound, LumeRecorderErrorCode.concurrencyLimit,
         LumeRecorderErrorCode.insufficientStorage, LumeRecorderErrorCode.notPlayable,
-        LumeRecorderErrorCode.forbidden, LumeRecorderErrorCode.internalError
+        LumeRecorderErrorCode.forbidden, LumeRecorderErrorCode.internalError,
+        DispatcharrClient.recordingFinishedCode
     ]
 
     private static func knownCode(_ code: String?) -> String {

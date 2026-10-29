@@ -127,7 +127,7 @@ Lume/
 └── Views/                   SwiftUI, platform-adaptive
     ├── Home/                Hero carousel, rails, tvOS fold
     ├── Player/              Engine wrappers + unified overlay
-    ├── Components/          Shared building blocks, grouped: Cards, Compat, Detail, Images, Library, Playlists, Status
+    ├── Components/          Shared building blocks, grouped: Cards, Cast, Compat, Detail, Images, Library, Playlists, Status
     └── …
 ```
 
@@ -183,12 +183,33 @@ Three separate `ModelContainer`s:
 - Declared last in `PlayerEngineKind` so it appends to the end of existing priority lists — opt-in, never silently promoted while KSPlayer is the default.
 - The engine never retries on its own schedule: reconnect/backoff, engine fallback, and overlays stay Lume's job. If a fix would add retry policy to the engine, it belongs here instead.
 
-### LumeRecorder (DVR backend)
+### Recording servers (DVR): LumeRecorder + Dispatcharr
 - Recording-server support talks to our own self-hosted server, developed in the sibling repo [`bilipp/LumeRecorder`](https://github.com/bilipp/LumeRecorder). Its zero-dependency client is referenced as a **local** SPM package at `../LumeRecorder/Kit` (product `LumeRecorderKit`, static, link-only) — a clone without that sibling will not resolve.
 - Never edit the Kit from this repo. If its API is insufficient, change it in LumeRecorder and pair the commits.
-- App code talks to the `RecordingServerBackend` protocol (`Lume/Services/Recording/`); `LumeRecorderBackend` is the only implementation and owns its own `URLSession`. The client never retries — don't wrap POST/DELETE in retry helpers.
+- App code talks to the `RecordingServerBackend` protocol (`Lume/Services/Recording/`) in app-side types (`ServerRecording`, `RecordingID`, `RecordingPlayback`, `RecordingServerCapabilities`); Kit DTOs stop at `LumeRecorderBackend` (mappers in `RecordingServerTypes+LumeRecorder.swift`). Two implementations, `LumeRecorderBackend` and `DispatcharrBackend`, picked by `RecordingServerKind` in `RecordingServerEndpoint.makeBackend()`; each owns its own `URLSession`. Clients never retry — don't wrap POST/DELETE in retry helpers. UI hides rows per `capabilities` (disk status, active limit, code pairing, device revoke, read-only), never per kind.
+- **One server at a time**: `RecordingServerConfigService.savePairing` forgets every other server, whatever its kind. LumeRecorder unpair still revokes; removing Dispatcharr only forgets the config.
+- `RecordingID` for LumeRecorder is `uuid.uuidString`, so `recordingProgress.<uuid>` keys stay byte-identical — never change that mapping.
 - The paired server is `SyncedRecordingServer` in the **CloudKit** schema (token is `.allowsCloudEncryption`); recordings themselves are never stored in SwiftData. `CD_SyncedRecordingServer` must be deployed to CloudKit **Production** before release.
 - Stream URLs, playback grant URLs and tokens never go into logs or diagnostic exports.
+
+#### Dispatcharr
+- Second backend: `DispatcharrBackend` over `Lume/Services/Network/DispatcharrClient.swift` (own ephemeral session, 15 s/30 s). `LumeTests/Fixtures/Dispatcharr/README.md` records the verified API behaviour (padding, statuses, playback auth) — read it before touching either.
+- **No schema change**: a Dispatcharr row reuses `SyncedRecordingServer.token` for a JSON-encoded `DispatcharrCredential` (`apiKey` or `login(username:password:)`). LumeRecorder rows keep `token` byte-identical; `kindRaw`/`token`/`serverID`/`deviceID` are never renamed.
+- Auth is `X-API-Key`, or a Bearer JWT minted from the stored login and cached **in memory only** (`DispatcharrTokenCache` actor, refresh before re-login; the login endpoint is throttled to 3/min — never log in per request). A 401 may refresh the token but never replays a POST/DELETE. Lume never generates or revokes API keys.
+- `serverID` is derived (`RecordingServerIdentity.uuid(kind:host:port:user:)`, SHA-256 of kind + host:port + user or key hash) so CloudKit dedupe converges across devices; `deviceID` is nil. Default port 9191.
+- Record is offered only for channels of playlists served by the paired host:port (`DispatcharrChannelLocator`): Xtream `streamId` and XC-style `/live/…/<id>` are the channel id; `/proxy/ts/stream/<uuid>` resolves through one unpaginated channel list per refresh (`DispatcharrChannelDirectory`, memory only). Anything else hides Record — no per-row network.
+- Dispatcharr owns padding: Lume sends exact programme times plus `custom_properties.program` and `lume_source_ref` (a fixed-duration record-now sends no `program`, so it isn't padded); the server stores padded times, so match pending/active recordings on `program` times (`ServerRecording.programmeEnd`), never equal top-level times. Cancel scheduled = DELETE, stop running = POST `/stop/` (keeps a partial file), delete finished = DELETE.
+- View-only accounts (from `users/me` `user_level`/`dvr_access`) are read-only: library + playback, no write actions. Unattributed recordings (no `lume_source_ref`) show in the library but are hidden from restricted profiles.
+- Engine policy (`PlayableMedia.unsupportedEngines`): Dispatcharr recordings skip AVPlayer (finished files are MKV), and skip VLC unless the playback carries a Bearer JWT that `DispatcharrPlaybackAuth` folds into `?token=` (password sign-in only — the endpoints never take an API key in the query). Excluded engines are filtered before playback, not counted as QoE fallbacks. Progress keys are `dispatcharr-<serverID>-<id>`.
+- `users/me` returns the user's API key in plain text — never log or export that body, nor keys, JWTs, passwords or playback URLs.
+
+### Chromecast (Google Cast)
+- iOS/iPadOS only. `GoogleCastDynamic` (google-cast-ios-sdk, exact version) is linked into the Lume app target with `platformFilter = ios` — never into LumeTopShelf/LumeWidgets. macOS/tvOS/visionOS must still build without it.
+- `GoogleCastProvider.swift` is the only file that imports GoogleCast, wrapped in `#if os(iOS) && canImport(GoogleCast)` (never `canImport(UIKit)` — true on visionOS); `LumeAppDelegate` registers it under the same guard. Everything else talks to the `CastProvider` seam in `CastService.swift`, so cast logic stays pure and testable (`StubCastProvider`).
+- Not a `PlayerEngineKind`: casting is a host state of `FullScreenPlayerView` (`+Cast.swift`, `PlayerCastSession`). The local engine is torn down at cast start and rebuilt via `resumeActiveMedia(at:)` when the cast ends or the receiver fails. Closing the player keeps the receiver playing; `CastProgressCommitter` commits progress headlessly when no host is attached.
+- Header-auth sources (`PlayableMedia.httpHeaders != nil`), local files and recordings are never cast — `CastStreamResolver` rejects them; never move a token into a URL to make one castable.
+- Receiver/content URLs, tokens and device names are never logged public; SDK text goes through `LogRedaction` (`CastStatusMapping.redactedErrorDetail`).
+- The SDK is not configured under unit/UI tests or previews (`LumeApp.isTestOrPreviewHost`), and discovery starts only when the device sheet opens — no Local Network prompt at launch.
 
 ### LumeCloud (sync backend)
 - Lume Cloud is the optional, end-to-end encrypted alternative to iCloud, developed in the sibling repo [`bilipp/LumeCloud`](https://github.com/bilipp/LumeCloud). Its client is referenced as a **local** SPM package at `../LumeCloud/LumeCloudKit` (product `LumeCloudKit`) — a clone without that sibling will not resolve. `../LumeCloud/spec/PROTOCOL.md` is normative for the wire format, logical keys and payload fields.

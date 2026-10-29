@@ -563,16 +563,13 @@ struct KSPlayerEngineView: View {
                     }
                 }
             }
-            .onKeyPress(.leftArrow) { coordinator.skip(interval: -15); resetHideTimer(); return .handled }
-            .onKeyPress(.rightArrow) { coordinator.skip(interval: 15); resetHideTimer(); return .handled }
-            .playerVolume(coordinator, onReveal: showControls)
-            .liveChannelKeyNavigation(
-                neighbours: itemNeighbours, swapper: mediaSwapper,
-                onSelect: { selectMedia($0) }, onResetHideTimer: resetHideTimer
-            )
-            .onKeyPress(.space) { togglePlay(); return .handled }
-            .onKeyPress(.escape) { closePlayer(); return .handled }
+            .playerVolume(coordinator)
             #endif
+            .playerKeyboardShortcuts(PlayerKeyActions(
+                togglePlay: togglePlay, skip: { coordinator.skip(interval: Int($0)) }, close: closePlayer,
+                resetHideTimer: resetHideTimer, showControls: showControls,
+                neighbours: itemNeighbours, swapper: mediaSwapper, selectMedia: { selectMedia($0) }
+            ))
         }
 
     #endif

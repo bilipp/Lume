@@ -241,12 +241,15 @@ struct EPGRulerCorner: View {
     /// What the channel hub's long press offers, which nothing on screen
     /// would otherwise reveal. Never focusable.
     struct EPGGuideHint: View {
+        let playlistID: UUID?
         @Environment(\.recordChannel) private var recordChannel
 
-        /// The long press offers Record once a server is paired, behind the
-        /// crown if Lume Pro has lapsed, so Pro doesn't change the hint.
+        /// The long press offers Record where the paired server records the
+        /// guide's playlist, behind the crown if Lume Pro has lapsed, so Pro
+        /// doesn't change the hint.
         private var offersRecording: Bool {
-            recordChannel != nil && RecordingServerStore.shared.isPaired
+            guard let recordChannel, let playlistID else { return false }
+            return recordChannel.offersRecording(inPlaylist: playlistID)
         }
 
         var body: some View {

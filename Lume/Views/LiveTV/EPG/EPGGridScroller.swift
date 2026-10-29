@@ -117,7 +117,7 @@ struct EPGGridScroller: View {
             #endif
 
             #if os(tvOS)
-                EPGGuideHint()
+                EPGGuideHint(playlistID: preview.playlistID)
             #endif
         }
         #if os(tvOS)
