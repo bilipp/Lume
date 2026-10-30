@@ -33,6 +33,9 @@ struct PlayerNextUpOverlay: View {
     /// The IntroDB outro window for this episode when known; nil keeps the
     /// legacy 90% behaviour.
     let outro: IntroSegments.Segment?
+    /// Tells the tvOS host the button wants focus, so hiding the controls hands
+    /// it here rather than to the tap-catcher underneath.
+    let link: PlayerEpisodeOverlayLink
     let onPlayNext: (PlayableMedia) -> Void
 
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
@@ -79,11 +82,14 @@ struct PlayerNextUpOverlay: View {
             #endif
         }
         #if os(tvOS)
-        .onChange(of: showsButton) { _, shows in
-            // Pull focus onto the button the moment it appears so the viewer can
-            // play the next episode with a single Select.
+        .onChange(of: showsButton, initial: true) { _, shows in
+            link.claimFocus(.nextEpisode, shows)
+            // Pull focus onto the button the moment it appears — including when
+            // the controls hide over it — so the viewer can play the next
+            // episode with a single Select.
             if shows { Task { @MainActor in buttonFocused = true } }
         }
+        .onDisappear { link.claimFocus(.nextEpisode, false) }
         #endif
     }
 

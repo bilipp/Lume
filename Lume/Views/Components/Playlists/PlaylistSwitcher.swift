@@ -29,18 +29,20 @@ struct PlaylistSwitcher: View {
     /// Optional so previews (and any host that doesn't inject it) still switch
     /// instantly; when present, the switch routes through the blocking overlay.
     @Environment(PlaylistSwitchModel.self) private var switchModel: PlaylistSwitchModel?
+    @State private var showPaywall = false
 
     var body: some View {
         if !playlists.isEmpty {
             Menu {
-                ForEach(playlists) { playlist in
+                ForEach(QuickSwitchResolver.playlistRows(playlists, storedID: selectedPlaylistID)) { row in
                     Button {
-                        select(playlist)
+                        if row.isLocked {
+                            showPaywall = true
+                        } else {
+                            select(row.item)
+                        }
                     } label: {
-                        Label(
-                            playlist.name,
-                            systemImage: playlist.id.uuidString == effectiveID ? "checkmark" : ""
-                        )
+                        Label(row.item.name, systemImage: Self.symbol(for: row))
                     }
                 }
             } label: {
@@ -63,7 +65,15 @@ struct PlaylistSwitcher: View {
                 .frame(maxWidth: Self.maxLabelWidth, alignment: .leading)
             }
             .accessibilityLabel("Playlist: \(effectiveName)")
+            .paywall(isPresented: $showPaywall, highlight: .multiplePlaylists)
         }
+    }
+
+    /// A checkmark on the current playlist and a crown on the ones the free plan
+    /// locks — the same crown a locked Add Playlist shows.
+    private static func symbol(for row: QuickSwitchRow<Playlist>) -> String {
+        if row.isCurrent { return "checkmark" }
+        return row.isLocked ? "crown" : ""
     }
 
     // Width ceiling for the label in the toolbar. Deliberately a fixed value

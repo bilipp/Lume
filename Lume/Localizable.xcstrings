@@ -27638,6 +27638,64 @@
         }
       }
     },
+    "Free includes one playlist, the first one added. Upgrade to Lume Pro to use the others." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تتضمن الخطة المجانية قائمة تشغيل واحدة، وهي أول قائمة أُضيفت. قم بالترقية إلى Lume Pro لاستخدام القوائم الأخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kostenlos enthält eine Playlist – die zuerst hinzugefügte. Mit Lume Pro kannst du auch die anderen nutzen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El plan gratuito incluye una lista de reproducción: la primera que añadiste. Pásate a Lume Pro para usar las demás."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La formule gratuite inclut une playlist : la première ajoutée. Passez à Lume Pro pour utiliser les autres."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il piano gratuito include una playlist, la prima aggiunta. Passa a Lume Pro per usare le altre."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料プランで使えるプレイリストは1つ（最初に追加したもの）です。ほかのプレイリストを使うにはLume Proにアップグレードしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "무료에는 재생목록 한 개(처음 추가한 재생목록)가 포함됩니다. 다른 재생목록을 사용하려면 Lume Pro로 업그레이드하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O plano gratuito inclui uma playlist, a primeira adicionada. Atualize para o Lume Pro para usar as outras."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费版包含一个播放列表，即最先添加的那个。升级到Lume Pro即可使用其他播放列表。"
+          }
+        }
+      }
+    },
     "Free includes one playlist. Upgrade to Lume Pro to add more." : {
       "localizations" : {
         "ar" : {
@@ -52991,6 +53049,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放列表：%@"
+          }
+        }
+      }
+    },
+    "playlist.status.locked" : {
+      "comment" : "Status of a playlist the free plan can't use: it includes only the first playlist added.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتطلب Lume Pro"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfordert Lume Pro"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires Lume Pro"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requiere Lume Pro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nécessite Lume Pro"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Richiede Lume Pro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume Proが必要"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume Pro 필요"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requer o Lume Pro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要 Lume Pro"
           }
         }
       }

@@ -331,14 +331,39 @@ struct WidgetLinkResolverTests {
         return (container, playlist)
     }
 
-    private func resolve(_ link: DeepLink, _ container: ModelContainer, child: Bool = false, restricted: Set<String> = [])
-        -> WidgetLinkResolver.Target?
-    {
+    private func resolve(
+        _ link: DeepLink,
+        _ container: ModelContainer,
+        child: Bool = false,
+        restricted: Set<String> = [],
+        isPremium: Bool = true
+    ) -> WidgetLinkResolver.Target? {
         WidgetLinkResolver.resolve(
             link,
             in: container.mainContext,
-            restriction: ContentRestriction(isActive: child, restrictedCategoryIDs: restricted)
+            restriction: ContentRestriction(isActive: child, restrictedCategoryIDs: restricted),
+            isPremium: isPremium
         )
+    }
+
+    /// A second, newer playlist with one of each kind of content — the one the
+    /// free plan locks.
+    private func seedNewerPlaylist(after first: Playlist, in container: ModelContainer) throws -> String {
+        let context = container.mainContext
+        let newer = Playlist(name: "Newer", serverURL: "http://example.org", username: "u", password: "p")
+        newer.addedAt = first.addedAt.addingTimeInterval(60)
+        context.insert(newer)
+        let prefix = newer.id.uuidString
+        context.insert(Movie(id: "\(prefix)-m2", streamId: 2, name: "Other Movie"))
+        let series = Series(id: "\(prefix)-s2", seriesId: 20, name: "Other Show")
+        context.insert(series)
+        context.insert(Episode(
+            id: "\(prefix)-s2-1-1", episodeId: "e2", title: "Pilot", containerExtension: "mp4",
+            seasonNum: 1, episodeNum: 1, series: series
+        ))
+        context.insert(LiveStream(id: "\(prefix)-l2", streamId: 200, name: "Channel"))
+        try context.save()
+        return prefix
     }
 
     @Test func `a play movie link resolves to playable media`() throws {
@@ -377,6 +402,25 @@ struct WidgetLinkResolverTests {
     @Test func `a hidden channel does not play`() throws {
         let (container, playlist) = try seed()
         #expect(resolve(.playLive(id: "\(playlist.id.uuidString)-l1"), container) == nil)
+    }
+
+    @Test func `without Pro links into a playlist past the first resolve to nothing`() throws {
+        // A snapshot written while Pro was active can still point there.
+        let (container, playlist) = try seed()
+        let prefix = try seedNewerPlaylist(after: playlist, in: container)
+        let links: [DeepLink] = [
+            .playMovie(id: "\(prefix)-m2"),
+            .playEpisode(id: "\(prefix)-s2-1-1"),
+            .playLive(id: "\(prefix)-l2"),
+            .openMovie(id: "\(prefix)-m2"),
+            .openSeries(id: "\(prefix)-s2")
+        ]
+
+        for link in links {
+            #expect(resolve(link, container, isPremium: true) != nil, "\(link)")
+            #expect(resolve(link, container, isPremium: false) == nil, "\(link)")
+        }
+        #expect(resolve(.playMovie(id: "\(playlist.id.uuidString)-m1"), container, isPremium: false) != nil)
     }
 
     @Test func `an unknown id resolves to nothing`() throws {

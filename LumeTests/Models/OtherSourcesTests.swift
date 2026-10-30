@@ -4,7 +4,7 @@
 //
 //  Coverage for the detail screens' combined "Other Sources" row: same-playlist
 //  alternates first (unlabelled), then cross-playlist copies badged with the
-//  owning playlist's name.
+//  owning playlist's name — never from a playlist the free plan locks.
 //
 
 import Foundation
@@ -47,7 +47,7 @@ struct OtherSourcesTests {
         _ = makeMovie(id: "\(playlistB.id.uuidString)-movie-4", streamId: 4, tmdbId: 7, in: context)
         try context.save()
 
-        let sources = OtherSources.resolve(for: current, in: context)
+        let sources = OtherSources.resolve(for: current, in: context, isPremium: true)
         #expect(sources.map(\.id) == [HomeMediaItem.movie(sameList).id, HomeMediaItem.movie(otherList).id])
         #expect(sources.map(\.playlistName) == [nil, "Provider B"])
     }
@@ -63,7 +63,7 @@ struct OtherSourcesTests {
         let otherList = makeSeries(id: "\(playlistB.id.uuidString)-series-2", seriesId: 2, tmdbId: 314, in: context)
         try context.save()
 
-        let sources = OtherSources.resolve(for: current, in: context)
+        let sources = OtherSources.resolve(for: current, in: context, isPremium: true)
         #expect(sources.map(\.id) == [HomeMediaItem.series(otherList).id])
         #expect(sources.map(\.playlistName) == ["Provider B"])
     }
@@ -81,7 +81,7 @@ struct OtherSourcesTests {
         _ = makeMovie(id: "\(alpha.id.uuidString)-movie-3", streamId: 3, tmdbId: 42, in: context)
         try context.save()
 
-        let names = OtherSources.resolve(for: current, in: context).map(\.playlistName)
+        let names = OtherSources.resolve(for: current, in: context, isPremium: true).map(\.playlistName)
         #expect(names == ["Alpha IPTV", "Zeta TV"])
     }
 
@@ -96,6 +96,25 @@ struct OtherSourcesTests {
         try context.save()
 
         #expect(OtherSources.resolve(for: current, in: context).isEmpty)
+    }
+
+    @Test func `without Pro copies on locked playlists are dropped, alternates on the free one kept`() throws {
+        let container = try makeTestContainer()
+        let context = container.mainContext
+
+        let free = makePlaylist(name: "Provider A", in: context)
+        let locked = makePlaylist(name: "Provider B", in: context)
+        free.addedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        locked.addedAt = Date(timeIntervalSince1970: 1_700_000_001)
+
+        let current = makeMovie(id: "\(free.id.uuidString)-movie-1", streamId: 1, tmdbId: 42, in: context)
+        let sameList = makeMovie(id: "\(free.id.uuidString)-movie-2", streamId: 2, tmdbId: 42, in: context)
+        _ = makeMovie(id: "\(locked.id.uuidString)-movie-3", streamId: 3, tmdbId: 42, in: context)
+        try context.save()
+
+        let sources = OtherSources.resolve(for: current, in: context, isPremium: false)
+        #expect(sources.map(\.id) == [HomeMediaItem.movie(sameList).id])
+        #expect(sources.map(\.playlistName) == [nil])
     }
 
     @Test func `sources are empty without a tmdb id`() throws {

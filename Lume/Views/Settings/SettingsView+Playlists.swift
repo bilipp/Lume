@@ -18,6 +18,17 @@
 import SwiftData
 import SwiftUI
 
+private extension [Playlist] {
+    /// The free plan's note under the playlist list. Once playlists beyond the
+    /// free one have arrived — from iCloud, Lume Cloud or Lume for Android — the
+    /// news is that they're locked, not that no more can be added.
+    var freePlanFooter: Text {
+        count > 1
+            ? Text("Free includes one playlist, the first one added. Upgrade to Lume Pro to use the others.")
+            : Text("Free includes one playlist. Upgrade to Lume Pro to add more.")
+    }
+}
+
 #if !os(tvOS)
 
     struct PlaylistsSettingsView: View {
@@ -71,9 +82,13 @@ import SwiftUI
                             }
 
                             Spacer(minLength: 0)
-                            PlaylistSyncAccessory(state: playlist.syncState(
-                                isActive: playlist.id.uuidString == playlists.activeID(for: selectedPlaylistID)
-                            ))
+                            if playlists.isLocked(playlist) {
+                                PremiumBadge()
+                            } else {
+                                PlaylistSyncAccessory(state: playlist.syncState(
+                                    isActive: playlist.id.uuidString == playlists.activeID(for: selectedPlaylistID)
+                                ))
+                            }
                         }
                         .padding(.vertical, 1)
                     }
@@ -95,7 +110,7 @@ import SwiftUI
                 } else if premium.isPremium {
                     Text("\(playlists.count) playlist\(playlists.count == 1 ? "" : "s")")
                 } else {
-                    Text("Free includes one playlist. Upgrade to Lume Pro to add more.")
+                    playlists.freePlanFooter
                 }
             }
         }
@@ -183,7 +198,7 @@ import SwiftUI
                 .buttonStyle(TVSettingsRowButtonStyle())
 
                 if !premium.isPremium {
-                    Text("Free includes one playlist. Upgrade to Lume Pro to add more.")
+                    playlists.freePlanFooter
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -207,9 +222,14 @@ import SwiftUI
             HStack(spacing: 16) {
                 TVPlaylistSwitchRow(
                     playlist: playlist,
-                    isActive: playlist.id.uuidString == effectivePlaylistID
+                    isActive: playlist.id.uuidString == effectivePlaylistID,
+                    isLocked: playlists.isLocked(playlist)
                 ) {
-                    switchPlaylist(to: playlist)
+                    if playlists.isLocked(playlist) {
+                        presentPaywall(.multiplePlaylists)
+                    } else {
+                        switchPlaylist(to: playlist)
+                    }
                 }
 
                 Button {
