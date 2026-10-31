@@ -166,6 +166,9 @@ struct LumeCloudTransportFeedTests {
         try advance(server, by: 6)
         let transport = try makeTransport(server, serverURL: productionURL)
         try await transport.pull()
+        // The launch check has run and passed: from here on, only a push notices.
+        try await transport.pull()
+        #expect(server.accountRequests == 1)
 
         // The feed rewinds under the same server (a restored backup, or a move
         // recorded before the server was): its head falls behind the cursor,
@@ -192,6 +195,43 @@ struct LumeCloudTransportFeedTests {
         #expect(!settled.feedRewound)
     }
 
+    @Test func `a launch whose cursor is ahead of the feed pulls everything before anything is pushed`() async throws {
+        let server = StubLumeCloudClient(keys: keys)
+        try advance(server, by: 6)
+        try await makeTransport(server, serverURL: productionURL).pull()
+
+        // A device that only reads: the feed rewinds, another device writes,
+        // and this one has nothing to push that would reveal it.
+        server.state.withLock { $0 = StubLumeCloudClient.State() }
+        try server.upsert(profilePayload(name: "Lighthouse 6"))
+        try server.upsert(episodePayload("tide-episode-10"))
+        let relaunched = try makeTransport(server, serverURL: productionURL)
+        try await relaunched.pull()
+
+        // The rewound stub kept no history: this is the relaunch's only request.
+        #expect(server.requestedSince == [0])
+        #expect(server.accountRequests == 1)
+        #expect(try contentIDs() == ["tide-episode-10"])
+        #expect(try state(for: profileKey)?.version == 1)
+        #expect(try await relaunched.push().pushedRecords == 0)
+    }
+
+    @Test func `the launch check asks once, and never on a fresh device`() async throws {
+        let server = StubLumeCloudClient(keys: keys)
+        try advance(server, by: 3)
+        let transport = try makeTransport(server, serverURL: productionURL)
+        try await transport.pull()
+        #expect(server.accountRequests == 0)
+
+        try server.upsert(episodePayload("tide-episode-6"))
+        try await transport.pull()
+        try await transport.pull()
+
+        #expect(server.accountRequests == 1)
+        #expect(server.requestedSince == [0, 3, 4])
+        #expect(try contentIDs() == ["tide-episode-6"])
+    }
+
     @Test func `a push on the cursor's own feed never reads as rewound`() async throws {
         let server = StubLumeCloudClient(keys: keys)
         try advance(server, by: 3)
@@ -215,6 +255,7 @@ struct LumeCloudTransportFeedTests {
         let server = StubLumeCloudClient(keys: keys)
         try advance(server, by: 6)
         let transport = try makeTransport(server, serverURL: productionURL)
+        try await transport.pull()
         try await transport.pull()
 
         server.state.withLock { $0 = StubLumeCloudClient.State() }

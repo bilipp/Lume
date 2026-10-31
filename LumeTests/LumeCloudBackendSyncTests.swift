@@ -95,6 +95,8 @@ struct LumeCloudBackendSyncTests {
             server.feed.store(rid: rid, ciphertext: ciphertext)
         }
         try await backend.pull()
+        // The launch check passes; from here on, only a push notices.
+        try await backend.pull()
         // The server comes back from a backup: its feed is behind this
         // device's cursor, so the cursor would skip the feed's next writes.
         server.feed.state.withLock { $0 = StubLumeCloudClient.State() }

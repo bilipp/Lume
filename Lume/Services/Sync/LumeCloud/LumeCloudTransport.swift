@@ -43,6 +43,9 @@ actor LumeCloudTransport {
     /// The canonical bytes the server rejected with 413, per record. The record
     /// isn't sent again until its payload changes.
     var oversizedRecords: [String: Data] = [:]
+    /// Whether this transport has checked its stored cursor against the
+    /// server's feed (`resetIfCursorAheadOfFeed`). Once per launch.
+    private var checkedCursorAgainstFeed = false
     /// Record types this transport handles as unknown, the way a build that
     /// predates them would. Empty in the app; tests use it to stand for an
     /// older build.
@@ -137,7 +140,6 @@ actor LumeCloudTransport {
         defer { Perf.end(interval) }
         let context = makeContext()
         let meta = try preparedSyncMeta(in: context)
-        let since = meta.nextSeq
         // Saved before the request: the repair is local, and an offline pull
         // still owes the engine the restored rows.
         let restored = try restoreUnrecordedRemovals(in: context)
@@ -147,6 +149,8 @@ actor LumeCloudTransport {
         if restored > 0 {
             await postMirrorDidChange()
         }
+        try await resetIfCursorAheadOfFeed(meta, in: context)
+        let since = meta.nextSeq
 
         let page: ChangesPage
         let isSnapshot: Bool
@@ -173,6 +177,22 @@ actor LumeCloudTransport {
         }
         result.mirrorChanged = result.mirrorChanged || restored > 0
         return result
+    }
+
+    /// Once per launch, before the first pull: a stored cursor at or past the
+    /// server's next seq came from another feed (an account moved between
+    /// servers, a server restored from a backup). Pulls from it return nothing
+    /// until the feed passes it, and then skip every record up to it, so the
+    /// bookkeeping resets and this pull starts from 0. A device that only reads
+    /// would never notice otherwise: the push check needs a write.
+    private func resetIfCursorAheadOfFeed(_ meta: LumeCloudSyncMeta, in context: ModelContext) async throws {
+        guard !checkedCursorAgainstFeed, meta.nextSeq > 0 else { return }
+        let nextSeq = try await request { try await client.account() }.nextSeq
+        checkedCursorAgainstFeed = true
+        guard meta.nextSeq >= nextSeq else { return }
+        Logger.sync.notice("Lume Cloud cursor is ahead of the server's feed: pulling everything again")
+        try resetBookkeeping(meta, keepingHeldRecords: true, in: context)
+        try context.save()
     }
 
     func postMirrorDidChange() async {
