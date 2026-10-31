@@ -194,6 +194,9 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    #if os(iOS)
+                        SiriTipSection()
+                    #endif
                     HelpFeedbackSection()
                     AboutSection()
                 }

@@ -165,6 +165,24 @@ final class SignpostBenchmarks: XCTestCase {
         }
     }
 
+    /// The Siri entity lookup: one `IntentCatalogResolver.search` over a
+    /// two-playlist catalog of a few thousand channels, the read Siri waits on
+    /// while resolving a spoken title.
+    func testIntentEntityResolveSignpost() {
+        let activeID = seedIntentCatalog()
+        let resolver = IntentCatalogResolver(
+            container: store.container,
+            restriction: ContentRestriction(),
+            isPremium: true,
+            activePlaylistID: activeID
+        )
+        let metric = M3UColdImportBenchmarks.signpostMetric(.intentEntityResolve)
+
+        measure(metrics: [metric]) {
+            _ = resolver.search(kind: .channel, name: "Sport 1", limit: 10)
+        }
+    }
+
     // MARK: - Instrumentation integrity
 
     /// Two milestones sharing a name would silently merge into one metric, so a
@@ -184,6 +202,7 @@ final class SignpostBenchmarks: XCTestCase {
             .epgSourceSync, .epgIngest, .channelEPGLoad, .guideWindowLoad,
             .homeTrendingLoad, .homeRecommendations,
             .sportsChannelResolve, .sportsFixtureRefresh,
+            .intentEntityResolve,
             .lumeCloudPull, .lumeCloudPush, .lumeCloudMerge,
             .playerStartup, .playerRebuffer, .playerEngineFallback, .playerStartupFailure
         ]
@@ -204,6 +223,28 @@ final class SignpostBenchmarks: XCTestCase {
     }
 
     // MARK: - Seeding
+
+    /// Returns the active playlist's id.
+    private func seedIntentCatalog() -> String {
+        let context = ModelContext(store.container)
+        context.autosaveEnabled = false
+        let playlists = ["Active", "Other"].map {
+            Playlist(name: $0, serverURL: "http://perf.test", username: "u", password: "p")
+        }
+        for playlist in playlists {
+            context.insert(playlist)
+            for index in 0 ..< 2500 {
+                context.insert(LiveStream(
+                    id: "\(playlist.id.uuidString)-live-\(index)",
+                    streamId: index,
+                    name: "DE | Sport \(index)",
+                    categoryId: "cat\(index % 20)"
+                ))
+            }
+        }
+        try? context.save()
+        return playlists[0].id.uuidString
+    }
 
     private func seedGuide() {
         let context = ModelContext(store.container)

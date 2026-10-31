@@ -1,0 +1,412 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Continue watching in ${applicationName}" : {
+      "localizations" : {
+        "ar" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "تابع المشاهدة في ${applicationName}",
+              "استأنف المشاهدة في ${applicationName}"
+            ]
+          }
+        },
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Weiterschauen in ${applicationName}",
+              "Wiedergabe in ${applicationName} fortsetzen"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Continue watching in ${applicationName}",
+              "Resume watching in ${applicationName}"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Seguir viendo en ${applicationName}",
+              "Reanudar en ${applicationName}"
+            ]
+          }
+        },
+        "fr" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Reprendre la lecture dans ${applicationName}",
+              "Reprends le visionnage dans ${applicationName}"
+            ]
+          }
+        },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Continua a guardare in ${applicationName}",
+              "Riprendi la visione in ${applicationName}"
+            ]
+          }
+        },
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で視聴を続ける",
+              "${applicationName}で再生を再開"
+            ]
+          }
+        },
+        "ko" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}에서 계속 보기",
+              "${applicationName}에서 재생 재개"
+            ]
+          }
+        },
+        "pt" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Continuar assistindo no ${applicationName}",
+              "Retomar no ${applicationName}"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中继续观看",
+              "在${applicationName}中恢复播放"
+            ]
+          }
+        }
+      }
+    },
+    "Play ${channel} in ${applicationName}" : {
+      "localizations" : {
+        "ar" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "شغّل ${channel} في ${applicationName}",
+              "شاهد ${channel} في ${applicationName}",
+              "شغّل قناة في ${applicationName}"
+            ]
+          }
+        },
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Spiele ${channel} in ${applicationName}",
+              "Schaue ${channel} in ${applicationName}",
+              "Spiele einen Sender in ${applicationName}"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Play ${channel} in ${applicationName}",
+              "Watch ${channel} in ${applicationName}",
+              "Play a channel in ${applicationName}"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Reproduce ${channel} en ${applicationName}",
+              "Ver ${channel} en ${applicationName}",
+              "Reproduce un canal en ${applicationName}"
+            ]
+          }
+        },
+        "fr" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Lis ${channel} dans ${applicationName}",
+              "Regarde ${channel} dans ${applicationName}",
+              "Lis une chaîne dans ${applicationName}"
+            ]
+          }
+        },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Riproduci ${channel} in ${applicationName}",
+              "Guarda ${channel} in ${applicationName}",
+              "Riproduci un canale in ${applicationName}"
+            ]
+          }
+        },
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で${channel}を再生",
+              "${applicationName}で${channel}を見る",
+              "${applicationName}でチャンネルを再生"
+            ]
+          }
+        },
+        "ko" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}에서 ${channel} 재생",
+              "${applicationName}에서 ${channel} 보기",
+              "${applicationName}에서 채널 재생"
+            ]
+          }
+        },
+        "pt" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Reproduzir ${channel} no ${applicationName}",
+              "Assistir ${channel} no ${applicationName}",
+              "Reproduzir um canal no ${applicationName}"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中播放${channel}",
+              "在${applicationName}中观看${channel}",
+              "在${applicationName}中播放频道"
+            ]
+          }
+        }
+      }
+    },
+    "Play ${series} in ${applicationName}" : {
+      "localizations" : {
+        "ar" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "شغّل ${series} في ${applicationName}",
+              "تابع ${series} في ${applicationName}",
+              "شغّل مسلسلًا في ${applicationName}"
+            ]
+          }
+        },
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Spiele ${series} in ${applicationName}",
+              "Setze ${series} in ${applicationName} fort",
+              "Spiele eine Serie in ${applicationName}"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Play ${series} in ${applicationName}",
+              "Continue ${series} in ${applicationName}",
+              "Play a series in ${applicationName}"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Reproduce ${series} en ${applicationName}",
+              "Continúa ${series} en ${applicationName}",
+              "Reproduce una serie en ${applicationName}"
+            ]
+          }
+        },
+        "fr" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Lis ${series} dans ${applicationName}",
+              "Reprends ${series} dans ${applicationName}",
+              "Lis une série dans ${applicationName}"
+            ]
+          }
+        },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Riproduci ${series} in ${applicationName}",
+              "Continua ${series} in ${applicationName}",
+              "Riproduci una serie in ${applicationName}"
+            ]
+          }
+        },
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で${series}を再生",
+              "${applicationName}で${series}の続きを再生",
+              "${applicationName}でシリーズを再生"
+            ]
+          }
+        },
+        "ko" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}에서 ${series} 재생",
+              "${applicationName}에서 ${series} 이어서 보기",
+              "${applicationName}에서 시리즈 재생"
+            ]
+          }
+        },
+        "pt" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Reproduzir ${series} no ${applicationName}",
+              "Continuar ${series} no ${applicationName}",
+              "Reproduzir uma série no ${applicationName}"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中播放${series}",
+              "在${applicationName}中继续播放${series}",
+              "在${applicationName}中播放剧集"
+            ]
+          }
+        }
+      }
+    },
+    "Start ${movie} in ${applicationName}" : {
+      "localizations" : {
+        "ar" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "ابدأ ${movie} في ${applicationName}",
+              "شغّل ${movie} في ${applicationName}",
+              "ابدأ فيلمًا في ${applicationName}"
+            ]
+          }
+        },
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Starte ${movie} in ${applicationName}",
+              "Spiele ${movie} in ${applicationName}",
+              "Starte einen Film in ${applicationName}"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Start ${movie} in ${applicationName}",
+              "Play ${movie} in ${applicationName}",
+              "Start a movie in ${applicationName}"
+            ]
+          }
+        },
+        "es" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Inicia ${movie} en ${applicationName}",
+              "Reproduce ${movie} en ${applicationName}",
+              "Inicia una película en ${applicationName}"
+            ]
+          }
+        },
+        "fr" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Lance ${movie} dans ${applicationName}",
+              "Lis ${movie} dans ${applicationName}",
+              "Lance un film dans ${applicationName}"
+            ]
+          }
+        },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Avvia ${movie} in ${applicationName}",
+              "Riproduci ${movie} in ${applicationName}",
+              "Avvia un film in ${applicationName}"
+            ]
+          }
+        },
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で${movie}を開始",
+              "${applicationName}で${movie}を再生",
+              "${applicationName}で映画を開始"
+            ]
+          }
+        },
+        "ko" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}에서 ${movie} 시작",
+              "${applicationName}에서 ${movie} 재생",
+              "${applicationName}에서 영화 시작"
+            ]
+          }
+        },
+        "pt" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Iniciar ${movie} no ${applicationName}",
+              "Reproduzir ${movie} no ${applicationName}",
+              "Iniciar um filme no ${applicationName}"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中开始${movie}",
+              "在${applicationName}中播放${movie}",
+              "在${applicationName}中开始播放电影"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

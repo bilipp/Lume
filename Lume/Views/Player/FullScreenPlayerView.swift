@@ -267,6 +267,7 @@ struct FullScreenPlayerView: View {
         .preferredColorScheme(.dark)
         .playerOrientationLock()
         .macPlayerWindow(activeMedia: activeMedia, launchMedia: media) { switchMedia(to: $0) }
+        .appliesPlayerSwapRequests { newMedia in mediaSwapper.swap { switchMedia(to: newMedia) } }
         .playerRecording(for: activeMedia)
         .modifier(PlayerCastHandoff(host: self))
         .modifier(PlayerSourceSwitcherHost(session: sourceSession, media: activeMedia, onPick: switchSource))

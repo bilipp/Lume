@@ -102,7 +102,26 @@ final class DeepLinkRouter {
         /// `interactiveDismissDisabled`. The modal needs Menu for itself so a PIN
         /// pad nested over it can consume the press first.
         var isQuickSwitchPresented = false
+    #elseif os(iOS)
+        /// Bumped to ask the tab that presented Multi-View to close it. The grid
+        /// is a cover owned by that tab's view, out of this router's reach.
+        private(set) var multiViewCloseRequests = 0
     #endif
+
+    /// Takes down what a Siri request plays over: Multi-View and the tvOS
+    /// quick switch. macOS closes its Multi-View window itself.
+    func closeOverlaysForIntent() {
+        #if os(tvOS)
+            if multiViewLaunch != nil {
+                multiViewLaunch = nil
+            }
+            if isQuickSwitchPresented {
+                isQuickSwitchPresented = false
+            }
+        #elseif os(iOS)
+            multiViewCloseRequests += 1
+        #endif
+    }
 }
 
 /// Opens the Lume Cloud add-device flow with `code` filled in. Never log the code.

@@ -43,12 +43,16 @@ extension [Playlist] {
     /// The stored selection itself is left alone, so renewing Pro lands the
     /// viewer back on the playlist they had picked.
     func active(for storedID: String, isPremium: Bool? = nil) -> Playlist? {
+        active(for: storedID, isPremium: PremiumManager.isPremium(isPremium))
+    }
+
+    nonisolated func active(for storedID: String, isPremium: Bool) -> Playlist? {
         unlocked(isPremium: isPremium).first { $0.id.uuidString == storedID } ?? oldest
     }
 
     /// The playlist added first — the free plan's one playlist, and the
     /// fallback whenever the stored selection can't be used.
-    var oldest: Playlist? {
+    nonisolated var oldest: Playlist? {
         self.min { ($0.addedAt, $0.id.uuidString) < ($1.addedAt, $1.id.uuidString) }
     }
 
@@ -59,7 +63,8 @@ extension [Playlist] {
     /// never selected, synced, searched or played.
     ///
     /// `isPremium` pins the plan (tests); nil reads `PremiumManager`. The same
-    /// goes for every plan-aware helper here.
+    /// goes for every plan-aware helper here; the overloads taking a plain
+    /// `Bool` are the ones callable off the main actor.
     func isLocked(_ playlist: Playlist, isPremium: Bool? = nil) -> Bool {
         !PremiumManager.isPremium(isPremium) && playlist.id != oldest?.id
     }
@@ -72,7 +77,11 @@ extension [Playlist] {
 
     /// The playlists the plan can use: all of them with Pro, else the oldest.
     func unlocked(isPremium: Bool? = nil) -> [Playlist] {
-        PremiumManager.isPremium(isPremium) ? self : (oldest.map { [$0] } ?? [])
+        unlocked(isPremium: PremiumManager.isPremium(isPremium))
+    }
+
+    nonisolated func unlocked(isPremium: Bool) -> [Playlist] {
+        isPremium ? self : (oldest.map { [$0] } ?? [])
     }
 
     /// The playlist that synced a piece of content. Every catalog id is
@@ -83,7 +92,7 @@ extension [Playlist] {
     /// owner this way rather than reaching for the active playlist. Returns
     /// `nil` for an id no current playlist owns, so callers pick their own
     /// fallback.
-    func owner(ofContentID contentID: String) -> Playlist? {
+    nonisolated func owner(ofContentID contentID: String) -> Playlist? {
         first { contentID.hasPrefix($0.id.uuidString) }
     }
 
@@ -91,6 +100,10 @@ extension [Playlist] {
     /// no playlist at all. Never compare a raw stored value instead — it can name
     /// a deleted playlist.
     func activeID(for storedID: String, isPremium: Bool? = nil) -> String {
+        activeID(for: storedID, isPremium: PremiumManager.isPremium(isPremium))
+    }
+
+    nonisolated func activeID(for storedID: String, isPremium: Bool) -> String {
         active(for: storedID, isPremium: isPremium)?.id.uuidString ?? ""
     }
 }

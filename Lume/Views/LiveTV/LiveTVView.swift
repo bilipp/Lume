@@ -202,6 +202,9 @@ struct LiveTVView: View {
             .fullScreenCover(item: $multiViewLaunch) { launch in
                 MultiViewScreen(seed: launch.seed)
             }
+            .onChange(of: tabRouter?.multiViewCloseRequests) {
+                multiViewLaunch = nil
+            }
             #endif
             .paywall(isPresented: $showingPaywall, highlight: .multiView)
             .recordActionFlow(observesWhileVisible: false)

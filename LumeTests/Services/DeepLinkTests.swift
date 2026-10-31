@@ -162,3 +162,69 @@ struct DeepLinkRouterCloudPairingTests {
         #expect(router.hasCloudPairing == false)
     }
 }
+
+/// The in-memory slot a Siri request waits in while the launch gate, a PIN pad
+/// or the paywall is up.
+@MainActor
+struct IntentRouterTests {
+    @Test func `an enqueued request is consumed once the screen is clear`() {
+        let router = IntentRouter()
+        router.enqueue(.playLive(id: "p-l1"), startedBySiri: true)
+        #expect(router.hasPending)
+
+        let outcome = router.consumePending(screenIsClear: true, isPremium: true)
+        #expect(outcome == .play(PendingIntent(link: .playLive(id: "p-l1"), startedBySiri: true)))
+        #expect(router.hasPending == false)
+        #expect(router.consumePending(screenIsClear: true, isPremium: true) == nil)
+    }
+
+    @Test func `a newer request overwrites one still waiting`() {
+        let router = IntentRouter()
+        router.enqueue(.playMovie(id: "p-m1"), startedBySiri: true)
+        router.enqueue(.resume, startedBySiri: false)
+
+        #expect(router.consumePending(screenIsClear: true, isPremium: true)
+            == .play(PendingIntent(link: .resume, startedBySiri: false)))
+    }
+
+    @Test func `a request is kept while the screen is blocked`() {
+        let router = IntentRouter()
+        router.enqueue(.playMovie(id: "p-m1"), startedBySiri: true)
+
+        #expect(router.consumePending(screenIsClear: false, isPremium: true) == nil)
+        #expect(router.pending?.link == .playMovie(id: "p-m1"))
+        #expect(router.consumePending(screenIsClear: true, isPremium: true) != nil)
+    }
+
+    @Test func `without Pro the paywall shows once and the request is kept for an upgrade`() {
+        let router = IntentRouter()
+        router.enqueue(.playMovie(id: "p-m1"), startedBySiri: true)
+
+        #expect(router.consumePending(screenIsClear: true, isPremium: false) == .showPaywall)
+        #expect(router.consumePending(screenIsClear: true, isPremium: false) == nil)
+        #expect(router.pending?.link == .playMovie(id: "p-m1"))
+
+        router.paywallDismissed(isPremium: true)
+        #expect(router.consumePending(screenIsClear: true, isPremium: true)
+            == .play(PendingIntent(link: .playMovie(id: "p-m1"), startedBySiri: true)))
+    }
+
+    @Test func `closing the paywall without upgrading drops the request`() {
+        let router = IntentRouter()
+        router.enqueue(.playMovie(id: "p-m1"), startedBySiri: true)
+        _ = router.consumePending(screenIsClear: true, isPremium: false)
+
+        router.paywallDismissed(isPremium: false)
+        #expect(router.hasPending == false)
+    }
+
+    @Test func `a new request behind the paywall offers the paywall again`() {
+        let router = IntentRouter()
+        router.enqueue(.playMovie(id: "p-m1"), startedBySiri: true)
+        _ = router.consumePending(screenIsClear: true, isPremium: false)
+
+        router.enqueue(.playLive(id: "p-l1"), startedBySiri: true)
+        #expect(router.consumePending(screenIsClear: true, isPremium: false) == .showPaywall)
+        #expect(router.pending?.link == .playLive(id: "p-l1"))
+    }
+}

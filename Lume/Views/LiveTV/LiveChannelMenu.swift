@@ -117,6 +117,7 @@ enum LiveChannelFavorites {
     static func toggle(_ stream: LiveStream, in context: ModelContext) -> Bool {
         stream.isFavorite.toggle()
         try? context.save()
+        LumeShortcutsRefresh.schedule()
         return stream.isFavorite
     }
 }

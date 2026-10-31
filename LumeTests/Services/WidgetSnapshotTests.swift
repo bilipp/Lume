@@ -427,4 +427,22 @@ struct WidgetLinkResolverTests {
         let (container, playlist) = try seed()
         #expect(resolve(.playMovie(id: "\(playlist.id.uuidString)-missing"), container) == nil)
     }
+
+    @Test func `a queued Siri request is re-checked for the profile active when it drains`() throws {
+        // Siri ran for an adult; a child profile was picked before the gate cleared.
+        let (container, playlist) = try seed()
+        let router = IntentRouter()
+        router.enqueue(.playEpisode(id: "\(playlist.id.uuidString)-s1-1-1"), startedBySiri: true)
+        let outcome = try #require(router.consumePending(screenIsClear: true, isPremium: true))
+        guard case let .play(request) = outcome else {
+            Issue.record("expected a request to play, got \(outcome)")
+            return
+        }
+
+        let context = container.mainContext
+        let adult = ContentRestriction.fromCatalog(context, isChildProfile: false)
+        let child = ContentRestriction.fromCatalog(context, isChildProfile: true)
+        #expect(WidgetLinkResolver.resolve(request.link, in: context, restriction: adult, isPremium: true) != nil)
+        #expect(WidgetLinkResolver.resolve(request.link, in: context, restriction: child, isPremium: true) == nil)
+    }
 }
