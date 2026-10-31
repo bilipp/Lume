@@ -82,7 +82,9 @@ final class MediaServerPlaylistFlowTests: XCTestCase {
     }
 
     private func selectMediaServerSegment(_ app: XCUIApplication) {
-        let segment = app.buttons["Media Server"]
+        // The picker labels the segment "Server" — "Media Server" truncated
+        // with four segments on an iPhone (91a4cf8).
+        let segment = app.segmentedControls.buttons["Server"]
         XCTAssertTrue(segment.waitForExistence(timeout: 5), "No Media Server segment.\n\(app.debugDescription)")
         segment.tap()
     }
