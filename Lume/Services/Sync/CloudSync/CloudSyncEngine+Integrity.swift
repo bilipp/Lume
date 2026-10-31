@@ -36,19 +36,38 @@ extension CloudSyncEngine {
     }
 
     func localCatalogReadiness() -> LocalCatalogReadiness {
-        let catalogCount: Int
+        let counts: [Int]
         do {
-            catalogCount = try catalogContext.fetchCount(FetchDescriptor<Playlist>())
-                + catalogContext.fetchCount(FetchDescriptor<Movie>())
-                + catalogContext.fetchCount(FetchDescriptor<Series>())
-                + catalogContext.fetchCount(FetchDescriptor<Episode>())
-                + catalogContext.fetchCount(FetchDescriptor<LiveStream>())
+            counts = try [
+                catalogContext.fetchCount(FetchDescriptor<Playlist>()),
+                catalogContext.fetchCount(FetchDescriptor<Movie>()),
+                catalogContext.fetchCount(FetchDescriptor<Series>()),
+                catalogContext.fetchCount(FetchDescriptor<Episode>()),
+                catalogContext.fetchCount(FetchDescriptor<LiveStream>())
+            ]
         } catch {
             Logger.sync.error("Local catalog unreadable (\(error.localizedDescription, privacy: .public)) — skipping reconcile, not pushing deletions to iCloud")
             return .unreadable
         }
         let shadowHasBaseline = !shadow.playlistShadowIDs().isEmpty || !shadow.contentShadowIDs().isEmpty
-        if catalogCount == 0, shadowHasBaseline {
+        let readiness = Self.readiness(counts: counts, shadowHasBaseline: shadowHasBaseline)
+        if readiness == .unreadable {
+            Logger.sync.error("Local catalog returned an invalid count — skipping reconcile, not pushing deletions to iCloud")
+        }
+        return readiness
+    }
+
+    /// Classifies the probe counts. Core Data can report a count of
+    /// `NSNotFound` (`Int.max`) instead of throwing while a store is detached —
+    /// seen after macOS sleep/wake — and summing that trapped on overflow
+    /// (#256). A count outside `0..<NSNotFound` means the store didn't really
+    /// answer, so it reads as `.unreadable`. The counts are only tested for
+    /// zero, never added.
+    static func readiness(counts: [Int], shadowHasBaseline: Bool) -> LocalCatalogReadiness {
+        if counts.contains(where: { $0 < 0 || $0 >= NSNotFound }) {
+            return .unreadable
+        }
+        if shadowHasBaseline, counts.allSatisfy({ $0 == 0 }) {
             return .emptiedButHadData
         }
         return .ready
