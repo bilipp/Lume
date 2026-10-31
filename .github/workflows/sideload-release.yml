@@ -138,6 +138,9 @@ jobs:
           OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          SIMKL_CLIENT_SECRET: ${{ secrets.SIMKL_CLIENT_SECRET }}
+          MDBLIST_CLIENT_ID: ${{ secrets.MDBLIST_CLIENT_ID }}
         run: |
           {
             [ -n "$TMDB_ACCESS_TOKEN" ]     && echo "TMDB_ACCESS_TOKEN=$TMDB_ACCESS_TOKEN"
@@ -146,6 +149,9 @@ jobs:
             [ -n "$OPENSUBTITLES_API_KEY" ] && echo "OPENSUBTITLES_API_KEY=$OPENSUBTITLES_API_KEY"
             [ -n "$TRAKT_CLIENT_ID" ]       && echo "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID"
             [ -n "$TRAKT_CLIENT_SECRET" ]   && echo "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET"
+            [ -n "$SIMKL_CLIENT_ID" ]       && echo "SIMKL_CLIENT_ID=$SIMKL_CLIENT_ID"
+            [ -n "$SIMKL_CLIENT_SECRET" ]   && echo "SIMKL_CLIENT_SECRET=$SIMKL_CLIENT_SECRET"
+            [ -n "$MDBLIST_CLIENT_ID" ]     && echo "MDBLIST_CLIENT_ID=$MDBLIST_CLIENT_ID"
           } > .env || true
 
       # ── Archive (unsigned) ───────────────────────────────────────────────────
