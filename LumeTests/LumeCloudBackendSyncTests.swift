@@ -84,6 +84,32 @@ struct LumeCloudBackendSyncTests {
         #expect(host.settledCount == 1)
     }
 
+    @Test func `a push that finds the feed behind the cursor requests another pass`() async throws {
+        let (backend, _) = try await fixture.makeJoinedBackend()
+        let host = StubSyncBackendHost()
+        backend.attach(to: host)
+        let keys = try keys(of: backend)
+        for name in ["Harbor", "Harbor Lights", "Harbor Bay"] {
+            let profile = UserProfile(id: profileID, name: name, createdAt: .now, updatedAt: .now)
+            let (rid, ciphertext) = try keys.seal(LumeCloudPayloadCodec.payload(for: profile, previous: nil))
+            server.feed.store(rid: rid, ciphertext: ciphertext)
+        }
+        try await backend.pull()
+        // The server comes back from a backup: its feed is behind this
+        // device's cursor, so the cursor would skip the feed's next writes.
+        server.feed.state.withLock { $0 = StubLumeCloudClient.State() }
+        let context = ModelContext(backend.container)
+        context.insert(UserProfile(name: "Orchard"))
+        try context.save()
+        let requestedBefore = host.reconciles.count
+
+        try await backend.push()
+
+        #expect(Array(host.reconciles.dropFirst(requestedBefore)) == [.queued])
+        try await backend.pull()
+        #expect(server.feed.requestedSince.last == 0)
+    }
+
     @Test func `a deleted account ends this device's membership and clears the keychain`() async throws {
         let (backend, _) = try await fixture.makeJoinedBackend()
         let accountId = try #require(backend.identity?.accountId)
