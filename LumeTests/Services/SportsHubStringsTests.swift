@@ -46,7 +46,7 @@ struct SportsHubStringsTests {
         "Europe",
         "FT",
         "Final",
-        "Fixtures, live scores and standings refresh automatically in the background at this interval.",
+        "Fixtures, live scores and standings refresh whenever you open Home or the Sports tab, and every minute while they're on screen.",
         "Follow",
         "Follow %@",
         "Follow Your Teams",

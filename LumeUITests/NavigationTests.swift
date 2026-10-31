@@ -33,14 +33,20 @@ final class NavigationTests: XCTestCase {
         let liveTab = app.tabBars.buttons["Live TV"]
         XCTAssertTrue(liveTab.waitForExistence(timeout: 5))
         liveTab.tap()
-        XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 3))
+        // Live TV carries no navigation title, so check the tab selection instead.
+        XCTAssertTrue(app.waitForSelection(of: liveTab))
     }
 
     func testNavigationToHome() {
         let homeTab = app.tabBars.buttons["Home"]
         XCTAssertTrue(homeTab.waitForExistence(timeout: 5))
+        // Home is selected at launch; leave it first so the tap proves something.
+        let moviesTab = app.tabBars.buttons["Movies"]
+        moviesTab.tap()
+        XCTAssertTrue(app.waitForSelection(of: moviesTab))
         homeTab.tap()
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 3))
+        // Home carries no navigation title, so check the tab selection instead.
+        XCTAssertTrue(app.waitForSelection(of: homeTab))
     }
 
     func testAllTabsAreAccessible() {
@@ -49,5 +55,13 @@ final class NavigationTests: XCTestCase {
         XCTAssertTrue(tabs["Movies"].exists)
         XCTAssertTrue(tabs["Series"].exists)
         XCTAssertTrue(tabs["Live TV"].exists)
+    }
+}
+
+private extension XCUIApplication {
+    /// Waits for a tab-bar button to report itself selected.
+    func waitForSelection(of tab: XCUIElement, timeout: TimeInterval = 3) -> Bool {
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: tab)
+        return XCTWaiter.wait(for: [selected], timeout: timeout) == .completed
     }
 }
