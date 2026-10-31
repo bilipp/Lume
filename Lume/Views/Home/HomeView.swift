@@ -249,6 +249,9 @@ struct HomeView: View {
                 .fullScreenCover(item: $multiViewLaunch) { launch in
                     MultiViewScreen(seed: launch.seed)
             }
+            .onChange(of: pathRouter?.multiViewCloseRequests) {
+                multiViewLaunch = nil
+            }
             #endif
             .paywall(isPresented: $showingPaywall, highlight: .multiView)
         }

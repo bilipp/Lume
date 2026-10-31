@@ -22,6 +22,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     case sportsHub
     case recordingServer
     case chromecast
+    case siri
 
     var id: String {
         rawValue
@@ -72,6 +73,12 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
                 defaultValue: "Chromecast",
                 comment: "Lume Pro feature title: send playback to a Chromecast."
             )
+        case .siri:
+            LocalizedStringResource(
+                "premium.siri.title",
+                defaultValue: "Siri",
+                comment: "Lume Pro feature title: control playback in Lume by asking Siri."
+            )
         }
     }
 
@@ -93,6 +100,12 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
                 defaultValue: "Send live TV, movies and episodes from your iPhone or iPad to a Chromecast and control them from Lume.",
                 comment: "Lume Pro feature description: casting from iPhone or iPad to a Chromecast on the same network."
             )
+        case .siri:
+            LocalizedStringResource(
+                "premium.siri.subtitle",
+                defaultValue: "Ask Siri to play a channel, start a movie or series, or continue watching — no searching needed.",
+                comment: "Lume Pro feature description: Siri voice commands that start playback of a channel, movie, series or Continue Watching."
+            )
         }
     }
 
@@ -109,6 +122,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .sportsHub: "sportscourt"
         case .recordingServer: "record.circle"
         case .chromecast: "tv.badge.wifi"
+        case .siri: "mic"
         }
     }
 }

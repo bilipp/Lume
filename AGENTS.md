@@ -227,6 +227,16 @@ Three separate `ModelContainer`s:
 - The Apple-wide handoff record is `SyncedBackendChoice` in the **CloudKit** schema (`rootKey` is `.allowsCloudEncryption`). `CD_SyncedBackendChoice` must be deployed to CloudKit **Production** before release. `SIDE_LOAD` builds never touch it (or CloudKit at all).
 - No account IDs, device IDs, keys, recovery keys, pairing codes, payloads or `Bearer` credentials in logs or diagnostic exports — `LogRedaction` scrubs `Bearer`, and `DebugLogExporter` reports only backend, state, last sync/error and server type.
 
+### Siri / App Intents
+- Intents, entities, `LumeShortcuts` and `IntentCatalogResolver` live in `Lume/Services/Intents/`, main app target only. Siri is Pro-only (`PremiumFeature.siri`), enforced at the `MainTabView` drain (`SiriIntentDrain`), not in `perform()`: a free user gets the `.siri` paywall, which waits for an open player to close. The request is kept for replay only if they upgrade from that paywall; dismissing it without upgrading drops it (`IntentRouter.paywallDismissed`).
+- A no-match (unknown, Pro-locked, restricted or hidden title) throws `IntentPlaybackError.notFound` before `openLume`, so Siri answers "not found" and the app is never opened.
+- `ProfileManager` is registered with `AppDependencyManager` in `LumeApp` alongside the catalog container; intents read the active profile through it (`@Dependency`).
+- Entity ids are the playlist-prefixed catalog ids `WidgetDeepLink` uses — never a URL. Display titles are prefix-stripped (`IntentCatalogResolver.displayTitle`).
+- Entity queries fetch on a fresh background `ModelContext` of the **catalog** container only (never the CloudKit/Lume Cloud mirrors), with `fetchLimit` and no `sortBy`; ranking is in memory. Pro-locked playlists, restricted/hidden categories and hidden channels never match.
+- Intents never save, never touch the network, never log stream URLs/headers/tokens. `perform()` re-checks through `WidgetLinkResolver` for the active profile; the drain in `MainTabView` re-checks again once the launch gate clears (pending slot `IntentRouter.shared`, in memory only).
+- On OS 26+ `IntentLaunch.open` queues the request **before** `continueInForeground`, so the cold-launch auto-sync gate (`SiriLaunchSyncDeferral.holdsAutoSync`) sees it; a failed foregrounding withdraws it, and a background-only run that can't come forward never queues it — nothing may play unasked later. 26+ continues directly (`continueInForeground(alwaysConfirm: false)`); on OS 18–25 Siri shows its "Continue in Lume" confirmation (`requestToContinueInForeground`), and that extra tap is accepted.
+- Phrases live in `Lume/AppShortcuts.xcstrings` (every phrase keeps `${applicationName}`, all 10 locales — `SiriLocalizationTests`); intent titles/dialogs in `Localizable.xcstrings`.
+
 ### Localization
 String Catalogs (10 languages: ar, en, de, es, fr, it, ja, ko, pt, zh-Hans; the App Store listing mirrors them — see `ship-release`'s `references/store-metadata.json`). Run `xcstringstool sync` and include the tvOS stringsdata. Normalize `.xcstrings` with `Scripts/normalize-xcstrings.swift` (pre-commit hook) to avoid format churn.
 

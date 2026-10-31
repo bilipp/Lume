@@ -154,9 +154,9 @@ struct MainTabView: View {
             .tabBarMinimizeOnScrollDownIfAvailable()
             .castMiniController { linkedMedia = $0 }
         #endif
-            .onOpenURL { url in
-                handleDeepLink(url)
-            }
+            .onOpenURL { DeepLink(url: $0).map(handleDeepLink) }
+            .drainsSiriIntents(router: router, rootIsCovered: hasBlockingPresentation || profileManager?.isReady == false, restriction: contentRestriction, route: handleDeepLink)
+            .resumesSyncAfterSiriPlayback { enqueueDueSyncs(playlists) }
         #if !os(macOS)
             .fullScreenCover(item: $linkedMedia) { media in
                 FullScreenPlayerView(media: media)
@@ -394,8 +394,7 @@ struct MainTabView: View {
     /// a detail screen by catalog id. Silently ignores unknown links and titles
     /// not present in the catalog (e.g. a tmdbId that was never synced or
     /// enriched).
-    private func handleDeepLink(_ url: URL) {
-        guard let link = DeepLink(url: url) else { return }
+    private func handleDeepLink(_ link: DeepLink) {
         switch link {
         case let .movie(tmdbId):
             guard let movie = resolveMovie(tmdbId: tmdbId) else { return }
@@ -500,7 +499,7 @@ struct MainTabView: View {
     /// launch (where `lastSyncDate == nil` makes a playlist due) as well as
     /// periodic refreshes. A playlist the free plan locks never syncs.
     private func enqueueDueSyncs(_ candidates: [Playlist]) {
-        guard !isUITesting else { return }
+        guard !isUITesting, !SiriLaunchSyncDeferral.shared.holdsAutoSync() else { return }
 
         for playlist in candidates where !playlists.isLocked(playlist) && shouldAutoSync(playlist) {
             autoSyncAttempted.insert(playlist.id)
