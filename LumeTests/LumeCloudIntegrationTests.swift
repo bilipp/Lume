@@ -79,7 +79,8 @@ private struct IntegrationHarness {
             backend: backend,
             iCloudBackend: iCloud,
             makeLumeCloudBackend: { lumeCloud },
-            defaults: defaults
+            defaults: defaults,
+            deletionLog: SyncMirrorDeletionLog()
         )
     }
 
@@ -262,5 +263,68 @@ extension CloudSyncParentalEngineTests {
         #expect(harness.liveRemoteRecords == liveBeforeLoss)
         try harness.expectLocalStateIntact()
         try harness.expectMirrorCarriesState(lumeCloud.container)
+    }
+
+    @Test func `an unfavorite on Lume Cloud reaches the server as a tombstone`() async throws {
+        let harness = try IntegrationHarness()
+        defer { _ = ParentalControlsStore.clear() }
+        let (lumeCloud, _) = try await harness.fixture.makeJoinedBackend(defaults: harness.defaults)
+        let coordinator = harness.makeCoordinator(backend: lumeCloud, lumeCloud: lumeCloud)
+        try await runIntegrationPass(coordinator)
+        let channelKey = try #require(harness.contentStates(in: lumeCloud.container)[harness.favoriteChannelID]).lumeCloudKey
+        #expect(try harness.remotePayload(channelKey, of: lumeCloud)?.data["isFavorite"] == .bool(true))
+
+        let context = harness.catalog.mainContext
+        let channel = try #require(try context.fetch(FetchDescriptor<LiveStream>()).first { $0.id == harness.favoriteChannelID })
+        MediaFavorites.clearFavoriteState(channel)
+        try context.save()
+        try await runIntegrationPass(coordinator)
+
+        #expect(try harness.remotePayload(channelKey, of: lumeCloud) == nil)
+        #expect(harness.pushedTombstones == 1)
+        #expect(try harness.contentStates(in: lumeCloud.container)[harness.favoriteChannelID] == nil)
+        // The next pass leaves the un-favorite alone: no repair brings it back.
+        try await runIntegrationPass(coordinator)
+        #expect(try harness.contentStates(in: lumeCloud.container)[harness.favoriteChannelID] == nil)
+        let channels = try ModelContext(harness.catalog).fetch(FetchDescriptor<LiveStream>())
+        #expect(channels.first { $0.id == harness.favoriteChannelID }?.isFavorite == false)
+    }
+
+    @Test func `state cleaned up while its playlist was briefly gone comes back and deletes nothing`() async throws {
+        let harness = try IntegrationHarness()
+        defer { _ = ParentalControlsStore.clear() }
+        let (lumeCloud, _) = try await harness.fixture.makeJoinedBackend(defaults: harness.defaults)
+        let coordinator = harness.makeCoordinator(backend: lumeCloud, lumeCloud: lumeCloud)
+        try await runIntegrationPass(coordinator)
+        let liveBefore = harness.liveRemoteRecords
+
+        // What the engine's cleanup of a briefly absent playlist leaves: no
+        // content rows and no baseline, the catalog reset, the bookkeeping
+        // still calling every record synced.
+        let mirror = ModelContext(lumeCloud.container)
+        try mirror.delete(model: UserContentState.self)
+        try mirror.save()
+        let shadow = CloudSyncShadow(defaults: harness.defaults, namespace: .lumecloud)
+        for id in shadow.contentShadowIDs() {
+            shadow.setContentShadow(id, nil)
+        }
+        shadow.persist()
+        let context = harness.catalog.mainContext
+        for channel in try context.fetch(FetchDescriptor<LiveStream>()) {
+            MediaFavorites.clearFavoriteState(channel)
+        }
+        for movie in try context.fetch(FetchDescriptor<Movie>()) {
+            MediaFavorites.clearFavoriteState(movie)
+        }
+        try context.save()
+
+        // A relaunch: the new engine loads the baseline from the defaults.
+        let relaunched = harness.makeCoordinator(backend: lumeCloud, lumeCloud: lumeCloud)
+        try await runIntegrationPass(relaunched)
+
+        try harness.expectLocalStateIntact()
+        try harness.expectMirrorCarriesState(lumeCloud.container)
+        #expect(harness.pushedTombstones == 0)
+        #expect(harness.liveRemoteRecords == liveBefore)
     }
 }

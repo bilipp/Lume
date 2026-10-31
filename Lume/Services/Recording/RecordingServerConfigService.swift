@@ -138,7 +138,7 @@ final class RecordingServerConfigService {
             return inserted
         }()
         for other in rows where other !== row && other.kind != nil {
-            context.delete(other)
+            SyncMirrorDeletionLog.shared.delete(other, in: context)
         }
         row.kindRaw = kind.rawValue
         row.name = name
@@ -181,7 +181,7 @@ final class RecordingServerConfigService {
         let rows = fetchRows().filter { $0.id == id }
         guard !rows.isEmpty else { return }
         for row in rows {
-            context.delete(row)
+            SyncMirrorDeletionLog.shared.delete(row, in: context)
         }
         save(context, action: "delete")
     }

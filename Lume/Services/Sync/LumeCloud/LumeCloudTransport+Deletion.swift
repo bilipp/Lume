@@ -23,6 +23,17 @@ extension LumeCloudTransport {
         }
     }
 
+    /// Queues a tombstone for each key in `logicalKeys` whose mirror row
+    /// another writer deleted on purpose (`SyncMirrorDeletionLog`). Unlike
+    /// `recordDeletions`, it deletes no row: a key whose row exists again — an
+    /// un-favorite undone before the pass — queues nothing.
+    func recordRemovals(logicalKeys: [String]) async throws {
+        guard !logicalKeys.isEmpty else { return }
+        try await serialized { transport in
+            try transport.performRecordRemovals(logicalKeys: logicalKeys)
+        }
+    }
+
     /// The logical keys of every synced record, not already queued for
     /// deletion, whose key contains any of `fragments`. Callers still match
     /// the parsed key: a fragment only narrows the read.
@@ -66,6 +77,40 @@ extension LumeCloudTransport {
             try context.save()
         }
         return deletedRow
+    }
+
+    private func performRecordRemovals(logicalKeys: [String]) throws {
+        let context = makeContext()
+        var removed: [String] = []
+        var keysByModel: [ObjectIdentifier: (model: any LumeCloudPayloadMappable.Type, keys: Set<String>)] = [:]
+        for logicalKey in logicalKeys {
+            guard let key = LumeCloudLogicalKey(logicalKey) else { continue }
+            let modelType = key.modelType
+            keysByModel[ObjectIdentifier(modelType), default: (modelType, [])].keys.insert(logicalKey)
+        }
+        for entry in keysByModel.values {
+            let present = try presentKeys(entry.keys, as: entry.model, in: context)
+            removed += entry.keys.subtracting(present)
+        }
+        guard !removed.isEmpty else { return }
+        liftQuotaHold()
+        let rids = removed.map { keys.recordID(for: $0) }
+        let descriptor = FetchDescriptor<LumeCloudRecordState>(predicate: #Predicate { rids.contains($0.rid) })
+        for state in try context.fetch(descriptor) where state.lastSyncedPayload != nil && !state.isUndecodable {
+            update(state, \.isDeletionPending, to: true)
+            update(state, \.isDirty, to: true)
+        }
+        if context.hasChanges {
+            try context.save()
+        }
+    }
+
+    private func presentKeys<Model: LumeCloudPayloadMappable>(
+        _ keys: Set<String>,
+        as _: Model.Type,
+        in context: ModelContext
+    ) throws -> Set<String> {
+        try Set(mirrorRows(Model.self, withKeys: keys, in: context).map(\.lumeCloudKey)).intersection(keys)
     }
 
     private func deleteRows<Model: LumeCloudPayloadMappable>(

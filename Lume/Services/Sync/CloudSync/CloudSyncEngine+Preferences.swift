@@ -44,7 +44,7 @@ extension CloudSyncEngine {
 
     private func applyLiveTVPreferencesToCloud(_ value: LiveTVPreferenceValues?, mirror: SyncedLiveTVPreferences?) {
         guard let value else {
-            if let mirror { cloudContext.delete(mirror) }
+            if let mirror { deletionLog.delete(mirror, in: cloudContext) }
             return
         }
         guard let mirror else {
