@@ -146,7 +146,7 @@ final class SportsFollowService {
     func unfollow(_ key: String) {
         guard let context else { return }
         for row in fetchRows() where row.key == key {
-            context.delete(row)
+            SyncMirrorDeletionLog.shared.delete(row, in: context)
         }
         try? context.save()
         reload()

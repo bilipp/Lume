@@ -155,7 +155,7 @@ private extension CloudSyncEngine {
             upsertMirror(&mirrors, id: id, profileID: profileID, kind: entry.kind, values: entry.values)
         }
         for (id, mirror) in mirrors where localValues[id] == nil {
-            cloudContext.delete(mirror)
+            deletionLog.delete(mirror, in: cloudContext)
         }
     }
 

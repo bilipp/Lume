@@ -77,6 +77,9 @@ actor CloudSyncEngine {
     let shadow: CloudSyncShadow
     /// Where the synced settings live locally (`LiveTVRailSettings`).
     let preferences: UserDefaults
+    /// Where mirror rows deleted on purpose are reported, so Lume Cloud can
+    /// send them as tombstones. Cleanup and dedupe deletions stay unreported.
+    let deletionLog: SyncMirrorDeletionLog
 
     /// The profile whose state the catalog currently projects. Read from
     /// `ActiveProfileStore` at the start of each reconcile, so content state is
@@ -89,7 +92,8 @@ actor CloudSyncEngine {
         catalogContainer: ModelContainer,
         cloudContainer: ModelContainer,
         shadow: CloudSyncShadow = CloudSyncShadow(),
-        preferences: UserDefaults = .standard
+        preferences: UserDefaults = .standard,
+        deletionLog: SyncMirrorDeletionLog = .shared
     ) {
         catalogContext = ModelContext(catalogContainer)
         catalogContext.autosaveEnabled = false
@@ -97,6 +101,7 @@ actor CloudSyncEngine {
         cloudContext.autosaveEnabled = false
         self.shadow = shadow
         self.preferences = preferences
+        self.deletionLog = deletionLog
     }
 
     #if DEBUG
@@ -105,13 +110,19 @@ actor CloudSyncEngine {
         /// behavior. Production uses the two-container designated init above so
         /// CloudKit's churn can't invalidate the catalog; the reconcile/merge logic
         /// the tests exercise routes identically either way.
-        init(container: ModelContainer, shadow: CloudSyncShadow = CloudSyncShadow(), preferences: UserDefaults = .standard) {
+        init(
+            container: ModelContainer,
+            shadow: CloudSyncShadow = CloudSyncShadow(),
+            preferences: UserDefaults = .standard,
+            deletionLog: SyncMirrorDeletionLog = .shared
+        ) {
             let ctx = ModelContext(container)
             ctx.autosaveEnabled = false
             catalogContext = ctx
             cloudContext = ctx
             self.shadow = shadow
             self.preferences = preferences
+            self.deletionLog = deletionLog
         }
     #endif
 
@@ -477,7 +488,7 @@ private extension CloudSyncEngine {
 private extension CloudSyncEngine {
     func applyPlaylistToCloud(_ value: PlaylistConfigValues?, id: UUID, mirror: SyncedPlaylist?) {
         guard let value else {
-            if let mirror { cloudContext.delete(mirror) }
+            if let mirror { deletionLog.delete(mirror, in: cloudContext) }
             return
         }
         if let mirror {
@@ -541,7 +552,7 @@ private extension CloudSyncEngine {
 
     func applyEPGSourceToCloud(_ value: EPGSourceValues?, id: UUID, mirror: SyncedEPGSource?) {
         guard let value else {
-            if let mirror { cloudContext.delete(mirror) }
+            if let mirror { deletionLog.delete(mirror, in: cloudContext) }
             return
         }
         if let mirror {
