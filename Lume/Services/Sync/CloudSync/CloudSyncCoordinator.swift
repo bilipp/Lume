@@ -21,9 +21,12 @@ final class CloudSyncCoordinator {
     let status = CloudSyncStatus()
 
     private let catalogContainer: ModelContainer
-    private var engine: CloudSyncEngine
+    private(set) var engine: CloudSyncEngine
     /// Backs the shadow, the engine and `settings`.
     let defaults: UserDefaults
+    /// Mirror rows deleted on purpose, drained into the backend at each pass.
+    /// Every engine this coordinator builds reports into it.
+    let deletionLog: SyncMirrorDeletionLog
     /// Where the device's backend choice persists.
     let settings: LumeCloudSettings
     /// The mirror store the engine reconciles against and its readers follow.
@@ -138,19 +141,22 @@ final class CloudSyncCoordinator {
         iCloudBackend: (any SyncBackend)? = nil,
         makeLumeCloudBackend: (() throws -> LumeCloudBackend)? = nil,
         awaitingBackendChoice: Bool = false,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        deletionLog: SyncMirrorDeletionLog = .shared
     ) {
         let namespace = backend.kind ?? .icloud
         let mirror = backend.mirrorContainer ?? cloudContainer
         self.catalogContainer = catalogContainer
         self.defaults = defaults
+        self.deletionLog = deletionLog
         settings = LumeCloudSettings(defaults: defaults)
         mirrorContainer = mirror
         engine = Self.makeEngine(
             catalogContainer: catalogContainer,
             mirrorContainer: mirror,
             namespace: namespace,
-            defaults: defaults
+            defaults: defaults,
+            deletionLog: deletionLog
         )
         engineNamespace = namespace
         self.backend = backend
@@ -282,6 +288,7 @@ final class CloudSyncCoordinator {
         isReconciling = true
         let backend = backend
         let engine = engine
+        let deletionLog = deletionLog
 
         passTask = Task {
             let result = await BackgroundActivity.perform("Sync reconcile") {
@@ -290,12 +297,16 @@ final class CloudSyncCoordinator {
                 if await backend.recoverLostMirror() {
                     await engine.resetShadow()
                 }
+                // Removals made since the last pass go first, so the pull's
+                // repair of rows deleted without one can't bring them back.
+                await Self.recordRemovals(deletionLog, to: backend)
                 do {
                     try await backend.pull()
                 } catch {
                     Logger.sync.error("Sync pull failed: \(error)")
                 }
                 let result = await engine.reconcile()
+                await Self.recordRemovals(deletionLog, to: backend)
                 do {
                     try await backend.push()
                 } catch {
@@ -324,6 +335,13 @@ final class CloudSyncCoordinator {
         }
     }
 
+    /// Hands the rows deleted on purpose since the last drain to `backend`.
+    private static func recordRemovals(_ log: SyncMirrorDeletionLog, to backend: any SyncBackend) async {
+        let keys = log.drain()
+        guard !keys.isEmpty else { return }
+        await backend.recordRemovals(logicalKeys: keys)
+    }
+
     // MARK: - Engine swap
 
     /// Rebuild the engine over `mirrorContainer` with the shadow namespace
@@ -349,7 +367,8 @@ final class CloudSyncCoordinator {
                 mirrorContainer: mirrorContainer,
                 namespace: namespace,
                 resettingShadow: resettingShadow,
-                defaults: defaults ?? self.defaults
+                defaults: defaults ?? self.defaults,
+                deletionLog: deletionLog
             )
             engineNamespace = namespace
             self.mirrorContainer = mirrorContainer
@@ -430,13 +449,19 @@ final class CloudSyncCoordinator {
         mirrorContainer: ModelContainer,
         namespace: SyncBackendKind,
         resettingShadow: Bool = false,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        deletionLog: SyncMirrorDeletionLog
     ) -> CloudSyncEngine {
         let shadow = CloudSyncShadow(defaults: defaults, namespace: namespace)
         if resettingShadow {
             shadow.resetAll()
         }
-        return CloudSyncEngine(catalogContainer: catalogContainer, cloudContainer: mirrorContainer, shadow: shadow)
+        return CloudSyncEngine(
+            catalogContainer: catalogContainer,
+            cloudContainer: mirrorContainer,
+            shadow: shadow,
+            deletionLog: deletionLog
+        )
     }
 
     // MARK: - Mirror consumers
@@ -484,55 +509,6 @@ final class CloudSyncCoordinator {
             return
         }
         await backend.recordPlaylistDeletion(id: id)
-    }
-
-    // MARK: - Profiles
-
-    /// Bootstrap the profile store (ensure a default, resolve the active profile,
-    /// claim legacy records). Falls back to the preferred/default id on failure
-    /// so the app still launches into a usable profile.
-    func bootstrapProfiles(preferredActiveID: UUID?, defaultName: String) async -> ProfileBootstrap {
-        do {
-            return try await engine.bootstrapProfiles(preferredActiveID: preferredActiveID, defaultName: defaultName)
-        } catch {
-            Logger.sync.error("Profile bootstrap failed: \(error.localizedDescription)")
-            return ProfileBootstrap(
-                activeProfileID: preferredActiveID ?? UserProfile.defaultProfileID,
-                profileCount: 1
-            )
-        }
-    }
-
-    /// Re-project the catalog from one profile to another (flush, reset, hydrate).
-    func switchProfile(from: UUID, to toID: UUID) async {
-        do {
-            try await engine.switchProfile(from: from, to: toID)
-        } catch {
-            Logger.sync.error("Profile switch failed: \(error.localizedDescription)")
-        }
-    }
-
-    /// The user deleted a profile: purge its content state and sports follows,
-    /// delete its row on the mirror's main context (the one the profile UI
-    /// reads), refresh the mirror's readers, then, under Lume Cloud, queue
-    /// tombstones for all of it; iCloud exports the deleted rows on its own.
-    func deleteProfile(id: UUID) async {
-        do {
-            try await engine.purgeProfileData(id)
-        } catch {
-            Logger.sync.error("Profile purge failed: \(error.localizedDescription)")
-        }
-        let context = mirrorContainer.mainContext
-        do {
-            for profile in try context.fetch(FetchDescriptor<UserProfile>(predicate: #Predicate { $0.id == id })) {
-                context.delete(profile)
-            }
-            try context.save()
-        } catch {
-            Logger.sync.error("Profile deletion failed: \(error.localizedDescription)")
-        }
-        notifyMirrorConsumers()
-        await backend.recordProfileDeletion(id: id)
     }
 
     // MARK: - Initial-sync gate
