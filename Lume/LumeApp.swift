@@ -5,6 +5,7 @@
 //  Created by Philipp Bischoff on 09.04.26.
 //
 
+import AppIntents
 import OSLog
 import SwiftData
 import SwiftUI
@@ -59,6 +60,9 @@ struct LumeApp: App {
         let profiles = ProfileManager(catalogContainer: catalog, cloudContainer: coordinator.mirrorContainer, coordinator: coordinator)
         _profileManager = State(initialValue: profiles)
         _parentalControls = State(initialValue: ParentalControls(profileManager: profiles))
+        // The Siri entity queries read the catalog and the active profile from these.
+        AppDependencyManager.shared.add(dependency: catalog)
+        AppDependencyManager.shared.add(dependency: profiles)
     }
 
     /// Builds **two separate containers** (the foreground-freeze fix):

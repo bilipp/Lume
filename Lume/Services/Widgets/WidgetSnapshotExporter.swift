@@ -79,11 +79,7 @@ enum WidgetSnapshotExporter {
         }
 
         let playlistPrefix = "\(playlist.id.uuidString)-"
-        let restriction = ContentRestriction(
-            isActive: isChildProfile,
-            restrictedCategoryIDs: isChildProfile ? categoryIDs(in: context, matching: #Predicate { $0.isRestricted }) : [],
-            hiddenCategoryIDs: categoryIDs(in: context, matching: #Predicate { $0.isHidden })
-        )
+        let restriction = ContentRestriction.fromCatalog(context, isChildProfile: isChildProfile)
 
         return WidgetSnapshot(
             generatedAt: now,
@@ -91,14 +87,6 @@ enum WidgetSnapshotExporter {
             favorites: favorites(in: context, prefix: playlistPrefix, restriction: restriction),
             onNow: onNow(in: context, container: container, prefix: playlistPrefix, restriction: restriction, now: now)
         )
-    }
-
-    private nonisolated static func categoryIDs(
-        in context: ModelContext,
-        matching predicate: Predicate<Category>
-    ) -> Set<String> {
-        let categories = (try? context.fetch(FetchDescriptor<Category>(predicate: predicate))) ?? []
-        return Set(categories.map(\.id))
     }
 
     // MARK: - Continue Watching

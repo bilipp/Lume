@@ -27,6 +27,7 @@ enum MediaFavorites {
         if favorited {
             model.isFavorite = true
             model.addedToWatchlistDate = Date()
+            LumeShortcutsRefresh.schedule()
         } else {
             clearFavoriteState(model)
         }
@@ -52,5 +53,6 @@ enum MediaFavorites {
         model.isFavorite = false
         model.favoriteOrder = nil
         (model as? any WatchlistFavoritable)?.addedToWatchlistDate = nil
+        LumeShortcutsRefresh.schedule()
     }
 }

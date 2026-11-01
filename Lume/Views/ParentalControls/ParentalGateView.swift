@@ -66,5 +66,9 @@ private struct PINPromptModifier: ViewModifier {
             },
             onCancel: { target = nil }
         )
+        // Raised from toolbars and overlays the browse root can't see; a
+        // waiting Siri request must not land over the PIN pad.
+        .onAppear { ScreenOccupancy.shared.noteBlockingSheetAppeared() }
+        .onDisappear { ScreenOccupancy.shared.noteBlockingSheetDismissed() }
     }
 }

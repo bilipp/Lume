@@ -117,6 +117,12 @@ nonisolated extension PerfSignpost {
     /// league.
     static let sportsFixtureRefresh = PerfSignpost("SportsFixtureRefresh")
 
+    /// Siri / App Intents
+    /// One `IntentCatalogResolver.search`: the bounded per-playlist name
+    /// fetches plus favorites/recents, filtered and ranked in memory. Siri
+    /// waits on it while resolving a spoken title.
+    static let intentEntityResolve = PerfSignpost("IntentEntityResolve")
+
     // Lume Cloud
 
     /// One transport pull: the `/changes` walk plus applying it to the mirror.

@@ -9,6 +9,7 @@
 
 import Foundation
 @testable import Lume
+import SwiftData
 import Testing
 
 /// Minimal stand-in for a categorised content item (Movie/Series/LiveStream all
@@ -80,5 +81,33 @@ struct ContentRestrictionTests {
         let items = [StubItem(categoryId: "nl"), StubItem(categoryId: "en"), StubItem(categoryId: nil)]
         let restriction = ContentRestriction(isActive: false, hiddenCategoryIDs: ["nl"])
         #expect(items.excludingRestricted(restriction).map(\.categoryId) == ["en", nil])
+    }
+
+    // MARK: - Built from the catalog
+
+    @Test func `catalog restriction applies restricted categories only for a child profile`() throws {
+        try OnDiskCatalogStore.withContext { context in
+            let playlist = Playlist(name: "Test", serverURL: "http://example.com", username: "u", password: "p")
+            context.insert(playlist)
+            let restricted = Lume.Category(apiId: "1", name: "Adults", parentId: 0, type: .vod, playlist: playlist)
+            restricted.isRestricted = true
+            let hidden = Lume.Category(apiId: "2", name: "Hidden", parentId: 0, type: .vod, playlist: playlist)
+            hidden.isHidden = true
+            let visible = Lume.Category(apiId: "3", name: "Kids", parentId: 0, type: .vod, playlist: playlist)
+            for category in [restricted, hidden, visible] {
+                context.insert(category)
+            }
+            try context.save()
+
+            let parent = ContentRestriction.fromCatalog(context, isChildProfile: false)
+            #expect(parent.isActive == false)
+            #expect(parent.restrictedCategoryIDs.isEmpty)
+            #expect(parent.excludedCategoryIDs == [hidden.id])
+
+            let child = ContentRestriction.fromCatalog(context, isChildProfile: true)
+            #expect(child.isActive == true)
+            #expect(child.excludedCategoryIDs == [hidden.id, restricted.id])
+            #expect(child.hides(categoryID: visible.id) == false)
+        }
     }
 }
