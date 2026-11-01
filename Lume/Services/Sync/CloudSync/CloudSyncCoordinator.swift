@@ -89,7 +89,8 @@ final class CloudSyncCoordinator {
     /// Ends a launch-time Lume Cloud join's hold on the gate when it runs out.
     var launchJoinWaitTask: Task<Void, Never>?
 
-    private var observers: [NSObjectProtocol] = []
+    /// Not `private`: `CloudSyncCoordinator+Episodes.swift` registers one too.
+    var observers: [NSObjectProtocol] = []
     private var observesContentSync = false
 
     /// Readers of the mirror store, repointed when an engine swap changes it.
@@ -173,6 +174,7 @@ final class CloudSyncCoordinator {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.notifyMirrorConsumers() }
         })
+        observeNewEpisodes()
         // Nothing to wait for under previews / tests / Off: open the launch gate
         // now so an empty store shows the add-playlist form immediately. Behind
         // the first-run choice it stays closed for the chosen backend's first

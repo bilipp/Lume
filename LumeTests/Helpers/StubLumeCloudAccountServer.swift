@@ -151,7 +151,8 @@ final nonisolated class StubLumeCloudAccountServer: Sendable {
         func account() async throws -> AccountInfo {
             try log("account")
             let accountId = try authorize()
-            return AccountInfo(accountId: accountId, createdAt: 1_760_000_000_000, usedBytes: 0, recordCount: 0, nextSeq: 1)
+            let nextSeq = server.feed.state.withLock(\.lastSeq) + 1
+            return AccountInfo(accountId: accountId, createdAt: 1_760_000_000_000, usedBytes: 0, recordCount: 0, nextSeq: nextSeq)
         }
 
         func deleteAccount() async throws {

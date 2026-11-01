@@ -23,6 +23,9 @@ nonisolated struct LumeCloudPullResult: Equatable {
 /// store; `CloudSyncEngine` reconciles the catalog against it afterwards.
 actor LumeCloudTransport {
     let accountId: String
+    /// The server `client` talks to, as `LumeCloudConfig.comparable`: the
+    /// bookkeeping is reset when it was written against another one.
+    let serverURL: String
     let client: any LumeCloudSyncing
     let container: ModelContainer
     let keys: LumeCloudKeys
@@ -40,6 +43,9 @@ actor LumeCloudTransport {
     /// The canonical bytes the server rejected with 413, per record. The record
     /// isn't sent again until its payload changes.
     var oversizedRecords: [String: Data] = [:]
+    /// Whether this transport has checked its stored cursor against the
+    /// server's feed (`resetIfCursorAheadOfFeed`). Once per launch.
+    private var checkedCursorAgainstFeed = false
     /// Record types this transport handles as unknown, the way a build that
     /// predates them would. Empty in the app; tests use it to stand for an
     /// older build.
@@ -59,12 +65,14 @@ actor LumeCloudTransport {
     nonisolated static let contextAuthor = "LumeCloudTransport"
 
     /// `container` is the Lume Cloud mirror (`LumeApp.makeLumeCloudContainer`),
-    /// which carries the bookkeeping models too.
+    /// which carries the bookkeeping models too. `serverURL` is the server
+    /// `client` talks to.
     init(
         client: any LumeCloudSyncing,
         container: ModelContainer,
         rootKey: Data,
         accountId: String,
+        serverURL: URL = LumeCloudConfig.defaultURL,
         now: @escaping @Sendable () -> Date = { Date() },
         unreadableRecordTypes: Set<String> = [],
         deletionLog: SyncMirrorDeletionLog = .shared
@@ -73,6 +81,7 @@ actor LumeCloudTransport {
         self.container = container
         keys = try LumeCloudKeys(rootKey: rootKey)
         self.accountId = accountId
+        self.serverURL = LumeCloudConfig.comparable(serverURL)
         self.now = now
         self.unreadableRecordTypes = unreadableRecordTypes
         self.deletionLog = deletionLog
@@ -110,13 +119,20 @@ actor LumeCloudTransport {
         }
     }
 
-    /// The stored `/changes` cursor; 0 before the first pull of this account.
+    /// The stored `/changes` cursor; 0 before the first pull of this account
+    /// on this server.
     func storedCursor() throws -> Int {
         let context = makeContext()
         guard let meta = try context.fetch(FetchDescriptor<LumeCloudSyncMeta>()).first,
-              meta.accountId == accountId
+              meta.accountId == accountId, !isFromAnotherServer(meta)
         else { return 0 }
         return meta.nextSeq
+    }
+
+    /// Whether `meta` was written against another server's feed. Bookkeeping
+    /// from before the server was recorded counts as this server's.
+    func isFromAnotherServer(_ meta: LumeCloudSyncMeta) -> Bool {
+        !meta.serverURL.isEmpty && meta.serverURL != serverURL
     }
 
     private func performPull() async throws -> LumeCloudPullResult {
@@ -124,7 +140,6 @@ actor LumeCloudTransport {
         defer { Perf.end(interval) }
         let context = makeContext()
         let meta = try preparedSyncMeta(in: context)
-        let since = meta.nextSeq
         // Saved before the request: the repair is local, and an offline pull
         // still owes the engine the restored rows.
         let restored = try restoreUnrecordedRemovals(in: context)
@@ -134,6 +149,8 @@ actor LumeCloudTransport {
         if restored > 0 {
             await postMirrorDidChange()
         }
+        try await resetIfCursorAheadOfFeed(meta, in: context)
+        let since = meta.nextSeq
 
         let page: ChangesPage
         let isSnapshot: Bool
@@ -162,6 +179,22 @@ actor LumeCloudTransport {
         return result
     }
 
+    /// Once per launch, before the first pull: a stored cursor at or past the
+    /// server's next seq came from another feed (an account moved between
+    /// servers, a server restored from a backup). Pulls from it return nothing
+    /// until the feed passes it, and then skip every record up to it, so the
+    /// bookkeeping resets and this pull starts from 0. A device that only reads
+    /// would never notice otherwise: the push check needs a write.
+    private func resetIfCursorAheadOfFeed(_ meta: LumeCloudSyncMeta, in context: ModelContext) async throws {
+        guard !checkedCursorAgainstFeed, meta.nextSeq > 0 else { return }
+        let nextSeq = try await request { try await client.account() }.nextSeq
+        checkedCursorAgainstFeed = true
+        guard meta.nextSeq >= nextSeq else { return }
+        Logger.sync.notice("Lume Cloud cursor is ahead of the server's feed: pulling everything again")
+        try resetBookkeeping(meta, keepingHeldRecords: true, in: context)
+        try context.save()
+    }
+
     func postMirrorDidChange() async {
         await MainActor.run {
             NotificationCenter.default.post(name: .lumeSyncMirrorDidChange, object: nil)
@@ -169,10 +202,10 @@ actor LumeCloudTransport {
     }
 
     /// The account's sync meta, with its bookkeeping reset when it belongs to
-    /// another account, or when the mirror was lost (`mirrorWasLost`,
-    /// PROTOCOL.md §6.4): pulling from 0 then refills the mirror instead of a
-    /// later push reading the empty mirror as deletions. `mirrorLost` is a
-    /// `mirrorWasLost` result the caller already has.
+    /// another account, to another server's feed, or when the mirror was lost
+    /// (`mirrorWasLost`, PROTOCOL.md §6.4): pulling from 0 then refills the
+    /// mirror instead of a later push reading the empty mirror as deletions.
+    /// `mirrorLost` is a `mirrorWasLost` result the caller already has.
     func preparedSyncMeta(in context: ModelContext, mirrorLost: Bool? = nil) throws -> LumeCloudSyncMeta {
         let meta: LumeCloudSyncMeta
         if let existing = try context.fetch(FetchDescriptor<LumeCloudSyncMeta>()).first {
@@ -184,9 +217,16 @@ actor LumeCloudTransport {
         if meta.accountId != accountId {
             try resetBookkeeping(meta, keepingHeldRecords: false, in: context)
             meta.accountId = accountId
+        } else if isFromAnotherServer(meta) {
+            // The same account on another server: its seqs and versions are
+            // another feed's, and a cursor ahead of this feed's head would skip
+            // every record up to it. The mirror is still this account's data.
+            Logger.sync.notice("Lume Cloud server changed: pulling everything again")
+            try resetBookkeeping(meta, keepingHeldRecords: true, in: context)
         } else if try mirrorLost ?? mirrorWasLost(in: context) {
             try resetBookkeeping(meta, keepingHeldRecords: true, in: context)
         }
+        update(meta, \.serverURL, to: serverURL)
         return meta
     }
 
@@ -216,7 +256,7 @@ actor LumeCloudTransport {
     /// snapshot pull that follows drops it if the server no longer lists it. It
     /// keeps unpushed user deletions as they are, so the pull can't revive them.
     /// Another account's held records never open under these keys, so they go.
-    private func resetBookkeeping(_ meta: LumeCloudSyncMeta, keepingHeldRecords: Bool, in context: ModelContext) throws {
+    func resetBookkeeping(_ meta: LumeCloudSyncMeta, keepingHeldRecords: Bool, in context: ModelContext) throws {
         for state in try context.fetch(FetchDescriptor<LumeCloudRecordState>()) {
             if keepingHeldRecords, state.isDeletionPending, state.lastSyncedPayload != nil, !state.isUndecodable {
                 continue

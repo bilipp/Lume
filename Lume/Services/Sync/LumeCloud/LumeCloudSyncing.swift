@@ -15,6 +15,9 @@ nonisolated protocol LumeCloudSyncing: Sendable {
     func changes(since: Int, limit: Int?) async throws -> ChangesPage
     /// `GET /v1/socket`: the feed's `seq` each time it advances. Never reconnects.
     func events() -> AsyncThrowingStream<Int, Error>
+    /// `GET /v1/accounts/me`. Its `nextSeq` is the next seq the server will
+    /// assign: never a cursor, but every cursor of this feed is below it.
+    func account() async throws -> AccountInfo
 }
 
 /// `LumeCloudSyncing` over the real server.
@@ -68,5 +71,9 @@ nonisolated struct LiveLumeCloudSyncing: LumeCloudSyncing {
 
     func events() -> AsyncThrowingStream<Int, Error> {
         socketClient.events()
+    }
+
+    func account() async throws -> AccountInfo {
+        try await client.account()
     }
 }
