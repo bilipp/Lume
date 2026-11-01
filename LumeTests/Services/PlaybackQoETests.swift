@@ -53,6 +53,19 @@ struct PlaybackQoETests {
     }
 
     @Test
+    func `sessions on AetherEngine are tallied under its own engine key`() {
+        let (qoe, suite) = makeTracker()
+        defer { tearDown(suite) }
+
+        qoe.beginStartup(engine: .aetherEngine, isLive: true)
+        qoe.noteFirstFrame()
+        qoe.endSession()
+
+        #expect(qoe.summary.engines[PlayerEngineKind.aetherEngine.rawValue]?.firstFrames == 1)
+        #expect(qoe.summary.engines[PlayerEngineKind.lumeEngine.rawValue] == nil)
+    }
+
+    @Test
     func `abandoning a stream before the first frame counts as an exit before video start`() {
         let (qoe, suite) = makeTracker()
         defer { tearDown(suite) }

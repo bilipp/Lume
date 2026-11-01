@@ -18,7 +18,7 @@ struct FullScreenPreviewAdoptionTests {
         )
     }
 
-    private let priority: [PlayerEngineKind] = [.vlcKit, .ksPlayer, .avPlayer, .lumeEngine]
+    private let priority: [PlayerEngineKind] = [.vlcKit, .ksPlayer, .avPlayer, .lumeEngine, .aetherEngine]
 
     private func startedHandle(
         _ coordinator: KSVideoPlayer.Coordinator? = nil,

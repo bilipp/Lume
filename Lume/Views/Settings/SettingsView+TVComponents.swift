@@ -32,6 +32,8 @@ import SwiftUI
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                case .aetherEngine:
+                    AetherEngineSettingsTVDetail()
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

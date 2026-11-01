@@ -42,11 +42,35 @@ nonisolated enum CreditsInfo {
     /// Playback engines and the media stack they bundle. Lume itself is licensed
     /// under the GNU AGPL v3 (see `sourceCodeURL` / `licenseURL`); these are the
     /// third-party components whose licences require acknowledgement.
-    static let libraries: [Library] = [
-        Library(name: "KSPlayer", license: "GPL v3", urlString: "https://github.com/kingslay/KSPlayer"),
-        Library(name: "FFmpegKit", license: "GPL v3 / LGPL v3", urlString: "https://github.com/kingslay/FFmpegKit"),
-        Library(name: "VLCKit", license: "LGPL v2.1", urlString: "https://code.videolan.org/videolan/VLCKit")
-    ]
+    static let libraries: [Library] = {
+        var libraries = [
+            Library(name: "KSPlayer", license: "GPL v3", urlString: "https://github.com/kingslay/KSPlayer"),
+            Library(name: "FFmpegKit", license: "GPL v3 / LGPL v3", urlString: "https://github.com/kingslay/FFmpegKit"),
+            Library(name: "VLCKit", license: "LGPL v2.1", urlString: "https://code.videolan.org/videolan/VLCKit")
+        ]
+        #if !os(visionOS)
+            // The engine's licence asks for the exact tag built against, and
+            // FFmpegBuild's tag carries the patched FFmpeg sources the LGPL
+            // requires us to point at. Keep both in step with Package.resolved.
+            libraries += [
+                Library(
+                    name: "AetherEngine",
+                    license: "LGPL v3 + App Store exception",
+                    urlString: "https://github.com/superuser404notfound/AetherEngine/tree/7.53.1"
+                ),
+                Library(
+                    name: "FFmpeg (FFmpegBuild)",
+                    license: "LGPL v2.1",
+                    urlString: "https://github.com/superuser404notfound/FFmpegBuild/tree/3.11.1"
+                ),
+                Library(name: "dav1d", license: "BSD 2-Clause", urlString: "https://code.videolan.org/videolan/dav1d"),
+                Library(name: "zimg", license: "WTFPL", urlString: "https://github.com/sekrit-twc/zimg"),
+                Library(name: "libzvbi", license: "LGPL v2.1 / MIT", urlString: "https://github.com/zapping-vbi/zvbi"),
+                Library(name: "libdovi", license: "MIT", urlString: "https://github.com/quietvoid/dovi_tool")
+            ]
+        #endif
+        return libraries
+    }()
 
     // MARK: - Sample footage
 

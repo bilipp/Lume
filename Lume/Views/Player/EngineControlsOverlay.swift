@@ -3,22 +3,48 @@ import SwiftUI
 
 // MARK: - Controls Overlay (iOS / macOS)
 
-// Native iOS-style controls overlay for the LumeEngine (FFmpeg) backend.
+// Native iOS-style controls overlay for the engines Lume renders itself
+// (LumeEngine, AetherEngine).
 //
 // Visually identical to the VLCKit and KSPlayer overlays: a center transport
 // cluster (skip · large play/pause · skip) rendered in Liquid Glass, a title
 // block paired with a grouped glass pill of track controls (subtitles · audio ·
 // speed · PiP · favorite), and a clean full-width scrubber. tvOS uses the shared
-// `TVPlayerControlsOverlay` instead (see `LumeEngineEngineView.tvBody`).
+// `TVPlayerControlsOverlay` instead.
 //
-// The engine reports tracks through the neutral `PlayerTrackOption` surface on
-// `LumeEngineCoordinator`, so the menus stay engine-agnostic. Only the
-// `PlaybackTimeline` leaf reads the 10 Hz `PlaybackClock` — this body never
-// does, so a playback tick invalidates that leaf alone and an open track `Menu`
-// stays stable and tappable (see the note on the `clock` property).
+// The engine reports tracks through the neutral `PlayerTrackOption` surface, so
+// the menus stay engine-agnostic. Only the `PlaybackTimeline` leaf reads the
+// 10 Hz `PlaybackClock` — this body never does, so a playback tick invalidates
+// that leaf alone and an open track `Menu` stays stable and tappable (see the
+// note on the `clock` property).
 #if !os(tvOS)
-    struct LumeEngineControlsOverlay: View {
-        @ObservedObject var coordinator: LumeEngineCoordinator
+    /// The playback surface `EngineControlsOverlay` reads and commands.
+    protocol EngineControlsOverlayDriving: ObservableObject, TogglePlaybackControlling {
+        var videoInfo: PlayerVideoInfo? { get }
+        /// Selectable audio tracks (empty / single-entry hides the menu).
+        var audioTrackOptions: [PlayerTrackOption] { get }
+        /// Selectable subtitle tracks, excluding the implicit "Off" entry.
+        var textTrackOptions: [PlayerTrackOption] { get }
+        var isPipSupported: Bool { get }
+        var isPipActive: Bool { get }
+        var playbackRate: Float { get set }
+
+        func skip(by seconds: Double)
+        func selectAudioTrack(id: String)
+        /// `nil` disables subtitles ("Off").
+        func selectTextTrack(id: String?)
+        func togglePictureInPicture()
+    }
+
+    extension LumeEngineCoordinator: EngineControlsOverlayDriving {}
+    #if !os(visionOS)
+        extension AetherEngineCoordinator: EngineControlsOverlayDriving {}
+    #endif
+
+    struct EngineControlsOverlay<Coordinator: EngineControlsOverlayDriving>: View {
+        @ObservedObject var coordinator: Coordinator
+        /// The engine named in the stream-info caption.
+        let engine: PlayerEngineKind
         let media: PlayableMedia
         @Binding var isSeeking: Bool
         @Binding var seekPosition: TimeInterval
@@ -222,7 +248,7 @@ import SwiftUI
                 StreamInfoCaption(
                     media: media,
                     videoInfo: coordinator.videoInfo,
-                    engine: .lumeEngine
+                    engine: engine
                 )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
@@ -360,13 +386,13 @@ import SwiftUI
                             coordinator.playbackRate = rate
                             onResetHideTimer()
                         } label: {
-                            playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                            playerCheckmarkLabel(verbatim: rate.playbackRateLabel, checked: abs(coordinator.playbackRate - rate) < 0.01)
                         }
                     }
                 }
                 .holdsPlayerControls()
             } label: {
-                Text(verbatim: rateString(coordinator.playbackRate))
+                Text(verbatim: coordinator.playbackRate.playbackRateLabel)
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.white)
                     .frame(minWidth: 44, minHeight: 44)
@@ -417,11 +443,6 @@ import SwiftUI
                 .foregroundStyle(dimmed ? .white.opacity(0.55) : .white)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
-        }
-
-        /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
-        private func rateString(_ rate: Float) -> String {
-            String(format: "%g×", rate)
         }
     }
 #endif

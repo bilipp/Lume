@@ -61,9 +61,9 @@ Browse, search, and stream your Xtream Codes or **M3U/M3U8** playlists with a cl
 **Lume** is a native IPTV client for the Apple ecosystem. It connects to your own
 **Xtream Codes** provider or imports **M3U/M3U8** playlists, indexes the full catalog
 locally with **SwiftData** for instant, offline-capable browsing, and plays everything
-through a choice of four playback engines — from VLC's universal codec support to
+through a choice of five playback engines — from VLC's universal codec support to
 Apple's native AVPlayer, plus [our own FFmpeg 9 engine](https://github.com/bilipp/LumeEngine)
-in beta.
+in beta and the opt-in [AetherEngine](https://github.com/superuser404notfound/AetherEngine).
 
 It is built entirely in **SwiftUI** with a single, platform-adaptive codebase that
 runs on iPhone, iPad, Mac, Apple TV, and Apple Vision Pro. Content is enriched with
@@ -227,7 +227,7 @@ dedicated focus-driven interface and top-shelf branding on tvOS.
 
 ## Playback engines
 
-Lume ships with four interchangeable engines, ordered into a **priority list** in
+Lume ships with five interchangeable engines, ordered into a **priority list** in
 **Settings**. Playback starts with your preferred engine and **automatically falls
 back** to the next one whenever an engine can't play a stream, so a codec or stream
 one engine chokes on is retried with another before any error is shown. The default
@@ -240,6 +240,7 @@ available on the platform).
 | **KSPlayer** | FFmpeg (FFmpegKit) | Wide IPTV support | Handles most formats common in IPTV streams; configurable decoder (FFmpeg / VideoToolbox) |
 | **AVPlayer** | AVFoundation | HLS & MP4 | Native Apple player with **custom unified overlay** matching the other engines |
 | **Lume Engine** *(beta)* | [LumeEngine](https://github.com/bilipp/LumeEngine) (FFmpeg 9) | Long-running IPTV streams | Our own engine, built from scratch for stability on live streams: Apple-owned A/V sync, supervised pipelines, MPEG-TS wraparound handled at the demux boundary, deinterlacing that keeps hardware decoding |
+| **AetherEngine** | [AetherEngine](https://github.com/superuser404notfound/AetherEngine) (FFmpeg) | HDR & multichannel audio | Hardware decoding with a software fallback, HDR, multichannel audio, deinterlacing and Picture in Picture; plays HLS through Apple's native player where it can. Tunable in its engine options in **Settings** (decode path, deinterlacing, fast zap, buffering, audio, and on Apple TV *Match Content*). Not available on visionOS |
 
 **Lume Engine** is opt-in: it sits at the *end* of the priority list until you move it
 up in **Settings**, so it is never silently promoted while it is in beta. It is
@@ -247,6 +248,10 @@ developed in the open in its own repository —
 [**bilipp/LumeEngine**](https://github.com/bilipp/LumeEngine) — where the
 [design document](https://github.com/bilipp/LumeEngine/blob/main/PLAN.md) explains the
 failure modes it is built to make structurally impossible.
+
+**AetherEngine** is opt-in too: it is always appended *last* to the priority list and
+only plays once you move it up. In Multiview tiles and guide previews it runs muted and
+never switches the TV's display mode.
 
 Prefer a third-party app? Lume can hand streams off to an **external player** —
 **Infuse**, **VLC** or **VidHub** — via their deep-link APIs, selectable in **Settings**.
@@ -309,7 +314,7 @@ Lume follows a clean, layered SwiftUI architecture:
 
 - **UI** — SwiftUI, adaptive across iOS / macOS / tvOS / visionOS
 - **Persistence** — SwiftData (8 model types, local catalog index)
-- **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer · LumeEngine (FFmpeg 9, beta)
+- **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer · LumeEngine (FFmpeg 9, beta) · AetherEngine (FFmpeg; iOS, macOS, tvOS)
 - **Networking** — `URLSession` with typed endpoints, retry/backoff, and error classification
 - **Integrations** — TMDB (metadata), MDBList (ratings), Trakt & Simkl (device OAuth + scrobbling), OpenSubtitles (external subtitle tracks)
 - **Localization** — 10 languages via String Catalogs (English, German, French, Spanish, Italian, Portuguese, Japanese, Korean, Simplified Chinese, Arabic), with right-to-left layout for Arabic
@@ -322,6 +327,7 @@ Lume follows a clean, layered SwiftUI architecture:
 | [FFmpegKit](https://github.com/kingslay/FFmpegKit.git) | Media decoding backend for KSPlayer |
 | [VLCKit](https://code.videolan.org/videolan/VLCKit) | VLCKit 4 playback engine |
 | [LumeEngine](https://github.com/bilipp/LumeEngine) | Lume's own FFmpeg 9 engine (beta) — referenced as a local package, see [Build & run](#build--run) |
+| [AetherEngine](https://github.com/superuser404notfound/AetherEngine) | Opt-in FFmpeg playback engine (LGPL v3 + App Store exception), pinned to 7.53.1 behind the in-repo `LumeAetherBridge` package; brings [FFmpegBuild](https://github.com/superuser404notfound/FFmpegBuild) (FFmpeg, LGPL v2.1, dynamically linked) and [libdovi](https://github.com/quietvoid/dovi_tool) (MIT). Not linked on visionOS |
 
 ---
 
@@ -391,7 +397,7 @@ Select the **Lume** scheme and a target destination (iPhone, Mac, Apple TV, or V
 Pro), then build and run (`⌘R`). On first launch, sign in with your Xtream credentials
 or import an M3U playlist, and Lume will sync your catalog.
 
-> Remote dependencies (KSPlayer, FFmpegKit, VLCKit) are resolved automatically by Swift
+> Remote dependencies (KSPlayer, FFmpegKit, VLCKit, AetherEngine) are resolved automatically by Swift
 > Package Manager on first build.
 >
 > **[LumeEngine](https://github.com/bilipp/LumeEngine) is different**: the project
