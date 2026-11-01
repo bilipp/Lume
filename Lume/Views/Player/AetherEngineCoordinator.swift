@@ -64,6 +64,10 @@
         static let defaultStartupTimeout: TimeInterval = 40
         /// Gives up early so the next engine gets its turn sooner.
         static let quickStartupTimeout: TimeInterval = 15
+        /// The floor for a live load on the standard join profile. Aether holds
+        /// the first playlist until ~18 s of a 1x origin has arrived, and gives
+        /// up on its own after 30 s; a shorter watchdog kills a healthy join.
+        static let standardLiveJoinStartupTimeout: TimeInterval = 35
 
         /// Silences this player without pausing it. Every engine keeps
         /// decoding its audio, so switching the audible tile is a volume
@@ -164,7 +168,12 @@
             }
             let plan = AetherLoadPlan.make(options: .load(), context: loadContext(for: media))
             applyAudioLevel()
-            startupTask = makeStartupWatchdog(timeout: startupTimeout)
+            let waitsForStandardLiveJoin = plan.isLive && plan.liveJoinProfile == .standard
+            startupTask = makeStartupWatchdog(
+                timeout: waitsForStandardLiveJoin
+                    ? max(startupTimeout, Self.standardLiveJoinStartupTimeout)
+                    : startupTimeout
+            )
 
             let request = LumeAetherLoadRequest(plan: plan, media: media, audioStreamIndex: manualAudioTrackID)
             let generation = loadGeneration
@@ -298,6 +307,7 @@
         private func loadContext(for media: PlayableMedia) -> AetherLoadContext {
             AetherLoadContext(
                 isLive: media.isLive,
+                isHLSSource: AetherLoadContext.isHLS(media.url),
                 httpHeaders: media.httpHeaders,
                 preferredAudioLanguages: PlayerLanguageOptions.load().preferredAudioLanguages,
                 isEmbedded: isEmbedded

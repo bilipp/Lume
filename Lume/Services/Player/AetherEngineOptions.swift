@@ -17,8 +17,9 @@ import Foundation
 extension PlayerSettings {
     /// Storage keys and defaults for AetherEngine's curated option set, read by
     /// `AetherEngineOptions.load(from:)`. Device-local, never synced. The
-    /// defaults match `LoadOptions`' own, except native remote HLS (on) and
-    /// Match Content (on; only honoured on tvOS).
+    /// defaults match `LoadOptions`' own, except the live join profile (fast
+    /// zap) and Match Content (on; only honoured on tvOS). Native remote HLS,
+    /// when turned on, only applies to live HLS sources.
     nonisolated enum Aether {
         static let decodePathKey = "player.aether.decodePath"
         static let escalateToSoftwareKey = "player.aether.escalateToSoftware"
@@ -40,12 +41,16 @@ extension PlayerSettings {
         static let escalateToSoftwareDefault = true
         static let deinterlaceModeDefault = AetherDeinterlaceMode.auto
         static let deinterlaceFieldRateDefault = AetherDeinterlaceFieldRate.field
-        static let liveJoinProfileDefault = AetherLiveJoinProfile.standard
+        /// Fast zap, unlike the engine: IPTV origins deliver at 1x, and the
+        /// standard profile's 4 s segments hold the first frame back ~18 s.
+        static let liveJoinProfileDefault = AetherLiveJoinProfile.fastZap
         /// 0 keeps the engine's own window (10 segments, ~40 s).
         static let forwardBufferSegmentsDefault = 0
         static let probeSizeDefault = AetherProbeSize.auto
         static let analyzeDurationDefault = AetherAnalyzeDuration.auto
-        static let nativeRemoteHLSDefault = true
+        /// Off, like the engine: AVPlayer plays some IPTV HLS channels as
+        /// sound only, which Aether's own live-ingest path decodes.
+        static let nativeRemoteHLSDefault = false
         static let audioBridgeModeDefault = AetherAudioBridgeMode.surroundCompat
         static let dynamicRangeDefault = AetherDynamicRangeHandling.automatic
         static let upscaleLowResolutionDefault = false
@@ -175,7 +180,8 @@ nonisolated enum AetherDynamicRangeHandling: String, AetherChoice {
     }
 }
 
-/// `LoadOptions.probesize`. `.auto` keeps the engine default (50 MB).
+/// `LoadOptions.probesize`. `.auto` keeps the engine default (50 MB), except
+/// on live loads.
 nonisolated enum AetherProbeSize: Int, AetherChoice {
     case auto = 0
     case oneMB = 1
@@ -189,12 +195,22 @@ nonisolated enum AetherProbeSize: Int, AetherChoice {
         self == .auto ? nil : Int64(rawValue) * 1_048_576
     }
 
+    /// What `.auto` asks for on a live load. The engine's own 50 MiB lets a
+    /// channel carrying data-only streams (ID3, SCTE-35), which never resolve
+    /// a codec, analyse until Lume's startup watchdog gives up.
+    static let liveAutoBytes: Int64 = 5 * 1_048_576
+
+    func optionValue(isLive: Bool) -> Int64? {
+        self == .auto && isLive ? Self.liveAutoBytes : optionValue
+    }
+
     var label: String {
         self == .auto ? String(localized: "Default") : "\(rawValue) MB"
     }
 }
 
-/// `LoadOptions.maxAnalyzeDuration`. `.auto` keeps the engine default.
+/// `LoadOptions.maxAnalyzeDuration`. `.auto` keeps the engine default, except
+/// on live loads.
 nonisolated enum AetherAnalyzeDuration: Int, AetherChoice {
     case auto = 0
     case oneSecond = 1
@@ -205,6 +221,14 @@ nonisolated enum AetherAnalyzeDuration: Int, AetherChoice {
     /// Microseconds, or `nil` to keep the engine default.
     var optionValue: Int64? {
         self == .auto ? nil : Int64(rawValue) * 1_000_000
+    }
+
+    /// What `.auto` asks for on a live load, in place of the engine's 60 s
+    /// (see `AetherProbeSize.liveAutoBytes`).
+    static let liveAutoMicroseconds: Int64 = 5 * 1_000_000
+
+    func optionValue(isLive: Bool) -> Int64? {
+        self == .auto && isLive ? Self.liveAutoMicroseconds : optionValue
     }
 
     var label: String {
@@ -285,7 +309,16 @@ nonisolated struct AetherEngineOptions: Equatable {
 
 /// What a load knows about the stream and where it plays.
 nonisolated struct AetherLoadContext {
+    /// Whether `url` names an HLS playlist, by its path extension.
+    static func isHLS(_ url: URL) -> Bool {
+        ["m3u8", "m3u"].contains(url.pathExtension.lowercased())
+    }
+
     var isLive: Bool
+    /// The stream URL is an HLS playlist. `nativeRemoteHLS` hands the URL to
+    /// AVPlayer untouched, which can't play a raw MPEG-TS or MKV stream, so
+    /// only an HLS source may take that route.
+    var isHLSSource: Bool
     var httpHeaders: [String: String]?
     /// Normalized preferred audio languages (`PlayerLanguageOptions`).
     var preferredAudioLanguages: [String]
@@ -347,9 +380,9 @@ nonisolated struct AetherLoadPlan: Equatable {
             deinterlaceFieldRate: options.deinterlaceFieldRate,
             liveJoinProfile: options.liveJoinProfile,
             forwardBufferSegments: AetherForwardBufferPreset.optionValue(options.forwardBufferSegments),
-            probesize: options.probeSize.optionValue,
-            maxAnalyzeDuration: options.analyzeDuration.optionValue,
-            nativeRemoteHLS: options.nativeRemoteHLS,
+            probesize: options.probeSize.optionValue(isLive: context.isLive),
+            maxAnalyzeDuration: options.analyzeDuration.optionValue(isLive: context.isLive),
+            nativeRemoteHLS: options.nativeRemoteHLS && context.isLive && context.isHLSSource,
             audioBridgeMode: options.audioBridgeMode,
             dolbyVisionHandling: options.dynamicRange,
             upscalesLowResolutionVideo: options.upscaleLowResolution,

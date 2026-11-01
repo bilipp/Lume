@@ -7,6 +7,7 @@ struct AetherEngineSettingsTests {
 
     private static let fullScreen = AetherLoadContext(
         isLive: false,
+        isHLSSource: false,
         httpHeaders: nil,
         preferredAudioLanguages: [],
         isEmbedded: false,
@@ -28,11 +29,11 @@ struct AetherEngineSettingsTests {
             #expect(options.escalateToSoftware)
             #expect(options.deinterlaceMode == .auto)
             #expect(options.deinterlaceFieldRate == .field)
-            #expect(options.liveJoinProfile == .standard)
+            #expect(options.liveJoinProfile == .fastZap)
             #expect(options.forwardBufferSegments == 0)
             #expect(options.probeSize == .auto)
             #expect(options.analyzeDuration == .auto)
-            #expect(options.nativeRemoteHLS)
+            #expect(!options.nativeRemoteHLS)
             #expect(options.audioBridgeMode == .surroundCompat)
             #expect(options.dynamicRange == .automatic)
             #expect(!options.upscaleLowResolution)
@@ -46,7 +47,7 @@ struct AetherEngineSettingsTests {
         withIsolatedDefaults { defaults in
             defaults.set("software", forKey: Keys.decodePathKey)
             defaults.set(false, forKey: Keys.escalateToSoftwareKey)
-            defaults.set("fastZap", forKey: Keys.liveJoinProfileKey)
+            defaults.set("standard", forKey: Keys.liveJoinProfileKey)
             defaults.set(40, forKey: Keys.forwardBufferSegmentsKey)
             defaults.set(5, forKey: Keys.probeSizeKey)
             defaults.set(2, forKey: Keys.analyzeDurationKey)
@@ -57,7 +58,7 @@ struct AetherEngineSettingsTests {
             let options = AetherEngineOptions.load(from: defaults)
             #expect(options.decodePath == .software)
             #expect(!options.escalateToSoftware)
-            #expect(options.liveJoinProfile == .fastZap)
+            #expect(options.liveJoinProfile == .standard)
             #expect(options.forwardBufferSegments == 40)
             #expect(options.probeSize == .fiveMB)
             #expect(options.analyzeDuration == .twoSeconds)
@@ -87,8 +88,10 @@ struct AetherEngineSettingsTests {
             defaults.set(250, forKey: Keys.audioDelayKey)
             defaults.set(true, forKey: Keys.upscaleLowResolutionKey)
             defaults.set(true, forKey: Keys.prepareNativeSubtitlesKey)
+            defaults.set(true, forKey: Keys.nativeRemoteHLSKey)
             var context = Self.fullScreen
             context.isLive = true
+            context.isHLSSource = true
             context.httpHeaders = ["X-Test": "1"]
             context.preferredAudioLanguages = ["de", "en"]
             let plan = AetherLoadPlan.make(options: .load(from: defaults), context: context)
@@ -107,6 +110,30 @@ struct AetherEngineSettingsTests {
         }
     }
 
+    @Test func `native remote HLS only applies to live HLS sources`() {
+        withIsolatedDefaults { defaults in
+            defaults.set(true, forKey: Keys.nativeRemoteHLSKey)
+            let options = AetherEngineOptions.load(from: defaults)
+            #expect(options.nativeRemoteHLS)
+
+            var liveTS = Self.fullScreen
+            liveTS.isLive = true
+            liveTS.isHLSSource = AetherLoadContext.isHLS(URL(string: "https://example.com/live/u/p/1.ts")!)
+            #expect(!AetherLoadPlan.make(options: options, context: liveTS).nativeRemoteHLS)
+
+            var liveHLS = liveTS
+            liveHLS.isHLSSource = AetherLoadContext.isHLS(URL(string: "https://example.com/live/u/p/1.M3U8?token=x")!)
+            #expect(AetherLoadPlan.make(options: options, context: liveHLS).nativeRemoteHLS)
+
+            var vodHLS = liveHLS
+            vodHLS.isLive = false
+            #expect(!AetherLoadPlan.make(options: options, context: vodHLS).nativeRemoteHLS)
+
+            #expect(!AetherLoadContext.isHLS(URL(string: "https://example.com/live/u/p/1")!))
+            #expect(!AetherLoadContext.isHLS(URL(string: "https://example.com/movie/u/p/2.mkv")!))
+        }
+    }
+
     @Test func `engine defaults map to nil`() {
         withIsolatedDefaults { defaults in
             let plan = AetherLoadPlan.make(options: .load(from: defaults), context: Self.fullScreen)
@@ -115,6 +142,22 @@ struct AetherEngineSettingsTests {
             #expect(plan.probesize == nil)
             #expect(plan.maxAnalyzeDuration == nil)
             #expect(plan.audioDelaySeconds == 0)
+        }
+    }
+
+    @Test func `live loads bound the probe on auto, explicit choices win`() {
+        withIsolatedDefaults { defaults in
+            var live = Self.fullScreen
+            live.isLive = true
+            let auto = AetherLoadPlan.make(options: .load(from: defaults), context: live)
+            #expect(auto.probesize == AetherProbeSize.liveAutoBytes)
+            #expect(auto.maxAnalyzeDuration == AetherAnalyzeDuration.liveAutoMicroseconds)
+
+            defaults.set(20, forKey: Keys.probeSizeKey)
+            defaults.set(10, forKey: Keys.analyzeDurationKey)
+            let chosen = AetherLoadPlan.make(options: .load(from: defaults), context: live)
+            #expect(chosen.probesize == Int64(20 * 1_048_576))
+            #expect(chosen.maxAnalyzeDuration == Int64(10_000_000))
         }
     }
 
