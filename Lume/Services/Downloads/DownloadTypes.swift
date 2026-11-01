@@ -94,6 +94,8 @@ struct PendingDownload {
     let title: String
     let url: URL
     let filename: String
+    /// The source's credential, for sources that authenticate per request.
+    let headers: [String: String]?
 }
 
 /// The per-task state the delegate needs, carried on the task itself.

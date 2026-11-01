@@ -106,6 +106,7 @@ extension ContentSyncManager {
             try await syncJellyfinShows(scope: viewScope, seen: &shows, progress: progress)
         }
         pruneJellyfinSeries(playlistId: playlistId, flavor: flavor, seen: shows, fetched: !showViews.isEmpty)
+        persistResolvesSourcesOnDemand(!shows.episodesFetchedPerShow.isEmpty, playlistId: playlistId)
         await progress?.complete(.series)
 
         markPlaylistUpdated(playlistId)
@@ -168,6 +169,19 @@ extension ContentSyncManager {
         ).first else { return }
         playlist.jellyfinAccessToken = session.accessToken
         playlist.jellyfinUserId = session.userId
+        try? context.save()
+    }
+
+    /// Records whether the server lists shows without the episodes under
+    /// them, the sign of one that picks a source per item on demand. Written
+    /// only when it changes, so an unchanged sync saves nothing.
+    func persistResolvesSourcesOnDemand(_ value: Bool, playlistId: UUID) {
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        guard let playlist = try? context.fetch(
+            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
+        ).first, playlist.resolvesSourcesOnDemand != value else { return }
+        playlist.resolvesSourcesOnDemand = value
         try? context.save()
     }
 
