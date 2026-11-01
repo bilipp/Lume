@@ -378,6 +378,27 @@ final nonisolated class JellyfinClient: Sendable {
         return components?.url
     }
 
+    /// The original-file download URL for an item, derived from the stream
+    /// URL the sync stored (`…/Videos/{id}/stream`), so a server mounted under
+    /// a path prefix keeps it. Unlike the stream route, `/Items/{id}/Download`
+    /// honours the server's per-user "allow media downloading" policy. `nil`
+    /// for a URL of any other shape.
+    nonisolated static func downloadURL(forStreamURL stream: URL) -> URL? {
+        guard var components = URLComponents(url: stream, resolvingAgainstBaseURL: false) else { return nil }
+        var segments = components.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard segments.count >= 3,
+              segments[segments.count - 1] == "stream",
+              segments[segments.count - 3] == "Videos"
+        else { return nil }
+        let itemId = segments[segments.count - 2]
+        guard !itemId.isEmpty else { return nil }
+        segments.removeLast(3)
+        segments += ["Items", itemId, "Download"]
+        components.path = segments.joined(separator: "/")
+        components.query = nil
+        return components.url
+    }
+
     /// Artwork URL. Unlike streams this one embeds the token: image loaders
     /// fetch a plain URL with no chance to attach headers. Refreshed on every
     /// sync alongside the token itself.

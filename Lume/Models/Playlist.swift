@@ -51,6 +51,14 @@ final class Playlist {
     /// mirrored to CloudKit. `nil` for every other source type.
     var plexAccessToken: String?
 
+    /// Whether this Jellyfin/Emby/Silo server picks a playable source per item
+    /// on demand instead of serving files from its own libraries. Inferred by
+    /// the sync from a library that lists series but no episodes under them;
+    /// there is no file on the server to download. Device-local and rewritten
+    /// on every sync, so it is not mirrored to CloudKit. `nil` until a media
+    /// server's first sync, and for every other source type.
+    var resolvesSourcesOnDemand: Bool?
+
     var serverTimezone: String?
     var serverVersion: String?
 
@@ -346,13 +354,10 @@ extension Playlist {
         // Stalker portals hand out short-lived, per-session stream URLs, so
         // there is no stable URL to persist for offline use.
         case .stalker: false
-        // Deferred to a later change: a background URLSession cannot answer an
-        // auth challenge after the app is relaunched.
-        case .webdav: false
-        // Deferred to a later change: downloads need the session token as a
-        // header the background session cannot re-issue after relaunch. The
-        // same holds for Plex's `X-Plex-Token`.
-        case .jellyfin, .emby, .plex, .silo: false
+        // The credential travels as a pre-built header on the download
+        // request, which the background session persists with the task.
+        case .webdav, .plex: true
+        case .jellyfin, .emby, .silo: resolvesSourcesOnDemand != true
         }
     }
 

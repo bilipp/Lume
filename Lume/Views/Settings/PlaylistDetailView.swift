@@ -438,6 +438,7 @@ extension PlaylistDetailView {
             // drop it and let the next sync log in again.
             playlist.jellyfinAccessToken = nil
             playlist.jellyfinUserId = nil
+            playlist.resolvesSourcesOnDemand = nil
         } else if isPlex {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword

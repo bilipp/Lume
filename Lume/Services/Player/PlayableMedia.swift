@@ -164,7 +164,8 @@ nonisolated extension PlayableMedia {
 
     /// The auth headers for the playlist's source, if it authenticates per
     /// request rather than per URL. `nil` for the URL-credential sources.
-    private static func authHeaders(for playlist: Playlist) -> [String: String]? {
+    /// Shared with `DownloadManager`, whose requests need the same credential.
+    static func authHeaders(for playlist: Playlist) -> [String: String]? {
         webdavHeaders(for: playlist) ?? jellyfinHeaders(for: playlist) ?? plexHeaders(for: playlist)
     }
 
