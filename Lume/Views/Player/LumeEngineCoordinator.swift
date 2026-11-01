@@ -26,7 +26,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     /// Active subtitle cue text, on its own observable so the 10 Hz tick that
     /// refreshes it doesn't invalidate this coordinator. A `@Published` here
     /// would fire `objectWillChange` on every tick, re-rendering every overlay
-    /// that observes the coordinator (iOS `LumeEngineControlsOverlay`, tvOS
+    /// that observes the coordinator (iOS `EngineControlsOverlay`, tvOS
     /// `TVPlayerControlsOverlay`) — which flickers an open audio/subtitle `Menu`
     /// and cancels in-flight taps. Only the subtitle-rendering leaf observes
     /// this model, so a cue change invalidates that leaf alone.

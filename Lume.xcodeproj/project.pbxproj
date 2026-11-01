@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C6DD50012FE100050000DD01 /* LumeAetherBridge in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, tvos, ); productRef = C6DD50022FE100050000DD02 /* LumeAetherBridge */; };
+		C6DD50042FE100050000DD04 /* LumeAetherBridge in Embed Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, tvos, ); productRef = C6DD50022FE100050000DD02 /* LumeAetherBridge */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = C66C81682FC5A59D0048468D /* KSPlayer */; };
 		C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; };
 		C6AA10042FDD00010000AA04 /* LumeEngine in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -64,6 +66,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				C6AA10042FDD00010000AA04 /* LumeEngine in Embed Frameworks */,
+				C6DD50042FE100050000DD04 /* LumeAetherBridge in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -179,6 +182,7 @@
 				C6CC40012FE000040000CC01 /* GoogleCastDynamic in Frameworks */,
 				C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */,
 				C6CC30012FDF00040000CC01 /* LumeCloudKit in Frameworks */,
+				C6DD50012FE100050000DD01 /* LumeAetherBridge in Frameworks */,
 				C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */,
 				C6BB20012FDE00030000BB01 /* LumeRecorderKit in Frameworks */,
 				C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */,
@@ -280,6 +284,7 @@
 			packageProductDependencies = (
 				C6CC40022FE000040000CC02 /* GoogleCastDynamic */,
 				C66C81682FC5A59D0048468D /* KSPlayer */,
+				C6DD50022FE100050000DD02 /* LumeAetherBridge */,
 				C6CC30022FDF00040000CC02 /* LumeCloudKit */,
 				C6AA10022FDD00010000AA02 /* LumeEngine */,
 				C6BB20022FDE00030000BB02 /* LumeRecorderKit */,
@@ -461,6 +466,7 @@
 				C6BB20032FDE00030000BB03 /* XCLocalSwiftPackageReference "../LumeRecorder/Kit" */,
 				C6CC30032FDF00040000CC03 /* XCLocalSwiftPackageReference "../LumeCloud/LumeCloudKit" */,
 				C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */,
+				C6DD50032FE100050000DD03 /* XCLocalSwiftPackageReference "LumeAetherBridge" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C67C02C12F880F2200842DBA /* Products */;
@@ -1769,6 +1775,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../LumeCloud/LumeCloudKit;
 		};
+		C6DD50032FE100050000DD03 /* XCLocalSwiftPackageReference "LumeAetherBridge" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = LumeAetherBridge;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1799,6 +1809,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		C6DD50022FE100050000DD02 /* LumeAetherBridge */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LumeAetherBridge;
+		};
 		C66C81682FC5A59D0048468D /* KSPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C66C81662FC5A59D0048468D /* XCRemoteSwiftPackageReference "KSPlayer" */;

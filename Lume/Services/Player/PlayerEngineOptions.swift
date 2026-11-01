@@ -508,7 +508,7 @@ extension UserDefaults {
         object(forKey: key) == nil ? def : bool(forKey: key)
     }
 
-    func integer(_ key: String, default def: Int) -> Int {
+    nonisolated func integer(_ key: String, default def: Int) -> Int {
         object(forKey: key) == nil ? def : integer(forKey: key)
     }
 

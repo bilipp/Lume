@@ -26,6 +26,9 @@ final class PreviewPlayerHandle {
         case av(AVPlayerCoordinator)
         case vlc(VLCPlayerCoordinator)
         case lume(LumeEngineCoordinator)
+        #if !os(visionOS)
+            case aether(AetherEngineCoordinator)
+        #endif
 
         func isSame(as other: EngineCoordinator) -> Bool {
             switch (self, other) {
@@ -33,6 +36,9 @@ final class PreviewPlayerHandle {
             case let (.av(lhs), .av(rhs)): lhs === rhs
             case let (.vlc(lhs), .vlc(rhs)): lhs === rhs
             case let (.lume(lhs), .lume(rhs)): lhs === rhs
+            #if !os(visionOS)
+                case let (.aether(lhs), .aether(rhs)): lhs === rhs
+            #endif
             default: false
             }
         }
@@ -43,6 +49,9 @@ final class PreviewPlayerHandle {
             case .av: .avPlayer
             case .vlc: .vlcKit
             case .lume: .lumeEngine
+            #if !os(visionOS)
+                case .aether: .aetherEngine
+            #endif
             }
         }
 
@@ -62,6 +71,9 @@ final class PreviewPlayerHandle {
             case let .av(coordinator): coordinator.isMuted = muted
             case let .vlc(coordinator): coordinator.isMuted = muted
             case let .lume(coordinator): coordinator.isMuted = muted
+            #if !os(visionOS)
+                case let .aether(coordinator): coordinator.isMuted = muted
+            #endif
             }
         }
 
@@ -71,6 +83,9 @@ final class PreviewPlayerHandle {
             case let .av(coordinator): coordinator.tearDown()
             case let .vlc(coordinator): coordinator.tearDown()
             case let .lume(coordinator): coordinator.tearDown()
+            #if !os(visionOS)
+                case let .aether(coordinator): coordinator.tearDown()
+            #endif
             }
         }
     }

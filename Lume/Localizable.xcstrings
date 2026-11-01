@@ -2314,6 +2314,107 @@
         }
       }
     },
+    "%lld segments" : {
+      "comment" : "An AetherEngine forward-buffer preset, in stream segments.",
+      "localizations" : {
+        "ar" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld مقاطع"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld مقطعًا"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "مقطع واحد"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld مقطع"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "مقطعان"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld مقطع"
+                }
+              }
+            }
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Segmente"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld segments"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld segmentos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld segments"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld segmenti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld セグメント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개 세그먼트"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld segmentos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个分段"
+          }
+        }
+      }
+    },
     "%lld show%@ will be marked the first time you open them." : {
       "localizations" : {
         "ar" : {
@@ -3037,6 +3138,71 @@
         }
       }
     },
+    "A doubled frame rate turns each interlaced field into its own frame for smoother motion." : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحوّل معدل الإطارات المضاعَف كل حقل متشابك إلى إطار مستقل لحركة أكثر سلاسة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine verdoppelte Bildrate macht aus jedem Halbbild ein eigenes Bild und sorgt so für flüssigere Bewegungen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A doubled frame rate turns each interlaced field into its own frame for smoother motion."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una frecuencia de imagen duplicada convierte cada campo entrelazado en un fotograma propio para un movimiento más fluido."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une fréquence d’images doublée transforme chaque trame entrelacée en image distincte pour un mouvement plus fluide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una frequenza fotogrammi raddoppiata trasforma ogni semiquadro interlacciato in un fotogramma a sé, per un movimento più fluido."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フレームレートを2倍にすると、インターレースの各フィールドを個別のフレームにして動きを滑らかにします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프레임 속도를 2배로 하면 인터레이스 필드마다 별도의 프레임으로 만들어 움직임이 더 부드러워집니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma taxa de quadros duplicada transforma cada campo entrelaçado em um quadro próprio para um movimento mais suave."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧率翻倍会将每个隔行场转换为独立的帧，使画面运动更流畅。"
+          }
+        }
+      }
+    },
     "A PIN is required to switch away from a child profile and to open Content Management." : {
       "localizations" : {
         "ar" : {
@@ -3210,6 +3376,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从儿童个人资料切换或打开内容管理时需要输入PIN码。可在“个人资料”中将某个个人资料标记为儿童个人资料。"
+          }
+        }
+      }
+    },
+    "A positive audio delay plays sound later. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يؤدي تأخير الصوت الموجب إلى تشغيل الصوت لاحقًا. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine positive Audioverzögerung gibt den Ton später wieder. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A positive audio delay plays sound later. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un retraso de audio positivo reproduce el sonido más tarde. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un décalage audio positif diffuse le son plus tard. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un ritardo audio positivo riproduce il suono più tardi. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオ遅延を正の値にすると、音声が遅れて再生されます。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 지연을 양수로 설정하면 소리가 더 늦게 재생됩니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um atraso de áudio positivo reproduz o som mais tarde. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频延迟为正值时，声音会延后播放。 "
           }
         }
       }
@@ -5643,6 +5874,266 @@
         }
       }
     },
+    "AetherEngine — Audio & Subtitles" : {
+      "comment" : "AetherEngine options in Settings (tvOS).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — الصوت والترجمة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Audio & Untertitel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Audio & Subtitles"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Audio y subtítulos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Audio et sous-titres"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Audio e sottotitoli"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — オーディオと字幕"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — 오디오 및 자막"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Áudio e legendas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — 音频与字幕"
+          }
+        }
+      }
+    },
+    "AetherEngine — Network & Buffering" : {
+      "comment" : "AetherEngine options in Settings (tvOS).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — الشبكة والتخزين المؤقت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Netzwerk & Pufferung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Network & Buffering"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Red y almacenamiento en búfer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Réseau et mise en mémoire tampon"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Rete e buffering"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — ネットワークとバッファリング"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — 네트워크 및 버퍼링"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Rede e buffering"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — 网络与缓冲"
+          }
+        }
+      }
+    },
+    "AetherEngine — Video" : {
+      "comment" : "AetherEngine options in Settings (tvOS).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — الفيديو"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Video"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Video"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Vídeo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Vidéo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — ビデオ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — 비디오"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — Vídeo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine — 视频"
+          }
+        }
+      }
+    },
+    "AetherEngine Options" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "خيارات AetherEngine"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine-Optionen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine Options"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opciones de AetherEngine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options d’AetherEngine"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opzioni di AetherEngine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngineのオプション"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine 옵션"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opções do AetherEngine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine 选项"
+          }
+        }
+      }
+    },
     "After extra innings" : {
       "localizations" : {
         "ar" : {
@@ -7409,6 +7900,136 @@
         }
       }
     },
+    "Audio & Subtitles" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الصوت والترجمة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio & Untertitel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio & Subtitles"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio y subtítulos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio et sous-titres"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio e sottotitoli"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオと字幕"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 및 자막"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Áudio e legendas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频与字幕"
+          }
+        }
+      }
+    },
+    "Audio Delay" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تأخير الصوت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audioverzögerung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Delay"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retraso de audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décalage audio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ritardo audio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオ遅延"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 지연"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atraso de áudio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频延迟"
+          }
+        }
+      }
+    },
     "Audio Languages" : {
       "localizations" : {
         "ar" : {
@@ -7463,6 +8084,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音频语言"
+          }
+        }
+      }
+    },
+    "Audio Output" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إخراج الصوت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audioausgabe"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Output"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salida de audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sortie audio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uscita audio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオ出力"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 출력"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saída de áudio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频输出"
           }
         }
       }
@@ -8052,6 +8738,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动"
+          }
+        }
+      }
+    },
+    "Automatic decodes in hardware where the device supports the format; Software always uses the CPU. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفك الوضع التلقائي الترميز عبر العتاد حيث يدعم الجهاز التنسيق، بينما يستخدم البرنامج المعالج دائمًا. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatisch dekodiert per Hardware, wenn das Gerät das Format unterstützt; Software nutzt immer die CPU. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic decodes in hardware where the device supports the format; Software always uses the CPU. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático decodifica por hardware cuando el dispositivo admite el formato; Software siempre usa la CPU. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatique décode en matériel lorsque l’appareil prend en charge le format ; Logiciel utilise toujours le processeur. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatico decodifica in hardware quando il dispositivo supporta il formato; Software usa sempre la CPU. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「自動」はデバイスが対応する形式をハードウェアでデコードし、「ソフトウェア」は常にCPUを使用します。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동은 기기가 지원하는 형식을 하드웨어로 디코딩하고, 소프트웨어는 항상 CPU를 사용합니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático decodifica por hardware quando o dispositivo suporta o formato; Software sempre usa a CPU. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“自动”会在设备支持该格式时使用硬件解码；“软件”始终使用 CPU。 "
           }
         }
       }
@@ -16726,6 +17477,71 @@
         }
       }
     },
+    "Decoding" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فك الترميز"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dekodierung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decoding"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decodificación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décodage"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decodifica"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デコード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디코딩"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decodificação"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解码"
+          }
+        }
+      }
+    },
     "Default" : {
       "comment" : "Label for the automatic clock jitter tuning option.",
       "isCommentAutoGenerated" : true,
@@ -25298,6 +26114,136 @@
         }
       }
     },
+    "Fall Back to Software Decoding" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الرجوع إلى فك الترميز البرمجي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf Software-Dekodierung zurückgreifen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fall Back to Software Decoding"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recurrir a decodificación por software"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basculer vers le décodage logiciel"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripiega sulla decodifica software"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソフトウェアデコードにフォールバック"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소프트웨어 디코딩으로 대체"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorrer à decodificação por software"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回退到软件解码"
+          }
+        }
+      }
+    },
+    "Falling back retries a stream in software when the hardware decoder rejects it. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يعيد الرجوع محاولة تشغيل البث برمجيًا عندما يرفضه مفكك الترميز العتادي. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Rückgriff versucht einen Stream erneut per Software, wenn der Hardware-Decoder ihn ablehnt. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falling back retries a stream in software when the hardware decoder rejects it. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al recurrir, se reintenta la transmisión por software cuando el decodificador por hardware la rechaza. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le basculement relance un flux en logiciel lorsque le décodeur matériel le refuse. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ripiego riprova uno stream in software quando il decodificatore hardware lo rifiuta. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォールバックすると、ハードウェアデコーダが拒否したストリームをソフトウェアで再試行します。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대체 시 하드웨어 디코더가 거부한 스트림을 소프트웨어로 다시 시도합니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ao recorrer, o stream é tentado novamente por software quando o decodificador de hardware o rejeita. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回退会在硬件解码器拒绝某个流时改用软件重试。 "
+          }
+        }
+      }
+    },
     "Fast Open" : {
       "comment" : "A toggle to enable fast opening of streams",
       "isCommentAutoGenerated" : true,
@@ -25354,6 +26300,136 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "快速打开"
+          }
+        }
+      }
+    },
+    "Fast Zap" : {
+      "comment" : "An AetherEngine live-join profile that starts channels sooner.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تبديل سريع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schnelles Umschalten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast Zap"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambio rápido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zapping rapide"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zapping rapido"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高速ザッピング"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빠른 채널 전환"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Troca rápida"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速换台"
+          }
+        }
+      }
+    },
+    "Fast Zap starts live channels sooner, but streams from unsteady servers may rebuffer more often. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يبدأ التبديل السريع القنوات المباشرة أسرع، لكن البث من الخوادم غير المستقرة قد يعيد التخزين المؤقت أكثر. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schnelles Umschalten startet Live-Sender früher, Streams von instabilen Servern puffern aber öfter nach. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast Zap starts live channels sooner, but streams from unsteady servers may rebuffer more often. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambio rápido inicia antes los canales en directo, pero las transmisiones de servidores inestables pueden volver a cargar el búfer más a menudo. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le zapping rapide lance les chaînes en direct plus tôt, mais les flux de serveurs instables peuvent remettre en mémoire tampon plus souvent. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo zapping rapido avvia prima i canali live, ma gli stream da server instabili possono andare in buffering più spesso. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高速ザッピングはライブチャンネルをより早く開始しますが、不安定なサーバーのストリームでは再バッファリングが増える場合があります。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빠른 채널 전환은 라이브 채널을 더 빨리 시작하지만, 불안정한 서버의 스트림은 더 자주 다시 버퍼링될 수 있습니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A troca rápida inicia canais ao vivo mais cedo, mas streams de servidores instáveis podem refazer o buffer com mais frequência. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速换台能更快开始播放直播频道，但来自不稳定服务器的流可能更频繁地重新缓冲。 "
           }
         }
       }
@@ -25645,6 +26721,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "FFmpeg对所有流都遵循以下每个选项。"
+          }
+        }
+      }
+    },
+    "FFmpeg-based engine with hardware decoding, HDR, multichannel audio, deinterlacing and Picture in Picture. Plays HLS through Apple's native player where it can." : {
+      "comment" : "Description of AetherEngine, an optional playback engine, shown in the engine priority list.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "محرك قائم على FFmpeg يدعم فك الترميز عبر العتاد وHDR والصوت متعدد القنوات وإزالة التشابك وصورة داخل صورة. يشغّل HLS عبر مشغّل Apple الأصلي حيثما أمكن."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FFmpeg-basierte Engine mit Hardware-Dekodierung, HDR, Mehrkanal-Audio, Deinterlacing und Bild-in-Bild. Spielt HLS nach Möglichkeit über Apples nativen Player ab."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FFmpeg-based engine with hardware decoding, HDR, multichannel audio, deinterlacing and Picture in Picture. Plays HLS through Apple's native player where it can."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motor basado en FFmpeg con decodificación por hardware, HDR, audio multicanal, desentrelazado e imagen dentro de imagen. Reproduce HLS con el reproductor nativo de Apple cuando es posible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moteur basé sur FFmpeg avec décodage matériel, HDR, audio multicanal, désentrelacement et image dans l’image. Lit le HLS via le lecteur natif d’Apple lorsque c’est possible."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motore basato su FFmpeg con decodifica hardware, HDR, audio multicanale, deinterlacciamento e Picture in Picture. Riproduce HLS tramite il player nativo di Apple quando possibile."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハードウェアデコード、HDR、マルチチャンネルオーディオ、インターレース解除、ピクチャ・イン・ピクチャに対応したFFmpegベースのエンジン。可能な場合はHLSをAppleのネイティブプレーヤーで再生します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하드웨어 디코딩, HDR, 멀티채널 오디오, 디인터레이스, 화면 속 화면을 지원하는 FFmpeg 기반 엔진입니다. 가능한 경우 HLS를 Apple 기본 플레이어로 재생합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motor baseado em FFmpeg com decodificação por hardware, HDR, áudio multicanal, desentrelaçamento e Picture in Picture. Reproduz HLS pelo player nativo da Apple quando possível."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基于 FFmpeg 的引擎，支持硬件解码、HDR、多声道音频、去隔行和画中画。在可行时通过 Apple 原生播放器播放 HLS。"
           }
         }
       }
@@ -27278,6 +28419,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "强制高级版"
+          }
+        }
+      }
+    },
+    "Forward Buffer" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التخزين المؤقت المسبق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorauspuffer"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forward Buffer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Búfer anticipado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tampon d’avance"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buffer in avanti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先読みバッファ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선행 버퍼"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buffer antecipado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前向缓冲"
           }
         }
       }
@@ -29808,6 +31014,201 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "硬件解码"
+          }
+        }
+      }
+    },
+    "HDR" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR"
+          }
+        }
+      }
+    },
+    "HDR Base Layer Only" : {
+      "comment" : "An AetherEngine dynamic-range choice: show only the HDR base layer of a layered HDR stream.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "طبقة HDR الأساسية فقط"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur HDR-Basisschicht"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR Base Layer Only"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo capa base HDR"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couche de base HDR uniquement"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo livello base HDR"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDRベースレイヤーのみ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR 기본 레이어만"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apenas camada base HDR"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅 HDR 基础层"
+          }
+        }
+      }
+    },
+    "HDR Base Layer Only skips the enhancement layer of layered HDR video. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتخطى خيار طبقة HDR الأساسية فقط طبقة التحسين في فيديو HDR متعدد الطبقات. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur HDR-Basisschicht überspringt die Erweiterungsschicht von mehrschichtigem HDR-Video. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR Base Layer Only skips the enhancement layer of layered HDR video. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo capa base HDR omite la capa de mejora del vídeo HDR por capas. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couche de base HDR uniquement ignore la couche d’amélioration des vidéos HDR à plusieurs couches. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo livello base HDR ignora il livello di miglioramento dei video HDR a più livelli. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「HDRベースレイヤーのみ」は、レイヤー構造のHDRビデオの拡張レイヤーをスキップします。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR 기본 레이어만은 다중 레이어 HDR 비디오의 향상 레이어를 건너뜁니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apenas camada base HDR ignora a camada de aprimoramento de vídeos HDR em camadas. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“仅 HDR 基础层”会跳过分层 HDR 视频的增强层。 "
           }
         }
       }
@@ -35931,6 +37332,71 @@
         }
       }
     },
+    "Live Channel Start" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بدء القناة المباشرة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start von Live-Sendern"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live Channel Start"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicio de canales en directo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrage des chaînes en direct"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvio dei canali live"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブチャンネルの開始"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 채널 시작"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Início de canais ao vivo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直播频道启动"
+          }
+        }
+      }
+    },
     "Live Stream Format" : {
       "localizations" : {
         "ar" : {
@@ -36759,6 +38225,136 @@
         }
       }
     },
+    "Lossless" : {
+      "comment" : "An AetherEngine audio mode: lossless multichannel audio.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بدون فقدان"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verlustfrei"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lossless"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin pérdida"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans perte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senza perdita"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ロスレス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "무손실"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem perdas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无损"
+          }
+        }
+      }
+    },
+    "Lossless keeps full quality but needs a receiver that takes multichannel PCM. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحافظ وضع بدون فقدان على الجودة الكاملة لكنه يتطلب مستقبِلًا يدعم PCM متعدد القنوات. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verlustfrei erhält die volle Qualität, benötigt aber einen Receiver, der Mehrkanal-PCM annimmt. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lossless keeps full quality but needs a receiver that takes multichannel PCM. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin pérdida mantiene la calidad completa, pero requiere un receptor que admita PCM multicanal. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans perte conserve la qualité intégrale mais nécessite un récepteur qui accepte le PCM multicanal. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senza perdita mantiene la qualità piena ma richiede un ricevitore che accetti PCM multicanale. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「ロスレス」は品質を完全に保ちますが、マルチチャンネルPCMに対応したレシーバーが必要です。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "무손실은 원래 품질을 유지하지만 멀티채널 PCM을 받는 리시버가 필요합니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem perdas mantém a qualidade total, mas exige um receiver que aceite PCM multicanal. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“无损”可保持完整音质，但需要支持多声道 PCM 的接收器。 "
+          }
+        }
+      }
+    },
     "Low Latency (No Buffer)" : {
       "comment" : "A toggle that enables or disables low latency playback",
       "isCommentAutoGenerated" : true,
@@ -36815,6 +38411,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "低延迟（无缓冲）"
+          }
+        }
+      }
+    },
+    "Lower probe sizes and analyze durations start streams faster but can miss audio or subtitle tracks." : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تبدأ أحجام الفحص ومدد التحليل الأصغر البث أسرع، لكنها قد تفوّت مسارات الصوت أو الترجمة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kleinere Prüfgrößen und Analysedauern starten Streams schneller, können aber Audio- oder Untertitelspuren übersehen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lower probe sizes and analyze durations start streams faster but can miss audio or subtitle tracks."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tamaños de sondeo y duraciones de análisis menores inician las transmisiones antes, pero pueden omitir pistas de audio o subtítulos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des tailles de sondage et des durées d’analyse plus faibles démarrent les flux plus vite, mais peuvent manquer des pistes audio ou de sous-titres."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dimensioni di analisi e durate di analisi minori avviano gli stream prima, ma possono non rilevare tracce audio o sottotitoli."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プローブサイズと解析時間を小さくするとストリームの開始は速くなりますが、オーディオや字幕のトラックを見落とす場合があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로브 크기와 분석 시간을 줄이면 스트림이 더 빨리 시작되지만 오디오나 자막 트랙을 놓칠 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tamanhos de sondagem e durações de análise menores iniciam os streams mais rápido, mas podem deixar passar faixas de áudio ou legendas."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "较小的探测大小和分析时长能更快开始播放，但可能遗漏音频或字幕轨道。"
           }
         }
       }
@@ -39983,6 +41644,136 @@
         }
       }
     },
+    "Match Content" : {
+      "comment" : "AetherEngine options in Settings (tvOS).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مطابقة المحتوى"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inhalt angleichen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Match Content"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustar al contenido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adapter au contenu"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adatta al contenuto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コンテンツに合わせる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "콘텐츠 일치"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corresponder ao conteúdo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配内容"
+          }
+        }
+      }
+    },
+    "Match Content switches the TV to the video's frame rate and dynamic range. Previews and Multiview tiles never switch it." : {
+      "comment" : "AetherEngine options in Settings (tvOS).",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يبدّل خيار مطابقة المحتوى التلفاز إلى معدل إطارات الفيديو ونطاقه الديناميكي. لا تبدّله المعاينات ومربعات العرض المتعدد أبدًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inhalt angleichen stellt den Fernseher auf die Bildrate und den Dynamikumfang des Videos um. Vorschauen und Multiview-Kacheln stellen ihn nie um."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Match Content switches the TV to the video's frame rate and dynamic range. Previews and Multiview tiles never switch it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustar al contenido cambia el televisor a la frecuencia de imagen y el rango dinámico del vídeo. Las vistas previas y los mosaicos de Multivista nunca lo cambian."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adapter au contenu règle le téléviseur sur la fréquence d’images et la plage dynamique de la vidéo. Les aperçus et les vignettes Multivue ne le modifient jamais."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adatta al contenuto imposta il televisore sulla frequenza fotogrammi e sulla gamma dinamica del video. Anteprime e riquadri Multiview non lo cambiano mai."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「コンテンツに合わせる」は、テレビをビデオのフレームレートとダイナミックレンジに切り替えます。プレビューとマルチビューのタイルでは切り替えません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "콘텐츠 일치는 TV를 비디오의 프레임 속도와 다이내믹 레인지로 전환합니다. 미리보기와 멀티뷰 타일에서는 전환하지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corresponder ao conteúdo muda a TV para a taxa de quadros e a faixa dinâmica do vídeo. Pré-visualizações e blocos do Multiview nunca a mudam."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“匹配内容”会将电视切换为视频的帧率和动态范围。预览和多画面窗格不会切换。"
+          }
+        }
+      }
+    },
     "Matches your library against TMDB and builds an on-device index for smarter search and a \"For You\" row on Home. Runs slowly in the background." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -42379,6 +44170,136 @@
         }
       }
     },
+    "Native HLS hands HLS streams straight to the system player; the forward buffer and live start settings don't apply to them. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يسلّم HLS الأصلي بث HLS مباشرةً إلى مشغّل النظام، ولا تنطبق عليه إعدادات التخزين المؤقت المسبق وبدء البث المباشر. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Natives HLS übergibt HLS-Streams direkt an den System-Player; Vorauspuffer und Live-Start-Einstellungen gelten dafür nicht. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Native HLS hands HLS streams straight to the system player; the forward buffer and live start settings don't apply to them. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HLS nativo entrega las transmisiones HLS directamente al reproductor del sistema; el búfer anticipado y los ajustes de inicio en directo no se aplican a ellas. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le HLS natif confie les flux HLS directement au lecteur système ; le tampon d’avance et les réglages de démarrage en direct ne s’y appliquent pas. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HLS nativo passa gli stream HLS direttamente al player di sistema; il buffer in avanti e le impostazioni di avvio live non si applicano. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネイティブHLSはHLSストリームをシステムのプレーヤーに直接渡します。先読みバッファとライブ開始の設定は適用されません。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네이티브 HLS는 HLS 스트림을 시스템 플레이어에 바로 넘기며, 선행 버퍼와 라이브 시작 설정은 적용되지 않습니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HLS nativo entrega os streams HLS diretamente ao player do sistema; o buffer antecipado e os ajustes de início ao vivo não se aplicam a eles. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原生 HLS 会将 HLS 流直接交给系统播放器；前向缓冲和直播启动设置对其不适用。 "
+          }
+        }
+      }
+    },
+    "Native HLS Playback" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تشغيل HLS الأصلي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Native HLS-Wiedergabe"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Native HLS Playback"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproducción HLS nativa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture HLS native"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riproduzione HLS nativa"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネイティブHLS再生"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네이티브 HLS 재생"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprodução HLS nativa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原生 HLS 播放"
+          }
+        }
+      }
+    },
     "Netherlands" : {
       "localizations" : {
         "ar" : {
@@ -42433,6 +44354,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "荷兰"
+          }
+        }
+      }
+    },
+    "Network & Buffering" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الشبكة والتخزين المؤقت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Netzwerk & Pufferung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network & Buffering"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Red y almacenamiento en búfer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau et mise en mémoire tampon"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rete e buffering"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネットワークとバッファリング"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네트워크 및 버퍼링"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rede e buffering"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网络与缓冲"
           }
         }
       }
@@ -59878,6 +61864,71 @@
         }
       }
     },
+    "Restore the default AetherEngine options?" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هل تريد استعادة خيارات AetherEngine الافتراضية؟"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine-Standardoptionen wiederherstellen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore the default AetherEngine options?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Restaurar las opciones predeterminadas de AetherEngine?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurer les options par défaut d’AetherEngine ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristinare le opzioni predefinite di AetherEngine?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngineのオプションをデフォルトに戻しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AetherEngine 기본 옵션을 복원하시겠습니까?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar as opções padrão do AetherEngine?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要恢复 AetherEngine 的默认选项吗？"
+          }
+        }
+      }
+    },
     "Restore the default KSPlayer options?" : {
       "localizations" : {
         "ar" : {
@@ -68477,6 +70528,71 @@
         }
       }
     },
+    "Software" : {
+      "comment" : "An AetherEngine choice: decode or deinterlace in software.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البرنامج"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Software"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Software"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Software"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Logiciel"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Software"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソフトウェア"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소프트웨어"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Software"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "软件"
+          }
+        }
+      }
+    },
     "Something not working? Send a diagnostic report to the developer." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -71745,6 +73861,136 @@
         }
       }
     },
+    "Surround Compatible" : {
+      "comment" : "An AetherEngine audio mode: lossy surround that works on every audio output.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متوافق مع الصوت المحيطي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround-kompatibel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround Compatible"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible con envolvente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible surround"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatibile surround"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サラウンド互換"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서라운드 호환"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatível com surround"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "环绕声兼容"
+          }
+        }
+      }
+    },
+    "Surround Compatible converts audio formats the system can't play as-is to lossy surround that every speaker setup accepts. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحوّل خيار التوافق مع الصوت المحيطي تنسيقات الصوت التي لا يشغّلها النظام مباشرةً إلى صوت محيطي مضغوط تقبله جميع أنظمة السماعات. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround-kompatibel wandelt Audioformate, die das System nicht direkt abspielen kann, in verlustbehafteten Surround-Ton um, den jedes Lautsprechersetup annimmt. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround Compatible converts audio formats the system can't play as-is to lossy surround that every speaker setup accepts. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible con envolvente convierte los formatos de audio que el sistema no puede reproducir tal cual en sonido envolvente con pérdida que acepta cualquier configuración de altavoces. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible surround convertit les formats audio que le système ne peut pas lire tels quels en surround avec perte, accepté par toutes les configurations d’enceintes. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatibile surround converte i formati audio che il sistema non può riprodurre così come sono in surround con perdita, accettato da ogni configurazione di altoparlanti. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「サラウンド互換」は、システムがそのまま再生できないオーディオ形式を、どのスピーカー構成でも使える非可逆サラウンドに変換します。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서라운드 호환은 시스템이 그대로 재생할 수 없는 오디오 형식을 모든 스피커 구성에서 받을 수 있는 손실 서라운드로 변환합니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatível com surround converte formatos de áudio que o sistema não reproduz diretamente em surround com perdas, aceito por qualquer configuração de alto-falantes. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“环绕声兼容”会将系统无法直接播放的音频格式转换为任何扬声器配置都支持的有损环绕声。 "
+          }
+        }
+      }
+    },
     "Suspended" : {
       "localizations" : {
         "ar" : {
@@ -74067,6 +76313,136 @@
         }
       }
     },
+    "System Subtitle Tracks" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مسارات الترجمة في النظام"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System-Untertitelspuren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System Subtitle Tracks"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pistas de subtítulos del sistema"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pistes de sous-titres système"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tracce sottotitoli di sistema"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム字幕トラック"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 자막 트랙"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faixas de legendas do sistema"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统字幕轨道"
+          }
+        }
+      }
+    },
+    "System subtitle tracks keep text subtitles visible in Picture in Picture and on AirPlay. Applied the next time playback starts." : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُبقي مسارات الترجمة في النظام الترجمات النصية ظاهرة في وضع صورة داخل صورة وعلى AirPlay. يُطبَّق عند بدء التشغيل التالي."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System-Untertitelspuren halten Textuntertitel in Bild-in-Bild und über AirPlay sichtbar. Wird beim nächsten Wiedergabestart übernommen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System subtitle tracks keep text subtitles visible in Picture in Picture and on AirPlay. Applied the next time playback starts."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las pistas de subtítulos del sistema mantienen visibles los subtítulos de texto en imagen dentro de imagen y en AirPlay. Se aplica la próxima vez que se inicie la reproducción."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les pistes de sous-titres système gardent les sous-titres texte visibles en image dans l’image et sur AirPlay. Appliqué au prochain démarrage de la lecture."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le tracce sottotitoli di sistema mantengono visibili i sottotitoli di testo in Picture in Picture e su AirPlay. Applicato al prossimo avvio della riproduzione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム字幕トラックを使うと、ピクチャ・イン・ピクチャやAirPlayでもテキスト字幕が表示されます。次回の再生開始時に適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 자막 트랙은 화면 속 화면과 AirPlay에서도 텍스트 자막이 보이도록 합니다. 다음 재생 시작 시 적용됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As faixas de legendas do sistema mantêm as legendas de texto visíveis no Picture in Picture e no AirPlay. Aplicado na próxima vez que a reprodução iniciar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统字幕轨道可让文本字幕在画中画和 AirPlay 中保持可见。将在下次开始播放时生效。"
+          }
+        }
+      }
+    },
     "Table" : {
       "comment" : "Standings section header in the game-detail sheet",
       "localizations" : {
@@ -76147,6 +78523,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "首次连接时会请求查找本地网络设备的权限。如果拒绝，只能在“设置”App 中重新允许。"
+          }
+        }
+      }
+    },
+    "The forward buffer sets how many segments are fetched ahead of playback. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحدد التخزين المؤقت المسبق عدد المقاطع التي تُجلب قبل التشغيل. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Vorauspuffer legt fest, wie viele Segmente vor der Wiedergabe geladen werden. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The forward buffer sets how many segments are fetched ahead of playback. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El búfer anticipado define cuántos segmentos se descargan por delante de la reproducción. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le tampon d’avance définit le nombre de segments récupérés en avance sur la lecture. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il buffer in avanti stabilisce quanti segmenti vengono scaricati in anticipo rispetto alla riproduzione. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先読みバッファは、再生より先に取得するセグメントの数を設定します。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선행 버퍼는 재생보다 앞서 가져올 세그먼트 수를 정합니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O buffer antecipado define quantos segmentos são obtidos antes da reprodução. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前向缓冲决定在播放前预先获取多少个分段。 "
           }
         }
       }
@@ -84234,6 +86675,71 @@
         }
       }
     },
+    "Upscale Low-Resolution Video" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تكبير دقة الفيديو المنخفض"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Videos mit niedriger Auflösung hochskalieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upscale Low-Resolution Video"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escalar vídeo de baja resolución"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre à l’échelle les vidéos basse résolution"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upscaling dei video a bassa risoluzione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低解像度ビデオをアップスケール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저해상도 비디오 업스케일"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aumentar a escala de vídeo em baixa resolução"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大低分辨率视频"
+          }
+        }
+      }
+    },
     "URL" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -84843,6 +87349,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本 %@"
+          }
+        }
+      }
+    },
+    "Video" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الفيديو"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vídeo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ビデオ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "비디오"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vídeo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频"
           }
         }
       }

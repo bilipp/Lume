@@ -1,6 +1,6 @@
 # Lume — AI Agent Guide
 
-Lume is a native, multi-platform IPTV player (iOS 18+, macOS 15+, tvOS 18+, visionOS 2+) built with SwiftUI + SwiftData. Single Swift codebase with four interchangeable playback engines: KSPlayer (default) → VLCKit → AVPlayer, plus the opt-in beta LumeEngine (sibling repo `../LumeEngine`). It is built with the iOS 26 SDK and uses Liquid Glass / iOS 26 navigation APIs where available, falling back to system materials on older OS versions.
+Lume is a native, multi-platform IPTV player (iOS 18+, macOS 15+, tvOS 18+, visionOS 2+) built with SwiftUI + SwiftData. Single Swift codebase with five interchangeable playback engines: KSPlayer (default) → VLCKit → AVPlayer, plus the opt-in beta LumeEngine (sibling repo `../LumeEngine`) and the opt-in AetherEngine (remote SPM, not on visionOS). It is built with the iOS 26 SDK and uses Liquid Glass / iOS 26 navigation APIs where available, falling back to system materials on older OS versions.
 
 ---
 
@@ -182,6 +182,16 @@ Three separate `ModelContainer`s:
 - App-side wiring only lives here (`Lume/Views/Player/LumeEngine*.swift`); demux/decode/render/sync bugs are engine-side. Decide which side a bug belongs to *before* editing.
 - Declared last in `PlayerEngineKind` so it appends to the end of existing priority lists — opt-in, never silently promoted while KSPlayer is the default.
 - The engine never retries on its own schedule: reconnect/backoff, engine fallback, and overlays stay Lume's job. If a fix would add retry policy to the engine, it belongs here instead.
+
+### AetherEngine (5th engine)
+- Third-party FFmpeg engine ([superuser404notfound/AetherEngine](https://github.com/superuser404notfound/AetherEngine)), remote SPM pinned **exactly 7.53.1**. Lume never imports it directly: the in-repo local package `LumeAetherBridge/` (dynamic library, library evolution) is the only importer (`internal import AetherEngine`) and exposes a small Lume-facing API (`LumeAetherLoadRequest`, `LumeAetherSession`). That keeps Aether's FFmpeg modules and symbols out of Lume's image, apart from KSPlayer's FFmpegKit `Libav*`. Bump the pin in `LumeAetherBridge/Package.swift` and the tag URLs in `CreditsInfo.swift` together.
+- Linked to the **Lume app target only**, `platformFilters = (ios, macos, tvos)` — never LumeTopShelf/LumeWidgets, never `AetherEngineSMB`. **visionOS is excluded**: every Aether file is `#if !os(visionOS)`, and `PlayerEngineKind.isAvailable` / `.available` is the one helper both the priority UI and the fallback chain use to drop `.aetherEngine` there.
+- Declared after `lumeEngine` in `PlayerEngineKind`, so `PlayerEnginePriority.normalized` appends it last; `defaultValue` stays KSPlayer. Opt-in, never promoted.
+- **Package traits stay off** (`TrueHDObjectAudio`, `DTSXObjectAudio`, `DualLayerDolbyVision`, `DolbyVisionStillReshaping`) — the licence/App Store review covered the default build only. The options they gate (object audio rendering, dual-layer DV) are never set or shown, nor are the diagnostic flags (DV on non-DV displays, panel HDR assertions, held source connection, max concurrent requests).
+- Options are device-local `UserDefaults` under `player.aether.*` (`PlayerSettings.Aether`), never synced. `AetherEngineOptions` maps them plus the media into a load request; embedded use (Multiview tiles, guide previews) is a secondary output, muted, quick startup timeout and **no display criteria** — same HDMI re-sync trap as KSPlayer's embedded tiles. The tvOS *Match Content* toggle is Aether's own (default on). No preview→full-screen handoff (`GuidePreviewPolicy.supportsHandoff` is false).
+- Lume keeps retry, reconnect, engine fallback, overlays and Now Playing; Aether only decodes and renders. No timeshift/DVR window. Engine text goes through `LogRedaction`; never log URLs, headers or tokens.
+- Licences: AetherEngine LGPL-3 + App Store exception; FFmpegBuild LGPL 2.1 (no `--enable-gpl`/`--enable-nonfree`, dynamically linked); libdovi MIT. Notices live in `CreditsInfo.swift`. macOS needs `com.apple.security.network.server` for Aether's loopback HLS server; iOS/tvOS reuse the existing `NSLocalNetworkUsageDescription`.
+- LibDovi's static `Dovi.xcframework` ships `Headers/module.modulemap` at the slice root, as does LumeEngine's `FFmpeg.xcframework`; Xcode copies both into `Products/<config>/include/`, which fails with "Multiple commands produce …/include/module.modulemap". One of them has to nest its module map in a subdirectory.
 
 ### Recording servers (DVR): LumeRecorder + Dispatcharr
 - Recording-server support talks to our own self-hosted server, developed in the sibling repo [`bilipp/LumeRecorder`](https://github.com/bilipp/LumeRecorder). Its zero-dependency client is referenced as a **local** SPM package at `../LumeRecorder/Kit` (product `LumeRecorderKit`, static, link-only) — a clone without that sibling will not resolve.
