@@ -83,6 +83,11 @@ protocol SyncBackend: AnyObject {
 
     /// The user deleted a profile; its row is already gone from the mirror.
     func recordProfileDeletion(id: UUID) async
+
+    /// Mirror rows a writer deleted on purpose (`SyncMirrorDeletionLog`),
+    /// drained at each pass. A backend whose remote follows the mirror's own
+    /// row deletions ignores them.
+    func recordRemovals(logicalKeys: [String]) async
 }
 
 /// No-ops for a backend whose remote follows the mirror on its own.
@@ -96,6 +101,7 @@ extension SyncBackend {
     func prepareMirrorForAttach() async throws {}
     func recordPlaylistDeletion(id _: UUID) async {}
     func recordProfileDeletion(id _: UUID) async {}
+    func recordRemovals(logicalKeys _: [String]) async {}
 }
 
 /// What a `SyncBackend` reports back to. Implemented by `CloudSyncCoordinator`.

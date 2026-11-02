@@ -69,6 +69,18 @@ final class PremiumManager {
     /// True while a purchase or restore is in flight, for button spinners.
     private(set) var isWorking = false
 
+    /// The entitlement as last read, answering for this launch until its own read
+    /// of `Transaction.currentEntitlements` lands. Without it every launch began
+    /// on the free plan for a moment — long enough to put a Pro subscriber on
+    /// their first playlist (`[Playlist].active(for:)`) and start its sync.
+    private static let lastKnownEntitledKey = "premium.lastKnownEntitled"
+    private var hasReadEntitlements = false
+    private var lastKnownEntitled = UserDefaults.standard.bool(forKey: PremiumManager.lastKnownEntitledKey)
+
+    private var isEntitled: Bool {
+        hasReadEntitlements ? !purchasedProductIDs.isEmpty : lastKnownEntitled
+    }
+
     #if SIDE_LOAD
         /// Sideloaded / self-compiled builds unlock everything. No StoreKit, no
         /// paywall — this is the open-source promise.
@@ -90,13 +102,13 @@ final class PremiumManager {
         }
 
         var isPremium: Bool {
-            debugForcePremium || !purchasedProductIDs.isEmpty
+            debugForcePremium || isEntitled
         }
     #else
         /// App Store build: Premium iff the user owns the lifetime unlock or has an
         /// active subscription.
         var isPremium: Bool {
-            !purchasedProductIDs.isEmpty
+            isEntitled
         }
     #endif
 
@@ -199,6 +211,9 @@ final class PremiumManager {
             }
         }
         purchasedProductIDs = owned
+        hasReadEntitlements = true
+        lastKnownEntitled = !owned.isEmpty
+        UserDefaults.standard.set(lastKnownEntitled, forKey: Self.lastKnownEntitledKey)
         subscriptionStatus = owned.contains(Plan.monthly.rawValue) ? await loadSubscriptionStatus() : nil
     }
 

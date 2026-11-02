@@ -14,6 +14,8 @@ struct PlaylistDetailView: View {
     /// Combined selection — decides between "Sync due" and "Syncs when
     /// selected": auto-sync only refreshes the playlists on screen.
     @Environment(\.catalogScope) private var catalogScope
+    /// Every playlist, for the free plan's lock (only the oldest is unlocked).
+    @Query private var playlists: [Playlist]
 
     /// This playlist's sync condition, shared by the Status row and the
     /// `Last Synced` line below it so the two can never disagree.
@@ -48,6 +50,36 @@ struct PlaylistDetailView: View {
     /// Presents the full-catalog download (Stalker only). Kept separate from
     /// `showSync` so the two sheets carry different `full` flags.
     @State var showFullSync = false
+    @State var showPaywall = false
+
+    /// Locked by the free plan (see `[Playlist].isLocked`): a sync would fetch
+    /// a catalog nothing can show, so Sync Now opens the paywall instead.
+    var isLocked: Bool {
+        playlists.isLocked(playlist)
+    }
+
+    /// The Status line. The plan's lock outranks every sync state — none of
+    /// them can change while it holds.
+    var statusLabel: LocalizedStringResource {
+        isLocked
+            ? LocalizedStringResource(
+                "playlist.status.locked",
+                defaultValue: "Requires Lume Pro",
+                comment: "Status of a playlist the free plan can't use: it includes only the first playlist added."
+            )
+            : syncState.statusLabel
+    }
+
+    /// Sync Now and Download Full Catalog, or the paywall for a locked playlist.
+    func requestSync(full: Bool = false) {
+        if isLocked {
+            showPaywall = true
+        } else if full {
+            showFullSync = true
+        } else {
+            showSync = true
+        }
+    }
 
     var isM3U: Bool {
         playlist.sourceType == .m3u
@@ -164,6 +196,7 @@ struct PlaylistDetailView: View {
                 .sheet(isPresented: $showFullSync) {
                     SyncProgressView(playlist: playlist, full: true)
                 }
+                .paywall(isPresented: $showPaywall, highlight: .multiplePlaylists)
         }
     #endif
 
@@ -305,7 +338,7 @@ struct PlaylistDetailView: View {
                             ProgressView()
                                 .controlSize(.small)
                         }
-                        Text(syncState.statusLabel)
+                        Text(statusLabel)
                             .foregroundStyle(syncState.tint)
                     }
                 }
@@ -318,13 +351,13 @@ struct PlaylistDetailView: View {
                 }
 
                 Button("Sync Now") {
-                    showSync = true
+                    requestSync()
                 }
                 .disabled(playlist.syncStatus == .syncing)
 
                 if isStalker {
                     Button("Download Full Catalog") {
-                        showFullSync = true
+                        requestSync(full: true)
                     }
                     .disabled(playlist.syncStatus == .syncing)
                 }
@@ -407,6 +440,7 @@ extension PlaylistDetailView {
             // drop it and let the next sync log in again.
             playlist.jellyfinAccessToken = nil
             playlist.jellyfinUserId = nil
+            playlist.resolvesSourcesOnDemand = nil
         } else if isPlex {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
             playlist.password = editPassword

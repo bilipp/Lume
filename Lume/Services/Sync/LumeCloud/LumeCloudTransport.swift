@@ -23,6 +23,9 @@ nonisolated struct LumeCloudPullResult: Equatable {
 /// store; `CloudSyncEngine` reconciles the catalog against it afterwards.
 actor LumeCloudTransport {
     let accountId: String
+    /// The server `client` talks to, as `LumeCloudConfig.comparable`: the
+    /// bookkeeping is reset when it was written against another one.
+    let serverURL: String
     let client: any LumeCloudSyncing
     let container: ModelContainer
     let keys: LumeCloudKeys
@@ -40,10 +43,16 @@ actor LumeCloudTransport {
     /// The canonical bytes the server rejected with 413, per record. The record
     /// isn't sent again until its payload changes.
     var oversizedRecords: [String: Data] = [:]
+    /// Whether this transport has checked its stored cursor against the
+    /// server's feed (`resetIfCursorAheadOfFeed`). Once per launch.
+    private var checkedCursorAgainstFeed = false
     /// Record types this transport handles as unknown, the way a build that
     /// predates them would. Empty in the app; tests use it to stand for an
     /// older build.
     let unreadableRecordTypes: Set<String>
+    /// Rows another writer deleted on purpose and the next pass reports; a
+    /// repair never restores one of them.
+    let deletionLog: SyncMirrorDeletionLog
     /// `LumeCloudPayloadCodec.encoded` calls a push made to diff mirror rows.
     /// Read by tests.
     var upsertEncodeCount = 0
@@ -56,21 +65,26 @@ actor LumeCloudTransport {
     nonisolated static let contextAuthor = "LumeCloudTransport"
 
     /// `container` is the Lume Cloud mirror (`LumeApp.makeLumeCloudContainer`),
-    /// which carries the bookkeeping models too.
+    /// which carries the bookkeeping models too. `serverURL` is the server
+    /// `client` talks to.
     init(
         client: any LumeCloudSyncing,
         container: ModelContainer,
         rootKey: Data,
         accountId: String,
+        serverURL: URL = LumeCloudConfig.defaultURL,
         now: @escaping @Sendable () -> Date = { Date() },
-        unreadableRecordTypes: Set<String> = []
+        unreadableRecordTypes: Set<String> = [],
+        deletionLog: SyncMirrorDeletionLog = .shared
     ) throws {
         self.client = client
         self.container = container
         keys = try LumeCloudKeys(rootKey: rootKey)
         self.accountId = accountId
+        self.serverURL = LumeCloudConfig.comparable(serverURL)
         self.now = now
         self.unreadableRecordTypes = unreadableRecordTypes
+        self.deletionLog = deletionLog
     }
 
     /// Runs `operation` once every earlier operation has finished, so no two
@@ -105,13 +119,20 @@ actor LumeCloudTransport {
         }
     }
 
-    /// The stored `/changes` cursor; 0 before the first pull of this account.
+    /// The stored `/changes` cursor; 0 before the first pull of this account
+    /// on this server.
     func storedCursor() throws -> Int {
         let context = makeContext()
         guard let meta = try context.fetch(FetchDescriptor<LumeCloudSyncMeta>()).first,
-              meta.accountId == accountId
+              meta.accountId == accountId, !isFromAnotherServer(meta)
         else { return 0 }
         return meta.nextSeq
+    }
+
+    /// Whether `meta` was written against another server's feed. Bookkeeping
+    /// from before the server was recorded counts as this server's.
+    func isFromAnotherServer(_ meta: LumeCloudSyncMeta) -> Bool {
+        !meta.serverURL.isEmpty && meta.serverURL != serverURL
     }
 
     private func performPull() async throws -> LumeCloudPullResult {
@@ -119,6 +140,16 @@ actor LumeCloudTransport {
         defer { Perf.end(interval) }
         let context = makeContext()
         let meta = try preparedSyncMeta(in: context)
+        // Saved before the request: the repair is local, and an offline pull
+        // still owes the engine the restored rows.
+        let restored = try restoreUnrecordedRemovals(in: context)
+        if context.hasChanges {
+            try context.save()
+        }
+        if restored > 0 {
+            await postMirrorDidChange()
+        }
+        try await resetIfCursorAheadOfFeed(meta, in: context)
         let since = meta.nextSeq
 
         let page: ChangesPage
@@ -135,7 +166,7 @@ actor LumeCloudTransport {
             update(meta, \.historyToken, to: nil)
         }
 
-        let result = try Perf.measure(.lumeCloudMerge) {
+        var result = try Perf.measure(.lumeCloudMerge) {
             try apply(page, isSnapshot: isSnapshot, meta: meta, in: context)
         }
         let records = page.records.count
@@ -144,7 +175,24 @@ actor LumeCloudTransport {
         if result.mirrorChanged {
             await postMirrorDidChange()
         }
+        result.mirrorChanged = result.mirrorChanged || restored > 0
         return result
+    }
+
+    /// Once per launch, before the first pull: a stored cursor at or past the
+    /// server's next seq came from another feed (an account moved between
+    /// servers, a server restored from a backup). Pulls from it return nothing
+    /// until the feed passes it, and then skip every record up to it, so the
+    /// bookkeeping resets and this pull starts from 0. A device that only reads
+    /// would never notice otherwise: the push check needs a write.
+    private func resetIfCursorAheadOfFeed(_ meta: LumeCloudSyncMeta, in context: ModelContext) async throws {
+        guard !checkedCursorAgainstFeed, meta.nextSeq > 0 else { return }
+        let nextSeq = try await request { try await client.account() }.nextSeq
+        checkedCursorAgainstFeed = true
+        guard meta.nextSeq >= nextSeq else { return }
+        Logger.sync.notice("Lume Cloud cursor is ahead of the server's feed: pulling everything again")
+        try resetBookkeeping(meta, keepingHeldRecords: true, in: context)
+        try context.save()
     }
 
     func postMirrorDidChange() async {
@@ -154,10 +202,10 @@ actor LumeCloudTransport {
     }
 
     /// The account's sync meta, with its bookkeeping reset when it belongs to
-    /// another account, or when the mirror was lost (`mirrorWasLost`,
-    /// PROTOCOL.md §6.4): pulling from 0 then refills the mirror instead of a
-    /// later push reading the empty mirror as deletions. `mirrorLost` is a
-    /// `mirrorWasLost` result the caller already has.
+    /// another account, to another server's feed, or when the mirror was lost
+    /// (`mirrorWasLost`, PROTOCOL.md §6.4): pulling from 0 then refills the
+    /// mirror instead of a later push reading the empty mirror as deletions.
+    /// `mirrorLost` is a `mirrorWasLost` result the caller already has.
     func preparedSyncMeta(in context: ModelContext, mirrorLost: Bool? = nil) throws -> LumeCloudSyncMeta {
         let meta: LumeCloudSyncMeta
         if let existing = try context.fetch(FetchDescriptor<LumeCloudSyncMeta>()).first {
@@ -169,9 +217,16 @@ actor LumeCloudTransport {
         if meta.accountId != accountId {
             try resetBookkeeping(meta, keepingHeldRecords: false, in: context)
             meta.accountId = accountId
+        } else if isFromAnotherServer(meta) {
+            // The same account on another server: its seqs and versions are
+            // another feed's, and a cursor ahead of this feed's head would skip
+            // every record up to it. The mirror is still this account's data.
+            Logger.sync.notice("Lume Cloud server changed: pulling everything again")
+            try resetBookkeeping(meta, keepingHeldRecords: true, in: context)
         } else if try mirrorLost ?? mirrorWasLost(in: context) {
             try resetBookkeeping(meta, keepingHeldRecords: true, in: context)
         }
+        update(meta, \.serverURL, to: serverURL)
         return meta
     }
 
@@ -201,7 +256,7 @@ actor LumeCloudTransport {
     /// snapshot pull that follows drops it if the server no longer lists it. It
     /// keeps unpushed user deletions as they are, so the pull can't revive them.
     /// Another account's held records never open under these keys, so they go.
-    private func resetBookkeeping(_ meta: LumeCloudSyncMeta, keepingHeldRecords: Bool, in context: ModelContext) throws {
+    func resetBookkeeping(_ meta: LumeCloudSyncMeta, keepingHeldRecords: Bool, in context: ModelContext) throws {
         for state in try context.fetch(FetchDescriptor<LumeCloudRecordState>()) {
             if keepingHeldRecords, state.isDeletionPending, state.lastSyncedPayload != nil, !state.isUndecodable {
                 continue
@@ -464,103 +519,11 @@ actor LumeCloudTransport {
         states[rid] = state
         return state
     }
-
-    // MARK: Three-way merge
-
-    /// Merges every record of one collection into the mirror: the server value
-    /// against the local mirror row, over the last-synced payload as the base.
-    func merge<Model: LumeCloudConflictMerging>(
-        _ records: [PulledRecord],
-        as _: Model.Type,
-        states: inout [String: LumeCloudRecordState],
-        in context: ModelContext
-    ) throws -> (changed: Bool, skipped: Int) {
-        var rows = try Dictionary(
-            mirrorRows(Model.self, withKeys: Set(records.map(\.key)), in: context).map { ($0.lumeCloudKey, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
-        var changed = false
-        var skipped = 0
-        for record in records {
-            var probe: Model?
-            if let payload = record.payload {
-                probe = try? LumeCloudPayloadCodec.makeModel(from: payload, as: Model.self)
-                guard probe != nil else {
-                    hold(record.remote, key: record.key, type: record.type, states: &states, in: context)
-                    skipped += 1
-                    continue
-                }
-            }
-            let base = states[record.rid]?.lastSyncedPayload
-            let local = rows[record.key]
-            let localBytes = try local.map { try LumeCloudPayloadCodec.encoded($0, previous: base) }
-            let verdict = CloudSyncMerge.reconcile(local: localBytes, cloud: record.bytes, shadow: base) { localPayload, remotePayload in
-                (try? Self.mergedPayload(local: localPayload, remote: remotePayload, as: Model.self)) ?? remotePayload
-            }
-            let result: Data? = switch verdict {
-            case .noChange: localBytes
-            case let .pushToCloud(value), let .pullToLocal(value): value
-            case let .writeBoth(value): value
-            }
-            if result != localBytes {
-                try write(result, pulled: record, probe: probe, rows: &rows, in: context)
-                changed = true
-            }
-            let state = recordState(rid: record.rid, key: record.key, type: record.type, states: &states, in: context)
-            update(state, \.version, to: record.version)
-            update(state, \.lastSyncedPayload, to: record.bytes)
-            update(state, \.isDirty, to: result != record.bytes)
-            release(state)
-        }
-        return (changed, skipped)
-    }
-
-    /// Both sides changed the record differently: the collection's conflict
-    /// policy decides. Fields only the server's payload carries survive.
-    nonisolated static func mergedPayload<Model: LumeCloudConflictMerging>(
-        local: Data,
-        remote: Data,
-        as _: Model.Type
-    ) throws -> Data {
-        let localModel = try LumeCloudPayloadCodec.makeModel(from: LumeCloudPayload.decode(local), as: Model.self)
-        let remoteModel = try LumeCloudPayloadCodec.makeModel(from: LumeCloudPayload.decode(remote), as: Model.self)
-        try localModel.mergeLumeCloudConflict(with: remoteModel)
-        return try LumeCloudPayloadCodec.encoded(localModel, previous: remote)
-    }
 }
 
 // MARK: - Store writes
 
 extension LumeCloudTransport {
-    /// Writes `result` over the mirror row under `record`'s key. `probe` is the
-    /// uninserted model built from `record`'s payload, inserted as is when
-    /// `result` is that payload.
-    private func write<Model: LumeCloudConflictMerging>(
-        _ result: Data?,
-        pulled record: PulledRecord,
-        probe: Model?,
-        rows: inout [String: Model],
-        in context: ModelContext
-    ) throws {
-        let local = rows[record.key]
-        guard let result else {
-            if let local {
-                context.delete(local)
-                rows[record.key] = nil
-            }
-            return
-        }
-        let pulledPayload = result == record.bytes ? record.payload : nil
-        let payload = try pulledPayload ?? LumeCloudPayload.decode(result)
-        if let local {
-            try LumeCloudPayloadCodec.apply(payload, to: local)
-        } else {
-            let model = try (pulledPayload == nil ? nil : probe) ?? LumeCloudPayloadCodec.makeModel(from: payload, as: Model.self)
-            context.insert(model)
-            rows[record.key] = model
-        }
-    }
-
     /// The mirror rows of `Model` under `keys`, and possibly others. Reads every
     /// row when `Model` has no keyed lookup or `keys` is too long for one.
     func mirrorRows<Model: LumeCloudPayloadMappable>(

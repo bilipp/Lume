@@ -461,14 +461,14 @@ struct MainTabView: View {
     }
 
     /// Finds a movie by `tmdbId`, preferring a copy from the playlists on
-    /// screen but falling back to any other playlist's. Restricted categories
-    /// stay hidden for a child profile.
+    /// screen but falling back to any other playlist's copy the plan unlocks.
+    /// Restricted categories stay hidden for a child profile.
     private func resolveMovie(tmdbId: Int) -> Movie? {
         let descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
         let restriction = contentRestriction
         let matcher = CatalogScope.Matcher(catalogScope)
         let matches = ((try? modelContext.fetch(descriptor)) ?? [])
-            .filter { !restriction.hides(categoryID: $0.categoryId) }
+            .filter { !restriction.hides(categoryID: $0.categoryId) && !playlists.isLocked(contentID: $0.id) }
         return matches.first { matcher.contains($0.id, .movies) } ?? matches.first
     }
 
@@ -477,14 +477,20 @@ struct MainTabView: View {
         let restriction = contentRestriction
         let matcher = CatalogScope.Matcher(catalogScope)
         let matches = ((try? modelContext.fetch(descriptor)) ?? [])
-            .filter { !restriction.hides(categoryID: $0.categoryId) }
+            .filter { !restriction.hides(categoryID: $0.categoryId) && !playlists.isLocked(contentID: $0.id) }
         return matches.first { matcher.contains($0.id, .series) } ?? matches.first
     }
 
     // MARK: - Automatic sync
 
+    /// A playlist the free plan locks never syncs.
     private func enqueueDueSyncs(_ candidates: [Playlist]) {
-        autoSyncQueue.enqueueDue(candidates, scope: catalogScope, frequency: syncFrequency, context: modelContext)
+        autoSyncQueue.enqueueDue(
+            candidates.filter { !playlists.isLocked($0) },
+            scope: catalogScope,
+            frequency: syncFrequency,
+            context: modelContext
+        )
     }
 }
 

@@ -3,8 +3,8 @@
 //  LumeTests
 //
 //  Covers the reworked EPG handling: guide-URL resolution, the automatic
-//  reconciliation of a playlist's EPG source on add/edit/delete, and the
-//  EPG-specific refresh schedule.
+//  reconciliation of a playlist's EPG source on add/edit/delete, skipping a
+//  locked playlist's source, and the EPG-specific refresh schedule.
 //
 
 import Foundation
@@ -116,6 +116,38 @@ struct EPGSourceTests {
         let sources = try context.fetch(FetchDescriptor<EPGSource>())
         #expect(sources.count == 1)
         #expect(sources.first?.isManual == true)
+    }
+
+    // MARK: - Free plan
+
+    @Test func `guide refresh skips the source of a playlist the free plan locks`() async throws {
+        let xmltv = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tv>
+          <programme start="20260611120000 +0000" stop="20260611130000 +0000" channel="news.1">
+            <title>Midday News</title>
+          </programme>
+        </tv>
+        """
+        let guide = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).xml")
+        try Data(xmltv.utf8).write(to: guide)
+        defer { try? FileManager.default.removeItem(at: guide) }
+
+        let container = try makeTestContainer()
+        let context = ModelContext(container)
+        let playlist = Playlist(name: "P", serverURL: "http://host:8080", username: "u", password: "p")
+        context.insert(playlist)
+        context.insert(LiveStream(id: "\(playlist.id.uuidString)-live-1", streamId: 1, name: "News", epgChannelId: "news.1"))
+        context.insert(EPGSource(name: "P", url: guide.absoluteString, playlistID: playlist.id))
+        try context.save()
+
+        let skipped = await EPGSyncManager(modelContainer: container).syncAllSources(lockedPlaylistIDs: [playlist.id])
+        #expect(!skipped)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<EPGListing>()) == 0)
+
+        let synced = await EPGSyncManager(modelContainer: container).syncAllSources(lockedPlaylistIDs: [UUID()])
+        #expect(synced)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<EPGListing>()) == 1)
     }
 
     // MARK: - EPG schedule

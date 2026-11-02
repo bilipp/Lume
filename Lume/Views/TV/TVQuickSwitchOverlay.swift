@@ -41,7 +41,7 @@
         @State private var pendingSwitch: UserProfile?
         /// Presented from here rather than after closing: the modal is a plain
         /// overlay, and when the paywall closes focus comes back to the
-        /// Combined row it left — unlocked, if the viewer just subscribed.
+        /// row it left — unlocked, if the viewer just subscribed.
         @State private var showsPaywall = false
 
         @FocusState private var focus: FocusTarget?
@@ -126,7 +126,8 @@
                         TVPlaylistSwitchRow(
                             playlist: row.item,
                             isActive: row.isCurrent,
-                            isInScope: row.isInScope
+                            isInScope: row.isInScope,
+                            isLocked: row.isLocked
                         ) {
                             select(playlist: row)
                         }
@@ -243,10 +244,15 @@
             router.isQuickSwitchPresented = false
         }
 
-        /// Picking the active row just closes the modal.
+        /// Picking the active row just closes the modal; a locked one opens the
+        /// paywall over it, so the modal is still there when the paywall closes.
         private func select(playlist row: QuickSwitchRow<Playlist>) {
             guard !row.isCurrent else {
                 close()
+                return
+            }
+            guard !row.isLocked else {
+                showsPaywall = true
                 return
             }
             close()

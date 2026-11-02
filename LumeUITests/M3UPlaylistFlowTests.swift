@@ -98,10 +98,11 @@ final class M3UPlaylistFlowTests: XCTestCase {
 
     /// Switches the active playlist to the one just added.
     private func activateM3UPlaylist(_ app: XCUIApplication) {
-        // Under `-ui-testing` the app also seeds an empty "Test Playlist" that
-        // stays active, so switch via the library toolbar's playlist switcher.
+        // Under `-ui-testing` another playlist (the seeded "Test Playlist", or
+        // one an earlier flow test added) is active, so switch via the library
+        // toolbar's playlist switcher.
         app.tabBars.buttons["Live TV"].tap()
-        let switcher = app.playlistSwitcher(named: "Test Playlist")
+        let switcher = app.activePlaylistSwitcher
         XCTAssertTrue(switcher.waitForExistence(timeout: 20), "Playlist switcher not found")
         switcher.tap()
         let item = app.buttons[playlistName].firstMatch

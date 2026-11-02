@@ -16,10 +16,16 @@ import Foundation
 @testable import Lume
 import Testing
 
+/// The bundled English sentence embedding is missing on some simulator
+/// runtimes (iOS 26.5 returns nil), where `TextEmbedder.sentence()` throws
+/// `.modelUnavailable`. Skip there rather than fail on the host.
+private nonisolated let sentenceModelAvailable = (try? TextEmbedder.sentence()) != nil
+
 struct TextEmbedderTests {
     // MARK: - Backends
 
-    @Test func `sentence backend needs no assets and no prepare`() async throws {
+    @Test(.enabled(if: sentenceModelAvailable, "No English sentence embedding on this host"))
+    func `sentence backend needs no assets and no prepare`() async throws {
         let embedder = try TextEmbedder.sentence()
         // Must not hang, throw or reach the network — this is the whole point
         // of the backend on tvOS, where contextual assets are never served.
@@ -30,7 +36,8 @@ struct TextEmbedderTests {
         #expect(vector.contains { $0 != 0 })
     }
 
-    @Test func `sentence backend separates genres in short documents`() throws {
+    @Test(.enabled(if: sentenceModelAvailable, "No English sentence embedding on this host"))
+    func `sentence backend separates genres in short documents`() throws {
         let embedder = try TextEmbedder.sentence()
         func vector(_ text: String) throws -> [Float] {
             let vector = try embedder.vector(for: text)
@@ -47,11 +54,13 @@ struct TextEmbedderTests {
             > RecommendationScoring.cosineSimilarity(nemo, godfather))
     }
 
-    @Test func `sentence backend prefers short documents`() throws {
+    @Test(.enabled(if: sentenceModelAvailable, "No English sentence embedding on this host"))
+    func `sentence backend prefers short documents`() throws {
         #expect(try TextEmbedder.sentence().prefersShortDocuments)
     }
 
-    @Test func `backends occupy different vector spaces`() throws {
+    @Test(.enabled(if: sentenceModelAvailable, "No English sentence embedding on this host"))
+    func `backends occupy different vector spaces`() throws {
         let sentence = try TextEmbedder.sentence()
         // Not available on every host; skip rather than fail when it isn't.
         guard let contextual = try? TextEmbedder.contextual() else { return }
@@ -59,7 +68,8 @@ struct TextEmbedderTests {
         #expect(!contextual.prefersShortDocuments)
     }
 
-    @Test func `unload is safe on a backend that was never prepared`() throws {
+    @Test(.enabled(if: sentenceModelAvailable, "No English sentence embedding on this host"))
+    func `unload is safe on a backend that was never prepared`() throws {
         try TextEmbedder.sentence().unload()
         try TextEmbedder.sentence().unload()
     }

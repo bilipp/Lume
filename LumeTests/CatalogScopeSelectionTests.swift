@@ -55,15 +55,18 @@ struct CatalogScopeSelectionTests {
         #expect(rows.allSatisfy { !$0.isCurrent })
     }
 
-    @Test func `a lapsed combined selection marks the priority-1 member current`() throws {
+    /// Without Pro only the oldest playlist is unlocked, so a lapsed Combined
+    /// selection lands there rather than on its priority-1 member.
+    @Test func `a lapsed combined selection marks the oldest playlist current`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["First", "Second"], in: container.mainContext)
         makeCombined(playlists)
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: false)
 
-        let rows = QuickSwitchResolver.playlistRows(playlists, scope: scope)
+        let rows = QuickSwitchResolver.playlistRows(playlists, scope: scope, isPremium: false)
 
-        #expect(rows.map(\.isCurrent) == [false, true])
+        #expect(rows.map(\.isCurrent) == [true, false])
+        #expect(rows.map(\.isLocked) == [false, true])
     }
 
     // MARK: - Single-playlist reads
@@ -90,7 +93,7 @@ struct CatalogScopeSelectionTests {
 
         #expect(!playlists.selectionTitle(for: combined).isEmpty)
         #expect(!playlists.map(\.name).contains(playlists.selectionTitle(for: combined)))
-        #expect(playlists.selectionTitle(for: lapsed) == "Second")
+        #expect(playlists.selectionTitle(for: lapsed) == "First")
         #expect(playlists.selectionTitle(for: .empty).isEmpty)
     }
 

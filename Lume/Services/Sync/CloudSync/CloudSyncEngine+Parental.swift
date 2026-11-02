@@ -114,7 +114,7 @@ extension CloudSyncEngine {
 
     private func applyPINToCloud(_ value: ParentalPINValues?, mirror: SyncedParentalPIN?) {
         guard let value else {
-            if let mirror { cloudContext.delete(mirror) }
+            if let mirror { deletionLog.delete(mirror, in: cloudContext) }
             return
         }
         guard let mirror else {
@@ -223,7 +223,7 @@ extension CloudSyncEngine {
 
     private func applyRestrictionToCloud(_ value: CategoryRestrictionValues?, id: String, mirror: SyncedCategoryRestriction?) {
         guard value != nil else {
-            if let mirror { cloudContext.delete(mirror) }
+            if let mirror { deletionLog.delete(mirror, in: cloudContext) }
             return
         }
         guard let mirror else {

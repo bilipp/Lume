@@ -83,14 +83,15 @@ struct PlaylistSwitcher: View {
                     Label(PlaylistSelectionStore.combinedTitle, systemImage: combinedSymbol(for: scope))
                 }
                 Divider()
-                ForEach(playlists) { playlist in
+                ForEach(QuickSwitchResolver.playlistRows(playlists, scope: scope, isPremium: premium.isPremium)) { row in
                     Button {
-                        select(id: playlist.id.uuidString, name: playlist.name)
+                        if row.isLocked {
+                            presentPaywall(.multiplePlaylists)
+                        } else {
+                            select(id: row.item.id.uuidString, name: row.item.name)
+                        }
                     } label: {
-                        Label(
-                            playlist.name,
-                            systemImage: playlist.id.uuidString == selectionID ? "checkmark" : ""
-                        )
+                        Label(row.item.name, systemImage: Self.symbol(for: row))
                     }
                 }
             } label: {
@@ -114,6 +115,13 @@ struct PlaylistSwitcher: View {
             }
             .accessibilityLabel("Playlist: \(selectionTitle)")
         }
+    }
+
+    /// A checkmark on the current playlist and a crown on the ones the free plan
+    /// locks — the same crown a locked Add Playlist shows.
+    private static func symbol(for row: QuickSwitchRow<Playlist>) -> String {
+        if row.isCurrent { return "checkmark" }
+        return row.isLocked ? "crown" : ""
     }
 
     // Width ceiling for the label in the toolbar. Deliberately a fixed value

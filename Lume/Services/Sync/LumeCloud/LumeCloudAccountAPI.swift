@@ -6,7 +6,6 @@ import LumeCloudKit
 /// `LumeCloudClient` so the account flows are tested offline. Never retries.
 nonisolated protocol LumeCloudAccountAPI: LumeCloudSyncing {
     func createAccount(keys: LumeCloudKeys) async throws -> AccountCreated
-    func account() async throws -> AccountInfo
     func deleteAccount() async throws
     func registerDevice(id: UUID, name: String, platform: LumeCloudPlatform) async throws -> Device
     func devices() async throws -> [Device]

@@ -24,6 +24,9 @@ struct QuickSwitchRow<Item>: Identifiable {
     /// Whether the item is in effect for its sync state: every Combined member
     /// is, while no playlist row is current. A profile row is when current.
     let isInScope: Bool
+    /// Out of reach on the free plan — see `[Playlist].isLocked(_:isPremium:)`.
+    /// A locked row stays listed and opens the paywall instead of switching.
+    var isLocked = false
     let id: UUID
 }
 
@@ -54,15 +57,46 @@ extension [Playlist] {
     /// Resolves the stored selection (the raw `PlaylistSelectionStore.key` value)
     /// to a concrete playlist, falling back to the oldest playlist when the
     /// stored id is empty or no longer exists (e.g. the selected playlist was
-    /// deleted).
+    /// deleted), or names a playlist the free plan has locked.
     ///
     /// The fallback is ordered rather than `first`: callers resolve against
     /// their own unsorted `@Query` or fetch, whose order SQLite doesn't promise
     /// to repeat, and the content tabs, the switchers and auto-sync all have to
     /// land on the same playlist.
-    func active(for storedID: String) -> Playlist? {
-        first(where: { $0.id.uuidString == storedID })
-            ?? self.min { ($0.addedAt, $0.id.uuidString) < ($1.addedAt, $1.id.uuidString) }
+    ///
+    /// The stored selection itself is left alone, so renewing Pro lands the
+    /// viewer back on the playlist they had picked.
+    func active(for storedID: String, isPremium: Bool? = nil) -> Playlist? {
+        unlocked(isPremium: isPremium).first { $0.id.uuidString == storedID } ?? oldest
+    }
+
+    /// The playlist added first — the free plan's one playlist, and the
+    /// fallback whenever the stored selection can't be used.
+    var oldest: Playlist? {
+        self.min { ($0.addedAt, $0.id.uuidString) < ($1.addedAt, $1.id.uuidString) }
+    }
+
+    /// Whether the plan puts `playlist` out of reach. The free plan includes one
+    /// playlist, the oldest; the rest still arrive — iCloud and Lume Cloud bring
+    /// over every playlist added on a device with Pro, or in Lume for Android —
+    /// and stay listed in Settings so they can be deleted or unlocked, but are
+    /// never selected, synced, searched or played.
+    ///
+    /// `isPremium` pins the plan (tests); nil reads `PremiumManager`. The same
+    /// goes for every plan-aware helper here.
+    func isLocked(_ playlist: Playlist, isPremium: Bool? = nil) -> Bool {
+        !PremiumManager.isPremium(isPremium) && playlist.id != oldest?.id
+    }
+
+    /// Whether a catalog row came from a playlist the plan locks, by the
+    /// playlist prefix on its id. An id no playlist owns isn't locked.
+    func isLocked(contentID: String, isPremium: Bool? = nil) -> Bool {
+        owner(ofContentID: contentID).map { isLocked($0, isPremium: isPremium) } ?? false
+    }
+
+    /// The playlists the plan can use: all of them with Pro, else the oldest.
+    func unlocked(isPremium: Bool? = nil) -> [Playlist] {
+        PremiumManager.isPremium(isPremium) ? self : (oldest.map { [$0] } ?? [])
     }
 
     /// The playlist that synced a piece of content. Every catalog id is
@@ -97,23 +131,24 @@ extension [Playlist] {
     /// value) to the scope every browse surface reads from.
     ///
     /// `PlaylistSelectionStore.combined` resolves to the members only for a Pro
-    /// user with at least two of them. Otherwise it falls back to the
-    /// priority-1 member — or, with none, the oldest playlist — on every read.
+    /// user with at least two of them. Otherwise it falls back on every read:
+    /// with Pro to the priority-1 member (or, with none, the oldest playlist);
+    /// on the free plan to the oldest playlist, the only one it unlocks.
     /// The fallback is never written back: a lapsed subscription or a
     /// temporarily removed member must not discard the selection or the config.
     func scope(for selection: String?, isPremium: Bool) -> CatalogScope {
         let stored = selection ?? ""
         guard stored == PlaylistSelectionStore.combined else {
-            return active(for: stored).map { .isolated($0.id) } ?? .empty
+            return active(for: stored, isPremium: isPremium).map { .isolated($0.id) } ?? .empty
         }
         let members = combinedMembers
         if isPremium, members.count >= 2 {
             return .combined(members.map { (id: $0.id, tabs: $0.combinedTabs) })
         }
-        if let first = members.first {
+        if isPremium, let first = members.first {
             return .isolated(first.id)
         }
-        return active(for: "").map { .isolated($0.id) } ?? .empty
+        return active(for: "", isPremium: isPremium).map { .isolated($0.id) } ?? .empty
     }
 
     /// The scope's priority-1 member — the isolated playlist outside Combined.
@@ -149,6 +184,24 @@ extension [Playlist] {
     var namesByID: [UUID: String] {
         Dictionary(map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
     }
+
+    /// The in-effect playlist's `id.uuidString`, or an empty string when there is
+    /// no playlist at all. Never compare a raw stored value instead — it can name
+    /// a deleted playlist.
+    func activeID(for storedID: String, isPremium: Bool? = nil) -> String {
+        active(for: storedID, isPremium: isPremium)?.id.uuidString ?? ""
+    }
+}
+
+// MARK: - Plan
+
+extension PremiumManager {
+    /// `override` when given, else the live plan. The plan-aware playlist
+    /// helpers take an optional rather than defaulting to `shared.isPremium`:
+    /// a default argument is evaluated outside the main actor.
+    static func isPremium(_ override: Bool?) -> Bool {
+        override ?? shared.isPremium
+    }
 }
 
 // MARK: - Resolver
@@ -158,10 +211,24 @@ enum QuickSwitchResolver {
 
     /// The playlist rows for a resolved scope. In Combined no single playlist
     /// is current; a Combined selection that fell back marks the playlist it
-    /// fell back to.
-    static func playlistRows(_ playlists: [Playlist], scope: CatalogScope) -> [QuickSwitchRow<Playlist>] {
+    /// fell back to. Each row is also tagged with whether the plan locks it.
+    static func playlistRows(
+        _ playlists: [Playlist],
+        scope: CatalogScope,
+        isPremium: Bool? = nil
+    ) -> [QuickSwitchRow<Playlist>] {
+        let isPremium = PremiumManager.isPremium(isPremium)
         let inScope = Set(scope.playlistIDs)
-        return rows(playlists, id: \.id, currentID: scope.isCombined ? nil : scope.primaryID, isInScope: inScope.contains)
+        let currentID = scope.isCombined ? nil : scope.primaryID
+        return playlists.map { playlist in
+            QuickSwitchRow(
+                item: playlist,
+                isCurrent: playlist.id == currentID,
+                isInScope: inScope.contains(playlist.id),
+                isLocked: playlists.isLocked(playlist, isPremium: isPremium),
+                id: playlist.id
+            )
+        }
     }
 
     /// A switch surface's playlist column: the Combined entry above the
@@ -172,7 +239,7 @@ enum QuickSwitchResolver {
         isPremium: Bool
     ) -> QuickSwitchPlaylistColumn {
         QuickSwitchPlaylistColumn(
-            rows: playlistRows(playlists, scope: scope),
+            rows: playlistRows(playlists, scope: scope, isPremium: isPremium),
             isCombinedCurrent: scope.isCombined,
             combinedAction: combinedAction(playlists, scope: scope, isPremium: isPremium),
             combinedMemberNames: playlists.combinedMembers.map(\.name)

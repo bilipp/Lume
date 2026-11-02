@@ -28,7 +28,11 @@ enum OtherSources {
 
     /// Other `Movie` entries that share `movie`'s TMDB id, excluding `movie`
     /// itself. Empty when the movie has no TMDB id.
-    static func resolve(for movie: Movie, in context: ModelContext) -> [Source] {
+    static func resolve(
+        for movie: Movie,
+        in context: ModelContext,
+        isPremium: Bool? = nil
+    ) -> [Source] {
         guard let tmdbId = movie.tmdbId else { return [] }
         let prefix = movie.id.components(separatedBy: "-movie-").first
         let matches = (try? context.fetch(
@@ -37,13 +41,18 @@ enum OtherSources {
         return sources(
             matches.filter { $0.id != movie.id }.map { ($0.id, HomeMediaItem.movie($0)) },
             ownPlaylist: prefix,
-            in: context
+            in: context,
+            isPremium: isPremium
         )
     }
 
     /// Other `Series` entries that share `series`'s TMDB id, excluding `series`
     /// itself. Empty when the series has no TMDB id.
-    static func resolve(for series: Series, in context: ModelContext) -> [Source] {
+    static func resolve(
+        for series: Series,
+        in context: ModelContext,
+        isPremium: Bool? = nil
+    ) -> [Source] {
         guard let tmdbId = series.tmdbId else { return [] }
         let prefix = series.id.components(separatedBy: "-series-").first
         let matches = (try? context.fetch(
@@ -52,20 +61,23 @@ enum OtherSources {
         return sources(
             matches.filter { $0.id != series.id }.map { ($0.id, HomeMediaItem.series($0)) },
             ownPlaylist: prefix,
-            in: context
+            in: context,
+            isPremium: isPremium
         )
     }
 
     /// Same-playlist entries first (unlabelled), then entries from other
     /// playlists labelled with the owning playlist's name and sorted by it.
-    /// Cross-playlist entries whose playlist can't be resolved are dropped —
-    /// without a playlist there are no credentials to play them with. A nil
+    /// Cross-playlist entries whose playlist can't be resolved, or is locked by
+    /// the free plan, are dropped — without a usable playlist there are no
+    /// credentials to play them with. A nil
     /// prefix means the owner couldn't be determined; keep everything
     /// unlabelled rather than guessing.
     private static func sources(
         _ candidates: [(id: String, item: HomeMediaItem)],
         ownPlaylist prefix: String?,
-        in context: ModelContext
+        in context: ModelContext,
+        isPremium: Bool?
     ) -> [Source] {
         guard let prefix else {
             return candidates.map { Source(item: $0.item, playlistName: nil) }
@@ -75,7 +87,7 @@ enum OtherSources {
             .map { Source(item: $0.item, playlistName: nil) }
         let foreign = candidates.filter { !$0.id.hasPrefix(prefix) }
         guard !foreign.isEmpty else { return own }
-        let playlists = (try? context.fetch(FetchDescriptor<Playlist>())) ?? []
+        let playlists = ((try? context.fetch(FetchDescriptor<Playlist>())) ?? []).unlocked(isPremium: isPremium)
         let labelled = foreign
             .compactMap { candidate in
                 playlists.first { candidate.id.hasPrefix($0.id.uuidString) }

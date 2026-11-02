@@ -159,19 +159,23 @@ final class DownloadManager: NSObject {
 
     func startDownload(movie: Movie, playlist: Playlist) {
         let id = movie.id
-        // Stalker streams resolve to short-lived URLs per session, so there is no
-        // stable URL to download for offline playback.
         guard playlist.supportsDownloads else { return }
         guard activeDownloads[id] == nil, !pendingIDs.contains(id) else { return }
         guard movie.downloadStatus != .completed else { return }
 
-        let directURL = movie.directURL.flatMap(URL.init(string:))
-        guard let url = directURL ?? XtreamClient().buildMovieURL(for: movie, playlist: playlist) else { return }
+        guard let url = DownloadSource.url(
+            stored: movie.directURL.flatMap(URL.init(string:)),
+            sourceType: playlist.sourceType,
+            xtream: { XtreamClient().buildMovieURL(for: movie, playlist: playlist) }
+        ) else { return }
 
-        let ext = movie.containerExtension ?? "mp4"
+        let ext = DownloadSource.fileExtension(container: movie.containerExtension)
         let filename = "\(Self.sanitize(id)).\(ext)"
         idToFilename[id] = filename
-        enqueue(PendingDownload(id: id, title: movie.name, url: url, filename: filename))
+        enqueue(PendingDownload(
+            id: id, title: movie.name, url: url, filename: filename,
+            headers: PlayableMedia.authHeaders(for: playlist)
+        ))
     }
 
     func startDownload(episode: Episode, playlist: Playlist) {
@@ -180,20 +184,23 @@ final class DownloadManager: NSObject {
         guard activeDownloads[id] == nil, !pendingIDs.contains(id) else { return }
         guard episode.downloadStatus != .completed else { return }
 
-        // m3u and media-server episodes carry their playback URL on the row;
-        // the Xtream/Stalker builders have nothing to build from.
-        let carriesDirectURL = switch playlist.sourceType {
-        case .m3u, .jellyfin, .emby, .plex, .silo: true
-        case .xtream, .stalker, .webdav: false
-        }
-        let directURL = carriesDirectURL ? episode.directSource.flatMap(URL.init(string:)) : nil
-        guard let url = directURL ?? XtreamClient().buildEpisodeURL(for: episode, playlist: playlist) else { return }
+        // An Xtream episode's `directSource` is the provider's unreliable
+        // `direct_source` field, so its URL is always built instead.
+        let stored = playlist.sourceType == .xtream ? nil : episode.directSource.flatMap(URL.init(string:))
+        guard let url = DownloadSource.url(
+            stored: stored,
+            sourceType: playlist.sourceType,
+            xtream: { XtreamClient().buildEpisodeURL(for: episode, playlist: playlist) }
+        ) else { return }
 
-        let ext = episode.containerExtension
+        let ext = DownloadSource.fileExtension(container: episode.containerExtension)
         let filename = "\(Self.sanitize(id)).\(ext)"
         let title = episode.series.map { "\($0.name) S\(episode.seasonNum)E\(episode.episodeNum)" } ?? episode.title
         idToFilename[id] = filename
-        enqueue(PendingDownload(id: id, title: title, url: url, filename: filename))
+        enqueue(PendingDownload(
+            id: id, title: title, url: url, filename: filename,
+            headers: PlayableMedia.authHeaders(for: playlist)
+        ))
     }
 
     func cancelDownload(id: String) {
@@ -309,7 +316,7 @@ final class DownloadManager: NSObject {
     }
 
     private func startTask(_ item: PendingDownload) {
-        let task = session.downloadTask(with: item.url)
+        let task = session.downloadTask(with: DownloadSource.request(url: item.url, headers: item.headers))
         task.taskDescription = DownloadTaskInfo(
             id: item.id, title: item.title, filename: item.filename
         ).taskDescription
@@ -418,6 +425,18 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let taskID = downloadTask.taskIdentifier
         let responseURL = downloadTask.response?.url ?? downloadTask.currentRequest?.url
         let ext = responseURL?.pathExtension.isEmpty == false ? responseURL!.pathExtension : "mp4"
+
+        guard DownloadSource.isAcceptable(downloadTask.response) else {
+            let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 0
+            let restoredID = DownloadTaskInfo(taskDescription: downloadTask.taskDescription)?.id
+            Task { @MainActor in
+                guard let id = self.taskMap[taskID] ?? restoredID else { return }
+                Logger.downloads.error("Download refused for \(id): HTTP \(status)")
+                self.handleFailure(taskID: taskID, id: id)
+                self.promoteIfNeeded()
+            }
+            return
+        }
 
         // Resolve the destination from the task itself rather than from any map
         // on the main actor: with a background session this callback can arrive

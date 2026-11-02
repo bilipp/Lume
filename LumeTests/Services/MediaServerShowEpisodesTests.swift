@@ -141,6 +141,10 @@ struct MediaServerShowEpisodesTests {
         #expect(show.episodes.isEmpty)
         let stored = try #require(try context.fetch(FetchDescriptor<Playlist>()).first)
         #expect(stored.supportsPerSeriesEpisodeFetch)
+        // Shows listed without their episodes: the server has no files of its
+        // own to download.
+        #expect(stored.resolvesSourcesOnDemand == true)
+        #expect(!stored.supportsDownloads)
 
         let parsed = try await manager.fetchEpisodes(seriesId: show.seriesId, seriesElementId: show.id, playlist: stored)
         let prefix = "\(playlist.id.uuidString)-jellyfin-"
@@ -154,6 +158,24 @@ struct MediaServerShowEpisodesTests {
         #expect(first.airDate == "2024-02-01")
         // No still of its own: the show's poster stands in.
         #expect(first.movieImage?.contains("/Items/s1/Images/Primary") == true)
+    }
+
+    @Test func `a server that lists its episodes keeps offering downloads`() async throws {
+        let host = uniqueHost()
+        defer { ShowEpisodesStubProtocol.remove(host: host) }
+        ShowEpisodesStubProtocol.install(host: host, replies: [
+            "/Users/AuthenticateByName": .init(body: #"{"AccessToken": "sess", "User": {"Id": "user1"}}"#),
+            "/Users/user1/Views": .init(body: #"{"Items": [{"Id": "libShows", "Name": "Shows", "CollectionType": "tvshows"}], "TotalRecordCount": 1}"#),
+            "/Users/user1/Items|libShows|Series": .init(body: page([showShell])),
+            "/Users/user1/Items|libShows|Episode": .init(body: page([episode("e1", season: 1, number: 1)]))
+        ])
+        let container = try makeTestContainer()
+        let playlist = try makePlaylist(container: container, host: host)
+        try await makeManager(container: container).syncPlaylist(playlist)
+
+        let stored = try #require(try ModelContext(container).fetch(FetchDescriptor<Playlist>()).first)
+        #expect(stored.resolvesSourcesOnDemand == false)
+        #expect(stored.supportsDownloads)
     }
 
     @Test func `a later sync keeps the episodes a show fetched for itself`() async throws {

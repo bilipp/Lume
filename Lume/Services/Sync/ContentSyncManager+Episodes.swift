@@ -45,7 +45,9 @@ extension Series {
     /// cache, which suppresses further refreshes until it goes stale again.
     func insertEpisodes(_ parsed: [ParsedEpisode], into context: ModelContext) {
         let existingIds = Set(episodes.map(\.id))
+        var insertedIds: [String] = []
         for parsed in parsed where !existingIds.contains(parsed.id) {
+            insertedIds.append(parsed.id)
             let episode = Episode(
                 id: parsed.id,
                 episodeId: parsed.episodeId,
@@ -73,5 +75,15 @@ extension Series {
         episodesFetchedAt = Date()
         episodesFetchedLastModified = lastModified
         try? context.save()
+        // Saved first: the sync engine reads the new rows from its own context.
+        // Watch state other devices synced for them applies now, not at the
+        // next reconcile.
+        if !insertedIds.isEmpty {
+            NotificationCenter.default.post(
+                name: .lumeEpisodesDidMaterialize,
+                object: nil,
+                userInfo: [Notification.episodeIDsKey: insertedIds]
+            )
+        }
     }
 }

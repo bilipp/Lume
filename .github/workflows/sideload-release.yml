@@ -52,10 +52,14 @@ env:
 jobs:
   build:
     name: Build ${{ matrix.platform }} Sideload
-    # macos-26 (matching the macOS 26 deployment target): on macos-15 the macOS
-    # icon's AssetCatalogAgent compile crashes with a dyld MediaToolbox/AVFCore
-    # symbol mismatch. iOS/tvOS build here too, so all platforms share one image.
-    runs-on: macos-26
+    # Must build with the same Xcode major as the App Store archives
+    # (ship-release, local Xcode 27): the linked SDK decides SDK-gated behaviour
+    # such as iPhone Duo layout — an iOS 26 SDK IPA runs in compatibility mode
+    # there. macos-26 only ships Xcode 26, so use the xcode-27 image (macOS 27).
+    # (Never macos-15: the macOS icon's AssetCatalogAgent compile crashes there
+    # with a dyld MediaToolbox/AVFCore symbol mismatch.) iOS/tvOS build here
+    # too, so all platforms share one image.
+    runs-on: xcode-27
 
     strategy:
       fail-fast: false
@@ -115,10 +119,13 @@ jobs:
           ref: ${{ env.CLOUD_REF }}
           path: LumeCloud
 
+      # Pinned, not latest-stable: latest-stable silently fell back to Xcode 26
+      # (iOS 26.5 SDK) while the App Store build used 27. Keep this on the
+      # Xcode ship-release archives with; bump both together.
       - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          xcodebuild -version
 
       # ── Metal Toolchain ──────────────────────────────────────────────────────
       # Xcode 26 no longer bundles the Metal toolchain; without it KSPlayer's
@@ -138,6 +145,9 @@ jobs:
           OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          SIMKL_CLIENT_SECRET: ${{ secrets.SIMKL_CLIENT_SECRET }}
+          MDBLIST_CLIENT_ID: ${{ secrets.MDBLIST_CLIENT_ID }}
         run: |
           {
             [ -n "$TMDB_ACCESS_TOKEN" ]     && echo "TMDB_ACCESS_TOKEN=$TMDB_ACCESS_TOKEN"
@@ -146,6 +156,9 @@ jobs:
             [ -n "$OPENSUBTITLES_API_KEY" ] && echo "OPENSUBTITLES_API_KEY=$OPENSUBTITLES_API_KEY"
             [ -n "$TRAKT_CLIENT_ID" ]       && echo "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID"
             [ -n "$TRAKT_CLIENT_SECRET" ]   && echo "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET"
+            [ -n "$SIMKL_CLIENT_ID" ]       && echo "SIMKL_CLIENT_ID=$SIMKL_CLIENT_ID"
+            [ -n "$SIMKL_CLIENT_SECRET" ]   && echo "SIMKL_CLIENT_SECRET=$SIMKL_CLIENT_SECRET"
+            [ -n "$MDBLIST_CLIENT_ID" ]     && echo "MDBLIST_CLIENT_ID=$MDBLIST_CLIENT_ID"
           } > .env || true
 
       # ── Archive (unsigned) ───────────────────────────────────────────────────

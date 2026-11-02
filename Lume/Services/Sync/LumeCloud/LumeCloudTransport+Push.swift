@@ -23,6 +23,11 @@ nonisolated struct LumeCloudPushResult: Equatable {
     var skippedRecords = 0
     /// Whether collapsing duplicate rows or merging a conflict changed the mirror.
     var mirrorChanged = false
+    /// Whether the server's feed turned out to be behind the stored cursor —
+    /// the cursor came from another feed (an account moved between servers, a
+    /// restored backup) — so the bookkeeping was reset and the next pull
+    /// starts over from 0. The caller owes a pass for that pull.
+    var feedRewound = false
 }
 
 /// One record of a push request, with the canonical bytes it carries (nil for a
@@ -54,8 +59,13 @@ extension LumeCloudTransport {
         /// else the dirty ones and those of the rows it diffs.
         var states: [String: LumeCloudRecordState]
         /// Records not retried in this pass.
+        /// The stored `/changes` cursor this pass started from.
+        let cursor: Int
         var excluded: Set<String> = []
         var result = LumeCloudPushResult()
+        /// Set when a response proved the server's feed behind `cursor`
+        /// (`noteServerSeqs`).
+        var cursorAheadOfFeed = false
 
         mutating func skip(_ rid: String) {
             excluded.insert(rid)
@@ -100,7 +110,7 @@ extension LumeCloudTransport {
         }
         // Taken before diffing: a write landing mid-pass is after the token.
         let history = pushHistory(since: meta.historyToken, in: context)
-        var pass = try newPass(scope: history.scope, in: context)
+        var pass = try newPass(scope: history.scope, cursor: meta.nextSeq, in: context)
         do {
             while pass.result.rounds < Self.maxPushRounds {
                 let outgoing = try outgoingRecords(pass: &pass, in: context)
@@ -112,10 +122,7 @@ extension LumeCloudTransport {
                 try mergeConflicts(conflicts, pass: &pass, in: context)
                 pass.scope = retryScope(for: conflicts, pass: pass)
             }
-            if context.hasChanges {
-                try context.save()
-            }
-            try storeHistoryToken(history.token, meta: meta, in: context)
+            try settle(&pass, historyToken: history.token, meta: meta, in: context)
         } catch {
             if pass.result.mirrorChanged {
                 await postMirrorDidChange()
@@ -136,8 +143,8 @@ extension LumeCloudTransport {
 
     /// A pass over `scope`, starting from every record for a full diff, else
     /// from the dirty ones.
-    private func newPass(scope: LumeCloudPushScope, in context: ModelContext) throws -> PushPass {
-        var pass = PushPass(scope: scope, states: [:])
+    private func newPass(scope: LumeCloudPushScope, cursor: Int, in context: ModelContext) throws -> PushPass {
+        var pass = PushPass(scope: scope, states: [:], cursor: cursor)
         try loadStates(
             scope.isEverything
                 ? FetchDescriptor<LumeCloudRecordState>()
@@ -443,6 +450,7 @@ extension LumeCloudTransport {
         pass: inout PushPass,
         conflicts: inout [RemoteRecord]
     ) {
+        noteServerSeqs(of: response, pass: &pass)
         let sent = Dictionary(batch.map { ($0.record.rid, $0) }, uniquingKeysWith: { first, _ in first })
         for result in response.results {
             switch result {
@@ -457,6 +465,46 @@ extension LumeCloudTransport {
                 guard sent[rid] != nil else { continue }
                 conflicts.append(current)
             }
+        }
+    }
+
+    /// Ends a pass that sent everything it could: saves the bookkeeping and
+    /// stores `historyToken`. When the pass found the server's feed behind the
+    /// stored cursor, the stored seqs and versions are another feed's: start
+    /// over from 0. The mirror stays, so the snapshot pull merges into it and
+    /// only records this feed lacks are pushed again.
+    private func settle(
+        _ pass: inout PushPass,
+        historyToken: Data?,
+        meta: LumeCloudSyncMeta,
+        in context: ModelContext
+    ) throws {
+        if context.hasChanges {
+            try context.save()
+        }
+        try storeHistoryToken(historyToken, meta: meta, in: context)
+        guard pass.cursorAheadOfFeed else { return }
+        Logger.sync.notice("Lume Cloud cursor is ahead of the server's feed: pulling everything again")
+        try resetBookkeeping(meta, keepingHeldRecords: true, in: context)
+        try context.save()
+        pass.result.feedRewound = true
+    }
+
+    /// Checks the stored cursor against the seqs the server just reported.
+    /// Every seq of a feed this device pulled from is below its next seq to
+    /// assign, and below each seq it assigns to this push's writes. A cursor
+    /// at or past one of them came from another feed: the account moved
+    /// between servers, or the server was restored from a backup. Such a
+    /// cursor skips every record up to it, so pulls from it miss the other
+    /// devices' writes (PROTOCOL.md: clients that see older `seq`s resync).
+    private func noteServerSeqs(of response: PushResponse, pass: inout PushPass) {
+        guard pass.cursor > 0 else { return }
+        let assigned = response.results.compactMap { result -> Int? in
+            if case let .ok(_, _, seq) = result { seq } else { nil }
+        }
+        let lowest = assigned.min() ?? response.nextSeq
+        if lowest <= pass.cursor {
+            pass.cursorAheadOfFeed = true
         }
     }
 

@@ -89,12 +89,11 @@ final class StalkerPortalFlowTests: XCTestCase {
 
     /// Switches the active playlist to the portal just added.
     private func activatePortalPlaylist(_ app: XCUIApplication) {
-        // Under `-ui-testing` the app also seeds an empty "Test Playlist" that
-        // stays active, so switch the active playlist to the portal we just added
-        // via the library toolbar's playlist switcher (a menu labelled with the
-        // active playlist's name).
+        // Under `-ui-testing` another playlist (the seeded "Test Playlist", or
+        // one an earlier flow test added) is active, so switch via the library
+        // toolbar's playlist switcher.
         app.tabBars.buttons["Live TV"].tap()
-        let switcher = app.playlistSwitcher(named: "Test Playlist")
+        let switcher = app.activePlaylistSwitcher
         XCTAssertTrue(switcher.waitForExistence(timeout: 15), "Playlist switcher not found")
         switcher.tap()
         let portalItem = app.buttons["Example Portal"].firstMatch

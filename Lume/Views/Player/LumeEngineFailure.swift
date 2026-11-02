@@ -5,7 +5,7 @@ import LumeEngine
 /// The engine only classifies (bilipp/LumeEngine#45); what each cause gets —
 /// a fresh stream URL, a slower reconnect, no reconnect at all — is Lume's
 /// call, made by the player views.
-nonisolated enum LumeEngineFailure: String, Equatable {
+nonisolated enum LumeEngineFailure: String, EngineFailurePolicy {
     /// No cause worth acting on: the stall watchdog, a dropped connection, a
     /// decoder fault, a 400 or another 4xx. Reconnects on the normal schedule.
     case interrupted

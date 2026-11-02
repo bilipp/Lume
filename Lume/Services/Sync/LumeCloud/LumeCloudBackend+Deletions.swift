@@ -38,6 +38,17 @@ extension LumeCloudBackend {
         }
     }
 
+    /// Rows a writer removed on purpose: an un-favorite, a cleared PIN, an
+    /// unfollowed team. Only the keys whose row is still gone become tombstones.
+    func recordRemovals(logicalKeys: [String]) async {
+        guard let transport, !logicalKeys.isEmpty else { return }
+        do {
+            try await transport.recordRemovals(logicalKeys: logicalKeys)
+        } catch {
+            Logger.sync.error("Lume Cloud couldn't record \(logicalKeys.count) removed rows")
+        }
+    }
+
     /// `subject` names the deleted thing's type for the log, never its id.
     private func recordDeletions(
         of subject: String,

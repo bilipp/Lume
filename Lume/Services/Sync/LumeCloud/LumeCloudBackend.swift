@@ -181,7 +181,7 @@ final class LumeCloudBackend: SyncBackend {
         activePush = generation
         defer { activePush = nil }
         do {
-            try await transport.push { [weak self] progress in
+            let result = try await transport.push { [weak self] progress in
                 Task { @MainActor [weak self] in
                     guard let self, activePush == generation else { return }
                     setState(.uploading(completed: progress.completed, total: progress.total))
@@ -189,6 +189,11 @@ final class LumeCloudBackend: SyncBackend {
             }
             setState(.joined)
             host?.status.lastError = nil
+            if result.feedRewound {
+                // The reset cursor pulls everything on the next pass, which
+                // brings in the other devices' writes the old cursor skipped.
+                host?.reconcile(reason: .queued, debounced: true)
+            }
         } catch {
             handleSyncError(error)
             throw error
@@ -244,6 +249,7 @@ final class LumeCloudBackend: SyncBackend {
             container: container,
             rootKey: identity.rootKey,
             accountId: identity.accountId,
+            serverURL: serverURL,
             now: now
         )
         self.identity = identity

@@ -38,7 +38,9 @@ extension CloudSyncEngine {
 
     func applyContentToCloud(_ value: ContentStateValues?, id: String, kind: SyncedContentKind?, mirror: UserContentState?) {
         guard let value, !value.isEmpty else {
-            if let mirror { cloudContext.delete(mirror) }
+            // A cleared state (an un-favorite, reset progress): reported, so
+            // Lume Cloud sends it as a tombstone.
+            if let mirror { deletionLog.delete(mirror, in: cloudContext) }
             return
         }
         let kind = kind ?? mirror?.kind ?? .movie

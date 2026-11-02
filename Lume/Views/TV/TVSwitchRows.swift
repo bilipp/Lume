@@ -22,6 +22,9 @@
         /// Whether the playlist is in the resolved scope, for its sync state. In
         /// Combined every member is, while no row carries the checkmark.
         let isInScope: Bool
+        /// Locked by the free plan: the crown replaces the sync accessory, which
+        /// would only report a sync that can't run. The caller opens the paywall.
+        var isLocked = false
         let action: () -> Void
 
         var body: some View {
@@ -36,7 +39,11 @@
                             .truncationMode(.middle)
                     }
                     Spacer(minLength: 0)
-                    PlaylistSyncAccessory(state: playlist.syncState(isActive: isInScope), size: 26)
+                    if isLocked {
+                        PremiumBadge()
+                    } else {
+                        PlaylistSyncAccessory(state: playlist.syncState(isActive: isInScope), size: 26)
+                    }
                     if isActive {
                         TVSwitchRowCheckmark()
                     }

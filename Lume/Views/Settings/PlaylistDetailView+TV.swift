@@ -45,6 +45,7 @@ import SwiftUI
             .fullScreenCover(isPresented: $showFullSync) {
                 SyncProgressView(playlist: playlist, full: true)
             }
+            .paywall(isPresented: $showPaywall, highlight: .multiplePlaylists)
         }
 
         var tvServerSection: some View {
@@ -196,7 +197,7 @@ import SwiftUI
                             if syncState == .syncing {
                                 ProgressView()
                             }
-                            Text(syncState.statusLabel)
+                            Text(statusLabel)
                                 .foregroundStyle(syncState.tint)
                         }
                     }
@@ -207,12 +208,12 @@ import SwiftUI
                         }
                     }
 
-                    Button("Sync Now") { showSync = true }
+                    Button("Sync Now") { requestSync() }
                         .buttonStyle(TVSettingsRowButtonStyle())
                         .disabled(playlist.syncStatus == .syncing)
 
                     if isStalker {
-                        Button("Download Full Catalog") { showFullSync = true }
+                        Button("Download Full Catalog") { requestSync(full: true) }
                             .buttonStyle(TVSettingsRowButtonStyle())
                             .disabled(playlist.syncStatus == .syncing)
                     }

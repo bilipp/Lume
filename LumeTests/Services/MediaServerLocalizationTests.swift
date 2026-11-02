@@ -24,11 +24,11 @@ struct MediaServerLocalizationTests {
         "e.g. http://192.168.1.10:8096",
         "Username (optional)",
         "Password (optional)",
-        "Enter your server address — Lume recognizes Jellyfin, Emby and Plex servers and WebDAV shares automatically.",
+        "Enter your server address — Lume recognizes Jellyfin, Emby, Plex and Silo servers and WebDAV shares automatically.",
         "For a WebDAV share, enter the full path of the folder that holds your media — a server's root address usually isn't browsable.",
         "Leave the username and password empty for an anonymous share. For Plex, enter your Plex account — or paste an X-Plex-Token in the password field.",
         "The first connection asks permission to find devices on your local network. If you decline it, only the system Settings app can allow it again.",
-        "Enter your server address — Jellyfin, Emby, Plex and WebDAV are detected automatically. A declined local network prompt can only be allowed again in Settings."
+        "Enter your server address — Jellyfin, Emby, Plex, Silo and WebDAV are detected automatically. A declined local network prompt can only be allowed again in Settings."
     ]
 
     /// The failures the copy deliberately tells apart: the two the detection
@@ -36,7 +36,7 @@ struct MediaServerLocalizationTests {
     /// `JellyfinError` descriptions that surface as the generic
     /// connection-failed text.
     static let errorKeys = [
-        "Lume couldn't recognize a media server at that address. Enter your Jellyfin, Emby or Plex server's base address, or the full path of a WebDAV folder.",
+        "Lume couldn't recognize a media server at that address. Enter your Jellyfin, Emby, Plex or Silo server's base address, or the full path of a WebDAV folder.",
         "This server needs a username and password. Enter them and try again.",
         "The server rejected this username and password.",
         "That URL doesn't answer as a Jellyfin or Emby server. Enter the server's base address, e.g. http://192.168.1.10:8096.",

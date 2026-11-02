@@ -25,6 +25,8 @@ final nonisolated class StubLumeCloudClient: LumeCloudSyncing {
         var pushes: [[PushRecord]] = []
         /// Every push request, failed ones included.
         var pushAttempts = 0
+        /// Every `GET /v1/accounts/me`.
+        var accountRequests = 0
     }
 
     let state = Mutex(State())
@@ -55,6 +57,21 @@ final nonisolated class StubLumeCloudClient: LumeCloudSyncing {
 
     var pushAttempts: Int {
         state.withLock(\.pushAttempts)
+    }
+
+    var accountRequests: Int {
+        state.withLock(\.accountRequests)
+    }
+
+    /// `nextSeq` is the next seq this feed assigns.
+    func account() async throws -> AccountInfo {
+        state.withLock { state in
+            state.accountRequests += 1
+            return AccountInfo(
+                accountId: "acct-stub", createdAt: 1_760_000_000_000, usedBytes: 0,
+                recordCount: state.records.count, nextSeq: state.lastSeq + 1
+            )
+        }
     }
 
     func record(forKey logicalKey: String) -> RemoteRecord? {

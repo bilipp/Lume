@@ -202,7 +202,7 @@ struct MultiViewTilePlayer: View {
                 sourceMedia: self.media
             )
         case .lumeEngine:
-            MultiViewLumeTile(
+            MultiViewReconnectingTile(
                 media: media,
                 isMuted: isMuted,
                 usesQuickStartupTimeout: hasFallbackEngine,
@@ -210,9 +210,35 @@ struct MultiViewTilePlayer: View {
                 onPlaybackStarted: { isPlaying = true },
                 onPlaybackFailed: handleFailure,
                 onStreamGone: giveUp,
-                sourceMedia: self.media
+                sourceMedia: self.media,
+                coordinator: LumeEngineCoordinator(),
+                previewCoordinator: { .lume($0) },
+                surface: { LumeEngineVideoSurface(coordinator: $0) }
             )
+        case .aetherEngine:
+            aetherTile(for: media)
         }
+    }
+
+    @ViewBuilder
+    private func aetherTile(for media: PlayableMedia) -> some View {
+        #if os(visionOS)
+            UnavailableEngineStub(onUnavailable: handleFailure)
+        #else
+            MultiViewReconnectingTile(
+                media: media,
+                isMuted: isMuted,
+                usesQuickStartupTimeout: hasFallbackEngine,
+                role: role,
+                onPlaybackStarted: { isPlaying = true },
+                onPlaybackFailed: handleFailure,
+                onStreamGone: giveUp,
+                sourceMedia: self.media,
+                coordinator: AetherEngineCoordinator(),
+                previewCoordinator: { .aether($0) },
+                surface: { AetherEngineVideoSurface(videoView: $0.videoView) }
+            )
+        #endif
     }
 
     private var failureBadge: some View {

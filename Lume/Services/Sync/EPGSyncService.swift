@@ -198,6 +198,8 @@ final class EPGSyncService {
         isSyncing = true
         isBackgroundRefresh = background
         let manager = EPGSyncManager(modelContainer: container)
+        let playlists = (try? ModelContext(container).fetch(FetchDescriptor<Playlist>())) ?? []
+        let lockedPlaylistIDs = Set(playlists.filter { playlists.isLocked($0) }.map(\.id))
         // Background guide refresh: run below the UI so an in-flight sync (which
         // saves into the shared catalog container, churning browse `@Query`s)
         // yields CPU to the main thread instead of competing with it. The
@@ -205,7 +207,7 @@ final class EPGSyncService {
         // lockstep with a frozen main thread right after a playlist sync.
         task = Task(priority: .utility) {
             let succeeded = await BackgroundActivity.perform("Guide refresh") {
-                await manager.syncAllSources()
+                await manager.syncAllSources(lockedPlaylistIDs: lockedPlaylistIDs)
             }
             if succeeded {
                 EPGSyncSchedule.lastSyncDate = Date()
