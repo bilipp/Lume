@@ -9,6 +9,9 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
     /// END of existing priority lists (`PlayerEnginePriority.normalized`):
     /// available to opt into, never silently promoted while KSPlayer is default.
     case lumeEngine
+    /// AetherEngine — opt-in, declared after LumeEngine so it appends last to
+    /// existing priority lists. Not linked on visionOS (see `isAvailable`).
+    case aetherEngine
 
     var id: String {
         rawValue
@@ -20,6 +23,7 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
         case .ksPlayer: "KSPlayer"
         case .avPlayer: "AVPlayer"
         case .lumeEngine: "Lume Engine (Beta)"
+        case .aetherEngine: "AetherEngine"
         }
     }
 
@@ -29,6 +33,7 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
         case .ksPlayer: "KSPlayer is a powerful third-party player that supports a wide range of formats, including those commonly used in IPTV streams."
         case .avPlayer: "Native Apple player. Best for HLS and MP4. But does not support many formats used in IPTV streams."
         case .lumeEngine: "Lume's own FFmpeg 9 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
+        case .aetherEngine: "FFmpeg-based engine with hardware decoding, HDR, multichannel audio, deinterlacing and Picture in Picture. Plays HLS through Apple's native player where it can."
         }
     }
 
@@ -37,8 +42,30 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
     /// for these, to avoid duplicate controls.
     var rendersOwnControls: Bool {
         switch self {
-        case .vlcKit, .ksPlayer, .avPlayer, .lumeEngine: true
+        case .vlcKit, .ksPlayer, .avPlayer, .lumeEngine, .aetherEngine: true
         }
+    }
+
+    /// Whether this engine is linked on the running platform. AetherEngine is
+    /// not built for visionOS.
+    var isAvailable: Bool {
+        #if os(visionOS)
+            self != .aetherEngine
+        #else
+            true
+        #endif
+    }
+
+    /// The engines offered in the priority UI and used by the fallback chain,
+    /// in declaration order.
+    static var available: [PlayerEngineKind] {
+        allCases.filter(\.isAvailable)
+    }
+
+    /// The available engines with an options screen, in settings order;
+    /// AVPlayer has none.
+    static var configurable: [PlayerEngineKind] {
+        [.ksPlayer, .vlcKit, .lumeEngine, .aetherEngine].filter(\.isAvailable)
     }
 
     /// The default engine, and the primary of the default priority list. KSPlayer
@@ -117,13 +144,14 @@ enum PlayerEnginePriority {
     /// duplicates, then append any engine missing from the list in declaration
     /// order. Guarantees the priority list is always complete even if a new
     /// engine is added to `PlayerEngineKind` after the user stored their order.
+    /// Engines not available on this platform are dropped.
     static func normalized(_ order: [PlayerEngineKind]) -> [PlayerEngineKind] {
         var seen = Set<PlayerEngineKind>()
         var result: [PlayerEngineKind] = []
-        for kind in order where seen.insert(kind).inserted {
+        for kind in order where kind.isAvailable && seen.insert(kind).inserted {
             result.append(kind)
         }
-        for kind in PlayerEngineKind.allCases where seen.insert(kind).inserted {
+        for kind in PlayerEngineKind.available where seen.insert(kind).inserted {
             result.append(kind)
         }
         return result

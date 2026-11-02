@@ -376,13 +376,13 @@ import SwiftUI
                             coordinator.playbackRate = rate
                             onResetHideTimer()
                         } label: {
-                            playerCheckmarkLabel(verbatim: rateString(rate), checked: abs(coordinator.playbackRate - rate) < 0.01)
+                            playerCheckmarkLabel(verbatim: rate.playbackRateLabel, checked: abs(coordinator.playbackRate - rate) < 0.01)
                         }
                     }
                 }
                 .holdsPlayerControls()
             } label: {
-                Text(verbatim: rateString(coordinator.playbackRate))
+                Text(verbatim: coordinator.playbackRate.playbackRateLabel)
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.white)
                     .frame(minWidth: 44, minHeight: 44)
@@ -448,11 +448,6 @@ import SwiftUI
                 .foregroundStyle(dimmed ? .white.opacity(0.55) : .white)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
-        }
-
-        /// Compact rate label, e.g. `1×`, `1.25×`. `%g` drops trailing zeros.
-        private func rateString(_ rate: Float) -> String {
-            String(format: "%g×", rate)
         }
     }
 #endif

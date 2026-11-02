@@ -2,22 +2,11 @@
 //  KSPlayerEngineView+Components.swift
 //  Lume
 //
-//  The invisible tap-catcher button style and the SwiftUI preview, split out of
-//  KSPlayerEngineView to keep that file within the project's size limit.
+//  The SwiftUI preview, split out of KSPlayerEngineView to keep that file
+//  within the project's size limit.
 //
 
 import SwiftUI
-
-#if os(tvOS)
-    /// Draws only its (clear) label — no focus highlight, scale or background —
-    /// so the full-screen tap-catcher stays invisible even while it holds focus
-    /// with the controls hidden.
-    struct KSInvisibleButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            configuration.label
-        }
-    }
-#endif
 
 #Preview("Fallback") {
     KSPlayerEngineView(

@@ -6,39 +6,19 @@
 //  out of the main file (which is at its length cap).
 //
 
-import OSLog
 import SwiftUI
 
 extension LumeEngineEngineView {
-    /// Mid-stream drop: bounded backoff, then give up loudly. A missing stream
-    /// gives up at once, a refused one reconnects through a fresh URL, and an
-    /// overloaded source gets the slower schedule.
+    /// Mid-stream drop: bounded backoff, then give up loudly.
     func reconnect(after failure: LumeEngineFailure) {
-        guard failure != .notFound else {
-            Logger.player.error("LumeEngine stream not found → failure overlay, no reconnect")
-            reconnector.cancel()
-            withAnimation(.easeInOut(duration: 0.25)) { loadFailed = true }
-            return
-        }
-        if !reconnector.hasGivenUp {
-            let cause = failure.rawValue
-            Logger.player.warning("LumeEngine dropped (\(cause, privacy: .public)) → scheduling engine reload")
-            reconnector.scheduleRetry(pace: failure == .overloaded ? .overloaded : .normal) {
-                guard failure == .unauthorized, let refreshStreamURL else {
-                    coordinator.reload()
-                    return
-                }
-                urlRefresh = Task {
-                    let url = await refreshStreamURL()
-                    guard !Task.isCancelled else { return }
-                    coordinator.reload(replacingURL: url)
-                }
-            }
-        }
-        // Checked after scheduling too: the attempt that spends the budget only
-        // marks it spent, and a failed session sends nothing further.
-        if reconnector.hasGivenUp {
-            Logger.player.error("LumeEngine reconnects exhausted → failure overlay")
+        let showsFailure = reconnector.reconnect(
+            after: failure,
+            engine: "LumeEngine",
+            refreshStreamURL: refreshStreamURL,
+            holdURLRefresh: { urlRefresh = $0 },
+            reload: { coordinator.reload(replacingURL: $0) }
+        )
+        if showsFailure {
             withAnimation(.easeInOut(duration: 0.25)) { loadFailed = true }
         }
     }
@@ -49,10 +29,11 @@ extension LumeEngineEngineView {
     /// fallback: every engine would be asking for the same missing stream.
     func reportFailure(_ failure: LumeEngineFailure) {
         guard !loadFailed else { return }
-        let fallsBack = reportsStartupFailure && !coordinator.hasStartedPlayback && failure != .notFound
-        let cause = failure.rawValue
-        Logger.player.error("LumeEngine startup failure (\(cause, privacy: .public)) → \(fallsBack ? "falling back to next engine" : "failure overlay", privacy: .public)")
-        if fallsBack {
+        if failure.handsOffStartupFailure(
+            engine: "LumeEngine",
+            reportsStartupFailure: reportsStartupFailure,
+            hasStartedPlayback: coordinator.hasStartedPlayback
+        ) {
             onPlaybackFailed?()
             return
         }
