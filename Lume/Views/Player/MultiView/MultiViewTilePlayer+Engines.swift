@@ -248,9 +248,11 @@ struct MultiViewAVTile: View {
     }
 }
 
-// MARK: - LumeEngine
+// MARK: - LumeEngine / AetherEngine
 
-struct MultiViewLumeTile: View {
+/// A tile for an engine that reports drops but never reconnects on its own
+/// schedule (LumeEngine, AetherEngine): the reconnects are the tile's.
+struct MultiViewReconnectingTile<Coordinator: MultiViewReconnectingCoordinator, Surface: View>: View {
     let media: PlayableMedia
     let isMuted: Bool
     let usesQuickStartupTimeout: Bool
@@ -262,14 +264,40 @@ struct MultiViewLumeTile: View {
     /// would ask for the same missing stream.
     var onStreamGone: () -> Void
     let sourceMedia: PlayableMedia
+    private let previewCoordinator: (Coordinator) -> PreviewPlayerHandle.EngineCoordinator
+    private let surface: (Coordinator) -> Surface
 
-    @StateObject private var coordinator = LumeEngineCoordinator()
-    /// The engine never retries on its own schedule — reconnect policy is the
-    /// app's job (see the engine's contract in CLAUDE.md).
+    @StateObject private var coordinator: Coordinator
     @State private var reconnector = PlaybackRetryController()
 
+    init(
+        media: PlayableMedia,
+        isMuted: Bool,
+        usesQuickStartupTimeout: Bool,
+        role: MultiViewTileRole,
+        onPlaybackStarted: @escaping () -> Void,
+        onPlaybackFailed: @escaping () -> Void,
+        onStreamGone: @escaping () -> Void,
+        sourceMedia: PlayableMedia,
+        coordinator: @autoclosure @escaping () -> Coordinator,
+        previewCoordinator: @escaping (Coordinator) -> PreviewPlayerHandle.EngineCoordinator,
+        @ViewBuilder surface: @escaping (Coordinator) -> Surface
+    ) {
+        self.media = media
+        self.isMuted = isMuted
+        self.usesQuickStartupTimeout = usesQuickStartupTimeout
+        self.role = role
+        self.onPlaybackStarted = onPlaybackStarted
+        self.onPlaybackFailed = onPlaybackFailed
+        self.onStreamGone = onStreamGone
+        self.sourceMedia = sourceMedia
+        self.previewCoordinator = previewCoordinator
+        self.surface = surface
+        _coordinator = StateObject(wrappedValue: coordinator())
+    }
+
     var body: some View {
-        LumeEngineVideoSurface(coordinator: coordinator)
+        surface(coordinator)
             .onAppear {
                 if role.mixesWithOtherAudio {
                     MultiViewTileAudioSession.configureMixing()
@@ -279,35 +307,70 @@ struct MultiViewLumeTile: View {
                 coordinator.startupTimeout = usesQuickStartupTimeout
                     ? MultiViewTilePlayer.fallbackStartupTimeout
                     : MultiViewTilePlayer.startupTimeout
-                coordinator.onPlaybackFailure = { failure in
-                    failure == .notFound ? onStreamGone() : onPlaybackFailed()
-                }
-                coordinator.onStalled = { failure in
-                    guard failure != .notFound else {
-                        reconnector.cancel()
-                        onStreamGone()
-                        return
-                    }
-                    reconnector.scheduleRetry(pace: failure == .overloaded ? .overloaded : .normal) {
-                        coordinator.reload()
-                    }
-                    // A failed reconnect no longer lands on the startup-failure
-                    // path, so a spent budget hands over here instead.
-                    if reconnector.hasGivenUp {
-                        onPlaybackFailed()
-                    }
-                }
-                coordinator.onRecovered = { reconnector.reset() }
+                reconnector.bindTile(coordinator, onPlaybackFailed: onPlaybackFailed, onStreamGone: onStreamGone)
                 coordinator.configure(media: media)
             }
             .onDisappear { reconnector.cancel() }
-            .previewHandoff(role, media: sourceMedia, resolved: media, coordinator: .lume(coordinator))
+            .previewHandoff(role, media: sourceMedia, resolved: media, coordinator: previewCoordinator(coordinator))
             .onChange(of: isMuted) { _, muted in coordinator.isMuted = muted }
             .onChange(of: coordinator.hasStartedPlayback) { _, started in
                 if started {
                     onPlaybackStarted()
                 }
             }
+    }
+}
+
+// MARK: - Reconnect wiring
+
+protocol MultiViewReconnectingCoordinator: ObservableObject {
+    associatedtype Failure: EngineFailurePolicy
+    var isEmbedded: Bool { get set }
+    var isMuted: Bool { get set }
+    var startupTimeout: TimeInterval { get set }
+    var hasStartedPlayback: Bool { get }
+    var onPlaybackFailure: ((Failure) -> Void)? { get set }
+    var onStalled: ((Failure) -> Void)? { get set }
+    var onRecovered: (() -> Void)? { get set }
+    func configure(media: PlayableMedia)
+    func reload(replacingURL url: URL?)
+}
+
+extension LumeEngineCoordinator: MultiViewReconnectingCoordinator {}
+
+#if !os(visionOS)
+    extension AetherEngineCoordinator: MultiViewReconnectingCoordinator {}
+#endif
+
+private extension PlaybackRetryController {
+    /// A missing stream gives up without another engine, any other drop
+    /// reconnects within this budget, and a startup failure or a spent budget
+    /// hands the tile over.
+    func bindTile(
+        _ coordinator: some MultiViewReconnectingCoordinator,
+        onPlaybackFailed: @escaping () -> Void,
+        onStreamGone: @escaping () -> Void
+    ) {
+        coordinator.onPlaybackFailure = { failure in
+            failure.givesUpWithoutReconnect ? onStreamGone() : onPlaybackFailed()
+        }
+        coordinator.onStalled = { [weak self, weak coordinator] failure in
+            guard let self else { return }
+            guard !failure.givesUpWithoutReconnect else {
+                cancel()
+                onStreamGone()
+                return
+            }
+            scheduleRetry(pace: failure.reconnectPace) {
+                coordinator?.reload(replacingURL: nil)
+            }
+            // A failed reconnect no longer lands on the startup-failure path,
+            // so a spent budget hands over here instead.
+            if hasGivenUp {
+                onPlaybackFailed()
+            }
+        }
+        coordinator.onRecovered = { [weak self] in self?.reset() }
     }
 }
 

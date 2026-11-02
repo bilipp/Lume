@@ -164,4 +164,33 @@ struct PreviewPlayerHandleTests {
         #expect(!ksPlayer.isSame(as: avPlayer))
         #expect(ksPlayer.isSame(as: ksPlayer))
     }
+
+    #if !os(visionOS)
+        @Test func `an AetherEngine preview reports its engine and identity`() {
+            let coordinator = AetherEngineCoordinator()
+            let aether = PreviewPlayerHandle.EngineCoordinator.aether(coordinator)
+            #expect(aether.engine == .aetherEngine)
+            #expect(aether.isSame(as: .aether(coordinator)))
+            #expect(!aether.isSame(as: .aether(AetherEngineCoordinator())))
+            #expect(!aether.isSame(as: .ks(KSVideoPlayer.Coordinator())))
+        }
+
+        @Test func `a started AetherEngine preview is never adopted`() {
+            let handle = PreviewPlayerHandle()
+            handle.register(media: media("a"), resolved: media("a"), coordinator: .aether(AetherEngineCoordinator()))
+            handle.markStarted()
+            #expect(handle.hasStarted)
+            #expect(!handle.canAdopt(media("a"), airPlayActive: false))
+        }
+
+        @Test func `unregister clears an AetherEngine tile's registration`() {
+            let handle = PreviewPlayerHandle()
+            let coordinator = AetherEngineCoordinator()
+            handle.register(media: media("a"), resolved: nil, coordinator: .aether(coordinator))
+            handle.unregister(.aether(AetherEngineCoordinator()))
+            #expect(handle.coordinator != nil)
+            handle.unregister(.aether(coordinator))
+            #expect(handle.coordinator == nil)
+        }
+    #endif
 }

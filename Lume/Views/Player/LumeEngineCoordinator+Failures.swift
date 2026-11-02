@@ -47,27 +47,16 @@ extension LumeEngineCoordinator {
     /// shows no byte progress and still fails within `startupTimeout`. A hard
     /// cap bounds pathological "downloads but never starts" cases.
     func makeStartupWatchdog() -> Task<Void, Never> {
-        Task { [startupTimeout] in
-            let hardDeadline = Date(timeIntervalSinceNow: max(startupTimeout * 3, 60))
-            var deadline = Date(timeIntervalSinceNow: startupTimeout)
-            var lastBytes: Int64 = 0
-            while !Task.isCancelled, !self.hasStartedPlayback {
-                try? await Task.sleep(for: .seconds(5))
-                guard !Task.isCancelled, !self.hasStartedPlayback else { return }
-                if let session = self.session {
-                    let bytes = await session.diagnostics.deliveredBytes
-                    if bytes > lastBytes {
-                        lastBytes = bytes
-                        deadline = min(Date(timeIntervalSinceNow: startupTimeout), hardDeadline)
-                    }
-                }
-                if Date() >= deadline {
-                    Logger.player.error("LumeEngine startup window elapsed (read \(lastBytes) bytes, never played)")
-                    self.streamFailed(.interrupted)
-                    return
-                }
+        StartupWatchdog.start(
+            timeout: startupTimeout,
+            pollInterval: .seconds(5),
+            progress: { await self.session?.diagnostics.deliveredBytes ?? 0 },
+            hasStarted: { self.hasStartedPlayback },
+            onTimeout: { lastBytes in
+                Logger.player.error("LumeEngine startup window elapsed (read \(lastBytes) bytes, never played)")
+                self.streamFailed(.interrupted)
             }
-        }
+        )
     }
 
     /// Returns once `shutdown` has finished, or after `shutdownGrace`.

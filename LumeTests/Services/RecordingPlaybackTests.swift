@@ -255,7 +255,7 @@ struct RecordingPlaybackTests {
     // MARK: - Engines
 
     @Test func `catalog media and LumeRecorder recordings keep every engine`() throws {
-        let priority: [PlayerEngineKind] = [.ksPlayer, .vlcKit, .avPlayer, .lumeEngine]
+        let priority: [PlayerEngineKind] = [.ksPlayer, .vlcKit, .avPlayer, .lumeEngine, .aetherEngine]
         let media = try makeMedia()
 
         #expect(media.unsupportedEngines.isEmpty)
@@ -266,7 +266,7 @@ struct RecordingPlaybackTests {
         let media = try makeDispatcharrMedia(headers: ["X-API-Key": "fixture-key"])
 
         #expect(media.unsupportedEngines == [.avPlayer, .vlcKit])
-        #expect(PlayerEnginePriority.playable([.vlcKit, .avPlayer, .ksPlayer, .lumeEngine], for: media) == [.ksPlayer, .lumeEngine])
+        #expect(PlayerEnginePriority.playable([.vlcKit, .avPlayer, .ksPlayer, .lumeEngine, .aetherEngine], for: media) == [.ksPlayer, .lumeEngine, .aetherEngine])
     }
 
     @Test func `a password Dispatcharr recording keeps VLC through the token URL`() throws {
@@ -275,11 +275,24 @@ struct RecordingPlaybackTests {
         )
 
         #expect(media.unsupportedEngines == [.avPlayer])
-        #expect(PlayerEnginePriority.playable([.avPlayer, .vlcKit, .ksPlayer, .lumeEngine], for: media) == [.vlcKit, .ksPlayer, .lumeEngine])
+        #expect(PlayerEnginePriority.playable([.avPlayer, .vlcKit, .ksPlayer, .lumeEngine, .aetherEngine], for: media) == [.vlcKit, .ksPlayer, .lumeEngine, .aetherEngine])
         let vlcURL = try #require(DispatcharrPlaybackAuth.authenticatedURL(media.url, headers: media.httpHeaders))
         #expect(vlcURL.absoluteString == "http://192.168.1.30:9191/api/channels/recordings/42/hls/index.m3u8?token=header.payload.sig")
         // The token exists only in the URL handed to VLC.
         #expect(media.url.query() == nil)
+    }
+
+    @Test func `dispatcharr recordings keep AetherEngine whatever the sign-in`() throws {
+        let apiKey = try makeDispatcharrMedia(headers: ["X-API-Key": "fixture-key"])
+        let password = try makeDispatcharrMedia(
+            headers: ["Authorization": "Bearer header.payload.sig"], path: "/api/channels/recordings/42/hls/index.m3u8"
+        )
+
+        for media in [apiKey, password] {
+            #expect(!media.unsupportedEngines.contains(.aetherEngine))
+            #expect(media.unsupportedEngines.contains(.avPlayer))
+            #expect(PlayerEnginePriority.playable([.aetherEngine, .avPlayer], for: media) == [.aetherEngine])
+        }
     }
 
     @Test func `filtering never leaves the player without an engine`() throws {

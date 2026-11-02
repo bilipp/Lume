@@ -72,7 +72,6 @@ struct AVPlayerEngineView: View {
     @State private var isSeeking = false
     @State private var seekPosition: TimeInterval = 0
     @State private var hideTask: Task<Void, Never>?
-    @State private var hoverHideTask: Task<Void, Never>?
     /// While an overlay panel (episodes / info) is open the controls must not
     /// auto-hide out from under the viewer.
     @State private var isPanelOpen = false
@@ -185,24 +184,11 @@ struct AVPlayerEngineView: View {
             if !keepAdoptedItem(as: media) {
                 coordinator.configure(media: media)
             }
-            NowPlayingService.shared.attachTransport(.init(
-                isPlaying: { [weak coordinator] in coordinator?.isPlaying ?? false },
-                play: { [weak coordinator] in
-                    guard let coordinator, !coordinator.isPlaying else { return }
-                    coordinator.togglePlay()
-                },
-                pause: { [weak coordinator] in
-                    guard let coordinator, coordinator.isPlaying else { return }
-                    coordinator.togglePlay()
-                },
-                seek: { [weak coordinator] in coordinator?.seek(to: $0) },
-                advance: onRemoteAdvance
-            ), owner: coordinator)
+            NowPlayingService.shared.attachTransport(.toggling(coordinator, advance: onRemoteAdvance), owner: coordinator)
             scheduleHide()
         }
         .onDisappear {
             hideTask?.cancel()
-            hoverHideTask?.cancel()
             NowPlayingService.shared.detachTransport(owner: coordinator)
             coordinator.tearDown()
         }
@@ -235,23 +221,7 @@ struct AVPlayerEngineView: View {
         .onMenuPress { handleMenuPress() }
         .onPlayPausePress { togglePlay() }
         #if os(macOS)
-            .onContinuousHover(coordinateSpace: .local) { phase in
-                switch phase {
-                case .active:
-                    if !isControlsVisible {
-                        withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
-                    }
-                    resetHideTimer()
-                    hoverHideTask?.cancel()
-                case .ended:
-                    hoverHideTask?.cancel()
-                    hoverHideTask = Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 600_000_000)
-                        guard !Task.isCancelled else { return }
-                        withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
-                    }
-                }
-            }
+            .playerHoverRevealsControls($isControlsVisible, onActivity: resetHideTimer)
             .playerVolume(coordinator)
         #endif
             .playerKeyboardShortcuts(PlayerKeyActions(
@@ -269,7 +239,7 @@ struct AVPlayerEngineView: View {
             Button(action: showControls) {
                 Color.clear.contentShape(Rectangle())
             }
-            .buttonStyle(AVInvisibleButtonStyle())
+            .buttonStyle(PlayerInvisibleButtonStyle())
             // Yield focus to the failure overlay's buttons when a stream dies.
             .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
             .focused($catcherFocused)
@@ -483,40 +453,6 @@ struct AVPlayerEngineView: View {
     private func retryPlayback() {
         withAnimation(.easeInOut(duration: 0.25)) { loadFailed = false }
         coordinator.retryAfterFailure()
-    }
-}
-
-#if os(tvOS)
-    /// Draws only its (clear) label so the full-screen tap-catcher stays
-    /// invisible even while it holds focus with the controls hidden.
-    private struct AVInvisibleButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            configuration.label
-        }
-    }
-#endif
-
-private extension View {
-    /// Runs `action` on the Siri remote's Menu/back press (tvOS only); a no-op
-    /// elsewhere so the cross-platform body still compiles.
-    @ViewBuilder
-    func onMenuPress(perform action: @escaping () -> Void) -> some View {
-        #if os(tvOS)
-            onExitCommand(perform: action)
-        #else
-            self
-        #endif
-    }
-
-    /// Runs `action` on the Siri remote's dedicated Play/Pause button (tvOS
-    /// only); a no-op elsewhere so the cross-platform body still compiles.
-    @ViewBuilder
-    func onPlayPausePress(perform action: @escaping () -> Void) -> some View {
-        #if os(tvOS)
-            onPlayPauseCommand(perform: action)
-        #else
-            self
-        #endif
     }
 }
 

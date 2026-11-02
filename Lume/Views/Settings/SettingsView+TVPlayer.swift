@@ -188,7 +188,7 @@ import SwiftUI
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Options")
                     VStack(spacing: 2) {
-                        ForEach([PlayerEngineKind.ksPlayer, .vlcKit, .lumeEngine]) { engine in
+                        ForEach(PlayerEngineKind.configurable) { engine in
                             tvDrillInRow(label: Text(verbatim: engine.displayName), opens: .engineOptions(engine)) {
                                 selectedEngineOptions = engine
                             }
