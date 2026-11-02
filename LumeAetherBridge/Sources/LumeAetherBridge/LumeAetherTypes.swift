@@ -27,6 +27,10 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
     public var upscalesLowResolutionVideo: Bool
     public var audioDelaySeconds: Double
     public var prepareNativeSubtitles: Bool
+    /// How many requests the engine may have open against the source's
+    /// origin at once; nil leaves it uncapped. The engine keeps a ceiling
+    /// per origin for the rest of the process.
+    public var maxConcurrentSourceRequests: Int?
     /// The engine writes the display criteria (the TV switches to the
     /// video's frame rate and dynamic range, where tvOS Match Content
     /// allows it). False leaves the TV in the output format chosen in
@@ -58,6 +62,7 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         upscalesLowResolutionVideo: Bool,
         audioDelaySeconds: Double,
         prepareNativeSubtitles: Bool,
+        maxConcurrentSourceRequests: Int?,
         writesDisplayCriteria: Bool,
         isSecondaryOutput: Bool
     ) {
@@ -81,6 +86,7 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         self.upscalesLowResolutionVideo = upscalesLowResolutionVideo
         self.audioDelaySeconds = audioDelaySeconds
         self.prepareNativeSubtitles = prepareNativeSubtitles
+        self.maxConcurrentSourceRequests = maxConcurrentSourceRequests
         self.writesDisplayCriteria = writesDisplayCriteria
         self.isSecondaryOutput = isSecondaryOutput
     }

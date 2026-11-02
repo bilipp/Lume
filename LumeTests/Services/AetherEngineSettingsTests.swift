@@ -183,6 +183,25 @@ struct AetherEngineSettingsTests {
         }
     }
 
+    @Test func `only live HLS limits the origin to one request at a time`() {
+        withIsolatedDefaults { defaults in
+            let options = AetherEngineOptions.load(from: defaults)
+            #expect(AetherLoadPlan.make(options: options, context: Self.fullScreen).maxConcurrentSourceRequests == nil)
+
+            var liveTS = Self.fullScreen
+            liveTS.isLive = true
+            #expect(AetherLoadPlan.make(options: options, context: liveTS).maxConcurrentSourceRequests == nil)
+
+            var liveHLS = liveTS
+            liveHLS.isHLSSource = true
+            #expect(AetherLoadPlan.make(options: options, context: liveHLS).maxConcurrentSourceRequests == 1)
+
+            var hlsMovie = Self.fullScreen
+            hlsMovie.isHLSSource = true
+            #expect(AetherLoadPlan.make(options: options, context: hlsMovie).maxConcurrentSourceRequests == nil)
+        }
+    }
+
     @Test func `preset labels`() {
         #expect(AetherForwardBufferPreset.values.first == 0)
         #expect(AetherAudioDelayPreset.label(100) == "+100 ms")

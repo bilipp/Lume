@@ -400,6 +400,7 @@ public final class LumeAetherSession {
             sharedOutputRole: request.isSecondaryOutput ? .secondary : .primary
         )
         options.httpHeaders = request.httpHeaders
+        options.maxConcurrentSourceRequests = request.maxConcurrentSourceRequests
         // `matchContentEnabled` stays the engine default: it mirrors the
         // system's own Match Content flag, which the engine reads live. What
         // decides whether the TV switches is who owns the criteria.

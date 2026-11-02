@@ -363,6 +363,16 @@ nonisolated struct AetherLoadPlan: Equatable {
     var upscalesLowResolutionVideo: Bool
     var audioDelaySeconds: Double
     var prepareNativeSubtitles: Bool
+    /// 1 for live HLS, else nil (uncapped). The engine's live HLS ingest
+    /// fetches four segments in parallel and hands the demuxer a segment
+    /// only once it has arrived whole, so on a join the first segment
+    /// shares the link with the next three. One request at a time got
+    /// the picture up about 0.5 s sooner per zap on an Apple TV (median
+    /// 2.40 → 1.94 s). The engine keeps the ceiling for that origin for the
+    /// rest of the process, so VOD from the same provider then runs on one
+    /// request too; measured on that provider, movie starts were no
+    /// slower (MKV, MP4, AVI).
+    var maxConcurrentSourceRequests: Int?
     /// The engine owns `preferredDisplayCriteria`. Off, the TV stays in the
     /// output format chosen in tvOS Settings.
     var writesDisplayCriteria: Bool
@@ -393,6 +403,7 @@ nonisolated struct AetherLoadPlan: Equatable {
             upscalesLowResolutionVideo: options.upscaleLowResolution,
             audioDelaySeconds: Double(options.audioDelay) / 1000,
             prepareNativeSubtitles: options.prepareNativeSubtitles,
+            maxConcurrentSourceRequests: context.isLive && context.isHLSSource ? 1 : nil,
             writesDisplayCriteria: writesCriteria,
             sharedOutputRole: context.isEmbedded ? .secondary : .primary
         )

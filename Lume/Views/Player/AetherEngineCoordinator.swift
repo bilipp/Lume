@@ -499,6 +499,7 @@
                 upscalesLowResolutionVideo: plan.upscalesLowResolutionVideo,
                 audioDelaySeconds: plan.audioDelaySeconds,
                 prepareNativeSubtitles: plan.prepareNativeSubtitles,
+                maxConcurrentSourceRequests: plan.maxConcurrentSourceRequests,
                 writesDisplayCriteria: plan.writesDisplayCriteria,
                 isSecondaryOutput: plan.sharedOutputRole == .secondary
             )
