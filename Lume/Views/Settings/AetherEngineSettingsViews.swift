@@ -215,6 +215,7 @@ import SwiftUI
                     ) { analyzeDuration = PlayerOptionCycle.next(analyzeDuration, in: AetherAnalyzeDuration.self) }
                     (Text("Fast Zap starts live channels sooner, but streams from unsteady servers may rebuffer more often. ")
                         + Text("Native HLS hands HLS streams straight to the system player; the forward buffer and live start settings don't apply to them. ")
+                        + Text("With Native HLS, the TV switches its frame rate only for HDR video. ")
                         + Text("Lower probe sizes and analyze durations start streams faster but can miss audio or subtitle tracks."))
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)

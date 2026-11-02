@@ -105,7 +105,7 @@ struct AetherEngineSettingsTests {
             #expect(plan.upscalesLowResolutionVideo)
             #expect(plan.prepareNativeSubtitles)
             #expect(plan.nativeRemoteHLS)
-            #expect(plan.matchContentEnabled)
+            #expect(plan.writesDisplayCriteria)
             #expect(plan.sharedOutputRole == .primary)
         }
     }
@@ -166,7 +166,7 @@ struct AetherEngineSettingsTests {
             var context = Self.fullScreen
             context.isEmbedded = true
             let plan = AetherLoadPlan.make(options: .load(from: defaults), context: context)
-            #expect(!plan.matchContentEnabled)
+            #expect(!plan.writesDisplayCriteria)
             #expect(plan.sharedOutputRole == .secondary)
         }
     }
@@ -175,11 +175,11 @@ struct AetherEngineSettingsTests {
         withIsolatedDefaults { defaults in
             defaults.set(false, forKey: Keys.matchContentKey)
             let options = AetherEngineOptions.load(from: defaults)
-            #expect(!AetherLoadPlan.make(options: options, context: Self.fullScreen).matchContentEnabled)
+            #expect(!AetherLoadPlan.make(options: options, context: Self.fullScreen).writesDisplayCriteria)
 
             var elsewhere = Self.fullScreen
             elsewhere.honorsMatchContentToggle = false
-            #expect(AetherLoadPlan.make(options: options, context: elsewhere).matchContentEnabled)
+            #expect(AetherLoadPlan.make(options: options, context: elsewhere).writesDisplayCriteria)
         }
     }
 

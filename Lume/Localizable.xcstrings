@@ -2318,45 +2318,9 @@
       "comment" : "An AetherEngine forward-buffer preset, in stream segments.",
       "localizations" : {
         "ar" : {
-          "variations" : {
-            "plural" : {
-              "few" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld مقاطع"
-                }
-              },
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld مقطعًا"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "مقطع واحد"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld مقطع"
-                }
-              },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "مقطعان"
-                }
-              },
-              "zero" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld مقطع"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld مقطع"
           }
         },
         "de" : {
@@ -89844,6 +89808,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "胜 %lld"
+          }
+        }
+      }
+    },
+    "With Native HLS, the TV switches its frame rate only for HDR video. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مع HLS الأصلي، لا يغيّر التلفاز معدل الإطارات إلا لفيديو HDR. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit nativem HLS passt der Fernseher die Bildrate nur bei HDR-Videos an. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With Native HLS, the TV switches its frame rate only for HDR video. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con HLS nativo, el televisor solo cambia la frecuencia de fotogramas con vídeo HDR. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec le HLS natif, le téléviseur n’adapte sa fréquence d’images qu’aux vidéos HDR. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con HLS nativo, il televisore cambia la frequenza dei fotogrammi solo per i video HDR. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネイティブHLSでは、テレビのフレームレートはHDRビデオの場合にのみ切り替わります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네이티브 HLS에서는 TV가 HDR 영상에서만 프레임 레이트를 전환합니다. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com HLS nativo, a TV só muda a taxa de quadros para vídeo HDR. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用原生 HLS 时，电视仅在播放 HDR 视频时切换帧率。"
           }
         }
       }

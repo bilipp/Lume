@@ -16,7 +16,7 @@
     @MainActor
     final class AetherEngineCoordinator: NSObject, ObservableObject {
         @Published private(set) var isPlaying = false
-        @Published private(set) var isBuffering = false
+        @Published var isBuffering = false
         /// Set once the picture is moving; drives the loading indicator and
         /// the startup-failure watchdog.
         @Published private(set) var hasStartedPlayback = false
@@ -94,7 +94,7 @@
         /// native route never reaches readiness without a layer in a window.
         @Published private(set) var session: LumeAetherSession?
         var pictureInPicture: AetherPictureInPictureController?
-        private var currentMedia: PlayableMedia?
+        private(set) var currentMedia: PlayableMedia?
         private var loadTask: Task<Void, Never>?
         /// Bumped by every load and teardown, so a late result from a
         /// superseded load is dropped.
@@ -120,6 +120,14 @@
         /// doesn't report them again. Cleared by `configure`: the host resets
         /// its codecs when it swaps streams.
         private var loggedAudioCodecs: String?
+        /// The viewer paused: the overlay, the remote, Now Playing or leaving
+        /// the app. A pause on live TV nobody asked for is the engine running
+        /// out of buffer; see `AetherEngineCoordinator+LiveRecovery`.
+        var isPauseRequested = false
+        /// The phase last reported by the engine.
+        var lastPhase: LumeAetherPhase = .idle
+        /// Re-asserts play on a live channel the engine paused by itself.
+        var unrequestedPauseRecovery: Task<Void, Never>?
 
         // MARK: Lifecycle
 
@@ -148,12 +156,16 @@
         }
 
         private func start(_ media: PlayableMedia) {
-            // A window that is up survives the reload: the next load replaces
-            // the running one in place, and a native session hands its item
-            // over without closing the window.
-            endLoad(stopsSession: !isPipActive)
+            // The next load replaces the running one in place rather than
+            // after a stop: the TV keeps its display mode across a zap (a stop
+            // returns it to the menu's mode, and the next channel would re-sync
+            // the HDMI link twice), the last picture holds until the next item is
+            // attached, and a Picture in Picture window stays up.
+            endLoad(stopsSession: false)
+            session?.prepareForReplacement()
             currentMedia = media
             reportedFailure = false
+            isPauseRequested = false
             // After `tearDown` (which ends any previous session) so a reload
             // counts as its own startup attempt rather than extending the last.
             PlaybackQoE.shared.beginStartup(engine: .aetherEngine, isLive: media.isLive)
@@ -218,6 +230,8 @@
             startupTask?.cancel()
             loadTask = nil
             startupTask = nil
+            cancelUnrequestedPauseRecovery()
+            lastPhase = .idle
             if stopsSession {
                 session?.stop()
             }
@@ -232,8 +246,11 @@
 
         func togglePlay() {
             if isPlaying {
+                isPauseRequested = true
+                cancelUnrequestedPauseRecovery()
                 session?.pause()
             } else {
+                isPauseRequested = false
                 session?.play()
             }
         }
@@ -319,8 +336,10 @@
             Logger.player.info("AetherEngine phase → \(label, privacy: .public)")
             pictureInPicture?.refresh()
             pictureInPicture?.invalidatePlaybackState()
+            lastPhase = phase
             switch phase {
             case .playing:
+                cancelUnrequestedPauseRecovery()
                 isPlaying = true
                 isBuffering = false
                 PlaybackQoE.shared.noteStallEnded()
@@ -331,6 +350,8 @@
                     PlaybackQoE.shared.noteFirstFrame()
                 }
                 onRecovered?()
+            case .paused where isUnrequestedLivePause:
+                recoverUnrequestedPause()
             case .paused, .idle:
                 resetTransportFlags()
                 PlaybackQoE.shared.noteStallEnded()
@@ -478,7 +499,7 @@
                 upscalesLowResolutionVideo: plan.upscalesLowResolutionVideo,
                 audioDelaySeconds: plan.audioDelaySeconds,
                 prepareNativeSubtitles: plan.prepareNativeSubtitles,
-                matchContentEnabled: plan.matchContentEnabled,
+                writesDisplayCriteria: plan.writesDisplayCriteria,
                 isSecondaryOutput: plan.sharedOutputRole == .secondary
             )
         }

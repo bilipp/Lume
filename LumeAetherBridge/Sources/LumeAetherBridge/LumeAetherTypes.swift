@@ -27,7 +27,12 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
     public var upscalesLowResolutionVideo: Bool
     public var audioDelaySeconds: Double
     public var prepareNativeSubtitles: Bool
-    public var matchContentEnabled: Bool
+    /// The engine writes the display criteria (the TV switches to the
+    /// video's frame rate and dynamic range, where tvOS Match Content
+    /// allows it). False leaves the TV in the output format chosen in
+    /// tvOS Settings: the engine writes nothing and only clears criteria
+    /// it left applied itself.
+    public var writesDisplayCriteria: Bool
     /// A Multiview tile or a guide preview: never writes display criteria and
     /// never owns Now Playing.
     public var isSecondaryOutput: Bool
@@ -53,7 +58,7 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         upscalesLowResolutionVideo: Bool,
         audioDelaySeconds: Double,
         prepareNativeSubtitles: Bool,
-        matchContentEnabled: Bool,
+        writesDisplayCriteria: Bool,
         isSecondaryOutput: Bool
     ) {
         self.url = url
@@ -76,7 +81,7 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         self.upscalesLowResolutionVideo = upscalesLowResolutionVideo
         self.audioDelaySeconds = audioDelaySeconds
         self.prepareNativeSubtitles = prepareNativeSubtitles
-        self.matchContentEnabled = matchContentEnabled
+        self.writesDisplayCriteria = writesDisplayCriteria
         self.isSecondaryOutput = isSecondaryOutput
     }
 }

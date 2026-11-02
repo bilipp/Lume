@@ -280,7 +280,8 @@ nonisolated struct AetherEngineOptions: Equatable {
     /// Milliseconds.
     var audioDelay: Int
     var prepareNativeSubtitles: Bool
-    /// The tvOS-only Match Content toggle.
+    /// The tvOS-only Match Content toggle: whether the engine writes the
+    /// display criteria at all.
     var matchContent: Bool
 
     static func load(from defaults: UserDefaults = .standard) -> AetherEngineOptions {
@@ -362,13 +363,17 @@ nonisolated struct AetherLoadPlan: Equatable {
     var upscalesLowResolutionVideo: Bool
     var audioDelaySeconds: Double
     var prepareNativeSubtitles: Bool
-    var matchContentEnabled: Bool
+    /// The engine owns `preferredDisplayCriteria`. Off, the TV stays in the
+    /// output format chosen in tvOS Settings.
+    var writesDisplayCriteria: Bool
     var sharedOutputRole: OutputRole
 
     static func make(options: AetherEngineOptions, context: AetherLoadContext) -> AetherLoadPlan {
         // Aether's own Match Content toggle decides on tvOS (owner decision);
-        // embedded tiles and previews never apply display criteria.
-        let matchContent = !context.isEmbedded
+        // embedded tiles and previews never apply display criteria. The
+        // engine's `matchContentEnabled` is not the switch: it only mirrors
+        // the system flag, so the toggle hands the criteria to the host.
+        let writesCriteria = !context.isEmbedded
             && (!context.honorsMatchContentToggle || options.matchContent)
         return AetherLoadPlan(
             httpHeaders: context.httpHeaders ?? [:],
@@ -388,7 +393,7 @@ nonisolated struct AetherLoadPlan: Equatable {
             upscalesLowResolutionVideo: options.upscaleLowResolution,
             audioDelaySeconds: Double(options.audioDelay) / 1000,
             prepareNativeSubtitles: options.prepareNativeSubtitles,
-            matchContentEnabled: matchContent,
+            writesDisplayCriteria: writesCriteria,
             sharedOutputRole: context.isEmbedded ? .secondary : .primary
         )
     }

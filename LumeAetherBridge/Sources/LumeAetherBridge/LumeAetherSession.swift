@@ -87,6 +87,15 @@ public final class LumeAetherSession {
         publishSubtitleText(nil)
     }
 
+    /// Readies a running session to be replaced by the next `load`, in
+    /// place of `stop()`. The TV keeps its display mode, so a zap between
+    /// channels of the same format re-syncs nothing, and the outgoing item
+    /// holds its last picture, paused, until the next one is attached.
+    public func prepareForReplacement() {
+        engine.prepareForItemReplacement()
+        publishSubtitleText(nil)
+    }
+
     // MARK: Transport
 
     public func play() {
@@ -374,7 +383,6 @@ public final class LumeAetherSession {
         var options = LoadOptions(
             dolbyVisionHandling: DolbyVisionHandling(rawValue: request.dolbyVisionHandling) ?? .automatic,
             upscalesLowResolutionVideo: request.upscalesLowResolutionVideo,
-            matchContentEnabled: request.matchContentEnabled,
             audioBridgeMode: AudioBridgeMode(rawValue: request.audioBridgeMode) ?? .surroundCompat,
             isLive: request.isLive,
             liveJoinProfile: request.usesFastZapLiveJoin ? .fastZap : .standard,
@@ -392,6 +400,10 @@ public final class LumeAetherSession {
             sharedOutputRole: request.isSecondaryOutput ? .secondary : .primary
         )
         options.httpHeaders = request.httpHeaders
+        // `matchContentEnabled` stays the engine default: it mirrors the
+        // system's own Match Content flag, which the engine reads live. What
+        // decides whether the TV switches is who owns the criteria.
+        options.displayCriteriaOwner = request.writesDisplayCriteria ? .engine : .host
         return options
     }
 }
