@@ -327,7 +327,7 @@ Lume follows a clean, layered SwiftUI architecture:
 | [FFmpegKit](https://github.com/kingslay/FFmpegKit.git) | Media decoding backend for KSPlayer |
 | [VLCKit](https://code.videolan.org/videolan/VLCKit) | VLCKit 4 playback engine |
 | [LumeEngine](https://github.com/bilipp/LumeEngine) | Lume's own FFmpeg 9 engine (beta) — referenced as a local package, see [Build & run](#build--run) |
-| [AetherEngine](https://github.com/superuser404notfound/AetherEngine) | Opt-in FFmpeg playback engine (LGPL v3 + App Store exception), pinned to 7.53.1 behind the in-repo `LumeAetherBridge` package; brings [FFmpegBuild](https://github.com/superuser404notfound/FFmpegBuild) (FFmpeg, LGPL v2.1, dynamically linked) and [libdovi](https://github.com/quietvoid/dovi_tool) (MIT). Not linked on visionOS |
+| [AetherEngine](https://github.com/superuser404notfound/AetherEngine) | Opt-in FFmpeg playback engine (LGPL v3 + App Store exception), pinned to 7.54.0 behind the in-repo `LumeAetherBridge` package; brings [FFmpegBuild](https://github.com/superuser404notfound/FFmpegBuild) (FFmpeg, LGPL v2.1, dynamically linked) and [libdovi](https://github.com/quietvoid/dovi_tool) (MIT). Not linked on visionOS |
 
 ---
 
