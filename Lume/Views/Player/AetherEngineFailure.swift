@@ -41,6 +41,11 @@ nonisolated enum AetherEngineFailure: String, EngineFailurePolicy {
              "hlsPlaylistOnRawLivePath", "noPlayableTrackWithinBudget",
              "masterPlaylistRejected", "nativeItemFailed", "softwarePipelineFailed":
             .unsupported
+        // The origin's certificate isn't trusted (self-signed, private CA,
+        // expired). No retry changes a trust decision; another engine with its
+        // own TLS stack may still connect.
+        case "sourceCertificateRejected":
+            .unsupported
         default:
             .interrupted
         }

@@ -180,3 +180,27 @@ public nonisolated struct LumeAetherVideoInfo: Sendable, Equatable {
     /// session's `pictureInPicture…` members.
     case sampleBuffer(AVSampleBufferDisplayLayer)
 }
+
+/// A bitmap subtitle (PGS, DVB, DVD) showing now, fully rendered with
+/// premultiplied alpha. `position` is normalized to [0, 1] against the
+/// subtitle canvas; `canvasSize` is that canvas in pixels, `.zero` when the
+/// source didn't name one (the canvas is then the video frame).
+public nonisolated struct LumeAetherSubtitleImage: @unchecked Sendable, Equatable, Identifiable {
+    /// Unique per cue within a session.
+    public let id: Int
+    public let image: CGImage
+    public let position: CGRect
+    public let canvasSize: CGSize
+
+    public init(id: Int, image: CGImage, position: CGRect, canvasSize: CGSize) {
+        self.id = id
+        self.image = image
+        self.position = position
+        self.canvasSize = canvasSize
+    }
+
+    /// Cue identity, never the pixels: a cue's image doesn't change.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.position == rhs.position && lhs.canvasSize == rhs.canvasSize
+    }
+}

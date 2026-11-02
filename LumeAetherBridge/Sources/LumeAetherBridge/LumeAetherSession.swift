@@ -31,6 +31,8 @@ public final class LumeAetherSession {
     public var onMediaChange: (() -> Void)?
     /// The text of the subtitle cues showing now, nil when none is.
     public var onSubtitleText: ((String?) -> Void)?
+    /// The bitmap subtitle cues (PGS, DVB, DVD) showing now, empty when none is.
+    public var onSubtitleImages: (([LumeAetherSubtitleImage]) -> Void)?
     /// The route serving the session changed, so `pictureInPictureSource`
     /// may name another layer.
     public var onPictureInPictureSourceChange: (() -> Void)?
@@ -39,9 +41,10 @@ public final class LumeAetherSession {
     private let playerView: AetherPlayerView
     private var cancellables: Set<AnyCancellable> = []
     private var lastSubtitleText: String?
+    private var lastSubtitleImages: [LumeAetherSubtitleImage] = []
     /// The source-time span over which the showing cues stay the same, and
-    /// their text, so a tick inside it skips scanning every cue.
-    private var subtitleCueWindow: (span: Range<Double>, text: String?)?
+    /// those cues, so a tick inside it skips scanning every cue.
+    private var subtitleCueWindow: (span: Range<Double>, cues: ShowingCues)?
     private var isMediaChangePending = false
 
     public init() throws {
@@ -84,7 +87,7 @@ public final class LumeAetherSession {
     /// display criteria). Call it before letting go of the session.
     public func stop() {
         engine.stop()
-        publishSubtitleText(nil)
+        publishSubtitles(.none)
     }
 
     /// Readies a running session to be replaced by the next `load`, in
@@ -93,7 +96,7 @@ public final class LumeAetherSession {
     /// holds its last picture, paused, until the next one is attached.
     public func prepareForReplacement() {
         engine.prepareForItemReplacement()
-        publishSubtitleText(nil)
+        publishSubtitles(.none)
     }
 
     // MARK: Transport
@@ -126,6 +129,17 @@ public final class LumeAetherSession {
 
     public var isLive: Bool {
         engine.isLive
+    }
+
+    /// Resumes a live source the engine gave up on (after `onLiveSourceReset`)
+    /// into the same session, keeping its cache and replay history, where a
+    /// fresh `load` would discard both. True when the session took the
+    /// request or already has one in flight; false when only a fresh load
+    /// can continue (stopped or replaced, a route that can't reopen, a
+    /// changed track layout). The host owns the backoff and the limit.
+    @discardableResult
+    public func retryLiveSourceRecovery() -> Bool {
+        engine.retryLiveSourceRecovery()
     }
 
     /// Startup work finished so far for the current load, 0 before any.
@@ -171,7 +185,7 @@ public final class LumeAetherSession {
             engine.selectSubtitleTrack(index: id)
         } else {
             engine.clearSubtitle()
-            publishSubtitleText(nil)
+            publishSubtitles(.none)
         }
     }
 
@@ -239,7 +253,7 @@ public final class LumeAetherSession {
             .sink { [weak self] current in
                 guard let self else { return }
                 onTime?(current, engine.duration)
-                publishSubtitleText(activeSubtitleText())
+                publishSubtitles(showingSubtitleCues())
             }
             .store(in: &cancellables)
         engine.$playbackPhase
@@ -301,20 +315,36 @@ public final class LumeAetherSession {
         }
     }
 
-    private func activeSubtitleText() -> String? {
-        guard engine.isSubtitleActive else { return nil }
+    /// The cues showing at the presented frame, text and bitmaps apart.
+    private struct ShowingCues {
+        var text: String?
+        var images: [LumeAetherSubtitleImage]
+
+        static let none = ShowingCues(text: nil, images: [])
+    }
+
+    private func showingSubtitleCues() -> ShowingCues {
+        guard engine.isSubtitleActive else { return .none }
         let now = engine.clock.sourceTime
         if let window = subtitleCueWindow, window.span.contains(now) {
-            return window.text
+            return window.cues
         }
         var lower = -Double.infinity
         var upper = Double.infinity
         var lines: [String] = []
+        var images: [LumeAetherSubtitleImage] = []
         for cue in engine.subtitleCues {
             if cue.startTime <= now, now < cue.endTime {
                 lower = max(lower, cue.startTime)
                 upper = min(upper, cue.endTime)
-                if let text = cue.text, !text.isEmpty {
+                if case let .image(bitmap) = cue.body {
+                    images.append(LumeAetherSubtitleImage(
+                        id: cue.id,
+                        image: bitmap.cgImage,
+                        position: bitmap.position,
+                        canvasSize: bitmap.canvasSize
+                    ))
+                } else if let text = cue.text, !text.isEmpty {
                     lines.append(text)
                 }
             } else if cue.endTime <= now {
@@ -323,15 +353,20 @@ public final class LumeAetherSession {
                 upper = min(upper, cue.startTime)
             }
         }
-        let text = lines.isEmpty ? nil : lines.joined(separator: "\n")
-        subtitleCueWindow = lower <= upper ? (lower ..< upper, text) : nil
-        return text
+        let cues = ShowingCues(text: lines.isEmpty ? nil : lines.joined(separator: "\n"), images: images)
+        subtitleCueWindow = lower <= upper ? (lower ..< upper, cues) : nil
+        return cues
     }
 
-    private func publishSubtitleText(_ text: String?) {
-        guard text != lastSubtitleText else { return }
-        lastSubtitleText = text
-        onSubtitleText?(text)
+    private func publishSubtitles(_ cues: ShowingCues) {
+        if cues.text != lastSubtitleText {
+            lastSubtitleText = cues.text
+            onSubtitleText?(cues.text)
+        }
+        if cues.images != lastSubtitleImages {
+            lastSubtitleImages = cues.images
+            onSubtitleImages?(cues.images)
+        }
     }
 
     private func failure(message: String) -> LumeAetherFailure {

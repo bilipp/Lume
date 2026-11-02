@@ -85,7 +85,11 @@ import SwiftUI
                 AetherEngineVideoSurface(videoView: coordinator.videoView)
                     .ignoresSafeArea()
 
-                EngineSubtitleCueOverlay(cues: coordinator.subtitleCues, controlsVisible: isControlsVisible)
+                EngineSubtitleCueOverlay(
+                    cues: coordinator.subtitleCues,
+                    controlsVisible: isControlsVisible,
+                    videoSize: coordinator.videoInfo.map { CGSize(width: $0.width, height: $0.height) }
+                )
 
                 // Catches taps over the engine's view, which would otherwise
                 // swallow them before SwiftUI's gesture sees them.

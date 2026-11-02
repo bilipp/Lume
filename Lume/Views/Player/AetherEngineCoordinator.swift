@@ -128,6 +128,17 @@
         var lastPhase: LumeAetherPhase = .idle
         /// Re-asserts play on a live channel the engine paused by itself.
         var unrequestedPauseRecovery: Task<Void, Never>?
+        /// An in-place retry of a parked live source: its backoff, then the
+        /// check that the picture moves again. See
+        /// `AetherEngineCoordinator+LiveSourceRecovery`.
+        var liveSourceRecovery: Task<Void, Never>?
+        /// The retry was accepted and `liveSourceRecovery` is now only
+        /// watching whether the picture recovers.
+        var liveSourceRecoveryIsChecking = false
+        var liveSourceRecoveryBudget = LiveSourceRecoveryBudget()
+        /// The values registered with the engine's log redaction for the
+        /// current load; see `AetherLogSecrets`. Never logged.
+        private var registeredLogSecrets: Set<String> = []
 
         // MARK: Lifecycle
 
@@ -164,6 +175,7 @@
             endLoad(stopsSession: false)
             session?.prepareForReplacement()
             currentMedia = media
+            registerLogSecrets(for: media)
             reportedFailure = false
             isPauseRequested = false
             // After `tearDown` (which ends any previous session) so a reload
@@ -221,6 +233,29 @@
         func tearDown() {
             pictureInPicture?.stop()
             endLoad(stopsSession: true)
+            releaseLogSecrets()
+        }
+
+        /// Registers the load's credentials before the engine sees its URL,
+        /// and releases the previous load's after, so a value both share
+        /// stays redacted throughout. Registrations are counted engine-wide,
+        /// so every one is paired with a release.
+        private func registerLogSecrets(for media: PlayableMedia) {
+            let secrets = AetherLogSecrets.values(url: media.url, httpHeaders: media.httpHeaders)
+            for secret in secrets.subtracting(registeredLogSecrets) {
+                LumeAetherBridge.registerLogSecret(secret)
+            }
+            for secret in registeredLogSecrets.subtracting(secrets) {
+                LumeAetherBridge.unregisterLogSecret(secret)
+            }
+            registeredLogSecrets = secrets
+        }
+
+        private func releaseLogSecrets() {
+            for secret in registeredLogSecrets {
+                LumeAetherBridge.unregisterLogSecret(secret)
+            }
+            registeredLogSecrets = []
         }
 
         private func endLoad(stopsSession: Bool) {
@@ -231,6 +266,7 @@
             loadTask = nil
             startupTask = nil
             cancelUnrequestedPauseRecovery()
+            cancelLiveSourceRecovery()
             lastPhase = .idle
             if stopsSession {
                 session?.stop()
@@ -238,7 +274,7 @@
             isPlaying = false
             isBuffering = false
             hasStartedPlayback = false
-            subtitleCues.update(nil)
+            subtitleCues.clear()
             externalSubtitleTrackID = nil
         }
 
@@ -282,7 +318,7 @@
             isExternalSubtitleSelected = index != nil && index == externalSubtitleTrackID
             session?.selectSubtitleTrack(id: index)
             if index == nil {
-                subtitleCues.update(nil)
+                subtitleCues.clear()
             }
         }
 
@@ -304,8 +340,7 @@
                 self?.engineFailed(failure)
             }
             session.onLiveSourceReset = { [weak self] in
-                Logger.player.warning("AetherEngine live source reset → retune")
-                self?.streamFailed(.sourceEnded)
+                self?.liveSourceDidReset()
             }
             session.onAudioDropped = { [weak self] in
                 Logger.player.error("AetherEngine dropped the audio: no pipeline for the source's audio")
@@ -316,6 +351,11 @@
             }
             session.onSubtitleText = { [weak self] text in
                 self?.subtitleCues.update(text)
+            }
+            session.onSubtitleImages = { [weak self] images in
+                self?.subtitleCues.updateBitmaps(images.map {
+                    SubtitleBitmap(id: $0.id, image: $0.image, position: $0.position, canvasSize: $0.canvasSize)
+                })
             }
             self.session = session
             return session
@@ -465,7 +505,7 @@
         func loadExternalSubtitle(_ subtitle: ExternalSubtitle) {
             externalSubtitle = subtitle
             isExternalSubtitleSelected = true
-            subtitleCues.update(nil)
+            subtitleCues.clear()
             guard let session else { return }
             restoreExternalSubtitle(on: session)
             publishMedia()

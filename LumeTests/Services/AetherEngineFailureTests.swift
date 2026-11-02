@@ -23,8 +23,13 @@ struct AetherEngineFailureTests {
         }
     }
 
+    @Test func `an untrusted certificate is not retried on the same engine`() {
+        #expect(AetherEngineFailure.classify(kind: "sourceCertificateRejected", code: -1202) == .unsupported)
+        #expect(AetherEngineFailure.classify(kind: "sourceCertificateRejected", code: nil) == .unsupported)
+    }
+
     @Test func `source loss and unknown kinds reconnect on the normal schedule`() {
-        for kind in ["liveSourceUnavailable", "sourceOpenFailed", "vodSourceFailed", "storageExhausted", "", "someFutureKind"] {
+        for kind in ["liveSourceUnavailable", "sourceOpenFailed", "vodSourceFailed", "storageExhausted", "customSourceProbeFailed", "reloadFailed", "audioTrackSwitchFailed", "", "someFutureKind"] {
             #expect(AetherEngineFailure.classify(kind: kind, code: 500) == .interrupted)
         }
     }
