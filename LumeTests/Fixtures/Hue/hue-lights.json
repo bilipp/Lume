@@ -1,0 +1,33 @@
+{
+  "errors": [],
+  "data": [
+    {
+      "id": "6a1f0c2d-0000-4000-8000-000000000001",
+      "type": "light",
+      "metadata": { "name": "Lightstrip", "archetype": "hue_lightstrip_tv" },
+      "on": { "on": true },
+      "dimming": { "brightness": 62.5, "min_dim_level": 0.2 },
+      "color_temperature": { "mirek": null, "mirek_valid": false, "mirek_schema": { "mirek_minimum": 153, "mirek_maximum": 500 } },
+      "color": {
+        "xy": { "x": 0.4573, "y": 0.41 },
+        "gamut": {
+          "red": { "x": 0.6915, "y": 0.3083 },
+          "green": { "x": 0.17, "y": 0.7 },
+          "blue": { "x": 0.1532, "y": 0.0475 }
+        },
+        "gamut_type": "C"
+      },
+      "mode": "normal"
+    },
+    {
+      "id": "6a1f0c2d-0000-4000-8000-000000000002",
+      "type": "light",
+      "metadata": { "name": "Play", "archetype": "hue_play" },
+      "on": { "on": false },
+      "dimming": { "brightness": 100.0 },
+      "color_temperature": { "mirek": 366, "mirek_valid": true },
+      "color": { "xy": { "x": 0.4573, "y": 0.41 }, "gamut_type": "C" },
+      "mode": "normal"
+    }
+  ]
+}

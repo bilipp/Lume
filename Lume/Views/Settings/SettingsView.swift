@@ -117,6 +117,8 @@ struct SettingsView: View {
         /// Whether the Player category is drilled into Subtitle Style in place.
         /// Not `private`: set by the SettingsView+TVPlayer extension (separate file).
         @State var showingSubtitleStyle = false
+        /// Whether the Player category is drilled into Philips Hue in place.
+        @State var showingHue = false
         /// Whether the Live TV category is drilled into the Recording Server
         /// pane, in place (same reasoning as `selectedPlaylist`).
         @State private var showingRecordingServer = false
@@ -350,6 +352,7 @@ struct SettingsView: View {
             showingEngines = false
             showingOpenSubtitles = false
             showingSubtitleStyle = false
+            showingHue = false
             showingRecordingServer = false
             recordingServerRoute = nil
             syncRoute = nil
@@ -525,7 +528,9 @@ struct SettingsView: View {
                     case .sports:
                         TVSportsSettingsPane()
                     case .player:
-                        if showingOpenSubtitles {
+                        if showingHue {
+                            TVHueSettingsPane { presentPaywall($0) }
+                        } else if showingOpenSubtitles {
                             TVOpenSubtitlesIntegrationView()
                         } else if showingSubtitleStyle {
                             TVSubtitleStyleSettingsView()
@@ -577,7 +582,7 @@ struct SettingsView: View {
         case contentManagement
         case recordingServer
         case audioLanguages, addLanguage
-        case subtitleStyle, openSubtitles
+        case subtitleStyle, openSubtitles, philipsHue
         case engines
         case engineOptions(PlayerEngineKind)
         case syncBackend(SyncBackendSelection)

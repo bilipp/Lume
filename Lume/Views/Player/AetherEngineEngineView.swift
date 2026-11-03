@@ -141,6 +141,7 @@ import SwiftUI
             }
             .preferredColorScheme(.dark)
             .nowPlayingTransport(coordinator, advance: onRemoteAdvance)
+            .hueFrameSource(coordinator, isPictureInPicture: coordinator.isPipActive)
             .onAppear {
                 wireCoordinator()
                 coordinator.startupTimeout = usesQuickStartupTimeout

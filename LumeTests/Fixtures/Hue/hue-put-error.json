@@ -1,0 +1,6 @@
+{
+  "errors": [
+    { "description": "device (light) is \"soft off\", command (.on) may not have effect" }
+  ],
+  "data": []
+}

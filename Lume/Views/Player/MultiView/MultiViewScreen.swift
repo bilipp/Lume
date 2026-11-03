@@ -206,6 +206,7 @@ struct MultiViewScreen: View {
         #endif
             .persistentSystemOverlays(.hidden)
             .preferredColorScheme(.dark)
+            .multiViewHueSync(audioSlotID: session.audioSlotID)
             .task {
                 // The tiles' QoE reports would be nonsense against a summary that
                 // models one stream at a time, and background indexing merges
@@ -401,6 +402,7 @@ struct MultiViewScreen: View {
             },
             onRemove: { session.setMedia(nil, in: slot.id) }
         )
+        .multiViewHueSlot(slot.id)
     }
 
     /// Whether selecting the tile at `index` should swap it onto the stage: only

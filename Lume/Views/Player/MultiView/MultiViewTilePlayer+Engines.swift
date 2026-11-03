@@ -60,6 +60,7 @@ struct MultiViewKSTile: View {
                 reconnector.cancel()
             }
             .previewHandoff(role, media: sourceMedia, resolved: media, coordinator: .ks(coordinator))
+            .hueFrameSource(coordinator, role: role)
             .onChange(of: isMuted) { _, muted in
                 guard role.ownsSession else { return }
                 coordinator.isMuted = muted

@@ -147,7 +147,7 @@
                 // Moving between controls counts as activity — keep them up.
                 onResetHideTimer()
                 // A menu takes focus along; hold the chrome until it comes back.
-                if new == nil, let old, [TVPlayerFocus.audio, .subtitles, .quality].contains(old) { PlayerControlsAutoHide.menuOpened() }
+                if new == nil, let old, [TVPlayerFocus.audio, .subtitles, .quality, .hue].contains(old) { PlayerControlsAutoHide.menuOpened() }
             }
         }
 
@@ -372,7 +372,7 @@
             .disabled(!enabled)
         }
 
-        // MARK: - Trailing controls (audio / subtitles / sources / quality / favorite / record)
+        // MARK: - Trailing controls (audio / subtitles / sources / quality / hue / favorite / record)
 
         private var trailingControls: some View {
             HStack(spacing: 16) {
@@ -380,6 +380,7 @@
                 subtitleMenu
                 sourcesButton
                 qualityButton
+                hueButton
                 if PlayerFavorites.supportsFavorites(media.contentRef) {
                     favoriteButton
                 }
@@ -387,17 +388,7 @@
             }
             .tvPlayerRecordFocusHandoff(media: media, focus: $focus)
             .tvPlayerQualityFocusHandoff(media: media, focus: $focus)
-        }
-
-        /// Icon-only heart in the track menus' glass circle; needs no tracks.
-        private var favoriteButton: some View {
-            Button(action: toggleFavorite) {
-                Image(systemName: isFavorite ? "heart.fill" : "heart")
-                    .symbolReplaceTransition(value: isFavorite)
-            }
-            .buttonStyle(TVPlayerCircleButtonStyle())
-            .focused($focus, equals: .favorite)
-            .accessibilityLabel(isFavorite ? "In Favorites" : "Favorite")
+            .tvPlayerHueMenu(media: media, focus: $focus)
         }
 
         @ViewBuilder

@@ -1,0 +1,32 @@
+{
+  "errors": [],
+  "data": [
+    {
+      "id": "0e6b1c4e-0000-4000-8000-000000000001",
+      "type": "entertainment",
+      "owner": { "rid": "9b3d0000-0000-4000-8000-000000000001", "rtype": "device" },
+      "renderer": true,
+      "renderer_reference": { "rid": "6a1f0c2d-0000-4000-8000-000000000001", "rtype": "light" },
+      "proxy": true,
+      "equalizer": true,
+      "max_streams": 1
+    },
+    {
+      "id": "0e6b1c4e-0000-4000-8000-000000000002",
+      "type": "entertainment",
+      "owner": { "rid": "9b3d0000-0000-4000-8000-000000000002", "rtype": "device" },
+      "renderer": true,
+      "renderer_reference": { "rid": "6a1f0c2d-0000-4000-8000-000000000002", "rtype": "light" },
+      "proxy": false,
+      "equalizer": true
+    },
+    {
+      "id": "0e6b1c4e-0000-4000-8000-0000000000f0",
+      "type": "entertainment",
+      "owner": { "rid": "9b3d0000-0000-4000-8000-0000000000f0", "rtype": "device" },
+      "renderer": false,
+      "proxy": true,
+      "equalizer": false
+    }
+  ]
+}

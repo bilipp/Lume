@@ -43,6 +43,15 @@ final nonisolated class PerfLumeCloudFeed: LumeCloudSyncing {
         AsyncThrowingStream { $0.finish() }
     }
 
+    func account() async throws -> AccountInfo {
+        state.withLock { state in
+            AccountInfo(
+                accountId: "acct-perf", createdAt: 1_800_000_000_000, usedBytes: 0,
+                recordCount: state.records.count, nextSeq: state.lastSeq + 1
+            )
+        }
+    }
+
     func push(_ records: [PushRecord]) async throws -> PushResponse {
         state.withLock { state in
             state.pushRequests += 1

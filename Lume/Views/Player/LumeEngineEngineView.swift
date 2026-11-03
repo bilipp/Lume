@@ -192,6 +192,7 @@ struct LumeEngineEngineView: View {
             coordinator.loadExternalSubtitle(subtitle)
         }
         .preferredColorScheme(.dark)
+        .hueFrameSource(coordinator, isPictureInPicture: coordinator.isPipActive)
         .onAppear {
             wireCoordinator()
             coordinator.startupTimeout = usesQuickStartupTimeout ? 15 : 40

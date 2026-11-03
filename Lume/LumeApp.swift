@@ -418,6 +418,14 @@ struct LumeApp: App {
                     // without sending the viewer to Settings first.
                     OpenSubtitlesService.shared.restore()
 
+                    // Lamps a crash left in Hue stream colours. Never under tests
+                    // or previews, which must not reach a real bridge.
+                    #if os(tvOS)
+                        if !Self.isTestOrPreviewHost {
+                            HueSyncController.shared.restoreLeftoverSnapshot()
+                        }
+                    #endif
+
                     // A Mac rarely reaches `.background`, so also trim at launch.
                     ImageDiskCache.shared.trimInBackground()
 
@@ -494,6 +502,9 @@ struct LumeApp: App {
                     if phase == .background {
                         exportWidgetSnapshot()
                     }
+                    #if os(tvOS)
+                        if phase == .background { HueSyncController.shared.suspend() }
+                    #endif
                 }
                 .appAppearance(AppAppearance.resolve(appearanceRaw))
         }

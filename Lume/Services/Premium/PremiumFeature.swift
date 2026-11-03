@@ -22,21 +22,22 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
     case sportsHub
     case recordingServer
     case chromecast
+    case hueSync
 
     var id: String {
         rawValue
     }
 
-    /// The features this platform offers. Guide Preview only exists in the
-    /// tvOS Guide and Chromecast only on iPhone and iPad, so other platforms
-    /// never advertise them.
+    /// The features this platform offers. Guide Preview and Hue Sync only
+    /// exist on Apple TV and Chromecast only on iPhone and iPad, so other
+    /// platforms never advertise them.
     static var available: [PremiumFeature] {
         allCases.filter(\.isOnThisPlatform)
     }
 
     private var isOnThisPlatform: Bool {
         switch self {
-        case .guidePreview: Self.isTV
+        case .guidePreview, .hueSync: Self.isTV
         case .chromecast: Self.isIOS
         default: true
         }
@@ -72,6 +73,12 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
                 defaultValue: "Chromecast",
                 comment: "Lume Pro feature title: send playback to a Chromecast."
             )
+        case .hueSync:
+            LocalizedStringResource(
+                "premium.hueSync.title",
+                defaultValue: "Philips Hue Sync",
+                comment: "Lume Pro feature title: Philips Hue lights follow the picture on Apple TV."
+            )
         }
     }
 
@@ -93,6 +100,12 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
                 defaultValue: "Send live TV, movies and episodes from your iPhone or iPad to a Chromecast and control them from Lume.",
                 comment: "Lume Pro feature description: casting from iPhone or iPad to a Chromecast on the same network."
             )
+        case .hueSync:
+            LocalizedStringResource(
+                "premium.hueSync.subtitle",
+                defaultValue: "Let the lamps of a Philips Hue entertainment area follow the colours of what you watch on Apple TV.",
+                comment: "Lume Pro feature description: Hue lights synced to the picture during playback on Apple TV."
+            )
         }
     }
 
@@ -109,6 +122,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable {
         case .sportsHub: "sportscourt"
         case .recordingServer: "record.circle"
         case .chromecast: "tv.badge.wifi"
+        case .hueSync: "lightbulb.2"
         }
     }
 }
