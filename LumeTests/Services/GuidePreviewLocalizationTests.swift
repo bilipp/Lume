@@ -45,6 +45,7 @@ struct GuidePreviewLocalizationTests {
 
     @Test func `paywalls outside tvOS never advertise the Guide preview`() {
         #expect(!PremiumFeature.available.contains(.guidePreview))
-        #expect(PremiumFeature.available.count == PremiumFeature.allCases.count - 1)
+        #expect(!PremiumFeature.available.contains(.hueSync))
+        #expect(PremiumFeature.available.count == PremiumFeature.allCases.count - 2)
     }
 }

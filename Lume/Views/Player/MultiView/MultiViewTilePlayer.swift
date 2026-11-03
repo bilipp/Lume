@@ -213,7 +213,7 @@ struct MultiViewTilePlayer: View {
                 sourceMedia: self.media,
                 coordinator: LumeEngineCoordinator(),
                 previewCoordinator: { .lume($0) },
-                surface: { LumeEngineVideoSurface(coordinator: $0) }
+                surface: { LumeEngineVideoSurface(coordinator: $0).hueFrameSource($0, role: role) }
             )
         case .aetherEngine:
             aetherTile(for: media)
@@ -236,7 +236,7 @@ struct MultiViewTilePlayer: View {
                 sourceMedia: self.media,
                 coordinator: AetherEngineCoordinator(),
                 previewCoordinator: { .aether($0) },
-                surface: { AetherEngineVideoSurface(videoView: $0.videoView) }
+                surface: { AetherEngineVideoSurface(videoView: $0.videoView).hueFrameSource($0, role: role) }
             )
         #endif
     }

@@ -30,6 +30,7 @@
         case subtitles
         case sources
         case quality
+        case hue
         case favorite
         case record
         case panelClose

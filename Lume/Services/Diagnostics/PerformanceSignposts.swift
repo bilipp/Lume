@@ -140,6 +140,16 @@ nonisolated extension PerfSignpost {
     static let castSessionStart = PerfSignpost("CastSessionStart")
     /// Load sent → receiver accepted or rejected the media.
     static let castMediaLoad = PerfSignpost("CastMediaLoad")
+
+    // Hue
+
+    /// One decoded frame scaled down to the sampling grid. Absent for engines
+    /// that hand out a grid of their own.
+    static let hueDownscale = PerfSignpost("HueDownscale")
+    /// Grid → channel colours: region averages, smoothing and intensity.
+    static let hueMap = PerfSignpost("HueMap")
+    /// Channel colours → one stream packet.
+    static let hueEncode = PerfSignpost("HueEncode")
 }
 
 // MARK: - Interval handle

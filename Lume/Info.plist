@@ -54,6 +54,7 @@
 		<string>_lume-recorder._tcp</string>
 		<string>_googlecast._tcp</string>
 		<string>_CC1AD845._googlecast._tcp</string>
+		<string>_hue._tcp</string>
 	</array>
 	<key>TMDBAccessToken</key>
 	<string></string>

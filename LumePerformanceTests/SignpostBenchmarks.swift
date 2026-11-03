@@ -185,7 +185,8 @@ final class SignpostBenchmarks: XCTestCase {
             .homeTrendingLoad, .homeRecommendations,
             .sportsChannelResolve, .sportsFixtureRefresh,
             .lumeCloudPull, .lumeCloudPush, .lumeCloudMerge,
-            .playerStartup, .playerRebuffer, .playerEngineFallback, .playerStartupFailure
+            .playerStartup, .playerRebuffer, .playerEngineFallback, .playerStartupFailure,
+            .hueDownscale, .hueMap, .hueEncode
         ]
         let names = all.map(\.metricName)
         XCTAssertEqual(

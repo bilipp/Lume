@@ -167,6 +167,7 @@ struct AVPlayerEngineView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .hueFrameSource(coordinator)
         .onAppear {
             coordinator.onTime = { current in
                 if !isSeeking, current.isFinite { clock.current = current }

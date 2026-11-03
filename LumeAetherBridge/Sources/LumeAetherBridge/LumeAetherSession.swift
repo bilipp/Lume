@@ -246,6 +246,44 @@ public final class LumeAetherSession {
         engine.softwarePiPSource?.skip(by: seconds)
     }
 
+    #if !os(visionOS)
+
+        // MARK: Frame sampling
+
+        /// The native path's player, for a host that reads the picture from
+        /// it (ambient lighting); nil while nothing plays or another path
+        /// serves the picture.
+        public var nativePlayer: AVPlayer? {
+            Self.isNative(engine.videoRoute) ? engine.nativePlayerLayer?.player : nil
+        }
+
+        /// False only while the audio-only path plays: there is no picture.
+        public var isSampleable: Bool {
+            engine.videoRoute != .audio
+        }
+
+        /// The picture the software path shows now (interlaced live channels,
+        /// VP9, AV1 without a hardware decoder), read back from its
+        /// sample-buffer layer; nil on every other path or before the first
+        /// frame. A full-size frame in the decoder's own format.
+        public func displayedSoftwareFrame() -> CVPixelBuffer? {
+            guard engine.videoRoute == .software else { return nil }
+            #if canImport(UIKit)
+                let sublayers = playerView.layer.sublayers
+            #else
+                let sublayers = playerView.layer?.sublayers
+            #endif
+            guard let layer = sublayers?.lazy.compactMap({ $0 as? AVSampleBufferDisplayLayer }).first else {
+                return nil
+            }
+            return layer.sampleBufferRenderer.displayedPixelBuffer()
+        }
+
+        private static func isNative(_ route: VideoRoute) -> Bool {
+            route == .loopback || route == .remoteBypass
+        }
+    #endif
+
     // MARK: Internals
 
     private func observe() {

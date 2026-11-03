@@ -323,9 +323,20 @@
             }
         }
 
+        /// Icon-only heart in the track menus' glass circle; needs no tracks.
+        var favoriteButton: some View {
+            Button(action: toggleFavorite) {
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .symbolReplaceTransition(value: isFavorite)
+            }
+            .buttonStyle(TVPlayerCircleButtonStyle())
+            .focused($focus, equals: .favorite)
+            .accessibilityLabel(isFavorite ? "In Favorites" : "Favorite")
+        }
+
         /// Drives the heart control in the trailing track-menu group (see
-        /// `TVPlayerControlsOverlay.favoriteButton`). Reads the resolved
-        /// `@Observable` model so toggling re-renders the glyph.
+        /// `favoriteButton`). Reads the resolved `@Observable` model so
+        /// toggling re-renders the glyph.
         var isFavorite: Bool {
             if isSeries { return episode?.series?.isFavorite ?? false }
             if media.isLive { return liveStream?.isFavorite ?? false }

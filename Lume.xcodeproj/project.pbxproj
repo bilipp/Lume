@@ -124,6 +124,13 @@
 			);
 			target = C6BD5701000000000000E001 /* LumeTopShelf */;
 		};
+		C6E0F1A52FE0000000000001 /* Exceptions for "LumeTests" folder in "LumeTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Fixtures/Hue/README.md,
+			);
+			target = C67C02D02F880F2400842DBA /* LumeTests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -137,6 +144,9 @@
 		};
 		C67C02D42F880F2400842DBA /* LumeTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C6E0F1A52FE0000000000001 /* Exceptions for "LumeTests" folder in "LumeTests" target */,
+			);
 			path = LumeTests;
 			sourceTree = "<group>";
 		};
@@ -671,7 +681,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs, Cast devices and Philips Hue Bridges, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -733,7 +743,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs, Cast devices and Philips Hue Bridges, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1068,7 +1078,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs, Cast devices and Philips Hue Bridges, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1557,7 +1567,7 @@
 				INFOPLIST_FILE = Lume/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs and Cast devices, and to reach media servers, WebDAV shares and recording servers running on it.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to find TVs, Cast devices and Philips Hue Bridges, and to reach media servers, WebDAV shares and recording servers running on it.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;

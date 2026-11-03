@@ -1,0 +1,75 @@
+{
+  "errors": [],
+  "data": [
+    {
+      "id": "8d199a37-5ce4-4aae-a60e-db5d0aa27df3",
+      "id_v1": "/groups/200",
+      "type": "entertainment_configuration",
+      "metadata": { "name": "TV" },
+      "name": "TV",
+      "configuration_type": "screen",
+      "status": "inactive",
+      "stream_proxy": {
+        "mode": "auto",
+        "node": { "rid": "0e6b1c4e-0000-4000-8000-000000000001", "rtype": "entertainment" }
+      },
+      "channels": [
+        {
+          "channel_id": 0,
+          "position": { "x": 0.47, "y": 1.0, "z": -1.0 },
+          "members": [
+            { "service": { "rid": "0e6b1c4e-0000-4000-8000-000000000001", "rtype": "entertainment" }, "index": 0 }
+          ]
+        },
+        {
+          "channel_id": 1,
+          "position": { "x": -0.11, "y": 0.04, "z": 1.0 },
+          "members": [
+            { "service": { "rid": "0e6b1c4e-0000-4000-8000-000000000002", "rtype": "entertainment" }, "index": 0 }
+          ]
+        }
+      ],
+      "locations": {
+        "service_locations": [
+          {
+            "service": { "rid": "0e6b1c4e-0000-4000-8000-000000000001", "rtype": "entertainment" },
+            "position": { "x": 0.47, "y": 1.0, "z": -1.0 },
+            "positions": [{ "x": 0.47, "y": 1.0, "z": -1.0 }],
+            "equalization_factor": 1.0
+          },
+          {
+            "service": { "rid": "0e6b1c4e-0000-4000-8000-000000000002", "rtype": "entertainment" },
+            "position": { "x": -0.11, "y": 0.04, "z": 1.0 },
+            "positions": [{ "x": -0.11, "y": 0.04, "z": 1.0 }],
+            "equalization_factor": 1.0
+          }
+        ]
+      },
+      "light_services": [
+        { "rid": "6a1f0c2d-0000-4000-8000-000000000001", "rtype": "light" },
+        { "rid": "6a1f0c2d-0000-4000-8000-000000000002", "rtype": "light" }
+      ]
+    },
+    {
+      "id": "3c0e7a51-0000-4000-8000-0000000000b1",
+      "id_v1": "/groups/201",
+      "type": "entertainment_configuration",
+      "metadata": { "name": "Bildschirm" },
+      "name": "Bildschirm",
+      "configuration_type": "monitor",
+      "status": "inactive",
+      "channels": [
+        {
+          "channel_id": 0,
+          "position": { "x": 0.0, "y": 0.8, "z": 0.0 },
+          "members": [
+            { "service": { "rid": "0e6b1c4e-0000-4000-8000-000000000003", "rtype": "entertainment" }, "index": 0 }
+          ]
+        }
+      ],
+      "light_services": [
+        { "rid": "6a1f0c2d-0000-4000-8000-000000000003", "rtype": "light" }
+      ]
+    }
+  ]
+}
