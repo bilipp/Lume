@@ -42,6 +42,9 @@ nonisolated struct CloudSyncReconcileResult: Equatable {
     /// lost or recreated `default.store`): the stale shadow was dropped so this
     /// pass pulls the surviving cloud records back instead of pushing deletions.
     var recoveredFromEmptyLocalStore = false
+    /// Set when the mirror came up without records the shadow had baselined:
+    /// the stale shadow was dropped so this pass merged without deletions.
+    var recoveredFromLostMirror = false
 }
 
 /// A local catalog item paired with its current syncable state, gathered up-front
@@ -153,6 +156,8 @@ actor CloudSyncEngine {
             shadow.reset()
             result.recoveredFromEmptyLocalStore = true
         }
+        // The mirror can lose records too; see `CloudSyncEngine+Integrity`.
+        result.recoveredFromLostMirror = recoverFromLostMirror()
         do {
             // Collapse any duplicate default profile a freshly-synced device
             // imported before its own bootstrap-created one could converge.

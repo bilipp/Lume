@@ -194,7 +194,7 @@ extension CloudSyncParentalEngineTests {
         #expect(iCloudReloaded.parentalPINShadow() != nil)
     }
 
-    @Test func `without resetAll a stale baseline against an empty mirror deletes local data`() async throws {
+    @Test func `without resetAll the mirror guard keeps a stale baseline from deleting local data`() async throws {
         let defaults = LumeCloudBackendFixture.makeDefaults()
         let preferences = LumeCloudBackendFixture.makeDefaults()
         defer { ParentalControlsStore.clear() }
@@ -203,14 +203,18 @@ extension CloudSyncParentalEngineTests {
 
         let stale = try await staleLumeCloudShadow(catalog: catalog, defaults: defaults, preferences: preferences)
         let mirror = try LumeApp.makeLumeCloudContainer(isStoredInMemoryOnly: true)
-        _ = await CloudSyncEngine(
+        let result = await CloudSyncEngine(
             catalogContainer: catalog, cloudContainer: mirror, shadow: stale, preferences: preferences
         ).reconcile()
 
-        // The failure `resetAll()` exists to prevent: every item reads as
-        // deleted on the other side and is removed locally.
-        #expect(try ModelContext(catalog).fetch(FetchDescriptor<Playlist>()).isEmpty)
-        #expect(!ParentalControlsStore.isSet)
-        #expect(LiveTVRailSettings.storedValues(in: preferences) == nil)
+        // What `resetAll()` exists to prevent: every item reading as deleted on
+        // the other side. A stale baseline against an empty mirror is also the
+        // signature of a mirror that lost its records, so the reconcile's own
+        // mirror guard drops the baseline and merges — the second line of
+        // defence when a switch skipped the reset.
+        #expect(result.recoveredFromLostMirror)
+        #expect(try ModelContext(catalog).fetch(FetchDescriptor<Playlist>()).count == 1)
+        #expect(ParentalControlsStore.isSet)
+        #expect(LiveTVRailSettings.storedValues(in: preferences) == Self.hiddenRails)
     }
 }
