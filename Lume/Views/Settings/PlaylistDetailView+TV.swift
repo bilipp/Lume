@@ -26,6 +26,7 @@ import SwiftUI
                 tvServerSection
                 tvAccountSection
                 tvStreamFormatSection
+                tvContentSection
                 tvSyncSection
                 tvActionsSection
             }

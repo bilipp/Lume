@@ -78,9 +78,9 @@ struct MainTabView: View {
         playlists.active(for: selectedPlaylistID).showsTab(tab)
     }
 
-    /// The tabs the active playlist hides, as a value `onChange` can watch.
+    /// The tabs the active playlist hides and the content it doesn't fetch, as one value `onChange` can watch.
     private var hiddenTabsRaw: String {
-        playlists.active(for: selectedPlaylistID)?.hiddenTabsRaw ?? ""
+        playlists.active(for: selectedPlaylistID).map { $0.hiddenTabsRaw + "|" + $0.disabledContentRaw } ?? ""
     }
 
     /// UI tests seed a fake playlist; auto-sync would present a blocking cover

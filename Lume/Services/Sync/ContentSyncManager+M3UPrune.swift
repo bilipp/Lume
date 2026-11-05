@@ -27,24 +27,36 @@ extension ContentSyncManager {
     /// this import is measured at.
     func pruneStaleM3URows(playlistId: UUID, state: M3UImportState) {
         let imported = state.totalImported
-        Perf.measure(.m3uPruneLive) {
-            pruneLiveStreams(playlistId: playlistId, seenHashes: state.seenLiveIds, importedCount: imported)
+        // A kind the playlist doesn't fetch has an empty seen set by design,
+        // which the coverage gate would read as a truncated payload and count
+        // as a skip — holding the file's fingerprint back forever.
+        // `removeDisabledContent` clears those rows instead.
+        let disabled = state.disabledContent
+        if !disabled.contains(.liveTV) {
+            Perf.measure(.m3uPruneLive) {
+                pruneLiveStreams(playlistId: playlistId, seenHashes: state.seenLiveIds, importedCount: imported)
+            }
         }
         state.seenLiveIds = []
-        Perf.measure(.m3uPruneMovies) {
-            pruneMovies(playlistId: playlistId, seenHashes: state.seenMovieIds, importedCount: imported)
+        if !disabled.contains(.movies) {
+            Perf.measure(.m3uPruneMovies) {
+                pruneMovies(playlistId: playlistId, seenHashes: state.seenMovieIds, importedCount: imported)
+            }
         }
         state.seenMovieIds = []
-        Perf.measure(.m3uPruneEpisodes) {
-            pruneEpisodes(playlistId: playlistId, seenHashes: state.seenEpisodeIds, importedCount: imported)
+        if !disabled.contains(.series) {
+            Perf.measure(.m3uPruneEpisodes) {
+                pruneEpisodes(playlistId: playlistId, seenHashes: state.seenEpisodeIds, importedCount: imported)
+            }
+            state.seenEpisodeIds = []
+            Perf.measure(.m3uPruneSeries) {
+                pruneSeries(playlistId: playlistId, seenHashes: state.seenSeriesIds, importedCount: imported)
+            }
         }
         state.seenEpisodeIds = []
-        Perf.measure(.m3uPruneSeries) {
-            pruneSeries(playlistId: playlistId, seenHashes: state.seenSeriesIds, importedCount: imported)
-        }
         state.seenSeriesIds = []
         Perf.measure(.m3uPruneCategories) {
-            for type in CategoryType.allCases {
+            for type in CategoryType.allCases where !disabled.contains(where: { $0.categoryType == type }) {
                 let typePrefix = "\(type.rawValue)|"
                 let seenApiIds = Set(
                     state.seenCategoryKeys

@@ -2,9 +2,9 @@ import SwiftData
 import SwiftUI
 
 struct PlaylistDetailView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
+    @Environment(CloudSyncCoordinator.self) var cloudSync: CloudSyncCoordinator?
     @Bindable var playlist: Playlist
     /// Held here rather than read inside `playlist.syncState` so changing the
     /// frequency in Settings re-renders the Status row (it decides `.overdue`).
@@ -152,6 +152,8 @@ struct PlaylistDetailView: View {
                 if playlist.supportsStreamFormatChoice {
                     streamFormatSection
                 }
+
+                contentSection
 
                 syncSection
 

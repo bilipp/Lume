@@ -276,6 +276,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
             "epgURL": Codec.wire(epgURL),
             "syncEnabled": .bool(syncEnabled),
             "hiddenTabsRaw": .string(hiddenTabsRaw),
+            "disabledContentRaw": .string(disabledContentRaw),
             "updatedAt": Codec.wire(updatedAt)
         ]
     }
@@ -295,6 +296,9 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
         let epgURL = try fields.optionalString("epgURL")
         let syncEnabled = try fields.bool("syncEnabled")
         let hiddenTabsRaw = try fields.string("hiddenTabsRaw")
+        // Added after the first Lume Cloud release: a record an older client
+        // wrote has no such field and still means "fetch everything".
+        let disabledContentRaw = try fields.optionalString("disabledContentRaw") ?? ""
         let updatedAt = try fields.date("updatedAt")
 
         self.id = id
@@ -307,6 +311,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled
         self.hiddenTabsRaw = hiddenTabsRaw
+        self.disabledContentRaw = disabledContentRaw
         self.updatedAt = updatedAt
     }
 

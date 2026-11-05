@@ -49,8 +49,6 @@ nonisolated enum PlaylistDeletion {
     /// of the `Playlist` row itself first (the UI's `@Query`s drop it promptly)
     /// before this — potentially long — cleanup runs.
     static func removeOrphanedContent(playlistID: UUID, in context: ModelContext) {
-        let prefix = playlistID.uuidString
-
         // The prune gate's skip counters, the m3u file fingerprint and the
         // WebDAV listing fingerprint live in UserDefaults, outside every
         // cascade, so nothing else ever collects them: they would leak for the
@@ -70,13 +68,23 @@ nonisolated enum PlaylistDeletion {
         // saved once: about 1.2 GB for 178k movie rows, far past what an Apple TV
         // allows. Everything is scoped by the playlist-prefixed id, which
         // `starts(with:)` turns into a range seek on the unique `id` index.
-        //
-        // Channels and guide listings have no relationships, so
-        // `delete(model:where:)` removes them without materializing a row (300k
-        // rows: 2.6 s and 19 MB), on a context of their own. Episodes can't go
-        // this way: Core Data refuses a batch delete that has to nullify their
-        // series inverse, so they cascade from the series pages below.
-        let bulk = ModelContext(context.container)
+        removeLiveStreams(playlistID: playlistID, container: context.container)
+        removeMovies(playlistID: playlistID, container: context.container)
+        removeSeries(playlistID: playlistID, container: context.container)
+    }
+
+    /// Deletes every live stream of `playlistID`, and the guide listings no
+    /// surviving playlist's channel still needs. Also what a playlist that
+    /// stops fetching live TV runs, so the two paths can't drift apart.
+    ///
+    /// Channels and guide listings have no relationships, so
+    /// `delete(model:where:)` removes them without materializing a row (300k
+    /// rows: 2.6 s and 19 MB), on a context of their own. Episodes can't go
+    /// this way: Core Data refuses a batch delete that has to nullify their
+    /// series inverse, so they cascade from the series pages in `removeSeries`.
+    static func removeLiveStreams(playlistID: UUID, container: ModelContainer) {
+        let prefix = playlistID.uuidString
+        let bulk = ModelContext(container)
         bulk.autosaveEnabled = false
 
         // A channel another playlist also carries keeps its guide listings, so
@@ -98,12 +106,15 @@ nonisolated enum PlaylistDeletion {
             try? bulk.delete(model: EPGListing.self, where: #Predicate { chunk.contains($0.channelId) })
         }
         try? bulk.save()
+    }
 
-        // Movies and series cascade to their cast (and series to their
-        // episodes), which a predicate delete would orphan, so they go row by
-        // row — a page at a time, each page on its own context and saved, so no
-        // page outlives its own deletion.
-        deletePaged(container: context.container, idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
+    /// Deletes every movie of `playlistID`. Movies cascade to their cast, which
+    /// a predicate delete would orphan, so they go row by row — a page at a
+    /// time, each page on its own context and saved, so no page outlives its
+    /// own deletion.
+    static func removeMovies(playlistID: UUID, container: ModelContainer) {
+        let prefix = playlistID.uuidString
+        deletePaged(container: container, idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id, comparator: .lexical)]
@@ -111,7 +122,13 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
-        deletePaged(container: context.container, idOf: { (show: Series) in show.id }, page: { cursor, limit in
+    }
+
+    /// Deletes every series of `playlistID`, paged like `removeMovies`; the
+    /// episodes and cast cascade from each series.
+    static func removeSeries(playlistID: UUID, container: ModelContainer) {
+        let prefix = playlistID.uuidString
+        deletePaged(container: container, idOf: { (show: Series) in show.id }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id, comparator: .lexical)]

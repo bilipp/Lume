@@ -58,6 +58,7 @@ struct LumeCloudPayloadCodecTests {
             epgURL: nil,
             syncEnabled: false,
             hiddenTabsRaw: "series,liveTV",
+            disabledContentRaw: "movies",
             updatedAt: edited
         ))
 
@@ -76,6 +77,7 @@ struct LumeCloudPayloadCodecTests {
         #expect(decoded.epgURL == nil)
         #expect(!decoded.syncEnabled)
         #expect(decoded.hiddenTabsRaw == "series,liveTV")
+        #expect(decoded.disabledContentRaw == "movies")
     }
 
     @Test func `a content state round-trips`() throws {

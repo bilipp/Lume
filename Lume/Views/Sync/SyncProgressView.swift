@@ -40,7 +40,9 @@ struct SyncProgressView: View {
         self.playlist = playlist
         self.autoStart = autoStart
         self.full = full
-        _progress = State(initialValue: SyncProgress(steps: SyncStep.steps(for: playlist.sourceType, full: full)))
+        _progress = State(initialValue: SyncProgress(
+            steps: SyncStep.steps(for: playlist.sourceType, full: full, disabled: playlist.disabledContent)
+        ))
         // Start already in the syncing state for auto-sync so the "Ready" screen
         // (with its Start button) never flashes before `.task` kicks off.
         _phase = State(initialValue: autoStart ? .syncing : .ready)
@@ -93,7 +95,9 @@ struct SyncProgressView: View {
 
     private func startSync() {
         // Fresh progress for each attempt so a retry starts clean.
-        progress = SyncProgress(steps: SyncStep.steps(for: playlist.sourceType, full: full))
+        progress = SyncProgress(
+            steps: SyncStep.steps(for: playlist.sourceType, full: full, disabled: playlist.disabledContent)
+        )
         syncError = nil
         phase = .syncing
 

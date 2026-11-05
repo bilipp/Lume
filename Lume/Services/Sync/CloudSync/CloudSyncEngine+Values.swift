@@ -20,7 +20,8 @@ extension CloudSyncEngine {
             sourceTypeRaw: playlist.sourceTypeRaw,
             epgURL: playlist.epgURL,
             syncEnabled: playlist.syncEnabled,
-            hiddenTabsRaw: playlist.hiddenTabsRaw
+            hiddenTabsRaw: playlist.hiddenTabsRaw,
+            disabledContentRaw: playlist.disabledContentRaw
         )
     }
 
@@ -34,7 +35,8 @@ extension CloudSyncEngine {
             sourceTypeRaw: mirror.sourceTypeRaw,
             epgURL: mirror.epgURL,
             syncEnabled: mirror.syncEnabled,
-            hiddenTabsRaw: mirror.hiddenTabsRaw
+            hiddenTabsRaw: mirror.hiddenTabsRaw,
+            disabledContentRaw: mirror.disabledContentRaw
         )
     }
 

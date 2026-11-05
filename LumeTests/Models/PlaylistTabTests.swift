@@ -32,6 +32,55 @@ struct PlaylistTabTests {
         let none: Playlist? = nil
         #expect(none.showsTab(.liveTV))
     }
+
+    @Test func `a playlist fetches every kind until one is switched off`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        #expect(playlist.disabledContent.isEmpty)
+        #expect(playlist.syncs(.movies) && playlist.syncs(.series) && playlist.syncs(.liveTV))
+
+        playlist.disabledContent = [.liveTV, .movies]
+        #expect(playlist.disabledContentRaw == "movies,liveTV")
+        #expect(!playlist.syncs(.movies))
+        #expect(playlist.syncs(.series))
+        #expect(!playlist.syncs(.liveTV))
+    }
+
+    @Test func `content a playlist doesn't fetch hides its tab too`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        playlist.disabledContent = [.series]
+        #expect(!Optional(playlist).showsTab(.series))
+        #expect(Optional(playlist).showsTab(.movies))
+
+        // Both switches hide; either alone is enough.
+        playlist.hiddenTabs = [.movies]
+        #expect(!Optional(playlist).showsTab(.movies))
+        #expect(Optional(playlist).showsTab(.liveTV))
+    }
+
+    @Test func `only sources with live channels offer the live switch`() {
+        let xtream = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        #expect(xtream.selectableContent == [.movies, .series, .liveTV])
+
+        let share = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        share.sourceType = .webdav
+        #expect(share.selectableContent == [.movies, .series])
+    }
+
+    @Test func `each kind files under its category type`() {
+        #expect(PlaylistTab.movies.categoryType == .vod)
+        #expect(PlaylistTab.series.categoryType == .series)
+        #expect(PlaylistTab.liveTV.categoryType == .live)
+    }
+
+    @Test func `the Content switches are translated in every shipping locale`() throws {
+        let catalog = try StringCatalog.localizable()
+        for key in [
+            "Content",
+            "Content that is off is not fetched from this playlist and is removed from your library. Its tab is hidden."
+        ] {
+            expectTranslatedEverywhere(key, in: catalog)
+        }
+    }
 }
 
 struct SettingsCategoryTests {

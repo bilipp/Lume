@@ -19,6 +19,11 @@ extension ContentSyncManager {
     /// holds: the categories previous syncs created, and the `num` each kind's
     /// next insert should take.
     func seedImportState(_ state: M3UImportState, playlistId: UUID) {
+        if let playlist = try? ModelContext(modelContainer).fetch(
+            FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
+        ).first {
+            state.disabledContent = playlist.disabledContent
+        }
         // Categories from previous syncs are updated in place — re-inserting
         // would be an upsert that wipes isHidden / customOrder.
         for type in CategoryType.allCases {
