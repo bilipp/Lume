@@ -41,6 +41,9 @@ import SwiftUI
         var refreshStreamURL: (() async -> URL?)?
 
         @StateObject private var coordinator = AetherEngineCoordinator()
+        /// The host's audio offset for this session; the engine takes a
+        /// change while playing, so the view registers as adjustable on mount.
+        @Environment(\.playerAudioOffset) private var audioOffset
         @State private var reconnector = PlaybackRetryController()
         /// A reconnect waiting on `refreshStreamURL`; cancelled when the player
         /// goes away or the stream changes, so a late answer can't reopen it.
@@ -148,7 +151,9 @@ import SwiftUI
                     ? AetherEngineCoordinator.quickStartupTimeout
                     : AetherEngineCoordinator.defaultStartupTimeout
                 clock.reset()
+                coordinator.audioOffsetMilliseconds = audioOffset?.effectiveMilliseconds
                 coordinator.configure(media: media)
+                audioOffset?.register(engine: .aetherEngine, isAdjustable: true)
                 scheduleHide()
             }
             .onDisappear {
@@ -156,9 +161,13 @@ import SwiftUI
                 reconnector.cancel()
                 urlRefresh?.cancel()
                 coordinator.tearDown()
+                audioOffset?.unregister(engine: .aetherEngine)
             }
             .onChange(of: coordinator.isPlaying) { _, _ in
                 resetHideTimer()
+            }
+            .onChange(of: audioOffset?.effectiveMilliseconds) { _, milliseconds in
+                coordinator.audioOffsetMilliseconds = milliseconds
             }
             .onChange(of: coordinator.hasStartedPlayback) { _, started in
                 if started { resetHideTimer() }
@@ -177,6 +186,7 @@ import SwiftUI
                 reconnector.reset()
                 urlRefresh?.cancel()
                 clock.reset()
+                coordinator.audioOffsetMilliseconds = audioOffset?.effectiveMilliseconds
                 coordinator.configure(media: newMedia)
                 resetHideTimer()
             }

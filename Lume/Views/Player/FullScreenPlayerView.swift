@@ -101,6 +101,9 @@ struct FullScreenPlayerView: View {
     /// The Jellyfin/Emby version being looked up, chosen or played — see
     /// `FullScreenPlayerView+Sources`.
     @State var sourceSession = PlayerSourceSession()
+    /// The audio offset in force: the provider's default and the viewer's
+    /// nudge for this session — see `FullScreenPlayerView+AudioOffset`.
+    @State var audioOffsetSession = PlayerAudioOffsetSession()
 
     /// The episode queued to play after `activeMedia`, resolved whenever the
     /// active stream changes. Drives both the in-player Next Episode button and
@@ -272,6 +275,7 @@ struct FullScreenPlayerView: View {
         .playerHueSync(isCasting: castSession.isCasting)
         .modifier(PlayerSourceSwitcherHost(session: sourceSession, media: activeMedia, onPick: switchSource))
         .modifier(PlayerQualityVariantsHost(media: activeMedia, onSelect: switchQuality))
+        .modifier(PlayerAudioOffsetHost(session: audioOffsetSession, media: activeMedia))
         // Synchronous on purpose, and ahead of the `.task` below: the engine
         // coordinators report `beginStartup` / `noteEngineFallback` from their
         // own appearance, and an async baseline can land after them — which

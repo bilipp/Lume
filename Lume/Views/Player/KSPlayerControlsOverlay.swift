@@ -280,6 +280,7 @@ import SwiftUI
                 }
                 PlayerSourcesButton(onResetHideTimer: onResetHideTimer)
                 PlayerQualityButton(onResetHideTimer: onResetHideTimer)
+                PlayerAudioOffsetButton(onResetHideTimer: onResetHideTimer)
                 PlayerRecordButton(media: media, onResetHideTimer: onResetHideTimer)
                 PlayerVolumeControl(onResetHideTimer: onResetHideTimer)
             }

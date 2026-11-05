@@ -30,6 +30,7 @@
         case subtitles
         case sources
         case quality
+        case audioOffset
         case hue
         case favorite
         case record
