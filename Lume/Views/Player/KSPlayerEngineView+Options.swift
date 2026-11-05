@@ -161,7 +161,7 @@ enum KSPlayerOptionsFactory {
         options.hardwareDecode = settings.hardwareDecode
         options.asynchronousDecompression = settings.asyncDecompression
         options.isSecondOpen = settings.secondOpen
-        options.isAccurateSeek = settings.accurateSeek
+        options.isAccurateSeek = settings.accurateSeek || media.programmeDuration != nil
         options.isLoopPlay = settings.loopPlay
         options.autoDeInterlace = settings.autoDeinterlace
         options.autoRotate = settings.autoRotate
@@ -197,6 +197,14 @@ enum KSPlayerOptionsFactory {
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
 extension KSPlayerEngineView {
     func makeOptions() -> KSOptions {
-        KSPlayerOptionsFactory.make(for: media)
+        let options = KSPlayerOptionsFactory.make(for: media)
+        #if os(macOS)
+            if timeshift != nil {
+                options.formatContextOptions["live_start_index"] = 0
+                options.isAccurateSeek = true
+                options.startPlayTime = 0
+            }
+        #endif
+        return options
     }
 }

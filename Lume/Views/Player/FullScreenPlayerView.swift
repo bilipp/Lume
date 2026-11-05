@@ -12,7 +12,6 @@ import SwiftUI
 /// into SwiftData for VOD content.
 struct FullScreenPlayerView: View {
     let media: PlayableMedia
-
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -299,6 +298,7 @@ struct FullScreenPlayerView: View {
             // commands (lock screen, Control Center, the iPhone's Apple TV
             // remote). Runs per active stream so a channel surf / next episode
             // republishes; cancelled on swap.
+            clock.programmeDuration = activeMedia.programmeDuration
             await NowPlayingService.shared.runSession(
                 media: activeMedia, clock: clock, container: modelContext.container
             )
@@ -432,6 +432,19 @@ struct FullScreenPlayerView: View {
         }
     }
 
+    private func ksPlayerView(for media: PlayableMedia) -> some View {
+        KSPlayerEngineView(
+            media: media, clock: clock, mediaSwapper: mediaSwapper,
+            nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours, skipSegments: skipSegments,
+            reportsStartupFailure: reportsStartupFailure,
+            usesQuickStartupTimeout: hasFallbackEngine,
+            onPlaybackFailed: fallBackToNextEngine,
+            onSelectMedia: switchMedia,
+            onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler, coordinator: adoptedKSCoordinator ?? .init(), isAdoptedSession: adoptedKSCoordinator != nil
+        )
+        .id(engineAttempt)
+    }
+
     @ViewBuilder
     private func engineView(for media: PlayableMedia) -> some View {
         // Keyed on the engine attempt so falling back tears the failed engine
@@ -469,16 +482,7 @@ struct FullScreenPlayerView: View {
             )
             .id(engineAttempt)
         case .ksPlayer:
-            KSPlayerEngineView(
-                media: media, clock: clock, mediaSwapper: mediaSwapper,
-                nextUpMedia: nextUpMedia, itemNeighbours: itemNeighbours, skipSegments: skipSegments,
-                reportsStartupFailure: reportsStartupFailure,
-                usesQuickStartupTimeout: hasFallbackEngine,
-                onPlaybackFailed: fallBackToNextEngine,
-                onSelectMedia: switchMedia,
-                onCompleteCurrentItem: completeActiveEpisode, onRemoteAdvance: remoteAdvanceHandler, coordinator: adoptedKSCoordinator ?? .init(), isAdoptedSession: adoptedKSCoordinator != nil
-            )
-            .id(engineAttempt)
+            TimeshiftPlayerAdapter(media: media, clock: clock) { ksPlayerView(for: $0) }
         case .vlcKit:
             VLCPlayerEngineView(
                 media: media, clock: clock, mediaSwapper: mediaSwapper,

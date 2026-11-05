@@ -65,6 +65,8 @@ extension PlaybackClock {
     /// timeline (see `RecordingTimeline.displayDuration`). Reads `current` and
     /// `duration`, so call it only where the clock is already followed.
     func displayDuration(growing timeline: RecordingTimeline?) -> TimeInterval {
-        RecordingTimeline.displayDuration(engineDuration: duration, position: current, timeline: timeline)
+        let captured = RecordingTimeline.displayDuration(engineDuration: duration, position: current, timeline: timeline)
+        let enabled = UserDefaults.standard.object(forKey: TimeshiftPreferences.programmeTimelineKey) as? Bool ?? true
+        return TimeshiftPreferences.displayDuration(engine: captured, programme: programmeDuration, limitToProgramme: enabled)
     }
 }

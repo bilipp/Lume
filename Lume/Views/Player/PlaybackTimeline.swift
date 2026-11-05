@@ -27,7 +27,7 @@ import SwiftUI
             let duration = clock.displayDuration(growing: timeline)
             Slider(
                 value: Binding<TimeInterval>(
-                    get: { isSeeking ? seekPosition : (clock.current.isFinite ? clock.current : 0) },
+                    get: { isSeeking ? seekPosition : min(max(clock.current.isFinite ? clock.current : 0, 0), max(duration, 1)) },
                     set: { seekPosition = $0 }
                 ),
                 in: 0 ... max(duration.isFinite ? duration : 1, 1),
@@ -36,7 +36,7 @@ import SwiftUI
             .tint(.white)
 
             HStack {
-                Text(timeString(from: isSeeking ? seekPosition : clock.current))
+                Text(timeString(from: isSeeking ? seekPosition : min(max(clock.current, 0), duration)))
                     .contentTransition(.numericText())
                     .foregroundStyle(.white)
                 Spacer()
