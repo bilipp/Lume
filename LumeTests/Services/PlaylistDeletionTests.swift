@@ -190,4 +190,203 @@ struct PlaylistDeletionTests {
 
         #expect(try context.fetchCount(FetchDescriptor<EPGListing>()) == 1)
     }
+
+    @Test func `deleting a playlist without EPG channels deletes catalog cleanly without touching EPG`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let kept = Playlist(name: "Kept", serverURL: "http://b.test", username: "u", password: "p")
+        seed(kept, channelId: "ch.kept", in: context)
+
+        // A VOD/movie-only playlist with no channels and no EPG listings.
+        let noEPG = Playlist(name: "NoEPG", serverURL: "http://a.test", username: "u", password: "p")
+        context.insert(noEPG)
+        let prefix = noEPG.id.uuidString
+        let movie = Movie(id: "\(prefix)-movie-1", streamId: 101, name: "VOD Movie")
+        context.insert(movie)
+        let streamWithoutEPG = LiveStream(id: "\(prefix)-live-noepg", streamId: 102, name: "Live No EPG", epgChannelId: nil)
+        context.insert(streamWithoutEPG)
+        try context.save()
+
+        PlaylistDeletion.delete(noEPG, in: context)
+        try context.save()
+
+        #expect(try context.fetchCount(FetchDescriptor<Playlist>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<Movie>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<LiveStream>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<EPGListing>()) == 1)
+    }
+
+    @Test func `cloud reconcile entry point removeOrphanedContent deletes content properly`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let doomed = Playlist(name: "Doomed", serverURL: "http://a.test", username: "u", password: "p")
+        seed(doomed, channelId: "ch.doomed", in: context)
+        try context.save()
+        let doomedID = doomed.id
+
+        // The CloudSyncEngine deletes the Playlist row first so UI updates immediately.
+        context.delete(doomed)
+        try context.save()
+        #expect(try context.fetchCount(FetchDescriptor<Playlist>()) == 0)
+
+        // Then calls removeOrphanedContent for the heavy cleanup.
+        PlaylistDeletion.removeOrphanedContent(playlistID: doomedID, in: context)
+        try context.save()
+
+        #expect(try context.fetchCount(FetchDescriptor<Movie>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Series>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Episode>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<LiveStream>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<EPGListing>()) == 0)
+    }
+
+    @Test func `multi-playlist catalog prunes only exclusively orphaned listings across shared guides`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let first = Playlist(name: "P1", serverURL: "http://p1.test", username: "u", password: "p")
+        let second = Playlist(name: "P2", serverURL: "http://p2.test", username: "u", password: "p")
+        let third = Playlist(name: "P3", serverURL: "http://p3.test", username: "u", password: "p")
+        for playlist in [first, second, third] {
+            context.insert(playlist)
+        }
+
+        let p1Prefix = first.id.uuidString
+        let p2Prefix = second.id.uuidString
+        let p3Prefix = third.id.uuidString
+
+        let channels = [
+            (p1Prefix, "1", "ch.exclusive.p1"), (p1Prefix, "2", "ch.shared.p1_p2"), (p1Prefix, "3", "ch.shared.all"),
+            (p2Prefix, "2", "ch.shared.p1_p2"), (p2Prefix, "3", "ch.shared.all"), (p2Prefix, "4", "ch.exclusive.p2"),
+            (p3Prefix, "3", "ch.shared.all"), (p3Prefix, "5", "ch.exclusive.p3")
+        ]
+        for (prefix, id, epg) in channels {
+            context.insert(LiveStream(id: "\(prefix)-ch\(id)", streamId: Int(id) ?? 0, name: "Ch\(id)", epgChannelId: epg))
+        }
+
+        let guideIDs = ["ch.exclusive.p1", "ch.shared.p1_p2", "ch.shared.all", "ch.exclusive.p2", "ch.exclusive.p3"]
+        for guideID in guideIDs {
+            context.insert(EPGListing(
+                id: "\(guideID)-1000", channelId: guideID, title: "Show", listingDescription: "",
+                start: Date(timeIntervalSince1970: 1000), end: Date(timeIntervalSince1970: 2000)
+            ))
+        }
+        try context.save()
+
+        // Delete first: only ch.exclusive.p1 should be pruned.
+        PlaylistDeletion.delete(first, in: context)
+        try context.save()
+        let remainingListings = try context.fetch(FetchDescriptor<EPGListing>()).map(\.channelId)
+        #expect(!remainingListings.contains("ch.exclusive.p1"))
+        #expect(remainingListings.contains("ch.shared.p1_p2"))
+        #expect(remainingListings.contains("ch.shared.all"))
+
+        // Delete second: ch.shared.p1_p2 is now orphaned, while ch.shared.all remains.
+        PlaylistDeletion.delete(second, in: context)
+        try context.save()
+        let afterSecondListings = try context.fetch(FetchDescriptor<EPGListing>()).map(\.channelId)
+        #expect(!afterSecondListings.contains("ch.shared.p1_p2"))
+        #expect(!afterSecondListings.contains("ch.exclusive.p2"))
+        #expect(afterSecondListings.contains("ch.shared.all"))
+        #expect(afterSecondListings.contains("ch.exclusive.p3"))
+    }
+
+    @Test func `a single huge series with over a thousand episodes cascades and deletes cleanly`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let doomed = Playlist(name: "Doomed", serverURL: "http://a.test", username: "u", password: "p")
+        let kept = Playlist(name: "Kept", serverURL: "http://b.test", username: "u", password: "p")
+        seed(kept, channelId: "ch.kept", in: context)
+        context.insert(doomed)
+
+        let prefix = doomed.id.uuidString
+        let hugeSeries = Series(id: "\(prefix)-series-huge", seriesId: 99, name: "Huge Show with 1500 Episodes")
+        context.insert(hugeSeries)
+
+        for number in 1 ... 1500 {
+            let episode = Episode(
+                id: "\(prefix)-series-huge-e\(number)",
+                episodeId: "\(number)",
+                title: "Episode \(number)",
+                containerExtension: "mkv",
+                seasonNum: 1,
+                episodeNum: number
+            )
+            context.insert(episode)
+            hugeSeries.episodes.append(episode)
+        }
+        try context.save()
+
+        #expect(try context.fetchCount(FetchDescriptor<Episode>()) == 1501)
+
+        PlaylistDeletion.delete(doomed, in: context)
+        try context.save()
+
+        let check = ModelContext(container)
+        #expect(try check.fetchCount(FetchDescriptor<Series>()) == 1)
+        #expect(try check.fetchCount(FetchDescriptor<Episode>()) == 1)
+        let survivor = try #require(try check.fetch(FetchDescriptor<Episode>()).first)
+        #expect(survivor.id.hasPrefix(kept.id.uuidString))
+    }
+
+    @Test func `bounded EPG deletion pages through more channels than batch size`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+
+        let doomed = Playlist(name: "Doomed", serverURL: "http://a.test", username: "u", password: "p")
+        let kept = Playlist(name: "Kept", serverURL: "http://b.test", username: "u", password: "p")
+        context.insert(doomed)
+        context.insert(kept)
+
+        let doomedPrefix = doomed.id.uuidString
+        let keptPrefix = kept.id.uuidString
+
+        // 1,200 channels on doomed (> 2 batches of 500).
+        // 10 channels are shared with kept.
+        for index in 1 ... 10 {
+            let sharedID = "ch.shared.\(index)"
+            context.insert(LiveStream(id: "\(doomedPrefix)-ch-\(index)", streamId: index, name: "Shared \(index)", epgChannelId: sharedID))
+            context.insert(LiveStream(id: "\(keptPrefix)-ch-\(index)", streamId: index, name: "Kept Shared \(index)", epgChannelId: sharedID))
+            context.insert(EPGListing(
+                id: "\(sharedID)-1000",
+                channelId: sharedID,
+                title: "Shared Listing \(index)",
+                listingDescription: "",
+                start: Date(timeIntervalSince1970: 1000),
+                end: Date(timeIntervalSince1970: 2000)
+            ))
+        }
+
+        // Remaining 1,190 channels are unique to doomed.
+        for index in 11 ... 1200 {
+            let uniqueID = "ch.doomed.\(index)"
+            context.insert(LiveStream(id: "\(doomedPrefix)-ch-\(index)", streamId: index, name: "Unique \(index)", epgChannelId: uniqueID))
+            context.insert(EPGListing(
+                id: "\(uniqueID)-1000",
+                channelId: uniqueID,
+                title: "Unique Listing \(index)",
+                listingDescription: "",
+                start: Date(timeIntervalSince1970: 1000),
+                end: Date(timeIntervalSince1970: 2000)
+            ))
+        }
+        try context.save()
+
+        #expect(try context.fetchCount(FetchDescriptor<LiveStream>()) == 1210)
+        #expect(try context.fetchCount(FetchDescriptor<EPGListing>()) == 1200)
+
+        PlaylistDeletion.delete(doomed, in: context)
+        try context.save()
+
+        let check = ModelContext(container)
+        #expect(try check.fetchCount(FetchDescriptor<LiveStream>()) == 10)
+        #expect(try check.fetchCount(FetchDescriptor<EPGListing>()) == 10)
+        let survivingListings = try check.fetch(FetchDescriptor<EPGListing>()).map(\.channelId)
+        for index in 1 ... 10 {
+            #expect(survivingListings.contains("ch.shared.\(index)"))
+        }
+    }
 }
