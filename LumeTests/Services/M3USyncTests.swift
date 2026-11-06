@@ -533,6 +533,96 @@ struct M3USyncTests {
         let seconds = elapsed.components.seconds
         #expect(seconds < 120, "\(episodeTotal)-episode sync took \(seconds)s — expected < 120s")
     }
+
+    // MARK: - Cold import pruning skip & interrupted retry recovery (perf/m3u-first-import-prune)
+
+    @Test func `interrupted import followed by shorter retry prunes stale committed rows`() async throws {
+        let container = try makeTestContainer()
+
+        // 1. Simulate an interrupted import: batches committed 5 live channels, but
+        // import failed/cancelled before completing, so lastSyncDate is nil.
+        let playlistURL = try writeTempFile(mixedPlaylist, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: playlistURL) }
+        let playlist = try makePlaylist(container: container, fileURL: playlistURL)
+        let playlistId = playlist.id
+
+        do {
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
+            for index in 0 ..< 5 {
+                context.insert(LiveStream(
+                    id: "\(playlistId.uuidString)-live-\(index)",
+                    streamId: index,
+                    name: "Stale Channel \(index)"
+                ))
+            }
+            try context.save()
+        }
+
+        // Verify pre-condition: lastSyncDate is nil, but rows are in store
+        #expect(playlist.lastSyncDate == nil)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<LiveStream>()) == 5)
+
+        // 2. Now run a sync with a playlist containing 3 different live channels.
+        // Even though lastSyncDate == nil, playlistHasExistingCatalogRows detects the
+        // committed rows, so sweeps MUST run and prune the 5 stale channels!
+        let retryContent = """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="new.1" group-title="News",New One
+        http://example.com/live/new1.ts
+        #EXTINF:-1 tvg-id="new.2" group-title="News",New Two
+        http://example.com/live/new2.ts
+        #EXTINF:-1 tvg-id="new.3" group-title="News",New Three
+        http://example.com/live/new3.ts
+        """
+        try retryContent.write(to: playlistURL, atomically: true, encoding: .utf8)
+
+        let manager = ContentSyncManager(modelContainer: container)
+        try await manager.syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let streams = try context.fetch(FetchDescriptor<LiveStream>())
+        // The 5 stale channels were pruned, and the 3 new ones were imported!
+        #expect(streams.count == 3)
+        #expect(streams.allSatisfy { $0.name.hasPrefix("New ") })
+    }
+
+    @Test func `first import of second playlist skips sweeps and preserves first playlist`() async throws {
+        let container = try makeTestContainer()
+
+        // Sync Playlist A first
+        let fileA = try writeTempFile(mixedPlaylist, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileA) }
+        let playlistA = try makePlaylist(container: container, fileURL: fileA)
+        let manager = ContentSyncManager(modelContainer: container)
+        try await manager.syncPlaylist(playlistA)
+
+        let countA = try ModelContext(container).fetchCount(FetchDescriptor<LiveStream>())
+        #expect(countA == 3)
+
+        // Now import Playlist B into the same store
+        let playlistBContent = """
+        #EXTM3U
+        #EXTINF:-1 group-title="Live",B Channel 1
+        http://example.com/live/b1.ts
+        """
+        let fileB = try writeTempFile(playlistBContent, ext: "m3u")
+        defer { try? FileManager.default.removeItem(at: fileB) }
+        let playlistB = try makePlaylist(container: container, fileURL: fileB)
+
+        // Playlist B is cold (0 rows for Playlist B)
+        #expect(await manager.playlistHasExistingCatalogRows(playlistId: playlistB.id) == false)
+
+        try await manager.syncPlaylist(playlistB)
+
+        let context = ModelContext(container)
+        let totalStreams = try context.fetch(FetchDescriptor<LiveStream>())
+        #expect(totalStreams.count == 4) // 3 from A + 1 from B
+        let streamsA = totalStreams.filter { $0.id.starts(with: playlistA.id.uuidString) }
+        let streamsB = totalStreams.filter { $0.id.starts(with: playlistB.id.uuidString) }
+        #expect(streamsA.count == 3)
+        #expect(streamsB.count == 1)
+    }
 }
 
 /// Counts the catalog rows the `ModelContext` saves in one store touch.

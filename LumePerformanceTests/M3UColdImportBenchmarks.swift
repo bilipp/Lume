@@ -155,6 +155,59 @@ final class M3UColdImportBenchmarks: XCTestCase {
         }
     }
 
+    // MARK: - Reimport
+
+    /// A re-import into a store that already holds this playlist's rows.
+    ///
+    /// Unlike the cold first import where post-import sweeps are skipped because
+    /// the store was proven empty, a re-import must run the sweeps to prune any
+    /// rows the provider dropped.
+    func testReimportProviderShapedPlaylist() throws {
+        let fixtureURL = try XCTUnwrap(fixtureURL)
+
+        let options = XCTMeasureOptions()
+        options.invocationOptions = [.manuallyStart, .manuallyStop]
+        options.iterationCount = 1
+        measure(metrics: Self.coldImportMetrics, options: options) {
+            guard let store = try? PerfStore.makeOnDiskContainer() else {
+                XCTFail("could not create the on-disk store")
+                return
+            }
+            defer { PerfStore.destroy(directory: store.directory) }
+
+            guard let playlistId = try? seedM3UPlaylist(fileURL: fixtureURL, container: store.container) else {
+                XCTFail("could not seed the playlist row")
+                return
+            }
+            clearM3UDeviceLocalState(playlistId: playlistId)
+            defer { clearM3UDeviceLocalState(playlistId: playlistId) }
+
+            let manager = ContentSyncManager(modelContainer: store.container)
+            // Initial cold import (unmeasured) to populate the store.
+            let warmupOutcome = syncPlaylistSynchronously(
+                manager: manager, playlistId: playlistId, container: store.container
+            )
+            if let error = warmupOutcome.error {
+                XCTFail("warmup m3u sync failed: \(error)")
+                return
+            }
+
+            // Clear digest so second import performs the pass rather than skipping.
+            clearM3UDeviceLocalState(playlistId: playlistId)
+
+            startMeasuring()
+            let outcome = syncPlaylistSynchronously(
+                manager: manager, playlistId: playlistId, container: store.container
+            )
+            stopMeasuring()
+
+            if let error = outcome.error {
+                XCTFail("m3u reimport sync failed: \(error)")
+            }
+            assertCatalogWasWritten(container: store.container)
+        }
+    }
+
     // MARK: - Metrics
 
     /// Clock, memory and every m3u phase in one `metrics:` array. Split into

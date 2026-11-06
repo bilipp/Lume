@@ -59,6 +59,13 @@ final nonisolated class M3UImportState {
     /// First error hit inside a batch; aborts the remaining batches.
     var firstError: Error?
 
+    /// Whether this playlist had any catalog rows or categories stored before
+    /// this import began. Captured at import start before any writes take place.
+    /// When `false`, the playlist was proven empty: all rows in the store were
+    /// written by this import, so the post-import mark-and-sweep phases can be
+    /// safely skipped without leaving stale rows behind.
+    var hadExistingContent: Bool = true
+
     var totalImported: Int {
         importedLive + importedMovies + importedEpisodes
     }
