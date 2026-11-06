@@ -16,7 +16,7 @@
 //    up restores the full hero.
 //
 
-#if os(tvOS)
+#if os(tvOS) || DEBUG
 
     import SwiftData
     import SwiftUI
@@ -44,7 +44,13 @@
 
         /// Set while the hero is below the fold so the carousel doesn't page
         /// (and prefetch artwork) where nobody can see it.
-        var isPaused = false
+        var isPaused = false {
+            didSet {
+                if isPaused, progress != 0 {
+                    progress = 0
+                }
+            }
+        }
 
         private let autoAdvanceInterval: Duration = .seconds(6)
 
@@ -81,7 +87,9 @@
             // While paused, hold the bar EMPTY rather than frozen so the slide
             // always gets a full dwell once it becomes visible again.
             if isPaused {
-                progress = 0
+                if progress != 0 {
+                    progress = 0
+                }
                 return false
             }
             if progress >= 1 {
@@ -133,6 +141,10 @@
             Task { await ImagePipeline.shared.prefetch(neighbours, maxPixelSize: nil) }
         }
     }
+
+#endif
+
+#if os(tvOS)
 
     // MARK: - Screen
 
@@ -209,7 +221,13 @@
             .onChange(of: heroItems) { _, items in
                 model.configure(items: items)
             }
-            .onAppear { model.configure(items: heroItems) }
+            .onAppear {
+                model.configure(items: heroItems)
+                model.isPaused = zone != .expanded
+            }
+            .onDisappear {
+                model.isPaused = true
+            }
         }
     }
 
@@ -469,6 +487,13 @@
         private func runAutoAdvance() async {
             guard model.items.count > 1 else { return }
             while !Task.isCancelled {
+                if model.isPaused {
+                    if model.tickAutoAdvance() {
+                        model.advance()
+                    }
+                    try? await Task.sleep(for: .milliseconds(200))
+                    continue
+                }
                 try? await Task.sleep(for: .milliseconds(50))
                 if Task.isCancelled { return }
                 if model.tickAutoAdvance() {
