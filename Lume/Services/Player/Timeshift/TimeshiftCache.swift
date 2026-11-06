@@ -98,6 +98,7 @@ actor TimeshiftCache {
         let retained = window.entries.filter { entry in firstSequence.map { entry.id >= $0 } ?? true }
         var lines = ["#EXTM3U", "#EXT-X-VERSION:3", "#EXT-X-TARGETDURATION:\(Int(ceil(targetDuration)))",
                      "#EXT-X-MEDIA-SEQUENCE:\(retained.first?.id ?? 0)"]
+        lines.append("#EXT-X-PLAYLIST-TYPE:EVENT")
         lines.append("#EXT-X-START:TIME-OFFSET=0,PRECISE=YES")
         for entry in retained {
             if segments[entry.id]?.discontinuity == true { lines.append("#EXT-X-DISCONTINUITY") }

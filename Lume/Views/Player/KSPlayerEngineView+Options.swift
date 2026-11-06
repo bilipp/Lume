@@ -201,8 +201,9 @@ extension KSPlayerEngineView {
         #if os(macOS)
             if timeshift != nil {
                 options.formatContextOptions["live_start_index"] = 0
+                options.formatContextOptions["prefer_x_start"] = 1
                 options.isAccurateSeek = true
-                options.startPlayTime = 0
+                options.startPlayTime = media.startTime
             }
         #endif
         return options

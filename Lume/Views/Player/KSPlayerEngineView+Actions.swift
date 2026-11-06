@@ -34,8 +34,11 @@ extension KSPlayerEngineView {
                   let player = coordinator.playerLayer?.player else { return }
             appliedTimeshiftOffset = true
             // Initial HLS opens can round to a segment boundary. Seek after
-            // decoding starts so KSPlayer's accurate frame-discard pass runs.
-            player.seek(time: media.startTime) { _ in }
+            // decoding starts so KSPlayer's accurate frame-discard pass runs,
+            // only if playback didn't already start at the requested offset.
+            if abs(player.currentPlaybackTime - media.startTime) > 0.5 {
+                player.seek(time: media.startTime) { _ in }
+            }
         #endif
     }
 
