@@ -28,6 +28,7 @@ nonisolated extension SportsChannelResolver {
         guard !phrases.isEmpty, fixture.startTimeIsTentative != true else { return nil }
         let kickoff = fixture.startDate
         let tournament = fixture.name.map(SportsCompetitionMatcher.tournamentTokens) ?? []
+        let tournamentPadded = tournament.map { " \($0) " }
 
         var best: CompetitionHit?
         for candidate in candidates {
@@ -39,7 +40,7 @@ nonisolated extension SportsChannelResolver {
             let headline = candidate.normalizedTitle + candidate.normalizedSubtitle
             guard SportsRaceMatcher.containsAny(phrases, in: headline) else { continue }
 
-            let score = 1 + tournament.count { headline.contains(" \($0) ") } * titleWeight
+            let score = 1 + tournamentPadded.count { headline.contains($0) } * titleWeight
             if score > (best?.score ?? 0) {
                 best = CompetitionHit(score: score, title: candidate.title, start: candidate.start)
             }
