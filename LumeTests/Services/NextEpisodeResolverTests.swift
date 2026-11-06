@@ -141,4 +141,56 @@ struct NextEpisodeResolverTests {
         let (context, _, _) = try makeWorld(episodes: twoSeasons)
         #expect(NextEpisodeResolver.previousMedia(before: .live("l-1"), in: context) == nil)
     }
+
+    @Test func `next skips duplicate episode positions to the next distinct position`() throws {
+        // Show has S1E1, two versions of S1E2 (ep-a and ep-b), and S1E3.
+        let container = try makeTestContainer()
+        let context = ModelContext(container)
+        let playlist = Playlist(name: "P", serverURL: "http://example.com", username: "u", password: "p")
+        context.insert(playlist)
+        let series = Series(id: "\(playlist.id.uuidString)-series-dup", seriesId: 2, name: "DupShow")
+        context.insert(series)
+
+        let ep1 = Episode(id: "ep-1", episodeId: "1", title: "E1", containerExtension: "mkv", seasonNum: 1, episodeNum: 1, series: series)
+        let ep2a = Episode(id: "ep-2a", episodeId: "2a", title: "E2 A", containerExtension: "mkv", seasonNum: 1, episodeNum: 2, series: series)
+        let ep2b = Episode(id: "ep-2b", episodeId: "2b", title: "E2 B", containerExtension: "mkv", seasonNum: 1, episodeNum: 2, series: series)
+        let ep3 = Episode(id: "ep-3", episodeId: "3", title: "E3", containerExtension: "mkv", seasonNum: 1, episodeNum: 3, series: series)
+        for ep in [ep1, ep2a, ep2b, ep3] {
+            context.insert(ep)
+            series.episodes.append(ep)
+        }
+        try context.save()
+
+        // From ep2a, the next episode should advance to S1E3, skipping the duplicate S1E2 (ep2b).
+        let next = NextEpisodeResolver.nextMedia(after: .episode("ep-2a"), in: context)
+        #expect(next?.contentRef == .episode("ep-3"))
+
+        // From ep2b, previous should be S1E1, skipping ep2a.
+        let prev = NextEpisodeResolver.previousMedia(before: .episode("ep-2b"), in: context)
+        #expect(prev?.contentRef == .episode("ep-1"))
+    }
+
+    @Test func `season boundary crosses non-consecutive seasons`() throws {
+        // Show has Season 1 and Season 3 (Season 2 is missing).
+        let container = try makeTestContainer()
+        let context = ModelContext(container)
+        let playlist = Playlist(name: "P", serverURL: "http://example.com", username: "u", password: "p")
+        context.insert(playlist)
+        let series = Series(id: "\(playlist.id.uuidString)-series-gap", seriesId: 3, name: "GapShow")
+        context.insert(series)
+
+        let s1e1 = Episode(id: "s1e1", episodeId: "101", title: "S1E1", containerExtension: "mkv", seasonNum: 1, episodeNum: 1, series: series)
+        let s3e1 = Episode(id: "s3e1", episodeId: "301", title: "S3E1", containerExtension: "mkv", seasonNum: 3, episodeNum: 1, series: series)
+        for ep in [s1e1, s3e1] {
+            context.insert(ep)
+            series.episodes.append(ep)
+        }
+        try context.save()
+
+        let next = NextEpisodeResolver.nextMedia(after: .episode("s1e1"), in: context)
+        #expect(next?.contentRef == .episode("s3e1"))
+
+        let prev = NextEpisodeResolver.previousMedia(before: .episode("s3e1"), in: context)
+        #expect(prev?.contentRef == .episode("s1e1"))
+    }
 }

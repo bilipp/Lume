@@ -26,7 +26,7 @@ nonisolated enum NextEpisodeResolver {
         guard let current = try? context.fetch(descriptor).first,
               let series = current.series else { return nil }
 
-        guard let next = neighbour(of: current, in: series, after: true),
+        guard let next = nextEpisode(after: current, in: series, in: context),
               let playlist = playlist(for: series, in: context) else { return nil }
         return PlayableMedia.from(episode: next, playlist: playlist, client: client)
     }
@@ -46,33 +46,96 @@ nonisolated enum NextEpisodeResolver {
         guard let current = try? context.fetch(descriptor).first,
               let series = current.series else { return nil }
 
-        guard let previous = neighbour(of: current, in: series, after: false),
+        guard let previous = previousEpisode(before: current, in: series, in: context),
               let playlist = playlist(for: series, in: context) else { return nil }
         return PlayableMedia.from(episode: previous, playlist: playlist, client: client)
     }
 
-    /// The episode adjacent to `current` across the whole series, ordered by
-    /// `(season, episode)`.
+    /// The episode immediately after `current` across the series, ordered by
+    /// `(seasonNum, episodeNum)`.
     ///
-    /// A single pass for the nearest key on the chosen side, rather than sorting
-    /// the relationship into a second array to read one element out of it: the
-    /// episodes are faulted either way, and a long-running show carries hundreds
-    /// of them through a lookup that runs on the main actor at every stream
-    /// change.
-    private static func neighbour(of current: Episode, in series: Series, after: Bool) -> Episode? {
-        let currentKey = (current.seasonNum, current.episodeNum)
-        var best: Episode?
-        for episode in series.episodes where episode.id != current.id {
-            let key = (episode.seasonNum, episode.episodeNum)
-            guard after ? key > currentKey : key < currentKey else { continue }
-            guard let found = best else {
-                best = episode
-                continue
-            }
-            let bestKey = (found.seasonNum, found.episodeNum)
-            if after ? key < bestKey : key > bestKey { best = episode }
+    /// Resolves via bounded `LIMIT 1` fetches rather than traversing
+    /// `series.episodes`, which would fault the entire show into memory on the
+    /// main actor at every stream change.
+    private static func nextEpisode(
+        after current: Episode,
+        in series: Series,
+        in context: ModelContext
+    ) -> Episode? {
+        let seriesID = series.id
+        let currentSeason = current.seasonNum
+        let currentEpisode = current.episodeNum
+
+        // 1. Next episode in the same season.
+        var sameSeasonDesc = FetchDescriptor<Episode>(
+            predicate: #Predicate { episode in
+                episode.series?.id == seriesID &&
+                episode.seasonNum == currentSeason &&
+                episode.episodeNum > currentEpisode
+            },
+            sortBy: [SortDescriptor(\Episode.episodeNum, order: .forward)]
+        )
+        sameSeasonDesc.fetchLimit = 1
+        if let next = try? context.fetch(sameSeasonDesc).first {
+            return next
         }
-        return best
+
+        // 2. First episode of a subsequent season (crossing the season boundary).
+        var laterSeasonDesc = FetchDescriptor<Episode>(
+            predicate: #Predicate { episode in
+                episode.series?.id == seriesID &&
+                episode.seasonNum > currentSeason
+            },
+            sortBy: [
+                SortDescriptor(\Episode.seasonNum, order: .forward),
+                SortDescriptor(\Episode.episodeNum, order: .forward)
+            ]
+        )
+        laterSeasonDesc.fetchLimit = 1
+        return try? context.fetch(laterSeasonDesc).first
+    }
+
+    /// The episode immediately before `current` across the series, ordered by
+    /// `(seasonNum, episodeNum)`.
+    ///
+    /// Resolves via bounded `LIMIT 1` fetches rather than traversing
+    /// `series.episodes`.
+    private static func previousEpisode(
+        before current: Episode,
+        in series: Series,
+        in context: ModelContext
+    ) -> Episode? {
+        let seriesID = series.id
+        let currentSeason = current.seasonNum
+        let currentEpisode = current.episodeNum
+
+        // 1. Previous episode in the same season.
+        var sameSeasonDesc = FetchDescriptor<Episode>(
+            predicate: #Predicate { episode in
+                episode.series?.id == seriesID &&
+                episode.seasonNum == currentSeason &&
+                episode.episodeNum < currentEpisode
+            },
+            sortBy: [SortDescriptor(\Episode.episodeNum, order: .reverse)]
+        )
+        sameSeasonDesc.fetchLimit = 1
+        if let previous = try? context.fetch(sameSeasonDesc).first {
+            return previous
+        }
+
+        // 2. Last episode of the nearest preceding season (crossing season boundary backwards).
+        var earlierSeasonDesc = FetchDescriptor<Episode>(
+            predicate: #Predicate { episode in
+                episode.series?.id == seriesID &&
+                episode.seasonNum < currentSeason
+            },
+            sortBy: [
+                SortDescriptor(\Episode.seasonNum, order: .reverse),
+                SortDescriptor(\Episode.episodeNum, order: .reverse)
+            ]
+        )
+        earlierSeasonDesc.fetchLimit = 1
+        return try? context.fetch(earlierSeasonDesc).first
     }
 
     /// The playlist that owns a series, mirroring the detail screen and tvOS

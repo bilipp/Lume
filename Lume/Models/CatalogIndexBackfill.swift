@@ -94,6 +94,16 @@ nonisolated enum CatalogIndexBackfill {
             name: "Z_EPGListing_SwiftDataIndexOnBinarychannelIdend",
             table: "ZEPGLISTING",
             columns: ["ZCHANNELID", "ZEND"]
+        ),
+        // Episode neighbor lookups (NextEpisodeResolver) seek next/previous
+        // episodes ordered by (season, episode) within a series. Core Data's
+        // automatic ZSERIES index leaves SQLite scanning every episode in the
+        // show with a temp B-tree sort; indexing series + season + episode turns
+        // the neighbor resolution into an indexed range seek with no sorting.
+        Index(
+            name: "Z_Episode_SwiftDataIndexOnBinaryseriesSeasonEpisode",
+            table: "ZEPISODE",
+            columns: ["ZSERIES", "ZSEASONNUM", "ZEPISODENUM"]
         )
     ]
 
