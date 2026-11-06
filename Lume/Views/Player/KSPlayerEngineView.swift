@@ -12,6 +12,10 @@ import SwiftUI
 /// layers its own Apple-style controls (`KSPlayerControlsOverlay`).
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, *)
 struct KSPlayerEngineView: View {
+    #if os(macOS)
+        @Environment(TimeshiftPlayback.self) var timeshift: TimeshiftPlayback?
+        @State var appliedTimeshiftOffset = false
+    #endif
     let media: PlayableMedia
     /// High-frequency playback clock, threaded down as the `@Observable` object
     /// rather than as `@Binding` scalars. A `@Binding` whose root is an
@@ -454,6 +458,7 @@ struct KSPlayerEngineView: View {
                     }
                 } onPlay: { current, total in
                     DispatchQueue.main.async {
+                        applyTimeshiftOffsetIfNeeded()
                         if !isSeeking {
                             if current.isFinite {
                                 clock.current = current
@@ -545,7 +550,7 @@ struct KSPlayerEngineView: View {
                 .playerVolume(coordinator)
             #endif
                 .playerKeyboardShortcuts(PlayerKeyActions(
-                    togglePlay: togglePlay, skip: { coordinator.skip(interval: Int($0)) }, close: closePlayer,
+                    togglePlay: togglePlay, skip: { skipTimeshiftOrMedia($0) }, close: closePlayer,
                     resetHideTimer: resetHideTimer, showControls: showControls,
                     neighbours: itemNeighbours, swapper: mediaSwapper, selectMedia: { selectMedia($0) }
                 ))

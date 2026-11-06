@@ -28,7 +28,36 @@ extension KSPlayerEngineView {
         ), owner: coordinator)
     }
 
+    func applyTimeshiftOffsetIfNeeded() {
+        #if os(macOS)
+            guard timeshift != nil, !appliedTimeshiftOffset, media.startTime > 0,
+                  let player = coordinator.playerLayer?.player else { return }
+            appliedTimeshiftOffset = true
+            // Initial HLS opens can round to a segment boundary. Seek after
+            // decoding starts so KSPlayer's accurate frame-discard pass runs,
+            // only if playback didn't already start at the requested offset.
+            if abs(player.currentPlaybackTime - media.startTime) > 0.5 {
+                player.seek(time: media.startTime) { _ in }
+            }
+        #endif
+    }
+
+    func skipTimeshiftOrMedia(_ seconds: TimeInterval) {
+        #if os(macOS)
+            if let timeshift { timeshift.skip(seconds, clock: clock); return }
+        #endif
+        if media.programmeDuration != nil {
+            let end = clock.displayDuration(growing: media.recordingTimeline)
+            coordinator.seek(time: min(max(0, clock.current + seconds), end))
+        } else {
+            coordinator.skip(interval: Int(seconds))
+        }
+    }
+
     func togglePlay() {
+        #if os(macOS)
+            if let timeshift, !(coordinator.playerLayer?.state.isPlaying ?? false), timeshift.resumeIfExpired(clock: clock) { return }
+        #endif
         let playing: Bool
         #if os(tvOS)
             playing = engine.isPlaying
@@ -86,6 +115,7 @@ extension KSPlayerEngineView {
 
     func closePlayer() {
         #if os(macOS)
+            timeshift?.stop()
             if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) {
                 window.toggleFullScreen(nil)
             }

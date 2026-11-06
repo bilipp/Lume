@@ -362,9 +362,11 @@ import SwiftUI
         /// `duration`, or a growing recording's timeline while the engine
         /// reports none (see `RecordingTimeline`).
         private var displayDuration: TimeInterval {
-            RecordingTimeline.displayDuration(
+            let captured = RecordingTimeline.displayDuration(
                 engineDuration: duration, position: currentTime, timeline: media.recordingTimeline
             )
+            let enabled = UserDefaults.standard.object(forKey: TimeshiftPreferences.programmeTimelineKey) as? Bool ?? true
+            return TimeshiftPreferences.displayDuration(engine: captured, programme: media.programmeDuration, limitToProgramme: enabled)
         }
 
         private var scrubber: some View {

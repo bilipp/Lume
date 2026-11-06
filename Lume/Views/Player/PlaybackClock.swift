@@ -16,6 +16,7 @@ import Observation
 final class PlaybackClock {
     var current: TimeInterval = 0
     var duration: TimeInterval = 0
+    var programmeDuration: TimeInterval?
     /// FFmpeg codec names of the stream's audio tracks, once the engine has
     /// opened it; empty when unknown. The Cast sheet warns from these when no
     /// track would play on a receiver.
