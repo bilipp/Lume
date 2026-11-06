@@ -24,23 +24,61 @@ nonisolated extension SportsChannelResolver {
         guard !series.isEmpty else { return [] }
         let kind = fixture.sessionKind ?? (fixture.sessions.count == 1 ? fixture.sessions.first?.kind : nil)
 
+        struct RaceCacheKey: Hashable {
+            let epgChannelId: String
+            let channelNamesSeries: Bool
+        }
+        var raceHits: [RaceCacheKey: RaceHit] = [:]
+        var raceMisses: Set<RaceCacheKey> = []
+        var airingAtStartCache: [String: Bool] = [:]
+
         var resolved: [ResolvedChannel] = []
         for channel in channels {
             let channelNamesSeries = SportsRaceMatcher.containsAny(series, in: channel.nameHaystack)
-            let listings = channel.summary.epgChannelId.flatMap { guide[$0] } ?? []
-            let epg = bestRaceHit(
-                in: listings,
-                series: series,
-                kind: kind,
-                channelNamesSeries: channelNamesSeries,
-                kickoff: fixture.startDate
-            )
+            let epgChannelId = channel.summary.epgChannelId
+            let listings = epgChannelId.flatMap { guide[$0] } ?? []
+
+            let epg: RaceHit?
+            if let epgChannelId, !epgChannelId.isEmpty, !listings.isEmpty {
+                let cacheKey = RaceCacheKey(epgChannelId: epgChannelId, channelNamesSeries: channelNamesSeries)
+                if let hit = raceHits[cacheKey] {
+                    epg = hit
+                } else if raceMisses.contains(cacheKey) {
+                    epg = nil
+                } else if let hit = bestRaceHit(
+                    in: listings,
+                    series: series,
+                    kind: kind,
+                    channelNamesSeries: channelNamesSeries,
+                    kickoff: fixture.startDate
+                ) {
+                    raceHits[cacheKey] = hit
+                    epg = hit
+                } else {
+                    raceMisses.insert(cacheKey)
+                    epg = nil
+                }
+            } else {
+                epg = nil
+            }
+
             let isPick = pickIndex[
                 SportsChannelPicks.compositeKey(competitionKey: fixture.leagueId, channelKey: channel.key)
             ] != nil
             // A series-named channel ("Sky Sports F1") with no guide entry at the
             // session's start is a fallback; one airing something else is not.
-            let airingAtStart = listings.contains { $0.start <= fixture.startDate && $0.end > fixture.startDate }
+            let airingAtStart: Bool
+            if let epgChannelId, !epgChannelId.isEmpty, !listings.isEmpty {
+                if let cached = airingAtStartCache[epgChannelId] {
+                    airingAtStart = cached
+                } else {
+                    let onAir = listings.contains { $0.start <= fixture.startDate && $0.end > fixture.startDate }
+                    airingAtStartCache[epgChannelId] = onAir
+                    airingAtStart = onAir
+                }
+            } else {
+                airingAtStart = false
+            }
             let nameFallback = channelNamesSeries && !airingAtStart
 
             let source: ResolvedChannelSource
