@@ -140,14 +140,9 @@ actor TimeshiftCache {
     }
 
     private func fetch(_ url: URL, headers: [String: String], limit: Int64 = 1_048_576) async throws -> (Data, URLResponse) {
-        let (stream, response) = try await session.bytes(for: request(url, headers: headers))
+        let (data, response) = try await session.data(for: request(url, headers: headers))
         guard let http = response as? HTTPURLResponse, (200 ... 299).contains(http.statusCode),
-              response.expectedContentLength <= limit else { throw CacheError.invalidResponse }
-        var data = Data()
-        for try await byte in stream {
-            guard data.count < limit else { throw CacheError.invalidResponse }
-            data.append(byte)
-        }
+              data.count <= limit else { throw CacheError.invalidResponse }
         try checkActive()
         return (data, response)
     }
