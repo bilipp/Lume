@@ -26,6 +26,20 @@ extension ContentSyncManager {
     /// read once, and holding all five to the end of the last sweep is the peak
     /// this import is measured at.
     func pruneStaleM3URows(playlistId: UUID, state: M3UImportState) {
+        guard state.hadExistingContent else {
+            // A genuinely first import into an empty playlist: every row currently
+            // stored was inserted by this very import. Mark-and-sweep would walk
+            // hundreds of thousands of newly inserted rows across all five phases
+            // only to find that every id was seen and delete nothing.
+            // Release the seen-sets immediately so their memory is reclaimed.
+            state.seenLiveIds = []
+            state.seenMovieIds = []
+            state.seenEpisodeIds = []
+            state.seenSeriesIds = []
+            state.seenCategoryKeys = []
+            return
+        }
+
         let imported = state.totalImported
         Perf.measure(.m3uPruneLive) {
             pruneLiveStreams(playlistId: playlistId, seenHashes: state.seenLiveIds, importedCount: imported)

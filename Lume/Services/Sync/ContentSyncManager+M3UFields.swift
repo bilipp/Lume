@@ -31,6 +31,7 @@ extension ContentSyncManager {
             state.categoryOrder[type.rawValue] = lookup.count
         }
         seedInsertOrder(playlistId: playlistId, state: state, context: ModelContext(modelContainer))
+        state.hadExistingContent = !state.knownCategories.isEmpty || playlistHasExistingCatalogRows(playlistId: playlistId)
     }
 
     /// The `num` values a fresh import should start handing to newly-inserted

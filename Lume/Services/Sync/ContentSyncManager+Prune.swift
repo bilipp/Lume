@@ -461,6 +461,49 @@ extension ContentSyncManager {
     private func clearSweepSkips(playlistId: UUID, kind: String) {
         UserDefaults.standard.removeObject(forKey: SweepSkipDefaults.key(playlistId: playlistId, kind: kind))
     }
+
+    // MARK: - Pre-import emptiness check
+
+    /// Answers whether this playlist already has any catalog rows stored
+    /// (`LiveStream`, `Movie`, `Series`, or `Episode`).
+    ///
+    /// Each check is bounded (`fetchLimit: 1`) so it stops at the first matching
+    /// row rather than scanning or counting the table. When all four return
+    /// empty, the playlist has no pre-existing catalog content in the store:
+    /// every row committed by the upcoming import is guaranteed new, so the
+    /// post-import mark-and-sweep phases would only walk freshly written rows to
+    /// delete nothing.
+    ///
+    /// This inspects the actual catalog store directly rather than trusting
+    /// `playlist.lastSyncDate`: an interrupted or failed import leaves its
+    /// committed batches behind while leaving `lastSyncDate == nil`, so a retry
+    /// must still sweep to remove any rows the shorter or altered retry dropped.
+    func playlistHasExistingCatalogRows(playlistId: UUID) -> Bool {
+        let context = ModelContext(modelContainer)
+        let prefix = playlistId.uuidString
+
+        var live = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        live.fetchLimit = 1
+        live.propertiesToFetch = [\.id]
+        if let found = try? context.fetch(live), !found.isEmpty { return true }
+
+        var movie = FetchDescriptor<Movie>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        movie.fetchLimit = 1
+        movie.propertiesToFetch = [\.id]
+        if let found = try? context.fetch(movie), !found.isEmpty { return true }
+
+        var series = FetchDescriptor<Series>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        series.fetchLimit = 1
+        series.propertiesToFetch = [\.id]
+        if let found = try? context.fetch(series), !found.isEmpty { return true }
+
+        var episode = FetchDescriptor<Episode>(predicate: #Predicate { $0.id.starts(with: prefix) })
+        episode.fetchLimit = 1
+        episode.propertiesToFetch = [\.id]
+        if let found = try? context.fetch(episode), !found.isEmpty { return true }
+
+        return false
+    }
 }
 
 /// Where `sweepIsAllowed` keeps its consecutive-skip counters.

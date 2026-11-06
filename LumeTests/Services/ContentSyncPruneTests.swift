@@ -476,4 +476,104 @@ struct ContentSyncM3UPruneGateTests {
 
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<Lume.Category>()) == 200)
     }
+
+    // MARK: - Pre-import emptiness and cold sweep skip (perf/m3u-first-import-prune)
+
+    @Test func `playlistHasExistingCatalogRows returns false for empty store`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        let manager = ContentSyncManager(modelContainer: container)
+        #expect(await manager.playlistHasExistingCatalogRows(playlistId: playlistId) == false)
+    }
+
+    @Test func `playlistHasExistingCatalogRows ignores rows of other playlists`() async throws {
+        let container = try makeTestContainer()
+        let otherPlaylistId = UUID()
+        let ourPlaylistId = UUID()
+        try insertMovies(0 ..< 10, playlistId: otherPlaylistId, container: container)
+
+        let manager = ContentSyncManager(modelContainer: container)
+        #expect(await manager.playlistHasExistingCatalogRows(playlistId: ourPlaylistId) == false)
+        #expect(await manager.playlistHasExistingCatalogRows(playlistId: otherPlaylistId) == true)
+    }
+
+    @Test func `playlistHasExistingCatalogRows detects each catalog kind individually`() async throws {
+        let container = try makeTestContainer()
+        let manager = ContentSyncManager(modelContainer: container)
+
+        // Live stream only
+        let livePlaylist = UUID()
+        do {
+            let context = ModelContext(container)
+            context.insert(LiveStream(id: "\(livePlaylist.uuidString)-live-1", streamId: 1, name: "Live 1"))
+            try context.save()
+        }
+        #expect(await manager.playlistHasExistingCatalogRows(playlistId: livePlaylist) == true)
+
+        // Movie only
+        let moviePlaylist = UUID()
+        try insertMovies(0 ..< 1, playlistId: moviePlaylist, container: container)
+        #expect(await manager.playlistHasExistingCatalogRows(playlistId: moviePlaylist) == true)
+
+        // Series only
+        let seriesPlaylist = UUID()
+        do {
+            let context = ModelContext(container)
+            context.insert(Series(id: "\(seriesPlaylist.uuidString)-series-1", seriesId: 1, name: "Series 1"))
+            try context.save()
+        }
+        #expect(await manager.playlistHasExistingCatalogRows(playlistId: seriesPlaylist) == true)
+
+        // Episode only
+        let episodePlaylist = UUID()
+        try insertEpisodes(0 ..< 1, playlistId: episodePlaylist, container: container)
+        #expect(await manager.playlistHasExistingCatalogRows(playlistId: episodePlaylist) == true)
+    }
+
+    @Test func `first import into cold playlist skips sweeps and releases seen sets`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        let manager = ContentSyncManager(modelContainer: container)
+
+        // Simulate an import that just wrote 10 movies into a previously empty store.
+        try insertMovies(0 ..< 10, playlistId: playlistId, container: container)
+
+        let state = M3UImportState()
+        state.hadExistingContent = false // Pre-import state was proven empty
+        state.importedMovies = 10
+        // Put something in seenMovieIds that does NOT match all stored movies
+        // (if sweep ran, it would delete movies not in seenMovieIds).
+        state.seenMovieIds = [M3UIdentity.hash64(movieId(0, playlistId: playlistId))]
+        state.seenCategoryKeys = ["vod|action"]
+
+        await manager.pruneStaleM3URows(playlistId: playlistId, state: state)
+
+        // Because pre-import state was cold, sweeps were skipped: all 10 movies survive!
+        #expect(try storedMovieCount(container) == 10)
+        // And seen sets were released to reclaim memory immediately.
+        #expect(state.seenMovieIds.isEmpty)
+        #expect(state.seenCategoryKeys.isEmpty)
+    }
+
+    @Test func `reimport into populated playlist executes sweeps and prunes stale rows`() async throws {
+        let container = try makeTestContainer()
+        let playlistId = UUID()
+        let manager = ContentSyncManager(modelContainer: container)
+
+        // Store already has 10 movies.
+        try insertMovies(0 ..< 10, playlistId: playlistId, container: container)
+
+        let state = M3UImportState()
+        state.hadExistingContent = true // Pre-import state was NOT empty
+        state.importedMovies = 10
+        let keptId = movieId(0, playlistId: playlistId)
+        state.seenMovieIds = [M3UIdentity.hash64(keptId)]
+
+        // Make sure coverage gate allows it (coverage: 1/10 = 0.1, exactly minimumCoverage)
+        await manager.pruneStaleM3URows(playlistId: playlistId, state: state)
+
+        #expect(try storedMovieCount(container) == 1)
+        let remaining = try ModelContext(container).fetch(FetchDescriptor<Movie>()).map(\.id)
+        #expect(remaining == [keptId])
+    }
 }
