@@ -35,6 +35,27 @@
             didSet { session?.setRate(playbackRate) }
         }
 
+        /// The session's audio offset in milliseconds, written by the
+        /// full-screen host; `nil` follows the media's provider default. A
+        /// change reaches the running session through `setAudioDelay`, on top
+        /// of the engine-wide delay the load was made with.
+        var audioOffsetMilliseconds: Int? {
+            didSet {
+                guard audioOffsetMilliseconds != oldValue, let session else { return }
+                session.setAudioDelay(AudioOffsetPreset.aetherSeconds(
+                    engineMilliseconds: loadedEngineAudioDelay, offsetMilliseconds: effectiveAudioOffset
+                ))
+            }
+        }
+
+        /// The engine-wide "Audio Delay" setting the running load was made
+        /// with, so a session change adds to the same base.
+        private var loadedEngineAudioDelay = 0
+
+        private var effectiveAudioOffset: Int {
+            audioOffsetMilliseconds ?? currentMedia?.audioOffsetMilliseconds ?? 0
+        }
+
         /// The engine's playback tick: (current, duration) in seconds. A
         /// callback rather than `@Published`, so the host writes it into its
         /// `PlaybackClock` and nothing observing this coordinator re-renders.
@@ -190,7 +211,9 @@
                 streamFailed(.unsupported)
                 return
             }
-            let plan = AetherLoadPlan.make(options: .load(), context: loadContext(for: media))
+            let options = AetherEngineOptions.load()
+            loadedEngineAudioDelay = options.audioDelay
+            let plan = AetherLoadPlan.make(options: options, context: loadContext(for: media))
             applyAudioLevel()
             let waitsForStandardLiveJoin = plan.isLive && plan.liveJoinProfile == .standard
             startupTask = makeStartupWatchdog(
@@ -367,7 +390,8 @@
                 isHLSSource: AetherLoadContext.isHLS(media.url),
                 httpHeaders: media.httpHeaders,
                 preferredAudioLanguages: PlayerLanguageOptions.load().preferredAudioLanguages,
-                isEmbedded: isEmbedded
+                isEmbedded: isEmbedded,
+                audioOffsetMilliseconds: effectiveAudioOffset
             )
         }
 

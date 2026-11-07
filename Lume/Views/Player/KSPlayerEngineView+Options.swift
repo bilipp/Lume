@@ -172,6 +172,11 @@ enum KSPlayerOptionsFactory {
         options.autoSelectEmbedSubtitle = settings.autoSelectSubtitle
         options.maxBufferDuration = Double(settings.maxBuffer)
         options.preferredForwardBufferDuration = Double(media.isLive ? settings.liveBuffer : settings.vodBuffer)
+        // The provider's audio offset, as the video delay KSPlayer's FFmpeg
+        // clock sync reads per frame (opposite sign, see `AudioOffsetPreset`).
+        // The AVPlayer path (`KSAVPlayer`) ignores it. The session's own nudge
+        // is written onto the live layer's options by `applyAudioOffset`.
+        options.videoDelay = AudioOffsetPreset.ksPlayerVideoDelaySeconds(media.audioOffsetMilliseconds ?? 0)
         // Conditional: `appendHeader` writes both FFmpeg's `headers` format
         // option and `AVURLAssetHTTPHeaderFieldsKey`, so calling it
         // unconditionally would change the open path for every IPTV stream.

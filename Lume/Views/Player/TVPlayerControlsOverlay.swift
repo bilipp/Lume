@@ -147,7 +147,7 @@
                 // Moving between controls counts as activity — keep them up.
                 onResetHideTimer()
                 // A menu takes focus along; hold the chrome until it comes back.
-                if new == nil, let old, [TVPlayerFocus.audio, .subtitles, .quality, .hue].contains(old) { PlayerControlsAutoHide.menuOpened() }
+                if new == nil, let old, [TVPlayerFocus.audio, .subtitles, .quality, .audioOffset, .hue].contains(old) { PlayerControlsAutoHide.menuOpened() }
             }
         }
 
@@ -372,7 +372,7 @@
             .disabled(!enabled)
         }
 
-        // MARK: - Trailing controls (audio / subtitles / sources / quality / hue / favorite / record)
+        // MARK: - Trailing controls (audio / subtitles / sources / quality / audio delay / hue / favorite / record)
 
         private var trailingControls: some View {
             HStack(spacing: 16) {
@@ -380,6 +380,7 @@
                 subtitleMenu
                 sourcesButton
                 qualityButton
+                audioOffsetButton
                 hueButton
                 if PlayerFavorites.supportsFavorites(media.contentRef) {
                     favoriteButton
@@ -388,6 +389,7 @@
             }
             .tvPlayerRecordFocusHandoff(media: media, focus: $focus)
             .tvPlayerQualityFocusHandoff(media: media, focus: $focus)
+            .tvPlayerAudioOffsetFocusHandoff(media: media, focus: $focus)
             .tvPlayerHueMenu(media: media, focus: $focus)
         }
 

@@ -95,3 +95,25 @@ extension KSPlayerEngineView {
         #endif
     }
 }
+
+// MARK: - Audio offset
+
+extension KSPlayerEngineView {
+    /// Writes the offset in force onto the live layer's options. KSPlayer's
+    /// FFmpeg clock sync reads `videoDelay` per frame, so the change lands on
+    /// the next frame without a rebuild; the rebuild paths (`rebuildStream`,
+    /// `reconnect`) reuse the same options object and keep it.
+    func applyAudioOffset() {
+        guard let layer = coordinator.playerLayer else { return }
+        let milliseconds = audioOffset?.effectiveMilliseconds ?? media.audioOffsetMilliseconds ?? 0
+        layer.options.videoDelay = AudioOffsetPreset.ksPlayerVideoDelaySeconds(milliseconds)
+    }
+
+    /// Only the FFmpeg player honours `videoDelay`; on the AVPlayer path
+    /// (`KSAVPlayer`) the in-player control stays hidden. Called once the
+    /// layer has a player, from `.readyToPlay`.
+    func registerAudioOffsetSupport() {
+        let isFFmpeg = coordinator.playerLayer?.player is KSMEPlayer
+        audioOffset?.register(engine: .ksPlayer, isAdjustable: isFFmpeg)
+    }
+}

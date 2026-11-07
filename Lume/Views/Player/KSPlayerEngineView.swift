@@ -61,6 +61,9 @@ struct KSPlayerEngineView: View {
     var onRemoteAdvance: ((PlayerMediaSwapper.Step) -> Bool)?
 
     @StateObject var coordinator = KSVideoPlayer.Coordinator()
+    /// The host's audio offset for this session; applied to the live layer by
+    /// `applyAudioOffset` (see `KSPlayerEngineView+Actions`).
+    @Environment(\.playerAudioOffset) var audioOffset
     /// Set when `coordinator` came from the tvOS Guide preview already
     /// playing. See `KSPlayerEngineView+Adoption`.
     @State var isAdoptedSession = false
@@ -330,9 +333,13 @@ struct KSPlayerEngineView: View {
                 PlaybackQoE.shared.endSession()
                 NowPlayingService.shared.detachTransport(owner: coordinator)
                 coordinator.resetPlayer()
+                audioOffset?.unregister(engine: .ksPlayer)
             }
             .onChange(of: engine.isPlaying) { _, _ in
                 resetHideTimer()
+            }
+            .onChange(of: audioOffset?.effectiveMilliseconds) { _, _ in
+                applyAudioOffset()
             }
             .onChange(of: scenePhase) { _, phase in
                 // The Home button backgrounds the app without calling
@@ -521,6 +528,10 @@ struct KSPlayerEngineView: View {
                 PlaybackQoE.shared.endSession()
                 NowPlayingService.shared.detachTransport(owner: coordinator)
                 coordinator.resetPlayer()
+                audioOffset?.unregister(engine: .ksPlayer)
+            }
+            .onChange(of: audioOffset?.effectiveMilliseconds) { _, _ in
+                applyAudioOffset()
             }
             #if os(iOS)
             .onChange(of: scenePhase) { oldPhase, phase in
