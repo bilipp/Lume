@@ -15,6 +15,10 @@ import OSLog
 /// Mutable registries that live across import batches: which categories exist,
 /// which series have been created, and running provider-order counters.
 final nonisolated class M3UImportState {
+    /// The kinds the playlist doesn't fetch: their entries are dropped before
+    /// the upsert and their sweeps skipped (`removeDisabledContent` clears
+    /// them instead). Seeded from the playlist with the rest of the state.
+    var disabledContent: Set<PlaylistTab> = []
     /// Ensured category unique-ids, keyed by "\(typeRaw)|\(groupName)".
     var knownCategories: Set<String> = []
     /// Next first-appearance sort order per category type.

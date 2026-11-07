@@ -46,6 +46,18 @@ nonisolated struct M3UClassifiedBatch {
     var live: [M3UEntry] = []
     var movies: [M3UEntry] = []
     var episodes: [M3UClassifiedEpisode] = []
+
+    /// The batch without the kinds a playlist doesn't fetch. Episodes are the
+    /// series kind: dropping them is what keeps their `Series` rows from
+    /// being created.
+    func dropping(_ disabled: Set<PlaylistTab>) -> M3UClassifiedBatch {
+        guard !disabled.isEmpty else { return self }
+        var batch = self
+        if disabled.contains(.liveTV) { batch.live = [] }
+        if disabled.contains(.movies) { batch.movies = [] }
+        if disabled.contains(.series) { batch.episodes = [] }
+        return batch
+    }
 }
 
 // MARK: - Classifier

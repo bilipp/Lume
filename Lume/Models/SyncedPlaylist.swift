@@ -38,6 +38,7 @@ final class SyncedPlaylist {
     var epgURL: String?
     var syncEnabled: Bool = true
     var hiddenTabsRaw: String = ""
+    var disabledContentRaw: String = ""
 
     /// Last time this record's config fields changed. Informational (surfaced in
     /// diagnostics / "last write wins" tie-breaks); the reconciler's correctness
@@ -55,6 +56,7 @@ final class SyncedPlaylist {
         epgURL: String?,
         syncEnabled: Bool,
         hiddenTabsRaw: String = "",
+        disabledContentRaw: String = "",
         updatedAt: Date = Date()
     ) {
         self.id = id
@@ -67,6 +69,7 @@ final class SyncedPlaylist {
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled
         self.hiddenTabsRaw = hiddenTabsRaw
+        self.disabledContentRaw = disabledContentRaw
         self.updatedAt = updatedAt
     }
 }

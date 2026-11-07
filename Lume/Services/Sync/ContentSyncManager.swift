@@ -113,6 +113,11 @@ actor ContentSyncManager {
             try await performPlexSync(playlist: playlist, playlistId: playlistId, progress: progress)
         }
 
+        // Content the playlist no longer fetches: the pipelines above skip its
+        // phases, this removes what earlier syncs (or another device's choice,
+        // arriving through cloud sync) left behind.
+        removeDisabledContent(playlistId: playlistId, disabled: playlist.disabledContent)
+
         // Every source writes the same unread history rows (see the method).
         purgeCatalogHistory()
 
@@ -141,29 +146,43 @@ actor ContentSyncManager {
         // `spaceContentPhaseRequests` for the connection-cap reason.
         // A manual full sync re-imports every phase; a scheduled one skips a
         // phase whose payload is byte-identical to its last import.
+        // A kind the playlist doesn't fetch is skipped outright; `performSync`
+        // removes its rows afterwards.
         let reuse = !full
-        try await syncMovies(for: playlist, playlistId: playlistId, progress: progress, reuseUnchanged: reuse)
-        try await spaceContentPhaseRequests()
-        try await syncSeries(for: playlist, playlistId: playlistId, progress: progress, reuseUnchanged: reuse)
-        try await spaceContentPhaseRequests()
-        try await syncLiveStreams(for: playlist, playlistId: playlistId, progress: progress, reuseUnchanged: reuse)
+        if playlist.syncs(.movies) {
+            try await syncMovies(for: playlist, playlistId: playlistId, progress: progress, reuseUnchanged: reuse)
+            try await spaceContentPhaseRequests()
+        }
+        if playlist.syncs(.series) {
+            try await syncSeries(for: playlist, playlistId: playlistId, progress: progress, reuseUnchanged: reuse)
+            try await spaceContentPhaseRequests()
+        }
+        if playlist.syncs(.liveTV) {
+            try await syncLiveStreams(for: playlist, playlistId: playlistId, progress: progress, reuseUnchanged: reuse)
+        }
     }
 
     func syncAllCategories(for playlist: Playlist, playlistId: UUID, progress: SyncProgress? = nil, full _: Bool = false) async throws {
-        Logger.database.info("Starting VOD category sync")
-        await progress?.start(.movieCategories)
-        try await syncVODCategories(for: playlist, playlistId: playlistId, progress: progress)
-        await progress?.complete(.movieCategories)
+        if playlist.syncs(.movies) {
+            Logger.database.info("Starting VOD category sync")
+            await progress?.start(.movieCategories)
+            try await syncVODCategories(for: playlist, playlistId: playlistId, progress: progress)
+            await progress?.complete(.movieCategories)
+        }
 
-        Logger.database.info("Starting Series category sync")
-        await progress?.start(.seriesCategories)
-        try await syncSeriesCategories(for: playlist, playlistId: playlistId, progress: progress)
-        await progress?.complete(.seriesCategories)
+        if playlist.syncs(.series) {
+            Logger.database.info("Starting Series category sync")
+            await progress?.start(.seriesCategories)
+            try await syncSeriesCategories(for: playlist, playlistId: playlistId, progress: progress)
+            await progress?.complete(.seriesCategories)
+        }
 
-        Logger.database.info("Starting Live TV category sync")
-        await progress?.start(.liveCategories)
-        try await syncLiveCategories(for: playlist, playlistId: playlistId, progress: progress)
-        await progress?.complete(.liveCategories)
+        if playlist.syncs(.liveTV) {
+            Logger.database.info("Starting Live TV category sync")
+            await progress?.start(.liveCategories)
+            try await syncLiveCategories(for: playlist, playlistId: playlistId, progress: progress)
+            await progress?.complete(.liveCategories)
+        }
     }
 
     // MARK: - Category Sync
