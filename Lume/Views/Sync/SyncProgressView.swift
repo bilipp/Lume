@@ -97,28 +97,11 @@ struct SyncProgressView: View {
         syncError = nil
         phase = .syncing
 
-        // Reported to the guide refresh so the two never share the provider's
-        // connection allowance: it stands aside (or is cut short) while this
-        // runs, and catches up once nothing else is pending — see
-        // `EPGRefreshGate`. Every start is paired with exactly one finish.
-        let epgSync = EPGSyncService.shared
-        epgSync.contentSyncDidStart()
+        let container = modelContext.container
         syncTask = Task {
-            var succeeded = false
-            defer { epgSync.contentSyncDidFinish(succeeded: succeeded) }
             do {
-                let syncManager = ContentSyncManager(modelContainer: modelContext.container)
-                try await BackgroundActivity.perform("Playlist sync") {
-                    try await syncManager.syncPlaylist(playlist, progress: progress, full: full)
-                }
-                succeeded = true
+                try await AutoSync.runSync(playlist, container: container, progress: progress, full: full)
                 await MainActor.run {
-                    // Newly synced titles need indexing; the launch-time pass
-                    // may already be finished, so kick a fresh one — but hold it
-                    // off a few seconds so loading the embedding model and the
-                    // per-chunk saves don't fight the first browse of the catalog
-                    // the user just synced.
-                    ContentIndexingService.shared.kick(after: .seconds(3))
                     phase = .finished
                     // Auto-sync gets out of the way as soon as it succeeds so the
                     // user can start browsing; the manual flow waits for Done.

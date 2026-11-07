@@ -15,7 +15,7 @@
 
     struct TVChannelsList: View {
         let scope: LiveChannelScope
-        let playlistPrefix: String
+        let catalogScope: CatalogScope
         /// The active playlist's source, so an empty list can say *why* it is
         /// empty rather than tell a WebDAV user to sync again.
         let sourceType: PlaylistSourceType?
@@ -41,14 +41,14 @@
 
         init(
             scope: LiveChannelScope,
-            playlistPrefix: String,
+            catalogScope: CatalogScope,
             sort: ContentSortOption,
             sourceType: PlaylistSourceType?,
             onStartMultiView: @escaping (LiveStream) -> Void,
             onPlay: @escaping (LiveStream) -> Void
         ) {
             self.scope = scope
-            self.playlistPrefix = playlistPrefix
+            self.catalogScope = catalogScope
             self.sourceType = sourceType
             self.onStartMultiView = onStartMultiView
             self.onPlay = onPlay
@@ -56,7 +56,7 @@
         }
 
         private var scopedStreams: [LiveStream] {
-            LiveChannelQuery.scoped(streams, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
+            LiveChannelQuery.scoped(streams, scope: scope, catalogScope: catalogScope, restriction: restriction)
         }
 
         var body: some View {
@@ -153,7 +153,7 @@
         /// parent gates it on `hasRecents`).
         private func clearRecentlyWatched() {
             let container = modelContext.container
-            Task { await StorageManager.clearRecentlyWatchedChannels(playlistPrefix: playlistPrefix, container: container) }
+            Task { await StorageManager.clearRecentlyWatchedChannels(catalogScope: catalogScope, container: container) }
         }
     }
 
@@ -167,6 +167,7 @@
         let onPlay: () -> Void
 
         @Environment(\.modelContext) private var modelContext
+        @Environment(\.playlistProvenance) private var provenance
         @FocusState private var isFocused: Bool
 
         private var currentEPG: EPGSlot? {
@@ -225,6 +226,10 @@
                             CatchupBadge(days: PlayableMedia.archiveBadgeDays(for: stream), spacing: 6)
                                 .font(.system(size: 22))
                                 .foregroundStyle(Color.blue)
+                        }
+
+                        if let playlistBadge = provenance.name(forContentID: stream.id, in: .liveTV) {
+                            PlaylistBadge(name: playlistBadge)
                         }
                     }
 
@@ -309,7 +314,7 @@
     /// either the channel list or the programme guide. The layout is chosen in
     /// Settings › Player › Live TV.
     struct TVLiveTVScreen: View {
-        let sections: [LiveTVSection]
+        let groups: [LiveTVSectionGroup]
         @Binding var selectedSection: LiveTVSection?
         let displayedSection: LiveTVSection?
         let contentSort: ContentSortOption
@@ -318,9 +323,9 @@
         /// Raises Multi-View seeded with a channel, from its long-press menu.
         let onStartMultiView: (LiveStream) -> Void
 
-        /// The active playlist's id prefix, needed to scope the virtual
-        /// (favorites / recently watched) collections in-memory.
-        let playlistPrefix: String
+        /// The playlists the virtual (favorites / recently watched)
+        /// collections are scoped to in-memory.
+        let catalogScope: CatalogScope
 
         /// The active playlist's source, forwarded so an empty channel list can
         /// explain itself. See `LiveTVEmptyState`.
@@ -361,7 +366,7 @@
                 // not this screen's `content`, which would otherwise reconstruct
                 // `EPGGuideView` (and re-run its grid build) on every keypress.
                 TVCategoryRail(
-                    sections: sections,
+                    groups: groups,
                     selectedSection: $selectedSection,
                     onCategoryActivated: {
                         showsRecordings = false
@@ -410,7 +415,7 @@
                 case .guide:
                     EPGGuideView(
                         scope: section.scope,
-                        playlistPrefix: playlistPrefix,
+                        catalogScope: catalogScope,
                         sort: contentSort,
                         onPlay: onPlay,
                         onPlayCatchup: onPlayCatchup,
@@ -424,7 +429,7 @@
                 case .list:
                     TVChannelsList(
                         scope: section.scope,
-                        playlistPrefix: playlistPrefix,
+                        catalogScope: catalogScope,
                         sort: contentSort,
                         sourceType: sourceType,
                         onStartMultiView: onStartMultiView,

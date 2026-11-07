@@ -20,7 +20,9 @@ extension CloudSyncEngine {
             sourceTypeRaw: playlist.sourceTypeRaw,
             epgURL: playlist.epgURL,
             syncEnabled: playlist.syncEnabled,
-            hiddenTabsRaw: playlist.hiddenTabsRaw
+            hiddenTabsRaw: playlist.hiddenTabsRaw,
+            combinedTypesRaw: playlist.combinedTypesRaw,
+            combinedPriority: playlist.combinedPriority
         )
     }
 
@@ -34,7 +36,9 @@ extension CloudSyncEngine {
             sourceTypeRaw: mirror.sourceTypeRaw,
             epgURL: mirror.epgURL,
             syncEnabled: mirror.syncEnabled,
-            hiddenTabsRaw: mirror.hiddenTabsRaw
+            hiddenTabsRaw: mirror.hiddenTabsRaw,
+            combinedTypesRaw: mirror.combinedTypesRaw,
+            combinedPriority: mirror.combinedPriority
         )
     }
 
@@ -87,5 +91,59 @@ extension CloudSyncEngine {
             isEnabled: server.isEnabled,
             updatedAt: server.updatedAt
         )
+    }
+}
+
+// MARK: - Value application
+
+/// The inverse of `values(from:)`: writes a merged `PlaylistConfigValues` back
+/// onto the catalog playlist or its cloud mirror.
+nonisolated extension Playlist {
+    func apply(_ value: PlaylistConfigValues) {
+        name = value.name
+        serverURL = value.serverURL
+        username = value.username
+        password = value.password
+        macAddress = value.macAddress.isEmpty ? nil : value.macAddress
+        sourceTypeRaw = value.sourceTypeRaw
+        epgURL = value.epgURL
+        syncEnabled = value.syncEnabled
+        hiddenTabsRaw = value.hiddenTabsRaw
+        combinedTypesRaw = value.combinedTypesRaw
+        combinedPriority = value.combinedPriority
+    }
+}
+
+nonisolated extension SyncedPlaylist {
+    convenience init(id: UUID, value: PlaylistConfigValues) {
+        self.init(
+            id: id,
+            name: value.name,
+            serverURL: value.serverURL,
+            username: value.username,
+            password: value.password,
+            macAddress: value.macAddress,
+            sourceTypeRaw: value.sourceTypeRaw,
+            epgURL: value.epgURL,
+            syncEnabled: value.syncEnabled,
+            hiddenTabsRaw: value.hiddenTabsRaw,
+            combinedTypesRaw: value.combinedTypesRaw,
+            combinedPriority: value.combinedPriority
+        )
+    }
+
+    func apply(_ value: PlaylistConfigValues) {
+        name = value.name
+        serverURL = value.serverURL
+        username = value.username
+        password = value.password
+        macAddress = value.macAddress
+        sourceTypeRaw = value.sourceTypeRaw
+        epgURL = value.epgURL
+        syncEnabled = value.syncEnabled
+        hiddenTabsRaw = value.hiddenTabsRaw
+        combinedTypesRaw = value.combinedTypesRaw
+        combinedPriority = value.combinedPriority
+        updatedAt = Date()
     }
 }

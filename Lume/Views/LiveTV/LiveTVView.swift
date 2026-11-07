@@ -49,6 +49,9 @@ nonisolated enum LiveTVLayoutMode: String, CaseIterable, Identifiable {
 struct LiveTVView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
+    /// The playlists the rail, the channel lists and the guide read from: one
+    /// playlist, or the Combined members.
+    @Environment(\.catalogScope) private var catalogScope
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
@@ -66,7 +69,7 @@ struct LiveTVView: View {
     /// fallbacks serve previews, which have no router.
     @Environment(DeepLinkRouter.self) private var tabRouter: DeepLinkRouter?
     @State private var fallbackSection: LiveTVSection?
-    @State private var fallbackSeededPrefix: String?
+    @State private var fallbackSeededScopeToken: String?
     @State private var showingSync = false
     @State private var playingMedia: PlayableMedia?
     @State private var showingSettings = false
@@ -105,7 +108,7 @@ struct LiveTVView: View {
             if layoutMode == .guide {
                 EPGGuideView(
                     scope: section.scope,
-                    playlistPrefix: playlistPrefix,
+                    catalogScope: catalogScope,
                     sort: contentSort,
                     onPlay: { playChannel($0, scope: section.scope) },
                     onPlayCatchup: { playCatchup($0, cell: $1) },
@@ -123,9 +126,9 @@ struct LiveTVView: View {
         #if os(tvOS)
             TVChannelsList(
                 scope: section.scope,
-                playlistPrefix: playlistPrefix,
+                catalogScope: catalogScope,
                 sort: contentSort,
-                sourceType: activePlaylist?.knownSourceType,
+                sourceType: liveSourceType,
                 onStartMultiView: { startMultiView(with: $0) },
                 onPlay: { playChannel($0, scope: section.scope) }
             )
@@ -133,7 +136,7 @@ struct LiveTVView: View {
         #else
             ChannelsList(
                 scope: section.scope,
-                playlistPrefix: playlistPrefix,
+                catalogScope: catalogScope,
                 sort: contentSort,
                 onStartMultiView: { startMultiView(with: $0) },
                 onPlay: { playChannel($0, scope: section.scope) }
@@ -152,7 +155,7 @@ struct LiveTVView: View {
                     )
                 } else if categories.isEmpty || sourceHasNoLiveChannels {
                     VStack(spacing: 20) {
-                        LiveTVEmptyState(sourceType: activePlaylist?.knownSourceType)
+                        LiveTVEmptyState(sourceType: liveSourceType)
                     }
                 } else {
                     // The rail resolves in a child view: gating the two virtual
@@ -160,12 +163,12 @@ struct LiveTVView: View {
                     // a `@Query` carries that scope only when its descriptor is
                     // built in an `init` the active playlist reaches.
                     LiveTVSections(
-                        playlistPrefix: playlistPrefix,
+                        catalogScope: catalogScope,
                         restriction: restriction,
-                        categorySections: categorySections
-                    ) { sections in
-                        layout(for: sections)
-                            .task(id: playlistPrefix) { seedSelection(from: sections) }
+                        categoryGroups: categoryGroups
+                    ) { groups in
+                        layout(for: groups)
+                            .task(id: catalogScope.token) { seedSelection(from: groups.allSections) }
                     }
                 }
             }
@@ -175,8 +178,7 @@ struct LiveTVView: View {
                 categorySortRaw: $categorySortRaw,
                 contentSortRaw: $contentSortRaw,
                 showingSync: $showingSync,
-                showingSettings: $showingSettings,
-                activePlaylist: activePlaylist
+                showingSettings: $showingSettings
             ))
             // After `libraryToolbar`, so Recordings and Multi-View lead the bar
             // as their own cluster, never beside Settings. Guide or List is
@@ -185,7 +187,7 @@ struct LiveTVView: View {
             // the cluster how much room is left for it.
             .liveTVToolbarCluster(
                 multiViewAvailable: !playlists.isEmpty && !categories.isEmpty,
-                switcherTitle: playlists.count > 1 ? activePlaylist?.name : nil
+                switcherTitle: playlists.count > 1 ? playlists.selectionTitle(for: catalogScope) : nil
             ) {
                 openMultiView()
             }
@@ -213,22 +215,22 @@ struct LiveTVView: View {
     /// This platform's browse layout for the resolved rail. The displayed
     /// section resolves here, once per render — rail and detail pane both need it.
     @ViewBuilder
-    private func layout(for sections: [LiveTVSection]) -> some View {
-        let displayed = displayedSection(in: sections)
+    private func layout(for groups: [LiveTVSectionGroup]) -> some View {
+        let displayed = displayedSection(in: groups.allSections)
         #if os(iOS)
-            iOSLayout(sections: sections, displayed: displayed)
+            iOSLayout(groups: groups, displayed: displayed)
         #elseif os(tvOS)
-            tvOSLayout(sections: sections, displayed: displayed)
+            tvOSLayout(groups: groups, displayed: displayed)
         #else
-            macOSLayout(sections: sections, displayed: displayed)
+            macOSLayout(groups: groups, displayed: displayed)
         #endif
     }
 
     #if os(iOS)
-        private func iOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
+        private func iOSLayout(groups: [LiveTVSectionGroup], displayed: LiveTVSection?) -> some View {
             VStack(spacing: 0) {
                 CategoryBar(
-                    sections: sections,
+                    groups: groups,
                     selectedSection: selectedSectionBinding
                 )
 
@@ -245,10 +247,10 @@ struct LiveTVView: View {
         }
     #endif
 
-    private func macOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
+    private func macOSLayout(groups: [LiveTVSectionGroup], displayed: LiveTVSection?) -> some View {
         HStack(spacing: 0) {
             CategorySidebar(
-                sections: sections,
+                groups: groups,
                 selectedSection: selectedSectionBinding
             )
             .frame(width: 200)
@@ -271,23 +273,23 @@ struct LiveTVView: View {
         /// One shape for both modes: the category sidebar on the leading edge
         /// beside the content area, which shows either the channel list or the
         /// programme guide (picked in Settings › Player › Live TV).
-        private func tvOSLayout(sections: [LiveTVSection], displayed: LiveTVSection?) -> some View {
+        private func tvOSLayout(groups: [LiveTVSectionGroup], displayed: LiveTVSection?) -> some View {
             TVLiveTVScreen(
-                sections: sections,
+                groups: groups,
                 selectedSection: selectedSectionBinding,
                 displayedSection: displayed,
                 contentSort: contentSort,
                 onPlay: { playChannel($0, scope: displayed?.scope) },
                 onPlayCatchup: { playCatchup($0, cell: $1) },
                 onStartMultiView: { startMultiView(with: $0) },
-                playlistPrefix: playlistPrefix,
-                sourceType: activePlaylist?.knownSourceType,
+                catalogScope: catalogScope,
+                sourceType: liveSourceType,
                 layoutMode: layoutMode,
                 preview: EPGGuidePreviewInputs(
-                    media: { [activePlaylist] stream in
-                        activePlaylist.flatMap { PlayableMedia.from(stream: stream, playlist: $0) }
+                    media: { [playlists] stream in
+                        PlayableMedia.from(stream: stream, ownedByOneOf: playlists)
                     },
-                    playlistID: activePlaylist?.id,
+                    playlistIDs: catalogScope.members(for: .liveTV),
                     controller: guidePreview,
                     hero: guideHero
                 )
@@ -303,10 +305,12 @@ struct LiveTVView: View {
         }
     #endif
 
-    /// The playlist whose content is currently shown, resolved from the global
-    /// selection. Falls back to the first playlist until the user picks one.
-    private var activePlaylist: Playlist? {
-        playlists.active(for: selectedPlaylistID)
+    /// The source type the empty states describe. In Combined a member that can
+    /// carry live channels wins, so one WebDAV or media-server member never
+    /// speaks for the rest.
+    private var liveSourceType: PlaylistSourceType? {
+        let types = playlists.members(of: catalogScope, for: .liveTV).compactMap(\.knownSourceType)
+        return types.first(where: \.canCarryLiveChannels) ?? types.first
     }
 
     /// A WebDAV share carries no live channels, so its rail stays empty even
@@ -314,23 +318,20 @@ struct LiveTVView: View {
     /// query cannot see that on its own. Same for the media servers, whose
     /// Live TV tuner APIs are not synced.
     private var sourceHasNoLiveChannels: Bool {
-        activePlaylist?.knownSourceType.map { !$0.canCarryLiveChannels } == true && categorySections.isEmpty
+        liveSourceType.map { !$0.canCarryLiveChannels } == true && categoryGroups.isEmpty
     }
 
-    /// The id prefix every Category / LiveStream of the active playlist shares.
-    private var playlistPrefix: String {
-        activePlaylist.map { "\($0.id.uuidString)-" } ?? ""
-    }
-
-    /// The rail's category entries: the active playlist's live categories this
-    /// viewer may see, in the chosen order. The `@Query` fetches every playlist's
-    /// categories (SwiftData can't parameterize a `@Query` on view state), so the
-    /// isolation by playlist-prefixed `id` — and the sort — happen here, memoized
-    /// so a body pass that changed nothing about them costs a key comparison.
-    private var categorySections: [LiveTVSection] {
-        categoryMemo.sections(
+    /// The rail's category entries: the scope's live categories this viewer may
+    /// see, in the chosen order, grouped by member. The `@Query` fetches every
+    /// playlist's categories (SwiftData can't parameterize a `@Query` on view
+    /// state), so the isolation by playlist-prefixed `id` — and the sort — happen
+    /// here, memoized so a body pass that changed nothing about them costs a key
+    /// comparison.
+    private var categoryGroups: [LiveTVSectionGroup] {
+        categoryMemo.groups(
             categories: categories,
-            playlistPrefix: playlistPrefix,
+            catalogScope: catalogScope,
+            playlistNames: playlists.members(of: catalogScope, for: .liveTV).namesByID,
             sort: categorySort,
             restriction: restriction
         )
@@ -347,11 +348,11 @@ struct LiveTVView: View {
         Binding(get: { selectedSection }, set: { selectedSection = $0 })
     }
 
-    /// The playlist `selectedSection` was last seeded for — see `seedSelection`.
-    private var seededPrefix: String? {
-        get { tabRouter.map(\.liveTVSeededPrefix) ?? fallbackSeededPrefix }
+    /// The scope `selectedSection` was last seeded for — see `seedSelection`.
+    private var seededScopeToken: String? {
+        get { tabRouter.map(\.liveTVSeededScopeToken) ?? fallbackSeededScopeToken }
         nonmutating set {
-            if let tabRouter { tabRouter.liveTVSeededPrefix = newValue } else { fallbackSeededPrefix = newValue }
+            if let tabRouter { tabRouter.liveTVSeededScopeToken = newValue } else { fallbackSeededScopeToken = newValue }
         }
     }
 
@@ -362,12 +363,12 @@ struct LiveTVView: View {
     /// Anything narrower (a category hidden in Content Management, the last
     /// favorite removed) is left to `displayedSection(in:)`, as before.
     private func seedSelection(from sections: [LiveTVSection]) {
-        if seededPrefix != nil, seededPrefix != playlistPrefix {
+        if seededScopeToken != nil, seededScopeToken != catalogScope.token {
             selectedSection = sections.first
         } else if selectedSection == nil {
             selectedSection = sections.first
         }
-        seededPrefix = playlistPrefix
+        seededScopeToken = catalogScope.token
     }
 
     /// The section to render in the detail pane. Normally the user's selection,
@@ -384,14 +385,15 @@ struct LiveTVView: View {
     /// `scope` is the section the channel was picked from; it travels with the
     /// media so in-player channel surfing stays inside that list.
     private func playChannel(_ stream: LiveStream, scope: LiveChannelScope?) {
-        guard let playlist = activePlaylist,
-              let media = PlayableMedia.from(stream: stream, playlist: playlist, scope: scope) else { return }
+        guard let media = PlayableMedia.from(
+            stream: stream, ownedByOneOf: playlists, scope: scope, surfScope: LiveSurfScope(catalogScope)
+        ) else { return }
         present(media)
     }
 
     /// Replays a past programme from the channel's catch-up archive.
     private func playCatchup(_ stream: LiveStream, cell: EPGProgramCell) {
-        guard let playlist = activePlaylist,
+        guard let playlist = playlists.owner(ofContentID: stream.id),
               let media = PlayableMedia.catchup(
                   stream: stream,
                   playlist: playlist,
@@ -405,11 +407,7 @@ struct LiveTVView: View {
     /// Opens Multi-View on a channel picked from the list, so the grid starts
     /// with something playing rather than two empty tiles.
     private func startMultiView(with stream: LiveStream) {
-        guard let playlist = activePlaylist,
-              let media = PlayableMedia.from(stream: stream, playlist: playlist)
-        else {
-            return
-        }
+        guard let media = PlayableMedia.from(stream: stream, ownedByOneOf: playlists) else { return }
         openMultiView(seed: [media])
     }
 

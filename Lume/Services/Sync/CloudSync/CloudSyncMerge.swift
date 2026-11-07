@@ -102,6 +102,8 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
     var epgURL: String?
     var syncEnabled: Bool
     var hiddenTabsRaw: String
+    var combinedTypesRaw: String
+    var combinedPriority: Int?
 
     init(
         name: String,
@@ -112,7 +114,9 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         sourceTypeRaw: String,
         epgURL: String?,
         syncEnabled: Bool,
-        hiddenTabsRaw: String = ""
+        hiddenTabsRaw: String = "",
+        combinedTypesRaw: String = "",
+        combinedPriority: Int? = nil
     ) {
         self.name = name
         self.serverURL = serverURL
@@ -123,10 +127,13 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled
         self.hiddenTabsRaw = hiddenTabsRaw
+        self.combinedTypesRaw = combinedTypesRaw
+        self.combinedPriority = combinedPriority
     }
 
     /// Hand-rolled decode so a shadow baseline persisted before Stalker support
-    /// (no `macAddress` key) or before hidden tabs (no `hiddenTabsRaw`) still
+    /// (no `macAddress` key), before hidden tabs (no `hiddenTabsRaw`) or before
+    /// combined playlists (no `combinedTypesRaw` / `combinedPriority`) still
     /// decodes — the field falls back to "" rather than failing the whole
     /// baseline, which would discard the shadow and risk a spurious mass reconcile.
     nonisolated init(from decoder: any Decoder) throws {
@@ -140,6 +147,8 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         epgURL = try container.decodeIfPresent(String.self, forKey: .epgURL)
         syncEnabled = try container.decode(Bool.self, forKey: .syncEnabled)
         hiddenTabsRaw = try container.decodeIfPresent(String.self, forKey: .hiddenTabsRaw) ?? ""
+        combinedTypesRaw = try container.decodeIfPresent(String.self, forKey: .combinedTypesRaw) ?? ""
+        combinedPriority = try container.decodeIfPresent(Int.self, forKey: .combinedPriority)
     }
 
     /// Conflict policy: cloud wins. Deterministic and adequate for config.

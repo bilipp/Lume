@@ -91,6 +91,12 @@ final class ContentIndexingService {
         return Date.now.timeIntervalSince(lastUserInteraction) < Self.browsingQuietWindow
     }
 
+    /// Playback, a CloudKit import/export or the user browsing: what background
+    /// catalog writers pause for besides a playlist sync.
+    var isForegroundBusy: Bool {
+        isPlaybackActive || isCloudSyncActive || isUserBrowsing
+    }
+
     /// Called by browse surfaces to hold indexing off for the next few seconds.
     /// One line at the call site with nothing to balance, and it costs a single
     /// `Date` write — cheap enough to sit on an `.onAppear`, a tab change or a

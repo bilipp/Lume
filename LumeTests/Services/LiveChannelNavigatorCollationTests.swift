@@ -83,7 +83,7 @@ struct LiveChannelNavigatorCollationTests {
         try context.fetch(LiveChannelNavigator.scopeDescriptor(
             scope: scope,
             sort: sort,
-            playlistPrefix: "\(playlist.id.uuidString)-",
+            catalogScope: .isolated(playlist.id),
             restriction: restriction,
             admittingHidden: nil
         ))

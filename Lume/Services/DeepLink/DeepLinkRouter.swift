@@ -22,9 +22,10 @@ final class DeepLinkRouter {
     var seriesPath = NavigationPath()
     var sportsPath = NavigationPath()
     var homePath = NavigationPath()
-    /// Live TV's selected rail section, and the playlist it was seeded for.
+    /// Live TV's selected rail section, and the `CatalogScope.token` it was
+    /// seeded for.
     var liveTVSection: LiveTVSection?
-    var liveTVSeededPrefix: String?
+    var liveTVSeededScopeToken: String?
     /// A `lume://cloud/pair` link asked to add a device to Lume Cloud, and the
     /// add-device sheet hasn't come up for it yet. It waits here while
     /// something the sheet can't be presented over is on screen.
@@ -102,6 +103,11 @@ final class DeepLinkRouter {
         /// `interactiveDismissDisabled`. The modal needs Menu for itself so a PIN
         /// pad nested over it can consume the press first.
         var isQuickSwitchPresented = false
+
+        /// A Settings page another surface asked for, opened — and cleared — by
+        /// the Settings tab once it is on screen. tvOS Settings is a tab, not a
+        /// sheet a caller could seed with `SettingsView(opening:)`.
+        var pendingSettingsRoute: SettingsRoute?
     #endif
 }
 

@@ -25,7 +25,11 @@ import Testing
 
 @MainActor
 struct BrowseQueryShapeTests {
-    private let prefix = "\(UUID().uuidString)-"
+    private let playlistID = UUID()
+
+    private var scope: CatalogScope {
+        .isolated(playlistID)
+    }
 
     // MARK: - Collection rails are bounded
 
@@ -34,8 +38,8 @@ struct BrowseQueryShapeTests {
     /// had a few thousand watched titles, re-running on every catalog write.
     @Test func `every preview row is bounded`() {
         for kind in [LibraryCollection.Kind.recentlyWatched, .favorites, .recentlyAdded] {
-            #expect(MovieCollectionQuery.rowDescriptor(for: kind, playlistPrefix: prefix).fetchLimit == collectionRowFetchLimit)
-            #expect(SeriesCollectionQuery.rowDescriptor(for: kind, playlistPrefix: prefix).fetchLimit == collectionRowFetchLimit)
+            #expect(MovieCollectionQuery.rowDescriptor(for: kind, scope: scope).fetchLimit == collectionRowFetchLimit)
+            #expect(SeriesCollectionQuery.rowDescriptor(for: kind, scope: scope).fetchLimit == collectionRowFetchLimit)
         }
         #expect(collectionRowFetchLimit > collectionPreviewLimit, "the cap has to leave room for `hasMore`")
     }
@@ -45,9 +49,9 @@ struct BrowseQueryShapeTests {
     /// Added keeps its cap because its predicate matches the whole catalog —
     /// every title has an `added` stamp.
     @Test func `show-all grids are unbounded except recently added`() {
-        #expect(MovieCollectionQuery.gridDescriptor(for: .favorites, playlistPrefix: prefix).fetchLimit == nil)
-        #expect(MovieCollectionQuery.gridDescriptor(for: .recentlyWatched, playlistPrefix: prefix).fetchLimit == nil)
-        #expect(MovieCollectionQuery.gridDescriptor(for: .recentlyAdded, playlistPrefix: prefix).fetchLimit == recentlyAddedFetchLimit)
+        #expect(MovieCollectionQuery.gridDescriptor(for: .favorites, scope: scope).fetchLimit == nil)
+        #expect(MovieCollectionQuery.gridDescriptor(for: .recentlyWatched, scope: scope).fetchLimit == nil)
+        #expect(MovieCollectionQuery.gridDescriptor(for: .recentlyAdded, scope: scope).fetchLimit == recentlyAddedFetchLimit)
     }
 
     // MARK: - Live TV gates stay probes
@@ -59,8 +63,8 @@ struct BrowseQueryShapeTests {
     /// a tab the viewer may never open.
     @Test func `live tv section gates are limit-one probes with no sort`() {
         for descriptor in [
-            LiveChannelQuery.favoritesProbe(playlistPrefix: prefix, restriction: ContentRestriction()),
-            LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: prefix, restriction: ContentRestriction())
+            LiveChannelQuery.favoritesProbe(catalogScope: scope, restriction: ContentRestriction()),
+            LiveChannelQuery.recentlyWatchedProbe(catalogScope: scope, restriction: ContentRestriction())
         ] {
             #expect(descriptor.fetchLimit == 1)
             #expect(descriptor.sortBy.isEmpty)
@@ -122,13 +126,14 @@ struct BrowseQueryShapeTests {
     @Test func `collection rails only fetch the active playlist`() throws {
         let container = try makeSQLiteContainer()
         let context = ModelContext(container)
-        let mine = "\(UUID().uuidString)-"
+        let mineID = UUID()
+        let mine = "\(mineID.uuidString)-"
         let theirs = "\(UUID().uuidString)-"
 
-        for (scope, count) in [(mine, 3), (theirs, 5)] {
+        for (owner, count) in [(mine, 3), (theirs, 5)] {
             for index in 0 ..< count {
                 let movie = Movie(
-                    id: "\(scope)vod-\(index)",
+                    id: "\(owner)vod-\(index)",
                     streamId: index,
                     name: "Feature \(index)",
                     added: String(1_700_000_000 + index)
@@ -141,7 +146,7 @@ struct BrowseQueryShapeTests {
         try context.save()
 
         for kind in [LibraryCollection.Kind.favorites, .recentlyWatched, .recentlyAdded] {
-            let rows = try context.fetch(MovieCollectionQuery.rowDescriptor(for: kind, playlistPrefix: mine))
+            let rows = try context.fetch(MovieCollectionQuery.rowDescriptor(for: kind, scope: .isolated(mineID)))
             #expect(rows.count == 3, "\(kind) leaked rows from another playlist")
             #expect(rows.allSatisfy { $0.id.hasPrefix(mine) })
         }
@@ -152,7 +157,8 @@ struct BrowseQueryShapeTests {
     @Test func `live tv gates only see the active playlist`() throws {
         let container = try makeSQLiteContainer()
         let context = ModelContext(container)
-        let mine = "\(UUID().uuidString)-"
+        let mineID = UUID()
+        let mine = "\(mineID.uuidString)-"
         let theirs = "\(UUID().uuidString)-"
 
         let other = LiveStream(id: "\(theirs)live-1", streamId: 1, name: "Theirs")
@@ -162,8 +168,8 @@ struct BrowseQueryShapeTests {
         try context.save()
 
         let restriction = ContentRestriction()
-        #expect(try context.fetch(LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: restriction)).isEmpty)
-        #expect(try context.fetch(LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: mine, restriction: restriction)).isEmpty)
+        #expect(try context.fetch(LiveChannelQuery.favoritesProbe(catalogScope: .isolated(mineID), restriction: restriction)).isEmpty)
+        #expect(try context.fetch(LiveChannelQuery.recentlyWatchedProbe(catalogScope: .isolated(mineID), restriction: restriction)).isEmpty)
 
         let ours = LiveStream(id: "\(mine)live-1", streamId: 2, name: "Ours")
         ours.isFavorite = true
@@ -171,8 +177,8 @@ struct BrowseQueryShapeTests {
         context.insert(ours)
         try context.save()
 
-        #expect(try context.fetch(LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: restriction)).count == 1)
-        #expect(try context.fetch(LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: mine, restriction: restriction)).count == 1)
+        #expect(try context.fetch(LiveChannelQuery.favoritesProbe(catalogScope: .isolated(mineID), restriction: restriction)).count == 1)
+        #expect(try context.fetch(LiveChannelQuery.recentlyWatchedProbe(catalogScope: .isolated(mineID), restriction: restriction)).count == 1)
     }
 
     /// A hidden channel is the only favorite: the gate must report empty, or the
@@ -180,7 +186,8 @@ struct BrowseQueryShapeTests {
     @Test func `live tv gates respect channel visibility`() throws {
         let container = try makeSQLiteContainer()
         let context = ModelContext(container)
-        let mine = "\(UUID().uuidString)-"
+        let mineID = UUID()
+        let mine = "\(mineID.uuidString)-"
 
         let hidden = LiveStream(id: "\(mine)live-1", streamId: 1, name: "Hidden")
         hidden.isFavorite = true
@@ -188,7 +195,7 @@ struct BrowseQueryShapeTests {
         context.insert(hidden)
         try context.save()
 
-        let probe = LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: ContentRestriction())
+        let probe = LiveChannelQuery.favoritesProbe(catalogScope: .isolated(mineID), restriction: ContentRestriction())
         #expect(try context.fetch(probe).isEmpty)
     }
 
@@ -198,7 +205,8 @@ struct BrowseQueryShapeTests {
     @Test func `a restricted-only favorite does not light up the rail`() throws {
         let container = try makeSQLiteContainer()
         let context = ModelContext(container)
-        let mine = "\(UUID().uuidString)-"
+        let mineID = UUID()
+        let mine = "\(mineID.uuidString)-"
         let locked = "\(mine)live-locked"
 
         let stream = LiveStream(id: "\(mine)live-1", streamId: 1, name: "Locked", categoryId: locked)
@@ -207,11 +215,11 @@ struct BrowseQueryShapeTests {
         try context.save()
 
         let restriction = ContentRestriction(isActive: true, restrictedCategoryIDs: [locked])
-        let probe = LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: restriction)
+        let probe = LiveChannelQuery.favoritesProbe(catalogScope: .isolated(mineID), restriction: restriction)
         #expect(try context.fetch(probe).isEmpty)
 
         // …and is offered again to a viewer the lock does not apply to.
-        let parent = LiveChannelQuery.favoritesProbe(playlistPrefix: mine, restriction: ContentRestriction())
+        let parent = LiveChannelQuery.favoritesProbe(catalogScope: .isolated(mineID), restriction: ContentRestriction())
         #expect(try context.fetch(parent).count == 1)
     }
 
@@ -225,7 +233,7 @@ struct BrowseQueryShapeTests {
         let scope = LiveChannelNavigator.scopeDescriptor(
             scope: .category("cat-a"),
             sort: .playlist,
-            playlistPrefix: prefix,
+            catalogScope: .isolated(playlistID),
             restriction: ContentRestriction(),
             admittingHidden: nil
         )
@@ -299,10 +307,10 @@ struct BrowseQueryShapeTests {
     }
 
     /// Episode and channel neighbours both resolve the owning playlist from the
-    /// row's id prefix. That used to fetch every installed playlist and match in
-    /// Swift; it is an indexed lookup now, and the fallback that keeps a legacy
-    /// id playable has to survive it.
-    @Test func `the owning playlist is found by id, with the fallback intact`() throws {
+    /// row's id prefix, as an indexed lookup. An id whose owner can't be found
+    /// resolves to nothing: with playlists combined, any other playlist would
+    /// build the stream URL against the wrong provider.
+    @Test func `the owning playlist is found by id, and an unowned id finds none`() throws {
         let container = try makeSQLiteContainer()
         let context = ModelContext(container)
         let ids = [makePlaylist(in: context), makePlaylist(in: context)].map(\.id)
@@ -310,11 +318,8 @@ struct BrowseQueryShapeTests {
 
         let owner = try #require(ids.last)
         #expect(PlaylistOwner.playlist(forPrefixedID: "\(owner.uuidString)-live-1", in: context)?.id == owner)
-        // Which playlist an id that names none falls back to is unspecified —
-        // an unsorted fetch has no order to promise — but it must still be one,
-        // or a legacy id stops resolving a stream URL at all.
-        let fallback = try #require(PlaylistOwner.playlist(forPrefixedID: "legacy-live-1", in: context))
-        #expect(ids.contains(fallback.id))
+        #expect(PlaylistOwner.playlist(forPrefixedID: "legacy-live-1", in: context) == nil)
+        #expect(PlaylistOwner.playlist(forPrefixedID: "\(UUID().uuidString)-live-1", in: context) == nil)
     }
 
     // MARK: - Helpers

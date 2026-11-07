@@ -19,7 +19,9 @@ extension ContentSyncManager {
         if movie.plot != item.description { movie.plot = item.description }
         if let year = item.year, !year.isEmpty, movie.releaseDate != year { movie.releaseDate = year }
         if let rating = Double(item.rating ?? ""), movie.rating != rating { movie.rating = rating }
-        if let added = item.added, movie.added != added { movie.added = added }
+        if let added = CatalogAddedDate.unixString(item.added) {
+            CatalogAddedDate.assign(added, to: \.added, of: movie)
+        }
         if movie.categoryId != categoryId { movie.categoryId = categoryId }
         if movie.directURL != cmd { movie.directURL = cmd }
     }
@@ -32,7 +34,9 @@ extension ContentSyncManager {
         if let year = item.year, !year.isEmpty, series.releaseDate != year { series.releaseDate = year }
         // The Recently Added series rail orders by `lastModified`; the portal's
         // `added` timestamp is the closest equivalent.
-        if let added = item.added, series.lastModified != added { series.lastModified = added }
+        if let added = CatalogAddedDate.unixString(item.added) {
+            CatalogAddedDate.assign(added, to: \.lastModified, of: series)
+        }
         if series.categoryId != categoryId { series.categoryId = categoryId }
     }
 

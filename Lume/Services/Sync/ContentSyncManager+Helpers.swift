@@ -145,7 +145,10 @@ extension ContentSyncManager {
     /// and the lenient decoders preserve the difference), and the `Double`
     /// comparisons must stay exact. Any tolerance — treating empty as nil,
     /// rounding a rating — silently *stops* applying a legitimate provider
-    /// update, which is harder to notice than the reverse.
+    /// update, which is harder to notice than the reverse. The one exception is
+    /// the `added` / `lastModified` timestamps: both sides compare in
+    /// `CatalogAddedDate`'s canonical form, so a row stored in an older format
+    /// is not rewritten (or its episode cache invalidated) by every sync.
     ///
     /// The cyclomatic-complexity opt-out below is deliberate: this is a flat
     /// field copy with one independent guard per provider field, not branching
@@ -158,7 +161,7 @@ extension ContentSyncManager {
         if movie.rating != rating { movie.rating = rating }
         let rating5Based = dto.rating5Based ?? 0
         if movie.rating5Based != rating5Based { movie.rating5Based = rating5Based }
-        if movie.added != dto.added { movie.added = dto.added }
+        CatalogAddedDate.assign(dto.added, to: \.added, of: movie)
         if movie.containerExtension != dto.containerExtension { movie.containerExtension = dto.containerExtension }
         if movie.tmdb != dto.tmdb { movie.tmdb = dto.tmdb }
         let num = dto.num ?? 0
@@ -201,7 +204,7 @@ extension ContentSyncManager {
         if let releaseDate = dto.releaseDate, !releaseDate.isEmpty, series.releaseDate != releaseDate {
             series.releaseDate = releaseDate
         }
-        if series.lastModified != dto.lastModified { series.lastModified = dto.lastModified }
+        CatalogAddedDate.assign(dto.lastModified, to: \.lastModified, of: series)
         if series.rating != dto.rating { series.rating = dto.rating }
         if series.rating5Based != dto.rating5Based { series.rating5Based = dto.rating5Based }
         if series.tmdb != dto.tmdb { series.tmdb = dto.tmdb }
@@ -221,13 +224,13 @@ extension ContentSyncManager {
     /// or freshly-inserted `LiveStream`, leaving user state intact.
     ///
     /// Dirty-checked for the same reason, and under the same exactness rules, as
-    /// `applyMovieFields`, including the complexity opt-out.
-    func applyLiveStreamFields(from dto: XtreamLiveStream, to stream: LiveStream, playlistPrefix: String) { // swiftlint:disable:this cyclomatic_complexity
+    /// `applyMovieFields`.
+    func applyLiveStreamFields(from dto: XtreamLiveStream, to stream: LiveStream, playlistPrefix: String) {
         let name = dto.name ?? ""
         if stream.name != name { stream.name = name }
         if stream.streamIcon != dto.streamIcon { stream.streamIcon = dto.streamIcon }
         if stream.epgChannelId != dto.epgChannelId { stream.epgChannelId = dto.epgChannelId }
-        if stream.added != dto.added { stream.added = dto.added }
+        CatalogAddedDate.assign(dto.added, to: \.added, of: stream)
         if stream.customSid != dto.customSid { stream.customSid = dto.customSid }
         let tvArchive = dto.tvArchive ?? 0
         if stream.tvArchive != tvArchive { stream.tvArchive = tvArchive }

@@ -8,9 +8,9 @@
 //  category — so they're driven by their own predicates rather than a
 //  `categoryId`, mirroring the Home screen's rows.
 //
-//  Each surface scopes its @Query to the active playlist inside the predicate:
-//  ids are playlist-prefixed, so `id.starts(with:)` is a prefix match SQLite
-//  answers itself. Scoping in memory instead meant every row hydrated every
+//  Each surface scopes its @Query to the active `CatalogScope` inside the
+//  predicate: ids are playlist-prefixed, so `id.starts(with:)` is a prefix match
+//  SQLite answers itself. Scoping in memory instead meant every row hydrated every
 //  playlist's matches and then threw most of them away, on every catalog write
 //  — 0.85 ms for a fresh library, 59 ms once 3,035 movies carried a watch date.
 //  Only the viewer's hidden categories are filtered in Swift, since that state
@@ -148,10 +148,10 @@ struct MovieCollectionRow: View {
     @Environment(\.contentRestriction) private var restriction
     @Query private var movies: [Movie]
 
-    init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
         self.animationNamespace = animationNamespace
-        _movies = Query(MovieCollectionQuery.rowDescriptor(for: kind, playlistPrefix: playlistPrefix))
+        _movies = Query(MovieCollectionQuery.rowDescriptor(for: kind, scope: scope))
     }
 
     private var visible: [Movie] {
@@ -185,10 +185,10 @@ struct MovieCollectionView: View {
     @Environment(\.contentRestriction) private var restriction
     @Query private var movies: [Movie]
 
-    init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
         self.animationNamespace = animationNamespace
-        _movies = Query(MovieCollectionQuery.gridDescriptor(for: kind, playlistPrefix: playlistPrefix))
+        _movies = Query(MovieCollectionQuery.gridDescriptor(for: kind, scope: scope))
     }
 
     private var visible: [Movie] {
@@ -223,8 +223,8 @@ struct MovieCollectionView: View {
 enum MovieCollectionQuery {
     /// The fetch behind a preview row — always bounded, see
     /// `collectionRowFetchLimit`.
-    static func rowDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Movie> {
-        var descriptor = base(for: kind, playlistPrefix: playlistPrefix)
+    static func rowDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Movie> {
+        var descriptor = base(for: kind, scope: scope)
         descriptor.fetchLimit = collectionRowFetchLimit
         return descriptor
     }
@@ -232,24 +232,19 @@ enum MovieCollectionQuery {
     /// The fetch behind "Show All". Recently Watched and Favorites stay
     /// unbounded — the grid is the surface that legitimately shows everything —
     /// while Recently Added keeps the cap its whole-playlist predicate needs.
-    static func gridDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Movie> {
-        var descriptor = base(for: kind, playlistPrefix: playlistPrefix)
+    static func gridDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Movie> {
+        var descriptor = base(for: kind, scope: scope)
         if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
         return descriptor
     }
 
-    private static func base(for kind: LibraryCollection.Kind, playlistPrefix prefix: String) -> FetchDescriptor<Movie> {
-        switch kind {
+    private static func base(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Movie> {
+        let scoped = predicate(for: kind, scope: scope)
+        return switch kind {
         case .recentlyWatched:
-            FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) },
-                sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
-            )
+            FetchDescriptor<Movie>(predicate: scoped, sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)])
         case .favorites:
-            FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.isFavorite && $0.id.starts(with: prefix) },
-                sortBy: [SortDescriptor(\.name)]
-            )
+            FetchDescriptor<Movie>(predicate: scoped, sortBy: [SortDescriptor(\.name)])
         case .recentlyAdded:
             // `comparator: .lexical`, not the `.localizedStandard` default:
             // `added` is a Unix timestamp string, and the localized comparator
@@ -257,9 +252,27 @@ enum MovieCollectionQuery {
             // `Movie.added` cannot serve. 222.4 ms → 92.6 ms on a 179k-title
             // catalog, and that one query was 46% of a cold launch's SQL.
             FetchDescriptor<Movie>(
-                predicate: #Predicate { $0.added != nil && $0.id.starts(with: prefix) },
+                predicate: scoped,
                 sortBy: [SortDescriptor(\.added, comparator: .lexical, order: .reverse), SortDescriptor(\.num)]
             )
+        }
+    }
+
+    /// One contributing playlist inlines `id.starts(with:)`, the predicate
+    /// isolated mode always had; several compose the scope's OR via `evaluate`.
+    private static func predicate(for kind: LibraryCollection.Kind, scope: CatalogScope) -> Predicate<Movie> {
+        if let prefix = scope.singlePrefix(for: .movies) {
+            switch kind {
+            case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) }
+            case .favorites: return #Predicate { $0.isFavorite && $0.id.starts(with: prefix) }
+            case .recentlyAdded: return #Predicate { $0.added != nil && $0.id.starts(with: prefix) }
+            }
+        }
+        let scoped = scope.moviePredicate()
+        switch kind {
+        case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && scoped.evaluate($0) }
+        case .favorites: return #Predicate { $0.isFavorite && scoped.evaluate($0) }
+        case .recentlyAdded: return #Predicate { $0.added != nil && scoped.evaluate($0) }
         }
     }
 }
@@ -275,10 +288,10 @@ struct SeriesCollectionRow: View {
     @Environment(\.contentRestriction) private var restriction
     @Query private var series: [Series]
 
-    init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
         self.animationNamespace = animationNamespace
-        _series = Query(SeriesCollectionQuery.rowDescriptor(for: kind, playlistPrefix: playlistPrefix))
+        _series = Query(SeriesCollectionQuery.rowDescriptor(for: kind, scope: scope))
     }
 
     private var visible: [Series] {
@@ -312,10 +325,10 @@ struct SeriesCollectionView: View {
     @Environment(\.contentRestriction) private var restriction
     @Query private var series: [Series]
 
-    init(kind: LibraryCollection.Kind, playlistPrefix: String, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
         self.animationNamespace = animationNamespace
-        _series = Query(SeriesCollectionQuery.gridDescriptor(for: kind, playlistPrefix: playlistPrefix))
+        _series = Query(SeriesCollectionQuery.gridDescriptor(for: kind, scope: scope))
     }
 
     private var visible: [Series] {
@@ -346,39 +359,52 @@ struct SeriesCollectionView: View {
 enum SeriesCollectionQuery {
     /// The fetch behind a preview row — always bounded, see
     /// `collectionRowFetchLimit`.
-    static func rowDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Series> {
-        var descriptor = base(for: kind, playlistPrefix: playlistPrefix)
+    static func rowDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Series> {
+        var descriptor = base(for: kind, scope: scope)
         descriptor.fetchLimit = collectionRowFetchLimit
         return descriptor
     }
 
     /// The fetch behind "Show All"; see `MovieCollectionQuery.gridDescriptor`.
-    static func gridDescriptor(for kind: LibraryCollection.Kind, playlistPrefix: String) -> FetchDescriptor<Series> {
-        var descriptor = base(for: kind, playlistPrefix: playlistPrefix)
+    static func gridDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Series> {
+        var descriptor = base(for: kind, scope: scope)
         if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
         return descriptor
     }
 
-    private static func base(for kind: LibraryCollection.Kind, playlistPrefix prefix: String) -> FetchDescriptor<Series> {
-        switch kind {
+    private static func base(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Series> {
+        let scoped = predicate(for: kind, scope: scope)
+        return switch kind {
         case .recentlyWatched:
-            FetchDescriptor<Series>(
-                predicate: #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) },
-                sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
-            )
+            FetchDescriptor<Series>(predicate: scoped, sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)])
         case .favorites:
-            FetchDescriptor<Series>(
-                predicate: #Predicate { $0.isFavorite && $0.id.starts(with: prefix) },
-                sortBy: [SortDescriptor(\.name)]
-            )
+            FetchDescriptor<Series>(predicate: scoped, sortBy: [SortDescriptor(\.name)])
         case .recentlyAdded:
             // `comparator: .lexical` for the same reason as the movie side:
             // `lastModified` is a Unix timestamp string, and the default
             // localized comparator forfeits the `#Index` to NSCollateFinderlike.
             FetchDescriptor<Series>(
-                predicate: #Predicate { $0.lastModified != nil && $0.id.starts(with: prefix) },
+                predicate: scoped,
                 sortBy: [SortDescriptor(\.lastModified, comparator: .lexical, order: .reverse), SortDescriptor(\.num)]
             )
+        }
+    }
+
+    /// Inline for one contributing playlist, composed for several; see
+    /// `MovieCollectionQuery.predicate`.
+    private static func predicate(for kind: LibraryCollection.Kind, scope: CatalogScope) -> Predicate<Series> {
+        if let prefix = scope.singlePrefix(for: .series) {
+            switch kind {
+            case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) }
+            case .favorites: return #Predicate { $0.isFavorite && $0.id.starts(with: prefix) }
+            case .recentlyAdded: return #Predicate { $0.lastModified != nil && $0.id.starts(with: prefix) }
+            }
+        }
+        let scoped = scope.seriesPredicate()
+        switch kind {
+        case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && scoped.evaluate($0) }
+        case .favorites: return #Predicate { $0.isFavorite && scoped.evaluate($0) }
+        case .recentlyAdded: return #Predicate { $0.lastModified != nil && scoped.evaluate($0) }
         }
     }
 }

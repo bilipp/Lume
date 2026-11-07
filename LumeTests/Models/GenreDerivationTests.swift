@@ -5,6 +5,7 @@ import Testing
 
 @MainActor
 struct GenreDerivationTests {
+    private let playlistID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
     private let prefix = "11111111-1111-1111-1111-111111111111-"
     private let otherPrefix = "22222222-2222-2222-2222-222222222222-"
 
@@ -31,7 +32,7 @@ struct GenreDerivationTests {
         // inserts must be persisted before it can see them.
         try context.save()
 
-        let genres = await GenreDerivation.movieGenres(in: container, playlistPrefix: prefix, restriction: ContentRestriction())
+        let genres = await GenreDerivation.movieGenres(in: container, scope: .isolated(playlistID), restriction: ContentRestriction())
         #expect(genres == ["Action", "Comedy", "Drama"])
     }
 
@@ -43,7 +44,7 @@ struct GenreDerivationTests {
         context.insert(makeSeries(seriesId: 3, genre: "Horror", prefix: otherPrefix))
         try context.save()
 
-        let genres = await GenreDerivation.seriesGenres(in: container, playlistPrefix: prefix, restriction: ContentRestriction())
+        let genres = await GenreDerivation.seriesGenres(in: container, scope: .isolated(playlistID), restriction: ContentRestriction())
         #expect(genres == ["Drama", "Sci-Fi & Fantasy"])
     }
 
@@ -53,7 +54,7 @@ struct GenreDerivationTests {
         context.insert(makeMovie(streamId: 1, genre: nil, prefix: prefix))
         try context.save()
 
-        let genres = await GenreDerivation.movieGenres(in: container, playlistPrefix: prefix, restriction: ContentRestriction())
+        let genres = await GenreDerivation.movieGenres(in: container, scope: .isolated(playlistID), restriction: ContentRestriction())
         #expect(genres.isEmpty)
     }
 }

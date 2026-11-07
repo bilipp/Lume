@@ -16,6 +16,9 @@ struct HomeView: View {
     // watchlist loading in `HomeView+Trending.swift` can drive them.
     @Environment(\.modelContext) var modelContext
     @Environment(\.contentRestriction) var restriction
+    /// The playlists whose content is shown: one playlist, or the Combined
+    /// members.
+    @Environment(\.catalogScope) var catalogScope
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
     #endif
@@ -75,6 +78,7 @@ struct HomeView: View {
     /// Observed for the Home empty-state check, which mirrors the Sports rail.
     @State var sportsFollows = SportsFollowService.shared
     @State var sportsStore = SportsStore.shared
+    @State var scopeMatcherMemo = CatalogScopeMatcherMemo()
     @State private var playingMedia: PlayableMedia?
     @State private var showingSync = false
     @State private var showingSettings = false
@@ -200,8 +204,7 @@ struct HomeView: View {
                 categorySortRaw: $categorySortRaw,
                 contentSortRaw: $contentSortRaw,
                 showingSync: $showingSync,
-                showingSettings: $showingSettings,
-                activePlaylist: activePlaylist
+                showingSettings: $showingSettings
             ))
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
@@ -216,40 +219,23 @@ struct HomeView: View {
                 #endif
             }
             .homeDownloadsDestination()
-            #if os(tvOS)
-                .navigationDestination(item: $selectedHero) { hero in
-                    if let movie = hero.movie {
-                        MovieDetailView(movie: movie, animationNamespace: animationNamespace)
-                    } else if let series = hero.series {
-                        SeriesDetailView(series: series, animationNamespace: animationNamespace)
-                    }
-                }
-            #endif
-                .task(id: trendingKey) {
-                    await loadTrending(cacheKey: trendingKey)
-                }
-                .task(id: watchlistsKey) {
-                    await loadWatchlists(scope: watchlistScope)
-                }
-                .task(id: recommendationsKey) {
-                    await loadRecommendations()
-                }
-                .task(id: seriesResumeKey) {
-                    await loadSeriesResume()
-                }
-                .task(id: sportsWarmKey) {
-                    warmSports()
-                }
-            #if os(iOS) || os(tvOS)
-                .fullScreenCover(item: $playingMedia) { media in
-                    FullScreenPlayerView(media: media)
-                }
-            #endif
-            #if os(iOS)
-                .fullScreenCover(item: $multiViewLaunch) { launch in
-                    MultiViewScreen(seed: launch.seed)
+            .homeHeroDestination(heroSelection, animationNamespace: animationNamespace)
+            .task(id: trendingKey) {
+                await loadTrending(cacheKey: trendingKey)
             }
-            #endif
+            .task(id: watchlistsKey) {
+                await loadWatchlists(scope: watchlistScope)
+            }
+            .task(id: recommendationsKey) {
+                await loadRecommendations()
+            }
+            .task(id: seriesResumeKey) {
+                await loadSeriesResume()
+            }
+            .task(id: sportsWarmKey) {
+                warmSports()
+            }
+            .homePlayerCovers(playingMedia: $playingMedia, multiViewLaunch: multiViewLaunchSelection)
             .paywall(isPresented: $showingPaywall, highlight: .multiView)
         }
         .recordActionFlow(observesWhileVisible: false) // once, for every rail's channel menu
@@ -332,14 +318,17 @@ struct HomeView: View {
     /// Content Management reloads the rows instead of replaying a cached list
     /// that was matched against the whole catalog.
     var trendingKey: String {
-        let synced = activePlaylist?.lastSyncDate?.timeIntervalSince1970 ?? 0
-        return "\(playlists.count)-\(selectedPlaylistID)-\(synced)-\(restriction.visibilityToken)"
+        let scope = catalogScope
+        let synced = playlists.members(of: scope)
+            .compactMap { $0.lastSyncDate?.timeIntervalSince1970 }
+            .max() ?? 0
+        return "\(playlists.count)-\(scope.token)-\(synced)-\(restriction.visibilityToken)"
     }
 
     /// What the watchlist rows are matched against. Each service caches per
     /// connection state plus this scope (see `loadWatchlist`).
     var watchlistScope: String {
-        "\(selectedPlaylistID)-\(restriction.visibilityToken)"
+        "\(catalogScope.token)-\(restriction.visibilityToken)"
     }
 
     var watchlistsKey: String {
@@ -352,36 +341,26 @@ struct HomeView: View {
     /// moves whenever a resume bar would.
     private var seriesResumeKey: String {
         let newest = watchedSeries.first?.lastWatchedDate?.timeIntervalSince1970 ?? 0
-        return "resume-\(watchedSeries.count)-\(newest)-\(selectedPlaylistID)"
+        return "resume-\(watchedSeries.count)-\(newest)-\(catalogScope.token)"
     }
 
     // MARK: - Playlist scoping
 
-    /// The playlist whose content is currently shown, resolved from the global
-    /// selection. Falls back to the first playlist until the user picks one.
-    private var activePlaylist: Playlist? {
-        playlists.active(for: selectedPlaylistID)
-    }
-
-    /// The id prefix every Movie/Series/LiveStream belonging to the active
-    /// playlist shares (ids are stored as `"\(playlistID)-…"`). The `@Query`
-    /// results span all playlists, so this scopes them in-memory.
-    private var playlistPrefix: String? {
-        activePlaylist.map { "\($0.id.uuidString)-" }
-    }
-
-    func belongsToActivePlaylist(_ id: String) -> Bool {
-        guard let prefix = playlistPrefix else { return true }
-        return id.hasPrefix(prefix)
+    /// Scopes the all-playlist `@Query` results in-memory by prefixed id, per
+    /// content type: a Combined member contributes only the types switched on
+    /// for it. Memoized so a body pass doesn't rebuild the prefixes per row.
+    var scopeMatcher: CatalogScope.Matcher {
+        scopeMatcherMemo.matcher(for: catalogScope)
     }
 
     // MARK: - Derived content
 
     private var recentlyWatched: [HomeMediaItem] {
-        var items = watchedMovies.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.movie)
-            + watchedSeries.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.series)
+        let scope = scopeMatcher
+        var items = watchedMovies.filter { scope.contains($0.id, .movies) }.excludingRestricted(restriction).map(HomeMediaItem.movie)
+            + watchedSeries.filter { scope.contains($0.id, .series) }.excludingRestricted(restriction).map(HomeMediaItem.series)
         if recentlyWatchedIncludesLiveTV {
-            items += watchedStreams.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.live)
+            items += watchedStreams.filter { scope.contains($0.id, .liveTV) }.excludingRestricted(restriction).map(HomeMediaItem.live)
         }
         return items
             .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
@@ -390,23 +369,16 @@ struct HomeView: View {
     }
 
     private var favorites: [HomeMediaItem] {
-        let movies = favoriteMovies.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction)
-        let series = favoriteSeries.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction)
-        let streams = favoriteStreams.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction)
-
-        // Interleave the three types by the cross-type `favoriteOrder` set in
-        // Content Management → Favorites, so a movie placed above a channel shows
-        // above it here too. Items never reordered (nil) fall back to a stable
-        // type/name grouping (channels, movies, then series) — the same fallback
-        // the favorites manager uses.
-        let entries: [(order: Int?, rank: Int, name: String, item: HomeMediaItem)] =
-            streams.map { ($0.favoriteOrder, 0, $0.name, HomeMediaItem.live($0)) }
-                + movies.map { ($0.favoriteOrder, 1, $0.name, HomeMediaItem.movie($0)) }
-                + series.map { ($0.favoriteOrder, 2, $0.name, HomeMediaItem.series($0)) }
-
-        return entries
-            .sorted { ($0.order ?? Int.max, $0.rank, $0.name) < ($1.order ?? Int.max, $1.rank, $1.name) }
-            .map(\.item)
+        let scope = scopeMatcher
+        let movies = favoriteMovies.filter { scope.contains($0.id, .movies) }.excludingRestricted(restriction)
+        let series = favoriteSeries.filter { scope.contains($0.id, .series) }.excludingRestricted(restriction)
+        let streams = favoriteStreams.filter { scope.contains($0.id, .liveTV) }.excludingRestricted(restriction)
+        typealias Entry = FavoritesOrder.Entry<HomeMediaItem>
+        return FavoritesOrder.sorted(
+            streams.map { Entry(order: $0.favoriteOrder, member: scope.memberRank(of: $0.id), kind: 0, num: $0.num, name: $0.name, item: .live($0)) }
+                + movies.map { Entry(order: $0.favoriteOrder, member: scope.memberRank(of: $0.id), kind: 1, num: $0.num, name: $0.name, item: .movie($0)) }
+                + series.map { Entry(order: $0.favoriteOrder, member: scope.memberRank(of: $0.id), kind: 2, num: $0.num, name: $0.name, item: .series($0)) }
+        )
     }
 
     /// Truly empty home — only show the empty state once trending has settled
@@ -453,8 +425,7 @@ struct HomeView: View {
     /// paywall when the viewer isn't on Lume Pro. Mirrors `LiveTVView`'s pair of
     /// the same name — the rails are a second entry point to the same feature.
     private func startMultiView(with stream: LiveStream) {
-        guard let playlist = activePlaylist,
-              let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+        guard let media = PlayableMedia.from(stream: stream, ownedByOneOf: playlists) else { return }
         guard premium.isPremium else {
             showingPaywall = true
             return
@@ -473,8 +444,9 @@ struct HomeView: View {
     }
 
     private func playChannel(_ stream: LiveStream) {
-        guard let playlist = activePlaylist,
-              let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+        guard let media = PlayableMedia.from(
+            stream: stream, ownedByOneOf: playlists, surfScope: LiveSurfScope(catalogScope)
+        ) else { return }
         if ExternalPlayback.open(media) { return }
         #if os(macOS)
             MacPlayerWindowRouter.shared.play(media, using: openWindow)
@@ -487,6 +459,24 @@ struct HomeView: View {
 // MARK: - For You
 
 private extension HomeView {
+    /// The immersive tvOS home's hero selection; inert elsewhere.
+    var heroSelection: Binding<HeroItem?> {
+        #if os(tvOS)
+            $selectedHero
+        #else
+            .constant(nil)
+        #endif
+    }
+
+    /// Multi-View launched from a rail; tvOS presents it through the router.
+    var multiViewLaunchSelection: Binding<MultiViewLaunch?> {
+        #if os(tvOS)
+            .constant(nil)
+        #else
+            $multiViewLaunch
+        #endif
+    }
+
     /// Refresh the row when the active playlist, the favorites/history queries or
     /// the hidden categories change. This only re-resolves the list (cheap, and
     /// re-validates each entry against live state) — the engine still throttles the actual re-ranking to
@@ -494,7 +484,7 @@ private extension HomeView {
     var recommendationsKey: String {
         let counts = "\(watchedMovies.count)-\(watchedSeries.count)-\(favoriteMovies.count)-\(favoriteSeries.count)"
         let visibility = restriction.visibilityToken
-        return "rec-\(recommendationsEnabled)-\(premium.isPremium)-\(isSyncBusy)-\(recommendationsRecalcToken)-\(counts)-\(selectedPlaylistID)-\(visibility)"
+        return "rec-\(recommendationsEnabled)-\(premium.isPremium)-\(isSyncBusy)-\(recommendationsRecalcToken)-\(counts)-\(catalogScope.token)-\(visibility)"
     }
 
     /// True while a playlist sync, iCloud sync or EPG import is running. The For
@@ -552,7 +542,7 @@ private extension HomeView {
         var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         guard let movie = try? modelContext.fetch(descriptor).first,
-              belongsToActivePlaylist(movie.id), !restriction.hides(categoryID: movie.categoryId)
+              scopeMatcher.contains(movie.id, .movies), !restriction.hides(categoryID: movie.categoryId)
         else { return nil }
         return movie
     }
@@ -561,7 +551,7 @@ private extension HomeView {
         var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         guard let series = try? modelContext.fetch(descriptor).first,
-              belongsToActivePlaylist(series.id), !restriction.hides(categoryID: series.categoryId)
+              scopeMatcher.contains(series.id, .series), !restriction.hides(categoryID: series.categoryId)
         else { return nil }
         return series
     }
