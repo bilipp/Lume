@@ -56,7 +56,7 @@ nonisolated enum CreditsInfo {
                 Library(
                     name: "AetherEngine",
                     license: "LGPL v3 + App Store exception",
-                    urlString: "https://github.com/superuser404notfound/AetherEngine/tree/7.54.0"
+                    urlString: "https://github.com/superuser404notfound/AetherEngine/tree/7.59.0"
                 ),
                 Library(
                     name: "FFmpeg (FFmpegBuild)",
