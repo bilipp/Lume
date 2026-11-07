@@ -241,7 +241,7 @@ import SwiftUI
         case contentManagement
         case recordingServer
         case audioLanguages, addLanguage
-        case subtitleStyle, openSubtitles
+        case subtitleStyle, openSubtitles, philipsHue
         case engines
         case engineOptions(PlayerEngineKind)
         case syncBackend(SyncBackendSelection)

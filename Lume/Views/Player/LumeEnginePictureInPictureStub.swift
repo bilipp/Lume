@@ -15,6 +15,7 @@
     final class PictureInPictureBridge {
         let isSupported = false
         let isActive = false
+        var onActiveChange: ((Bool) -> Void)?
 
         init(session _: PlayerSession, mediaInfo _: MediaInfo) {}
 

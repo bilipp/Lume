@@ -1,0 +1,9 @@
+[
+  {
+    "error": {
+      "type": 101,
+      "address": "",
+      "description": "link button not pressed"
+    }
+  }
+]

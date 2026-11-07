@@ -40,6 +40,7 @@ Release would change what ships. Debug, Release and Sideload are untouched.
 | End-to-end import | `M3UColdImportBenchmarks` | The whole production cold import, phase by phase |
 | Attribution harnesses | `M3UEpisodeRelationshipBenchmarks`, `M3UExistingRowFetchBenchmarks` | Which part of an import loop the time is actually in |
 | Lume Cloud push | `LumeCloudSyncBenchmarks` | The per-pass push diff or the first push of a large library getting slower |
+| Hue light sync | `HueSamplingBenchmarks` | One ~50 Hz sampling tick (downscale, region average, smoothing, encode) growing into the decoder's CPU budget |
 | Signpost metrics | `SignpostBenchmarks` | A named production phase getting slower |
 | Field telemetry | `AppPerformanceMetrics` (MetricKit) in the app | What users actually experience |
 | Player QoE | `PlaybackQoE` in the app | Join time, rebuffering, startup failures |
@@ -323,6 +324,31 @@ seal), then the 200 requests, where each per-request save of about 0.1 s
 on a context holding 200,000 registered models, and the first save also writes
 the 100,000 new bookkeeping rows. The history purge after the first push takes
 about 1.8 s.
+
+## The Hue sampling tick
+
+While Philips Hue sync is on (tvOS), `HueFrameSampler` runs one tick about 50
+times a second on its own queue, beside the decoder: a `VTPixelTransferSession`
+pass from the decoded frame to a 32 × 18 BGRA grid, the channel-region
+averages (with the letterbox scan), smoothing, the intensity curve and the
+HueStream encode. `HueSamplingBenchmarks` drives `HueFramePipeline` directly
+with fixed-seed synthetic 1080p frames from `PerfFixtures.hueFrames` (16 × 9
+colour blocks, letterbox bars on every second frame, IOSurface-backed):
+
+| Benchmark | Input |
+|---|---|
+| `testTick1080pBGRA` | BGRA, Rec. 709 |
+| `testTick1080p420v` | 8-bit 4:2:0 video range, Rec. 709 |
+| `testTick1080pX420HDR` | 10-bit 4:2:0 tagged BT.2020 / PQ, so the transfer tone-maps |
+| `testTickPrescaledGrid` | LumeEngine's pre-sampled grid: no downscale |
+
+Each measured block is 500 ticks (10 s of playback) over eight rotating
+frames; divide the clock by 500 for one tick. The pipeline is built and warmed
+outside the measured span, so the `HueDownscale` / `HueMap` / `HueEncode`
+signpost metrics read one warm tick each. At 50 Hz the budget is 20 ms per
+tick; anything above roughly 1 ms is CPU taken from the decoder. No baseline
+is recorded yet: the simulator's VideoToolbox is not the Apple TV's, so the
+number worth keeping is one from a device (see "Tracing a real Apple TV").
 
 ## The parser microbenchmarks, and the offset-less XMLTV win
 

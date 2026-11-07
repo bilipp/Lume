@@ -1,0 +1,14 @@
+{
+  "errors": [],
+  "data": [
+    {
+      "id": "8d199a37-5ce4-4aae-a60e-db5d0aa27df3",
+      "type": "entertainment_configuration",
+      "metadata": { "name": "TV" },
+      "configuration_type": "screen",
+      "status": "active",
+      "active_streamer": { "rid": "f7d2a7c0-0000-4000-8000-0000000000aa", "rtype": "auth_v1" },
+      "channels": []
+    }
+  ]
+}

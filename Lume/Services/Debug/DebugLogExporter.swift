@@ -44,6 +44,8 @@ nonisolated struct DebugLogExporter {
         var lastUnexpectedEnd: Date?
         var isPremium: Bool?
         var cloudSync: [String] = []
+        /// `hueLine`, on the platforms that have Hue sync.
+        var hue: String?
         var settings: [String] = []
         /// Where the user opened diagnostics from ("Add Playlist") and the
         /// error that screen was showing, so the report leads with it.
@@ -167,6 +169,9 @@ nonisolated struct DebugLogExporter {
         ]
         if let isPremium = metadata.isPremium {
             lines.append("Lume Pro: \(isPremium ? "yes" : "no")")
+        }
+        if let hue = metadata.hue {
+            lines.append(hue)
         }
         if !metadata.locale.isEmpty {
             lines.append("Locale: \(metadata.locale)")
@@ -370,6 +375,7 @@ nonisolated struct DebugLogExporter {
             lastUnexpectedEnd: DiagnosticSession.lastUnexpectedEnd,
             isPremium: PremiumManager.shared.isPremium,
             cloudSync: cloudSync.map { cloudSyncLines($0.status) } ?? [],
+            hue: currentHueLine,
             settings: settingsLines(defaults),
             origin: origin,
             visibleProblem: visibleProblem,
@@ -424,7 +430,8 @@ nonisolated struct DebugLogExporter {
     static func settingsLines(_ defaults: UserDefaults) -> [String] {
         // Lume's keys are lowercase and dotted ("player.ks.hardwareDecode");
         // the system and SDK domains mixed into `standard` are capitalized.
-        let excludedPrefixes = ["com.", "diagnostics.", "debug.logging.enabledSince"]
+        // `hue.` holds the bridge's address and id, the area id and the lamps' snapshot.
+        let excludedPrefixes = ["com.", "diagnostics.", "debug.logging.enabledSince", "hue."]
         var lines: [String] = []
         for (key, value) in defaults.dictionaryRepresentation() {
             guard key.count < 80, key.first?.isLowercase == true, key.contains("."),
@@ -492,5 +499,39 @@ nonisolated struct DebugLogExporter {
         case .undefined: "—"
         @unknown default: "—"
         }
+    }
+}
+
+// MARK: - Philips Hue
+
+nonisolated extension DebugLogExporter {
+    @MainActor
+    static var currentHueLine: String? {
+        #if os(tvOS)
+            let hueSync = HueSyncController.shared
+            return hueLine(
+                paired: HueCredentialStore().pairedBridge != nil,
+                state: hueSync.state,
+                lastError: hueSync.lastError
+            )
+        #else
+            return nil
+        #endif
+    }
+
+    /// Paired, state and last error only: never the bridge's address or id,
+    /// its keys, or the area.
+    static func hueLine(paired: Bool, state: HueSyncState, lastError: HueSyncError?) -> String {
+        let stateLabel = switch state {
+        case .idle: "idle"
+        case .connecting: "connecting"
+        case .streaming: "streaming"
+        case .unavailable(.unsupportedEngine): "streaming, unsupported engine"
+        case .unavailable(.unsupportedContent): "streaming, unsupported video"
+        case .areaInUse: "area in use"
+        case .error: "stopped on error"
+        }
+        let error = lastError.map { LogRedaction.scrubURLs(in: $0.logDescription) } ?? "none"
+        return "Hue: paired \(paired ? "yes" : "no") · \(stateLabel) · last error: \(error)"
     }
 }

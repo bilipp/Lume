@@ -151,6 +151,7 @@ private extension [Playlist] {
         private var combinedLabel: some View {
             HStack(spacing: 6) {
                 Text("Combined View")
+                BetaBadge()
                 if !premium.isPremium {
                     PremiumBadge()
                 }
@@ -226,6 +227,7 @@ private extension [Playlist] {
                 } label: {
                     HStack(spacing: 16) {
                         Text("Combined View")
+                        BetaBadge()
                         if !premium.isPremium {
                             PremiumBadge()
                         }

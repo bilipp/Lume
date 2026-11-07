@@ -77,9 +77,12 @@
         private func list(proxy: ScrollViewProxy) -> some View {
             let members = playlists.combinedMembers.map(CombinedMemberRow.init)
 
-            Text("Combined View")
-                .font(.system(size: 34, weight: .bold))
-                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            HStack(spacing: 16) {
+                Text("Combined View")
+                    .font(.system(size: 34, weight: .bold))
+                BetaBadge()
+            }
+            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
             if !members.isEmpty {
                 memberSection(members, proxy: proxy)
@@ -92,6 +95,7 @@
             VStack(alignment: .leading, spacing: 8) {
                 // swiftlint:disable:next line_length
                 Text("Combined View merges the content types you choose from each playlist into one library, grouped by playlist. Include at least two playlists, then choose Combined in Quick Switch (Play/Pause).")
+                Text("Combined View is in beta and may still change.")
                 if !premium.isPremium {
                     Text("Combined View is part of Lume Pro. Your choices here are kept.")
                 }

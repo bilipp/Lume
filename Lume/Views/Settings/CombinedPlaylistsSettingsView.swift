@@ -62,6 +62,7 @@ import SwiftUI
                     VStack(alignment: .leading, spacing: 8) {
                         // swiftlint:disable:next line_length
                         Text("Combined View merges the content types you choose from each playlist into one library, grouped by playlist. Include at least two playlists, then choose Combined in the playlist switcher.")
+                        Text("Combined View is in beta and may still change.")
                         if !premium.isPremium {
                             Text("Combined View is part of Lume Pro. Your choices here are kept.")
                         }

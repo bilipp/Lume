@@ -1,0 +1,12 @@
+{
+  "name": "Hue Bridge",
+  "datastoreversion": "172",
+  "swversion": "1978125090",
+  "apiversion": "1.78.0",
+  "mac": "00:17:88:00:00:00",
+  "bridgeid": "001788FFFE000000",
+  "factorynew": false,
+  "replacesbridgeid": null,
+  "modelid": "BSB002",
+  "starterkitid": ""
+}

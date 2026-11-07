@@ -374,4 +374,107 @@ struct MultiViewSessionTests {
         )
         #expect(session.playlistsInUse() == [playlist])
     }
+
+    // MARK: - Hue source follows the audio
+
+    private final class FakeHueSource: HueFrameSource {
+        func latestFrame() -> HueFrameSample {
+            .noFrame
+        }
+
+        func detach() {}
+    }
+
+    /// Records what the router hands to the Hue controller.
+    private final class RouteLog {
+        var routed: [ObjectIdentifier?] = []
+
+        func record(_ source: (any HueFrameSource)?) {
+            routed.append(source.map { ObjectIdentifier($0) })
+        }
+    }
+
+    @MainActor
+    @Test func `the Hue source follows the tile with the audio`() async {
+        let session = MultiViewSession(seed: [channel(1), channel(2)], layout: .two)
+        let log = RouteLog()
+        let router = HueSourceRouter<MultiViewSlot.ID>(debounce: .zero) { log.record($0) }
+        let first = FakeHueSource()
+        let second = FakeHueSource()
+        router.register(first, for: session.slots[0].id)
+        router.register(second, for: session.slots[1].id)
+
+        router.selectNow(session.audioSlotID)
+        session.focusAudio(on: session.slots[1].id)
+        await router.select(session.audioSlotID).value
+
+        #expect(log.routed == [ObjectIdentifier(first), ObjectIdentifier(second)])
+    }
+
+    @MainActor
+    @Test func `a tile that registers after taking the audio still drives the lamps`() {
+        let session = MultiViewSession(seed: [channel(1)], layout: .two)
+        let log = RouteLog()
+        let router = HueSourceRouter<MultiViewSlot.ID>(debounce: .zero) { log.record($0) }
+        router.selectNow(session.audioSlotID)
+        #expect(log.routed.isEmpty)
+
+        let source = FakeHueSource()
+        router.register(source, for: session.audioSlotID)
+        #expect(log.routed == [ObjectIdentifier(source)])
+    }
+
+    @MainActor
+    @Test func `clearing the only playing tile leaves no source, so the lamps hold`() {
+        let session = MultiViewSession(seed: [channel(1)], layout: .two)
+        let log = RouteLog()
+        let router = HueSourceRouter<MultiViewSlot.ID>(debounce: .zero) { log.record($0) }
+        let source = FakeHueSource()
+        let slotID = session.slots[0].id
+        router.register(source, for: slotID)
+        router.selectNow(session.audioSlotID)
+
+        session.setMedia(nil, in: slotID)
+        router.unregister(source, for: slotID)
+        router.selectNow(session.audioSlotID)
+
+        #expect(log.routed == [ObjectIdentifier(source), nil])
+    }
+
+    @MainActor
+    @Test func `an engine fallback in the audible tile swaps the source without a gap`() {
+        let session = MultiViewSession(seed: [channel(1)], layout: .two)
+        let log = RouteLog()
+        let router = HueSourceRouter<MultiViewSlot.ID>(debounce: .zero) { log.record($0) }
+        let slotID = session.audioSlotID
+        let outgoing = FakeHueSource()
+        let incoming = FakeHueSource()
+        router.register(outgoing, for: slotID)
+        router.selectNow(slotID)
+
+        // The new engine's view appears before the old one's disappears.
+        router.register(incoming, for: slotID)
+        router.unregister(outgoing, for: slotID)
+
+        #expect(log.routed == [ObjectIdentifier(outgoing), ObjectIdentifier(incoming)])
+    }
+
+    @MainActor
+    @Test func `flicking the audio across tiles only routes where it settles`() async {
+        let session = MultiViewSession(seed: [channel(1), channel(2), channel(3)], layout: .three)
+        let log = RouteLog()
+        let router = HueSourceRouter<MultiViewSlot.ID>(debounce: .milliseconds(50)) { log.record($0) }
+        let sources = session.slots.map { _ in FakeHueSource() }
+        for (slot, source) in zip(session.slots, sources) {
+            router.register(source, for: slot.id)
+        }
+        router.selectNow(session.audioSlotID)
+
+        session.focusAudio(on: session.slots[1].id)
+        router.select(session.audioSlotID)
+        session.focusAudio(on: session.slots[2].id)
+        await router.select(session.audioSlotID).value
+
+        #expect(log.routed == [ObjectIdentifier(sources[0]), ObjectIdentifier(sources[2])])
+    }
 }

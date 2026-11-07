@@ -269,6 +269,7 @@ struct FullScreenPlayerView: View {
         .macPlayerWindow(activeMedia: activeMedia, launchMedia: media) { switchMedia(to: $0) }
         .playerRecording(for: activeMedia)
         .modifier(PlayerCastHandoff(host: self))
+        .playerHueSync(isCasting: castSession.isCasting)
         .modifier(PlayerSourceSwitcherHost(session: sourceSession, media: activeMedia, onPick: switchSource))
         .modifier(PlayerQualityVariantsHost(media: activeMedia, onSelect: switchQuality))
         // Synchronous on purpose, and ahead of the `.task` below: the engine
