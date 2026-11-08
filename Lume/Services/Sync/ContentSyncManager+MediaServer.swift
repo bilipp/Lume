@@ -92,11 +92,13 @@ extension ContentSyncManager {
 
         await progress?.start(.movies)
         var seenMovies = Set<String>()
+        var moviesComplete = true
         for view in movieViews {
             let viewScope = scope(connection, playlistId: playlistId, view: view, type: .vod)
-            try await syncJellyfinMovies(scope: viewScope, seenIds: &seenMovies, progress: progress)
+            let complete = try await syncJellyfinMovies(scope: viewScope, seenIds: &seenMovies, progress: progress)
+            moviesComplete = moviesComplete && complete
         }
-        pruneJellyfinMovies(playlistId: playlistId, flavor: flavor, seenIds: seenMovies, fetched: !movieViews.isEmpty)
+        pruneJellyfinMovies(playlistId: playlistId, flavor: flavor, seenIds: seenMovies, fetched: !movieViews.isEmpty && moviesComplete)
         await progress?.complete(.movies)
 
         await progress?.start(.series)
@@ -105,7 +107,7 @@ extension ContentSyncManager {
             let viewScope = scope(connection, playlistId: playlistId, view: view, type: .series)
             try await syncJellyfinShows(scope: viewScope, seen: &shows, progress: progress)
         }
-        pruneJellyfinSeries(playlistId: playlistId, flavor: flavor, seen: shows, fetched: !showViews.isEmpty)
+        pruneJellyfinSeries(playlistId: playlistId, flavor: flavor, seen: shows, fetched: !showViews.isEmpty && shows.complete)
         persistResolvesSourcesOnDemand(!shows.episodesFetchedPerShow.isEmpty, playlistId: playlistId)
         await progress?.complete(.series)
 
@@ -121,9 +123,32 @@ extension ContentSyncManager {
 
     // MARK: - Paging
 
+    /// How many items an open-ended library is read to (see
+    /// `JellyfinTotalTracker`). Such a library is a ranked list — popular,
+    /// trending, a streaming service's catalogue — that only ends when its
+    /// upstream source runs dry, tens of thousands of items and hours of
+    /// paging later. Its head is what anyone browses.
+    nonisolated static let openEndedLibraryItemLimit = 500
+
+    /// The outcome of one library walk.
+    struct JellyfinWalk {
+        var fetched = 0
+        /// False when an open-ended library failed part-way and the walk kept
+        /// what it had: the items it never reached may still be listed, so
+        /// the prune sweep for this kind must not run.
+        var complete = true
+    }
+
     /// Pages a recursive item query to exhaustion, handing each page to `body`.
-    /// Returns the number of items seen. Shared by the movie, series and
-    /// episode walks so the three differ only in what they do per page.
+    /// Shared by the movie, series and episode walks so the three differ only
+    /// in what they do per page.
+    ///
+    /// A library whose total moves ahead with every page (see
+    /// `JellyfinTotalTracker`) never reaches its total, so it stops at
+    /// `openEndedLibraryItemLimit` instead, and a page that fails part-way
+    /// through it ends that library rather than the whole sync. A library
+    /// with a fixed total keeps the old behaviour: read to the end, and any
+    /// failure aborts the sync with the catalog untouched.
     /// Not `private`: shared with `ContentSyncManager+MediaServerShows.swift`.
     func pageThroughJellyfinItems(
         types: [String],
@@ -131,28 +156,49 @@ extension ContentSyncManager {
         progress: SyncProgress?,
         unit: String,
         body: ([JellyfinItem]) -> Void
-    ) async throws -> Int {
-        var startIndex = 0
-        var total = Int.max
-        var fetched = 0
-        while fetched < total {
+    ) async throws -> JellyfinWalk {
+        var walk = JellyfinWalk()
+        var tracker = JellyfinTotalTracker()
+        let limit = Self.openEndedLibraryItemLimit
+        while walk.fetched < tracker.total {
             try Task.checkCancellation()
-            let page = try await jellyfinClient.items(
-                server: scope.server, session: scope.session, parentId: scope.view.id, types: types,
-                startIndex: startIndex
-            )
-            total = page.totalRecordCount
+            let page: JellyfinItemsResponse
+            do {
+                page = try await jellyfinClient.items(
+                    server: scope.server, session: scope.session, parentId: scope.view.id, types: types,
+                    startIndex: walk.fetched
+                )
+            } catch where tracker.isOpenEnded && !Task.isCancelled {
+                let described = (error as? JellyfinError)?.logDescription ?? "request failed"
+                let library = "\(scope.flavor.displayName) library \(scope.view.name)"
+                Logger.database.error(
+                    "\(library, privacy: .public) stopped at \(walk.fetched, privacy: .public) \(unit, privacy: .public) (\(described, privacy: .public)); keeping what it read"
+                )
+                walk.complete = false
+                break
+            }
+            tracker.record(page)
             if !page.items.isEmpty {
                 body(page.items)
             }
-            fetched += page.items.count
-            startIndex += page.items.count
-            await progress?.update(detail: "\(fetched) of \(total) \(unit) in \(scope.view.name)", fraction: total == 0 ? 1 : Double(fetched) / Double(total))
+            walk.fetched += page.items.count
+            let shownTotal = tracker.isOpenEnded ? min(tracker.total, limit) : tracker.total
+            await progress?.update(
+                detail: "\(walk.fetched) of \(shownTotal) \(unit) in \(scope.view.name)",
+                fraction: shownTotal == 0 ? 1 : min(1, Double(walk.fetched) / Double(shownTotal))
+            )
             if page.items.isEmpty {
                 break
             }
+            if tracker.isOpenEnded, walk.fetched >= limit {
+                let library = "\(scope.flavor.displayName) library \(scope.view.name)"
+                Logger.database.info(
+                    "\(library, privacy: .public) has no fixed length; read its first \(walk.fetched, privacy: .public) \(unit, privacy: .public)"
+                )
+                break
+            }
         }
-        return fetched
+        return walk
     }
 
     // MARK: - Session
@@ -225,13 +271,15 @@ extension ContentSyncManager {
 
     // MARK: - Movies
 
-    private func syncJellyfinMovies(scope: JellyfinViewScope, seenIds: inout Set<String>, progress: SyncProgress?) async throws {
+    /// Returns whether the library was read in full (see `JellyfinWalk.complete`).
+    private func syncJellyfinMovies(scope: JellyfinViewScope, seenIds: inout Set<String>, progress: SyncProgress?) async throws -> Bool {
         var seen = seenIds
-        let fetched = try await pageThroughJellyfinItems(types: ["Movie"], scope: scope, progress: progress, unit: "movie(s)") { items in
+        let walk = try await pageThroughJellyfinItems(types: ["Movie"], scope: scope, progress: progress, unit: "movie(s)") { items in
             seen.formUnion(upsertJellyfinMovies(items, scope: scope))
         }
         seenIds = seen
-        Logger.database.info("\(scope.flavor.displayName, privacy: .public) movies synced for library \(scope.view.name, privacy: .public): \(fetched, privacy: .public) item(s)")
+        Logger.database.info("\(scope.flavor.displayName, privacy: .public) movies synced for library \(scope.view.name, privacy: .public): \(walk.fetched, privacy: .public) item(s)")
+        return walk.complete
     }
 
     /// Upserts one page of movies, returning the ids it saw for the prune

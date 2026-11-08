@@ -21,11 +21,13 @@ extension ContentSyncManager {
         var series = Set<String>()
         var episodes = Set<String>()
         /// Series from libraries that list their shows but no episodes under
-        /// them — AIOStreams-style servers, which only answer per show. Their
+        /// them — servers that only answer per show. Their
         /// episodes are fetched when the show is opened (see
         /// `fetchMediaServerEpisodes`), so this sync never saw them and must
         /// not prune them.
         var episodesFetchedPerShow = Set<String>()
+        /// False once a library stopped part-way (see `JellyfinWalk.complete`).
+        var complete = true
     }
 
     func syncJellyfinShows(scope: JellyfinViewScope, seen: inout JellyfinShowsSeen, progress: SyncProgress?) async throws {
@@ -33,7 +35,7 @@ extension ContentSyncManager {
         var shells = JellyfinShellIndex()
         var seenSeries = seen.series
         var librarySeries = Set<String>()
-        _ = try await pageThroughJellyfinItems(types: ["Series"], scope: scope, progress: nil, unit: "series") { items in
+        let seriesWalk = try await pageThroughJellyfinItems(types: ["Series"], scope: scope, progress: nil, unit: "series") { items in
             let ids = upsertJellyfinSeries(items, scope: scope)
             seenSeries.formUnion(ids)
             librarySeries.formUnion(ids)
@@ -47,13 +49,15 @@ extension ContentSyncManager {
         // mis-scanned library does not fan out into one show per file.
         var seenEpisodes = seen.episodes
         let resolvedShells = shells
-        let episodeCount = try await pageThroughJellyfinItems(types: ["Episode"], scope: scope, progress: progress, unit: "episode(s)") { items in
+        let episodeWalk = try await pageThroughJellyfinItems(types: ["Episode"], scope: scope, progress: progress, unit: "episode(s)") { items in
             let (series, episodes) = upsertJellyfinEpisodes(items, seriesShells: resolvedShells, scope: scope)
             seenSeries.formUnion(series)
             seenEpisodes.formUnion(episodes)
         }
+        let episodeCount = episodeWalk.fetched
         seen.series = seenSeries
         seen.episodes = seenEpisodes
+        seen.complete = seen.complete && seriesWalk.complete && episodeWalk.complete
         if episodeCount == 0, !librarySeries.isEmpty {
             seen.episodesFetchedPerShow.formUnion(librarySeries)
             Logger.database.info("\(scope.flavor.displayName, privacy: .public) library \(scope.view.name, privacy: .public) lists \(librarySeries.count, privacy: .public) series but no episodes; episodes load per show")
