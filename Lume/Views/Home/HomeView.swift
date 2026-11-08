@@ -269,9 +269,9 @@ struct HomeView: View {
         if isSectionEnabled(section) {
             switch section {
             case .recentlyWatched:
-                rail("Recently Watched", recentlyWatched, onRemove: removeFromRecentlyWatched)
+                rail("Recently Watched", hasRecentlyWatched ? recentlyWatched : [], onRemove: removeFromRecentlyWatched)
             case .favorites:
-                rail("Favorites", favorites)
+                rail("Favorites", hasFavorites ? favorites : [])
             case .forYou:
                 ForYouRow(
                     items: recommendations,
@@ -377,43 +377,41 @@ struct HomeView: View {
 
     // MARK: - Derived content
 
+    private var derivedScope: HomeDerivedScope {
+        HomeDerivedScope(playlistPrefix: playlistPrefix, restriction: restriction)
+    }
+
+    var hasRecentlyWatched: Bool {
+        HomeDerivedContent.hasRecentlyWatched(
+            movies: watchedMovies, series: watchedSeries, streams: watchedStreams,
+            includeLiveTV: recentlyWatchedIncludesLiveTV, scope: derivedScope
+        )
+    }
+
+    var hasFavorites: Bool {
+        HomeDerivedContent.hasFavorites(
+            movies: favoriteMovies, series: favoriteSeries, streams: favoriteStreams, scope: derivedScope
+        )
+    }
+
     private var recentlyWatched: [HomeMediaItem] {
-        var items = watchedMovies.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.movie)
-            + watchedSeries.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.series)
-        if recentlyWatchedIncludesLiveTV {
-            items += watchedStreams.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction).map(HomeMediaItem.live)
-        }
-        return items
-            .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
-            .prefix(10)
-            .map(\.self)
+        HomeDerivedContent.recentlyWatched(
+            movies: watchedMovies, series: watchedSeries, streams: watchedStreams,
+            includeLiveTV: recentlyWatchedIncludesLiveTV, scope: derivedScope
+        )
     }
 
     private var favorites: [HomeMediaItem] {
-        let movies = favoriteMovies.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction)
-        let series = favoriteSeries.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction)
-        let streams = favoriteStreams.filter { belongsToActivePlaylist($0.id) }.excludingRestricted(restriction)
-
-        // Interleave the three types by the cross-type `favoriteOrder` set in
-        // Content Management → Favorites, so a movie placed above a channel shows
-        // above it here too. Items never reordered (nil) fall back to a stable
-        // type/name grouping (channels, movies, then series) — the same fallback
-        // the favorites manager uses.
-        let entries: [(order: Int?, rank: Int, name: String, item: HomeMediaItem)] =
-            streams.map { ($0.favoriteOrder, 0, $0.name, HomeMediaItem.live($0)) }
-                + movies.map { ($0.favoriteOrder, 1, $0.name, HomeMediaItem.movie($0)) }
-                + series.map { ($0.favoriteOrder, 2, $0.name, HomeMediaItem.series($0)) }
-
-        return entries
-            .sorted { ($0.order ?? Int.max, $0.rank, $0.name) < ($1.order ?? Int.max, $1.rank, $1.name) }
-            .map(\.item)
+        HomeDerivedContent.favorites(
+            movies: favoriteMovies, series: favoriteSeries, streams: favoriteStreams, scope: derivedScope
+        )
     }
 
     /// Truly empty home — only show the empty state once trending has settled
     /// so async-loaded content doesn't make the empty view flash on launch.
     private var isEmpty: Bool {
-        recentlyWatched.isEmpty
-            && favorites.isEmpty
+        !hasRecentlyWatched
+            && !hasFavorites
             && trendingMovies.isEmpty
             && trendingSeries.isEmpty
             && watchlists.values.allSatisfy(\.isEmpty)
