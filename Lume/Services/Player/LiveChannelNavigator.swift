@@ -8,6 +8,7 @@
 //  state — so it can be unit-tested independently of any UI.
 //
 
+import CoreData
 import Foundation
 import SwiftData
 
@@ -178,6 +179,9 @@ nonisolated enum LiveChannelNavigator {
         guard ring.count > 1 else { return nil }
         let position = (located.index + offset + ring.count) % ring.count
         guard let target = ring.row(at: position, in: context) else { return nil }
+        if case let .positions(_, count, key) = ring, let key {
+            RingCache.shared.record(streamID: target.id, at: position, count: count, in: key)
+        }
         // The scope rides along so the next press surfs the same list.
         return PlayableMedia.from(stream: target, playlist: playlist, scope: media.channelScope)
     }
@@ -263,28 +267,171 @@ nonisolated enum LiveChannelNavigator {
         return FetchDescriptor<LiveStream>(predicate: predicate, sortBy: sortBy)
     }
 
+    // MARK: - Navigation ring cache
+
+    /// A bounded, thread-safe cache for channel ring lookups.
+    ///
+    /// Preserves the exact browse/surf ordering (including localized collation,
+    /// null order keys, and tied runs) while eliminating repeated `LIMIT 1 OFFSET …`
+    /// SQLite temp-B-tree sorts during channel surfing.
+    ///
+    /// Invalidation:
+    /// - Cleared automatically whenever a ModelContext saves (`ModelContext.didSave`
+    ///   or `NSManagedObjectContextDidSave`).
+    /// - Keyed by scope, sort option, playlist prefix, content restriction token,
+    ///   and admitted hidden channel ID.
+    /// - Retains at most `maxCachedScopes` scopes, each with bounded position-to-id
+    ///   and id-to-position mappings, bounding total memory to < 1 MB.
+    final class RingCache: @unchecked Sendable {
+        static let shared = RingCache()
+
+        struct ScopeKey: Hashable {
+            let scope: LiveChannelScope
+            let sort: ContentSortOption
+            let prefix: String
+            let restrictionToken: String
+            let admitted: String?
+        }
+
+        final class ScopeEntry {
+            let count: Int
+            var indexByStreamID: [String: Int] = [:]
+            var streamIDByIndex: [Int: String] = [:]
+
+            init(count: Int) {
+                self.count = count
+            }
+        }
+
+        private let lock = NSLock()
+        private var scopes: [ScopeKey: ScopeEntry] = [:]
+        private var lruKeys: [ScopeKey] = []
+        private let maxCachedScopes = 6
+        private let maxEntriesPerScope = 2048
+        private var observers: [Any] = []
+
+        private init() {
+            let obs1 = NotificationCenter.default.addObserver(
+                forName: ModelContext.didSave,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                self?.clear()
+            }
+            let obs2 = NotificationCenter.default.addObserver(
+                forName: NSNotification.Name.NSManagedObjectContextDidSave,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                self?.clear()
+            }
+            observers = [obs1, obs2]
+        }
+
+        deinit {
+            for obs in observers {
+                NotificationCenter.default.removeObserver(obs)
+            }
+        }
+
+        func clear() {
+            lock.lock()
+            defer { lock.unlock() }
+            scopes.removeAll(keepingCapacity: false)
+            lruKeys.removeAll(keepingCapacity: false)
+        }
+
+        func index(of streamID: String, in key: ScopeKey) -> (index: Int, count: Int)? {
+            lock.lock()
+            defer { lock.unlock() }
+            guard let entry = scopes[key], let idx = entry.indexByStreamID[streamID] else {
+                return nil
+            }
+            touch(key)
+            return (idx, entry.count)
+        }
+
+        func streamID(at position: Int, in key: ScopeKey) -> String? {
+            lock.lock()
+            defer { lock.unlock() }
+            guard let entry = scopes[key], let id = entry.streamIDByIndex[position] else {
+                return nil
+            }
+            touch(key)
+            return id
+        }
+
+        func record(streamID: String, at index: Int, count: Int, in key: ScopeKey) {
+            lock.lock()
+            defer { lock.unlock() }
+            let entry: ScopeEntry
+            if let existing = scopes[key], existing.count == count {
+                entry = existing
+            } else {
+                entry = ScopeEntry(count: count)
+                scopes[key] = entry
+                touch(key)
+                trimScopes()
+            }
+            if entry.indexByStreamID.count < maxEntriesPerScope {
+                entry.indexByStreamID[streamID] = index
+                entry.streamIDByIndex[index] = streamID
+            }
+        }
+
+        private func touch(_ key: ScopeKey) {
+            if let idx = lruKeys.firstIndex(of: key) {
+                lruKeys.remove(at: idx)
+            }
+            lruKeys.append(key)
+        }
+
+        private func trimScopes() {
+            while lruKeys.count > maxCachedScopes {
+                let oldest = lruKeys.removeFirst()
+                scopes.removeValue(forKey: oldest)
+            }
+        }
+    }
+
+    /// Invalidates the in-memory ring navigation cache.
+    static func invalidateCache() {
+        RingCache.shared.clear()
+    }
+
     /// A channel list a position can be read out of.
     private enum Ring {
         /// Addressed by position: how many channels it holds, and how to read any
         /// one of them without reading the rest.
-        case positions(scope: FetchDescriptor<LiveStream>, count: Int)
+        case positions(scope: FetchDescriptor<LiveStream>, count: Int, key: RingCache.ScopeKey?)
         /// Already in memory. Recently Watched is the one list that arrives this
         /// way — see `recentsRing(…)`.
         case page([LiveStream])
 
         var count: Int {
             switch self {
-            case let .positions(_, count): count
+            case let .positions(_, count, _): count
             case let .page(rows): rows.count
             }
         }
 
         func row(at index: Int, in context: ModelContext) -> LiveStream? {
             switch self {
-            case let .positions(scope, _):
-                try? context.fetch(positionDescriptor(scope, at: index)).first
+            case let .positions(scope, count, key):
+                if let key, let streamID = RingCache.shared.streamID(at: index, in: key) {
+                    var targetDescriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == streamID })
+                    targetDescriptor.fetchLimit = 1
+                    if let stream = try? context.fetch(targetDescriptor).first {
+                        return stream
+                    }
+                }
+                guard let stream = try? context.fetch(positionDescriptor(scope, at: index)).first else { return nil }
+                if let key {
+                    RingCache.shared.record(streamID: stream.id, at: index, count: count, in: key)
+                }
+                return stream
             case let .page(rows):
-                rows.indices.contains(index) ? rows[index] : nil
+                return rows.indices.contains(index) ? rows[index] : nil
             }
         }
 
@@ -293,10 +440,17 @@ nonisolated enum LiveChannelNavigator {
         /// still contains the playing channel.
         func index(of stream: LiveStream, in context: ModelContext) -> Int? {
             switch self {
-            case let .positions(scope, count):
-                bisect(for: stream, scope: scope, count: count, in: context)
+            case let .positions(scope, count, key):
+                if let key, let cached = RingCache.shared.index(of: stream.id, in: key), cached.count == count {
+                    return cached.index
+                }
+                guard let index = bisect(for: stream, scope: scope, count: count, key: key, in: context) else { return nil }
+                if let key {
+                    RingCache.shared.record(streamID: stream.id, at: index, count: count, in: key)
+                }
+                return index
             case let .page(rows):
-                rows.firstIndex { $0.id == stream.id }
+                return rows.firstIndex { $0.id == stream.id }
             }
         }
     }
@@ -308,10 +462,22 @@ nonisolated enum LiveChannelNavigator {
         for stream: LiveStream,
         scope: FetchDescriptor<LiveStream>,
         count: Int,
+        key: RingCache.ScopeKey?,
         in context: ModelContext
     ) -> Int? {
         func row(at index: Int) -> LiveStream? {
-            try? context.fetch(positionDescriptor(scope, at: index)).first
+            if let key, let streamID = RingCache.shared.streamID(at: index, in: key) {
+                var targetDescriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == streamID })
+                targetDescriptor.fetchLimit = 1
+                if let target = try? context.fetch(targetDescriptor).first {
+                    return target
+                }
+            }
+            guard let fetched = try? context.fetch(positionDescriptor(scope, at: index)).first else { return nil }
+            if let key {
+                RingCache.shared.record(streamID: fetched.id, at: index, count: count, in: key)
+            }
+            return fetched
         }
         var low = 0
         var high = count
@@ -336,6 +502,9 @@ nonisolated enum LiveChannelNavigator {
             let tied = (try? context.fetch(positionDescriptor(scope, at: start, count: tiePage))) ?? []
             if tied.isEmpty { return nil }
             for (step, row) in tied.enumerated() {
+                if let key {
+                    RingCache.shared.record(streamID: row.id, at: start + step, count: count, in: key)
+                }
                 if row.id == stream.id { return start + step }
                 if compare(row, stream, using: scope.sortBy) != .orderedSame { return nil }
             }
@@ -409,12 +578,23 @@ nonisolated enum LiveChannelNavigator {
             ) else { return nil }
             ring = recents
         } else {
+            let key = RingCache.ScopeKey(
+                scope: scope,
+                sort: sort,
+                prefix: prefix,
+                restrictionToken: restriction.visibilityToken,
+                admitted: admitted
+            )
             let descriptor = scopeDescriptor(
                 scope: scope, sort: sort, playlistPrefix: prefix,
                 restriction: restriction, admittingHidden: admitted
             )
+            if let cached = RingCache.shared.index(of: current.id, in: key), cached.count > 0 {
+                ring = .positions(scope: descriptor, count: cached.count, key: key)
+                return (ring, cached.index)
+            }
             guard let total = try? context.fetchCount(descriptor), total > 0 else { return nil }
-            ring = .positions(scope: descriptor, count: total)
+            ring = .positions(scope: descriptor, count: total, key: key)
         }
         guard let index = ring.index(of: current, in: context) else { return nil }
         return (ring, index)
