@@ -49,12 +49,10 @@
                 .sorted { $0.episodeNum < $1.episodeNum }
         }
 
-        /// The playlist that owns a series, mirroring the detail screen's logic
-        /// (prefix match on the playlist UUID, falling back to the first one).
+        /// The playlist that owns a series, by the playlist UUID its id starts with.
         static func playlist(for series: Series?, in context: ModelContext) -> Playlist? {
-            let playlists = (try? context.fetch(FetchDescriptor<Playlist>())) ?? []
-            guard let series else { return playlists.first }
-            return playlists.first { series.id.hasPrefix($0.id.uuidString) } ?? playlists.first
+            guard let series else { return nil }
+            return PlaylistOwner.playlist(forPrefixedID: series.id, in: context)
         }
 
         // MARK: - Recent channels

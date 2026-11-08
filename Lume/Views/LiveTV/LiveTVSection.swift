@@ -81,6 +81,62 @@ enum LiveTVSection: Identifiable, Hashable {
     }
 }
 
+// MARK: - Section groups
+
+/// One block of the rail. With a single Live TV playlist in scope the rail is
+/// one untitled group, exactly the list it was before Combined existed. With two
+/// or more contributing members each one's categories form a group titled with
+/// the playlist's name, in member priority order — categories are never merged
+/// by name across playlists — below an untitled group for the virtual
+/// collections, which span every member.
+struct LiveTVSectionGroup: Identifiable, Hashable {
+    /// The member playlist; nil for the pinned virtual collections.
+    let id: UUID?
+    let title: String?
+    let sections: [LiveTVSection]
+}
+
+extension LiveTVSectionGroup {
+    /// Splits the sorted category sections by owning member. Keeps the order
+    /// within each member and drops members with nothing to show.
+    static func categoryGroups(
+        _ categories: [LiveTVSection],
+        catalogScope: CatalogScope,
+        playlistNames: [UUID: String]
+    ) -> [LiveTVSectionGroup] {
+        guard !categories.isEmpty, let first = catalogScope.members(for: .liveTV).first else { return [] }
+        guard catalogScope.namesMembers(for: .liveTV) else {
+            return [LiveTVSectionGroup(id: first, title: nil, sections: categories)]
+        }
+        return catalogScope.groupedByMember(categories, for: .liveTV, id: \.id).map { member, sections in
+            LiveTVSectionGroup(id: member, title: playlistNames[member], sections: sections)
+        }
+    }
+
+    /// The whole rail: `pinned` (the virtual collections) above the category
+    /// groups. Untitled category groups absorb them, so a rail without
+    /// headers stays one flat list.
+    static func rail(pinned: [LiveTVSection], categoryGroups: [LiveTVSectionGroup]) -> [LiveTVSectionGroup] {
+        guard !pinned.isEmpty else { return categoryGroups }
+        guard categoryGroups.contains(where: { $0.title != nil }) else {
+            let sections = pinned + categoryGroups.flatMap(\.sections)
+            return [LiveTVSectionGroup(id: categoryGroups.first?.id, title: nil, sections: sections)]
+        }
+        return [LiveTVSectionGroup(id: nil, title: nil, sections: pinned)] + categoryGroups
+    }
+}
+
+extension [LiveTVSectionGroup] {
+    /// Every section in rail order, for selection and for the tvOS rail.
+    var allSections: [LiveTVSection] {
+        flatMap(\.sections)
+    }
+
+    var hasHeaders: Bool {
+        contains { $0.title != nil }
+    }
+}
+
 // MARK: - Scope
 
 /// What a Live TV channel list / guide should show. Travels with a channel into
@@ -181,13 +237,21 @@ nonisolated enum LiveChannelQuery {
     /// would call the collection empty whenever the single row that came back
     /// happened to sit in a category this viewer can't see, silently dropping a
     /// section full of visible channels — so the excluded ids go to SQLite too.
-    static func favoritesProbe(playlistPrefix: String, restriction: ContentRestriction) -> FetchDescriptor<LiveStream> {
-        let prefix = playlistPrefix
+    static func favoritesProbe(catalogScope: CatalogScope, restriction: ContentRestriction) -> FetchDescriptor<LiveStream> {
         let excluded = excludedCategoryIDs(restriction)
         let filtersCategories = !excluded.isEmpty
+        if let prefix = catalogScope.singlePrefix(for: .liveTV) {
+            return probe(
+                predicate: #Predicate { stream in
+                    stream.isFavorite && stream.isHidden == false && stream.id.starts(with: prefix)
+                        && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
+                }
+            )
+        }
+        let scoped = catalogScope.liveStreamPredicate()
         return probe(
             predicate: #Predicate { stream in
-                stream.isFavorite && stream.isHidden == false && stream.id.starts(with: prefix)
+                stream.isFavorite && stream.isHidden == false && scoped.evaluate(stream)
                     && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
             }
         )
@@ -196,13 +260,24 @@ nonisolated enum LiveChannelQuery {
     /// The same probe for Recently Watched. Note it deliberately ignores
     /// `recentLimit`: the list is capped at 50, but "is there at least one" is
     /// unaffected by a cap.
-    static func recentlyWatchedProbe(playlistPrefix: String, restriction: ContentRestriction) -> FetchDescriptor<LiveStream> {
-        let prefix = playlistPrefix
+    static func recentlyWatchedProbe(
+        catalogScope: CatalogScope,
+        restriction: ContentRestriction
+    ) -> FetchDescriptor<LiveStream> {
         let excluded = excludedCategoryIDs(restriction)
         let filtersCategories = !excluded.isEmpty
+        if let prefix = catalogScope.singlePrefix(for: .liveTV) {
+            return probe(
+                predicate: #Predicate { stream in
+                    stream.lastWatchedDate != nil && stream.isHidden == false && stream.id.starts(with: prefix)
+                        && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
+                }
+            )
+        }
+        let scoped = catalogScope.liveStreamPredicate()
         return probe(
             predicate: #Predicate { stream in
-                stream.lastWatchedDate != nil && stream.isHidden == false && stream.id.starts(with: prefix)
+                stream.lastWatchedDate != nil && stream.isHidden == false && scoped.evaluate(stream)
                     && (!filtersCategories || stream.categoryId == nil || !excluded.contains(stream.categoryId))
             }
         )
@@ -244,14 +319,15 @@ nonisolated enum LiveChannelQuery {
     static func scoped(
         _ streams: [LiveStream],
         scope: LiveChannelScope,
-        playlistPrefix: String,
+        catalogScope: CatalogScope,
         restriction: ContentRestriction
     ) -> [LiveStream] {
         switch scope {
         case .category:
-            streams.excludingRestricted(restriction)
+            return streams.excludingRestricted(restriction)
         case .favorites, .recentlyWatched:
-            streams.filter { isVisible($0, playlistPrefix: playlistPrefix, restriction: restriction) }
+            let matcher = CatalogScope.Matcher(catalogScope)
+            return streams.filter { isVisible($0, in: matcher, restriction: restriction) }
         }
     }
 
@@ -262,20 +338,23 @@ nonisolated enum LiveChannelQuery {
     /// section that was offered then renders empty.
     static func containsVisible(
         _ streams: some Sequence<LiveStream>,
-        playlistPrefix: String,
+        catalogScope: CatalogScope,
         restriction: ContentRestriction
     ) -> Bool {
-        streams.contains { isVisible($0, playlistPrefix: playlistPrefix, restriction: restriction) }
+        let matcher = CatalogScope.Matcher(catalogScope)
+        return streams.contains { isVisible($0, in: matcher, restriction: restriction) }
     }
 
-    /// The per-channel test the virtual collections apply: in the active
-    /// playlist, and not in a category locked away from this viewer.
+    /// The per-channel test the virtual collections apply: in a playlist of the
+    /// scope, and not in a category locked away from this viewer. An empty
+    /// scope matches nothing here, unlike `Matcher.contains` on its own.
     private static func isVisible(
         _ stream: LiveStream,
-        playlistPrefix: String,
+        in matcher: CatalogScope.Matcher,
         restriction: ContentRestriction
     ) -> Bool {
-        stream.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: stream.categoryId)
+        !matcher.scope.isEmpty && matcher.contains(stream.id, .liveTV)
+            && !restriction.hides(categoryID: stream.categoryId)
     }
 
     /// The live categories of the active playlist this viewer may see: scoped by
@@ -288,12 +367,14 @@ nonisolated enum LiveChannelQuery {
     /// from a child mid-playback.
     static func visibleCategories(
         _ categories: [Category],
-        playlistPrefix: String,
+        catalogScope: CatalogScope,
         restriction: ContentRestriction
     ) -> [Category] {
-        categories.filter {
-            $0.type == .live && $0.id.hasPrefix(playlistPrefix)
-                && !$0.isHidden && !restriction.hides(categoryID: $0.id)
+        guard !catalogScope.isEmpty else { return [] }
+        let matcher = CatalogScope.Matcher(catalogScope)
+        return categories.filter { category in
+            category.type == .live && matcher.contains(category.id, .liveTV)
+                && !category.isHidden && !restriction.hides(categoryID: category.id)
         }
     }
 }
@@ -318,21 +399,32 @@ nonisolated enum LiveChannelQuery {
 @MainActor
 final class LiveTVCategoryMemo {
     private var key = ""
-    private var cached: [LiveTVSection] = []
+    private var cached: [LiveTVSectionGroup] = []
 
-    func sections(
+    func groups(
         categories: [Category],
-        playlistPrefix: String,
+        catalogScope: CatalogScope,
+        playlistNames: [UUID: String],
         sort: CategorySortOption,
         restriction: ContentRestriction
-    ) -> [LiveTVSection] {
+    ) -> [LiveTVSectionGroup] {
         // No active playlist: the rail has no categories to show, exactly as
         // when the filter below found none.
-        guard !playlistPrefix.isEmpty else { return [] }
-        let key = Self.key(categories: categories, playlistPrefix: playlistPrefix, sort: sort, restriction: restriction)
+        guard !catalogScope.isEmpty else { return [] }
+        let key = Self.key(
+            categories: categories,
+            catalogScope: catalogScope,
+            playlistNames: playlistNames,
+            sort: sort,
+            restriction: restriction
+        )
         guard key != self.key else { return cached }
-        let visible = LiveChannelQuery.visibleCategories(categories, playlistPrefix: playlistPrefix, restriction: restriction)
-        cached = sort.sort(visible).map(LiveTVSection.category)
+        let visible = LiveChannelQuery.visibleCategories(categories, catalogScope: catalogScope, restriction: restriction)
+        cached = LiveTVSectionGroup.categoryGroups(
+            sort.sort(visible).map(LiveTVSection.category),
+            catalogScope: catalogScope,
+            playlistNames: playlistNames
+        )
         self.key = key
         return cached
     }
@@ -348,11 +440,15 @@ final class LiveTVCategoryMemo {
     /// comparison rather than once per category.
     private static func key(
         categories: [Category],
-        playlistPrefix: String,
+        catalogScope: CatalogScope,
+        playlistNames: [UUID: String],
         sort: CategorySortOption,
         restriction: ContentRestriction
     ) -> String {
         var hasher = Hasher()
+        for id in catalogScope.members(for: .liveTV) {
+            hasher.combine(playlistNames[id])
+        }
         hasher.combine(categories.count)
         for category in categories {
             hasher.combine(category.id)
@@ -360,7 +456,7 @@ final class LiveTVCategoryMemo {
             hasher.combine(category.customOrder)
             hasher.combine(category.sortOrder)
         }
-        return "\(playlistPrefix)|\(sort.rawValue)|\(restriction.visibilityToken)|\(hasher.finalize())"
+        return "\(catalogScope.token)|\(sort.rawValue)|\(restriction.visibilityToken)|\(hasher.finalize())"
     }
 }
 
@@ -384,42 +480,40 @@ struct LiveTVSections<Content: View>: View {
     @AppStorage(LiveTVRailSettings.showsRecentlyWatchedKey)
     private var showsRecentlyWatched = LiveTVRailSettings.showsRecentlyWatchedDefault
 
-    private let playlistPrefix: String
-    private let categorySections: [LiveTVSection]
-    private let content: ([LiveTVSection]) -> Content
+    private let catalogScope: CatalogScope
+    private let categoryGroups: [LiveTVSectionGroup]
+    private let content: ([LiveTVSectionGroup]) -> Content
 
     init(
-        playlistPrefix: String,
+        catalogScope: CatalogScope,
         restriction: ContentRestriction,
-        categorySections: [LiveTVSection],
-        @ViewBuilder content: @escaping ([LiveTVSection]) -> Content
+        categoryGroups: [LiveTVSectionGroup],
+        @ViewBuilder content: @escaping ([LiveTVSectionGroup]) -> Content
     ) {
-        self.playlistPrefix = playlistPrefix
-        self.categorySections = categorySections
+        self.catalogScope = catalogScope
+        self.categoryGroups = categoryGroups
         self.content = content
         _favoriteProbe = Query(
-            LiveChannelQuery.favoritesProbe(playlistPrefix: playlistPrefix, restriction: restriction)
+            LiveChannelQuery.favoritesProbe(catalogScope: catalogScope, restriction: restriction)
         )
         _recentProbe = Query(
-            LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: playlistPrefix, restriction: restriction)
+            LiveChannelQuery.recentlyWatchedProbe(catalogScope: catalogScope, restriction: restriction)
         )
     }
 
     /// The rail's entries: the virtual collections (when non-empty) pinned above
     /// the synced categories.
-    private var sections: [LiveTVSection] {
-        // An empty prefix means there is no active playlist at all, and
-        // `starts(with: "")` matches every row — the guard the two `has…`
-        // properties used to carry before the probes moved into SQL.
-        guard !playlistPrefix.isEmpty else { return categorySections }
-        var resolved: [LiveTVSection] = []
-        if showsFavorites, !favoriteProbe.isEmpty { resolved.append(.favorites) }
-        if showsRecentlyWatched, !recentProbe.isEmpty { resolved.append(.recentlyWatched) }
-        resolved.append(contentsOf: categorySections)
-        return resolved
+    private var groups: [LiveTVSectionGroup] {
+        // No active playlist at all: the guard the two `has…` properties used
+        // to carry before the probes moved into SQL.
+        guard !catalogScope.isEmpty else { return categoryGroups }
+        var pinned: [LiveTVSection] = []
+        if showsFavorites, !favoriteProbe.isEmpty { pinned.append(.favorites) }
+        if showsRecentlyWatched, !recentProbe.isEmpty { pinned.append(.recentlyWatched) }
+        return LiveTVSectionGroup.rail(pinned: pinned, categoryGroups: categoryGroups)
     }
 
     var body: some View {
-        content(sections)
+        content(groups)
     }
 }

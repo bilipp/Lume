@@ -35,7 +35,7 @@ private extension [Playlist] {
         @Environment(\.modelContext) private var modelContext
         @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
         @Query private var playlists: [Playlist]
-        @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+        @Environment(\.catalogScope) private var catalogScope
         @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
         @State private var premium = PremiumManager.shared
         @State private var showingAddPlaylist = false
@@ -56,6 +56,9 @@ private extension [Playlist] {
         var body: some View {
             List {
                 playlistsSection
+                if !playlists.isEmpty {
+                    combinedSection
+                }
                 autoSyncSection
             }
             .platformNavigationTitle("Playlists")
@@ -66,7 +69,8 @@ private extension [Playlist] {
         }
 
         private var playlistsSection: some View {
-            Section {
+            let scope = catalogScope
+            return Section {
                 ForEach(playlists) { playlist in
                     NavigationLink {
                         PlaylistDetailView(playlist: playlist)
@@ -86,7 +90,7 @@ private extension [Playlist] {
                                 PremiumBadge()
                             } else {
                                 PlaylistSyncAccessory(state: playlist.syncState(
-                                    isActive: playlist.id.uuidString == playlists.activeID(for: selectedPlaylistID)
+                                    isActive: scope.playlistIDs.contains(playlist.id)
                                 ))
                             }
                         }
@@ -112,6 +116,46 @@ private extension [Playlist] {
                 } else {
                     playlists.freePlanFooter
                 }
+            }
+        }
+
+        /// The row opens the paywall or the Combined View page, per
+        /// `QuickSwitchResolver.combinedSettingsAction`.
+        private var combinedSection: some View {
+            Section {
+                if QuickSwitchResolver.combinedSettingsAction(playlists, isPremium: premium.isPremium) == .paywall {
+                    Button {
+                        showPaywall = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            combinedLabel
+                            Image(systemName: "chevron.forward")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    NavigationLink {
+                        CombinedPlaylistsSettingsView()
+                    } label: {
+                        combinedLabel
+                    }
+                }
+            } footer: {
+                Text("Browse Live TV, Movies and Series from several playlists together.")
+            }
+        }
+
+        private var combinedLabel: some View {
+            HStack(spacing: 6) {
+                Text("Combined View")
+                BetaBadge()
+                if !premium.isPremium {
+                    PremiumBadge()
+                }
+                Spacer(minLength: 0)
             }
         }
 
@@ -162,7 +206,44 @@ private extension [Playlist] {
         var tvPlaylistsDetail: some View {
             VStack(alignment: .leading, spacing: 36) {
                 tvPlaylistsList
+                if !playlists.isEmpty {
+                    tvCombinedSection
+                }
                 tvAutoSyncSection
+            }
+        }
+
+        /// The row opens the paywall or the Combined View page, per
+        /// `QuickSwitchResolver.combinedSettingsAction`.
+        private var tvCombinedSection: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    if QuickSwitchResolver.combinedSettingsAction(playlists, isPremium: premium.isPremium) == .paywall {
+                        presentPaywall(.multiplePlaylists)
+                    } else {
+                        beginContentManagementHandoff()
+                        showingCombinedView = true
+                    }
+                } label: {
+                    HStack(spacing: 16) {
+                        Text("Combined View")
+                        BetaBadge()
+                        if !premium.isPremium {
+                            PremiumBadge()
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.forward")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(TVSettingsRowButtonStyle())
+                .focused($drillInFocus, equals: .combinedView)
+                Text("Browse Live TV, Movies and Series from several playlists together.")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.top, 6)
             }
         }
 
@@ -176,8 +257,17 @@ private extension [Playlist] {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 } else {
+                    let scope = catalogScope
+                    let column = QuickSwitchResolver.playlistColumn(playlists, scope: scope, isPremium: premium.isPremium)
+                    TVCombinedSwitchRow(
+                        memberNames: column.combinedMemberNames,
+                        isActive: column.isCombinedCurrent,
+                        isLocked: column.combinedAction == .paywall
+                    ) {
+                        selectCombined(column.combinedAction)
+                    }
                     ForEach(playlists) { playlist in
-                        tvPlaylistRow(playlist)
+                        tvPlaylistRow(playlist, scope: scope)
                     }
                 }
 
@@ -218,17 +308,18 @@ private extension [Playlist] {
         /// into its settings. The active id resolves through the same empty /
         /// deleted fallback the content tabs use, so the first playlist reads as
         /// active by default.
-        private func tvPlaylistRow(_ playlist: Playlist) -> some View {
+        private func tvPlaylistRow(_ playlist: Playlist, scope: CatalogScope) -> some View {
             HStack(spacing: 16) {
                 TVPlaylistSwitchRow(
                     playlist: playlist,
-                    isActive: playlist.id.uuidString == effectivePlaylistID,
+                    isActive: playlist.id.uuidString == scope.selectionID,
+                    isInScope: scope.playlistIDs.contains(playlist.id),
                     isLocked: playlists.isLocked(playlist)
                 ) {
                     if playlists.isLocked(playlist) {
                         presentPaywall(.multiplePlaylists)
                     } else {
-                        switchPlaylist(to: playlist)
+                        switchPlaylist(to: playlist, from: scope)
                     }
                 }
 
@@ -243,21 +334,25 @@ private extension [Playlist] {
             }
         }
 
-        /// The active playlist's id, accounting for the empty-default / deleted
-        /// fallback to the first playlist.
-        private var effectivePlaylistID: String {
-            playlists.activeID(for: selectedPlaylistID)
-        }
-
         /// Switches the global selection, routing through the blocking overlay when
         /// the switch model is available (same path as the iOS toolbar switcher).
-        private func switchPlaylist(to playlist: Playlist) {
+        private func switchPlaylist(to playlist: Playlist, from scope: CatalogScope) {
             let id = playlist.id.uuidString
-            guard id != effectivePlaylistID else { return }
-            if let playlistSwitch {
-                playlistSwitch.switchTo(name: playlist.name) { selectedPlaylistID = id }
-            } else {
-                selectedPlaylistID = id
+            guard id != scope.selectionID else { return }
+            playlistSwitch.select(id, name: playlist.name, into: $selectedPlaylistID)
+        }
+
+        private func selectCombined(_ action: CombinedSwitchAction) {
+            switch action {
+            case .paywall:
+                presentPaywall(.multiplePlaylists)
+            case .configure:
+                beginContentManagementHandoff()
+                showingCombinedView = true
+            case .alreadyCurrent:
+                break
+            case .switchToCombined:
+                playlistSwitch.selectCombined(into: $selectedPlaylistID)
             }
         }
     }

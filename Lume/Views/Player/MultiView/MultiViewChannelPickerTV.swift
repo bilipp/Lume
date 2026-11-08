@@ -6,8 +6,9 @@
 //  sheet: `.searchable` on tvOS raises the full-screen keyboard, which covers
 //  the picker outright and leaves nothing to navigate. This is the same shape as
 //  the in-player channel browser instead — glass columns walked with the remote,
-//  no text entry — with a leading Playlists column, since reaching across
-//  playlists is the whole point of Multi-View.
+//  no text entry — with a leading Playlists column (Combined on top when it can
+//  be entered), since reaching across playlists is the whole point of
+//  Multi-View. It opens on the device's current selection.
 //
 
 #if os(tvOS)
@@ -33,10 +34,12 @@
         private var showsFavorites = LiveTVRailSettings.showsFavoritesDefault
         @AppStorage(LiveTVRailSettings.showsRecentlyWatchedKey)
         private var showsRecentlyWatched = LiveTVRailSettings.showsRecentlyWatchedDefault
+        @AppStorage(PlaylistSelectionStore.key) private var storedSelection: String = ""
 
+        @State private var premium = PremiumManager.shared
         @State private var playlists: [Playlist] = []
-        @State private var selectedPlaylistID: UUID?
-        @State private var sections: [LiveTVSection] = []
+        @State private var source: MultiViewPickerSource?
+        @State private var sectionGroups: [LiveTVSectionGroup] = []
         @State private var selectedSectionID: String?
         @State private var channels: [LiveStream] = []
         /// Debounces category-focus loads so sweeping down the rail doesn't fetch
@@ -46,13 +49,18 @@
         @FocusState private var focus: FocusTarget?
 
         private enum FocusTarget: Hashable {
+            case combined
             case playlist(UUID)
             case section(String)
             case channel(String)
         }
 
-        private var selectedPlaylist: Playlist? {
-            playlists.first { $0.id == selectedPlaylistID }
+        private var catalogScope: CatalogScope? {
+            playlists.multiViewScope(for: source, isPremium: premium.isPremium)
+        }
+
+        private var sections: [LiveTVSection] {
+            sectionGroups.allSections
         }
 
         var body: some View {
@@ -79,9 +87,10 @@
             .onAppear(perform: loadPlaylists)
             .onChange(of: focus) { _, target in
                 switch target {
-                case let .playlist(id) where id != selectedPlaylistID:
-                    selectedPlaylistID = id
-                    loadSections()
+                case .combined where source != .combined:
+                    select(.combined)
+                case let .playlist(id) where source != .playlist(id):
+                    select(.playlist(id))
                 case let .section(id) where id != selectedSectionID:
                     scheduleChannelLoad(sectionID: id)
                 default:
@@ -124,11 +133,29 @@
 
         // MARK: - Rows
 
+        @ViewBuilder
         private var playlistRows: some View {
+            if let combined = playlists.multiViewCombinedScope(isPremium: premium.isPremium) {
+                Button {
+                    select(.combined)
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(verbatim: PlaylistSelectionStore.combinedTitle)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        if combined.members(for: .liveTV).contains(where: playlistsInUse.contains) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .accessibilityLabel("Already streaming in another tile")
+                        }
+                    }
+                }
+                .buttonStyle(MultiViewPickerRowStyle(isSelected: source == .combined))
+                .focused($focus, equals: .combined)
+            }
             ForEach(playlists) { playlist in
                 Button {
-                    selectedPlaylistID = playlist.id
-                    loadSections()
+                    select(.playlist(playlist.id))
                 } label: {
                     HStack(spacing: 12) {
                         Text(playlist.name)
@@ -143,7 +170,7 @@
                         }
                     }
                 }
-                .buttonStyle(MultiViewPickerRowStyle(isSelected: playlist.id == selectedPlaylistID))
+                .buttonStyle(MultiViewPickerRowStyle(isSelected: source == .playlist(playlist.id)))
                 .focused($focus, equals: .playlist(playlist.id))
             }
         }
@@ -153,24 +180,38 @@
             if sections.isEmpty {
                 emptyLabel("No Channels")
             } else {
-                ForEach(sections) { section in
-                    Button {
-                        scheduleChannelLoad(sectionID: section.id)
-                    } label: {
-                        HStack(spacing: 12) {
-                            if let icon = section.icon {
-                                Image(systemName: icon)
-                                    .font(.system(size: 20, weight: .semibold))
+                ForEach(sectionGroups) { group in
+                    if let title = group.title {
+                        TVRailGroupHeader(title: title) {
+                            if let playlistID = group.id, playlistsInUse.contains(playlistID) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .accessibilityLabel("Already streaming in another tile")
                             }
-                            Text(section.title)
-                                .lineLimit(1)
-                            Spacer(minLength: 0)
                         }
                     }
-                    .buttonStyle(MultiViewPickerRowStyle(isSelected: section.id == selectedSectionID))
-                    .focused($focus, equals: .section(section.id))
+                    ForEach(group.sections) { section in
+                        sectionButton(section)
+                    }
                 }
             }
+        }
+
+        private func sectionButton(_ section: LiveTVSection) -> some View {
+            Button {
+                scheduleChannelLoad(sectionID: section.id)
+            } label: {
+                HStack(spacing: 12) {
+                    if let icon = section.icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 20, weight: .semibold))
+                    }
+                    Text(section.title)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+            }
+            .buttonStyle(MultiViewPickerRowStyle(isSelected: section.id == selectedSectionID))
+            .focused($focus, equals: .section(section.id))
         }
 
         @ViewBuilder
@@ -228,29 +269,38 @@
 
         private func loadPlaylists() {
             playlists = (try? modelContext.fetch(FetchDescriptor<Playlist>())) ?? []
-            if selectedPlaylistID == nil {
-                selectedPlaylistID = playlists.first?.id
+            if source == nil {
+                source = MultiViewPickerSource(playlists.scope(for: storedSelection, isPremium: premium.isPremium))
             }
             loadSections()
-            // Land focus on the categories rail once the lazy rows exist. Deferred
-            // so the write doesn't land inside the focus engine's animated context.
+            // Land focus on the categories rail once the lazy rows exist, or on
+            // the current source when it has nothing to list. Deferred so the
+            // write doesn't land inside the focus engine's animated context.
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(60))
                 if let selectedSectionID {
                     focus = .section(selectedSectionID)
-                } else if let first = playlists.first {
-                    focus = .playlist(first.id)
+                } else if playlists.count > 1 {
+                    switch source {
+                    case .combined: focus = .combined
+                    case let .playlist(id): focus = .playlist(id)
+                    case nil: break
+                    }
                 }
             }
         }
 
+        private func select(_ newSource: MultiViewPickerSource) {
+            source = newSource
+            loadSections()
+        }
+
         private func loadSections() {
-            guard let playlist = selectedPlaylist else {
-                sections = []
+            guard let playlistScope = catalogScope else {
+                sectionGroups = []
                 channels = []
                 return
             }
-            let prefix = "\(playlist.id.uuidString)-"
             let sort = CategorySortOption(rawValue: categorySortRaw) ?? .playlist
             let descriptor = FetchDescriptor<Category>(
                 predicate: #Predicate { $0.typeRaw == "live" && $0.isHidden == false }
@@ -258,21 +308,28 @@
             let categories = sort.sort(
                 LiveChannelQuery.visibleCategories(
                     (try? modelContext.fetch(descriptor)) ?? [],
-                    playlistPrefix: prefix,
+                    catalogScope: playlistScope,
                     restriction: restriction
                 )
             )
 
-            var rail: [LiveTVSection] = []
-            if showsFavorites, !fetchChannels(scope: .favorites, prefix: prefix).isEmpty { rail.append(.favorites) }
-            if showsRecentlyWatched, !fetchChannels(scope: .recentlyWatched, prefix: prefix).isEmpty {
-                rail.append(.recentlyWatched)
+            var pinned: [LiveTVSection] = []
+            if showsFavorites, !fetchChannels(scope: .favorites, catalogScope: playlistScope).isEmpty { pinned.append(.favorites) }
+            if showsRecentlyWatched, !fetchChannels(scope: .recentlyWatched, catalogScope: playlistScope).isEmpty {
+                pinned.append(.recentlyWatched)
             }
-            rail.append(contentsOf: categories.map(LiveTVSection.category))
-            sections = rail
+            sectionGroups = LiveTVSectionGroup.rail(
+                pinned: pinned,
+                categoryGroups: LiveTVSectionGroup.categoryGroups(
+                    categories.map(LiveTVSection.category),
+                    catalogScope: playlistScope,
+                    playlistNames: playlists.namesByID
+                )
+            )
 
-            selectedSectionID = rail.first?.id
-            channels = rail.first.map { fetchChannels(scope: $0.scope, prefix: prefix) } ?? []
+            let first = sections.first
+            selectedSectionID = first?.id
+            channels = first.map { fetchChannels(scope: $0.scope, catalogScope: playlistScope) } ?? []
         }
 
         /// Swap the channel column to another section's channels, debounced so
@@ -284,24 +341,23 @@
                 try? await Task.sleep(for: .milliseconds(150))
                 guard !Task.isCancelled,
                       let section = sections.first(where: { $0.id == sectionID }),
-                      let playlist = selectedPlaylist else { return }
+                      let catalogScope else { return }
                 selectedSectionID = sectionID
-                channels = fetchChannels(scope: section.scope, prefix: "\(playlist.id.uuidString)-")
+                channels = fetchChannels(scope: section.scope, catalogScope: catalogScope)
             }
         }
 
-        private func fetchChannels(scope: LiveChannelScope, prefix: String) -> [LiveStream] {
+        private func fetchChannels(scope: LiveChannelScope, catalogScope: CatalogScope) -> [LiveStream] {
             let sort = ContentSortOption(rawValue: contentSortRaw) ?? .playlist
             let descriptor = LiveChannelQuery.descriptor(for: scope, sort: sort)
             let fetched = (try? modelContext.fetch(descriptor)) ?? []
             // `scoped` applies the restriction itself — categories by their id,
             // the virtual collections per channel — so it must not be repeated.
-            return LiveChannelQuery.scoped(fetched, scope: scope, playlistPrefix: prefix, restriction: restriction)
+            return LiveChannelQuery.scoped(fetched, scope: scope, catalogScope: catalogScope, restriction: restriction)
         }
 
         private func pick(_ stream: LiveStream) {
-            guard let playlist = selectedPlaylist,
-                  let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
+            guard let media = PlayableMedia.from(stream: stream, ownedByOneOf: playlists) else { return }
             onPick(media)
         }
     }

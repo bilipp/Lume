@@ -102,6 +102,8 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
     var epgURL: String?
     var syncEnabled: Bool
     var hiddenTabsRaw: String
+    var combinedTypesRaw: String
+    var combinedPriority: Int?
     var disabledContentRaw: String
 
     init(
@@ -114,6 +116,8 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         epgURL: String?,
         syncEnabled: Bool,
         hiddenTabsRaw: String = "",
+        combinedTypesRaw: String = "",
+        combinedPriority: Int? = nil,
         disabledContentRaw: String = ""
     ) {
         self.name = name
@@ -125,12 +129,16 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled
         self.hiddenTabsRaw = hiddenTabsRaw
+        self.combinedTypesRaw = combinedTypesRaw
+        self.combinedPriority = combinedPriority
         self.disabledContentRaw = disabledContentRaw
     }
 
     /// Hand-rolled decode so a shadow baseline persisted before Stalker support
     /// (no `macAddress` key), before hidden tabs (no `hiddenTabsRaw`) or before
-    /// per-kind content sync (no `disabledContentRaw`) still decodes — the field falls back to "" rather than failing the whole
+    /// combined playlists (no `combinedTypesRaw` / `combinedPriority`) or before
+    /// per-kind content sync (no `disabledContentRaw`) still decodes — the
+    /// field falls back to "" rather than failing the whole
     /// baseline, which would discard the shadow and risk a spurious mass reconcile.
     nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -143,6 +151,8 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         epgURL = try container.decodeIfPresent(String.self, forKey: .epgURL)
         syncEnabled = try container.decode(Bool.self, forKey: .syncEnabled)
         hiddenTabsRaw = try container.decodeIfPresent(String.self, forKey: .hiddenTabsRaw) ?? ""
+        combinedTypesRaw = try container.decodeIfPresent(String.self, forKey: .combinedTypesRaw) ?? ""
+        combinedPriority = try container.decodeIfPresent(Int.self, forKey: .combinedPriority)
         disabledContentRaw = try container.decodeIfPresent(String.self, forKey: .disabledContentRaw) ?? ""
     }
 

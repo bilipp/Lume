@@ -334,6 +334,7 @@ struct MediaServerSyncTests {
         #expect(movie.id == "\(playlistId.uuidString)-emby-m1")
         #expect(movie.name == "Arrival")
         #expect(movie.directURL == "http://\(host):8096/Videos/m1/stream?Static=true")
+        #expect(movie.added == "1789638697", "DateCreated is stored as 10-digit unix seconds")
 
         let show = try #require(try context.fetch(FetchDescriptor<Series>()).first)
         #expect(show.id == "\(playlistId.uuidString)-emby-s1")

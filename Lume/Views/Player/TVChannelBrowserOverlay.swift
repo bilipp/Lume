@@ -51,7 +51,9 @@
         @State private var channels: [LiveStream] = []
         /// Programme titles airing now, keyed by EPG channel id.
         @State private var nowTitles: [String: String] = [:]
-        @State private var playlistPrefix = ""
+        /// The playing channel's playlist. Categories list from it alone;
+        /// Favorites and Recently Watched span `media.surfScope` when set.
+        @State private var playlistScope = CatalogScope.empty
         /// The channel whose guide fills the trailing column.
         @State private var guideChannelID: String?
         @State private var guideEntries: [GuideEntry] = []
@@ -329,7 +331,8 @@
             guard let stream = TVPlayerContent.liveStream(for: media.contentRef, in: modelContext),
                   let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext) else { return }
             let prefix = "\(playlist.id.uuidString)-"
-            playlistPrefix = prefix
+            let playlistScope = CatalogScope.isolated(playlist.id)
+            self.playlistScope = playlistScope
 
             let categorySort = CategorySortOption(rawValue: categorySortRaw) ?? .playlist
             // Scoped in SQL. Unscoped this fetched every live category of every
@@ -348,7 +351,7 @@
             let categories = categorySort.sort(
                 LiveChannelQuery.visibleCategories(
                     (try? modelContext.fetch(descriptor)) ?? [],
-                    playlistPrefix: prefix,
+                    catalogScope: playlistScope,
                     restriction: restriction
                 )
             )
@@ -362,10 +365,12 @@
             // descriptors the Live TV rail gates on, so the two surfaces can't
             // disagree about which collections a rail offers.
             var rail: [LiveTVSection] = []
-            if showsFavorites, hasVisible(LiveChannelQuery.favoritesProbe(playlistPrefix: prefix, restriction: restriction)) {
+            if showsFavorites, hasVisible(LiveChannelQuery.favoritesProbe(catalogScope: listScope(for: .favorites), restriction: restriction)) {
                 rail.append(.favorites)
             }
-            if showsRecentlyWatched, hasVisible(LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: prefix, restriction: restriction)) {
+            if showsRecentlyWatched,
+               hasVisible(LiveChannelQuery.recentlyWatchedProbe(catalogScope: listScope(for: .recentlyWatched), restriction: restriction))
+            {
                 rail.append(.recentlyWatched)
             }
             rail.append(contentsOf: categories.map(LiveTVSection.category))
@@ -404,7 +409,13 @@
             let sort = ContentSortOption(rawValue: contentSortRaw) ?? .playlist
             let descriptor = LiveChannelQuery.descriptor(for: scope, sort: sort)
             let fetched = (try? modelContext.fetch(descriptor)) ?? []
-            return LiveChannelQuery.scoped(fetched, scope: scope, playlistPrefix: playlistPrefix, restriction: restriction)
+            return LiveChannelQuery.scoped(fetched, scope: scope, catalogScope: listScope(for: scope), restriction: restriction)
+        }
+
+        /// The playlists `scope` lists from — the same ones up/down surfs.
+        private func listScope(for scope: LiveChannelScope) -> CatalogScope {
+            guard let owner = playlistScope.primaryID else { return playlistScope }
+            return LiveChannelNavigator.catalogScope(for: scope, owner: owner, surfScope: media.surfScope)
         }
 
         /// Swap the channel column to another section's channels. Debounced a
@@ -499,7 +510,9 @@
                 return
             }
             guard let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext),
-                  let target = PlayableMedia.from(stream: stream, playlist: playlist, scope: selectedScope) else { return }
+                  let target = PlayableMedia.from(
+                      stream: stream, playlist: playlist, scope: selectedScope, surfScope: media.surfScope
+                  ) else { return }
             onSelect(target)
         }
 

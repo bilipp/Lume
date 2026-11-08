@@ -38,6 +38,8 @@ final class SyncedPlaylist {
     var epgURL: String?
     var syncEnabled: Bool = true
     var hiddenTabsRaw: String = ""
+    var combinedTypesRaw: String = ""
+    var combinedPriority: Int?
     var disabledContentRaw: String = ""
 
     /// Last time this record's config fields changed. Informational (surfaced in
@@ -56,6 +58,8 @@ final class SyncedPlaylist {
         epgURL: String?,
         syncEnabled: Bool,
         hiddenTabsRaw: String = "",
+        combinedTypesRaw: String = "",
+        combinedPriority: Int? = nil,
         disabledContentRaw: String = "",
         updatedAt: Date = Date()
     ) {
@@ -69,6 +73,8 @@ final class SyncedPlaylist {
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled
         self.hiddenTabsRaw = hiddenTabsRaw
+        self.combinedTypesRaw = combinedTypesRaw
+        self.combinedPriority = combinedPriority
         self.disabledContentRaw = disabledContentRaw
         self.updatedAt = updatedAt
     }

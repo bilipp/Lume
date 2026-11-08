@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 struct LibraryToolbarModifier: ViewModifier {
@@ -7,7 +8,12 @@ struct LibraryToolbarModifier: ViewModifier {
     @Binding var contentSortRaw: String
     @Binding var showingSync: Bool
     @Binding var showingSettings: Bool
-    let activePlaylist: Playlist?
+    @Environment(\.catalogScope) private var catalogScope
+    /// The page Settings opens on, set by the switcher's Combined entry and
+    /// cleared when Settings closes so the toolbar's own gear opens the root.
+    @State private var settingsRoute: SettingsRoute?
+    @State private var showPaywall = false
+    @State private var paywallHighlight: PremiumFeature?
 
     @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
 
@@ -15,9 +21,7 @@ struct LibraryToolbarModifier: ViewModifier {
         content
             .toolbar {
                 if playlists.count > 1 {
-                    ToolbarItem(placement: .automatic) {
-                        PlaylistSwitcher(playlists: playlists, selectedPlaylistID: $selectedPlaylistID)
-                    }
+                    ToolbarItem(placement: .automatic) { playlistSwitcher }
                 }
 
                 ToolbarItem(placement: .automatic) {
@@ -33,11 +37,7 @@ struct LibraryToolbarModifier: ViewModifier {
                 // menu rows (and VoiceOver) real names rather than the symbols'
                 // defaults.
                 ToolbarItem(placement: .automatic) {
-                    Button {
-                        showingSync = true
-                    } label: {
-                        Label("Sync", systemImage: "arrow.triangle.2.circlepath")
-                    }
+                    LibrarySyncButton(playlists: playlists, scope: catalogScope, showingSync: $showingSync)
                 }
 
                 ToolbarItem(placement: .automatic) {
@@ -53,14 +53,20 @@ struct LibraryToolbarModifier: ViewModifier {
                 // Settings is a sheet on this toolbar, invisible to the browse
                 // root that raises the rating prompt and the root notices — so
                 // it reports itself, the way the paywall and the players do.
-                onDismiss: { ScreenOccupancy.shared.noteBlockingSheetDismissed() },
+                onDismiss: {
+                    settingsRoute = nil
+                    ScreenOccupancy.shared.noteBlockingSheetDismissed()
+                },
                 content: {
-                    SettingsView()
+                    SettingsView(opening: settingsRoute)
                         .onAppear { ScreenOccupancy.shared.noteBlockingSheetAppeared() }
                 }
             )
+            .paywall(isPresented: $showPaywall, highlight: paywallHighlight)
+            // The Sync sheet syncs one playlist; Combined queues every member
+            // through `AutoSyncQueue` instead.
             .sheet(isPresented: $showingSync) {
-                if let playlist = activePlaylist {
+                if let playlist = playlists.primaryMember(of: catalogScope) {
                     SyncProgressView(playlist: playlist)
                 }
             }
@@ -72,6 +78,55 @@ struct LibraryToolbarModifier: ViewModifier {
                 showingSync = false
             }
     }
+
+    private var playlistSwitcher: some View {
+        PlaylistSwitcher(
+            playlists: playlists,
+            selectedPlaylistID: $selectedPlaylistID,
+            presentPaywall: { feature in
+                paywallHighlight = feature
+                showPaywall = true
+            },
+            openCombinedSettings: {
+                settingsRoute = .combinedView
+                showingSettings = true
+            }
+        )
+    }
+}
+
+/// Sync for the playlist on screen, or — while Combined is on screen — every
+/// due member, queued one after another by `AutoSyncQueue` rather than in a
+/// sheet here. Its own view so the queue's busy flag re-renders this button only.
+private struct LibrarySyncButton: View {
+    let playlists: [Playlist]
+    let scope: CatalogScope
+    @Binding var showingSync: Bool
+    @Environment(AutoSyncQueue.self) private var autoSyncQueue: AutoSyncQueue?
+    @Environment(\.modelContext) private var modelContext
+    @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
+
+    private var syncsMembers: Bool {
+        autoSyncQueue != nil && scope.isCombined
+    }
+
+    var body: some View {
+        Button {
+            if syncsMembers, let autoSyncQueue {
+                autoSyncQueue.enqueueManualMembers(
+                    scope: scope,
+                    playlists: playlists,
+                    frequency: SyncFrequency.resolve(syncFrequencyRaw),
+                    context: modelContext
+                )
+            } else {
+                showingSync = true
+            }
+        } label: {
+            Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+        }
+        .disabled(syncsMembers && autoSyncQueue?.isBusy == true)
+    }
 }
 
 struct LibraryToolbarConfiguration {
@@ -81,7 +136,6 @@ struct LibraryToolbarConfiguration {
     @Binding var contentSortRaw: String
     @Binding var showingSync: Bool
     @Binding var showingSettings: Bool
-    let activePlaylist: Playlist?
 }
 
 extension View {
@@ -96,8 +150,7 @@ extension View {
                 categorySortRaw: config.$categorySortRaw,
                 contentSortRaw: config.$contentSortRaw,
                 showingSync: config.$showingSync,
-                showingSettings: config.$showingSettings,
-                activePlaylist: config.activePlaylist
+                showingSettings: config.$showingSettings
             ))
         #endif
     }

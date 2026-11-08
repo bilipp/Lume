@@ -223,7 +223,7 @@ extension Series {
     ///   only when a sync finishes successfully.
     func episodesAreStale(lastSyncedAt: Date?) -> Bool {
         guard let episodesFetchedAt else { return true }
-        if episodesFetchedLastModified != lastModified { return true }
+        if !CatalogAddedDate.sameInstant(episodesFetchedLastModified, lastModified) { return true }
         guard let lastSyncedAt else { return false }
         return lastSyncedAt > episodesFetchedAt
     }

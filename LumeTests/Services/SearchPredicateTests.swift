@@ -248,4 +248,110 @@ struct SearchPredicateTests {
         #expect(Set(movies.map(\.persistentModelID)) == Set(hits.movies))
         #expect((hydrateSearchHits([], in: context) as [Movie]).isEmpty)
     }
+
+    // MARK: - Combined
+
+    private func scopedRequest(
+        _ scope: CatalogScope, all: [UUID], searchAll: Bool, limit: Int = 20
+    ) -> SearchRequest {
+        SearchRequest(
+            query: "matrix",
+            searching: SearchRequest.searchedScope(scope, allPlaylistIDs: all, searchAllPlaylists: searchAll),
+            wantMovies: true, wantSeries: true, wantLive: true,
+            excludedCategoryIDs: [], limit: limit
+        )
+    }
+
+    @Test func `combined searches the members per type instead of every playlist`() {
+        let (movieLive, seriesMovie, outsider) = (UUID(), UUID(), UUID())
+        let scope = CatalogScope.combined([
+            (id: movieLive, tabs: [.movies, .liveTV]),
+            (id: seriesMovie, tabs: [.series, .movies])
+        ])
+
+        let request = scopedRequest(scope, all: [outsider, movieLive, seriesMovie], searchAll: true)
+
+        #expect(request.playlistIDs == [movieLive, seriesMovie].map(\.uuidString))
+        #expect(request.scopes(for: .movies).map(\.playlistID) == [movieLive, seriesMovie].map(\.uuidString))
+        #expect(request.scopes(for: .series).map(\.playlistID) == [seriesMovie.uuidString])
+        #expect(request.scopes(for: .liveTV).map(\.playlistID) == [movieLive.uuidString])
+    }
+
+    @Test func `outside combined the search-all setting still picks the playlists`() {
+        let (shown, other) = (UUID(), UUID())
+        let isolated = CatalogScope.isolated(shown)
+
+        let all = scopedRequest(isolated, all: [other, shown], searchAll: true)
+        let one = scopedRequest(isolated, all: [other, shown], searchAll: false)
+        let none = scopedRequest(.empty, all: [], searchAll: false)
+
+        #expect(all.playlistIDs == [other, shown].map(\.uuidString))
+        for tab in PlaylistTab.allCases {
+            #expect(all.scopes(for: tab).map(\.playlistID) == [other, shown].map(\.uuidString))
+        }
+        #expect(one.playlistIDs == [shown.uuidString])
+        #expect(none.scopes(for: .movies).map(\.restrictToPlaylist) == [false])
+    }
+
+    @Test func `combined search returns only member rows and shares the budget`() throws {
+        let container = try makeSQLiteContainer()
+        let context = container.mainContext
+        let limit = 10
+        let (big, small) = try insertTwoCatalogs(context, limit: limit)
+        let outsider = UUID().uuidString
+        context.insert(Movie(id: "\(outsider)-movie-1", streamId: 1, name: "Mmm Matrix"))
+        try context.save()
+        let scope = try CatalogScope.combined([
+            (id: #require(UUID(uuidString: big)), tabs: [.movies]),
+            (id: #require(UUID(uuidString: small)), tabs: [.movies, .series])
+        ])
+
+        let hits = SearchFetcher.fetch(
+            container: container,
+            request: scopedRequest(scope, all: [], searchAll: false, limit: limit)
+        )
+
+        let matched = names(hits.movies, in: context)
+        #expect(matched.count == limit)
+        #expect(matched.count(where: { $0.hasPrefix("Zzz") }) == 2)
+        #expect(!matched.contains("Mmm Matrix"))
+        #expect(hits.series.isEmpty)
+        #expect(hits.streams.isEmpty)
+    }
+
+    @Test func `rows name their playlist only when several contribute the type`() {
+        let (first, second) = (UUID(), UUID())
+        let combined = CatalogScope.combined([
+            (id: first, tabs: [.movies, .liveTV]),
+            (id: second, tabs: [.movies])
+        ])
+
+        func names(_ tab: PlaylistTab, _ scope: CatalogScope, searchAll: Bool) -> Bool {
+            SearchRequest.searchedScope(scope, allPlaylistIDs: [first, second], searchAllPlaylists: searchAll)
+                .namesMembers(for: tab)
+        }
+
+        #expect(names(.movies, combined, searchAll: false))
+        #expect(!names(.liveTV, combined, searchAll: true))
+        #expect(!names(.movies, .isolated(first), searchAll: false))
+        #expect(names(.movies, .isolated(first), searchAll: true))
+    }
+
+    @Test func `combined asks the portals of members contributing movies or series`() {
+        let (vod, liveOnly, outsider) = (UUID(), UUID(), UUID())
+        let combined = CatalogScope.combined([
+            (id: liveOnly, tabs: [.liveTV]),
+            (id: vod, tabs: [.series])
+        ])
+
+        func candidates(_ scope: CatalogScope, all: [UUID], searchAll: Bool) -> [UUID] {
+            SearchRequest.portalCandidateIDs(
+                in: SearchRequest.searchedScope(scope, allPlaylistIDs: all, searchAllPlaylists: searchAll)
+            )
+        }
+
+        #expect(candidates(combined, all: [outsider, liveOnly, vod], searchAll: true) == [vod])
+        #expect(candidates(.isolated(vod), all: [outsider, vod], searchAll: false) == [vod])
+        #expect(candidates(.isolated(vod), all: [outsider, vod], searchAll: true) == [outsider, vod])
+    }
 }

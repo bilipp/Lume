@@ -491,6 +491,40 @@ private extension CloudSyncEngine {
 // MARK: - EPG source mutations
 
 private extension CloudSyncEngine {
+    func applyPlaylistToCloud(_ value: PlaylistConfigValues?, id: UUID, mirror: SyncedPlaylist?) {
+        guard let value else {
+            if let mirror { deletionLog.delete(mirror, in: cloudContext) }
+            return
+        }
+        if let mirror {
+            // A re-baseline push the mirror already holds would only re-export it.
+            if Self.values(from: mirror) == value { return }
+            mirror.apply(value)
+        } else {
+            cloudContext.insert(SyncedPlaylist(id: id, value: value))
+        }
+    }
+
+    /// Returns true if a new local `Playlist` was created (it has no
+    /// `lastSyncDate`, so the UI's auto-sync will fetch its catalog).
+    func applyPlaylistToLocal(_ value: PlaylistConfigValues?, id: UUID, local: Playlist?) -> Bool {
+        guard let value else {
+            // Mirror the local-deletion path: remove the playlist's orphaned
+            // catalog content too, not just the `Playlist` row.
+            if let local { PlaylistDeletion.delete(local, in: catalogContext) }
+            return false
+        }
+        if let local {
+            local.apply(value)
+            return false
+        }
+        let playlist = Playlist(name: value.name, serverURL: value.serverURL, username: value.username, password: value.password)
+        playlist.id = id
+        playlist.apply(value)
+        catalogContext.insert(playlist)
+        return true
+    }
+
     func applyEPGSourceToCloud(_ value: EPGSourceValues?, id: UUID, mirror: SyncedEPGSource?) {
         guard let value else {
             if let mirror { deletionLog.delete(mirror, in: cloudContext) }

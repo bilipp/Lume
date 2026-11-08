@@ -59,6 +59,23 @@ final class PlaylistSwitchModel {
     }
 }
 
+extension PlaylistSwitchModel? {
+    /// Writes `id` into `selection`, behind the blocking overlay when a switch
+    /// model is injected and instantly otherwise.
+    func select(_ id: String, name: String, into selection: Binding<String>) {
+        guard let model = self else {
+            selection.wrappedValue = id
+            return
+        }
+        model.switchTo(name: name) { selection.wrappedValue = id }
+    }
+
+    /// What every switch surface does for `CombinedSwitchAction.switchToCombined`.
+    func selectCombined(into selection: Binding<String>) {
+        select(PlaylistSelectionStore.combined, name: PlaylistSelectionStore.combinedTitle, into: selection)
+    }
+}
+
 extension View {
     /// Layers the blocking switch-progress overlay over this view for whichever
     /// switch is in flight. The fade lives here rather than on the call site so

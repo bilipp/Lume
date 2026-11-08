@@ -97,18 +97,33 @@ struct CategoryContentGrid<Item: Identifiable & Hashable & WatchlistFavoritable,
 /// would otherwise spin up dozens of concurrent fetches and stutter the browse
 /// screen. Surfacing the long tail as plain name tiles keeps it fast.
 struct CategoryGridSection: View {
-    let title: LocalizedStringKey
+    private let title: Text
+    private let isMemberHeader: Bool
     let categories: [Category]
 
     private let columns = [GridItem(.adaptive(minimum: CategoryTileMetrics.minimum), spacing: CategoryTileMetrics.spacing)]
 
+    /// A titled group is a Combined member's tiles, headed by the playlist's
+    /// own name.
+    init(group: LibraryCategoryLayout.Group) {
+        if let name = group.title {
+            title = Text(verbatim: name)
+            isMemberHeader = true
+        } else {
+            title = Text("All Categories")
+            isMemberHeader = false
+        }
+        categories = group.categories
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
+            title
                 .font(.headline)
                 .fontWeight(.bold)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
+                .accessibilityAddTraits(isMemberHeader ? .isHeader : [])
 
             LazyVGrid(columns: columns, spacing: CategoryTileMetrics.spacing) {
                 ForEach(categories) { category in
@@ -435,7 +450,7 @@ struct MovieCategoryPreview: View {
             hasMore: movies.count > limit,
             animationNamespace: animationNamespace,
             emptyMessage: "No movies in this category",
-            card: { MovieCardView(movie: $0) }
+            card: { MovieCardView(movie: $0).environment(\.playlistProvenance, .none) }
         )
     }
 }

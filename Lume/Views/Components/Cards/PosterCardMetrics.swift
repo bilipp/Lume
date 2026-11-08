@@ -29,6 +29,8 @@ enum PosterCardMetrics {
         static let gridSpacing: CGFloat = 48
         /// Inset between a transparent channel logo and its card plate.
         static let liveLogoInset: CGFloat = 32
+        /// Inset of the provenance badge from the poster's bottom-leading corner.
+        static let badgeInset: CGFloat = 10
     #else
         static let posterWidth: CGFloat = 120
         static let posterHeight: CGFloat = 180
@@ -42,6 +44,7 @@ enum PosterCardMetrics {
         static let gridMinimum: CGFloat = 100
         static let gridSpacing: CGFloat = 16
         static let liveLogoInset: CGFloat = 16
+        static let badgeInset: CGFloat = 5
     #endif
 
     /// Poster proportions, used to derive a card's height from a grid cell's

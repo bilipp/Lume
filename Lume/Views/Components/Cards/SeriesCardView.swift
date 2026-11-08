@@ -13,6 +13,7 @@ struct SeriesCardView: View {
     /// Set by the category / genre grids so the card sizes to its cell rather
     /// than the fixed rail width — see `View.posterArtworkFrame(fillsWidth:)`.
     var fillsWidth: Bool = false
+    @Environment(\.playlistProvenance) private var provenance
 
     @Environment(\.modelContext) private var modelContext
     @State private var isFullyWatched = false
@@ -45,6 +46,7 @@ struct SeriesCardView: View {
                 }
             }
             .posterArtworkFrame(fillsWidth: fillsWidth)
+            .playlistBadgeOverlay(provenance.name(forContentID: series.id, in: .series))
             .watchedBadge(isFullyWatched)
             // `.task` restarts on every appear, so the badge catches up after
             // episodes are marked watched on the detail screen.

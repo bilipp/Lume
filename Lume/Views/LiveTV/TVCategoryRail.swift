@@ -13,7 +13,10 @@
     /// The Live TV categories as a `TVSidebarRail`: the virtual collections,
     /// the Recordings entry, then the provider's categories.
     struct TVCategoryRail: View {
-        let sections: [LiveTVSection]
+        /// One untitled group for a single Live TV playlist; with two or more
+        /// Combined members, the virtual collections above a titled group per
+        /// member.
+        let groups: [LiveTVSectionGroup]
         @Binding var selectedSection: LiveTVSection?
         /// Fired when the user activates (clicks) a category.
         var onCategoryActivated: () -> Void = {}
@@ -32,10 +35,12 @@
         }
 
         /// Visual order is focus order: Favorites and Recently Watched
-        /// (whichever exist), Recordings, then the provider's categories.
+        /// (whichever exist), Recordings, then the provider's categories —
+        /// each Combined member's under its name when there are headers.
+        /// Headers are plain text, never focusable, so up/down hops straight
+        /// from one member's last category to the next one's first.
         private var items: [TVSidebarRailItem] {
-            let pinnedCount = sections.prefix(while: \.isVirtual).count
-            var items = sections.prefix(pinnedCount).map(categoryItem)
+            var items = (groups.first?.sections ?? []).prefix(while: \.isVirtual).map { categoryItem($0) }
             if let recordings {
                 items.append(TVSidebarRailItem(
                     id: TVCategoryRailRecordingsEntry.id,
@@ -44,7 +49,12 @@
                     action: recordings.onActivate
                 ))
             }
-            items += sections.dropFirst(pinnedCount).map(categoryItem)
+            for group in groups {
+                let categories = group.sections.drop(while: \.isVirtual)
+                items += categories.enumerated().map { index, section in
+                    categoryItem(section, header: index == 0 ? group.title : nil)
+                }
+            }
             return items
         }
 
@@ -54,8 +64,8 @@
             recordings?.isSelected == true ? TVCategoryRailRecordingsEntry.id : selectedSection?.id
         }
 
-        private func categoryItem(_ section: LiveTVSection) -> TVSidebarRailItem {
-            TVSidebarRailItem(id: section.id, title: section.titleText, icon: section.icon) {
+        private func categoryItem(_ section: LiveTVSection, header: String? = nil) -> TVSidebarRailItem {
+            TVSidebarRailItem(id: section.id, title: section.titleText, icon: section.icon, header: header) {
                 selectedSection = section
                 onCategoryActivated()
             }
