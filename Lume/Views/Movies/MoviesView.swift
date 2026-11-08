@@ -13,6 +13,9 @@ struct MoviesView: View {
     @Namespace private var animationNamespace
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
+    /// The playlists the categories, collection rows and genres read from: one
+    /// playlist, or the Combined members.
+    @Environment(\.catalogScope) private var scope
     // Optional so previews (which don't inject it) fall back to a local path.
     @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
     @State private var fallbackPath = NavigationPath()
@@ -46,10 +49,9 @@ struct MoviesView: View {
     private let previewCategoryLimit = 4
 
     var body: some View {
-        // Resolve once per render — `sortedCategories` filters + sorts every
-        // playlist's categories, so reading it three times (the emptiness check
-        // plus the preview/remaining splits) tripled that work.
-        let sorted = sortedCategories
+        // Resolve once per render — `categoryLayout` filters + sorts every
+        // member's categories, so reading it per use multiplied that work.
+        let layout = categoryLayout
         NavigationStack(path: navigationPath) {
             Group {
                 if playlists.isEmpty {
@@ -58,7 +60,7 @@ struct MoviesView: View {
                         systemImage: "film.stack",
                         description: Text("Add a playlist in Settings to start browsing movies")
                     )
-                } else if sorted.isEmpty {
+                } else if layout.isEmpty {
                     VStack(spacing: 20) {
                         ContentUnavailableView(
                             "No Movies",
@@ -67,14 +69,13 @@ struct MoviesView: View {
                         )
                     }
                 } else {
-                    let remaining = Array(sorted.dropFirst(previewCategoryLimit))
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
-                            MovieCollectionRow(kind: .recentlyWatched, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
-                            MovieCollectionRow(kind: .favorites, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
-                            MovieCollectionRow(kind: .recentlyAdded, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+                            MovieCollectionRow(kind: .recentlyWatched, scope: scope, animationNamespace: animationNamespace)
+                            MovieCollectionRow(kind: .favorites, scope: scope, animationNamespace: animationNamespace)
+                            MovieCollectionRow(kind: .recentlyAdded, scope: scope, animationNamespace: animationNamespace)
 
-                            ForEach(sorted.prefix(previewCategoryLimit)) { category in
+                            ForEach(layout.previews) { category in
                                 MovieCategoryPreview(category: category, limit: previewLimit, sort: contentSort, animationNamespace: animationNamespace)
                                     .id("\(category.id)-\(contentSort.rawValue)")
                             }
@@ -83,16 +84,16 @@ struct MoviesView: View {
                                 GenreGridSection(genres: genres, type: .vod)
                             }
 
-                            if !remaining.isEmpty {
-                                CategoryGridSection(title: "All Categories", categories: remaining)
+                            ForEach(layout.remaining) { group in
+                                CategoryGridSection(group: group)
                                     .padding(.top, 12)
                             }
                         }
                         .padding(.vertical)
                     }
                     .browseActivity()
-                    .task(id: playlistPrefix) {
-                        genres = await GenreDerivation.movieGenres(in: modelContext.container, playlistPrefix: playlistPrefix, restriction: restriction)
+                    .task(id: scope.token) {
+                        genres = await GenreDerivation.movieGenres(in: modelContext.container, scope: scope, restriction: restriction)
                     }
                 }
             }
@@ -104,17 +105,16 @@ struct MoviesView: View {
                 categorySortRaw: $categorySortRaw,
                 contentSortRaw: $contentSortRaw,
                 showingSync: $showingSync,
-                showingSettings: $showingSettings,
-                activePlaylist: activePlaylist
+                showingSettings: $showingSettings
             ))
             .navigationDestination(for: Category.self) { category in
                 MovieCategoryView(category: category, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: LibraryCollection.self) { collection in
-                MovieCollectionView(kind: collection.kind, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+                MovieCollectionView(kind: collection.kind, scope: scope, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: GenreSelection.self) { selection in
-                MovieGenreView(genre: selection.genre, playlistPrefix: playlistPrefix, animationNamespace: animationNamespace)
+                MovieGenreView(genre: selection.genre, scope: scope, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: Movie.self) { movie in
                 MovieDetailView(movie: movie, animationNamespace: animationNamespace)
@@ -132,25 +132,18 @@ struct MoviesView: View {
         return Binding(get: { router.moviesPath }, set: { router.moviesPath = $0 })
     }
 
-    /// The playlist whose content is currently shown, resolved from the global
-    /// selection. Falls back to the first playlist until the user picks one.
-    private var activePlaylist: Playlist? {
-        playlists.active(for: selectedPlaylistID)
-    }
-
-    /// The id prefix every Movie/Category of the active playlist shares. Used to
-    /// scope the cross-category collection rows in-memory.
-    private var playlistPrefix: String {
-        activePlaylist.map { "\($0.id.uuidString)-" } ?? ""
-    }
-
-    /// Categories scoped to the active playlist. The `@Query` fetches every
-    /// playlist's categories (SwiftData can't parameterize a `@Query` on view
-    /// state), so we isolate by the playlist-prefixed category `id` here.
-    private var sortedCategories: [Category] {
-        guard let playlistId = activePlaylist?.id else { return [] }
-        let prefix = "\(playlistId.uuidString)-"
-        return categorySort.sort(categories.filter { $0.id.hasPrefix(prefix) && !restriction.hides(categoryID: $0.id) })
+    /// Categories in scope, as preview rows plus one tile group per member.
+    /// The `@Query` fetches every playlist's categories (SwiftData can't
+    /// parameterize a `@Query` on view state), so the isolation by
+    /// playlist-prefixed category `id` happens here.
+    private var categoryLayout: LibraryCategoryLayout {
+        LibraryCategoryLayout.make(
+            categories: categories,
+            members: playlists.members(of: scope, for: .movies).map { (id: $0.id, name: $0.name) },
+            sort: categorySort,
+            restriction: restriction,
+            previewLimit: previewCategoryLimit
+        )
     }
 }
 

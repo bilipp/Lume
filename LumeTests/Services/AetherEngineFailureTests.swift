@@ -28,6 +28,11 @@ struct AetherEngineFailureTests {
         #expect(AetherEngineFailure.classify(kind: "sourceCertificateRejected", code: nil) == .unsupported)
     }
 
+    @Test func `an origin that fabricates byte ranges hands over to another engine`() {
+        #expect(AetherEngineFailure.classify(kind: "sourceFabricatesRanges", code: 206) == .unsupported)
+        #expect(AetherEngineFailure.classify(kind: "sourceFabricatesRanges", code: nil) == .unsupported)
+    }
+
     @Test func `source loss and unknown kinds reconnect on the normal schedule`() {
         for kind in ["liveSourceUnavailable", "sourceOpenFailed", "vodSourceFailed", "storageExhausted", "customSourceProbeFailed", "reloadFailed", "audioTrackSwitchFailed", "", "someFutureKind"] {
             #expect(AetherEngineFailure.classify(kind: kind, code: 500) == .interrupted)

@@ -138,6 +138,10 @@ nonisolated enum LiveChannelNavigator {
     /// channel's own category is hidden or locked, which leaves it no position
     /// in any rotation and stops surfing where it stands.
     ///
+    /// Favorites and Recently Watched walk every playlist in
+    /// `media.surfScope` when the viewer launched from Combined; a category is
+    /// one playlist's, and surfs only that.
+    ///
     /// `restriction` is required rather than defaulted, like the channel-list
     /// helpers it shares descriptors with: surfing is the last surface that
     /// resolved channels on its own, which let a child keep rocking through a
@@ -178,8 +182,42 @@ nonisolated enum LiveChannelNavigator {
         guard ring.count > 1 else { return nil }
         let position = (located.index + offset + ring.count) % ring.count
         guard let target = ring.row(at: position, in: context) else { return nil }
-        // The scope rides along so the next press surfs the same list.
-        return PlayableMedia.from(stream: target, playlist: playlist, scope: media.channelScope)
+        // The scopes ride along so the next press surfs the same list.
+        return targetMedia(
+            for: target, nextTo: playlist, scope: media.channelScope, surfScope: media.surfScope, in: context
+        )
+    }
+
+    /// The playlists `scope` spans for a channel owned by `owner`: every
+    /// Combined member for Favorites and Recently Watched, `owner` alone for a
+    /// category or when playback carries no Combined membership.
+    static func catalogScope(
+        for scope: LiveChannelScope,
+        owner: UUID,
+        surfScope: LiveSurfScope?
+    ) -> CatalogScope {
+        switch scope {
+        case .category:
+            .isolated(owner)
+        case .favorites, .recentlyWatched:
+            surfScope?.catalogScope(owner: owner) ?? .isolated(owner)
+        }
+    }
+
+    /// `target` built against the playlist that owns it, which needn't be
+    /// `current` — the playing channel's owner — once a list spans playlists.
+    /// `current` is checked first so a single-playlist ring costs no lookup.
+    static func targetMedia(
+        for target: LiveStream,
+        nextTo current: Playlist,
+        scope: LiveChannelScope?,
+        surfScope: LiveSurfScope? = nil,
+        in context: ModelContext
+    ) -> PlayableMedia? {
+        guard let owner = [current].owner(ofContentID: target.id) ?? playlist(for: target, in: context) else {
+            return nil
+        }
+        return PlayableMedia.from(stream: target, playlist: owner, scope: scope, surfScope: surfScope)
     }
 
     // MARK: - The ring
@@ -210,38 +248,54 @@ nonisolated enum LiveChannelNavigator {
     static func scopeDescriptor(
         scope: LiveChannelScope,
         sort: ContentSortOption,
-        playlistPrefix prefix: String,
+        catalogScope: CatalogScope,
         restriction: ContentRestriction,
         admittingHidden admitted: String?
     ) -> FetchDescriptor<LiveStream> {
+        let sortBy = LiveChannelQuery.sortDescriptors(for: scope, sort: sort)
+        let predicate = if let prefix = catalogScope.singlePrefix(for: .liveTV) {
+            memberPredicate(scope: scope, prefix: prefix, restriction: restriction, admittingHidden: admitted)
+        } else {
+            combinedPredicate(
+                scope: scope, catalogScope: catalogScope, restriction: restriction, admittingHidden: admitted
+            )
+        }
+        return FetchDescriptor<LiveStream>(predicate: predicate, sortBy: sortBy)
+    }
+
+    /// One playlist: the playlist scope inlined as `id.starts(with:)`, the
+    /// predicate isolated mode has always run.
+    private static func memberPredicate(
+        scope: LiveChannelScope,
+        prefix: String,
+        restriction: ContentRestriction,
+        admittingHidden admitted: String?
+    ) -> Predicate<LiveStream> {
         // Optionals so the predicate can test the optional `categoryId` against
         // them directly: neither `?? ""` nor a nil-check plus force-unwrap
         // survives SwiftData's SQL generation. Same shape as
         // `LiveChannelQuery.favoritesProbe`.
         let excluded = Set(restriction.excludedCategoryIDs.map(String?.some))
         let filters = !excluded.isEmpty
-        let sortBy = LiveChannelQuery.sortDescriptors(for: scope, sort: sort)
-        let predicate: Predicate<LiveStream>
 
         switch scope {
         case let .category(categoryId):
             if let admitted {
-                predicate = #Predicate { stream in
+                return #Predicate { stream in
                     stream.categoryId == categoryId
                         && stream.id.starts(with: prefix)
                         && (stream.isHidden == false || stream.id == admitted)
                         && (!filters || !excluded.contains(stream.categoryId))
                 }
-            } else {
-                predicate = #Predicate { stream in
-                    stream.categoryId == categoryId
-                        && stream.id.starts(with: prefix)
-                        && stream.isHidden == false
-                        && (!filters || !excluded.contains(stream.categoryId))
-                }
+            }
+            return #Predicate { stream in
+                stream.categoryId == categoryId
+                    && stream.id.starts(with: prefix)
+                    && stream.isHidden == false
+                    && (!filters || !excluded.contains(stream.categoryId))
             }
         case .favorites:
-            predicate = #Predicate { stream in
+            return #Predicate { stream in
                 stream.isFavorite
                     && stream.isHidden == false
                     && stream.id.starts(with: prefix)
@@ -253,14 +307,59 @@ nonisolated enum LiveChannelNavigator {
             // `recentLimit` *before* the browse list filters by playlist and
             // restriction, so a ring that filters first walks a different set of
             // channels — see `recentsRing(…)`.
-            predicate = #Predicate { stream in
+            return #Predicate { stream in
                 stream.lastWatchedDate != nil
                     && stream.isHidden == false
                     && stream.id.starts(with: prefix)
                     && (!filters || !excluded.contains(stream.categoryId))
             }
         }
-        return FetchDescriptor<LiveStream>(predicate: predicate, sortBy: sortBy)
+    }
+
+    /// Several playlists: the same predicates with the playlist scope as the
+    /// `evaluate` OR fold of every member's prefix, still inside SQL.
+    private static func combinedPredicate(
+        scope: LiveChannelScope,
+        catalogScope: CatalogScope,
+        restriction: ContentRestriction,
+        admittingHidden admitted: String?
+    ) -> Predicate<LiveStream> {
+        guard !catalogScope.prefixes(for: .liveTV).isEmpty else { return #Predicate { _ in false } }
+        let scoped = catalogScope.liveStreamPredicate()
+        let excluded = Set(restriction.excludedCategoryIDs.map(String?.some))
+        let filters = !excluded.isEmpty
+
+        switch scope {
+        case let .category(categoryId):
+            if let admitted {
+                return #Predicate { stream in
+                    stream.categoryId == categoryId
+                        && scoped.evaluate(stream)
+                        && (stream.isHidden == false || stream.id == admitted)
+                        && (!filters || !excluded.contains(stream.categoryId))
+                }
+            }
+            return #Predicate { stream in
+                stream.categoryId == categoryId
+                    && scoped.evaluate(stream)
+                    && stream.isHidden == false
+                    && (!filters || !excluded.contains(stream.categoryId))
+            }
+        case .favorites:
+            return #Predicate { stream in
+                stream.isFavorite
+                    && stream.isHidden == false
+                    && scoped.evaluate(stream)
+                    && (!filters || !excluded.contains(stream.categoryId))
+            }
+        case .recentlyWatched:
+            return #Predicate { stream in
+                stream.lastWatchedDate != nil
+                    && stream.isHidden == false
+                    && scoped.evaluate(stream)
+                    && (!filters || !excluded.contains(stream.categoryId))
+            }
+        }
     }
 
     /// A channel list a position can be read out of.
@@ -356,14 +455,15 @@ nonisolated enum LiveChannelNavigator {
         playlist: Playlist,
         in context: ModelContext
     ) -> (ring: Ring, index: Int)? {
-        let prefix = "\(playlist.id.uuidString)-"
+        let catalogScope = CatalogScope.isolated(playlist.id)
         let ownCategory = current.categoryId.map(LiveChannelScope.category)
         // A category launch scope *is* the channel's own category, and the branch
         // below resolves that list anyway — asking for it here first would walk
         // it twice to get the same answer.
         if let scope = media.channelScope, scope != ownCategory,
            let located = locate(
-               current, scope: scope, sort: sort, prefix: prefix,
+               current, scope: scope, sort: sort,
+               catalogScope: Self.catalogScope(for: scope, owner: playlist.id, surfScope: media.surfScope),
                restriction: restriction, admittingHidden: nil, in: context
            )
         {
@@ -378,7 +478,7 @@ nonisolated enum LiveChannelNavigator {
         // same category id, so the answer is the same for all of them.
         guard !restriction.hides(categoryID: categoryId) else { return nil }
         if let located = locate(
-            current, scope: .category(categoryId), sort: sort, prefix: prefix,
+            current, scope: .category(categoryId), sort: sort, catalogScope: catalogScope,
             restriction: restriction, admittingHidden: nil, in: context
         ) {
             return located
@@ -388,7 +488,7 @@ nonisolated enum LiveChannelNavigator {
         // channel itself added back so it has a position in the ring. The *other*
         // hidden channels stay out: hiding a channel takes it out of the rotation.
         return locate(
-            current, scope: .category(categoryId), sort: sort, prefix: prefix,
+            current, scope: .category(categoryId), sort: sort, catalogScope: catalogScope,
             restriction: restriction, admittingHidden: current.id, in: context
         )
     }
@@ -397,7 +497,7 @@ nonisolated enum LiveChannelNavigator {
         _ current: LiveStream,
         scope: LiveChannelScope,
         sort: ContentSortOption,
-        prefix: String,
+        catalogScope: CatalogScope,
         restriction: ContentRestriction,
         admittingHidden admitted: String?,
         in context: ModelContext
@@ -405,12 +505,12 @@ nonisolated enum LiveChannelNavigator {
         let ring: Ring
         if scope == .recentlyWatched {
             guard let recents = recentsRing(
-                sort: sort, prefix: prefix, restriction: restriction, in: context
+                sort: sort, catalogScope: catalogScope, restriction: restriction, in: context
             ) else { return nil }
             ring = recents
         } else {
             let descriptor = scopeDescriptor(
-                scope: scope, sort: sort, playlistPrefix: prefix,
+                scope: scope, sort: sort, catalogScope: catalogScope,
                 restriction: restriction, admittingHidden: admitted
             )
             guard let total = try? context.fetchCount(descriptor), total > 0 else { return nil }
@@ -433,14 +533,14 @@ nonisolated enum LiveChannelNavigator {
     /// cannot arise behind a 50-row cap.
     private static func recentsRing(
         sort: ContentSortOption,
-        prefix: String,
+        catalogScope: CatalogScope,
         restriction: ContentRestriction,
         in context: ModelContext
     ) -> Ring? {
         let descriptor = LiveChannelQuery.descriptor(for: .recentlyWatched, sort: sort)
         guard let page = try? context.fetch(descriptor) else { return nil }
         let rows = LiveChannelQuery.scoped(
-            page, scope: .recentlyWatched, playlistPrefix: prefix, restriction: restriction
+            page, scope: .recentlyWatched, catalogScope: catalogScope, restriction: restriction
         )
         return rows.isEmpty ? nil : .page(rows)
     }

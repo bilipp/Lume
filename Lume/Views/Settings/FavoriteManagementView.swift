@@ -7,8 +7,10 @@
 //  "Favorites" from ContentManagementView. The arrangement persists on each
 //  model's `favoriteOrder`, stamped densely across the whole list so a movie can
 //  sit above a channel, and survives re-syncs (it also rides iCloud via
-//  UserContentState). Like the other Content Management screens, this view relies
-//  on the ambient NavigationStack and never creates its own.
+//  UserContentState). In Combined the list spans every member and a reorder
+//  stamps the whole merged list; a picker narrows it to one member. Like the
+//  other Content Management screens, this view relies on the ambient
+//  NavigationStack and never creates its own.
 //
 
 import SwiftData
@@ -57,13 +59,22 @@ struct FavoriteEntry: Identifiable, ReorderableRowItem {
     let title: String
     let iconURL: URL?
     let kind: Kind
-    let favoriteOrder: Int?
-    let providerNum: Int
+    /// The owning playlist, shown only when the list spans several members.
+    let playlistName: String?
+
+    var subtitle: String {
+        playlistName.map { "\(kind.label) · \($0)" } ?? kind.label
+    }
 }
 
 struct FavoriteManagementView: View {
     @Query private var playlists: [Playlist]
-    @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+    @Environment(\.catalogScope) private var catalogScope
+
+    /// The one Combined member the list is narrowed to; unset shows every
+    /// member.
+    @State private var pickedMemberID: UUID?
+    @State private var matcherMemo = CatalogScopeMatcherMemo()
 
     /// Each type is fetched and sorted by its own `favoriteOrder` (nil-first, then
     /// the provider order); the three are merged and re-sorted in-memory into the
@@ -83,44 +94,72 @@ struct FavoriteManagementView: View {
         sort: [SortDescriptor(\Series.favoriteOrder), SortDescriptor(\Series.num), SortDescriptor(\Series.name)]
     ) private var favoriteSeries: [Series]
 
-    private var activePlaylist: Playlist? {
-        playlists.active(for: selectedPlaylistID)
+    private var combinedMembers: [Playlist] {
+        playlists.combinedMembers(of: catalogScope)
     }
 
-    /// Every favorite of the active playlist, merged across types and ordered by
-    /// the cross-type `favoriteOrder`. Untouched favorites (nil order) fall
-    /// through to a stable type/provider grouping.
-    private var favorites: [FavoriteEntry] {
-        guard let playlistId = activePlaylist?.id else { return [] }
-        let prefix = "\(playlistId.uuidString)-"
+    /// The picked member while it is still in the scope; nil means every member.
+    private var effectivePickedID: UUID? {
+        playlists.pickedMember(pickedMemberID, in: catalogScope)?.id
+    }
 
-        var entries: [FavoriteEntry] = []
-        for stream in favoriteChannels where stream.id.hasPrefix(prefix) {
-            entries.append(FavoriteEntry(
+    /// `favoriteOrder` values collide across members, since each playlist is
+    /// stamped on its own. The merged list breaks those ties by member priority,
+    /// and reordering it re-stamps the whole list, which keeps every member's
+    /// own subset in a coherent relative order for its isolated view.
+    private var listedScope: CatalogScope {
+        effectivePickedID.map(CatalogScope.isolated) ?? catalogScope
+    }
+
+    private var memberSelection: Binding<UUID?> {
+        Binding(get: { effectivePickedID }, set: { pickedMemberID = $0 })
+    }
+
+    /// Every favorite in the listed scope, merged across types and ordered by
+    /// the cross-type `favoriteOrder`. Untouched favorites (nil order) fall
+    /// through to member priority, then a stable type/provider grouping.
+    private var favorites: [FavoriteEntry] {
+        let scope = listedScope
+        guard !scope.isEmpty else { return [] }
+        let matcher = matcherMemo.matcher(for: scope)
+        let memberNames: [String] = scope.isCombined
+            ? scope.playlistIDs.map { id in playlists.first { $0.id == id }?.name ?? "" }
+            : []
+        func playlistName(rank: Int) -> String? {
+            memberNames.indices.contains(rank) ? memberNames[rank] : nil
+        }
+
+        typealias Entry = FavoritesOrder.Entry<FavoriteEntry>
+        var entries: [Entry] = []
+        func append(_ entry: FavoriteEntry, order: Int?, rank: Int, num: Int) {
+            entries.append(Entry(order: order, member: rank, kind: entry.kind.sortRank, num: num, name: entry.title, item: entry))
+        }
+        for stream in favoriteChannels where matcher.contains(stream.id, .liveTV) {
+            let rank = matcher.memberRank(of: stream.id)
+            append(FavoriteEntry(
                 id: stream.id, model: stream, title: stream.name,
                 iconURL: URL(string: stream.streamIcon ?? ""), kind: .live,
-                favoriteOrder: stream.favoriteOrder, providerNum: stream.num
-            ))
+                playlistName: playlistName(rank: rank)
+            ), order: stream.favoriteOrder, rank: rank, num: stream.num)
         }
-        for movie in favoriteMovies where movie.id.hasPrefix(prefix) {
-            entries.append(FavoriteEntry(
+        for movie in favoriteMovies where matcher.contains(movie.id, .movies) {
+            let rank = matcher.memberRank(of: movie.id)
+            append(FavoriteEntry(
                 id: movie.id, model: movie, title: movie.name,
                 iconURL: URL(string: movie.streamIcon ?? ""), kind: .movie,
-                favoriteOrder: movie.favoriteOrder, providerNum: movie.num
-            ))
+                playlistName: playlistName(rank: rank)
+            ), order: movie.favoriteOrder, rank: rank, num: movie.num)
         }
-        for series in favoriteSeries where series.id.hasPrefix(prefix) {
-            entries.append(FavoriteEntry(
+        for series in favoriteSeries where matcher.contains(series.id, .series) {
+            let rank = matcher.memberRank(of: series.id)
+            append(FavoriteEntry(
                 id: series.id, model: series, title: series.name,
                 iconURL: URL(string: series.cover ?? ""), kind: .series,
-                favoriteOrder: series.favoriteOrder, providerNum: series.num
-            ))
+                playlistName: playlistName(rank: rank)
+            ), order: series.favoriteOrder, rank: rank, num: series.num)
         }
 
-        return entries.sorted { lhs, rhs in
-            (lhs.favoriteOrder ?? Int.max, lhs.kind.sortRank, lhs.providerNum, lhs.title)
-                < (rhs.favoriteOrder ?? Int.max, rhs.kind.sortRank, rhs.providerNum, rhs.title)
-        }
+        return FavoritesOrder.sorted(entries)
     }
 
     private func move(from source: IndexSet, to destination: Int) {
@@ -150,6 +189,10 @@ struct FavoriteManagementView: View {
                             .font(.system(size: 34, weight: .bold))
                             .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
+                        if !combinedMembers.isEmpty {
+                            tvMemberPicker
+                        }
+
                         HStack {
                             TVSettingsSectionLabel("All Favorites")
                             Spacer()
@@ -173,7 +216,7 @@ struct FavoriteManagementView: View {
                         } else {
                             TVReorderableContentList(
                                 items: favorites,
-                                title: { "\($0.title) · \($0.kind.label)" },
+                                title: { "\($0.title) · \($0.subtitle)" },
                                 isHidden: { _ in false },
                                 onToggleHidden: { remove($0) },
                                 onCommitOrder: { ContentOrganizer.commitFavoriteOrder($0.map(\.model)) },
@@ -192,9 +235,28 @@ struct FavoriteManagementView: View {
             }
             .tvSettingsBackground()
         }
+
+        private var tvMemberPicker: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                CombinedMemberPicker(members: combinedMembers, selection: memberSelection, includesCombined: true)
+                    .disabled(isReordering)
+                Text("Combined orders your favorites across every playlist. Pick a playlist to arrange only its favorites.")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+            }
+        }
     #else
         var body: some View {
             List {
+                if !combinedMembers.isEmpty {
+                    Section {
+                        CombinedMemberPicker(members: combinedMembers, selection: memberSelection, includesCombined: true)
+                    } footer: {
+                        Text("Combined orders your favorites across every playlist. Pick a playlist to arrange only its favorites.")
+                    }
+                }
+
                 Section {
                     if favorites.isEmpty {
                         Text("No favorites yet.")
@@ -267,7 +329,7 @@ struct FavoriteManagementView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entry.title)
                         .lineLimit(1)
-                    Text(entry.kind.label)
+                    Text(verbatim: entry.subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

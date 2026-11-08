@@ -46,6 +46,12 @@ nonisolated enum AetherEngineFailure: String, EngineFailurePolicy {
         // own TLS stack may still connect.
         case "sourceCertificateRejected":
             .unsupported
+        // The origin answers byte ranges with bytes from elsewhere (IPTV
+        // catch-up archives). The engine only plays those with
+        // `sequentialOrigin`, which Lume never sets, so a reconnect meets the
+        // same origin; another engine reads it sequentially.
+        case "sourceFabricatesRanges":
+            .unsupported
         default:
             .interrupted
         }
