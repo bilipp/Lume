@@ -131,8 +131,8 @@ extension HomeView {
     // MARK: - Watchlist
 
     /// Loads every service's watchlist row, concurrently, keeping only the
-    /// titles the user actually owns in the active playlist — matched by TMDB
-    /// id, the same way the trending rows work.
+    /// titles the user actually owns in the playlists on screen — matched by
+    /// TMDB id, the same way the trending rows work.
     func loadWatchlists(scope: String) async {
         async let trakt: Void = loadWatchlist(.trakt, scope: scope)
         async let simkl: Void = loadWatchlist(.simkl, scope: scope)
@@ -195,8 +195,8 @@ extension HomeView {
         }
     }
 
-    /// The first 20 watchlist titles the active playlist carries, in watchlist
-    /// order.
+    /// The first 20 watchlist titles the playlists on screen carry, in
+    /// watchlist order.
     private func matchWatchlist(_ titles: [WatchlistTitle]) -> [HomeMediaItem] {
         var movieIDs: [Int] = []
         var showIDs: [Int] = []
@@ -219,7 +219,7 @@ extension HomeView {
 
     // MARK: - Batched catalog lookup
 
-    /// All active-playlist catalog matches for the given TMDB ids from one
+    /// All in-scope catalog matches for the given TMDB ids from one
     /// query, keyed by id. The per-title variant this replaces issued one fetch
     /// per trending/watchlist row — hundreds of sequential main-context
     /// round-trips on every Home load.
@@ -227,11 +227,14 @@ extension HomeView {
         let ids = Set(tmdbIds)
         guard !ids.isEmpty else { return [:] }
         let descriptor = FetchDescriptor<Movie>(predicate: movieTmdbIdPredicate(ids: ids))
+        let scope = scopeMatcher
         var byId: [Int: Movie] = [:]
         for movie in (try? modelContext.fetch(descriptor)) ?? []
-            where belongsToActivePlaylist(movie.id) && !restriction.hides(categoryID: movie.categoryId)
+            where scope.contains(movie.id, .movies) && !restriction.hides(categoryID: movie.categoryId)
         {
-            guard let tmdbId = movie.tmdbId, byId[tmdbId] == nil else { continue }
+            guard let tmdbId = movie.tmdbId else { continue }
+            // One card per title: the highest-priority member's copy wins.
+            if let kept = byId[tmdbId], scope.memberRank(of: kept.id) <= scope.memberRank(of: movie.id) { continue }
             byId[tmdbId] = movie
         }
         return byId
@@ -241,11 +244,14 @@ extension HomeView {
         let ids = Set(tmdbIds)
         guard !ids.isEmpty else { return [:] }
         let descriptor = FetchDescriptor<Series>(predicate: seriesTmdbIdPredicate(ids: ids))
+        let scope = scopeMatcher
         var byId: [Int: Series] = [:]
         for series in (try? modelContext.fetch(descriptor)) ?? []
-            where belongsToActivePlaylist(series.id) && !restriction.hides(categoryID: series.categoryId)
+            where scope.contains(series.id, .series) && !restriction.hides(categoryID: series.categoryId)
         {
-            guard let tmdbId = series.tmdbId, byId[tmdbId] == nil else { continue }
+            guard let tmdbId = series.tmdbId else { continue }
+            // One card per title: the highest-priority member's copy wins.
+            if let kept = byId[tmdbId], scope.memberRank(of: kept.id) <= scope.memberRank(of: series.id) { continue }
             byId[tmdbId] = series
         }
         return byId

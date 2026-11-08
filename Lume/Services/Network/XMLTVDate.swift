@@ -47,7 +47,7 @@ enum XMLTVDate {
               hour < 24, minute < 60, tail.second < 60
         else { return nil }
 
-        let days = daysFromCivil(year: year, month: month, day: day)
+        let days = CivilDate.daysFromCivil(year: year, month: month, day: day)
         let epoch = days * 86400 + hour * 3600 + minute * 60 + tail.second - tail.offsetSeconds
         return Date(timeIntervalSince1970: TimeInterval(epoch))
     }
@@ -87,17 +87,5 @@ enum XMLTVDate {
         default:
             return nil
         }
-    }
-
-    /// Days from 1970-01-01 to a proleptic-Gregorian date (Howard Hinnant's
-    /// `days_from_civil`). Avoids `Calendar`, which is itself locale-aware and
-    /// far slower than this arithmetic.
-    private static func daysFromCivil(year: Int, month: Int, day: Int) -> Int {
-        let adjustedYear = month <= 2 ? year - 1 : year
-        let era = (adjustedYear >= 0 ? adjustedYear : adjustedYear - 399) / 400
-        let yearOfEra = adjustedYear - era * 400
-        let dayOfYear = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1
-        let dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
-        return era * 146_097 + dayOfEra - 719_468
     }
 }

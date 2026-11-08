@@ -87,6 +87,10 @@ final class BrowseQueryBenchmarks: XCTestCase {
         "\(playlistID.uuidString)-"
     }
 
+    var scope: CatalogScope {
+        .isolated(playlistID)
+    }
+
     override func setUpWithError() throws {
         try super.setUpWithError()
         store = try PerfStore.makeOnDiskContainer()
@@ -113,7 +117,7 @@ final class BrowseQueryBenchmarks: XCTestCase {
     /// back: the `#Index<Movie>([\.added])` entry, and `comparator: .lexical` on
     /// the sort. A binary index cannot serve a localized collation.
     func testRecentlyAddedMovieRail() {
-        let descriptor = MovieCollectionQuery.rowDescriptor(for: .recentlyAdded, playlistPrefix: prefix)
+        let descriptor = MovieCollectionQuery.rowDescriptor(for: .recentlyAdded, scope: scope)
         let context = ModelContext(store.container)
 
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
@@ -125,7 +129,7 @@ final class BrowseQueryBenchmarks: XCTestCase {
     /// The Series equivalent, sorting on `lastModified` — same index and same
     /// comparator dependency.
     func testRecentlyAddedSeriesRail() {
-        let descriptor = SeriesCollectionQuery.rowDescriptor(for: .recentlyAdded, playlistPrefix: prefix)
+        let descriptor = SeriesCollectionQuery.rowDescriptor(for: .recentlyAdded, scope: scope)
         let context = ModelContext(store.container)
 
         measure(metrics: [XCTClockMetric()]) {
@@ -139,7 +143,7 @@ final class BrowseQueryBenchmarks: XCTestCase {
     /// 59 ms with a few thousand, re-run on every write anywhere in the app.
     /// Guards the `fetchLimit` and the in-SQL playlist scope together.
     func testFavoritesMovieRail() {
-        let descriptor = MovieCollectionQuery.rowDescriptor(for: .favorites, playlistPrefix: prefix)
+        let descriptor = MovieCollectionQuery.rowDescriptor(for: .favorites, scope: scope)
         let context = ModelContext(store.container)
 
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
@@ -151,7 +155,7 @@ final class BrowseQueryBenchmarks: XCTestCase {
 
     /// Recently Watched, same shape as Favorites but ordered by a date index.
     func testRecentlyWatchedMovieRail() {
-        let descriptor = MovieCollectionQuery.rowDescriptor(for: .recentlyWatched, playlistPrefix: prefix)
+        let descriptor = MovieCollectionQuery.rowDescriptor(for: .recentlyWatched, scope: scope)
         let context = ModelContext(store.container)
 
         measure(metrics: [XCTClockMetric()]) {
@@ -166,7 +170,7 @@ final class BrowseQueryBenchmarks: XCTestCase {
     /// stays a deliberate cost on one screen rather than something that creeps
     /// back into the rails.
     func testFavoritesMovieGrid() {
-        let descriptor = MovieCollectionQuery.gridDescriptor(for: .favorites, playlistPrefix: prefix)
+        let descriptor = MovieCollectionQuery.gridDescriptor(for: .favorites, scope: scope)
         let context = ModelContext(store.container)
 
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
@@ -186,7 +190,7 @@ final class BrowseQueryBenchmarks: XCTestCase {
     /// with only the single-column indexes, SQLite picked the `isHidden` one,
     /// which matches almost every channel in the table.
     func testLiveFavoritesProbe() {
-        let descriptor = LiveChannelQuery.favoritesProbe(playlistPrefix: prefix, restriction: ContentRestriction())
+        let descriptor = LiveChannelQuery.favoritesProbe(catalogScope: scope, restriction: ContentRestriction())
         let context = ModelContext(store.container)
 
         measure(metrics: [XCTClockMetric()]) {
@@ -203,7 +207,7 @@ final class BrowseQueryBenchmarks: XCTestCase {
     /// chosen without table statistics, which Core Data never generates, so the
     /// plan silently falls back to the whole-table `isHidden` index.
     func testLiveRecentlyWatchedProbe() {
-        let descriptor = LiveChannelQuery.recentlyWatchedProbe(playlistPrefix: prefix, restriction: ContentRestriction())
+        let descriptor = LiveChannelQuery.recentlyWatchedProbe(catalogScope: scope, restriction: ContentRestriction())
         let context = ModelContext(store.container)
 
         measure(metrics: [XCTClockMetric()]) {
@@ -223,7 +227,7 @@ final class BrowseQueryBenchmarks: XCTestCase {
             restrictedCategoryIDs: Set((0 ..< 40).map { "\(prefix)live-cat\($0)" }),
             hiddenCategoryIDs: Set((40 ..< 80).map { "\(prefix)live-cat\($0)" })
         )
-        let descriptor = LiveChannelQuery.favoritesProbe(playlistPrefix: prefix, restriction: restriction)
+        let descriptor = LiveChannelQuery.favoritesProbe(catalogScope: scope, restriction: restriction)
         let context = ModelContext(store.container)
 
         measure(metrics: [XCTClockMetric()]) {

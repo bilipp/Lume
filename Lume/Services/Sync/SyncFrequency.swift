@@ -11,12 +11,13 @@
 //  which the launch / playlist-switch / foreground triggers in `MainTabView`
 //  call through.
 //
-//  Being due is necessary but not sufficient: a due playlist that is not the
-//  one on screen waits for the viewer to switch to it. See `AutoSync.shouldSync`
-//  for why.
+//  Being due is necessary but not sufficient: a due playlist that is not on
+//  screen — not a member of the resolved `CatalogScope` — waits for the viewer
+//  to switch to it. See `AutoSync.shouldSync` for why.
 //
 
 import Foundation
+import SwiftData
 import SwiftUI
 
 // MARK: - SyncFrequency
@@ -142,7 +143,9 @@ enum AutoSync {
         let status: SyncStatus
         /// When it last finished a successful sync.
         let lastSyncDate: Date?
-        /// Whether this is the playlist the content tabs are showing.
+        /// Whether the content tabs are showing it: a member of the resolved
+        /// `CatalogScope` — the one playlist in isolated mode, any member in
+        /// Combined.
         let isActive: Bool
         /// Whether the viewer added it on this device since launch — see
         /// `addedThisSession`.
@@ -160,10 +163,11 @@ enum AutoSync {
     /// playlists configured, launching used to mean sitting through one cover
     /// per playlist — on a large catalog, minutes each.
     ///
-    /// Only the active playlist earns that. Every content surface scopes to
-    /// `playlists.active(for:)`, so a stale *other* playlist changes nothing the
-    /// viewer can see; it syncs when they switch to it, which is the moment its
-    /// freshness starts to matter and which `MainTabView` already triggers on.
+    /// Only the playlists on screen earn that. Every content surface scopes to
+    /// the resolved `CatalogScope`, so a stale playlist outside it changes
+    /// nothing the viewer can see; it syncs when they switch to it, which is the
+    /// moment its freshness starts to matter and which `MainTabView` already
+    /// triggers on.
     ///
     /// The exception is a playlist just added from Settings, which syncs
     /// wherever it is: the add doesn't select it, and the viewer adding one
@@ -189,15 +193,96 @@ enum AutoSync {
     }
 }
 
+extension AutoSync {
+    /// Whether a queued sync takes the screen with the blocking cover.
+    ///
+    /// In isolated mode the one playlist on screen is the whole library, so it
+    /// always does. In Combined a member that already has rows keeps the rest of
+    /// the library browsable and refreshes in the background; only one with
+    /// nothing to show yet blocks, since its tabs would otherwise look broken.
+    static func presentsCover(isCombined: Bool, hasContent: @autoclosure () -> Bool) -> Bool {
+        !isCombined || !hasContent()
+    }
+
+    /// Whether any catalog row belongs to `playlistID`. One `LIMIT 1` seek on
+    /// the unique `id` index per table, stopping at the first hit.
+    static func hasContent(_ playlistID: UUID, in context: ModelContext) -> Bool {
+        func exists<T: PersistentModel>(_ predicate: Predicate<T>) -> Bool {
+            var descriptor = FetchDescriptor<T>(predicate: predicate)
+            descriptor.fetchLimit = 1
+            return !((try? context.fetchIdentifiers(descriptor)) ?? []).isEmpty
+        }
+        let scope = CatalogScope.isolated(playlistID)
+        return exists(scope.liveStreamPredicate()) || exists(scope.moviePredicate()) || exists(scope.seriesPredicate())
+    }
+
+    /// The playlists a manual Sync in Combined queues, in priority order: the
+    /// members that are due, or every member when none is — the viewer asked
+    /// for a refresh, and one that does nothing reads as broken. Members
+    /// already syncing are left out.
+    static func manualMemberSyncs(
+        _ members: [Playlist],
+        frequency: SyncFrequency,
+        now: Date = Date()
+    ) -> [Playlist] {
+        let idle = members.filter { $0.syncStatus != .syncing }
+        let due = idle.filter { frequency.isDue(lastSyncDate: $0.lastSyncDate, now: now) }
+        return due.isEmpty ? idle : due
+    }
+}
+
+extension AutoSync {
+    /// Runs one playlist sync. Reported to the guide refresh so the two never
+    /// share the provider's connection allowance: it stands aside (or is cut
+    /// short) while this runs, and catches up once nothing else is pending —
+    /// see `EPGRefreshGate`. Every start is paired with exactly one finish.
+    ///
+    /// Newly synced titles need indexing; the launch-time pass may already be
+    /// finished, so a fresh one is kicked — held off a few seconds so loading
+    /// the embedding model and the per-chunk saves don't fight the first
+    /// browse of the catalog just synced.
+    static func runSync(
+        _ playlist: Playlist,
+        container: ModelContainer,
+        progress: SyncProgress? = nil,
+        full: Bool = false
+    ) async throws {
+        let epgSync = EPGSyncService.shared
+        epgSync.contentSyncDidStart()
+        var succeeded = false
+        defer { epgSync.contentSyncDidFinish(succeeded: succeeded) }
+        let syncManager = ContentSyncManager(modelContainer: container)
+        try await BackgroundActivity.perform("Playlist sync") {
+            try await syncManager.syncPlaylist(playlist, progress: progress, full: full)
+        }
+        succeeded = true
+        ContentIndexingService.shared.kick(after: .seconds(3))
+    }
+
+    /// Runs the sync the blocking cover drives, without the cover. A failure
+    /// is recorded on the playlist's own status; the next due pass retries it.
+    static func syncInBackground(_ playlist: Playlist, container: ModelContainer) async {
+        try? await runSync(playlist, container: container)
+    }
+}
+
+extension [Playlist] {
+    /// These playlists with the scope's members first, in priority order, then
+    /// the rest as given.
+    func inPriorityOrder(of scope: CatalogScope) -> [Playlist] {
+        members(of: scope) + filter { !scope.playlistIDs.contains($0.id) }
+    }
+}
+
 extension Playlist {
-    /// This playlist as `AutoSync.shouldSync` sees it, given the id of the
-    /// playlist on screen (`[Playlist].activeID(for:)`).
-    func autoSyncCandidate(activeID: String) -> AutoSync.Candidate {
+    /// This playlist as `AutoSync.shouldSync` sees it, given the scope the
+    /// content tabs are showing (`[Playlist].scope(for:isPremium:)`).
+    func autoSyncCandidate(in scope: CatalogScope) -> AutoSync.Candidate {
         AutoSync.Candidate(
             syncEnabled: syncEnabled,
             status: syncStatus,
             lastSyncDate: lastSyncDate,
-            isActive: id.uuidString == activeID,
+            isActive: scope.playlistIDs.contains(id),
             wasAddedThisSession: AutoSync.addedThisSession.contains(id)
         )
     }

@@ -26,7 +26,7 @@
                 isFailed: previewTarget.map { previewFailedStreamIDs.contains($0.streamID) } ?? false,
                 controller: preview.controller,
                 hero: preview.hero,
-                playlistID: preview.playlistID,
+                playlistIDs: preview.playlistIDs,
                 onFailure: { [streamID = previewTarget?.streamID] in markPreviewFailed(streamID) }
             )
             .equatable()
@@ -125,7 +125,7 @@
         let isFailed: Bool
         let controller: GuidePreviewController?
         let hero: GuideHeroModel?
-        let playlistID: UUID?
+        let playlistIDs: [UUID]
         let onFailure: () -> Void
 
         @State private var premium = PremiumManager.shared
@@ -146,7 +146,7 @@
                 && lhs.isFailed == rhs.isFailed
                 && lhs.controller === rhs.controller
                 && lhs.hero === rhs.hero
-                && lhs.playlistID == rhs.playlistID
+                && lhs.playlistIDs == rhs.playlistIDs
         }
 
         static func isAvailable(mode: GuidePreviewMode, isPremium: Bool, autoplayAllowed: Bool) -> Bool {
@@ -169,7 +169,7 @@
                         isFailed: isFailed,
                         controller: controller,
                         hero: hero,
-                        playlistID: playlistID,
+                        playlistIDs: playlistIDs,
                         onFailure: onFailure
                     )
                 } else {
@@ -204,6 +204,10 @@
         let hero: GuideHeroModel?
         let onFailure: () -> Void
 
+        /// The playlists whose sync pauses the tile: every Combined member
+        /// contributing Live TV.
+        private let playlistIDs: Set<UUID>
+
         @State private var epgSync = EPGSyncService.shared
         @Query private var playlists: [Playlist]
         @Query private var guideSources: [EPGSource]
@@ -215,7 +219,7 @@
             isFailed: Bool,
             controller: GuidePreviewController?,
             hero: GuideHeroModel?,
-            playlistID: UUID?,
+            playlistIDs: [UUID],
             onFailure: @escaping () -> Void
         ) {
             self.target = target
@@ -225,19 +229,30 @@
             self.controller = controller
             self.hero = hero
             self.onFailure = onFailure
-            if let playlistID {
-                _playlists = Query(filter: #Predicate<Playlist> { $0.id == playlistID })
-                _guideSources = Query(filter: #Predicate<EPGSource> { $0.playlistID == playlistID })
-            } else {
+            self.playlistIDs = Set(playlistIDs)
+            switch playlistIDs.count {
+            case 0:
                 _playlists = Query(filter: #Predicate<Playlist> { _ in false })
                 _guideSources = Query(filter: #Predicate<EPGSource> { _ in false })
+            case 1:
+                let playlistID = playlistIDs[0]
+                _playlists = Query(filter: #Predicate<Playlist> { $0.id == playlistID })
+                _guideSources = Query(filter: #Predicate<EPGSource> { $0.playlistID == playlistID })
+            default:
+                // An optional key in an `IN` predicate breaks SQL generation, so
+                // the playlist-linked sources (a handful of rows) are matched to
+                // the members in `isSyncing` instead.
+                _playlists = Query(filter: #Predicate<Playlist> { playlistIDs.contains($0.id) })
+                _guideSources = Query(filter: #Predicate<EPGSource> { $0.playlistID != nil })
             }
         }
 
         private var isSyncing: Bool {
             if playlists.contains(where: { $0.syncStatus == .syncing }) { return true }
             return epgSync.isSyncing
-                && guideSources.contains { $0.syncStatus == .syncing }
+                && guideSources.contains { source in
+                    source.syncStatus == .syncing && source.playlistID.map { playlistIDs.contains($0) } == true
+                }
         }
 
         private var isAllowed: Bool {

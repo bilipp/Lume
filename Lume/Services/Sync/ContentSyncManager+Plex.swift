@@ -335,10 +335,8 @@ extension ContentSyncManager {
         if let imdb = item.providerId("imdb"), movie.imdbId != imdb {
             movie.imdbId = imdb
         }
-        let added = item.addedAt.map { Self.plexDateString(from: $0) }
-        if movie.added != added {
-            movie.added = added
-        }
+        let added = item.addedAt.flatMap { CatalogAddedDate.unixString(seconds: $0) }
+        CatalogAddedDate.assign(added, to: \.added, of: movie)
     }
 
     /// Removes movies the server no longer lists. Gated on `fetched`: an empty
@@ -370,15 +368,5 @@ extension ContentSyncManager {
     /// launch-stable hash the Jellyfin/Emby pipeline uses.
     nonisolated static func plexStreamId(_ ratingKey: String) -> Int {
         Int(ratingKey) ?? mediaServerHash(ratingKey)
-    }
-
-    /// `addedAt` is Unix seconds; the catalog's `added` column is the
-    /// `yyyy-MM-dd` string every other source writes.
-    nonisolated static func plexDateString(from unixSeconds: Int) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(unixSeconds))
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 }
