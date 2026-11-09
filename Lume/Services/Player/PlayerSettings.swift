@@ -5,12 +5,13 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
     case vlcKit
     case ksPlayer
     case avPlayer
-    /// Lume's own FFmpeg 9 engine — in beta. Declared last so it appends to the
-    /// END of existing priority lists (`PlayerEnginePriority.normalized`):
-    /// available to opt into, never silently promoted while KSPlayer is default.
+    /// Lume's own FFmpeg 9 engine. Declared after the original three so a
+    /// stored priority list from before it existed gets it appended at the end
+    /// (`PlayerEnginePriority.normalized`) rather than promoted over the user's
+    /// choice; a fresh install leads with it per `PlayerEnginePriority.defaultOrder`.
     case lumeEngine
-    /// AetherEngine — opt-in, declared after LumeEngine so it appends last to
-    /// existing priority lists. Not linked on visionOS (see `isAvailable`).
+    /// AetherEngine — declared after LumeEngine so it appends last to stored
+    /// priority lists. Not linked on visionOS (see `isAvailable`).
     case aetherEngine
 
     var id: String {
@@ -22,7 +23,7 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
         case .vlcKit: "VLCKit"
         case .ksPlayer: "KSPlayer"
         case .avPlayer: "AVPlayer"
-        case .lumeEngine: "Lume Engine (Beta)"
+        case .lumeEngine: "Lume Engine"
         case .aetherEngine: "AetherEngine"
         }
     }
@@ -32,7 +33,7 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
         case .vlcKit: "VLCKit 4 is VLC's native engine. Plays virtually any format and codec, with hardware-accelerated 4K HDR, Picture in Picture, and the broadest IPTV compatibility."
         case .ksPlayer: "KSPlayer is a powerful third-party player that supports a wide range of formats, including those commonly used in IPTV streams."
         case .avPlayer: "Native Apple player. Best for HLS and MP4. But does not support many formats used in IPTV streams."
-        case .lumeEngine: "Lume's own FFmpeg 9 engine, in beta. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
+        case .lumeEngine: "Lume's own FFmpeg 9 engine. Hardware-accelerated decoding of most formats, built for live-stream stability, with system A/V sync and Picture in Picture."
         case .aetherEngine: "FFmpeg-based engine with hardware decoding, HDR, multichannel audio, deinterlacing and Picture in Picture. Plays HLS through Apple's native player where it can."
         }
     }
@@ -68,19 +69,10 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
         [.ksPlayer, .vlcKit, .lumeEngine, .aetherEngine].filter(\.isAvailable)
     }
 
-    /// The default engine, and the primary of the default priority list. KSPlayer
-    /// leads (it handles most IPTV streams while supporting Picture in Picture and
-    /// per-stream decoder tuning), falling back to VLCKit then AVPlayer — the order
-    /// `PlayerEnginePriority.normalized` appends the remaining engines in. The
-    /// `#if` cascade just degrades gracefully if an engine isn't linked.
+    /// The default engine: the head of `PlayerEnginePriority.defaultOrder` on
+    /// this platform (AetherEngine, or LumeEngine on visionOS).
     static var defaultValue: PlayerEngineKind {
-        #if canImport(KSPlayer)
-            return .ksPlayer
-        #elseif canImport(VLCKit)
-            return .vlcKit
-        #else
-            return .avPlayer
-        #endif
+        PlayerEnginePriority.defaultOrder.first ?? .avPlayer
     }
 }
 
@@ -117,17 +109,23 @@ nonisolated enum StreamInfoDetailLevel: String, CaseIterable, Identifiable {
 /// comma-separated list of `PlayerEngineKind` raw values under
 /// `PlayerSettings.enginePriorityKey`.
 enum PlayerEnginePriority {
+    /// The order a fresh install tries engines in, restricted to the engines
+    /// available on this platform.
+    nonisolated static var defaultOrder: [PlayerEngineKind] {
+        [.aetherEngine, .lumeEngine, .ksPlayer, .vlcKit, .avPlayer].filter(\.isAvailable)
+    }
+
     /// Decode the stored priority into a complete, de-duplicated engine list.
-    /// Falls back to the legacy single-engine key (then the platform default)
-    /// when no priority list has been stored yet, so an upgrade keeps the user's
-    /// previously chosen engine as the primary.
+    /// A stored list is kept as the user ordered it. Without one, the legacy
+    /// single-engine key (from before priority lists) stays the primary and the
+    /// rest follow `defaultOrder`; with neither, it is `defaultOrder` itself.
     static func resolve(priorityRaw: String, legacyEngineRaw: String) -> [PlayerEngineKind] {
         let stored = decode(priorityRaw)
         if !stored.isEmpty {
             return normalized(stored)
         }
         let primary = PlayerEngineKind(rawValue: legacyEngineRaw) ?? .defaultValue
-        return normalized([primary])
+        return normalized([primary] + defaultOrder)
     }
 
     /// Parse the comma-separated raw value into engines, dropping any token that
