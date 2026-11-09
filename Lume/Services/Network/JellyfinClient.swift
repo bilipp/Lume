@@ -216,7 +216,10 @@ final nonisolated class JellyfinClient: Sendable {
 
     private static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
+        // A server that builds its lists from upstream catalogues can sit on
+        // a cold page well past 30 s before the first byte; logging in stays
+        // bounded by its own 20 s watchdog (`withConnectionTimeout`).
+        config.timeoutIntervalForRequest = 90
         config.timeoutIntervalForResource = 600
         config.httpAdditionalHeaders = ["User-Agent": lumeCatalogUserAgent]
         return URLSession(configuration: config)
@@ -317,7 +320,7 @@ final nonisolated class JellyfinClient: Sendable {
     }
 
     /// One page of a show's episodes, every season in order. The per-show
-    /// route is the one AIOStreams-style servers answer: they list a library's
+    /// route is the one on-demand servers answer: they list a library's
     /// series but report no episodes under it, so a library-wide episode query
     /// comes back empty for them.
     func showEpisodes(
@@ -341,7 +344,7 @@ final nonisolated class JellyfinClient: Sendable {
         return try await get(url, session: session)
     }
 
-    /// The versions an item can play as. On an AIOStreams-style server this
+    /// The versions an item can play as. On a server that resolves sources on demand this
     /// runs the whole stream lookup, so it is only ever asked at play time.
     /// `refresh` asks such a server to look again rather than answer from the
     /// list it keeps for a few minutes; a stock server ignores it.

@@ -16,8 +16,9 @@ import SwiftData
 extension ContentSyncManager {
     // MARK: - Series & episodes
 
-    /// What one sync saw across every TV library, for the prune sweep.
-    struct JellyfinShowsSeen {
+    /// What one TV library (or, merged, every TV library) saw, for the
+    /// prune sweep.
+    nonisolated struct JellyfinShowsSeen {
         var series = Set<String>()
         var episodes = Set<String>()
         /// Series from libraries that list their shows but no episodes under
@@ -28,14 +29,22 @@ extension ContentSyncManager {
         var episodesFetchedPerShow = Set<String>()
         /// False once a library stopped part-way (see `JellyfinWalk.complete`).
         var complete = true
+
+        mutating func merge(_ other: JellyfinShowsSeen) {
+            series.formUnion(other.series)
+            episodes.formUnion(other.episodes)
+            episodesFetchedPerShow.formUnion(other.episodesFetchedPerShow)
+            complete = complete && other.complete
+        }
     }
 
-    func syncJellyfinShows(scope: JellyfinViewScope, seen: inout JellyfinShowsSeen, progress: SyncProgress?) async throws {
+    /// Reads one TV library: its series shells, then its episodes.
+    func syncJellyfinShows(scope: JellyfinViewScope) async throws -> JellyfinShowsSeen {
         // Series shells first, so episodes below can link against them.
         var shells = JellyfinShellIndex()
-        var seenSeries = seen.series
+        var seenSeries = Set<String>()
         var librarySeries = Set<String>()
-        let seriesWalk = try await pageThroughJellyfinItems(types: ["Series"], scope: scope, progress: nil, unit: "series") { items in
+        let seriesWalk = try await pageThroughJellyfinItems(types: ["Series"], scope: scope, unit: "series") { items in
             let ids = upsertJellyfinSeries(items, scope: scope)
             seenSeries.formUnion(ids)
             librarySeries.formUnion(ids)
@@ -47,22 +56,22 @@ extension ContentSyncManager {
         // oddly) still imports, under the shell its `SeriesName` names — see
         // `JellyfinShellIndex` — so no playable file is ever dropped and a
         // mis-scanned library does not fan out into one show per file.
-        var seenEpisodes = seen.episodes
+        var seenEpisodes = Set<String>()
         let resolvedShells = shells
-        let episodeWalk = try await pageThroughJellyfinItems(types: ["Episode"], scope: scope, progress: progress, unit: "episode(s)") { items in
+        let episodeWalk = try await pageThroughJellyfinItems(types: ["Episode"], scope: scope, unit: "episode(s)") { items in
             let (series, episodes) = upsertJellyfinEpisodes(items, seriesShells: resolvedShells, scope: scope)
             seenSeries.formUnion(series)
             seenEpisodes.formUnion(episodes)
         }
         let episodeCount = episodeWalk.fetched
-        seen.series = seenSeries
-        seen.episodes = seenEpisodes
-        seen.complete = seen.complete && seriesWalk.complete && episodeWalk.complete
+        var seen = JellyfinShowsSeen(series: seenSeries, episodes: seenEpisodes)
+        seen.complete = seriesWalk.complete && episodeWalk.complete
         if episodeCount == 0, !librarySeries.isEmpty {
             seen.episodesFetchedPerShow.formUnion(librarySeries)
             Logger.database.info("\(scope.flavor.displayName, privacy: .public) library \(scope.view.name, privacy: .public) lists \(librarySeries.count, privacy: .public) series but no episodes; episodes load per show")
         }
         Logger.database.info("\(scope.flavor.displayName, privacy: .public) shows synced for library \(scope.view.name, privacy: .public): \(episodeCount, privacy: .public) episode(s)")
+        return seen
     }
 
     private func upsertJellyfinSeries(_ items: [JellyfinItem], scope: JellyfinViewScope) -> Set<String> {
@@ -93,7 +102,7 @@ extension ContentSyncManager {
         if series.name != name {
             series.name = name
         }
-        if series.categoryId != scope.categoryId {
+        if scope.claimsCategory(from: series.categoryId) {
             series.categoryId = scope.categoryId
         }
         if let tag = item.primaryImageTag,

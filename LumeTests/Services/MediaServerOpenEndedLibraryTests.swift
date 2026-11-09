@@ -15,7 +15,8 @@ import Testing
 // MARK: - Paging stub server
 
 /// Answers login and views with canned JSON and builds every `/Items` page
-/// from the request's `StartIndex`, so a library can be any length.
+/// from the request's `ParentId` and `StartIndex`, so each library can be any
+/// length and fail on its own.
 ///
 /// Keyed by a per-test host; registered only on the session handed to
 /// `JellyfinClient`.
@@ -25,15 +26,21 @@ private final nonisolated class PagingJellyfinStubProtocol: URLProtocol {
         var body: String
     }
 
-    typealias Pager = @Sendable (_ startIndex: Int) -> Reply
+    typealias Pager = @Sendable (_ library: String, _ startIndex: Int) -> Reply
+
+    /// The one movie library every test serves unless it lists its own.
+    static let defaultLibraries = ["libMovies"]
 
     private static let lock = NSLock()
     private nonisolated(unsafe) static var pagers: [String: Pager] = [:]
+    private nonisolated(unsafe) static var libraries: [String: [String]] = [:]
     private nonisolated(unsafe) static var requests: [String: [Int]] = [:]
 
-    static func install(host: String, pager: @escaping Pager) {
+    /// Serves `movieLibraries` (ids, also used as names) from `host`.
+    static func install(host: String, movieLibraries: [String] = defaultLibraries, pager: @escaping Pager) {
         lock.withLock {
             pagers[host] = pager
+            libraries[host] = movieLibraries
             requests[host] = []
         }
     }
@@ -41,6 +48,7 @@ private final nonisolated class PagingJellyfinStubProtocol: URLProtocol {
     static func remove(host: String) {
         lock.withLock {
             pagers[host] = nil
+            libraries[host] = nil
             requests[host] = nil
         }
     }
@@ -84,17 +92,20 @@ private final nonisolated class PagingJellyfinStubProtocol: URLProtocol {
         case "/Users/AuthenticateByName":
             return Reply(status: 200, body: #"{"AccessToken": "sess", "User": {"Id": "user1"}}"#)
         case "/Users/user1/Views":
+            let ids = lock.withLock { libraries[host] ?? [] }
+            let items = ids.map { #"{"Id": "\#($0)", "Name": "\#($0)", "CollectionType": "movies"}"# }
             return Reply(status: 200, body: """
-            {"Items": [{"Id": "libMovies", "Name": "Popular", "CollectionType": "movies"}], "TotalRecordCount": 1}
+            {"Items": [\(items.joined(separator: ","))], "TotalRecordCount": \(ids.count)}
             """)
         case "/Users/user1/Items":
             let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
             let start = query.first { $0.name == "StartIndex" }?.value.flatMap(Int.init) ?? 0
+            let library = query.first { $0.name == "ParentId" }?.value ?? ""
             let pager = lock.withLock {
                 requests[host, default: []].append(start)
                 return pagers[host]
             }
-            return pager?(start) ?? Reply(status: 404, body: "")
+            return pager?(library, start) ?? Reply(status: 404, body: "")
         default:
             return Reply(status: 404, body: "")
         }
@@ -151,7 +162,7 @@ struct MediaServerOpenEndedLibraryTests {
     @Test func `a library with a rolling total stops at the cap`() async throws {
         let host = uniqueHost()
         defer { PagingJellyfinStubProtocol.remove(host: host) }
-        PagingJellyfinStubProtocol.install(host: host) { rollingPage(start: $0) }
+        PagingJellyfinStubProtocol.install(host: host) { _, start in rollingPage(start: start) }
 
         let container = try makeTestContainer()
         let playlist = try makePlaylist(container: container, host: host)
@@ -166,7 +177,7 @@ struct MediaServerOpenEndedLibraryTests {
         let host = uniqueHost()
         defer { PagingJellyfinStubProtocol.remove(host: host) }
         let length = ContentSyncManager.openEndedLibraryItemLimit + 3 * pageSize + 7
-        PagingJellyfinStubProtocol.install(host: host) { fixedPage(start: $0, length: length) }
+        PagingJellyfinStubProtocol.install(host: host) { _, start in fixedPage(start: start, length: length) }
 
         let container = try makeTestContainer()
         let playlist = try makePlaylist(container: container, host: host)
@@ -183,14 +194,14 @@ struct MediaServerOpenEndedLibraryTests {
         let manager = makeManager(container: container)
 
         // First sync: a title the second, interrupted walk never reaches.
-        PagingJellyfinStubProtocol.install(host: host) { start in
+        PagingJellyfinStubProtocol.install(host: host) { _, start in
             start == 0 ? moviePage(start: 400, count: 1, total: 1) : fixedPage(start: start, length: 1)
         }
         try await manager.syncPlaylist(playlist)
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<Movie>()) == 1)
 
         // Second sync: rolling pages until the server times out on the fourth.
-        PagingJellyfinStubProtocol.install(host: host) { start in
+        PagingJellyfinStubProtocol.install(host: host) { _, start in
             start >= 3 * pageSize ? .init(status: 504, body: "") : rollingPage(start: start)
         }
         try await manager.syncPlaylist(playlist)
@@ -206,7 +217,7 @@ struct MediaServerOpenEndedLibraryTests {
     @Test func `a failed page in a fixed-length library still fails the sync`() async throws {
         let host = uniqueHost()
         defer { PagingJellyfinStubProtocol.remove(host: host) }
-        PagingJellyfinStubProtocol.install(host: host) { start in
+        PagingJellyfinStubProtocol.install(host: host) { _, start in
             start >= 2 * pageSize ? .init(status: 504, body: "") : fixedPage(start: start, length: 4 * pageSize)
         }
 
@@ -217,6 +228,74 @@ struct MediaServerOpenEndedLibraryTests {
         }
         let stored = try #require(try ModelContext(container).fetch(FetchDescriptor<Playlist>()).first)
         #expect(stored.syncStatus == .error)
+    }
+
+    // MARK: Several libraries
+
+    @Test func `a library that fails outright skips the prune and the others still import`() async throws {
+        let host = uniqueHost()
+        defer { PagingJellyfinStubProtocol.remove(host: host) }
+        let container = try makeTestContainer()
+        let playlist = try makePlaylist(container: container, host: host)
+        let manager = makeManager(container: container)
+        let libraries = ["libA", "libB"]
+
+        // First sync: libA lists m0–m2, libB lists m100.
+        PagingJellyfinStubProtocol.install(host: host, movieLibraries: libraries) { library, start in
+            library == "libA" ? fixedPage(start: start, length: 3) : moviePage(start: 100, count: start == 0 ? 1 : 0, total: 1)
+        }
+        try await manager.syncPlaylist(playlist)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<Movie>()) == 4)
+
+        // Second sync: libA times out on its first page; libB gained m101.
+        PagingJellyfinStubProtocol.install(host: host, movieLibraries: libraries) { library, start in
+            library == "libA" ? .init(status: 504, body: "") : moviePage(start: 100, count: start == 0 ? 2 : 0, total: 2)
+        }
+        try await manager.syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let ids = try Set(context.fetch(FetchDescriptor<Movie>()).map(\.id))
+        #expect(ids.count == 5)
+        #expect(ids.contains { $0.hasSuffix("-jellyfin-m0") })
+        #expect(ids.contains { $0.hasSuffix("-jellyfin-m101") })
+        let stored = try #require(try context.fetch(FetchDescriptor<Playlist>()).first)
+        #expect(stored.syncStatus == .idle)
+    }
+
+    @Test func `the sync fails when every library fails`() async throws {
+        let host = uniqueHost()
+        defer { PagingJellyfinStubProtocol.remove(host: host) }
+        PagingJellyfinStubProtocol.install(host: host, movieLibraries: ["libA", "libB"]) { _, _ in
+            .init(status: 504, body: "")
+        }
+
+        let container = try makeTestContainer()
+        let playlist = try makePlaylist(container: container, host: host)
+        await #expect(throws: JellyfinError.self) {
+            try await makeManager(container: container).syncPlaylist(playlist)
+        }
+        let stored = try #require(try ModelContext(container).fetch(FetchDescriptor<Playlist>()).first)
+        #expect(stored.syncStatus == .error)
+    }
+
+    @Test func `a title two libraries list keeps the library it was first filed under`() async throws {
+        let host = uniqueHost()
+        defer { PagingJellyfinStubProtocol.remove(host: host) }
+        let container = try makeTestContainer()
+        let playlist = try makePlaylist(container: container, host: host)
+        let manager = makeManager(container: container)
+        PagingJellyfinStubProtocol.install(host: host, movieLibraries: ["libA", "libB"]) { _, start in
+            fixedPage(start: start, length: 1)
+        }
+
+        try await manager.syncPlaylist(playlist)
+        let first = try #require(try ModelContext(container).fetch(FetchDescriptor<Movie>()).first?.categoryId)
+        for _ in 0 ..< 3 {
+            try await manager.syncPlaylist(playlist)
+            let movies = try ModelContext(container).fetch(FetchDescriptor<Movie>())
+            #expect(movies.count == 1)
+            #expect(movies.first?.categoryId == first)
+        }
     }
 }
 

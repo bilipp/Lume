@@ -18,7 +18,7 @@ import SwiftData
 extension ContentSyncManager {
     /// What every request of one sync shares: where the server is, who we
     /// are on it, and which product it is.
-    struct JellyfinConnection {
+    nonisolated struct JellyfinConnection {
         var server: URL
         var session: JellyfinSession
         var flavor: MediaServerFlavor
@@ -29,11 +29,23 @@ extension ContentSyncManager {
     /// parameter-count lint.
     ///
     /// Not `private`: shared with `ContentSyncManager+MediaServerShows.swift`.
-    struct JellyfinViewScope {
+    nonisolated struct JellyfinViewScope {
         var connection: JellyfinConnection
         var playlistId: UUID
         var view: JellyfinLibrary
         var categoryId: String
+        /// The category of every library of this kind in this sync, this one's
+        /// included.
+        var libraryCategoryIds: Set<String>
+
+        /// Whether a row filed under `current` moves to this library. A title
+        /// two libraries list stays in whichever holds it now: the libraries
+        /// are read in parallel, so "the last one wins" would move it back and
+        /// forth (and save it twice) on every sync.
+        func claimsCategory(from current: String?) -> Bool {
+            guard let current else { return true }
+            return current != categoryId && !libraryCategoryIds.contains(current)
+        }
 
         var server: URL {
             connection.server
@@ -91,22 +103,22 @@ extension ContentSyncManager {
         try await syncJellyfinCategories(views: showViews, type: .series, playlistId: playlistId)
 
         await progress?.start(.movies)
-        var seenMovies = Set<String>()
-        var moviesComplete = true
-        for view in movieViews {
-            let viewScope = scope(connection, playlistId: playlistId, view: view, type: .vod)
-            let complete = try await syncJellyfinMovies(scope: viewScope, seenIds: &seenMovies, progress: progress)
-            moviesComplete = moviesComplete && complete
+        let movieScopes = scopes(connection, playlistId: playlistId, views: movieViews, type: .vod)
+        let movies = try await walkJellyfinLibraries(movieScopes, progress: progress) { scope in
+            try await self.syncJellyfinMovies(scope: scope)
         }
+        let seenMovies = movies.values.reduce(into: Set<String>()) { $0.formUnion($1.seen) }
+        let moviesComplete = movies.allRead && movies.values.allSatisfy(\.complete)
         pruneJellyfinMovies(playlistId: playlistId, flavor: flavor, seenIds: seenMovies, fetched: !movieViews.isEmpty && moviesComplete)
         await progress?.complete(.movies)
 
         await progress?.start(.series)
-        var shows = JellyfinShowsSeen()
-        for view in showViews {
-            let viewScope = scope(connection, playlistId: playlistId, view: view, type: .series)
-            try await syncJellyfinShows(scope: viewScope, seen: &shows, progress: progress)
+        let showScopes = scopes(connection, playlistId: playlistId, views: showViews, type: .series)
+        let showWalks = try await walkJellyfinLibraries(showScopes, progress: progress) { scope in
+            try await self.syncJellyfinShows(scope: scope)
         }
+        var shows = showWalks.values.reduce(into: JellyfinShowsSeen()) { $0.merge($1) }
+        shows.complete = shows.complete && showWalks.allRead
         pruneJellyfinSeries(playlistId: playlistId, flavor: flavor, seen: shows, fetched: !showViews.isEmpty && shows.complete)
         persistResolvesSourcesOnDemand(!shows.episodesFetchedPerShow.isEmpty, playlistId: playlistId)
         await progress?.complete(.series)
@@ -114,11 +126,105 @@ extension ContentSyncManager {
         markPlaylistUpdated(playlistId)
     }
 
-    private func scope(_ connection: JellyfinConnection, playlistId: UUID, view: JellyfinLibrary, type: CategoryType) -> JellyfinViewScope {
-        JellyfinViewScope(
-            connection: connection, playlistId: playlistId, view: view,
-            categoryId: "\(playlistId.uuidString)-\(type.rawValue)-\(view.id)"
-        )
+    private func scopes(_ connection: JellyfinConnection, playlistId: UUID, views: [JellyfinLibrary], type: CategoryType) -> [JellyfinViewScope] {
+        let categoryIds = views.map { "\(playlistId.uuidString)-\(type.rawValue)-\($0.id)" }
+        let all = Set(categoryIds)
+        return zip(views, categoryIds).map { view, categoryId in
+            JellyfinViewScope(
+                connection: connection, playlistId: playlistId, view: view,
+                categoryId: categoryId, libraryCategoryIds: all
+            )
+        }
+    }
+
+    // MARK: - Libraries
+
+    /// How many libraries are read at once. A server that builds its lists
+    /// from upstream catalogues answers a page in up to ~12 s, and some list
+    /// 28 libraries; read one after another that took 400 s warm and well
+    /// past 10 minutes cold. Four in parallel is the same total work, and
+    /// what such a server answered without a single slow or failed page.
+    nonisolated static let concurrentLibraryWalks = 4
+
+    /// What reading every library of one kind produced.
+    nonisolated struct JellyfinLibraryWalks<Value: Sendable> {
+        var values: [Value] = []
+        /// False when a library failed outright: its rows were neither read
+        /// nor confirmed gone, so the prune sweep for this kind must not run.
+        var allRead = true
+    }
+
+    /// Reads each library with `walk`, `concurrentLibraryWalks` at a time.
+    ///
+    /// A library that fails is logged and skipped so the others still
+    /// import; the kind is then marked not fully read. Only when every
+    /// library failed does the sync fail, with the first error. A revoked
+    /// session or a cancelled sync ends the whole walk at once.
+    private func walkJellyfinLibraries<Value: Sendable>(
+        _ scopes: [JellyfinViewScope],
+        progress: SyncProgress?,
+        walk: @escaping @Sendable (JellyfinViewScope) async throws -> Value
+    ) async throws -> JellyfinLibraryWalks<Value> {
+        var result = JellyfinLibraryWalks<Value>()
+        var firstError: (any Error)?
+        try await withThrowingTaskGroup(of: Result<Value, any Error>.self) { group in
+            var pending = scopes.makeIterator()
+            func start(_ scope: JellyfinViewScope) {
+                group.addTask {
+                    do {
+                        return try await .success(walk(scope))
+                    } catch {
+                        return .failure(error)
+                    }
+                }
+            }
+            for _ in 0 ..< Self.concurrentLibraryWalks {
+                guard let scope = pending.next() else { break }
+                start(scope)
+            }
+            var finished = 0
+            while let outcome = try await group.next() {
+                finished += 1
+                switch outcome {
+                case let .success(value):
+                    result.values.append(value)
+                case let .failure(error):
+                    if Self.endsJellyfinSync(error) {
+                        throw error
+                    }
+                    result.allRead = false
+                    firstError = firstError ?? error
+                }
+                await progress?.update(
+                    detail: "\(finished) of \(scopes.count) libraries",
+                    fraction: Double(finished) / Double(scopes.count)
+                )
+                if let scope = pending.next() {
+                    start(scope)
+                }
+            }
+        }
+        if result.values.isEmpty, let firstError {
+            throw firstError
+        }
+        return result
+    }
+
+    /// Whether a library failure ends the sync instead of just that library:
+    /// cancellation, or a session the server no longer accepts (every other
+    /// library would fail the same way).
+    private nonisolated static func endsJellyfinSync(_ error: any Error) -> Bool {
+        if Task.isCancelled || error is CancellationError {
+            return true
+        }
+        switch error as? JellyfinError {
+        case .unauthorized:
+            return true
+        case let .networkError(inner):
+            return (inner as? URLError)?.code == .cancelled
+        default:
+            return false
+        }
     }
 
     // MARK: - Paging
@@ -131,7 +237,7 @@ extension ContentSyncManager {
     nonisolated static let openEndedLibraryItemLimit = 500
 
     /// The outcome of one library walk.
-    struct JellyfinWalk {
+    nonisolated struct JellyfinWalk {
         var fetched = 0
         /// False when an open-ended library failed part-way and the walk kept
         /// what it had: the items it never reached may still be listed, so
@@ -153,7 +259,6 @@ extension ContentSyncManager {
     func pageThroughJellyfinItems(
         types: [String],
         scope: JellyfinViewScope,
-        progress: SyncProgress?,
         unit: String,
         body: ([JellyfinItem]) -> Void
     ) async throws -> JellyfinWalk {
@@ -182,11 +287,6 @@ extension ContentSyncManager {
                 body(page.items)
             }
             walk.fetched += page.items.count
-            let shownTotal = tracker.isOpenEnded ? min(tracker.total, limit) : tracker.total
-            await progress?.update(
-                detail: "\(walk.fetched) of \(shownTotal) \(unit) in \(scope.view.name)",
-                fraction: shownTotal == 0 ? 1 : min(1, Double(walk.fetched) / Double(shownTotal))
-            )
             if page.items.isEmpty {
                 break
             }
@@ -271,15 +371,15 @@ extension ContentSyncManager {
 
     // MARK: - Movies
 
-    /// Returns whether the library was read in full (see `JellyfinWalk.complete`).
-    private func syncJellyfinMovies(scope: JellyfinViewScope, seenIds: inout Set<String>, progress: SyncProgress?) async throws -> Bool {
-        var seen = seenIds
-        let walk = try await pageThroughJellyfinItems(types: ["Movie"], scope: scope, progress: progress, unit: "movie(s)") { items in
+    /// Reads one movie library, returning the ids it saw and whether it was
+    /// read in full (see `JellyfinWalk.complete`).
+    private func syncJellyfinMovies(scope: JellyfinViewScope) async throws -> (seen: Set<String>, complete: Bool) {
+        var seen = Set<String>()
+        let walk = try await pageThroughJellyfinItems(types: ["Movie"], scope: scope, unit: "movie(s)") { items in
             seen.formUnion(upsertJellyfinMovies(items, scope: scope))
         }
-        seenIds = seen
         Logger.database.info("\(scope.flavor.displayName, privacy: .public) movies synced for library \(scope.view.name, privacy: .public): \(walk.fetched, privacy: .public) item(s)")
-        return walk.complete
+        return (seen, walk.complete)
     }
 
     /// Upserts one page of movies, returning the ids it saw for the prune
@@ -326,7 +426,7 @@ extension ContentSyncManager {
         if movie.name != name {
             movie.name = name
         }
-        if movie.categoryId != scope.categoryId {
+        if scope.claimsCategory(from: movie.categoryId) {
             movie.categoryId = scope.categoryId
         }
         if let url = JellyfinClient.streamURL(server: scope.server, itemId: item.id)?.absoluteString,
