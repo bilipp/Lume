@@ -4,7 +4,7 @@
 //
 //  Video-track introspection for the KSPlayer engine, shared by every platform.
 //
-//  KSPlayer is the default engine, so this must stay ungated: the tvOS overlay
+//  KSPlayer ships on every platform, so this must stay ungated: the tvOS overlay
 //  reads it through `KSTVPlaybackEngine`, the iOS / macOS / visionOS hosts read
 //  it directly. One implementation so the two can never drift.
 //
