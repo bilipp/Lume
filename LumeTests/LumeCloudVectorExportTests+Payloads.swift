@@ -101,6 +101,17 @@ extension LumeCloudVectorExportTests {
             ))
             try records.add("stalker playlist without an EPG URL", stalker)
             try records.add("unknown data survives a re-encode", playlist, previous: withUnknownData(playlist))
+            let combined = inserted(SyncedPlaylist(
+                id: UUID(uuidString: "0A1B2C3D-0000-4000-8000-00000000AB03")!, name: "Seaside Mix",
+                serverURL: "http://mix.example/get.php", username: "", password: "",
+                sourceTypeRaw: PlaylistSourceType.m3u.rawValue, epgURL: nil, syncEnabled: true,
+                combinedTypesRaw: "movies,liveTV", combinedPriority: 1, updatedAt: edited
+            ))
+            try records.add("combined playlist", combined)
+            let combinedPayload = LumeCloudPayloadCodec.payload(for: combined, previous: nil)
+            combined.combinedTypesRaw = ""
+            combined.combinedPriority = nil
+            try records.add("leaving Combined writes the defaults", combined, previous: combinedPayload)
         }
 
         let contents = try collect { records in

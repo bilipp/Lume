@@ -60,8 +60,12 @@ extension LumeCloudTransport {
         remote: Data,
         as _: Model.Type
     ) throws -> Data {
-        let localModel = try LumeCloudPayloadCodec.makeModel(from: LumeCloudPayload.decode(local), as: Model.self)
-        let remoteModel = try LumeCloudPayloadCodec.makeModel(from: LumeCloudPayload.decode(remote), as: Model.self)
+        let localPayload = try LumeCloudPayload.decode(local)
+        let localModel = try LumeCloudPayloadCodec.makeModel(from: localPayload, as: Model.self)
+        // Built over the local value, so a field the server's payload doesn't
+        // carry stays the local one when the server's side wins.
+        let remoteModel = try LumeCloudPayloadCodec.makeModel(from: localPayload, as: Model.self)
+        try LumeCloudPayloadCodec.apply(LumeCloudPayload.decode(remote), to: remoteModel)
         try localModel.mergeLumeCloudConflict(with: remoteModel)
         return try LumeCloudPayloadCodec.encoded(localModel, previous: remote)
     }
