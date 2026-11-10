@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C6DD50012FE100050000DD01 /* LumeAetherBridge in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, tvos, ); productRef = C6DD50022FE100050000DD02 /* LumeAetherBridge */; };
-		C6DD50042FE100050000DD04 /* LumeAetherBridge in Embed Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, tvos, ); productRef = C6DD50022FE100050000DD02 /* LumeAetherBridge */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C66C81672FC5A59D0048468D /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = C66C81682FC5A59D0048468D /* KSPlayer */; };
 		C6AA10012FDD00010000AA01 /* LumeEngine in Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; };
 		C6AA10042FDD00010000AA04 /* LumeEngine in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C6AA10022FDD00010000AA02 /* LumeEngine */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -17,6 +15,8 @@
 		C6BD5701000000000000F003 /* LumeTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C6BD5701000000000000A002 /* LumeTopShelf.appex */; platformFilters = (tvos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C6CC30012FDF00040000CC01 /* LumeCloudKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6CC30022FDF00040000CC02 /* LumeCloudKit */; };
 		C6CC40012FE000040000CC01 /* GoogleCastDynamic in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = C6CC40022FE000040000CC02 /* GoogleCastDynamic */; };
+		C6DD50012FE100050000DD01 /* LumeAetherBridge in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, tvos, ); productRef = C6DD50022FE100050000DD02 /* LumeAetherBridge */; };
+		C6DD50042FE100050000DD04 /* LumeAetherBridge in Embed Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, tvos, ); productRef = C6DD50022FE100050000DD02 /* LumeAetherBridge */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C6FF000A2FC5A59D00484601 /* VLCKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6FF000B2FC5A59D00484602 /* VLCKit */; };
 /* End PBXBuildFile section */
 
@@ -1819,10 +1819,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		C6DD50022FE100050000DD02 /* LumeAetherBridge */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = LumeAetherBridge;
-		};
 		C66C81682FC5A59D0048468D /* KSPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C66C81662FC5A59D0048468D /* XCRemoteSwiftPackageReference "KSPlayer" */;
@@ -1844,6 +1840,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C6CC40032FE000040000CC03 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */;
 			productName = GoogleCastDynamic;
+		};
+		C6DD50022FE100050000DD02 /* LumeAetherBridge */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LumeAetherBridge;
 		};
 		C6FF000B2FC5A59D00484602 /* VLCKit */ = {
 			isa = XCSwiftPackageProductDependency;
