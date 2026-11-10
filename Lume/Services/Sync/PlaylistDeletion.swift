@@ -79,24 +79,12 @@ nonisolated enum PlaylistDeletion {
         let bulk = ModelContext(context.container)
         bulk.autosaveEnabled = false
 
-        // A channel another playlist also carries keeps its guide listings, so
-        // split the channel ids first; both reads fetch only `epgChannelId`.
-        var removedDescriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id.starts(with: prefix) })
-        removedDescriptor.propertiesToFetch = [\.epgChannelId]
-        let removedChannelIDs = Set(((try? bulk.fetch(removedDescriptor)) ?? []).compactMap(\.epgChannelId))
-        var survivingDescriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { !$0.id.starts(with: prefix) })
-        survivingDescriptor.propertiesToFetch = [\.epgChannelId]
-        let survivingChannelIDs = Set(((try? bulk.fetch(survivingDescriptor)) ?? []).compactMap(\.epgChannelId))
+        // Prune guide listings for channels no surviving playlist carries.
+        // Processed in bounded batches so neither removed nor surviving channels
+        // are materialized in unbounded sets.
+        pruneOrphanedEPGListings(prefix: prefix, in: bulk)
 
         try? bulk.delete(model: LiveStream.self, where: #Predicate { $0.id.starts(with: prefix) })
-
-        // Prune the guide listings for channels no surviving playlist carries,
-        // in `IN` batches well under SQLite's bound-variable limit.
-        let orphaned = Array(removedChannelIDs.subtracting(survivingChannelIDs)).sorted()
-        for start in stride(from: 0, to: orphaned.count, by: 500) {
-            let chunk = Array(orphaned[start ..< min(start + 500, orphaned.count)])
-            try? bulk.delete(model: EPGListing.self, where: #Predicate { chunk.contains($0.channelId) })
-        }
         try? bulk.save()
 
         // Movies and series cascade to their cast (and series to their
@@ -111,7 +99,7 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
-        deletePaged(container: context.container, idOf: { (show: Series) in show.id }, page: { cursor, limit in
+        deletePaged(container: context.container, pageSize: 200, idOf: { (show: Series) in show.id }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id, comparator: .lexical)]
@@ -119,6 +107,79 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
+    }
+
+    /// Prunes EPG listings that are orphaned when `playlistID`'s channels are removed.
+    ///
+    /// Evaluates removed channels and surviving references in bounded batches so
+    /// libraries with tens of thousands of channels never materialize unbounded
+    /// channel arrays or string sets in memory. If the playlist has no EPG channels,
+    /// this returns immediately without touching surviving channels.
+    private static func pruneOrphanedEPGListings(prefix: String, in context: ModelContext) {
+        // Fast path: if this playlist has no channels with an EPG channel ID,
+        // skip orphan lookup entirely.
+        var checkDescriptor = FetchDescriptor<LiveStream>(
+            predicate: #Predicate { $0.id.starts(with: prefix) && $0.epgChannelId != nil }
+        )
+        checkDescriptor.fetchLimit = 1
+        checkDescriptor.propertiesToFetch = [\.id]
+        guard (try? context.fetch(checkDescriptor))?.isEmpty == false else {
+            return
+        }
+
+        // Keyset-page through the doomed playlist's channels in bounded batches.
+        // Candidate EPG IDs and surviving channel queries are processed per page,
+        // so resident memory stays strictly O(batchSize).
+        let batchSize = 500
+        var cursor = ""
+
+        while true {
+            var fetchedCount = 0
+            autoreleasepool {
+                var removedDescriptor = FetchDescriptor<LiveStream>(
+                    predicate: #Predicate {
+                        $0.id.starts(with: prefix) &&
+                            $0.epgChannelId != nil &&
+                            $0.id > cursor
+                    },
+                    sortBy: [SortDescriptor(\.id, comparator: .lexical)]
+                )
+                removedDescriptor.fetchLimit = batchSize
+                removedDescriptor.propertiesToFetch = [\.id, \.epgChannelId]
+
+                let removedChannels = (try? context.fetch(removedDescriptor)) ?? []
+                fetchedCount = removedChannels.count
+                if let last = removedChannels.last {
+                    cursor = last.id
+                }
+
+                let candidates = Array(Set(removedChannels.compactMap(\.epgChannelId)))
+                guard !candidates.isEmpty else { return }
+
+                // Check which of these candidate EPG IDs are still referenced by
+                // surviving channels from OTHER playlists.
+                var survivingDescriptor = FetchDescriptor<LiveStream>(
+                    predicate: #Predicate {
+                        !$0.id.starts(with: prefix) &&
+                            $0.epgChannelId != nil &&
+                            candidates.contains($0.epgChannelId!)
+                    }
+                )
+                survivingDescriptor.propertiesToFetch = [\.epgChannelId]
+                let survivingChannels = (try? context.fetch(survivingDescriptor)) ?? []
+                let survivingEPGIDs = Set(survivingChannels.compactMap(\.epgChannelId))
+
+                // Delete listings only for IDs that no surviving channel references.
+                let orphaned = candidates.filter { !survivingEPGIDs.contains($0) }
+                if !orphaned.isEmpty {
+                    try? context.delete(model: EPGListing.self, where: #Predicate { orphaned.contains($0.channelId) })
+                }
+            }
+
+            if fetchedCount < batchSize {
+                break
+            }
+        }
     }
 
     /// Deletes every row `page` selects, `pageSize` at a time, keyed on the last
