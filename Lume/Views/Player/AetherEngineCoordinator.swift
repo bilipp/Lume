@@ -130,13 +130,22 @@
         private(set) var hasPlayedStream = false
         /// An audio track picked by hand, carried into a reload (a fresh load)
         /// so it outranks the preferred languages. Cleared when the URL
-        /// changes. Persisted nowhere.
+        /// changes: a stream index names a track in this file only.
+        /// Persisted nowhere.
         private var manualAudioTrackID: Int?
+        /// The audio and subtitle picks made in the menus, matched by language
+        /// into a reload and into the next episode. Cleared on any other
+        /// stream change. Persisted nowhere.
+        private(set) var trackCarry = TrackCarryOver()
+        /// The carried subtitle pick still has to be applied to this load. It
+        /// waits for the engine to list the stream's tracks, which can come
+        /// after `load` returns.
+        var hasPendingCarriedSubtitle = false
         /// The sidecar subtitle file loaded from the OpenSubtitles search. A
         /// load forgets runtime tracks, so it is listed again after each one.
         private var externalSubtitle: ExternalSubtitle?
         private var externalSubtitleTrackID: Int?
-        private var isExternalSubtitleSelected = false
+        private(set) var isExternalSubtitleSelected = false
         /// The audio codecs last reported, so a republish of the same tracks
         /// doesn't report them again. Cleared by `configure`: the host resets
         /// its codecs when it swaps streams.
@@ -164,6 +173,9 @@
         // MARK: Lifecycle
 
         func configure(media: PlayableMedia) {
+            if !TrackCarryOver.carries(from: currentMedia, to: media) {
+                trackCarry = TrackCarryOver()
+            }
             if media.url != currentMedia?.url {
                 manualAudioTrackID = nil
             }
@@ -194,6 +206,7 @@
             // the HDMI link twice), the last picture holds until the next item is
             // attached, and a Picture in Picture window stays up.
             endLoad(stopsSession: false)
+            hasPendingCarriedSubtitle = trackCarry.subtitle != nil
             session?.prepareForReplacement()
             currentMedia = media
             registerLogSecrets(for: media)
@@ -333,12 +346,15 @@
         func selectAudioTrack(id: String) {
             guard let index = Int(id) else { return }
             manualAudioTrackID = index
+            trackCarry.audio = session?.audioTracks.first { $0.id == index }.map(Self.carryTrack)
             session?.selectAudioTrack(id: index)
         }
 
         func selectTextTrack(id: String?) {
             let index = id.flatMap(Int.init)
             isExternalSubtitleSelected = index != nil && index == externalSubtitleTrackID
+            hasPendingCarriedSubtitle = false
+            trackCarry.subtitle = carriedSubtitle(forTrackID: index)
             session?.selectSubtitleTrack(id: index)
             if index == nil {
                 subtitleCues.clear()
@@ -389,7 +405,9 @@
                 isLive: media.isLive,
                 isHLSSource: AetherLoadContext.isHLS(media.url),
                 httpHeaders: media.httpHeaders,
-                preferredAudioLanguages: PlayerLanguageOptions.load().preferredAudioLanguages,
+                preferredAudioLanguages: trackCarry.audioLanguages(
+                    over: PlayerLanguageOptions.load().preferredAudioLanguages
+                ),
                 isEmbedded: isEmbedded,
                 audioOffsetMilliseconds: effectiveAudioOffset
             )
@@ -446,6 +464,7 @@
 
         func publishMedia() {
             guard let session else { return }
+            applyCarriedSubtitle(on: session)
             let audio = session.audioTracks
             reportAudioCodecs(audio)
             let audioOptions = audio.enumerated().map { position, track in
