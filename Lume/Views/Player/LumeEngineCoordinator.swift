@@ -103,7 +103,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     private(set) var session: PlayerSession?
     private var pipBridge: PictureInPictureBridge?
-    private var mediaInfo: MediaInfo?
+    private(set) var mediaInfo: MediaInfo?
     private var currentMedia: PlayableMedia?
     private var eventTask: Task<Void, Never>?
     private var tickTask: Task<Void, Never>?
@@ -128,14 +128,13 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     /// rather than assumed: the engine starts on its own preferred/default
     /// pick, which is not necessarily the first track.
     private var selectedAudioID: String?
-    private var selectedSubtitleID: String?
-    /// A manual pick in the audio or subtitle menu outranks the preferred
-    /// languages for the rest of this stream: the engine has no rebuild in
-    /// place, so a stall recovery re-opens through `makeConfiguration` and
-    /// would otherwise re-assert the preference over the viewer's choice.
-    /// Cleared when the URL changes, so it cannot leak into the next channel
-    /// or episode. Persisted nowhere.
-    private var hasManualTrackSelection = false
+    var selectedSubtitleID: String?
+    /// The audio and subtitle picks made in the menus, re-applied to every
+    /// session that follows on this stream (the engine has no rebuild in
+    /// place, so a stall recovery re-opens through `makeConfiguration`) and
+    /// to the next episode. Cleared on any other stream change, so a pick
+    /// cannot leak into the next channel or film. Persisted nowhere.
+    private(set) var trackCarry = TrackCarryOver()
     /// The sidecar subtitle file loaded from the OpenSubtitles search, if any.
     /// Kept so the track survives a switch to an embedded track and back — the
     /// engine's sidecar loader is a one-shot parse, so re-selecting means
@@ -151,8 +150,8 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     // MARK: Lifecycle
 
     func configure(media: PlayableMedia) {
-        if media.url != currentMedia?.url {
-            hasManualTrackSelection = false
+        if !TrackCarryOver.carries(from: currentMedia, to: media) {
+            trackCarry = TrackCarryOver()
         }
         hasPlayedStream = false
         start(media)
@@ -211,10 +210,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 let info = try await session.open(url: media.url.absoluteString)
                 self.mediaInfo = info
                 self.selectedAudioID = await session.selectedAudioTrackIndex.map { String($0) }
-                // Non-nil only when the engine turned a forced track on by
-                // itself because the chosen audio is foreign to the viewer;
-                // embedded subtitles otherwise start off as they always have.
-                self.selectedSubtitleID = await session.selectedSubtitleTrackIndex.map { String($0) }
+                await self.syncSubtitleSelection(on: session, info: info, media: media)
                 self.publishTracks(info: info)
                 self.publishVideoInfo(info: info)
                 if !self.isEmbedded {
@@ -321,7 +317,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
 
     func selectAudioTrack(id: String) {
         guard let index = Int32(id) else { return }
-        hasManualTrackSelection = true
+        trackCarry.audio = mediaInfo?.audioTracks.first { $0.index == index }.map(Self.carryTrack)
         let session = session
         Task { await session?.selectAudioTrack(index) }
         selectedAudioID = id
@@ -331,7 +327,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     }
 
     func selectTextTrack(id: String?) {
-        hasManualTrackSelection = true
+        trackCarry.subtitle = carriedSubtitle(forTrackID: id)
         selectedSubtitleID = id
         if let external = externalSubtitle, id == Self.externalTrackID {
             loadExternalSubtitleFile(external)
@@ -379,17 +375,16 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         // Resolved engine-side while the pipeline is built, before the demuxer
         // streams a byte: selecting after `open()` would route through a seek
         // that discards `startPosition` on a VOD resume and that many live IPTV
-        // endpoints do not survive. Empty lists (the default, and what a manual
-        // pick leaves for the rest of this stream) mean the engine keeps the
-        // container's own selection.
-        if !hasManualTrackSelection {
-            let languages = PlayerLanguageOptions.load()
-            configuration.preferredAudioLanguages = languages.preferredAudioLanguages
-            // Subtitling untranslated dialogue is Lume's rule, not the
-            // engine's — the same one `AVPlayerCoordinator+Languages` applies
-            // on AVFoundation.
-            configuration.autoEnableForcedSubtitlesForForeignAudio = true
-        }
+        // endpoints do not survive. An empty list (the default) means the
+        // engine keeps the container's own selection. A carried audio pick goes
+        // first, so the next episode and a stall recovery reopen in the
+        // language the viewer chose.
+        let languages = PlayerLanguageOptions.load()
+        configuration.preferredAudioLanguages = trackCarry.audioLanguages(over: languages.preferredAudioLanguages)
+        // Subtitling untranslated dialogue is Lume's rule, not the engine's —
+        // the same one `AVPlayerCoordinator+Languages` applies on AVFoundation.
+        // Never against a viewer who turned subtitles off.
+        configuration.autoEnableForcedSubtitlesForForeignAudio = trackCarry.subtitle != .off
         if let headers = media.httpHeaders, !headers.isEmpty {
             configuration.demuxer.httpHeaders = headers
         }

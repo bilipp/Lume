@@ -4,8 +4,8 @@
 //
 //  A Jellyfin/Emby show's episodes fetched when the show is opened, through
 //  the per-show `/Shows/{id}/Episodes` route. A stock server's sync already
-//  imports every episode; this fills in the shows of an AIOStreams-style
-//  server, which lists a library's series but no episodes under it.
+//  imports every episode; this fills in the shows of a server that resolves
+//  sources on demand, which lists a library's series but no episodes under it.
 //
 //  Rows are keyed exactly as the sync keys them, so the two paths meet on the
 //  same `Episode` and watch progress never splits across duplicates.
