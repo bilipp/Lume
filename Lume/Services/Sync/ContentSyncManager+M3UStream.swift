@@ -255,6 +255,8 @@ extension ContentSyncManager {
         // them would delete every row the unread tail would have kept.
         try Task.checkCancellation()
 
+        // Sweeps stale rows, or skips immediately if pre-import state was proven
+        // cold/empty (perf/m3u-first-import-prune).
         pruneStaleM3URows(playlistId: playlistId, state: state)
 
         return M3UImportSummary(
