@@ -17,6 +17,7 @@ struct HeroInfo: View {
     let isCompact: Bool
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.titleGroupStates) private var groupStates
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -61,7 +62,7 @@ struct HeroInfo: View {
         // the favorite menu — the carousel surface below owns swipe paging and
         // the info crossfade, and a menu there would fight both.
         detailsButton(fullWidth: isCompact)
-            .heroFavoriteMenu(hero, in: modelContext)
+            .heroFavoriteMenu(hero, in: modelContext, groupStates: groupStates)
     }
 
     @ViewBuilder

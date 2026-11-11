@@ -451,6 +451,13 @@ struct LumeApp: App {
                     // syncs, iCloud imports and browsing like the indexer.
                     AddedDateNormalization.runIfNeeded(container: catalogContainer)
 
+                    // Title group keys and category primaries for rows stored
+                    // before those columns existed. Not on a store that is
+                    // unreadable or came up emptied.
+                    if case .ready = cloudSync.engine.localCatalogReadiness() {
+                        TitleGroupKeyBackfill.run(container: catalogContainer)
+                    }
+
                     // Refresh the TV guide on its own schedule. No-ops when no
                     // guide is due yet, and stands aside while a playlist sync
                     // is queued or running — the deferred refresh runs once

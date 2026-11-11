@@ -40,6 +40,16 @@
             StreamInfoDetailLevel(rawValue: streamInfoDetailLevelRaw) ?? PlayerSettings.StreamInfo.detailLevelDefault
         }
 
+        private static var sourcePickerHint: LocalizedStringKey {
+            #if os(macOS)
+                "Control-click Play to pick a source at any time."
+            #elseif os(visionOS)
+                "Pinch and hold Play to pick a source at any time."
+            #else
+                "Touch and hold Play to pick a source at any time."
+            #endif
+        }
+
         /// iPhone only, like the lock itself — see `PlayerOrientationLock`.
         private var showsRotateToLandscape: Bool {
             #if os(iOS)
@@ -74,7 +84,10 @@
                 } header: {
                     Text("Sources")
                 } footer: {
-                    Text("When a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the server's first version.")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("When a title has several sources, or a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the source you picked last, or the best one.")
+                        Text(Self.sourcePickerHint)
+                    }
                 }
 
                 Section {

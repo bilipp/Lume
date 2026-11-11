@@ -181,7 +181,7 @@ enum PlaylistSourceType: String, Codable {
     /// and series that a server application indexes and streams, as opposed
     /// to an IPTV provider or a bare file share. Written as an exhaustive
     /// switch so a future source type cannot inherit a default.
-    var isMediaServer: Bool {
+    nonisolated var isMediaServer: Bool {
         switch self {
         case .jellyfin, .emby, .plex, .silo: true
         case .xtream, .m3u, .stalker, .webdav: false

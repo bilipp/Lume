@@ -63,34 +63,22 @@ extension View {
 }
 
 extension View {
-    /// The favorite menu for a `HomeMediaItem` entry: the home rows and the
-    /// detail-screen poster rails. Live channels keep `liveChannelMenu` and are
-    /// left untouched here.
-    @ViewBuilder
-    func mediaFavoriteMenu(
+    /// The favorite menu for a detail-screen poster rail. Reads and clears the
+    /// favorite across every copy of the title, like the Home rails, and
+    /// re-reads that title's state after a toggle. Live channels never appear
+    /// on these rails.
+    func railFavoriteMenu(
         _ item: HomeMediaItem,
         in context: ModelContext,
-        onRemoveFromRecents: (() -> Void)? = nil,
-        onVote: ((RecommendationVote) -> Void)? = nil
+        groupStates: Binding<TitleGroupStates>
     ) -> some View {
-        switch item {
-        case let .movie(movie):
-            mediaFavoriteMenu(
-                isFavorite: { movie.isFavorite },
-                onToggleFavorite: { MediaFavorites.toggle(movie, in: context) },
-                onRemoveFromRecents: onRemoveFromRecents,
-                onVote: onVote
-            )
-        case let .series(series):
-            mediaFavoriteMenu(
-                isFavorite: { series.isFavorite },
-                onToggleFavorite: { MediaFavorites.toggle(series, in: context) },
-                onRemoveFromRecents: onRemoveFromRecents,
-                onVote: onVote
-            )
-        case .live:
-            self
-        }
+        mediaFavoriteMenu(
+            isFavorite: { groupStates.wrappedValue.isFavorite(item) },
+            onToggleFavorite: {
+                groupStates.wrappedValue.toggleFavorite(item, in: context)
+                groupStates.wrappedValue.reload(item, in: context)
+            }
+        )
     }
 }
 
@@ -122,16 +110,13 @@ extension View {
     /// hero pill is one structurally stable Button across every slide, and a
     /// conditional branch here would hand it a new identity on the pages that
     /// switch kind — focus falls to the first row and the whole home jumps.
-    func heroFavoriteMenu(_ hero: HeroItem, in context: ModelContext) -> some View {
+    ///
+    /// `groupStates` makes it read and clear the favorite across every copy of
+    /// the title, like the Home rails.
+    func heroFavoriteMenu(_ hero: HeroItem, in context: ModelContext, groupStates: TitleGroupStates) -> some View {
         mediaFavoriteMenu(
-            isFavorite: { hero.movie?.isFavorite ?? hero.series?.isFavorite ?? false },
-            onToggleFavorite: {
-                if let movie = hero.movie {
-                    MediaFavorites.toggle(movie, in: context)
-                } else if let series = hero.series {
-                    MediaFavorites.toggle(series, in: context)
-                }
-            }
+            isFavorite: { groupStates.isFavorite(hero.homeItem) },
+            onToggleFavorite: { groupStates.toggleFavorite(hero.homeItem, in: context) }
         )
     }
 }

@@ -18,8 +18,12 @@ struct SeriesCategoryView: View {
     @Environment(\.modelContext) private var modelContext
 
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
     @State private var series: [Series] = []
+    /// State of the loaded titles' other copies — see `MovieCategoryView`.
+    @State private var groupStates: [String: TitleGroupState] = [:]
     @State private var canLoadMore = true
     @State private var isLoadingPage = false
     /// True while a Stalker category's content is being fetched from the portal
@@ -38,6 +42,11 @@ struct SeriesCategoryView: View {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
     }
 
+    /// The sort and grouping the loaded pages were fetched for.
+    private var loadKey: String {
+        "\(contentSortRaw)|\(groupDuplicateTitles)"
+    }
+
     /// The playlist when it's a Stalker portal, whose categories are imported
     /// on demand rather than synced whole.
     private var stalkerPlaylist: Playlist? {
@@ -52,10 +61,14 @@ struct SeriesCategoryView: View {
                     ProgressView("Loading…")
                 }
             }
-            .task(id: contentSortRaw) {
-                guard loadedSort != contentSortRaw else { return }
-                loadedSort = contentSortRaw
+            .task(id: loadKey) {
+                guard loadedSort != loadKey else {
+                    refreshGroupStates()
+                    return
+                }
+                loadedSort = loadKey
                 series = []
+                groupStates = [:]
                 canLoadMore = true
                 await importStalkerContentIfNeeded()
                 loadNextPage()
@@ -74,8 +87,15 @@ struct SeriesCategoryView: View {
             emptyDescription: "This category has no series",
             sortRaw: $contentSortRaw,
             onLoadMore: { loadNextPage() },
-            card: { SeriesCardView(series: $0, fillsWidth: true) }
+            favoriteMenu: CategoryFavoriteMenu(
+                isFavorite: { TitleGroupStateLookup.state(of: $0, in: groupStates).isFavorite },
+                toggle: { toggleFavorite($0) }
+            ),
+            card: { series in
+                SeriesCardView(series: series, fillsWidth: true)
+            }
         )
+        .environment(\.titleGroupStates, TitleGroupStates(series: groupStates))
         // Pull-to-refresh re-imports a Stalker category — see `MovieCategoryView`.
         #if !os(tvOS)
             if stalkerPlaylist != nil {
@@ -92,9 +112,9 @@ struct SeriesCategoryView: View {
         guard canLoadMore, !isLoadingPage else { return }
         isLoadingPage = true
         defer { isLoadingPage = false }
-        let categoryId = category.id
-        var descriptor = FetchDescriptor<Series>(
-            predicate: #Predicate { $0.categoryId == categoryId },
+        var descriptor = CategoryGridQuery.series(
+            categoryId: category.id,
+            grouped: groupDuplicateTitles,
             sortBy: contentSort.seriesDescriptors
         )
         descriptor.fetchOffset = series.count
@@ -102,6 +122,16 @@ struct SeriesCategoryView: View {
         let page = (try? modelContext.fetch(descriptor)) ?? []
         series.append(contentsOf: page)
         if page.count < pageSize { canLoadMore = false }
+        let keys = page.compactMap(\.titleGroupKey)
+        groupStates.replace(keys: keys, with: TitleGroupStateLookup.series(keys: keys, in: modelContext))
+    }
+
+    private func refreshGroupStates() {
+        groupStates = TitleGroupStateLookup.states(of: series, in: modelContext)
+    }
+
+    private func toggleFavorite(_ series: Series) {
+        TitleGroupFavorites.toggle(series, updating: &groupStates, in: modelContext)
     }
 
     /// Imports the category from the portal the first time it's opened (Stalker
@@ -124,6 +154,7 @@ struct SeriesCategoryView: View {
         guard let playlist = stalkerPlaylist else { return }
         await runStalkerImport(playlist: playlist)
         series = []
+        groupStates = [:]
         canLoadMore = true
         loadNextPage()
     }
@@ -131,9 +162,9 @@ struct SeriesCategoryView: View {
     /// Re-fetches the already-loaded window in place — see
     /// `MovieCategoryView.reloadLoadedPages`.
     private func reloadLoadedPages() {
-        let categoryId = category.id
-        var descriptor = FetchDescriptor<Series>(
-            predicate: #Predicate { $0.categoryId == categoryId },
+        var descriptor = CategoryGridQuery.series(
+            categoryId: category.id,
+            grouped: groupDuplicateTitles,
             sortBy: contentSort.seriesDescriptors
         )
         let window = max(series.count, pageSize)
@@ -141,6 +172,7 @@ struct SeriesCategoryView: View {
         let rows = (try? modelContext.fetch(descriptor)) ?? []
         canLoadMore = rows.count == window
         series = rows
+        refreshGroupStates()
     }
 
     private func runStalkerImport(playlist: Playlist) async {
@@ -158,30 +190,44 @@ struct SeriesCategoryPreview: View {
     private let limit: Int
     @Query private var series: [Series]
     var animationNamespace: Namespace.ID?
+    @Environment(\.modelContext) private var modelContext
+    @State private var groupStates: [String: TitleGroupState] = [:]
 
-    init(category: Category, limit: Int, sort: ContentSortOption, animationNamespace: Namespace.ID? = nil) {
+    /// - Parameter grouped: see `MovieCategoryPreview`.
+    init(category: Category, limit: Int, sort: ContentSortOption, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
         self.category = category
         self.limit = limit
         self.animationNamespace = animationNamespace
-        let categoryId = category.id
-        var descriptor = FetchDescriptor<Series>(
-            predicate: #Predicate<Series> { $0.categoryId == categoryId },
-            sortBy: sort.seriesDescriptors
-        )
+        var descriptor = CategoryGridQuery.series(categoryId: category.id, grouped: grouped, sortBy: sort.seriesDescriptors)
         // Fetch one extra so we can tell whether a full grid would show more.
         descriptor.fetchLimit = limit + 1
         _series = Query(descriptor)
     }
 
     var body: some View {
+        let shown = Array(series.prefix(limit))
         CategoryPreviewRow(
             category: category,
-            items: Array(series.prefix(limit)),
+            items: shown,
             hasMore: series.count > limit,
             animationNamespace: animationNamespace,
             emptyMessage: "No series in this category",
-            card: { SeriesCardView(series: $0).environment(\.playlistProvenance, .none) }
+            favoriteMenu: CategoryFavoriteMenu(
+                isFavorite: { TitleGroupStateLookup.state(of: $0, in: groupStates).isFavorite },
+                toggle: { toggleFavorite($0) }
+            ),
+            card: { series in
+                SeriesCardView(series: series)
+            }
         )
+        .environment(\.titleGroupStates, TitleGroupStates(series: groupStates))
+        .task(id: shown.compactMap(\.titleGroupKey)) {
+            groupStates = TitleGroupStateLookup.states(of: shown, in: modelContext)
+        }
+    }
+
+    private func toggleFavorite(_ series: Series) {
+        TitleGroupFavorites.toggle(series, updating: &groupStates, in: modelContext)
     }
 }
 

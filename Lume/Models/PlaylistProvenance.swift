@@ -2,11 +2,11 @@
 //  PlaylistProvenance.swift
 //  Lume
 //
-//  Which member playlist a browse card's item came from, for the provenance
-//  badge on the Movies, Series and Live TV grids. Only a tab that two or more
-//  Combined members contribute to carries names; isolated mode and a
-//  single-contributor tab resolve every id to `nil`, so those cards look as
-//  they always have.
+//  Which member playlist a live channel card came from, for the provenance
+//  badge on the Live TV grids. Only while two or more Combined members
+//  contribute Live TV does it carry names; isolated mode and a single
+//  contributor resolve every id to `nil`, so those cards look as they always
+//  have. Movies and series carry no badge: duplicates group into one card.
 //
 
 import Foundation
@@ -18,42 +18,39 @@ nonisolated struct PlaylistProvenance: Equatable {
         let name: String
     }
 
-    private let labels: [PlaylistTab: [Label]]
+    private let labels: [Label]
 
-    static let none = PlaylistProvenance(labels: [:])
+    static let none = PlaylistProvenance(labels: [])
 
-    private init(labels: [PlaylistTab: [Label]]) {
+    private init(labels: [Label]) {
         self.labels = labels
     }
 
     init(scope: CatalogScope, names: [UUID: String]) {
-        var labels: [PlaylistTab: [Label]] = [:]
-        if scope.isCombined {
-            for tab in PlaylistTab.allCases {
-                guard scope.namesMembers(for: tab) else { continue }
-                labels[tab] = zip(scope.members(for: tab), scope.prefixes(for: tab)).compactMap { id, prefix in
-                    names[id].map { Label(prefix: prefix, name: $0) }
-                }
-            }
+        guard scope.isCombined, scope.namesMembers(for: .liveTV) else {
+            self.init(labels: [])
+            return
         }
-        self.init(labels: labels)
+        self.init(labels: zip(scope.members(for: .liveTV), scope.prefixes(for: .liveTV)).compactMap { id, prefix in
+            names[id].map { Label(prefix: prefix, name: $0) }
+        })
     }
 
-    /// The badge for a catalog row on `tab`'s grids, or `nil` to leave it off.
-    func name(forContentID contentID: String, in tab: PlaylistTab) -> String? {
-        labels[tab]?.first { contentID.hasPrefix($0.prefix) }?.name
+    /// The badge for a live stream row, or `nil` to leave it off.
+    func name(forStreamID streamID: String) -> String? {
+        labels.first { streamID.hasPrefix($0.prefix) }?.name
     }
 }
 
 extension EnvironmentValues {
-    /// Set with `catalogScope`, read by the poster and channel cards. Category
-    /// preview rows and the Multi-View picker set `.none` to stay unbadged.
+    /// Set with `catalogScope`, read by the channel cards. The Multi-View
+    /// picker sets `.none` to stay unbadged.
     @Entry var playlistProvenance = PlaylistProvenance.none
 }
 
 extension View {
-    /// Publishes the content tabs' scope and the provenance their grids badge
-    /// items with.
+    /// Publishes the content tabs' scope and the provenance their channel
+    /// grids badge items with.
     func catalogScope(_ scope: CatalogScope, playlists: [Playlist]) -> some View {
         environment(\.catalogScope, scope)
             .environment(\.playlistProvenance, PlaylistProvenance(scope: scope, names: playlists.namesByID))

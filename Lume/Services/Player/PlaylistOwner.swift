@@ -26,7 +26,7 @@ nonisolated enum PlaylistOwner {
         return playlist(withID: owner, in: context)
     }
 
-    static func playlist(withID id: UUID, in context: ModelContext) -> Playlist? {
+    private static func playlist(withID id: UUID, in context: ModelContext) -> Playlist? {
         var descriptor = FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
@@ -36,11 +36,7 @@ nonisolated enum PlaylistOwner {
     /// Round-tripped through `uuidString` on purpose: the prefix scan this
     /// replaced matched that canonical spelling verbatim, and `UUID(uuidString:)`
     /// also accepts spellings it would have missed.
-    static func ownerID(of id: String) -> UUID? {
-        declaredOwner(of: id)
-    }
-
-    private static func declaredOwner(of id: String) -> UUID? {
+    static func declaredOwner(of id: String) -> UUID? {
         guard id.count > uuidLength else { return nil }
         let candidate = String(id.prefix(uuidLength))
         guard let uuid = UUID(uuidString: candidate), uuid.uuidString == candidate else { return nil }

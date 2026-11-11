@@ -61,6 +61,14 @@ struct FavoriteEntry: Identifiable, ReorderableRowItem {
     let kind: Kind
     /// The owning playlist, shown only when the list spans several members.
     let playlistName: String?
+    /// Every favorited copy the entry stands for, `model` included. One title
+    /// grouped across playlists is one entry; its copies move and clear together.
+    var copies: [any FavoriteOrderable] = []
+    var titleGroupKey: String?
+
+    var allCopies: [any FavoriteOrderable] {
+        copies.isEmpty ? [model] : copies
+    }
 
     var subtitle: String {
         playlistName.map { "\(kind.label) · \($0)" } ?? kind.label
@@ -70,6 +78,8 @@ struct FavoriteEntry: Identifiable, ReorderableRowItem {
 struct FavoriteManagementView: View {
     @Query private var playlists: [Playlist]
     @Environment(\.catalogScope) private var catalogScope
+    @Environment(\.modelContext) private var modelContext
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey) private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
     /// The one Combined member the list is narrowed to; unset shows every
     /// member.
@@ -147,7 +157,7 @@ struct FavoriteManagementView: View {
             append(FavoriteEntry(
                 id: movie.id, model: movie, title: movie.name,
                 iconURL: URL(string: movie.streamIcon ?? ""), kind: .movie,
-                playlistName: playlistName(rank: rank)
+                playlistName: playlistName(rank: rank), titleGroupKey: movie.titleGroupKey
             ), order: movie.favoriteOrder, rank: rank, num: movie.num)
         }
         for series in favoriteSeries where matcher.contains(series.id, .series) {
@@ -155,23 +165,60 @@ struct FavoriteManagementView: View {
             append(FavoriteEntry(
                 id: series.id, model: series, title: series.name,
                 iconURL: URL(string: series.cover ?? ""), kind: .series,
-                playlistName: playlistName(rank: rank)
+                playlistName: playlistName(rank: rank), titleGroupKey: series.titleGroupKey
             ), order: series.favoriteOrder, rank: rank, num: series.num)
         }
 
-        return FavoritesOrder.sorted(entries)
+        let sorted = FavoritesOrder.sorted(entries)
+        return groupDuplicateTitles ? Self.collapsingTitles(sorted, ranking: TitleGrouping.Ranking(
+            matcher: matcher,
+            preferredLanguages: PlayerLanguageOptions.load().preferredAudioLanguages
+        )) : sorted
+    }
+
+    /// One entry per grouped movie or series title, at its first copy's
+    /// position, shown as the copy the ranking picks.
+    private static func collapsingTitles(_ entries: [FavoriteEntry], ranking: TitleGrouping.Ranking) -> [FavoriteEntry] {
+        TitleGrouping.collapse(entries, key: { $0.kind == .live ? nil : $0.titleGroupKey }, best: { copies in
+            switch copies[0].kind {
+            case .movie:
+                copies.first { $0.model === ranking.best(of: copies.compactMap { $0.model as? Movie }) } ?? copies[0]
+            case .series:
+                copies.first { $0.model === ranking.best(of: copies.compactMap { $0.model as? Series }) } ?? copies[0]
+            case .live:
+                copies[0]
+            }
+        })
+        .map { shown, copies in
+            guard copies.count > 1 else { return shown }
+            var entry = shown
+            entry.copies = copies.map(\.model)
+            return entry
+        }
     }
 
     private func move(from source: IndexSet, to destination: Int) {
-        ContentOrganizer.reorderFavorites(favorites.map(\.model), from: source, to: destination)
+        var arranged = favorites
+        arranged.move(fromOffsets: source, toOffset: destination)
+        ContentOrganizer.commitFavoriteOrder(arranged.flatMap(\.allCopies))
     }
 
+    /// A grouped title is unfavorited on every copy, in any playlist, so no
+    /// card keeps showing it as a favorite.
     private func remove(_ entry: FavoriteEntry) {
-        MediaFavorites.clearFavoriteState(entry.model)
+        guard groupDuplicateTitles else {
+            MediaFavorites.clearFavoriteState(entry.model)
+            return
+        }
+        switch entry.model {
+        case let movie as Movie: TitleGroupSiblings.unfavorite(movie, in: modelContext)
+        case let series as Series: TitleGroupSiblings.unfavorite(series, in: modelContext)
+        default: MediaFavorites.clearFavoriteState(entry.model)
+        }
     }
 
     private func reset() {
-        ContentOrganizer.resetFavoriteOrder(favorites.map(\.model))
+        ContentOrganizer.resetFavoriteOrder(favorites.flatMap(\.allCopies))
     }
 
     // MARK: - Platform bodies
@@ -219,7 +266,7 @@ struct FavoriteManagementView: View {
                                 title: { "\($0.title) · \($0.subtitle)" },
                                 isHidden: { _ in false },
                                 onToggleHidden: { remove($0) },
-                                onCommitOrder: { ContentOrganizer.commitFavoriteOrder($0.map(\.model)) },
+                                onCommitOrder: { ContentOrganizer.commitFavoriteOrder($0.flatMap(\.allCopies)) },
                                 isReordering: $isReordering,
                                 scrollProxy: proxy,
                                 toggleImage: { _ in "heart.fill" },

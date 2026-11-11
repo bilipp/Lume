@@ -59,6 +59,7 @@ extension ContentSyncManager {
         }
         try Task.checkCancellation()
 
+        try electDeferredTitleGroupPrimaries(state)
         pruneStaleM3URows(playlistId: playlistId, state: state)
         recordWebDAVFingerprint(walk.fingerprint, playlistId: playlistId, importedCount: state.totalImported)
 

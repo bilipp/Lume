@@ -77,9 +77,19 @@ actor RecommendationEngine {
     /// re-validates each entry against live state, so a freshly watched, favorited
     /// or voted title still drops out between recomputes. Empty when the user has
     /// no taste signals yet — the caller then simply hides the row.
-    func recommendations(limit: Int = 30, excluding excludedCategoryIDs: Set<String> = []) -> [ScoredRecommendation] {
+    ///
+    /// With `groupsTitles`, each title appears once (its best-scoring copy) and
+    /// a title any copy of which was watched, started, favorited or voted on is
+    /// left out, as the grouped card would show that state. The caller picks
+    /// which copy to show.
+    func recommendations(
+        limit: Int = 30,
+        excluding excludedCategoryIDs: Set<String> = [],
+        groupsTitles: Bool = LibrarySettings.groupDuplicateTitles()
+    ) -> [ScoredRecommendation] {
         let profileID = ActiveProfileStore.current
-        let visibility = ContentRestriction.visibilityToken(for: excludedCategoryIDs)
+        // Grouping changes which titles qualify, so it is part of the token.
+        let visibility = ContentRestriction.visibilityToken(for: excludedCategoryIDs) + (groupsTitles ? "|grouped" : "")
         // A changed visibility set invalidates the cache: the list was ranked
         // against the previous one, so titles the user just un-hid would stay
         // missing until the interval elapsed.
@@ -96,7 +106,7 @@ actor RecommendationEngine {
         }
         let dislike = RecommendationScoring.centroid(of: dislikeSignals())
         let ranked = rankCandidates(
-            limit: limit, taste: taste, dislike: dislike, excluding: excludedCategoryIDs
+            limit: limit, taste: taste, dislike: dislike, excluding: excludedCategoryIDs, groupsTitles: groupsTitles
         )
 
         // Only cache a real result — an empty one means "no signal yet", which
@@ -188,13 +198,24 @@ actor RecommendationEngine {
     /// the whole candidate set, so the category exclusion is applied in memory
     /// rather than widening the (index-served) predicate.
     private func rankCandidates(
-        limit: Int, taste: [Float], dislike: [Float]?, excluding excluded: Set<String>
+        limit: Int, taste: [Float], dislike: [Float]?, excluding excluded: Set<String>, groupsTitles: Bool
     ) -> [ScoredRecommendation] {
-        var top: [(item: ScoredRecommendation, score: Float)] = []
+        var top: [(item: ScoredRecommendation, title: String?, score: Float)] = []
+        let actedOn = groupsTitles ? actedOnTitles() : (movies: [], series: [])
 
-        func consider(_ id: String, _ kind: RecommendedKind, _ score: Float) {
-            guard top.count < limit || score > top.last!.score else { return }
-            top.append((ScoredRecommendation(id: id, kind: kind), score))
+        func consider(_ id: String, _ kind: RecommendedKind, _ titleGroupKey: String?, _ score: Float) {
+            let title = groupsTitles ? titleGroupKey : nil
+            if let title {
+                let acted = kind == .movie ? actedOn.movies : actedOn.series
+                guard !acted.contains(title) else { return }
+            }
+            if let title, let held = top.firstIndex(where: { $0.item.kind == kind && $0.title == title }) {
+                guard score > top[held].score else { return }
+                top.remove(at: held)
+            } else {
+                guard top.count < limit || score > top.last!.score else { return }
+            }
+            top.append((ScoredRecommendation(id: id, kind: kind), title, score))
             top.sort { $0.score > $1.score }
             if top.count > limit { top.removeLast() }
         }
@@ -202,41 +223,74 @@ actor RecommendationEngine {
         // Movies: unwatched, not favorited, never opened, not yet voted on (a
         // voted title — up or down — has already left the rail).
         forEachPage(idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
-            var descriptor = FetchDescriptor<Movie>(
-                predicate: #Predicate {
-                    $0.embeddingData != nil && !$0.isWatched && !$0.isFavorite
-                        && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor
-                },
-                sortBy: [SortDescriptor(\.id, comparator: .lexical)]
-            )
-            descriptor.fetchLimit = limit
-            descriptor.propertiesToFetch = [\.id, \.categoryId, \.embeddingData]
-            return descriptor
+            Self.movieCandidates(cursor: cursor, limit: limit)
         }, body: { movie in
             guard !excluded.contains(movie.categoryId ?? ""),
                   let vector = movie.embeddingData.map(TextEmbedder.decode) else { return }
-            consider(movie.id, .movie, RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike))
+            let score = RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike)
+            consider(movie.id, .movie, movie.titleGroupKey, score)
         })
 
         // Series: not favorited, never opened, not yet voted on.
         forEachPage(idOf: { (show: Series) in show.id }, page: { cursor, limit in
-            var descriptor = FetchDescriptor<Series>(
-                predicate: #Predicate {
-                    $0.embeddingData != nil && !$0.isFavorite
-                        && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor
-                },
-                sortBy: [SortDescriptor(\.id, comparator: .lexical)]
-            )
-            descriptor.fetchLimit = limit
-            descriptor.propertiesToFetch = [\.id, \.categoryId, \.embeddingData]
-            return descriptor
+            Self.seriesCandidates(cursor: cursor, limit: limit)
         }, body: { show in
             guard !excluded.contains(show.categoryId ?? ""),
                   let vector = show.embeddingData.map(TextEmbedder.decode) else { return }
-            consider(show.id, .series, RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike))
+            let score = RecommendationScoring.score(candidate: vector, taste: taste, dislike: dislike)
+            consider(show.id, .series, show.titleGroupKey, score)
         })
 
         return top.map(\.item)
+    }
+
+    private static func movieCandidates(cursor: String, limit: Int) -> FetchDescriptor<Movie> {
+        var descriptor = FetchDescriptor<Movie>(
+            predicate: #Predicate {
+                $0.embeddingData != nil && !$0.isWatched && !$0.isFavorite
+                    && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor
+            },
+            sortBy: [SortDescriptor(\.id, comparator: .lexical)]
+        )
+        descriptor.fetchLimit = limit
+        descriptor.propertiesToFetch = [\.id, \.categoryId, \.embeddingData, \.titleGroupKey]
+        return descriptor
+    }
+
+    private static func seriesCandidates(cursor: String, limit: Int) -> FetchDescriptor<Series> {
+        var descriptor = FetchDescriptor<Series>(
+            predicate: #Predicate {
+                $0.embeddingData != nil && !$0.isFavorite
+                    && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor
+            },
+            sortBy: [SortDescriptor(\.id, comparator: .lexical)]
+        )
+        descriptor.fetchLimit = limit
+        descriptor.propertiesToFetch = [\.id, \.categoryId, \.embeddingData, \.titleGroupKey]
+        return descriptor
+    }
+
+    /// Titles a copy of which carries user state, the same state that keeps a
+    /// row itself out of the candidate pages. One fetch per kind.
+    private func actedOnTitles() -> (movies: Set<String>, series: Set<String>) {
+        let context = ModelContext(modelContainer)
+        var movies = FetchDescriptor<Movie>(
+            predicate: #Predicate {
+                $0.titleGroupKey != nil
+                    && ($0.isWatched || $0.isFavorite || $0.lastWatchedDate != nil || $0.recommendationVoteRaw != 0)
+            }
+        )
+        movies.propertiesToFetch = [\.titleGroupKey]
+        var series = FetchDescriptor<Series>(
+            predicate: #Predicate {
+                $0.titleGroupKey != nil && ($0.isFavorite || $0.lastWatchedDate != nil || $0.recommendationVoteRaw != 0)
+            }
+        )
+        series.propertiesToFetch = [\.titleGroupKey]
+        return (
+            Set(((try? context.fetch(movies)) ?? []).compactMap(\.titleGroupKey)),
+            Set(((try? context.fetch(series)) ?? []).compactMap(\.titleGroupKey))
+        )
     }
 
     /// Walks every matching row `pageSize` at a time on a fresh context per page,

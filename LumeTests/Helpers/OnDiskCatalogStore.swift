@@ -43,11 +43,29 @@ nonisolated enum OnDiskCatalogStore {
     /// and failing the next fetch with `NSFileReadUnknownError`, several lines
     /// away from the binding that caused it.
     static func withContext<T>(_ body: (ModelContext) throws -> T) throws -> T {
-        let schema = catalogSchema
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        return try body(ModelContext(makeContainer(in: directory)))
+    }
+
+    /// `withContext` for a body that awaits, such as a call into
+    /// `ContentSyncManager`.
+    @MainActor
+    static func withContext<T>(_ body: (ModelContext) async throws -> T) async throws -> T {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        return try await body(ModelContext(makeContainer(in: directory)))
+    }
+
+    private static func makeDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("LumeTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        return directory
+    }
+
+    private static func makeContainer(in directory: URL) throws -> ModelContainer {
+        let schema = catalogSchema
         // `cloudKitDatabase: .none` is mandatory: the catalog's
         // `@Attribute(.unique)` models fail container load under the default
         // `.automatic` on an entitled simulator host.
@@ -56,7 +74,6 @@ nonisolated enum OnDiskCatalogStore {
             url: directory.appendingPathComponent("nav.store"),
             cloudKitDatabase: .none
         )
-        let container = try ModelContainer(for: schema, configurations: configuration)
-        return try body(ModelContext(container))
+        return try ModelContainer(for: schema, configurations: configuration)
     }
 }

@@ -57,6 +57,7 @@ nonisolated enum PlaylistDeletion {
         // lifetime of the install on each deleted playlist.
         SweepSkipDefaults.removeAll(playlistId: playlistID)
         M3UDigestStore.remove(playlistId: playlistID)
+        TitleGroupPrimaries.Deferred.clear(playlistId: playlistID)
         WebDAVDigestStore.remove(playlistId: playlistID)
         XtreamDigestStore.removeAll(playlistId: playlistID)
         // Remembered sports channel picks name a channel in this playlist; drop
@@ -103,7 +104,16 @@ nonisolated enum PlaylistDeletion {
         // episodes), which a predicate delete would orphan, so they go row by
         // row — a page at a time, each page on its own context and saved, so no
         // page outlives its own deletion.
-        deletePaged(container: context.container, idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
+        // A removed row that carried a tmdbId may have been the last one its
+        // title's tmdbId-less rows (in other playlists) were bridged through,
+        // or one of two ids that kept them apart. Its match key is a `t:` key,
+        // which the bridge reads as the title itself.
+        var movieGroupKeys = Set<String>()
+        var seriesGroupKeys = Set<String>()
+        deletePaged(container: context.container, idOf: { (movie: Movie) in movie.id }, onDelete: { movie in
+            guard movie.tmdbId != nil else { return }
+            movieGroupKeys.formUnion([movie.titleGroupKey, movie.titleMatchKey].compactMap(\.self))
+        }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id, comparator: .lexical)]
@@ -111,7 +121,10 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
-        deletePaged(container: context.container, idOf: { (show: Series) in show.id }, page: { cursor, limit in
+        deletePaged(container: context.container, idOf: { (show: Series) in show.id }, onDelete: { show in
+            guard show.tmdbId != nil else { return }
+            seriesGroupKeys.formUnion([show.titleGroupKey, show.titleMatchKey].compactMap(\.self))
+        }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id, comparator: .lexical)]
@@ -119,6 +132,9 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
+        try? TitleGroupPrimaries.settleRemoval(
+            movieGroupKeys: movieGroupKeys, seriesGroupKeys: seriesGroupKeys, in: context.container
+        )
     }
 
     /// Deletes every row `page` selects, `pageSize` at a time, keyed on the last
@@ -130,6 +146,7 @@ nonisolated enum PlaylistDeletion {
         container: ModelContainer,
         pageSize: Int = 2000,
         idOf: (T) -> String,
+        onDelete: (T) -> Void = { _ in },
         page: (_ cursor: String, _ limit: Int) -> FetchDescriptor<T>
     ) {
         var cursor = ""
@@ -142,6 +159,7 @@ nonisolated enum PlaylistDeletion {
                 fetched = rows.count
                 if let last = rows.last { cursor = idOf(last) }
                 for row in rows {
+                    onDelete(row)
                     context.delete(row)
                 }
                 if !rows.isEmpty { try? context.save() }

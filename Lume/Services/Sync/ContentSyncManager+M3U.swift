@@ -270,18 +270,33 @@ extension ContentSyncManager {
         context.autosaveEnabled = false
 
         try ensureCategories(for: batch, playlistId: playlistId, state: state, context: context)
+        var touched = TitleGroupPrimaries.Touched()
         Perf.measure(.m3uUpsertLive) { importLive(batch.live, playlistId: playlistId, state: state, context: context) }
         Perf.measure(.m3uUpsertMovies) {
-            importMovies(batch.movies, playlistId: playlistId, state: state, context: context)
+            importMovies(batch.movies, playlistId: playlistId, state: state, context: context, touched: &touched.movies)
         }
         Perf.measure(.m3uUpsertEpisodes) {
-            importEpisodes(batch.episodes, playlistId: playlistId, state: state, context: context)
+            importEpisodes(batch.episodes, playlistId: playlistId, state: state, context: context, touched: &touched.series)
         }
+        // Elected once after the last batch (`electDeferredTitleGroupPrimaries`):
+        // a title split across batches would otherwise be re-fetched and
+        // re-elected by every batch that adds a copy.
+        state.titleGroups?.add(touched)
 
         // A re-sync where the provider changed nothing leaves the context clean
         // (see ContentSyncManager+M3UFields): skip save() entirely rather than
         // pay a full transaction for zero rows.
-        if context.hasChanges { try context.save() }
+        if context.hasChanges { try Perf.measure(.m3uBatchSave) { try context.save() } }
+    }
+
+    /// The import's one `isCategoryGroupPrimary` election, after its last
+    /// batch and before the sweep.
+    func electDeferredTitleGroupPrimaries(_ state: M3UImportState) throws {
+        do {
+            try Perf.measure(.m3uTitleGroupPrimaries) { try state.titleGroups?.run(in: modelContainer) }
+        } catch {
+            throw SyncError.databaseError(error)
+        }
     }
 
     /// Creates any categories this batch references for the first time.
@@ -371,7 +386,13 @@ extension ContentSyncManager {
         state.importedLive += entries.count
     }
 
-    private func importMovies(_ entries: [M3UEntry], playlistId: UUID, state: M3UImportState, context: ModelContext) {
+    private func importMovies(
+        _ entries: [M3UEntry],
+        playlistId: UUID,
+        state: M3UImportState,
+        context: ModelContext,
+        touched: inout Set<TitleGroupPrimaries.CategoryKey>
+    ) {
         guard !entries.isEmpty else { return }
         let ids = entries.map { "\(playlistId.uuidString)-movie-\(M3UIdentity.key(for: $0.url))" }
         state.seenMovieIds.formUnion(ids.lazy.map(M3UIdentity.hash64))
@@ -396,11 +417,13 @@ extension ContentSyncManager {
                 movie.num = state.movieNum
                 state.movieNum += 1
             }
-            applyM3UMovieFields(
-                from: entry,
-                to: movie,
-                categoryId: categoryId(for: entry.group, type: .vod, playlistId: playlistId)
-            )
+            TitleGroupPrimaries.track(movie, into: &touched) {
+                applyM3UMovieFields(
+                    from: entry,
+                    to: movie,
+                    categoryId: categoryId(for: entry.group, type: .vod, playlistId: playlistId)
+                )
+            }
         }
         state.importedMovies += entries.count
     }
@@ -409,7 +432,8 @@ extension ContentSyncManager {
         _ entries: [M3UClassifiedEpisode],
         playlistId: UUID,
         state: M3UImportState,
-        context: ModelContext
+        context: ModelContext,
+        touched: inout Set<TitleGroupPrimaries.CategoryKey>
     ) {
         guard !entries.isEmpty else { return }
 
@@ -446,11 +470,10 @@ extension ContentSyncManager {
             // A series with no cover yet keeps consulting later entries, so an
             // early episode without artwork doesn't leave the show blank.
             if seriesApplied.insert(seriesId).inserted || series.cover == nil {
-                applyM3USeriesFields(
-                    from: entry,
-                    to: series,
-                    categoryId: categoryId(for: entry.group, type: .series, playlistId: playlistId)
-                )
+                TitleGroupPrimaries.track(series, into: &touched) {
+                    let category = categoryId(for: entry.group, type: .series, playlistId: playlistId)
+                    applyM3USeriesFields(from: entry, to: series, categoryId: category)
+                }
             }
 
             let episodeId = episodeIds[index]

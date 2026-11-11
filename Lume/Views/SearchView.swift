@@ -31,7 +31,11 @@ struct SearchView: View {
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
     @State private var selectedFilter: ContentFilter = .all
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
     @State private var results: [SearchResult] = []
+    /// Aggregated user state of the grouped results, loaded once per result set.
+    @State private var groupStates = TitleGroupStates.empty
     @State private var playingMedia: PlayableMedia?
 
     /// Max matches fetched per content type. Keeps the result set bounded so the
@@ -102,8 +106,8 @@ struct SearchView: View {
                                             .matchedTransitionSourceIfAvailable(id: movie.id, in: animationNamespace)
                                     }
                                     .mediaFavoriteMenu(
-                                        isFavorite: { movie.isFavorite },
-                                        onToggleFavorite: { MediaFavorites.toggle(movie, in: modelContext) }
+                                        isFavorite: { showsFavorite(movie) },
+                                        onToggleFavorite: { toggleFavorite(movie) }
                                     )
                                 case let .series(series):
                                     NavigationLink(value: series) {
@@ -111,8 +115,8 @@ struct SearchView: View {
                                             .matchedTransitionSourceIfAvailable(id: series.id, in: animationNamespace)
                                     }
                                     .mediaFavoriteMenu(
-                                        isFavorite: { series.isFavorite },
-                                        onToggleFavorite: { MediaFavorites.toggle(series, in: modelContext) }
+                                        isFavorite: { showsFavorite(series) },
+                                        onToggleFavorite: { toggleFavorite(series) }
                                     )
                                 case let .liveStream(stream):
                                     Button {
@@ -164,7 +168,8 @@ struct SearchView: View {
                 text: debouncedSearchText,
                 filter: selectedFilter,
                 allPlaylists: searchAllPlaylists,
-                scopeToken: scope.token
+                scopeToken: scope.token,
+                grouped: groupDuplicateTitles
             )) {
                 // Re-run whenever the settled query or the filter changes.
                 // Filter changes are instant (no debounce on the segmented control).
@@ -226,6 +231,7 @@ struct SearchView: View {
         let query = debouncedSearchText
         guard !query.isEmpty else {
             results = []
+            groupStates = .empty
             return
         }
 
@@ -256,7 +262,37 @@ struct SearchView: View {
         )
         guard !Task.isCancelled else { return }
 
-        results = assembleResults(portal: portal, localHits: localHits)
+        let assembled = assembleResults(portal: portal, localHits: localHits, scope: searched)
+        groupStates = groupDuplicateTitles ? TitleGroupStates(results: assembled, in: modelContext) : .empty
+        results = assembled
+    }
+
+    // MARK: - Grouped favorites
+
+    private func showsFavorite(_ movie: Movie) -> Bool {
+        groupDuplicateTitles ? groupStates.state(of: movie).isFavorite : movie.isFavorite
+    }
+
+    private func showsFavorite(_ series: Series) -> Bool {
+        groupDuplicateTitles ? groupStates.state(of: series).isFavorite : series.isFavorite
+    }
+
+    private func toggleFavorite(_ movie: Movie) {
+        guard groupDuplicateTitles else {
+            _ = MediaFavorites.toggle(movie, in: modelContext)
+            return
+        }
+        groupStates.toggleFavorite(.movie(movie), in: modelContext)
+        groupStates.reload(.movie(movie), in: modelContext)
+    }
+
+    private func toggleFavorite(_ series: Series) {
+        guard groupDuplicateTitles else {
+            _ = MediaFavorites.toggle(series, in: modelContext)
+            return
+        }
+        groupStates.toggleFavorite(.series(series), in: modelContext)
+        groupStates.reload(.series(series), in: modelContext)
     }
 
     /// Portal search hits (element ids) from every Stalker playlist in scope.
@@ -314,7 +350,7 @@ struct SearchView: View {
         // afterwards, so `resultLimit` isn't spent on rows the viewer will
         // never see. In Combined each member is searched only for the types
         // it contributes.
-        let request = SearchRequest(
+        var request = SearchRequest(
             query: query,
             searching: scope,
             wantMovies: wantMovies,
@@ -323,6 +359,7 @@ struct SearchView: View {
             excludedCategoryIDs: restriction.excludedCategoryIDs,
             limit: resultLimit
         )
+        if groupDuplicateTitles { request.titleOverFetch = TitleGrouping.overFetch }
         let container = modelContext.container
         // `Task.detached` starts an unstructured task, which does not inherit
         // this one's cancellation: every keystroke that settled into a query
@@ -343,21 +380,15 @@ struct SearchView: View {
 
     /// Portal hits first (relevance order), then the local pass. Hydrates rows
     /// in the view context, drops any the active profile restricts, and dedupes
-    /// so an already-imported title isn't listed twice.
+    /// so an already-imported title isn't listed twice. With duplicate titles
+    /// grouped, each movie and series title is listed once, as the copy
+    /// `scope`'s ranking prefers.
     private func assembleResults(
-        portal: (movies: [String], series: [String]), localHits: SearchHits
+        portal: (movies: [String], series: [String]), localHits: SearchHits, scope: CatalogScope
     ) -> [SearchResult] {
-        var matches: [SearchResult] = []
         var seen = Set<String>()
-        func add(_ result: SearchResult, categoryID: String?) {
-            guard !restriction.hides(categoryID: categoryID), seen.insert(result.id).inserted else { return }
-            matches.append(result)
-        }
-        for movie in hydrateMovies(ids: portal.movies) {
-            add(.movie(movie), categoryID: movie.categoryId)
-        }
-        for series in hydrateSeries(ids: portal.series) {
-            add(.series(series), categoryID: series.categoryId)
+        func visible<Row: TitleGroupedRow>(_ rows: [Row]) -> [Row] {
+            rows.filter { !restriction.hides(categoryID: $0.categoryId) && seen.insert($0.id).inserted }
         }
         // The local fetches deliberately run without an ORDER BY so SQLite can
         // stop at the per-type limit instead of sorting every match first (see
@@ -365,14 +396,28 @@ struct SearchView: View {
         // has always shown is restored here, over at most `resultLimit`
         // hydrated rows per type. `localizedStandardCompare` is what
         // `SortDescriptor(\.name)` used, so the ordering is unchanged.
-        for movie in sortedByName(hydrateSearchHits(localHits.movies, in: modelContext) as [Movie], name: \.name) {
-            add(.movie(movie), categoryID: movie.categoryId)
+        let portalMovies = visible(hydrateMovies(ids: portal.movies))
+        let portalSeries = visible(hydrateSeries(ids: portal.series))
+        let localMovies = visible(sortedByName(hydrateSearchHits(localHits.movies, in: modelContext) as [Movie], name: \.name))
+        let localSeries = visible(sortedByName(hydrateSearchHits(localHits.series, in: modelContext) as [Series], name: \.name))
+
+        var movies = portalMovies + localMovies
+        var series = portalSeries + localSeries
+        if groupDuplicateTitles {
+            let ranking = TitleGrouping.Ranking(scope: scope)
+            movies = Array(TitleGrouping.dedupe(movies, ranking: ranking, grouped: true).prefix(portalMovies.count + resultLimit))
+            series = Array(TitleGrouping.dedupe(series, ranking: ranking, grouped: true).prefix(portalSeries.count + resultLimit))
         }
-        for series in sortedByName(hydrateSearchHits(localHits.series, in: modelContext) as [Series], name: \.name) {
-            add(.series(series), categoryID: series.categoryId)
-        }
-        for stream in sortedByName(hydrateSearchHits(localHits.streams, in: modelContext) as [LiveStream], name: \.name) {
-            add(.liveStream(stream), categoryID: stream.categoryId)
+
+        var matches: [SearchResult] = []
+        matches += movies.prefix(portalMovies.count).map { .movie($0) }
+        matches += series.prefix(portalSeries.count).map { .series($0) }
+        matches += movies.dropFirst(portalMovies.count).map { .movie($0) }
+        matches += series.dropFirst(portalSeries.count).map { .series($0) }
+        for stream in sortedByName(hydrateSearchHits(localHits.streams, in: modelContext) as [LiveStream], name: \.name)
+            where !restriction.hides(categoryID: stream.categoryId) && seen.insert(stream.id).inserted
+        {
+            matches.append(.liveStream(stream))
         }
         return matches
     }
@@ -477,86 +522,25 @@ private struct SearchKey: Equatable {
     let filter: ContentFilter
     let allPlaylists: Bool
     let scopeToken: String
+    let grouped: Bool
 }
 
-// MARK: - Search Settings
-
-enum SearchSettings {
-    /// When enabled, search spans every configured playlist. Off by default, so
-    /// results stay scoped to the active playlist unless the user opts in.
-    static let searchAllPlaylistsKey = "search.allPlaylists"
-    static let searchAllPlaylistsDefault = false
-}
-
-// MARK: - Content Filter
-
-enum ContentFilter: String, CaseIterable, Identifiable {
-    case all = "All"
-    case movies = "Movies"
-    case series = "Series"
-    case liveTV = "Live TV"
-
-    var id: String {
-        rawValue
-    }
-
-    var label: LocalizedStringKey {
-        LocalizedStringKey(rawValue)
-    }
-}
-
-// MARK: - Search Result
-
-enum SearchResult: Identifiable, Hashable {
-    case movie(Movie)
-    case series(Series)
-    case liveStream(LiveStream)
-
-    var id: String {
-        switch self {
-        case let .movie(movie):
-            "movie-\(movie.id)"
-        case let .series(series):
-            "series-\(series.id)"
-        case let .liveStream(stream):
-            "live-\(stream.id)"
+/// The aggregated favorite state behind grouped search results, read in one
+/// lookup per type rather than per row.
+private extension TitleGroupStates {
+    init(results: [SearchResult], in context: ModelContext) {
+        var movieKeys: [String] = []
+        var seriesKeys: [String] = []
+        for result in results {
+            switch result {
+            case let .movie(movie): if let key = movie.titleGroupKey { movieKeys.append(key) }
+            case let .series(series): if let key = series.titleGroupKey { seriesKeys.append(key) }
+            case .liveStream: break
+            }
         }
+        self.init(
+            movies: TitleGroupStateLookup.movies(keys: movieKeys, in: context),
+            series: TitleGroupStateLookup.series(keys: seriesKeys, in: context)
+        )
     }
-
-    var tab: PlaylistTab {
-        switch self {
-        case .movie: .movies
-        case .series: .series
-        case .liveStream: .liveTV
-        }
-    }
-
-    /// The catalog row's own id, which carries the owning playlist's UUID as a
-    /// prefix. `id` above namespaces by kind so a movie and a channel can't
-    /// collide in the list; this one is what `owner(ofContentID:)` reads.
-    var contentID: String {
-        switch self {
-        case let .movie(movie): movie.id
-        case let .series(series): series.id
-        case let .liveStream(stream): stream.id
-        }
-    }
-
-    static func == (lhs: SearchResult, rhs: SearchResult) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-}
-
-#Preview("Empty") {
-    SearchView()
-        .modelContainer(for: Playlist.self, inMemory: true)
-}
-
-#Preview("With Data") {
-    SearchView()
-        .modelContainer(previewContainer())
 }

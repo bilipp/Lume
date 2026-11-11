@@ -54,6 +54,27 @@ struct BrowseQueryShapeTests {
         #expect(MovieCollectionQuery.gridDescriptor(for: .recentlyAdded, scope: scope).fetchLimit == recentlyAddedFetchLimit)
     }
 
+    /// Grouped rails collapse copies of a title after the fetch, so the bounded
+    /// fetches read wider; the unbounded grids stay unbounded.
+    @Test func `grouped collections over-fetch but stay bounded`() {
+        let groupedRow = collectionRowFetchLimit * TitleGrouping.overFetch
+        for kind in [LibraryCollection.Kind.recentlyWatched, .favorites, .recentlyAdded] {
+            #expect(MovieCollectionQuery.rowDescriptor(for: kind, scope: scope, grouped: true).fetchLimit == groupedRow)
+            #expect(SeriesCollectionQuery.rowDescriptor(for: kind, scope: scope, grouped: true).fetchLimit == groupedRow)
+        }
+        #expect(TitleGrouping.overFetch > 1)
+        #expect(MovieCollectionQuery.gridDescriptor(for: .favorites, scope: scope, grouped: true).fetchLimit == nil)
+        #expect(SeriesCollectionQuery.gridDescriptor(for: .recentlyWatched, scope: scope, grouped: true).fetchLimit == nil)
+        #expect(
+            MovieCollectionQuery.gridDescriptor(for: .recentlyAdded, scope: scope, grouped: true).fetchLimit
+                == recentlyAddedFetchLimit * TitleGrouping.overFetch
+        )
+        #expect(
+            SeriesCollectionQuery.gridDescriptor(for: .recentlyAdded, scope: scope, grouped: true).fetchLimit
+                == recentlyAddedFetchLimit * TitleGrouping.overFetch
+        )
+    }
+
     // MARK: - Live TV gates stay probes
 
     /// Both rail gates answer "is there at least one". They must stay `LIMIT 1`

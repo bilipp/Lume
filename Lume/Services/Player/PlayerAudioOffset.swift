@@ -146,7 +146,7 @@ final class PlayerAudioOffsetSession {
     private static func ownerPlaylistID(of media: PlayableMedia) -> UUID? {
         switch media.contentRef {
         case let .movie(id), let .episode(id), let .live(id):
-            PlaylistOwner.ownerID(of: id)
+            PlaylistOwner.declaredOwner(of: id)
         case .recording:
             nil
         }

@@ -89,6 +89,7 @@ private struct HomeItemCell: View {
     var onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
     var onStartMultiView: ((LiveStream) -> Void)?
     var animationNamespace: Namespace.ID?
+    @Environment(\.titleGroupStates) private var groupStates
 
     var body: some View {
         Group {
@@ -123,7 +124,7 @@ private struct HomeItemCell: View {
     }
 
     private var progress: Double? {
-        item.progress(seriesResume: seriesResume)
+        item.progress(seriesResume: seriesResume, groupStates: groupStates)
     }
 }
 
@@ -139,6 +140,7 @@ private struct HomeItemMenu: ViewModifier {
     let onVote: ((HomeMediaItem, RecommendationVote) -> Void)?
     let onStartMultiView: ((LiveStream) -> Void)?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.titleGroupStates) private var groupStates
 
     func body(content: Content) -> some View {
         let removeFromRecents = onRemove.map { action in { action(item) } }
@@ -155,8 +157,8 @@ private struct HomeItemMenu: ViewModifier {
             )
         default:
             content.mediaFavoriteMenu(
-                item,
-                in: modelContext,
+                isFavorite: { [groupStates] in groupStates.isFavorite(item) },
+                onToggleFavorite: { [groupStates] in groupStates.toggleFavorite(item, in: modelContext) },
                 onRemoveFromRecents: removeFromRecents,
                 onVote: voteAction
             )

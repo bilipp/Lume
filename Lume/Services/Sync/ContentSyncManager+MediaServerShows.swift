@@ -80,6 +80,7 @@ extension ContentSyncManager {
         let ids = items.map { scope.idPrefix + $0.id }
         let lookup = existingSeries(ids: ids, context: context)
 
+        var touched = TitleGroupPrimaries.Touched()
         for item in items {
             let id = scope.idPrefix + item.id
             let series: Series
@@ -89,8 +90,9 @@ extension ContentSyncManager {
                 series = Series(id: id, seriesId: Self.mediaServerHash(item.id), name: item.name ?? "")
                 context.insert(series)
             }
-            applyJellyfinSeriesFields(item, to: series, scope: scope)
+            TitleGroupPrimaries.track(series, into: &touched.series) { applyJellyfinSeriesFields(item, to: series, scope: scope) }
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
             try? context.save()
         }
@@ -98,6 +100,18 @@ extension ContentSyncManager {
     }
 
     private func applyJellyfinSeriesFields(_ item: JellyfinItem, to series: Series, scope: JellyfinViewScope) {
+        let previousName = series.name
+        let previousTmdbId = series.tmdbId
+        applyJellyfinSeriesMetadata(item, to: series, scope: scope)
+        if let tmdbId = Self.mediaServerTmdbId(item.providerIds?["Tmdb"]), series.tmdbId != tmdbId {
+            series.tmdbId = tmdbId
+        }
+        if TitleGroupPrimaries.needsKey(series, previousName: previousName, previousTmdbId: previousTmdbId) {
+            TitleGroupPrimaries.assignKey(to: series)
+        }
+    }
+
+    private func applyJellyfinSeriesMetadata(_ item: JellyfinItem, to series: Series, scope: JellyfinViewScope) {
         let name = item.name ?? ""
         if series.name != name {
             series.name = name
@@ -179,6 +193,7 @@ extension ContentSyncManager {
         // plus fallback shells for episodes whose `SeriesId` has no shell.
         let seriesIds = Set(items.map { scope.idPrefix + seriesShells.shellKey(for: $0) })
         var seriesLookup = existingSeries(ids: Array(seriesIds), context: context)
+        let storedSeriesIds = Set(seriesLookup.keys)
 
         let episodeIds = items.map { scope.idPrefix + "episode-" + $0.id }
         let episodeLookup = existingEpisodes(ids: episodeIds, context: context)
@@ -190,6 +205,7 @@ extension ContentSyncManager {
             let episode = episodeRow(for: item, series: series, lookup: episodeLookup, scope: scope, context: context)
             applyJellyfinEpisodeFields(item, to: episode, series: series, scope: scope)
         }
+        recomputeShellPrimaries(seriesLookup, excluding: storedSeriesIds, in: context)
         if context.hasChanges {
             try? context.save()
         }
@@ -215,8 +231,11 @@ extension ContentSyncManager {
         let series = Series(id: seriesId, seriesId: Self.mediaServerHash(shellJellyfinId), name: shellName)
         if let shell = seriesShells.byId[shellJellyfinId] {
             applyJellyfinSeriesFields(shell, to: series, scope: scope)
-        } else if series.categoryId != scope.categoryId {
-            series.categoryId = scope.categoryId
+        } else {
+            if series.categoryId != scope.categoryId {
+                series.categoryId = scope.categoryId
+            }
+            TitleGroupPrimaries.assignKey(to: series)
         }
         context.insert(series)
         lookup[seriesId] = series
@@ -312,6 +331,7 @@ extension ContentSyncManager {
             predicate: #Predicate { $0.id.starts(with: prefix) }
         ))) ?? []
         let infix = "-\(flavor.idInfix)-"
+        var touched = TitleGroupPrimaries.Touched()
         for series in rows where series.id.contains(infix) {
             if seen.series.contains(series.id) {
                 // Fetched per show, not by this sync: nothing to compare against.
@@ -323,9 +343,10 @@ extension ContentSyncManager {
                 }
             } else {
                 // Episodes and cast cascade from the deleted series.
-                context.delete(series)
+                TitleGroupPrimaries.delete(series, from: context, recordingInto: &touched.series)
             }
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
             try? context.save()
         }
@@ -335,6 +356,24 @@ extension ContentSyncManager {
     /// has no number for. FNV-1a, not `Hasher` — the latter is seeded per
     /// process, so ids would change on every launch and orphan user state.
     /// Only ever used as an opaque key: playback builds from `directURL`.
+    /// Re-elects the primaries of the series shells an episode page built,
+    /// which are the rows in `lookup` that were not stored before it.
+    /// Not `private`: the Plex episode upsert builds shells the same way.
+    func recomputeShellPrimaries(_ lookup: [String: Series], excluding stored: Set<String>, in context: ModelContext) {
+        let shells = lookup.lazy.filter { !stored.contains($0.key) }.map(\.value)
+        TitleGroupPrimaries.recompute(
+            categoryKeys: TitleGroupPrimaries.Touched(series: TitleGroupPrimaries.categoryKeys(of: shells)),
+            in: context
+        )
+    }
+
+    /// The TMDB id a media server reports in its provider ids, which it
+    /// stores as a string.
+    nonisolated static func mediaServerTmdbId(_ raw: String?) -> Int? {
+        guard let raw, let id = Int(raw.trimmingCharacters(in: .whitespaces)), id > 0 else { return nil }
+        return id
+    }
+
     nonisolated static func mediaServerHash(_ string: String) -> Int {
         var hash: UInt64 = 14_695_981_039_346_656_037
         for byte in string.utf8 {

@@ -3,7 +3,8 @@
 //  Lume
 //
 //  The small outlined "Beta" tag after a setting's title that marks a feature
-//  still in beta (Combined View). Sits beside `PremiumBadge` when both apply.
+//  still in beta (Combined View, Group Duplicate Titles). Sits beside
+//  `PremiumBadge` when both apply.
 //
 
 import SwiftUI

@@ -398,6 +398,7 @@ struct FullScreenPlayerView: View {
             releaseAudioSession()
             ContentIndexingService.shared.resume(for: indexingHoldOwner)
             adoption?.handle.release()
+            VODSourceFailureHandoff.shared.release(mediaID: activeMedia.id)
             endReviewSession(isChildWatching: profileManager?.activeProfileIsChild ?? false)
         }
     }

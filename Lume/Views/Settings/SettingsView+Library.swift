@@ -132,6 +132,8 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
         @AppStorage(SportsSyncService.tabEnabledKey) private var sportsTabEnabled = SportsSyncService.tabEnabledDefault
         @AppStorage(SearchSettings.searchAllPlaylistsKey)
         private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
+        @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+        private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
         var body: some View {
             let scope = catalogScope
@@ -173,6 +175,17 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
                     Text("Content")
                 } footer: {
                     Text("Hide and reorder categories and channels for the active playlist.")
+                }
+
+                Section {
+                    Toggle(isOn: $groupDuplicateTitles) {
+                        HStack(spacing: 6) {
+                            Text("Group Duplicate Titles")
+                            BetaBadge()
+                        }
+                    }
+                } footer: {
+                    Text("Show a movie or series once when it's in several qualities, languages or playlists, and pick the version when you play it.")
                 }
 
                 Section {
@@ -241,6 +254,15 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
                     .focused($drillInFocus, equals: .contentManagement)
                     .disabled(activePlaylist == nil)
                     Text("Hide and reorder categories and channels for the active playlist.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVOptionToggleRow(title: "Group Duplicate Titles", isOn: $groupDuplicateTitles, showsBetaBadge: true)
+                    Text("Show a movie or series once when it's in several qualities, languages or playlists, and pick the version when you play it.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)

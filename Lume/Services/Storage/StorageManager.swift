@@ -258,22 +258,38 @@ enum StorageManager {
                     let movies = try context.fetch(FetchDescriptor<Movie>(
                         predicate: #Predicate { $0.indexedAt != nil || $0.embeddingData != nil || $0.tmdbId != nil }
                     ))
-                    for movie in movies {
-                        movie.tmdbId = nil
-                        movie.embeddingData = nil
-                        movie.indexedAt = nil
+                    for start in stride(from: 0, to: movies.count, by: clearBatchSize) {
+                        let chunk = movies[start ..< min(start + clearBatchSize, movies.count)]
+                        var touched = TitleGroupPrimaries.Touched()
+                        for movie in chunk {
+                            movie.embeddingData = nil
+                            movie.indexedAt = nil
+                            TitleGroupPrimaries.track(movie, into: &touched.movies) {
+                                movie.tmdbId = nil
+                                TitleGroupPrimaries.assignKey(to: movie)
+                            }
+                        }
+                        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
+                        try context.save()
                     }
 
                     let series = try context.fetch(FetchDescriptor<Series>(
                         predicate: #Predicate { $0.indexedAt != nil || $0.embeddingData != nil || $0.tmdbId != nil }
                     ))
-                    for show in series {
-                        show.tmdbId = nil
-                        show.embeddingData = nil
-                        show.indexedAt = nil
+                    for start in stride(from: 0, to: series.count, by: clearBatchSize) {
+                        let chunk = series[start ..< min(start + clearBatchSize, series.count)]
+                        var touched = TitleGroupPrimaries.Touched()
+                        for show in chunk {
+                            show.embeddingData = nil
+                            show.indexedAt = nil
+                            TitleGroupPrimaries.track(show, into: &touched.series) {
+                                show.tmdbId = nil
+                                TitleGroupPrimaries.assignKey(to: show)
+                            }
+                        }
+                        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
+                        try context.save()
                     }
-
-                    try context.save()
                 } catch {
                     logger.error("Failed to clear index: \(error.localizedDescription)")
                 }

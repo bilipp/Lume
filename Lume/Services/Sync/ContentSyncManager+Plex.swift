@@ -256,6 +256,7 @@ extension ContentSyncManager {
             lookup[movie.id] = movie
         }
 
+        var touched = TitleGroupPrimaries.Touched()
         for item in items {
             let id = scope.idPrefix + item.ratingKey
             let movie: Movie
@@ -265,8 +266,9 @@ extension ContentSyncManager {
                 movie = Movie(id: id, streamId: Self.plexStreamId(item.ratingKey), name: item.title ?? "")
                 context.insert(movie)
             }
-            applyPlexMovieFields(item, to: movie, scope: scope)
+            TitleGroupPrimaries.track(movie, into: &touched.movies) { applyPlexMovieFields(item, to: movie, scope: scope) }
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
             try? context.save()
         }
@@ -278,8 +280,16 @@ extension ContentSyncManager {
     /// guarded: SwiftData dirties a row on assignment, not on change. Split in
     /// two halves (identity + metadata) for the complexity lint.
     private func applyPlexMovieFields(_ item: PlexMetadata, to movie: Movie, scope: PlexSectionScope) {
+        let previousName = movie.name
+        let previousTmdbId = movie.tmdbId
         applyPlexMovieIdentity(item, to: movie, scope: scope)
         applyPlexMovieMetadata(item, to: movie)
+        if let tmdbId = Self.mediaServerTmdbId(item.providerId("tmdb")), movie.tmdbId != tmdbId {
+            movie.tmdbId = tmdbId
+        }
+        if TitleGroupPrimaries.needsKey(movie, previousName: previousName, previousTmdbId: previousTmdbId) {
+            TitleGroupPrimaries.assignKey(to: movie)
+        }
     }
 
     private func applyPlexMovieIdentity(_ item: PlexMetadata, to movie: Movie, scope: PlexSectionScope) {
@@ -352,9 +362,11 @@ extension ContentSyncManager {
         ))) ?? []
         // Only rows this pipeline owns carry the `-plex-` infix; anything else
         // under the prefix belongs to another source and is left alone.
+        var touched = TitleGroupPrimaries.Touched()
         for movie in rows where movie.id.contains("-plex-") && !seenIds.contains(movie.id) {
-            context.delete(movie)
+            TitleGroupPrimaries.delete(movie, from: context, recordingInto: &touched.movies)
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
             try? context.save()
         }

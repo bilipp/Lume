@@ -88,6 +88,8 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable & WatchlistFav
     /// context menu (a long-press on the focused card on tvOS). Nil for rows
     /// where removal doesn't apply, e.g. Favorites.
     var removeAction: ((Item) -> Void)?
+    /// See `CategoryContentGrid.favoriteMenu`.
+    var favoriteMenu: CategoryFavoriteMenu<Item>?
     @Environment(\.modelContext) private var modelContext
     @ViewBuilder let card: (Item) -> Card
 
@@ -119,8 +121,8 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable & WatchlistFav
                         }
                         .posterCardButtonStyle()
                         .mediaFavoriteMenu(
-                            isFavorite: { item.isFavorite },
-                            onToggleFavorite: { MediaFavorites.toggle(item, in: modelContext) },
+                            isFavorite: { favoriteMenu?.isFavorite(item) ?? item.isFavorite },
+                            onToggleFavorite: { toggleFavorite(item) },
                             onRemoveFromRecents: removeAction.map { action in { action(item) } }
                         )
                     }
@@ -135,6 +137,25 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable & WatchlistFav
         .focusSection()
         #endif
     }
+
+    private func toggleFavorite(_ item: Item) {
+        if let favoriteMenu {
+            favoriteMenu.toggle(item)
+        } else {
+            MediaFavorites.toggle(item, in: modelContext)
+        }
+    }
+}
+
+private extension LibraryCollection.Kind {
+    /// One row per title when grouped. Recently Watched keeps each title's
+    /// newest copy, which its fetch sorts first, so the card reopens the copy
+    /// last played; the others show the title's representative.
+    func collapsingTitles<Row: TitleGroupedRow>(_ rows: [Row], scope: CatalogScope, grouped: Bool) -> [Row] {
+        guard grouped else { return rows }
+        if self == .recentlyWatched { return TitleGrouping.firstPerTitle(rows, grouped: true) }
+        return TitleGrouping.dedupe(rows, ranking: TitleGrouping.Ranking(scope: scope), grouped: true)
+    }
 }
 
 // MARK: - Movies
@@ -143,19 +164,26 @@ private struct CollectionPreviewRow<Item: Identifiable & Hashable & WatchlistFav
 /// nothing when the active playlist has no matching movies.
 struct MovieCollectionRow: View {
     let kind: LibraryCollection.Kind
+    private let scope: CatalogScope
+    private let grouped: Bool
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
     @Query private var movies: [Movie]
+    @State private var groupStates: [String: TitleGroupState] = [:]
 
-    init(kind: LibraryCollection.Kind, scope: CatalogScope, animationNamespace: Namespace.ID? = nil) {
+    /// - Parameter grouped: one card per title; callers re-identify the view
+    ///   when it changes, since it shapes the fetch.
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
+        self.scope = scope
+        self.grouped = grouped
         self.animationNamespace = animationNamespace
-        _movies = Query(MovieCollectionQuery.rowDescriptor(for: kind, scope: scope))
+        _movies = Query(MovieCollectionQuery.rowDescriptor(for: kind, scope: scope, grouped: grouped))
     }
 
     private var visible: [Movie] {
-        movies.excludingRestricted(restriction)
+        kind.collapsingTitles(movies.excludingRestricted(restriction), scope: scope, grouped: grouped)
     }
 
     var body: some View {
@@ -168,31 +196,50 @@ struct MovieCollectionRow: View {
                 items: items,
                 hasMore: matches.count > items.count,
                 animationNamespace: animationNamespace,
-                removeAction: kind == .recentlyWatched ? { movie in
-                    movie.lastWatchedDate = nil
-                    try? modelContext.save()
-                } : nil,
-                card: { MovieCardView(movie: $0) }
+                removeAction: kind == .recentlyWatched ? { removeFromRecents($0) } : nil,
+                favoriteMenu: .grouped(grouped, states: groupStates) { toggleFavorite($0) },
+                card: { movie in
+                    MovieCardView(movie: movie)
+                }
             )
+            .environment(\.titleGroupStates, TitleGroupStates(movies: groupStates))
+            .groupStateTask(grouped: grouped, rows: items, states: $groupStates) {
+                TitleGroupStateLookup.states(of: $0, in: modelContext)
+            }
         }
+    }
+
+    private func removeFromRecents(_ movie: Movie) {
+        TitleGroupSiblings.clearLastWatched(movie, grouped: grouped, in: modelContext)
+        try? modelContext.save()
+    }
+
+    private func toggleFavorite(_ movie: Movie) {
+        TitleGroupFavorites.toggle(movie, updating: &groupStates, in: modelContext)
     }
 }
 
 /// The full grid behind a Movies collection's "Show All".
 struct MovieCollectionView: View {
     let kind: LibraryCollection.Kind
+    private let scope: CatalogScope
+    private let grouped: Bool
     var animationNamespace: Namespace.ID?
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
     @Query private var movies: [Movie]
+    @State private var groupStates: [String: TitleGroupState] = [:]
 
-    init(kind: LibraryCollection.Kind, scope: CatalogScope, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
+        self.scope = scope
+        self.grouped = grouped
         self.animationNamespace = animationNamespace
-        _movies = Query(MovieCollectionQuery.gridDescriptor(for: kind, scope: scope))
+        _movies = Query(MovieCollectionQuery.gridDescriptor(for: kind, scope: scope, grouped: grouped))
     }
 
     private var visible: [Movie] {
-        movies.excludingRestricted(restriction)
+        kind.collapsingTitles(movies.excludingRestricted(restriction), scope: scope, grouped: grouped)
     }
 
     var body: some View {
@@ -201,17 +248,29 @@ struct MovieCollectionView: View {
         case .recentlyWatched: "Movies you watch will appear here"
         case .recentlyAdded: "Movies recently added to your library will appear here"
         }
+        let items = visible
         CategoryContentGrid(
             title: kind.localizedTitleString,
-            items: visible,
+            items: items,
             animationNamespace: animationNamespace,
             emptyTitle: kind.title,
             emptyIcon: kind.emptyIcon,
             emptyDescription: emptyDescription,
             sortRaw: .constant(""),
             showsSortMenu: false,
-            card: { MovieCardView(movie: $0, fillsWidth: true) }
+            favoriteMenu: .grouped(grouped, states: groupStates) { toggleFavorite($0) },
+            card: { movie in
+                MovieCardView(movie: movie, fillsWidth: true)
+            }
         )
+        .environment(\.titleGroupStates, TitleGroupStates(movies: groupStates))
+        .groupStateTask(grouped: grouped, rows: items, states: $groupStates) {
+            TitleGroupStateLookup.states(of: $0, in: modelContext)
+        }
+    }
+
+    private func toggleFavorite(_ movie: Movie) {
+        TitleGroupFavorites.toggle(movie, updating: &groupStates, in: modelContext)
     }
 }
 
@@ -223,18 +282,18 @@ struct MovieCollectionView: View {
 enum MovieCollectionQuery {
     /// The fetch behind a preview row — always bounded, see
     /// `collectionRowFetchLimit`.
-    static func rowDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Movie> {
+    static func rowDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false) -> FetchDescriptor<Movie> {
         var descriptor = base(for: kind, scope: scope)
-        descriptor.fetchLimit = collectionRowFetchLimit
+        descriptor.fetchLimit = TitleGrouping.fetchLimit(collectionRowFetchLimit, grouped: grouped)
         return descriptor
     }
 
     /// The fetch behind "Show All". Recently Watched and Favorites stay
     /// unbounded — the grid is the surface that legitimately shows everything —
     /// while Recently Added keeps the cap its whole-playlist predicate needs.
-    static func gridDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Movie> {
+    static func gridDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false) -> FetchDescriptor<Movie> {
         var descriptor = base(for: kind, scope: scope)
-        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
+        if kind == .recentlyAdded { descriptor.fetchLimit = TitleGrouping.fetchLimit(recentlyAddedFetchLimit, grouped: grouped) }
         return descriptor
     }
 
@@ -283,19 +342,25 @@ enum MovieCollectionQuery {
 /// nothing when the active playlist has no matching series.
 struct SeriesCollectionRow: View {
     let kind: LibraryCollection.Kind
+    private let scope: CatalogScope
+    private let grouped: Bool
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
     @Query private var series: [Series]
+    @State private var groupStates: [String: TitleGroupState] = [:]
 
-    init(kind: LibraryCollection.Kind, scope: CatalogScope, animationNamespace: Namespace.ID? = nil) {
+    /// - Parameter grouped: see `MovieCollectionRow`.
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
+        self.scope = scope
+        self.grouped = grouped
         self.animationNamespace = animationNamespace
-        _series = Query(SeriesCollectionQuery.rowDescriptor(for: kind, scope: scope))
+        _series = Query(SeriesCollectionQuery.rowDescriptor(for: kind, scope: scope, grouped: grouped))
     }
 
     private var visible: [Series] {
-        series.excludingRestricted(restriction)
+        kind.collapsingTitles(series.excludingRestricted(restriction), scope: scope, grouped: grouped)
     }
 
     var body: some View {
@@ -308,31 +373,50 @@ struct SeriesCollectionRow: View {
                 items: items,
                 hasMore: matches.count > items.count,
                 animationNamespace: animationNamespace,
-                removeAction: kind == .recentlyWatched ? { series in
-                    series.lastWatchedDate = nil
-                    try? modelContext.save()
-                } : nil,
-                card: { SeriesCardView(series: $0) }
+                removeAction: kind == .recentlyWatched ? { removeFromRecents($0) } : nil,
+                favoriteMenu: .grouped(grouped, states: groupStates) { toggleFavorite($0) },
+                card: { series in
+                    SeriesCardView(series: series)
+                }
             )
+            .environment(\.titleGroupStates, TitleGroupStates(series: groupStates))
+            .groupStateTask(grouped: grouped, rows: items, states: $groupStates) {
+                TitleGroupStateLookup.states(of: $0, in: modelContext)
+            }
         }
+    }
+
+    private func removeFromRecents(_ series: Series) {
+        TitleGroupSiblings.clearLastWatched(series, grouped: grouped, in: modelContext)
+        try? modelContext.save()
+    }
+
+    private func toggleFavorite(_ series: Series) {
+        TitleGroupFavorites.toggle(series, updating: &groupStates, in: modelContext)
     }
 }
 
 /// The full grid behind a Series collection's "Show All".
 struct SeriesCollectionView: View {
     let kind: LibraryCollection.Kind
+    private let scope: CatalogScope
+    private let grouped: Bool
     var animationNamespace: Namespace.ID?
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.contentRestriction) private var restriction
     @Query private var series: [Series]
+    @State private var groupStates: [String: TitleGroupState] = [:]
 
-    init(kind: LibraryCollection.Kind, scope: CatalogScope, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
+        self.scope = scope
+        self.grouped = grouped
         self.animationNamespace = animationNamespace
-        _series = Query(SeriesCollectionQuery.gridDescriptor(for: kind, scope: scope))
+        _series = Query(SeriesCollectionQuery.gridDescriptor(for: kind, scope: scope, grouped: grouped))
     }
 
     private var visible: [Series] {
-        series.excludingRestricted(restriction)
+        kind.collapsingTitles(series.excludingRestricted(restriction), scope: scope, grouped: grouped)
     }
 
     var body: some View {
@@ -341,17 +425,29 @@ struct SeriesCollectionView: View {
         case .recentlyWatched: "Series you watch will appear here"
         case .recentlyAdded: "Series recently added to your library will appear here"
         }
+        let items = visible
         CategoryContentGrid(
             title: kind.localizedTitleString,
-            items: visible,
+            items: items,
             animationNamespace: animationNamespace,
             emptyTitle: kind.title,
             emptyIcon: kind.emptyIcon,
             emptyDescription: emptyDescription,
             sortRaw: .constant(""),
             showsSortMenu: false,
-            card: { SeriesCardView(series: $0, fillsWidth: true) }
+            favoriteMenu: .grouped(grouped, states: groupStates) { toggleFavorite($0) },
+            card: { series in
+                SeriesCardView(series: series, fillsWidth: true)
+            }
         )
+        .environment(\.titleGroupStates, TitleGroupStates(series: groupStates))
+        .groupStateTask(grouped: grouped, rows: items, states: $groupStates) {
+            TitleGroupStateLookup.states(of: $0, in: modelContext)
+        }
+    }
+
+    private func toggleFavorite(_ series: Series) {
+        TitleGroupFavorites.toggle(series, updating: &groupStates, in: modelContext)
     }
 }
 
@@ -359,16 +455,16 @@ struct SeriesCollectionView: View {
 enum SeriesCollectionQuery {
     /// The fetch behind a preview row — always bounded, see
     /// `collectionRowFetchLimit`.
-    static func rowDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Series> {
+    static func rowDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false) -> FetchDescriptor<Series> {
         var descriptor = base(for: kind, scope: scope)
-        descriptor.fetchLimit = collectionRowFetchLimit
+        descriptor.fetchLimit = TitleGrouping.fetchLimit(collectionRowFetchLimit, grouped: grouped)
         return descriptor
     }
 
     /// The fetch behind "Show All"; see `MovieCollectionQuery.gridDescriptor`.
-    static func gridDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Series> {
+    static func gridDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false) -> FetchDescriptor<Series> {
         var descriptor = base(for: kind, scope: scope)
-        if kind == .recentlyAdded { descriptor.fetchLimit = recentlyAddedFetchLimit }
+        if kind == .recentlyAdded { descriptor.fetchLimit = TitleGrouping.fetchLimit(recentlyAddedFetchLimit, grouped: grouped) }
         return descriptor
     }
 
@@ -405,6 +501,41 @@ enum SeriesCollectionQuery {
         case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && scoped.evaluate($0) }
         case .favorites: return #Predicate { $0.isFavorite && scoped.evaluate($0) }
         case .recentlyAdded: return #Predicate { $0.lastModified != nil && scoped.evaluate($0) }
+        }
+    }
+}
+
+// MARK: - Grouped state
+
+/// Reloads the cards' aggregated state when the shown rows or their order
+/// change; a toggle from the menu refreshes its own key.
+private struct GroupStateRequest: Equatable {
+    let grouped: Bool
+    let ids: [String]
+
+    init(grouped: Bool, rows: [some TitleGroupedRow]) {
+        self.grouped = grouped
+        ids = grouped ? rows.map(\.id) : []
+    }
+}
+
+extension CategoryFavoriteMenu where Item: TitleGroupStateRow {
+    /// Favorite state read across every copy of a title; nil when titles
+    /// aren't grouped.
+    static func grouped(_ grouped: Bool, states: [String: TitleGroupState], toggle: @escaping (Item) -> Void) -> Self? {
+        grouped ? Self(isFavorite: { TitleGroupStateLookup.state(of: $0, in: states).isFavorite }, toggle: toggle) : nil
+    }
+}
+
+private extension View {
+    func groupStateTask<Row: TitleGroupedRow>(
+        grouped: Bool,
+        rows: [Row],
+        states: Binding<[String: TitleGroupState]>,
+        load: @escaping ([Row]) -> [String: TitleGroupState]
+    ) -> some View {
+        task(id: GroupStateRequest(grouped: grouped, rows: rows)) {
+            states.wrappedValue = grouped ? load(rows) : [:]
         }
     }
 }

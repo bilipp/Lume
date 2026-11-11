@@ -36,6 +36,8 @@ struct StalkerFieldGuardTests {
         #expect(!context.hasChanges)
         #expect(movie.name == "A Film")
         #expect(movie.rating == 7.5)
+        #expect(movie.titleGroupKey != nil)
+        #expect(movie.titleGroupKey == TitleGroupKey.movie(tmdbId: nil, name: "A Film"))
     }
 
     @Test func `an unchanged series leaves the context clean`() async throws {
