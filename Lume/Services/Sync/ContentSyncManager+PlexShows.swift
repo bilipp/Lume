@@ -49,6 +49,7 @@ extension ContentSyncManager {
         let ids = items.map { scope.idPrefix + $0.ratingKey }
         let lookup = existingSeries(ids: ids, context: context)
 
+        var touched = TitleGroupPrimaries.Touched()
         for item in items {
             let id = scope.idPrefix + item.ratingKey
             let series: Series
@@ -58,8 +59,9 @@ extension ContentSyncManager {
                 series = Series(id: id, seriesId: Self.plexStreamId(item.ratingKey), name: item.title ?? "")
                 context.insert(series)
             }
-            applyPlexSeriesFields(item, to: series, scope: scope)
+            TitleGroupPrimaries.track(series, into: &touched.series) { applyPlexSeriesFields(item, to: series, scope: scope) }
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
             try? context.save()
         }
@@ -67,6 +69,18 @@ extension ContentSyncManager {
     }
 
     private func applyPlexSeriesFields(_ item: PlexMetadata, to series: Series, scope: PlexSectionScope) {
+        let previousName = series.name
+        let previousTmdbId = series.tmdbId
+        applyPlexSeriesMetadata(item, to: series, scope: scope)
+        if let tmdbId = Self.mediaServerTmdbId(item.providerId("tmdb")), series.tmdbId != tmdbId {
+            series.tmdbId = tmdbId
+        }
+        if TitleGroupPrimaries.needsKey(series, previousName: previousName, previousTmdbId: previousTmdbId) {
+            TitleGroupPrimaries.assignKey(to: series)
+        }
+    }
+
+    private func applyPlexSeriesMetadata(_ item: PlexMetadata, to series: Series, scope: PlexSectionScope) {
         let name = item.title ?? ""
         if series.name != name {
             series.name = name
@@ -111,6 +125,7 @@ extension ContentSyncManager {
             seriesIds.insert(scope.idPrefix + (item.grandparentRatingKey ?? item.ratingKey))
         }
         var seriesLookup = existingSeries(ids: Array(seriesIds), context: context)
+        let storedSeriesIds = Set(seriesLookup.keys)
 
         let episodeIds = items.map { scope.idPrefix + "episode-" + $0.ratingKey }
         let episodeLookup = existingEpisodes(ids: episodeIds, context: context)
@@ -122,6 +137,7 @@ extension ContentSyncManager {
             let episode = plexEpisodeRow(for: item, series: series, lookup: episodeLookup, scope: scope, context: context)
             applyPlexEpisodeFields(item, to: episode, series: series, scope: scope)
         }
+        recomputeShellPrimaries(seriesLookup, excluding: storedSeriesIds, in: context)
         if context.hasChanges {
             try? context.save()
         }
@@ -147,8 +163,11 @@ extension ContentSyncManager {
         let series = Series(id: seriesId, seriesId: Self.plexStreamId(showKey), name: shellName)
         if let shell = showShells[showKey] {
             applyPlexSeriesFields(shell, to: series, scope: scope)
-        } else if series.categoryId != scope.categoryId {
-            series.categoryId = scope.categoryId
+        } else {
+            if series.categoryId != scope.categoryId {
+                series.categoryId = scope.categoryId
+            }
+            TitleGroupPrimaries.assignKey(to: series)
         }
         context.insert(series)
         lookup[seriesId] = series
@@ -244,6 +263,7 @@ extension ContentSyncManager {
         let rows = (try? context.fetch(FetchDescriptor<Series>(
             predicate: #Predicate { $0.id.starts(with: prefix) }
         ))) ?? []
+        var touched = TitleGroupPrimaries.Touched()
         for series in rows where series.id.contains("-plex-") {
             if seenSeries.contains(series.id) {
                 // The shell survives, but dropped episodes don't: delete them
@@ -253,9 +273,10 @@ extension ContentSyncManager {
                 }
             } else {
                 // Episodes and cast cascade from the deleted series.
-                context.delete(series)
+                TitleGroupPrimaries.delete(series, from: context, recordingInto: &touched.series)
             }
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
             try? context.save()
         }

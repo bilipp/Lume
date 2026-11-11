@@ -36,7 +36,7 @@ nonisolated enum PlaylistOwner {
     /// Round-tripped through `uuidString` on purpose: the prefix scan this
     /// replaced matched that canonical spelling verbatim, and `UUID(uuidString:)`
     /// also accepts spellings it would have missed.
-    private static func declaredOwner(of id: String) -> UUID? {
+    static func declaredOwner(of id: String) -> UUID? {
         guard id.count > uuidLength else { return nil }
         let candidate = String(id.prefix(uuidLength))
         guard let uuid = UUID(uuidString: candidate), uuid.uuidString == candidate else { return nil }

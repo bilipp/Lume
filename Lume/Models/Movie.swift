@@ -36,7 +36,10 @@ final class Movie {
         [\.genre],
         [\.indexedAt],
         [\.downloadStatusRaw],
-        [\.added]
+        [\.added],
+        [\.titleGroupKey],
+        [\.titleMatchKey],
+        [\.categoryId, \.isCategoryGroupPrimary]
     )
 
     @Attribute(.unique) var id: String
@@ -151,6 +154,17 @@ final class Movie {
 
     var traktId: String?
     var tmdbId: Int?
+
+    /// `TitleGroupKey` of this row; rows sharing it are one title across
+    /// qualities, languages and playlists. Catalog-only, never synced.
+    var titleGroupKey: String?
+    /// `TitleGroupKey.matchKey(name:)` of this row, set even when
+    /// `titleGroupKey` is the tmdb key. Catalog-only, never synced.
+    var titleMatchKey: String?
+    /// Whether this row stands for its `titleGroupKey` within its `categoryId`.
+    /// Category grids list only primaries, so a title appears once per
+    /// category; non-primaries stay in the store and in the source picker.
+    var isCategoryGroupPrimary: Bool = true
 
     init(
         id: String,

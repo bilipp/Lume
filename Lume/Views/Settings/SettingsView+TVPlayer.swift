@@ -467,12 +467,18 @@ import SwiftUI
 
                 TVOptionToggleRow(title: "Choose Source Before Playing", isOn: $chooseSourceBeforePlaying)
 
-                Text("When a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the server's first version.")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                    .padding(.top, 6)
+                footnote("When a title has several sources, or a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the source you picked last, or the best one.")
+
+                footnote("Press and hold Play to pick a source at any time.")
             }
+        }
+
+        private func footnote(_ text: LocalizedStringKey) -> some View {
+            Text(text)
+                .font(.system(size: 20))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                .padding(.top, 6)
         }
     }
 

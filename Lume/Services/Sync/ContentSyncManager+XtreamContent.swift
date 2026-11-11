@@ -39,6 +39,8 @@ extension ContentSyncManager {
         // Accumulated as the batches are written so the sweep no longer needs
         // the DTO array, which can then be released before the sweep runs.
         var seenIds = Set<String>(minimumCapacity: totalCount)
+        // Elected once after the last batch; see TitleGroupPrimaries.Deferred.
+        var primaries = TitleGroupPrimaries.Deferred(playlistId: playlistId)
 
         do {
             let upsertInterval = Perf.begin(.upsertMovies)
@@ -67,7 +69,7 @@ extension ContentSyncManager {
                             movie = Movie(id: movieId, streamId: streamId, name: "")
                             context.insert(movie)
                         }
-                        applyMovieFields(from: movieDTO, to: movie, playlistPrefix: playlistPrefix)
+                        primaries.track(movie, as: \.movies) { applyMovieFields(from: movieDTO, to: movie, playlistPrefix: playlistPrefix) }
                     }
 
                     // A re-sync where the provider changed nothing leaves the
@@ -83,6 +85,7 @@ extension ContentSyncManager {
                     fraction: totalCount == 0 ? 1 : Double(min(batchStart + batchSize, totalCount)) / Double(totalCount)
                 )
             }
+            try primaries.run(in: modelContainer)
         }
 
         // The decoded payload is ~178k rows on a large provider; drop it before
@@ -116,6 +119,8 @@ extension ContentSyncManager {
         // Accumulated as the batches are written so the sweep no longer needs
         // the DTO array, which can then be released before the sweep runs.
         var seenIds = Set<String>(minimumCapacity: totalCount)
+        // Elected once after the last batch; see TitleGroupPrimaries.Deferred.
+        var primaries = TitleGroupPrimaries.Deferred(playlistId: playlistId)
 
         do {
             let upsertInterval = Perf.begin(.upsertSeries)
@@ -144,7 +149,7 @@ extension ContentSyncManager {
                             series = Series(id: id, seriesId: seriesId, name: "")
                             context.insert(series)
                         }
-                        applySeriesFields(from: seriesDTO, to: series, playlistPrefix: playlistPrefix)
+                        primaries.track(series, as: \.series) { applySeriesFields(from: seriesDTO, to: series, playlistPrefix: playlistPrefix) }
                     }
 
                     // A re-sync where the provider changed nothing leaves the
@@ -160,6 +165,7 @@ extension ContentSyncManager {
                     fraction: totalCount == 0 ? 1 : Double(min(batchStart + batchSize, totalCount)) / Double(totalCount)
                 )
             }
+            try primaries.run(in: modelContainer)
         }
 
         // Series rows carry ~1 KB of plot/cast text each; drop the payload

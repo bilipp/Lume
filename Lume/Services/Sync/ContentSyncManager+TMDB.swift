@@ -8,14 +8,14 @@ extension ContentSyncManager {
     /// the data directly to its own context to avoid cross-context merge
     /// timing issues.
     func fetchTMDBMovieDetails(tmdbId: Int) async throws -> TMDBTitleDetails? {
-        let client = TMDBClient.shared
+        let client = tmdbClient
         guard client.isConfigured else { return nil }
         return try await client.movieDetails(tmdbId)
     }
 
     /// Fetches TMDB TV series details without persisting.
     func fetchTMDBTVDetails(tmdbId: Int) async throws -> TMDBTitleDetails? {
-        let client = TMDBClient.shared
+        let client = tmdbClient
         guard client.isConfigured else { return nil }
         return try await client.tvDetails(tmdbId)
     }
@@ -28,35 +28,91 @@ extension ContentSyncManager {
     /// the fetch, apply and save all run on the engine actor's own background
     /// context; SwiftData auto-merges the save into the main context, so the
     /// on-screen `@Model` (and its `@Query`s) update without the caller blocking.
+    ///
+    /// A row whose sibling (same TMDB id) is freshly enriched copies it without
+    /// a request. The copy carries no cast and leaves `tmdbEnrichedAt` unset:
+    /// only the main context writes a copied cast, so the main-context detail
+    /// enrichment still completes the row. A fetched result is written to every
+    /// sibling without cast, which only the requested row gets. A row that
+    /// already holds fresh details (``EnrichedTitleRow/hasFreshTMDBDetails(now:)``) is left
+    /// alone.
     func enrichMovie(id: String, tmdbId: Int) async {
-        guard let details = try? await fetchTMDBMovieDetails(tmdbId: tmdbId) else { return }
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
-        var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let movie = try? context.fetch(descriptor).first else { return }
-        applyMovieDetails(details, to: movie, context: context)
+        guard let movie = Movie.row(id: id, in: context), !movie.hasFreshTMDBStamp() else { return }
+        let source: Movie? = TitleEnrichmentSiblings.freshTMDBSibling(sharing: tmdbId, except: id, in: context)
+        guard !movie.hasFreshTMDBDetails(freshSibling: source) else { return }
+        if copyDetails(from: source, to: movie, context: context, includeCast: false) {
+            try? context.save()
+            return
+        }
+        guard let details = try? await fetchTMDBMovieDetails(tmdbId: tmdbId) else { return }
+        applyDetailsToSiblings(
+            details, to: movie, tmdbId: tmdbId, context: context, siblingsIncludeCast: false
+        )
         try? context.save()
     }
 
     /// Series counterpart of ``enrichMovie(id:tmdbId:)``.
     func enrichSeries(id: String, tmdbId: Int) async {
-        guard let details = try? await fetchTMDBTVDetails(tmdbId: tmdbId) else { return }
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
-        var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let series = try? context.fetch(descriptor).first else { return }
-        applySeriesDetails(details, to: series, context: context)
+        guard let series = Series.row(id: id, in: context), !series.hasFreshTMDBStamp() else { return }
+        let source: Series? = TitleEnrichmentSiblings.freshTMDBSibling(sharing: tmdbId, except: id, in: context)
+        guard !series.hasFreshTMDBDetails(freshSibling: source) else { return }
+        if copyDetails(from: source, to: series, context: context, includeCast: false) {
+            try? context.save()
+            return
+        }
+        guard let details = try? await fetchTMDBTVDetails(tmdbId: tmdbId) else { return }
+        applyDetailsToSiblings(
+            details, to: series, tmdbId: tmdbId, context: context, siblingsIncludeCast: false
+        )
         try? context.save()
     }
 
     /// Fetches the list of TMDB movie IDs that belong to a collection.
     func fetchTMDBCollectionMovieIDs(collectionId: Int) async throws -> [Int] {
-        let client = TMDBClient.shared
+        let client = tmdbClient
         guard client.isConfigured else { return [] }
         return try await client.collectionMovieIDs(collectionId)
     }
+}
+
+// MARK: - Detail-screen enrichment (view context)
+
+/// Enriches a movie on the detail view's own (main) context: copied from a
+/// freshly enriched sibling when there is one, else fetched and written to
+/// every sibling, cast included. Returns false when nothing was applied.
+@MainActor
+func enrichMovieDetails(_ movie: Movie, tmdbId: Int, context: ModelContext) async -> Bool {
+    if copyDetailsFromSibling(movie, tmdbId: tmdbId, context: context, includeCast: true) {
+        try? context.save()
+        return true
+    }
+    let manager = ContentSyncManager(modelContainer: context.container)
+    guard let details = try? await manager.fetchTMDBMovieDetails(tmdbId: tmdbId) else { return false }
+    applyDetailsToSiblings(
+        details, to: movie, tmdbId: tmdbId, context: context, siblingsIncludeCast: true
+    )
+    try? context.save()
+    return true
+}
+
+/// Series counterpart of ``enrichMovieDetails(_:tmdbId:context:)``.
+@MainActor
+func enrichSeriesDetails(_ series: Series, tmdbId: Int, context: ModelContext) async -> Bool {
+    if copyDetailsFromSibling(series, tmdbId: tmdbId, context: context, includeCast: true) {
+        try? context.save()
+        return true
+    }
+    let manager = ContentSyncManager(modelContainer: context.container)
+    guard let details = try? await manager.fetchTMDBTVDetails(tmdbId: tmdbId) else { return false }
+    applyDetailsToSiblings(
+        details, to: series, tmdbId: tmdbId, context: context, siblingsIncludeCast: true
+    )
+    try? context.save()
+    return true
 }
 
 // MARK: - Direct context apply

@@ -20,37 +20,52 @@ struct SeriesDetailView: View {
     let series: Series
     var animationNamespace: Namespace.ID?
 
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.catalogScope) var catalogScope
+    @Environment(\.contentRestriction) var contentRestriction
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
     #if os(macOS)
-        @Environment(\.openWindow) private var openWindow
+        @Environment(\.openWindow) var openWindow
     #endif
-    @Query private var playlists: [Playlist]
+    @Query var playlists: [Playlist]
 
-    @State private var selectedSeason: Int = 1
+    @State var selectedSeason: Int = 1
     /// The series' distinct season numbers, cached so the body (season menu,
     /// metadata) doesn't rebuild a Set over every episode on each render — a real
     /// cost for long-running shows with hundreds of episodes. Recomputed when the
     /// episodes relationship changes (see `recomputeSeasons`).
-    @State private var availableSeasons: [Int] = []
+    @State var availableSeasons: [Int] = []
     /// Per-season episode lists, cached alongside `availableSeasons` so the body
     /// doesn't re-filter and re-sort the whole episodes relationship on every
     /// render (it's read by the episode list, the play button and `playTitle`).
-    @State private var episodesBySeason: [Int: [Episode]] = [:]
-    @State private var isLoadingEpisodes = false
-    @State private var playingMedia: PlayableMedia?
+    @State var episodesBySeason: [Int: [Episode]] = [:]
+    /// The series row whose episodes are being fetched.
+    @State private var loadingSeriesID: String?
+    @State var playingMedia: PlayableMedia?
+    /// A pick made in the source sheet, played once the sheet has gone.
+    @State var pendingPick: VODSourceOption?
+    @State var sourcePicker: ContentSourcePickerRequest?
+    @State var sourceOptions: [VODSourceOption] = []
+    /// Copies that failed on every engine since the screen opened.
+    @State var failedSourceIDs: Set<String> = []
+    /// The copy of the title whose seasons and episodes the screen shows and
+    /// plays; nil until the sources are resolved.
+    @State var activeSeries: Series?
+    /// Favorite and last-watched copy across every copy of the title.
+    @State var groupStates: [String: TitleGroupState] = [:]
     @State private var similar: [HomeMediaItem] = []
-    @State private var otherSources: [OtherSources.Source] = []
     @State private var refreshToken: UUID = .init()
     @State private var isLoadingTMDB: Bool
     #if !os(tvOS)
-        @State private var downloads = DownloadManager.shared
+        @State var downloads = DownloadManager.shared
     #endif
 
     init(series: Series, animationNamespace: Namespace.ID? = nil) {
         self.series = series
         self.animationNamespace = animationNamespace
-        let needsFetch = if series.tmdbId != nil, TMDBClient.shared.isConfigured {
+        let needsFetch = if series.titleTMDBId != nil, TMDBClient.shared.isConfigured {
             if let enrichedAt = series.tmdbEnrichedAt,
                Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600
             {
@@ -85,11 +100,13 @@ struct SeriesDetailView: View {
             #endif
                 .toolbar { toolbarContent }
                 .task(id: series.id) {
+                    resolveSources()
+                    refreshGroupState()
+                    activeSeries = initialSource()
                     await loadEpisodesIfNeeded()
                     await enrichIfNeeded()
                     await enrichSeriesRatingsIfNeeded(series, context: modelContext)
                     resolveSimilar()
-                    resolveOtherSources()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isLoadingTMDB = false
                     }
@@ -97,14 +114,21 @@ struct SeriesDetailView: View {
                 // Separate task so a stale-cache refresh runs alongside the
                 // enrichment chain above instead of delaying the first paint,
                 // and still gets cancelled when the screen goes away.
-                .task(id: series.id) { await refreshEpisodesIfStale() }
+                .task(id: activeSeries?.id) { await refreshEpisodesIfStale() }
                 .onChange(of: series.similarTMDBIds) { resolveSimilar() }
                 .onChange(of: refreshToken) { resolveSimilar() }
-                .onChange(of: series.episodes.count) { recomputeSeasons() }
+                .onChange(of: shown.episodes.count) { recomputeSeasons() }
+                .onChange(of: playingMedia == nil) { _, isNil in
+                    if isNil { refreshGroupState() }
+                }
+                .onChange(of: sourcesKey) { resolveSources() }
+                .contentSourcePicker($sourcePicker, onDismiss: playPendingPick) { pendingPick = $0 }
             #if os(iOS)
-                .fullScreenCover(item: $playingMedia) { media in
+                .fullScreenCover(item: $playingMedia, onDismiss: takeSourceFailure) { media in
                     FullScreenPlayerView(media: media)
                 }
+            #elseif os(macOS)
+                .onChange(of: VODSourceFailureHandoff.shared.pending?.id) { takeSourceFailure() }
             #endif
         #endif
     }
@@ -181,12 +205,6 @@ struct SeriesDetailView: View {
                             SimilarRow(items: similar, animationNamespace: animationNamespace)
                         }
                     }
-
-                    if !otherSources.isEmpty {
-                        section(title: "Other Sources") {
-                            OtherSourcesRow(sources: otherSources, animationNamespace: animationNamespace)
-                        }
-                    }
                 }
                 .frame(width: proxy.size.width, alignment: .leading)
                 .padding(.bottom, 32)
@@ -206,15 +224,6 @@ struct SeriesDetailView: View {
         }
     }
 
-    private var actions: some View {
-        PrimaryPlayButton(
-            title: playTitle,
-            isEnabled: nextEpisode != nil && seriesPlaylist != nil,
-            action: { if let episode = nextEpisode { playEpisode(episode) } }
-        )
-        .missingPlaylistNotice(seriesPlaylist == nil)
-    }
-
     private var episodesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -226,7 +235,7 @@ struct SeriesDetailView: View {
             }
             .padding(.horizontal, DetailMetrics.contentPadding)
 
-            if series.episodes.isEmpty {
+            if shown.episodes.isEmpty {
                 episodesPlaceholder
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
@@ -287,7 +296,7 @@ struct SeriesDetailView: View {
 
     @ViewBuilder
     private var episodesPlaceholder: some View {
-        if isLoadingEpisodes {
+        if loadingSeriesID == shown.id {
             VStack(spacing: 12) {
                 ProgressView()
                 Text("Loading episodes…").foregroundStyle(.secondary)
@@ -349,8 +358,8 @@ struct SeriesDetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 GlassIconButton(
-                    systemImage: series.isFavorite ? "heart.fill" : "heart",
-                    accessibilityLabel: series.isFavorite ? "Remove from favorites" : "Add to favorites"
+                    systemImage: groupState.isFavorite ? "heart.fill" : "heart",
+                    accessibilityLabel: groupState.isFavorite ? "Remove from favorites" : "Add to favorites"
                 ) { toggleFavorite() }
             }
         #else
@@ -358,11 +367,11 @@ struct SeriesDetailView: View {
                 Button {
                     toggleFavorite()
                 } label: {
-                    Image(systemName: series.isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(series.isFavorite ? .red : .primary)
-                        .symbolReplaceTransition(value: series.isFavorite)
+                    Image(systemName: groupState.isFavorite ? "heart.fill" : "heart")
+                        .foregroundStyle(groupState.isFavorite ? .red : .primary)
+                        .symbolReplaceTransition(value: groupState.isFavorite)
                 }
-                .help(series.isFavorite ? "Remove from Favorites" : "Add to Favorites")
+                .help(groupState.isFavorite ? "Remove from Favorites" : "Add to Favorites")
             }
         #endif
     }
@@ -381,20 +390,20 @@ struct SeriesDetailView: View {
         )
     }
 
-    private func recomputeSeasons() {
-        availableSeasons = Set(series.episodes.map(\.seasonNum)).sorted()
-        episodesBySeason = Dictionary(grouping: series.episodes, by: \.seasonNum)
+    func recomputeSeasons() {
+        availableSeasons = Set(shown.episodes.map(\.seasonNum)).sorted()
+        episodesBySeason = Dictionary(grouping: shown.episodes, by: \.seasonNum)
             .mapValues { $0.sorted { $0.episodeNum < $1.episodeNum } }
     }
 
-    private func determineDefaultSeason() -> Int {
+    func determineDefaultSeason() -> Int {
         let seasons = availableSeasons
         guard !seasons.isEmpty else { return 1 }
 
         // Open on the season of the furthest point reached in the series, so
         // progress in a later season always wins over progress in an earlier
         // one — regardless of which was watched more recently.
-        let markers = SeriesEpisodeProgress.markers(in: series.episodes)
+        let markers = SeriesEpisodeProgress.markers(in: shown.episodes)
         let target = markers.furthestInProgress ?? markers.furthestAnyProgress
         if let target, seasons.contains(target.seasonNum) {
             return target.seasonNum
@@ -409,8 +418,8 @@ struct SeriesDetailView: View {
 
     /// Play button target — see `SeriesEpisodeProgress.nextEpisode`. Read on
     /// every body evaluation, so it must stay O(episodes) with no sorting.
-    private var nextEpisode: Episode? {
-        SeriesEpisodeProgress.nextEpisode(in: series.episodes, fallback: seasonEpisodes.first)
+    var nextEpisode: Episode? {
+        SeriesEpisodeProgress.nextEpisode(in: shown.episodes, fallback: seasonEpisodes.first)
     }
 
     private var backgroundColor: Color {
@@ -423,14 +432,15 @@ struct SeriesDetailView: View {
         #endif
     }
 
-    private var seriesPlaylist: Playlist? {
-        playlists.owner(ofContentID: series.id)
+    /// The playlist that owns the copy on screen, which plays its episodes.
+    var seriesPlaylist: Playlist? {
+        playlists.owner(ofContentID: shown.id)
     }
 
     // MARK: - Loading & enrichment
 
-    private func loadEpisodesIfNeeded() async {
-        if series.episodes.isEmpty {
+    func loadEpisodesIfNeeded() async {
+        if shown.episodes.isEmpty {
             await loadEpisodes()
         }
         recomputeSeasons()
@@ -446,48 +456,49 @@ struct SeriesDetailView: View {
     /// rest of the catalog on every sync, so there is nothing to pull
     /// per-series there.
     private func refreshEpisodesIfStale() async {
-        guard !series.episodes.isEmpty,
-              let playlist = seriesPlaylist,
+        guard let active = activeSeries,
+              !active.episodes.isEmpty,
+              let playlist = playlists.owner(ofContentID: active.id),
               playlist.supportsPerSeriesEpisodeFetch,
-              series.episodesAreStale(lastSyncedAt: playlist.lastSyncDate)
+              active.episodesAreStale(lastSyncedAt: playlist.lastSyncDate)
         else { return }
         await loadEpisodes()
     }
 
     private func loadEpisodes() async {
-        guard let playlist = seriesPlaylist, !isLoadingEpisodes else { return }
-        isLoadingEpisodes = true
-        defer { isLoadingEpisodes = false }
+        let target = shown
+        guard let playlist = playlists.owner(ofContentID: target.id), loadingSeriesID != target.id else { return }
+        loadingSeriesID = target.id
+        defer {
+            if loadingSeriesID == target.id { loadingSeriesID = nil }
+        }
         let manager = ContentSyncManager(modelContainer: modelContext.container)
         // A failed fetch must not reach `insertEpisodes`: it stamps the episode
         // cache, which would call the list fresh until the staleness window
         // reopens — the exact thing keeping a device an episode behind.
         guard let parsed = try? await manager.fetchEpisodes(
-            seriesId: series.seriesId,
-            seriesElementId: series.id,
+            seriesId: target.seriesId,
+            seriesElementId: target.id,
             playlist: playlist
         ) else { return }
-        // Insert through the view's own context, attaching to `series`, so its
+        // Insert through the view's own context, attaching to `target`, so its
         // episodes relationship — and this view — update synchronously.
-        await MainActor.run { series.insertEpisodes(parsed, into: modelContext) }
+        await MainActor.run { target.insertEpisodes(parsed, into: modelContext) }
     }
 
     private func enrichIfNeeded() async {
-        guard let tmdbId = series.tmdbId else { return }
+        guard let tmdbId = series.titleTMDBId else { return }
         if let enrichedAt = series.tmdbEnrichedAt,
            Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600
         {
             return
         }
-        let manager = ContentSyncManager(modelContainer: modelContext.container)
         // Fetch off-thread, then apply on the view's own context. Using the
         // background enrichSeries() path deletes-and-reinserts CastMember rows
         // from a separate ModelContext; if the main context holds faulted
         // references to those objects and a render fires before the merge lands,
         // SwiftData fires a fault against a deleted store row → _assertionFailure.
-        guard let details = try? await manager.fetchTMDBTVDetails(tmdbId: tmdbId) else { return }
-        applySeriesDetails(details, to: series, context: modelContext)
-        try? modelContext.save()
+        guard await enrichSeriesDetails(series, tmdbId: tmdbId, context: modelContext) else { return }
         refreshToken = UUID()
     }
 }
@@ -499,54 +510,31 @@ private extension SeriesDetailView {
         let ids = series.similarTitleIds
         guard !ids.isEmpty else { similar = []; return }
 
-        let playlistPrefix = series.id.components(separatedBy: "-series-").first
-        func owned(_ id: String) -> Bool {
-            guard let prefix = playlistPrefix else { return true }
-            return id.hasPrefix(prefix)
-        }
+        let ranking = TitleGrouping.Ranking(scope: catalogScope)
 
         var resolved: [HomeMediaItem] = []
         for tmdbId in ids {
             let seriesMatches = (try? modelContext.fetch(
                 FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
             )) ?? []
-            if let match = seriesMatches.first(where: { owned($0.id) && $0.id != series.id }) {
+            if let match = TitleGrouping.railRow(seriesMatches, excluding: series, tab: .series, ranking: ranking, grouped: groupDuplicateTitles) {
                 resolved.append(.series(match))
                 continue
             }
             let movieMatches = (try? modelContext.fetch(
                 FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
             )) ?? []
-            if let match = movieMatches.first(where: { owned($0.id) }) {
+            if let match = TitleGrouping.railRow(movieMatches, excluding: series, tab: .movies, ranking: ranking, grouped: groupDuplicateTitles) {
                 resolved.append(.movie(match))
             }
         }
         similar = Array(resolved.prefix(12))
-    }
-
-    func resolveOtherSources() {
-        otherSources = OtherSources.resolve(for: series, in: modelContext)
     }
 }
 
 // MARK: - Actions
 
 private extension SeriesDetailView {
-    func playEpisode(_ episode: Episode) {
-        guard let playlist = seriesPlaylist,
-              let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
-        if ExternalPlayback.open(media) { return }
-        #if os(macOS)
-            MacPlayerWindowRouter.shared.play(media, using: openWindow)
-        #else
-            playingMedia = media
-        #endif
-    }
-
-    func toggleFavorite() {
-        MediaFavorites.toggle(series, in: modelContext)
-    }
-
     func toggleWatched(_ episode: Episode) {
         episode.setWatched(!episode.isWatched)
         WatchedTrackers.sync(episode: episode, watched: episode.isWatched)
@@ -571,8 +559,8 @@ private extension SeriesDetailView {
 
 // MARK: - Derived helpers
 
-private extension SeriesDetailView {
-    var seasonCountLabel: String {
+extension SeriesDetailView {
+    private var seasonCountLabel: String {
         availableSeasons.count == 1 ? String(localized: "1 Season") : String(localized: "\(availableSeasons.count) Seasons")
     }
 

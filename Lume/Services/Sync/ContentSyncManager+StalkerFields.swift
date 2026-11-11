@@ -13,6 +13,7 @@ import Foundation
 
 extension ContentSyncManager {
     func applyStalkerMovieFields(from item: StalkerVODItem, cmd: String, to movie: Movie, categoryId: String) {
+        let previousName = movie.name
         let name = item.name ?? ""
         if movie.name != name { movie.name = name }
         if movie.streamIcon != item.screenshot { movie.streamIcon = item.screenshot }
@@ -24,9 +25,13 @@ extension ContentSyncManager {
         }
         if movie.categoryId != categoryId { movie.categoryId = categoryId }
         if movie.directURL != cmd { movie.directURL = cmd }
+        if TitleGroupPrimaries.needsKey(movie, previousName: previousName, previousTmdbId: movie.tmdbId) {
+            TitleGroupPrimaries.assignKey(to: movie)
+        }
     }
 
     func applyStalkerSeriesFields(from item: StalkerVODItem, to series: Series, categoryId: String) {
+        let previousName = series.name
         let name = item.name ?? ""
         if series.name != name { series.name = name }
         if series.cover != item.screenshot { series.cover = item.screenshot }
@@ -38,6 +43,9 @@ extension ContentSyncManager {
             CatalogAddedDate.assign(added, to: \.lastModified, of: series)
         }
         if series.categoryId != categoryId { series.categoryId = categoryId }
+        if TitleGroupPrimaries.needsKey(series, previousName: previousName, previousTmdbId: series.tmdbId) {
+            TitleGroupPrimaries.assignKey(to: series)
+        }
     }
 
     func applyStalkerChannelFields(from channel: StalkerChannel, cmd: String, to stream: LiveStream, playlistPrefix: String) {

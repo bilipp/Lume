@@ -13244,6 +13244,70 @@
         }
       }
     },
+    "Choose Source…" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختيار المصدر…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelle wählen…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Source…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir fuente…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir la source…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli la fonte…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースを選択…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소스 선택…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher fonte…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择来源…"
+          }
+        }
+      }
+    },
     "Choose which sections appear on Home and in what order." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16062,6 +16126,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不同步继续"
+          }
+        }
+      }
+    },
+    "Control-click Play to pick a source at any time." : {
+      "comment" : "macOS player settings hint: Control-clicking a movie or series Play button opens the source picker.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقر على \"تشغيل\" مع الضغط على Control لاختيار مصدر في أي وقت."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klicke bei gedrückter Ctrl-Taste auf „Abspielen“, um jederzeit eine Quelle zu wählen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Control-click Play to pick a source at any time."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haz clic en Reproducir con la tecla Control pulsada para elegir una fuente en cualquier momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cliquez sur Lecture en maintenant la touche Contrôle enfoncée pour choisir une source à tout moment."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic su Riproduci tenendo premuto Ctrl per scegliere una fonte in qualsiasi momento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlキーを押しながら「再生」をクリックすると、いつでもソースを選択できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Control 키를 누른 채 재생을 클릭하면 언제든지 소스를 선택할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clique em Reproduzir com a tecla Control pressionada para escolher uma fonte a qualquer momento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住 Control 键点按“播放”，可随时选择来源。"
           }
         }
       }
@@ -20287,6 +20416,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Discord"
+          }
+        }
+      }
+    },
+    "Dolby Vision" : {
+      "comment" : "Video tag on a row of the content source picker.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dolby Vision"
           }
         }
       }
@@ -31458,6 +31652,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "绿色"
+          }
+        }
+      }
+    },
+    "Group Duplicate Titles" : {
+      "comment" : "Library settings toggle: shows each movie or series once across qualities, languages and playlists.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تجميع العناوين المكررة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doppelte Titel zusammenfassen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Group Duplicate Titles"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrupar títulos duplicados"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regrouper les titres en double"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raggruppa titoli duplicati"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重複タイトルをまとめる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "중복 타이틀 묶기"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrupar títulos duplicados"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并重复影片"
           }
         }
       }
@@ -51131,64 +51390,6 @@
         }
       }
     },
-    "Other Sources" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "مصادر أخرى"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weitere Quellen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Otras fuentes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Autres sources"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Altre sorgenti"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "その他のソース"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "기타 소스"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Outras Fontes"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "其他源"
-          }
-        }
-      }
-    },
     "Outline" : {
       "localizations" : {
         "ar" : {
@@ -53522,6 +53723,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "画中画"
+          }
+        }
+      }
+    },
+    "Pinch and hold Play to pick a source at any time." : {
+      "comment" : "visionOS player settings hint: a pinch and hold on a movie or series Play button opens the source picker.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اقرص مطولًا على \"تشغيل\" لاختيار مصدر في أي وقت."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte „Abspielen“ per Fingertipp gedrückt, um jederzeit eine Quelle zu wählen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pinch and hold Play to pick a source at any time."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pellizca y mantén Reproducir para elegir una fuente en cualquier momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pincez et maintenez Lecture pour choisir une source à tout moment."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pizzica e tieni premuto Riproduci per scegliere una fonte in qualsiasi momento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「再生」をピンチしたままにすると、いつでもソースを選択できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생을 길게 핀치하면 언제든지 소스를 선택할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Belisque e mantenha Reproduzir para escolher uma fonte a qualquer momento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捏住“播放”不放，可随时选择来源。"
           }
         }
       }
@@ -58109,6 +58375,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在准备…"
+          }
+        }
+      }
+    },
+    "Press and hold Play to pick a source at any time." : {
+      "comment" : "tvOS player settings hint: holding the remote's select button on a movie or series Play button opens the source picker.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اضغط مطولًا على \"تشغيل\" لاختيار مصدر في أي وقت."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte „Abspielen“ gedrückt, um jederzeit eine Quelle zu wählen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold Play to pick a source at any time."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsado Reproducir para elegir una fuente en cualquier momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maintenez Lecture enfoncé pour choisir une source à tout moment."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tieni premuto Riproduci per scegliere una fonte in qualsiasi momento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「再生」を長押しすると、いつでもソースを選択できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생을 길게 누르면 언제든지 소스를 선택할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantenha Reproduzir pressionado para escolher uma fonte a qualquer momento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住“播放”可随时选择来源。"
           }
         }
       }
@@ -72629,6 +72960,71 @@
         }
       }
     },
+    "Show a movie or series once when it's in several qualities, languages or playlists, and pick the version when you play it." : {
+      "comment" : "Library settings footer for the Group Duplicate Titles toggle.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اعرض الفيلم أو المسلسل مرة واحدة عندما يتوفر بعدة جودات أو لغات أو قوائم تشغيل، واختر النسخة عند تشغيله."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt einen Film oder eine Serie nur einmal an, wenn es sie in mehreren Qualitäten, Sprachen oder Playlists gibt. Die Version wählst du beim Abspielen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show a movie or series once when it's in several qualities, languages or playlists, and pick the version when you play it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra una película o serie una sola vez cuando está en varias calidades, idiomas o listas, y elige la versión al reproducirla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche un film ou une série une seule fois lorsqu’il existe en plusieurs qualités, langues ou playlists, et choisissez la version au moment de la lecture."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra un film o una serie una sola volta quando è disponibile in più qualità, lingue o playlist, e scegli la versione quando lo riproduci."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複数の画質、言語、プレイリストにある映画やシリーズを1つにまとめて表示し、再生時にバージョンを選択します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여러 화질, 언어 또는 재생목록에 있는 영화나 시리즈를 한 번만 표시하고, 재생할 때 버전을 선택합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra um filme ou série uma única vez quando está em várias qualidades, idiomas ou playlists, e você escolhe a versão ao reproduzir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当同一部电影或剧集有多种画质、语言或播放列表时只显示一次，播放时再选择版本。"
+          }
+        }
+      }
+    },
     "Show All" : {
       "localizations" : {
         "ar" : {
@@ -76035,6 +76431,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "源代码"
+          }
+        }
+      }
+    },
+    "Source: %@" : {
+      "comment" : "Series detail: the copy of a grouped series whose episodes are shown, e.g. 'Source: My IPTV · 4K'. Opens a menu to switch.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المصدر: %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelle: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuente: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fonte: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソース: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소스: %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fonte: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来源：%@"
           }
         }
       }
@@ -89451,6 +89912,71 @@
         }
       }
     },
+    "Touch and hold Play to pick a source at any time." : {
+      "comment" : "iOS player settings hint: a long press on a movie or series Play button opens the source picker.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المس \"تشغيل\" مطولًا لاختيار مصدر في أي وقت."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte „Abspielen“ gedrückt, um jederzeit eine Quelle zu wählen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold Play to pick a source at any time."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsado Reproducir para elegir una fuente en cualquier momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez Lecture de manière prolongée pour choisir une source à tout moment."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tocca e tieni premuto Riproduci per scegliere una fonte in qualsiasi momento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「再生」を長押しすると、いつでもソースを選択できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생을 길게 터치하면 언제든지 소스를 선택할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque e mantenha pressionado Reproduzir para escolher uma fonte a qualquer momento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住“播放”可随时选择来源。"
+          }
+        }
+      }
+    },
     "Trakt" : {
       "localizations" : {
         "ar" : {
@@ -94706,60 +95232,67 @@
         }
       }
     },
-    "When a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the server's first version." : {
+    "When a title has several sources, or a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the source you picked last, or the best one." : {
+      "comment" : "Player settings footer for the Choose Source Before Playing toggle. Jellyfin and Emby are product names.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "عندما يتوفر لعنوان من Jellyfin أو Emby عدة إصدارات، اختر واحدًا قبل التشغيل. عند الإيقاف يُشغَّل الإصدار الأول من الخادم."
+            "value" : "عندما يتوفر لعنوان عدة مصادر، أو يتوفر لعنوان من Jellyfin أو Emby عدة إصدارات، اختر واحدًا قبل التشغيل. عند الإيقاف يُشغَّل آخر مصدر اخترته، أو أفضل مصدر."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bietet ein Jellyfin- oder Emby-Titel mehrere Versionen an, wählst du vor dem Abspielen eine aus. Aus spielt die erste Version des Servers ab."
+            "value" : "Hat ein Titel mehrere Quellen oder bietet ein Jellyfin- oder Emby-Titel mehrere Versionen an, wählst du vor dem Abspielen eine aus. Aus spielt die zuletzt gewählte Quelle ab, sonst die beste."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When a title has several sources, or a Jellyfin or Emby title offers several versions, pick one before it plays. Off plays the source you picked last, or the best one."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cuando un título de Jellyfin o Emby ofrece varias versiones, elige una antes de reproducirlo. Desactivado reproduce la primera versión del servidor."
+            "value" : "Cuando un título tiene varias fuentes, o un título de Jellyfin o Emby ofrece varias versiones, elige una antes de reproducirlo. Desactivado reproduce la última fuente que elegiste, o la mejor."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lorsqu’un titre Jellyfin ou Emby propose plusieurs versions, choisissez-en une avant la lecture. Désactivé lit la première version du serveur."
+            "value" : "Lorsqu’un titre a plusieurs sources, ou qu’un titre Jellyfin ou Emby propose plusieurs versions, choisissez-en une avant la lecture. Désactivé lit la dernière source choisie, ou la meilleure."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quando un titolo Jellyfin o Emby offre più versioni, scegline una prima della riproduzione. Se disattivato, viene riprodotta la prima versione del server."
+            "value" : "Quando un titolo ha più fonti, o un titolo Jellyfin o Emby offre più versioni, scegline una prima della riproduzione. Se disattivato, viene riprodotta l’ultima fonte scelta, o la migliore."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JellyfinやEmbyのタイトルに複数のバージョンがある場合、再生前に選択します。オフにするとサーバーの最初のバージョンを再生します。"
+            "value" : "タイトルに複数のソースがある場合や、JellyfinやEmbyのタイトルに複数のバージョンがある場合、再生前に選択します。オフにすると、最後に選んだソース、または最適なソースを再生します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jellyfin 또는 Emby 타이틀에 여러 버전이 있으면 재생 전에 하나를 선택합니다. 끄면 서버의 첫 번째 버전을 재생합니다."
+            "value" : "타이틀에 여러 소스가 있거나 Jellyfin 또는 Emby 타이틀에 여러 버전이 있으면 재생 전에 하나를 선택합니다. 끄면 마지막으로 선택한 소스나 가장 좋은 소스를 재생합니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quando um título do Jellyfin ou Emby oferece várias versões, escolha uma antes de reproduzir. Desativado reproduz a primeira versão do servidor."
+            "value" : "Quando um título tem várias fontes, ou um título do Jellyfin ou Emby oferece várias versões, escolha uma antes de reproduzir. Desativado reproduz a última fonte escolhida, ou a melhor."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当 Jellyfin 或 Emby 影片提供多个版本时，在播放前选择一个。关闭后将播放服务器的第一个版本。"
+            "value" : "当影片有多个来源，或 Jellyfin 或 Emby 影片提供多个版本时，在播放前选择一个。关闭后将播放你上次选择的来源，或最佳来源。"
           }
         }
       }

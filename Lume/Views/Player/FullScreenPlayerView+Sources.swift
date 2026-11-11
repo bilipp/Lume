@@ -41,7 +41,13 @@ extension FullScreenPlayerView {
     /// rather than showing its own error: another engine is left to try, or
     /// another version of the title.
     var reportsStartupFailure: Bool {
-        hasFallbackEngine || sourceSession.canRecoverFromFailure
+        hasFallbackEngine || sourceSession.canRecoverFromFailure || handsOffSourceFailure
+    }
+
+    /// The detail screen that opened this stream offers other sources of the
+    /// title and takes a failure back to its picker.
+    private var handsOffSourceFailure: Bool {
+        VODSourceFailureHandoff.shared.handsOff(mediaID: activeMedia.id)
     }
 
     /// Looks the active stream's versions up. `false` when it isn't a
@@ -50,10 +56,14 @@ extension FullScreenPlayerView {
         await sourceSession.begin(for: activeMedia, context: modelContext, refresh: refresh)
     }
 
-    /// Every engine failed to start the playing version: ask for another.
+    /// Every engine failed to start the playing version: ask for another, or
+    /// close and let the detail screen's picker offer the title's other sources.
     func recoverWithAnotherSource() {
         if sourceSession.recoverFromFailure() {
             engineAttempt = 0
+        } else if VODSourceFailureHandoff.shared.report(mediaID: activeMedia.id) {
+            Logger.player.log("source failed on every engine; returning to the title's source picker")
+            closePlayer()
         }
     }
 
@@ -100,17 +110,7 @@ struct PlayerSourceSwitcherHost: ViewModifier {
     func body(content: Content) -> some View {
         content
             .environment(\.playerSourceSession, session)
-        #if os(tvOS)
-            .fullScreenCover(isPresented: $session.isPresentingSwitcher) { picker }
-        #else
-            .sheet(isPresented: $session.isPresentingSwitcher) {
-                picker
-                #if os(macOS)
-                // A frameless macOS sheet collapses its scroll view to zero.
-                .frame(minWidth: 520, idealWidth: 640, minHeight: 460, idealHeight: 620)
-                #endif
-            }
-        #endif
+            .sourcePickerPresentation(isPresented: $session.isPresentingSwitcher) { picker }
     }
 
     private var picker: some View {

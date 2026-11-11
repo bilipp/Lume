@@ -42,7 +42,7 @@ struct EndedBadge: View {
     }
 }
 
-/// The source playlist of a Combined grid item, in the capsule the status
+/// The source playlist of a Combined channel, in the capsule the status
 /// badges use, backed by a material so it stays legible over poster artwork.
 struct PlaylistBadge: View {
     let name: String
@@ -61,19 +61,6 @@ struct PlaylistBadge: View {
         }
         .background(.ultraThinMaterial, in: Capsule())
         .accessibilityLabel(Text("from \(name)"))
-    }
-}
-
-extension View {
-    /// A poster card's provenance badge, inset in the artwork's bottom-leading
-    /// corner. `nil` leaves the card as it is outside Combined.
-    func playlistBadgeOverlay(_ name: String?) -> some View {
-        overlay(alignment: .bottomLeading) {
-            if let name {
-                PlaylistBadge(name: name)
-                    .padding(PosterCardMetrics.badgeInset)
-            }
-        }
     }
 }
 

@@ -26,6 +26,9 @@ struct CategoryContentGrid<Item: Identifiable & Hashable & WatchlistFavoritable,
     /// Called when the last item appears, so a paginating caller can fetch the
     /// next page. Nil callers load their full set up front (unchanged behavior).
     var onLoadMore: (() -> Void)?
+    /// Overrides the favorite menu for grouped titles, which read as favorite
+    /// when any copy is. Nil uses the row's own flag and `MediaFavorites`.
+    var favoriteMenu: CategoryFavoriteMenu<Item>?
     @Environment(\.modelContext) private var modelContext
     @ViewBuilder let card: (Item) -> Card
 
@@ -64,8 +67,8 @@ struct CategoryContentGrid<Item: Identifiable & Hashable & WatchlistFavoritable,
                             if let onLoadMore, item.id == items.last?.id { onLoadMore() }
                         }
                         .mediaFavoriteMenu(
-                            isFavorite: { item.isFavorite },
-                            onToggleFavorite: { MediaFavorites.toggle(item, in: modelContext) }
+                            isFavorite: { favoriteMenu?.isFavorite(item) ?? item.isFavorite },
+                            onToggleFavorite: { toggleFavorite(item) }
                         )
                     }
                 }
@@ -84,6 +87,21 @@ struct CategoryContentGrid<Item: Identifiable & Hashable & WatchlistFavoritable,
             }
         #endif
     }
+
+    private func toggleFavorite(_ item: Item) {
+        if let favoriteMenu {
+            favoriteMenu.toggle(item)
+        } else {
+            MediaFavorites.toggle(item, in: modelContext)
+        }
+    }
+}
+
+/// How a category surface reads and toggles a card's favorite when the card
+/// stands for every copy of its title.
+struct CategoryFavoriteMenu<Item> {
+    let isFavorite: (Item) -> Bool
+    let toggle: (Item) -> Void
 }
 
 // MARK: - Category Grid ("Show All" tiles)
@@ -222,6 +240,8 @@ struct CategoryPreviewRow<Item: Identifiable & Hashable & WatchlistFavoritable, 
     let hasMore: Bool
     let animationNamespace: Namespace.ID?
     let emptyMessage: LocalizedStringKey
+    /// See `CategoryContentGrid.favoriteMenu`.
+    var favoriteMenu: CategoryFavoriteMenu<Item>?
     @Environment(\.modelContext) private var modelContext
     @ViewBuilder let card: (Item) -> Card
 
@@ -258,8 +278,8 @@ struct CategoryPreviewRow<Item: Identifiable & Hashable & WatchlistFavoritable, 
                             }
                             .posterCardButtonStyle()
                             .mediaFavoriteMenu(
-                                isFavorite: { item.isFavorite },
-                                onToggleFavorite: { MediaFavorites.toggle(item, in: modelContext) }
+                                isFavorite: { favoriteMenu?.isFavorite(item) ?? item.isFavorite },
+                                onToggleFavorite: { toggleFavorite(item) }
                             )
                         }
                     }
@@ -269,6 +289,14 @@ struct CategoryPreviewRow<Item: Identifiable & Hashable & WatchlistFavoritable, 
                 .scrollClipDisabled()
                 .frame(height: PosterCardMetrics.rowHeight)
             }
+        }
+    }
+
+    private func toggleFavorite(_ item: Item) {
+        if let favoriteMenu {
+            favoriteMenu.toggle(item)
+        } else {
+            MediaFavorites.toggle(item, in: modelContext)
         }
     }
 }
@@ -281,8 +309,13 @@ struct MovieCategoryView: View {
     @Environment(\.modelContext) private var modelContext
 
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
     @State private var movies: [Movie] = []
+    /// Favorite and watched state of the loaded titles' other copies, looked
+    /// up once per page.
+    @State private var groupStates: [String: TitleGroupState] = [:]
     @State private var canLoadMore = true
     @State private var isLoadingPage = false
     /// True while a Stalker category's content is being fetched from the portal
@@ -302,6 +335,11 @@ struct MovieCategoryView: View {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
     }
 
+    /// The sort and grouping the loaded pages were fetched for.
+    private var loadKey: String {
+        "\(contentSortRaw)|\(groupDuplicateTitles)"
+    }
+
     /// The playlist when it's a Stalker portal, whose categories are imported
     /// on demand rather than synced whole.
     private var stalkerPlaylist: Playlist? {
@@ -316,10 +354,16 @@ struct MovieCategoryView: View {
                     ProgressView("Loading…")
                 }
             }
-            .task(id: contentSortRaw) {
-                guard loadedSort != contentSortRaw else { return }
-                loadedSort = contentSortRaw
+            .task(id: loadKey) {
+                // Back from a detail screen, which may have changed a copy's
+                // state, so only the group states are re-read.
+                guard loadedSort != loadKey else {
+                    refreshGroupStates()
+                    return
+                }
+                loadedSort = loadKey
                 movies = []
+                groupStates = [:]
                 canLoadMore = true
                 await importStalkerContentIfNeeded()
                 loadNextPage()
@@ -338,8 +382,15 @@ struct MovieCategoryView: View {
             emptyDescription: "This category has no movies",
             sortRaw: $contentSortRaw,
             onLoadMore: { loadNextPage() },
-            card: { MovieCardView(movie: $0, fillsWidth: true) }
+            favoriteMenu: CategoryFavoriteMenu(
+                isFavorite: { TitleGroupStateLookup.state(of: $0, in: groupStates).isFavorite },
+                toggle: { toggleFavorite($0) }
+            ),
+            card: { movie in
+                MovieCardView(movie: movie, fillsWidth: true)
+            }
         )
+        .environment(\.titleGroupStates, TitleGroupStates(movies: groupStates))
         // Pull-to-refresh re-imports a Stalker category from the portal without
         // waiting out `Category.stalkerContentTTL`. Not offered for fully-synced
         // sources.
@@ -358,9 +409,9 @@ struct MovieCategoryView: View {
         guard canLoadMore, !isLoadingPage else { return }
         isLoadingPage = true
         defer { isLoadingPage = false }
-        let categoryId = category.id
-        var descriptor = FetchDescriptor<Movie>(
-            predicate: #Predicate { $0.categoryId == categoryId },
+        var descriptor = CategoryGridQuery.movies(
+            categoryId: category.id,
+            grouped: groupDuplicateTitles,
             sortBy: contentSort.movieDescriptors
         )
         descriptor.fetchOffset = movies.count
@@ -368,6 +419,16 @@ struct MovieCategoryView: View {
         let page = (try? modelContext.fetch(descriptor)) ?? []
         movies.append(contentsOf: page)
         if page.count < pageSize { canLoadMore = false }
+        let keys = page.compactMap(\.titleGroupKey)
+        groupStates.replace(keys: keys, with: TitleGroupStateLookup.movies(keys: keys, in: modelContext))
+    }
+
+    private func refreshGroupStates() {
+        groupStates = TitleGroupStateLookup.states(of: movies, in: modelContext)
+    }
+
+    private func toggleFavorite(_ movie: Movie) {
+        TitleGroupFavorites.toggle(movie, updating: &groupStates, in: modelContext)
     }
 
     /// Imports the category from the portal the first time it's opened (Stalker
@@ -393,6 +454,7 @@ struct MovieCategoryView: View {
         guard let playlist = stalkerPlaylist else { return }
         await runStalkerImport(playlist: playlist)
         movies = []
+        groupStates = [:]
         canLoadMore = true
         loadNextPage()
     }
@@ -401,9 +463,9 @@ struct MovieCategoryView: View {
     /// (persistent model ids), so unchanged items keep the scroll position;
     /// only added/removed titles shift.
     private func reloadLoadedPages() {
-        let categoryId = category.id
-        var descriptor = FetchDescriptor<Movie>(
-            predicate: #Predicate { $0.categoryId == categoryId },
+        var descriptor = CategoryGridQuery.movies(
+            categoryId: category.id,
+            grouped: groupDuplicateTitles,
             sortBy: contentSort.movieDescriptors
         )
         let window = max(movies.count, pageSize)
@@ -411,6 +473,7 @@ struct MovieCategoryView: View {
         let rows = (try? modelContext.fetch(descriptor)) ?? []
         canLoadMore = rows.count == window
         movies = rows
+        refreshGroupStates()
     }
 
     private func runStalkerImport(playlist: Playlist) async {
@@ -428,30 +491,45 @@ struct MovieCategoryPreview: View {
     private let limit: Int
     @Query private var movies: [Movie]
     var animationNamespace: Namespace.ID?
+    @Environment(\.modelContext) private var modelContext
+    @State private var groupStates: [String: TitleGroupState] = [:]
 
-    init(category: Category, limit: Int, sort: ContentSortOption, animationNamespace: Namespace.ID? = nil) {
+    /// - Parameter grouped: lists each title once (its category primary); the
+    ///   caller re-keys the view when it changes, since `@Query` is fixed here.
+    init(category: Category, limit: Int, sort: ContentSortOption, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
         self.category = category
         self.limit = limit
         self.animationNamespace = animationNamespace
-        let categoryId = category.id
-        var descriptor = FetchDescriptor<Movie>(
-            predicate: #Predicate<Movie> { $0.categoryId == categoryId },
-            sortBy: sort.movieDescriptors
-        )
+        var descriptor = CategoryGridQuery.movies(categoryId: category.id, grouped: grouped, sortBy: sort.movieDescriptors)
         // Fetch one extra so we can tell whether a full grid would show more.
         descriptor.fetchLimit = limit + 1
         _movies = Query(descriptor)
     }
 
     var body: some View {
+        let shown = Array(movies.prefix(limit))
         CategoryPreviewRow(
             category: category,
-            items: Array(movies.prefix(limit)),
+            items: shown,
             hasMore: movies.count > limit,
             animationNamespace: animationNamespace,
             emptyMessage: "No movies in this category",
-            card: { MovieCardView(movie: $0).environment(\.playlistProvenance, .none) }
+            favoriteMenu: CategoryFavoriteMenu(
+                isFavorite: { TitleGroupStateLookup.state(of: $0, in: groupStates).isFavorite },
+                toggle: { toggleFavorite($0) }
+            ),
+            card: { movie in
+                MovieCardView(movie: movie)
+            }
         )
+        .environment(\.titleGroupStates, TitleGroupStates(movies: groupStates))
+        .task(id: shown.compactMap(\.titleGroupKey)) {
+            groupStates = TitleGroupStateLookup.states(of: shown, in: modelContext)
+        }
+    }
+
+    private func toggleFavorite(_ movie: Movie) {
+        TitleGroupFavorites.toggle(movie, updating: &groupStates, in: modelContext)
     }
 }
 

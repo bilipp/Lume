@@ -59,6 +59,10 @@ final nonisolated class M3UImportState {
     /// First error hit inside a batch; aborts the remaining batches.
     var firstError: Error?
 
+    /// Groups the batches touched, elected once after the last one. Set by
+    /// `seedImportState`.
+    var titleGroups: TitleGroupPrimaries.Deferred?
+
     var totalImported: Int {
         importedLive + importedMovies + importedEpisodes
     }
