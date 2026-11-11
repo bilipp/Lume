@@ -234,6 +234,11 @@ extension ContentSyncManager {
             )
             descriptor.fetchLimit = limit
             return descriptor
+        }, beforeSave: { context, deleted in
+            TitleGroupPrimaries.recompute(
+                categoryKeys: TitleGroupPrimaries.Touched(movies: TitleGroupPrimaries.categoryKeys(of: deleted)),
+                in: context
+            )
         })
         guard removed > 0 else { return }
         Logger.database.info("Pruned \(removed) stale movie(s) for playlist \(prefix)")
@@ -248,6 +253,11 @@ extension ContentSyncManager {
             )
             descriptor.fetchLimit = limit
             return descriptor
+        }, beforeSave: { context, deleted in
+            TitleGroupPrimaries.recompute(
+                categoryKeys: TitleGroupPrimaries.Touched(series: TitleGroupPrimaries.categoryKeys(of: deleted)),
+                in: context
+            )
         })
         guard removed > 0 else { return }
         Logger.database.info("Pruned \(removed) stale series for playlist \(prefix)")
@@ -341,12 +351,16 @@ extension ContentSyncManager {
     /// Membership is a closure rather than a `Set<String>` so a caller can hold
     /// its seen ids in a cheaper form: the m3u pipeline keeps 64-bit hashes
     /// instead of the ids themselves (see `pruneStaleM3U*`).
+    ///
+    /// `beforeSave` gets a page's deleted rows on that page's context, after
+    /// the deletes and before the save, so follow-up writes share the save.
     private func sweepPaged<T: PersistentModel>(
         after: String,
         isSeen: (String) -> Bool,
         idOf: (T) -> String,
         pageSize: Int = 2000,
-        page: (_ cursor: String, _ limit: Int) -> FetchDescriptor<T>
+        page: (_ cursor: String, _ limit: Int) -> FetchDescriptor<T>,
+        beforeSave: ((ModelContext, [T]) -> Void)? = nil
     ) -> Int {
         var cursor = after
         var totalRemoved = 0
@@ -363,11 +377,16 @@ extension ContentSyncManager {
                 fetched = rows.count
                 if let last = rows.last { cursor = idOf(last) }
 
+                var deleted: [T] = []
                 for row in rows where !isSeen(idOf(row)) {
                     context.delete(row)
-                    removed += 1
+                    deleted.append(row)
                 }
-                if removed > 0 { try? context.save() }
+                removed = deleted.count
+                if removed > 0 {
+                    beforeSave?(context, deleted)
+                    try? context.save()
+                }
             }
 
             totalRemoved += removed

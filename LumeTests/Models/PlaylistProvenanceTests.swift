@@ -12,35 +12,44 @@ struct PlaylistProvenanceTests {
 
     @Test func `isolated mode never badges`() {
         let provenance = PlaylistProvenance(scope: .isolated(first), names: names)
-        #expect(provenance.name(forContentID: "\(first.uuidString)-movie-1", in: .movies) == nil)
+        #expect(provenance.name(forStreamID: "\(first.uuidString)-live-1") == nil)
     }
 
-    @Test func `a tab with two contributors names each row's playlist`() {
+    @Test func `live TV with two contributors names each channel's playlist`() {
+        let scope = CatalogScope.combined([
+            (id: first, tabs: [.liveTV]),
+            (id: second, tabs: [.liveTV, .movies])
+        ])
+        let provenance = PlaylistProvenance(scope: scope, names: names)
+        #expect(provenance.name(forStreamID: "\(first.uuidString)-live-1") == "Alpha")
+        #expect(provenance.name(forStreamID: "\(second.uuidString)-live-1") == "Beta")
+    }
+
+    @Test func `live TV with one contributor stays unbadged`() {
         let scope = CatalogScope.combined([
             (id: first, tabs: [.movies, .liveTV]),
             (id: second, tabs: [.movies])
         ])
         let provenance = PlaylistProvenance(scope: scope, names: names)
-        #expect(provenance.name(forContentID: "\(first.uuidString)-movie-1", in: .movies) == "Alpha")
-        #expect(provenance.name(forContentID: "\(second.uuidString)-movie-1", in: .movies) == "Beta")
+        #expect(provenance.name(forStreamID: "\(first.uuidString)-live-1") == nil)
     }
 
-    @Test func `a tab with one contributor stays unbadged`() {
+    @Test func `movies and series are never badged, even with several contributors`() {
         let scope = CatalogScope.combined([
-            (id: first, tabs: [.movies, .liveTV]),
-            (id: second, tabs: [.movies])
+            (id: first, tabs: [.movies, .series]),
+            (id: second, tabs: [.movies, .series])
         ])
         let provenance = PlaylistProvenance(scope: scope, names: names)
-        #expect(provenance.name(forContentID: "\(first.uuidString)-live-1", in: .liveTV) == nil)
-        #expect(provenance.name(forContentID: "\(first.uuidString)-series-1", in: .series) == nil)
+        #expect(provenance.name(forStreamID: "\(first.uuidString)-movie-1") == nil)
+        #expect(provenance.name(forStreamID: "\(second.uuidString)-series-1") == nil)
     }
 
-    @Test func `a row from outside the members is unbadged`() {
+    @Test func `a channel from outside the members is unbadged`() {
         let scope = CatalogScope.combined([
-            (id: first, tabs: [.series]),
-            (id: second, tabs: [.series])
+            (id: first, tabs: [.liveTV]),
+            (id: second, tabs: [.liveTV])
         ])
         let provenance = PlaylistProvenance(scope: scope, names: names)
-        #expect(provenance.name(forContentID: "\(UUID().uuidString)-series-1", in: .series) == nil)
+        #expect(provenance.name(forStreamID: "\(UUID().uuidString)-live-1") == nil)
     }
 }

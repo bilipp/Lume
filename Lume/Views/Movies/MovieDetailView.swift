@@ -21,21 +21,32 @@ struct MovieDetailView: View {
     let movie: Movie
     var animationNamespace: Namespace.ID?
 
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.catalogScope) var catalogScope
+    @Environment(\.contentRestriction) var contentRestriction
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
     #if os(macOS)
-        @Environment(\.openWindow) private var openWindow
+        @Environment(\.openWindow) var openWindow
     #endif
-    @Query private var playlists: [Playlist]
+    @Query var playlists: [Playlist]
 
-    @State private var playingMedia: PlayableMedia?
+    @State var playingMedia: PlayableMedia?
+    /// A pick made in the source sheet, presented once the sheet has gone.
+    @State var pendingMedia: PlayableMedia?
+    @State var sourcePicker: ContentSourcePickerRequest?
+    @State var sourceOptions: [VODSourceOption] = []
+    /// Copies that failed on every engine since the screen opened.
+    @State var failedSourceIDs: Set<String> = []
+    /// Favorite, watched and progress across every copy of the title.
+    @State var groupStates: [String: TitleGroupState] = [:]
     @State private var similar: [HomeMediaItem] = []
     @State private var collectionMovies: [HomeMediaItem] = []
-    @State private var otherSources: [OtherSources.Source] = []
     @State private var refreshToken: UUID = .init()
     @State private var isLoadingTMDB: Bool
     #if !os(tvOS)
-        @State private var downloads = DownloadManager.shared
+        @State var downloads = DownloadManager.shared
         /// Offline downloads are a Premium feature; free users get the paywall.
         @State private var premium = PremiumManager.shared
         @State private var showDownloadPaywall = false
@@ -44,7 +55,7 @@ struct MovieDetailView: View {
     init(movie: Movie, animationNamespace: Namespace.ID? = nil) {
         self.movie = movie
         self.animationNamespace = animationNamespace
-        let needsFetch = if movie.tmdbId != nil, TMDBClient.shared.isConfigured {
+        let needsFetch = if movie.titleTMDBId != nil, TMDBClient.shared.isConfigured {
             if let enrichedAt = movie.tmdbEnrichedAt,
                Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600
             {
@@ -86,7 +97,8 @@ struct MovieDetailView: View {
                 await enrichMovieRatingsIfNeeded(movie, context: modelContext)
                 resolveSimilar()
                 await resolveCollection()
-                resolveOtherSources()
+                resolveSources()
+                refreshGroupState()
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isLoadingTMDB = false
                 }
@@ -94,10 +106,17 @@ struct MovieDetailView: View {
             .onChange(of: movie.similarTMDBIds) { resolveSimilar() }
             .onChange(of: movie.collectionId) { Task { await resolveCollection() } }
             .onChange(of: refreshToken) { resolveSimilar() }
+            .onChange(of: playingMedia == nil) { _, isNil in
+                if isNil { refreshGroupState() }
+            }
+            .onChange(of: sourcesKey) { resolveSources() }
+            .contentSourcePicker($sourcePicker, onDismiss: presentPendingMedia) { play($0) }
             #if os(iOS)
-                .fullScreenCover(item: $playingMedia) { media in
+                .fullScreenCover(item: $playingMedia, onDismiss: takeSourceFailure) { media in
                     FullScreenPlayerView(media: media)
                 }
+            #elseif os(macOS)
+                .onChange(of: VODSourceFailureHandoff.shared.pending?.id) { takeSourceFailure() }
             #endif
         #endif
     }
@@ -188,12 +207,6 @@ struct MovieDetailView: View {
                             SimilarRow(items: collectionMovies, animationNamespace: animationNamespace)
                         }
                     }
-
-                    if !otherSources.isEmpty {
-                        section(title: "Other Sources") {
-                            OtherSourcesRow(sources: otherSources, animationNamespace: animationNamespace)
-                        }
-                    }
                 }
                 .frame(width: proxy.size.width, alignment: .leading)
                 .padding(.bottom, 32)
@@ -214,12 +227,14 @@ struct MovieDetailView: View {
     }
 
     private var actions: some View {
-        PrimaryPlayButton(
-            title: movie.watchProgress > 1 ? "Resume" : "Play",
-            isEnabled: moviePlaylist != nil,
-            action: startPlayback
+        let isPlayable = moviePlaylist != nil || !sourceOptions.isEmpty
+        return PrimaryPlayButton(
+            title: (groupState.lastWatched?.watchProgress ?? 0) > 1 ? "Resume" : "Play",
+            isEnabled: isPlayable,
+            chooseSource: sourceOptions.isEmpty ? nil : { startPlayback(forcePicker: true) },
+            action: { startPlayback() }
         )
-        .missingPlaylistNotice(moviePlaylist == nil)
+        .missingPlaylistNotice(!isPlayable)
     }
 
     @ViewBuilder
@@ -281,25 +296,22 @@ struct MovieDetailView: View {
 
     /// The playlist this movie actually belongs to (ids are `"<playlistUUID>-…"`),
     /// so playback uses the correct credentials; `nil` when it is not installed.
-    private var moviePlaylist: Playlist? {
+    var moviePlaylist: Playlist? {
         playlists.owner(ofContentID: movie.id)
     }
 
     // MARK: - Enrichment
 
     private func enrichIfNeeded() async {
-        guard let tmdbId = movie.tmdbId else { return }
+        guard let tmdbId = movie.titleTMDBId else { return }
         if let enrichedAt = movie.tmdbEnrichedAt,
            Date().timeIntervalSince(enrichedAt) < 14 * 24 * 3600
         {
             return
         }
-        let manager = ContentSyncManager(modelContainer: modelContext.container)
         // Same fix as SeriesDetailView: apply on the view's own context to avoid
         // the fault-after-background-deletion race (see SeriesDetailView).
-        guard let details = try? await manager.fetchTMDBMovieDetails(tmdbId: tmdbId) else { return }
-        applyMovieDetails(details, to: movie, context: modelContext)
-        try? modelContext.save()
+        guard await enrichMovieDetails(movie, tmdbId: tmdbId, context: modelContext) else { return }
         refreshToken = UUID()
     }
 
@@ -307,26 +319,21 @@ struct MovieDetailView: View {
         let ids = movie.similarTitleIds
         guard !ids.isEmpty else { similar = []; return }
 
-        // Scope to the same playlist this movie belongs to.
-        let playlistPrefix = movie.id.components(separatedBy: "-movie-").first
-        func owned(_ id: String) -> Bool {
-            guard let prefix = playlistPrefix else { return true }
-            return id.hasPrefix(prefix)
-        }
+        let ranking = railRanking
 
         var resolved: [HomeMediaItem] = []
         for tmdbId in ids {
             let movieMatches = (try? modelContext.fetch(
                 FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
             )) ?? []
-            if let match = movieMatches.first(where: { owned($0.id) && $0.id != movie.id }) {
+            if let match = TitleGrouping.railRow(movieMatches, excluding: movie, tab: .movies, ranking: ranking, grouped: groupDuplicateTitles) {
                 resolved.append(.movie(match))
                 continue
             }
             let seriesMatches = (try? modelContext.fetch(
                 FetchDescriptor<Series>(predicate: #Predicate { $0.tmdbId == tmdbId })
             )) ?? []
-            if let match = seriesMatches.first(where: { owned($0.id) }) {
+            if let match = TitleGrouping.railRow(seriesMatches, excluding: movie, tab: .series, ranking: ranking, grouped: groupDuplicateTitles) {
                 resolved.append(.series(match))
             }
         }
@@ -348,39 +355,21 @@ struct MovieDetailView: View {
             return
         }
 
-        let playlistPrefix = movie.id.components(separatedBy: "-movie-").first
-        func owned(_ id: String) -> Bool {
-            guard let prefix = playlistPrefix else { return true }
-            return id.hasPrefix(prefix)
-        }
-
+        let ranking = railRanking
         var resolved: [HomeMediaItem] = []
         for tmdbId in partIDs {
             let movieMatches = (try? modelContext.fetch(
                 FetchDescriptor<Movie>(predicate: #Predicate { $0.tmdbId == tmdbId })
             )) ?? []
-            if let match = movieMatches.first(where: { owned($0.id) && $0.id != movie.id }) {
+            if let match = TitleGrouping.railRow(movieMatches, excluding: movie, tab: .movies, ranking: ranking, grouped: groupDuplicateTitles) {
                 resolved.append(.movie(match))
             }
         }
         collectionMovies = resolved
     }
 
-    private func resolveOtherSources() {
-        otherSources = OtherSources.resolve(for: movie, in: modelContext)
-    }
-
-    // MARK: - Actions
-
-    private func startPlayback() {
-        guard let playlist = moviePlaylist,
-              let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
-        if ExternalPlayback.open(media) { return }
-        #if os(macOS)
-            MacPlayerWindowRouter.shared.play(media, using: openWindow)
-        #else
-            playingMedia = media
-        #endif
+    private var railRanking: TitleGrouping.Ranking {
+        TitleGrouping.Ranking(scope: catalogScope)
     }
 
     private func openTrailer(_ trailer: String) {
@@ -390,21 +379,6 @@ struct MovieDetailView: View {
         #elseif os(macOS)
             NSWorkspace.shared.open(url)
         #endif
-    }
-
-    private func toggleFavorite() {
-        MediaFavorites.toggle(movie, in: modelContext)
-    }
-
-    private func toggleWatched() {
-        movie.isWatched.toggle()
-        if movie.isWatched {
-            movie.watchProgress = Double(movie.durationSecs ?? 0)
-            #if !os(tvOS)
-                downloads.checkAutoDelete(id: movie.id)
-            #endif
-        }
-        WatchedTrackers.sync(movie: movie, watched: movie.isWatched)
     }
 }
 
@@ -432,30 +406,30 @@ struct MovieDetailView: View {
                             )
                         }
                         GlassIconButton(
-                            systemImage: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle",
-                            accessibilityLabel: movie.isWatched ? "Mark as unwatched" : "Mark as watched"
+                            systemImage: groupState.isWatched ? "checkmark.circle.fill" : "checkmark.circle",
+                            accessibilityLabel: groupState.isWatched ? "Mark as unwatched" : "Mark as watched"
                         ) { toggleWatched() }
                         GlassIconButton(
-                            systemImage: movie.isFavorite ? "heart.fill" : "heart",
-                            accessibilityLabel: movie.isFavorite ? "Remove from favorites" : "Add to favorites"
+                            systemImage: groupState.isFavorite ? "heart.fill" : "heart",
+                            accessibilityLabel: groupState.isFavorite ? "Remove from favorites" : "Add to favorites"
                         ) { toggleFavorite() }
                     }
                 }
             #elseif os(macOS)
                 ToolbarItem(placement: .primaryAction) {
                     Button { toggleWatched() } label: {
-                        Image(systemName: movie.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
-                            .symbolReplaceTransition(value: movie.isWatched)
+                        Image(systemName: groupState.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
+                            .symbolReplaceTransition(value: groupState.isWatched)
                     }
-                    .help(movie.isWatched ? "Mark as Unwatched" : "Mark as Watched")
+                    .help(groupState.isWatched ? "Mark as Unwatched" : "Mark as Watched")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button { toggleFavorite() } label: {
-                        Image(systemName: movie.isFavorite ? "heart.fill" : "heart")
-                            .foregroundStyle(movie.isFavorite ? .red : .primary)
-                            .symbolReplaceTransition(value: movie.isFavorite)
+                        Image(systemName: groupState.isFavorite ? "heart.fill" : "heart")
+                            .foregroundStyle(groupState.isFavorite ? .red : .primary)
+                            .symbolReplaceTransition(value: groupState.isFavorite)
                     }
-                    .help(movie.isFavorite ? "Remove from Favorites" : "Add to Favorites")
+                    .help(groupState.isFavorite ? "Remove from Favorites" : "Add to Favorites")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     downloadMacItem

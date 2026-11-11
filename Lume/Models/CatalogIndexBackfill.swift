@@ -94,6 +94,23 @@ nonisolated enum CatalogIndexBackfill {
             name: "Z_EPGListing_SwiftDataIndexOnBinarychannelIdend",
             table: "ZEPGLISTING",
             columns: ["ZCHANNELID", "ZEND"]
+        ),
+        // Title grouping: sibling lookups seek on the group key, and category
+        // grids filter on `categoryId` plus the per-category primary flag. On
+        // the first launch after the columns were added this runs before the
+        // migration creates them, fails as "no such column" and is skipped; the
+        // next launch creates it.
+        Index(name: "Z_Movie_SwiftDataIndexOnBinarytitleGroupKey", table: "ZMOVIE", columns: ["ZTITLEGROUPKEY"]),
+        Index(
+            name: "Z_Movie_SwiftDataIndexOnBinarycategoryIdisCategoryGroupPrimary",
+            table: "ZMOVIE",
+            columns: ["ZCATEGORYID", "ZISCATEGORYGROUPPRIMARY"]
+        ),
+        Index(name: "Z_Series_SwiftDataIndexOnBinarytitleGroupKey", table: "ZSERIES", columns: ["ZTITLEGROUPKEY"]),
+        Index(
+            name: "Z_Series_SwiftDataIndexOnBinarycategoryIdisCategoryGroupPrimary",
+            table: "ZSERIES",
+            columns: ["ZCATEGORYID", "ZISCATEGORYGROUPPRIMARY"]
         )
     ]
 

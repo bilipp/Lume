@@ -3,8 +3,8 @@
 //  Lume
 //
 //  Shared building blocks for the Apple TV-style movie and series detail
-//  screens: a full-bleed backdrop hero, the metadata line, the prominent
-//  Play button, secondary action pills, an expandable synopsis, the cast row
+//  screens: a full-bleed backdrop hero, the metadata line,
+//  secondary action pills, an expandable synopsis, the cast row
 //  and the "You May Also Like" poster row. Both MovieDetailView and
 //  SeriesDetailView compose these so the two screens stay visually identical.
 //
@@ -227,36 +227,6 @@ struct MetadataLineView: View {
 
 // MARK: - Buttons
 
-// MARK: - Play button
-
-/// The big, full-width primary action (Play / Resume).
-///
-/// Renders as a high-contrast filled pill: a white button with black text in
-/// dark mode, inverting to a black button with white text in light mode so it
-/// never disappears against the detail view's `.systemBackground`.
-struct PrimaryPlayButton: View {
-    let title: LocalizedStringKey
-    var systemImage: String = "play.fill"
-    var isEnabled: Bool = true
-    let action: () -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.headline)
-                .foregroundStyle(colorScheme == .dark ? .black : .white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 30)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(colorScheme == .dark ? .white : .black)
-        .controlSize(.large)
-        .disabled(!isEnabled)
-    }
-}
-
 /// A circular glass button for the floating navigation overlay (back, share…).
 struct GlassIconButton: View {
     let systemImage: String
@@ -357,6 +327,7 @@ struct SimilarRow: View {
     var animationNamespace: Namespace.ID?
 
     @Environment(\.modelContext) private var modelContext
+    @State private var groupStates = TitleGroupStates.empty
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -380,10 +351,13 @@ struct SimilarRow: View {
                             EmptyView()
                         }
                     }
-                    .mediaFavoriteMenu(item, in: modelContext)
+                    .railFavoriteMenu(item, in: modelContext, groupStates: $groupStates)
                 }
             }
             .padding(.horizontal, DetailMetrics.contentPadding)
+        }
+        .task(id: items) {
+            groupStates = TitleGroupStates.load(for: items, in: modelContext)
         }
     }
 }
@@ -392,7 +366,6 @@ struct SimilarRow: View {
 struct DetailPosterCard: View {
     let title: String
     let imageURL: URL?
-    var badge: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -415,7 +388,6 @@ struct DetailPosterCard: View {
             }
             .frame(width: 120, height: 180)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .posterBadge(badge)
             .shadow(radius: 2)
 
             Text(title)
@@ -538,21 +510,6 @@ enum DetailFormat {
 
 #Preview("MetadataLineView - Empty") {
     MetadataLineView(metadata: DetailMetadata())
-}
-
-#Preview("PrimaryPlayButton - Enabled") {
-    PrimaryPlayButton(title: "Play", action: {})
-        .padding()
-}
-
-#Preview("PrimaryPlayButton - Disabled") {
-    PrimaryPlayButton(title: "Play", isEnabled: false, action: {})
-        .padding()
-}
-
-#Preview("PrimaryPlayButton - Resume") {
-    PrimaryPlayButton(title: "Resume", systemImage: "play.fill", action: {})
-        .padding()
 }
 
 #Preview("GlassIconButton") {

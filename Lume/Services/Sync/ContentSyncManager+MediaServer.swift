@@ -395,6 +395,7 @@ extension ContentSyncManager {
             lookup[movie.id] = movie
         }
 
+        var touched = TitleGroupPrimaries.Touched()
         for item in items {
             let id = scope.idPrefix + item.id
             let movie: Movie
@@ -404,8 +405,9 @@ extension ContentSyncManager {
                 movie = Movie(id: id, streamId: Self.mediaServerHash(item.id), name: item.name ?? "")
                 context.insert(movie)
             }
-            applyJellyfinMovieFields(item, to: movie, scope: scope)
+            TitleGroupPrimaries.track(movie, into: &touched.movies) { applyJellyfinMovieFields(item, to: movie, scope: scope) }
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
             try? context.save()
         }
@@ -417,8 +419,16 @@ extension ContentSyncManager {
     /// guarded: SwiftData dirties a row on assignment, not on change. Split in
     /// two halves (identity + metadata) for the complexity lint.
     private func applyJellyfinMovieFields(_ item: JellyfinItem, to movie: Movie, scope: JellyfinViewScope) {
+        let previousName = movie.name
+        let previousTmdbId = movie.tmdbId
         applyJellyfinMovieIdentity(item, to: movie, scope: scope)
         applyJellyfinMovieMetadata(item, to: movie)
+        if let tmdbId = Self.mediaServerTmdbId(item.providerIds?["Tmdb"]), movie.tmdbId != tmdbId {
+            movie.tmdbId = tmdbId
+        }
+        if TitleGroupPrimaries.needsKey(movie, previousName: previousName, previousTmdbId: previousTmdbId) {
+            TitleGroupPrimaries.assignKey(to: movie)
+        }
     }
 
     private func applyJellyfinMovieIdentity(_ item: JellyfinItem, to movie: Movie, scope: JellyfinViewScope) {
@@ -492,9 +502,11 @@ extension ContentSyncManager {
         // Only rows this pipeline owns carry the flavour infix; anything else
         // under the prefix belongs to another source and is left alone.
         let infix = "-\(flavor.idInfix)-"
+        var touched = TitleGroupPrimaries.Touched()
         for movie in rows where movie.id.contains(infix) && !seenIds.contains(movie.id) {
-            context.delete(movie)
+            TitleGroupPrimaries.delete(movie, from: context, recordingInto: &touched.movies)
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
             try? context.save()
         }

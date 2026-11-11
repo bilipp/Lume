@@ -154,6 +154,8 @@ extension ContentSyncManager {
     /// field copy with one independent guard per provider field, not branching
     /// logic.
     func applyMovieFields(from dto: XtreamVODStream, to movie: Movie, playlistPrefix: String) { // swiftlint:disable:this cyclomatic_complexity
+        let previousName = movie.name
+        let previousTmdbId = movie.tmdbId
         let name = dto.name ?? ""
         if movie.name != name { movie.name = name }
         if movie.streamIcon != dto.streamIcon { movie.streamIcon = dto.streamIcon }
@@ -176,6 +178,9 @@ extension ContentSyncManager {
         if let tmdbString = dto.tmdb, let tmdbInt = Int(tmdbString), movie.tmdbId != tmdbInt {
             movie.tmdbId = tmdbInt
         }
+        if TitleGroupPrimaries.needsKey(movie, previousName: previousName, previousTmdbId: previousTmdbId) {
+            TitleGroupPrimaries.assignKey(to: movie)
+        }
     }
 
     /// Copies the provider-owned fields from a series DTO onto an existing or
@@ -187,6 +192,8 @@ extension ContentSyncManager {
     /// numeric normalisation applies — `"7"` and `"7.0"` are different values
     /// and must stay so.
     func applySeriesFields(from dto: XtreamSeries, to series: Series, playlistPrefix: String) { // swiftlint:disable:this cyclomatic_complexity
+        let previousName = series.name
+        let previousTmdbId = series.tmdbId
         let name = dto.name ?? ""
         if series.name != name { series.name = name }
         if series.cover != dto.cover { series.cover = dto.cover }
@@ -217,6 +224,9 @@ extension ContentSyncManager {
         }
         if let tmdbString = dto.tmdb, let tmdbInt = Int(tmdbString), series.tmdbId != tmdbInt {
             series.tmdbId = tmdbInt
+        }
+        if TitleGroupPrimaries.needsKey(series, previousName: previousName, previousTmdbId: previousTmdbId) {
+            TitleGroupPrimaries.assignKey(to: series)
         }
     }
 

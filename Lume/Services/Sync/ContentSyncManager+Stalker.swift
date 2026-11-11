@@ -254,6 +254,7 @@ extension ContentSyncManager {
         }
 
         var imported = 0
+        var touched = TitleGroupPrimaries.Touched()
         for (item, categoryId) in items {
             guard let stalkerId = item.id, let cmd = item.cmd else { continue }
             let streamId = Self.streamId(for: stalkerId)
@@ -267,9 +268,12 @@ extension ContentSyncManager {
                 movie = Movie(id: movieId, streamId: streamId, name: "")
                 context.insert(movie)
             }
-            applyStalkerMovieFields(from: item, cmd: cmd, to: movie, categoryId: playlistPrefix + categoryId)
+            TitleGroupPrimaries.track(movie, into: &touched.movies) {
+                applyStalkerMovieFields(from: item, cmd: cmd, to: movie, categoryId: playlistPrefix + categoryId)
+            }
             imported += 1
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         // An unchanged page leaves the context clean (see applyStalkerMovieFields).
         if context.hasChanges { try? context.save() }
         return imported
@@ -331,6 +335,7 @@ extension ContentSyncManager {
         }
 
         var imported = 0
+        var touched = TitleGroupPrimaries.Touched()
         for (item, categoryId) in items {
             guard let stalkerId = item.id else { continue }
             let seriesId = Self.streamId(for: stalkerId)
@@ -344,9 +349,12 @@ extension ContentSyncManager {
                 series = Series(id: id, seriesId: seriesId, name: "")
                 context.insert(series)
             }
-            applyStalkerSeriesFields(from: item, to: series, categoryId: playlistPrefix + categoryId)
+            TitleGroupPrimaries.track(series, into: &touched.series) {
+                applyStalkerSeriesFields(from: item, to: series, categoryId: playlistPrefix + categoryId)
+            }
             imported += 1
         }
+        TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges { try? context.save() }
         return imported
     }

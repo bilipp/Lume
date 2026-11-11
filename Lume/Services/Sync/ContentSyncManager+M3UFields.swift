@@ -19,6 +19,7 @@ extension ContentSyncManager {
     /// holds: the categories previous syncs created, and the `num` each kind's
     /// next insert should take.
     func seedImportState(_ state: M3UImportState, playlistId: UUID) {
+        state.titleGroups = TitleGroupPrimaries.Deferred(playlistId: playlistId)
         // Categories from previous syncs are updated in place — re-inserting
         // would be an upsert that wipes isHidden / customOrder.
         for type in CategoryType.allCases {
@@ -148,12 +149,16 @@ extension ContentSyncManager {
     /// `applyM3ULiveStreamFields`. `num` is likewise assigned only on insert
     /// (see the call site in `importMovies`).
     func applyM3UMovieFields(from entry: M3UEntry, to movie: Movie, categoryId: String) {
+        let previousName = movie.name
         if movie.name != entry.name { movie.name = entry.name }
         if movie.streamIcon != entry.logo { movie.streamIcon = entry.logo }
         if movie.directURL != entry.url { movie.directURL = entry.url }
         let containerExtension = M3UClassifier.pathExtension(of: entry.url)
         if movie.containerExtension != containerExtension { movie.containerExtension = containerExtension }
         if movie.categoryId != categoryId { movie.categoryId = categoryId }
+        if TitleGroupPrimaries.needsKey(movie, previousName: previousName, previousTmdbId: movie.tmdbId) {
+            TitleGroupPrimaries.assignKey(to: movie)
+        }
     }
 
     /// Copies the fields an m3u episode entry carries for its parent `Series`.
@@ -168,6 +173,10 @@ extension ContentSyncManager {
     func applyM3USeriesFields(from entry: M3UEntry, to series: Series, categoryId: String) {
         if series.categoryId != categoryId { series.categoryId = categoryId }
         if series.cover == nil, entry.logo != nil { series.cover = entry.logo }
+        // The name is the series' m3u identity and never changes here.
+        if series.titleGroupKey == nil || series.titleMatchKey == nil {
+            TitleGroupPrimaries.assignKey(to: series)
+        }
     }
 
     /// Copies the provider-owned fields of an m3u entry onto an existing or

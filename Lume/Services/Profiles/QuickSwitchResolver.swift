@@ -72,7 +72,7 @@ extension [Playlist] {
 
     /// The playlist added first — the free plan's one playlist, and the
     /// fallback whenever the stored selection can't be used.
-    var oldest: Playlist? {
+    nonisolated var oldest: Playlist? {
         self.min { ($0.addedAt, $0.id.uuidString) < ($1.addedAt, $1.id.uuidString) }
     }
 
@@ -96,7 +96,13 @@ extension [Playlist] {
 
     /// The playlists the plan can use: all of them with Pro, else the oldest.
     func unlocked(isPremium: Bool? = nil) -> [Playlist] {
-        PremiumManager.isPremium(isPremium) ? self : (oldest.map { [$0] } ?? [])
+        unlocked(premium: PremiumManager.isPremium(isPremium))
+    }
+
+    /// `unlocked(isPremium:)` with the plan already read, for callers off the
+    /// main actor.
+    nonisolated func unlocked(premium: Bool) -> [Playlist] {
+        premium ? self : (oldest.map { [$0] } ?? [])
     }
 
     /// The playlist that synced a piece of content. Every catalog id is

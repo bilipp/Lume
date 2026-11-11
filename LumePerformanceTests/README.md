@@ -1102,6 +1102,86 @@ favourite, watch position and enrichment. The app therefore only *hints*: when a
 entered m3u URL is an Xtream `get.php` endpoint carrying credentials, the
 add-playlist screen says so and leaves the choice to the user.
 
+### The title-key bridge at provider scale
+
+`M3UColdImportBenchmarks` imports an m3u-only catalog: no row carries a tmdbId,
+so `hasBridgeWork` is false and `TitleGroupBridge` never runs there.
+`TitleGroupBridgeBenchmarks` cold-imports the same 600,000-entry provider m3u
+(unmeasured), then an Xtream playlist into the same on-disk store with one row
+and one tmdb id per distinct m3u title, and measures that Xtream phase. Every
+m3u row of a title adopts the Xtream row's `tmdb:` key (the test asserts it).
+Movies and series are separate tests: each phase runs the bridge once.
+
+iPhone 17 Pro simulator (iOS 26.5), Benchmark configuration, one sitting, one
+iteration per test. Movies: 24,617 titles. Peak RSS is the whole process.
+
+| Test | Stage | `TitleGroupBridge` | Phase clock | Peak RSS |
+|------|-------|-------------------:|------------:|---------:|
+| Movies | before | 53.7 s | 68.9 s | 101 MB |
+| Movies | gather per chunk | 53.8 s | 69.1 s | 108 MB |
+| Movies | match-key fetch | 50.5 s | 66.0 s | 92 MB |
+| Movies | fetch before re-key | **22.3 s** | **38.1 s** | 91 MB |
+| Series | before | 10.9 s | 16.1 s | 82 MB |
+| Series | gather per chunk | 11.0 s | 16.2 s | 84 MB |
+| Series | match-key fetch | 10.3 s | 15.6 s | 73 MB |
+| Series | fetch before re-key | **4.5 s** | **9.9 s** | 72 MB |
+
+The bridge is three-quarters of the Xtream movie phase. Peak RSS stays near
+100 MB, so memory is not the problem; time is.
+
+**Gathering per chunk bought nothing.** `matchKeys(forGroupKeys:in: container)`
+now fetches each 500-key chunk on a fresh context in its own autoreleasepool.
+Behaviour is unchanged, the numbers are inside noise, and the RSS difference is
+run-to-run. Kept because it bounds the gather's working set at any scale.
+
+**Where the 54 s goes** (temporary wall-clock probes on the movie pass, removed
+afterwards): the gather is 1.8 s. Each of the five 5,000-key passes costs
+~10.5 s: `bridgeTargets` 0.5 s, the `titleKeyedMatching` fetch of the full
+tmdbId-less rows **~6.7 s**, the in-memory re-key 0.1 s, and the save
+**~3.2 s**. That fetch is ~63% of the bridge and the saves ~30%.
+
+**The planner did use the tmdbId index — and it barely mattered.** With
+`com.apple.CoreData.SQLDebug` on, the old row fetch was
+`WHERE t0.ZTMDBID IS NULL AND t0.ZTITLEMATCHKEY IN (…)`, and `EXPLAIN QUERY
+PLAN` gives `SEARCH t0 USING INDEX Z_Movie_SwiftDataIndexOnBinarytmdbId
+(ZTMDBID=?)`: every chunk walked every tmdbId-less movie (there is no
+`sqlite_stat1`). The carrier query, `ZTMDBID IS NOT NULL AND
+ZTITLEMATCHKEY IN`, already used the match-key index. *Match-key fetch* is one
+`ZTITLEMATCHKEY IN` query per chunk that returns carriers and tmdbId-less
+rows together, filtered in memory, plus `relationshipKeyPathsForPrefetching =
+[\.castMembers]`: without it SwiftData fires a `castMembers` to-many fault per
+row inside `fetch`. 3 s of 54.
+
+**The fetch cost was the context's pending changes.** `ModelContext.fetch`
+also evaluates the predicate in memory against the context's changed rows, and
+a `keys.contains` over a 500-key list is linear. Each 5,000-key pass re-keyed a
+chunk before fetching the next, so the tenth fetch scanned nine chunks of
+changed rows: 32 s of fetch for 90,617 rows. *Fetch before re-key* reads every
+chunk of the pass before touching a row (disjoint match keys, so the result is
+identical): the fetch is **3.9 s**.
+
+**`propertiesToFetch` makes it slower, not faster.** A partial fetch issues
+one full-row `SELECT … WHERE Z_PK = ?` and a `castMembers` fault per row inside
+`fetch`, and the save faults every partial row in full again before its
+`UPDATE`. On a 20,000-row store, per 500-key chunk: full 0.25 s, partial
+0.45 s, full + prefetch 0.09 s, `fetchIdentifiers` 0.01 s but
+`model(for:)` per id 0.56 s.
+
+**What is left is the save: 16.5 s of the 22.3 s, for 66,000 re-keyed rows
+(0.25 ms each).** Index maintenance is not it: the `UPDATE` only sets
+`ZTITLEGROUPKEY` and `Z_OPT`, so only the `titleGroupKey` index changes, and
+saving 20,000 rows on a 60,000-row store costs the same 4.4 s whether the
+changed column is `titleGroupKey`, `genre` (both indexed) or `plot` (not
+indexed). Per row the save runs a full-row re-fault `SELECT`, a `castMembers`
+to-many fault, the `UPDATE OR FAIL … WHERE Z_PK = ? AND Z_OPT = ?` and an
+`ACHANGE` history insert, even for rows fetched in full. Every one of the
+66,000 rows really changes key (rows already on their target are skipped), so
+there is nothing left to drop. The remaining lever is a set-based update
+(`UPDATE ZMOVIE SET ZTITLEGROUPKEY = … WHERE ZTITLEMATCHKEY IN …` through
+Core Data's `NSBatchUpdateRequest` on the same store): no schema change, but
+it bypasses `ModelContext`, so open contexts have to be merged from history
+and the re-elect has to work from the keys rather than the saved rows.
+
 ## Baselines
 
 Xcode stores accepted baselines in

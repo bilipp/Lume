@@ -541,4 +541,46 @@ struct MediaServerSyncTests {
         let names = try Set(ModelContext(container).fetch(FetchDescriptor<Movie>()).map(\.name))
         #expect(names == ["Arrival", "Foreign"])
     }
+
+    // MARK: Title grouping
+
+    @Test func `provider tmdb ids key the title group and one copy leads its library`() async throws {
+        let host = uniqueHost()
+        defer { JellyfinServerStubProtocol.remove(host: host) }
+        installFullServer(
+            host: host,
+            movies: [
+                jellyfinMovie(id: "m1", name: "Arrival"),
+                jellyfinMovie(id: "m2", name: "Arrival 4K")
+            ],
+            series: [jellyfinSeries(id: "s1", name: "Harbor Lights")],
+            episodes: []
+        )
+
+        let container = try makeTestContainer()
+        let playlist = try makePlaylist(container: container, host: host)
+        try await makeManager(container: container).syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let movies = try context.fetch(FetchDescriptor<Movie>())
+        #expect(movies.count == 2)
+        #expect(movies.allSatisfy { $0.tmdbId == 329_865 && $0.titleGroupKey == "tmdb:329865" })
+        #expect(movies.filter(\.isCategoryGroupPrimary).count == 1)
+
+        let show = try #require(try context.fetch(FetchDescriptor<Series>()).first)
+        #expect(show.tmdbId == 12345)
+        #expect(show.titleGroupKey == "tmdb:12345")
+        #expect(show.isCategoryGroupPrimary)
+    }
+
+    @Test(arguments: [
+        (String?.none, Int?.none),
+        ("abc", nil),
+        ("0", nil),
+        ("-4", nil),
+        (" 603 ", 603)
+    ])
+    func `a provider tmdb id parses only as a positive integer`(raw: String?, expected: Int?) {
+        #expect(ContentSyncManager.mediaServerTmdbId(raw) == expected)
+    }
 }

@@ -428,4 +428,28 @@ struct PlexSyncTests {
         let media = try #require(PlayableMedia.from(movie: movie, playlist: playlist))
         #expect(media.httpHeaders == nil)
     }
+
+    @Test func `plex tmdb guids key the title group`() async throws {
+        let host = uniqueHost()
+        defer { PlexServerStubProtocol.remove(host: host) }
+        installFullServer(
+            host: host,
+            movies: [plexMovie(ratingKey: "1", title: "Arrival")],
+            shows: [plexShow(ratingKey: "10", title: "Harbor Lights")],
+            episodes: []
+        )
+
+        let container = try makeTestContainer()
+        let playlist = try makePlaylist(container: container, host: host, token: "tok")
+        try await makeManager(container: container).syncPlaylist(playlist)
+
+        let context = ModelContext(container)
+        let movie = try #require(try context.fetch(FetchDescriptor<Movie>()).first)
+        #expect(movie.tmdbId == 675)
+        #expect(movie.titleGroupKey == "tmdb:675")
+        #expect(movie.isCategoryGroupPrimary)
+        let show = try #require(try context.fetch(FetchDescriptor<Series>()).first)
+        #expect(show.tmdbId == 253_030)
+        #expect(show.titleGroupKey == "tmdb:253030")
+    }
 }
