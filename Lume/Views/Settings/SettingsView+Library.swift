@@ -178,7 +178,12 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
                 }
 
                 Section {
-                    Toggle("Group Duplicate Titles", isOn: $groupDuplicateTitles)
+                    Toggle(isOn: $groupDuplicateTitles) {
+                        HStack(spacing: 6) {
+                            Text("Group Duplicate Titles")
+                            BetaBadge()
+                        }
+                    }
                 } footer: {
                     Text("Show a movie or series once when it's in several qualities, languages or playlists, and pick the version when you play it.")
                 }
@@ -256,7 +261,7 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    TVOptionToggleRow(title: "Group Duplicate Titles", isOn: $groupDuplicateTitles)
+                    TVOptionToggleRow(title: "Group Duplicate Titles", isOn: $groupDuplicateTitles, showsBetaBadge: true)
                     Text("Show a movie or series once when it's in several qualities, languages or playlists, and pick the version when you play it.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
