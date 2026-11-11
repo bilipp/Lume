@@ -210,7 +210,7 @@ struct VODSourceResolverTests {
         #expect(sources.map(\.rowID) == [germanFHD.id, germanHD.id, englishUHD.id])
     }
 
-    @Test func `options carry the tags parsed from the title and the category's language`() throws {
+    @Test func `options carry the playlist's title, its parsed tags and the category's language`() throws {
         let container = try makeTestContainer()
         let context = container.mainContext
         let playlist = makePlaylist(name: "Provider A", in: context)
@@ -221,6 +221,7 @@ struct VODSourceResolverTests {
         try context.save()
 
         let option = try #require(movieSources(movie, scope: .isolated(playlist.id), in: context).first)
+        #expect(option.title == "Heat (1995) 4K HDR DV")
         #expect(option.qualityLabel == "4K")
         #expect(option.isHDR)
         #expect(option.isDolbyVision)
@@ -252,6 +253,7 @@ struct VODSourceResolverTests {
             rowID: id,
             playlistID: UUID(),
             playlistName: "P",
+            title: id,
             qualityLabel: nil,
             isHDR: false,
             isDolbyVision: false,

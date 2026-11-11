@@ -48,7 +48,7 @@ struct VODSourceFailureHandoffTests {
     @Test func `the picker comes back with the failed copy marked and another preselected`() {
         let options = ["a", "b", "c"].map { id in
             VODSourceOption(
-                rowID: id, playlistID: .init(), playlistName: id, qualityLabel: nil,
+                rowID: id, playlistID: .init(), playlistName: id, title: id, qualityLabel: nil,
                 isHDR: false, isDolbyVision: false, languageCode: nil, categoryName: nil, isMediaServer: false
             )
         }

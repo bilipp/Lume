@@ -39,10 +39,17 @@ extension SeriesDetailView: TitleGroupSeriesDetail {
                 Button {
                     switchSource(to: option)
                 } label: {
+                    // The second text is the menu item's subtitle.
                     if option.rowID == shown.id {
-                        Label(option.summaryLabel, systemImage: "checkmark")
+                        Label {
+                            Text(verbatim: option.summaryLabel)
+                            Text(verbatim: option.title)
+                        } icon: {
+                            Image(systemName: "checkmark")
+                        }
                     } else {
                         Text(verbatim: option.summaryLabel)
+                        Text(verbatim: option.title)
                     }
                 }
             }

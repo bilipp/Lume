@@ -16,6 +16,8 @@ nonisolated struct VODSourceOption: Identifiable, Hashable {
     let rowID: String
     let playlistID: UUID
     let playlistName: String
+    /// The title as this row's playlist lists it, tags and prefixes included.
+    let title: String
     /// 4K, UHD, FHD, HD or SD; nil when the provider's title names none.
     let qualityLabel: String?
     let isHDR: Bool
@@ -110,6 +112,7 @@ private nonisolated extension VODSourceResolver {
                 rowID: row.id,
                 playlistID: owner,
                 playlistName: playlist.name,
+                title: row.name,
                 qualityLabel: tags.qualityLabel,
                 isHDR: tags.isHDR,
                 isDolbyVision: tags.isDolbyVision,

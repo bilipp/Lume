@@ -3,8 +3,8 @@
 //  Lume
 //
 //  Which copy of a grouped movie or series plays, asked on the detail screen
-//  before the player opens. One row per catalog row: playlist, quality,
-//  HDR/DV and language. A Jellyfin, Emby or Plex row is a single entry; its
+//  before the player opens. One row per catalog row: playlist, the title as
+//  that playlist lists it, quality, HDR/DV and language. A Jellyfin, Emby or Plex row is a single entry; its
 //  versions are picked later by the player's own source flow.
 //
 
@@ -224,8 +224,8 @@ struct ContentSourcePicker: View {
     }
 }
 
-/// `[4K]  Playlist name`, then `HDR · Dolby Vision · German`. A title with no
-/// tags is just its playlist.
+/// `[4K]  Playlist name`, the title as that playlist lists it, then
+/// `HDR · Dolby Vision · German` when the title carries any tags.
 private struct ContentSourceRow: View {
     let option: VODSourceOption
     let isRemembered: Bool
@@ -246,6 +246,10 @@ private struct ContentSourceRow: View {
             VStack(alignment: .leading, spacing: Metrics.lineSpacing) {
                 Text(verbatim: option.playlistName)
                     .font(Metrics.headlineFont)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: option.title)
+                    .font(Metrics.detailFont)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 if !option.detailParts.isEmpty {
