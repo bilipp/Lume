@@ -11,6 +11,7 @@ import Foundation
 import SwiftData
 import Testing
 
+@Suite(.serialized)
 @MainActor
 struct SportsResolveCacheTests {
     private let leagueId = "espn:soccer/ger.1"

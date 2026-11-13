@@ -106,10 +106,20 @@ nonisolated extension SportsChannelResolver {
 
         /// The channels worth scoring for `fixture`, in their original order, so
         /// ties rank exactly as when every channel was scored.
-        func candidates(for fixture: SportsFixture) -> [Int] {
+        func candidates(
+            for fixture: SportsFixture,
+            homeTokens: Set<String>? = nil,
+            awayTokens: Set<String>? = nil
+        ) -> [Int] {
             var result = pickedChannels(competitionKey: fixture.leagueId)
-            if let home = fixture.home?.team, fixture.away?.team != nil {
-                result.formUnion(channels(mentioningAnyOf: SportsMatcher.tokens(for: home)))
+            if let home = fixture.home?.team, let away = fixture.away?.team {
+                let homeTokensToUse = homeTokens ?? SportsMatcher.tokens(for: home)
+                let homeChannels = channels(mentioningAnyOf: homeTokensToUse)
+                if !homeChannels.isEmpty {
+                    let awayTokensToUse = awayTokens ?? SportsMatcher.tokens(for: away)
+                    let awayChannels = channels(mentioningAnyOf: awayTokensToUse)
+                    result.formUnion(homeChannels.intersection(awayChannels))
+                }
                 result.formUnion(channels(mentioningAnyOf: SportsCompetitionMatcher.phrases(leagueId: fixture.leagueId)))
             } else {
                 result.formUnion(channels(mentioningAnyOf: SportsRaceMatcher.seriesPhrases(leagueId: fixture.leagueId)))
