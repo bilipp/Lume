@@ -78,6 +78,10 @@
                     }
                 }
 
+                #if os(macOS)
+                    TimeshiftSettingsSection()
+                #endif
+
                 // Free, like the stream caption below.
                 Section {
                     Toggle("Choose Source Before Playing", isOn: $chooseSourceBeforePlaying)

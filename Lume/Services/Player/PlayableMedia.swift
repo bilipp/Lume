@@ -47,6 +47,8 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     /// For a recording still being captured, how far its growing playlist
     /// reaches, which the engines don't report. `nil` for everything else.
     let recordingTimeline: RecordingTimeline?
+    /// Programme length from EPG, separate from unreliable provider duration.
+    let programmeDuration: TimeInterval?
     /// Set on a channel reached through the player's Quality menu: the
     /// `LiveStream.id` of the channel the viewer actually tuned to. History and
     /// channel surfing key off that channel rather than the variant on screen,
@@ -67,7 +69,8 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         surfScope: LiveSurfScope? = nil,
         httpHeaders: [String: String]? = nil,
         recordingTimeline: RecordingTimeline? = nil,
-        qualityAnchorID: String? = nil
+        qualityAnchorID: String? = nil,
+        programmeDuration: TimeInterval? = nil
     ) {
         self.id = id
         self.url = url
@@ -81,6 +84,7 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         self.surfScope = surfScope
         self.httpHeaders = httpHeaders
         self.recordingTimeline = recordingTimeline
+        self.programmeDuration = programmeDuration
         self.qualityAnchorID = qualityAnchorID
     }
 
@@ -425,7 +429,8 @@ nonisolated extension PlayableMedia {
             posterURL: URL(string: stream.streamIcon ?? ""),
             kind: .vod,
             startTime: 0,
-            contentRef: .live(stream.id)
+            contentRef: .live(stream.id),
+            programmeDuration: end.timeIntervalSince(start)
         )
     }
 }

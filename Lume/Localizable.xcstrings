@@ -2011,6 +2011,65 @@
         }
       }
     },
+    "%lld minutes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld دقيقة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Minuten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld minutos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld minutes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld minuti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld분"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld minutos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分钟"
+          }
+        }
+      }
+    },
     "%lld of %lld digits entered" : {
       "localizations" : {
         "ar" : {
@@ -26044,6 +26103,65 @@
         }
       }
     },
+    "Estimated Buffer Storage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مساحة التخزين المؤقت المقدرة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geschätzter Pufferspeicher"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Almacenamiento estimado del búfer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stockage estimé du tampon"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spazio stimato del buffer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推定バッファー容量"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예상 버퍼 저장 공간"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Armazenamento estimado da memória"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预计缓冲存储空间"
+          }
+        }
+      }
+    },
     "Europe" : {
       "localizations" : {
         "ar" : {
@@ -36105,6 +36223,65 @@
         }
       }
     },
+    "Jump to Live" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "العودة إلى البث المباشر"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zur Live-Übertragung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ir al directo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir au direct"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Torna alla diretta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブに戻る"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브로 이동"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar ao direto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回直播"
+          }
+        }
+      }
+    },
     "Keep your profiles, playlists and viewing progress in step across your devices." : {
       "comment" : "Subtitle of the first-run sync choice screen.",
       "localizations" : {
@@ -38240,6 +38417,65 @@
         }
       }
     },
+    "Limit Catch-up Timeline to Programme" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحديد شريط إعادة المشاهدة بمدة البرنامج"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catch-up-Zeitleiste auf Sendung begrenzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limitar la línea de tiempo al programa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limiter la chronologie au programme"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limita la barra di replay al programma"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見逃し配信の時間軸を番組に合わせる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시보기 시간 표시를 프로그램으로 제한"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limitar a linha temporal ao programa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将回看时间轴限制为节目时长"
+          }
+        }
+      }
+    },
     "Lineup" : {
       "localizations" : {
         "ar" : {
@@ -38718,6 +38954,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直播频道启动"
+          }
+        }
+      }
+    },
+    "Live connection interrupted. Retained video is still available." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقطع اتصال البث المباشر. لا يزال الفيديو المحفوظ متاحًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live-Verbindung unterbrochen. Gespeichertes Video ist weiterhin verfügbar."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conexión en directo interrumpida. El vídeo almacenado sigue disponible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion au direct interrompue. La vidéo conservée reste disponible."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connessione alla diretta interrotta. Il video memorizzato è ancora disponibile."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブ接続が中断されました。保存済みの映像は引き続き視聴できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 연결이 끊겼습니다. 저장된 영상은 계속 이용할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligação em direto interrompida. O vídeo guardado continua disponível."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直播连接中断。已保留的视频仍可播放。"
           }
         }
       }
@@ -39247,6 +39542,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在加载…"
+          }
+        }
+      }
+    },
+    "Local Live TV Buffer (Experimental)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تخزين مؤقت محلي للتلفزيون المباشر (تجريبي)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokaler Live-TV-Puffer (experimentell)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Búfer local de TV en directo (experimental)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tampon local de TV en direct (expérimental)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buffer locale TV in diretta (sperimentale)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブTVのローカルバッファー（試験機能）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브 TV 로컬 버퍼(실험적)"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memória local de TV em direto (experimental)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地直播缓冲（实验性）"
           }
         }
       }
@@ -50017,6 +50371,65 @@
         }
       }
     },
+    "Older buffered content expired. Playback resumed at the earliest available point." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انتهت صلاحية المحتوى الأقدم في الذاكرة المؤقتة. استؤنف التشغيل من أقدم نقطة متاحة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ältere gepufferte Inhalte sind abgelaufen. Die Wiedergabe wurde am frühesten verfügbaren Punkt fortgesetzt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El contenido almacenado más antiguo ha caducado. La reproducción continúa desde el primer punto disponible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le contenu le plus ancien du tampon a expiré. La lecture a repris au premier point disponible."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il contenuto meno recente nel buffer è scaduto. La riproduzione è ripresa dal primo punto disponibile."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "古いバッファー映像の保存期間が終了しました。視聴可能な最も古い位置から再生を再開しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오래된 버퍼 영상이 만료되었습니다. 재생 가능한 가장 이른 지점에서 다시 시작했습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O conteúdo mais antigo da memória temporária expirou. A reprodução retomou no primeiro ponto disponível."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "较早的缓冲内容已过期。已从最早可用位置恢复播放。"
+          }
+        }
+      }
+    },
     "Oldest First" : {
       "localizations" : {
         "ar" : {
@@ -52853,6 +53266,124 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂停"
+          }
+        }
+      }
+    },
+    "Pause and rewind supported HLS channels with KSPlayer. Keeps up to 15 minutes or 1 GB locally. Provider catch-up remains available. Reopen the player after changing this setting." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أوقف قنوات HLS المدعومة مؤقتًا وأعدها باستخدام KSPlayer. يحتفظ محليًا بما يصل إلى 15 دقيقة أو 1 GB. تظل خدمة إعادة المشاهدة لدى المزوّد متاحة. أعد فتح المشغّل بعد تغيير هذا الإعداد."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unterstützte HLS-Kanäle mit KSPlayer pausieren und zurückspulen. Speichert bis zu 15 Minuten oder 1 GB lokal. Anbieter-Catch-up bleibt verfügbar. Player nach Änderungen erneut öffnen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa y retrocede canales HLS compatibles con KSPlayer. Guarda hasta 15 minutos o 1 GB localmente. La función de archivo del proveedor sigue disponible. Vuelve a abrir el reproductor tras cambiar este ajuste."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettez en pause et rembobinez les chaînes HLS compatibles avec KSPlayer. Conserve jusqu’à 15 minutes ou 1 Go localement. Le replay du fournisseur reste disponible. Rouvrez le lecteur après modification."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metti in pausa e riavvolgi i canali HLS compatibili con KSPlayer. Conserva fino a 15 minuti o 1 GB in locale. Il replay del fornitore resta disponibile. Riapri il lettore dopo la modifica."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KSPlayerで対応するHLSチャンネルの一時停止と巻き戻しができます。最大15分または1 GBを端末に保存します。配信元の見逃し配信も引き続き利用できます。設定変更後はプレーヤーを開き直してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KSPlayer에서 지원되는 HLS 채널을 일시 정지하고 되감을 수 있습니다. 최대 15분 또는 1 GB를 로컬에 저장합니다. 제공업체의 다시보기도 계속 사용할 수 있습니다. 설정 변경 후 플레이어를 다시 여세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause e recue nos canais HLS compatíveis com KSPlayer. Guarda até 15 minutos ou 1 GB localmente. O arquivo do fornecedor continua disponível. Volte a abrir o leitor após alterar esta definição."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 KSPlayer 暂停和回看受支持的 HLS 频道。在本地保留最多 15 分钟或 1 GB 的内容。提供商的回看功能仍然可用。更改此设置后请重新打开播放器。"
+          }
+        }
+      }
+    },
+    "Pause Buffer Duration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مدة التخزين المؤقت للإيقاف"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dauer des Pausenpuffers"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duración del búfer de pausa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durée du tampon de pause"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durata del buffer di pausa"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一時停止バッファーの時間"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일시 정지 버퍼 시간"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duração da memória de pausa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂停缓冲时长"
           }
         }
       }
@@ -59322,6 +59853,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "个人资料"
+          }
+        }
+      }
+    },
+    "Programme mode uses EPG duration for catch-up. Turn it off to use the duration reported by the provider." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم وضع البرنامج مدة دليل البرامج لإعادة المشاهدة. أوقفه لاستخدام المدة التي يعلنها المزوّد."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Sendungsmodus nutzt die EPG-Dauer für Catch-up. Ausschalten, um die vom Anbieter gemeldete Dauer zu verwenden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El modo de programa usa la duración de la guía para el archivo. Desactívalo para usar la duración indicada por el proveedor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode programme utilise la durée du guide pour le replay. Désactivez-le pour utiliser la durée annoncée par le fournisseur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La modalità programma usa la durata EPG per il replay. Disattivala per usare la durata indicata dal fornitore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "番組モードではEPGの番組時間を使用します。無効にすると配信元が通知する時間を使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로그램 모드는 EPG의 방송 시간을 사용합니다. 끄면 제공업체가 보고한 시간을 사용합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O modo de programa usa a duração do guia para o arquivo. Desative-o para usar a duração indicada pelo fornecedor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "节目模式使用 EPG 中的节目时长。关闭后将使用提供商报告的时长。"
           }
         }
       }
@@ -78424,6 +79014,65 @@
         }
       }
     },
+    "Storage varies with channel quality. The estimate uses the last measured stream bitrate, or 8 Mbps before a measurement is available." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تختلف المساحة حسب جودة القناة. يستخدم التقدير آخر معدل بت مقاس، أو 8 ميغابت/ثانية قبل توفر قياس."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Speicherbedarf hängt von der Senderqualität ab. Die Schätzung nutzt die zuletzt gemessene Bitrate, zuvor 8 Mbit/s."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El espacio varía según la calidad del canal. La estimación usa la última tasa de bits medida, o 8 Mbps si aún no hay medición."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le stockage dépend de la qualité de la chaîne. L’estimation utilise le dernier débit mesuré, ou 8 Mbit/s avant toute mesure."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo spazio varia con la qualità del canale. La stima usa l’ultimo bitrate misurato, oppure 8 Mbps prima della misurazione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存容量はチャンネルの画質により変わります。直近の測定ビットレートを使用し、未測定の場合は8 Mbpsで推定します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장 공간은 채널 화질에 따라 달라집니다. 마지막으로 측정한 비트 전송률을 사용하며, 측정 전에는 8 Mbps로 추정합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O espaço varia com a qualidade do canal. A estimativa usa a última taxa de bits medida, ou 8 Mbps antes de uma medição."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储空间因频道画质而异。估算使用上次测得的码率，尚未测量时使用 8 Mbps。"
+          }
+        }
+      }
+    },
     "Store it somewhere safe, like a password manager. Never share it." : {
       "comment" : "Advice under the Lume Cloud recovery key; 'it' is the recovery key.",
       "localizations" : {
@@ -83615,6 +84264,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "您的 Dispatcharr 服务器地址。如未指定端口，Lume 将使用 %@ 端口。"
+          }
+        }
+      }
+    },
+    "The buffer uses available disk space and a 30 GB safety limit. Reopen the player to apply a new duration." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم التخزين المؤقت المساحة المتاحة بحد أمان 30 GB. أعد فتح المشغّل لتطبيق المدة الجديدة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Puffer nutzt freien Speicher bis maximal 30 GB. Den Player neu öffnen, um die neue Dauer anzuwenden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El búfer utiliza el espacio disponible con un límite de seguridad de 30 GB. Vuelve a abrir el reproductor para aplicar la duración."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le tampon utilise l’espace disponible avec une limite de sécurité de 30 Go. Rouvrez le lecteur pour appliquer la durée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il buffer usa lo spazio disponibile con un limite di sicurezza di 30 GB. Riapri il lettore per applicare la durata."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空き容量を使用し、安全上限は30 GBです。時間の変更を適用するにはプレーヤーを開き直してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "버퍼는 여유 공간을 사용하며 안전 한도는 30 GB입니다. 시간을 적용하려면 플레이어를 다시 여세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A memória usa o espaço disponível com um limite de segurança de 30 GB. Volte a abrir o leitor para aplicar a duração."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缓冲使用可用磁盘空间，安全上限为 30 GB。请重新打开播放器以应用新时长。"
           }
         }
       }

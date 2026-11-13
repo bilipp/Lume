@@ -16,6 +16,37 @@ import SwiftUI
     @available(iOS 16.0, macOS 13.0, *)
     struct KSPlayerControlsOverlay: View {
         @ObservedObject var coordinator: KSVideoPlayer.Coordinator
+        #if os(macOS)
+            @Environment(TimeshiftPlayback.self) private var timeshift: TimeshiftPlayback?
+        #endif
+        private var hasTimeshift: Bool {
+            #if os(macOS)
+                timeshift != nil
+            #else
+                false
+            #endif
+        }
+
+        private var canSeek: Bool {
+            #if os(macOS)
+                !media.isLive || timeshift != nil
+            #else
+                !media.isLive
+            #endif
+        }
+
+        private func skip(_ seconds: Int) {
+            #if os(macOS)
+                if let timeshift { timeshift.skip(Double(seconds), clock: clock); return }
+            #endif
+            if media.programmeDuration != nil {
+                let end = clock.displayDuration(growing: media.recordingTimeline)
+                coordinator.seek(time: min(max(0, clock.current + Double(seconds)), end))
+            } else {
+                coordinator.skip(interval: seconds)
+            }
+        }
+
         let media: PlayableMedia
         @Binding var isPlaying: Bool
         @Binding var isSeeking: Bool
@@ -156,9 +187,9 @@ import SwiftUI
                     )
                 }
 
-                if !media.isLive {
+                if canSeek {
                     Button {
-                        coordinator.skip(interval: -15)
+                        skip(-15)
                         onResetHideTimer()
                     } label: {
                         circleGlyph("gobackward.15", size: 22, diameter: 60)
@@ -177,9 +208,9 @@ import SwiftUI
                 .buttonStyle(.plain)
                 .accessibilityLabel(isPlaying ? "Pause" : "Play")
 
-                if !media.isLive {
+                if canSeek {
                     Button {
-                        coordinator.skip(interval: 15)
+                        skip(15)
                         onResetHideTimer()
                     } label: {
                         circleGlyph("goforward.15", size: 22, diameter: 60)
@@ -209,9 +240,14 @@ import SwiftUI
                     secondaryControls
                 }
 
-                if media.isLive {
+                #if os(macOS)
+                    if let timeshift {
+                        TimeshiftTimeline(playback: timeshift, clock: clock)
+                    }
+                #endif
+                if media.isLive, !hasTimeshift {
                     liveIndicator
-                } else {
+                } else if !media.isLive {
                     PlaybackTimeline(
                         clock: clock,
                         timeline: media.recordingTimeline,
