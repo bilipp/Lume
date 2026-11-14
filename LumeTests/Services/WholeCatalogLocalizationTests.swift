@@ -1,21 +1,24 @@
 //
-//  ArabicLocalizationTests.swift
+//  WholeCatalogLocalizationTests.swift
 //  LumeTests
 //
-//  Arabic was added as a whole-catalog translation rather than key by key, so
-//  it is asserted catalog-wide: it keeps pace with German, and every Arabic
-//  value formats with the arguments the source passes.
+//  Arabic, Dutch, Polish, Russian and Turkish were added as whole-catalog
+//  translations rather than key by key, so they are asserted catalog-wide: each
+//  keeps pace with German, and every value formats with the arguments the
+//  source passes.
 //
 
 import Foundation
 @testable import Lume
 import Testing
 
-@Suite("Arabic localization")
-struct ArabicLocalizationTests {
+@Suite("Whole-catalog localizations")
+struct WholeCatalogLocalizationTests {
+    private static let locales = ["ar", "nl", "pl", "ru", "tr"]
+
     /// One printf argument: its explicit `n$` position, if any, the conversion
     /// with that position stripped (`%lld`, `%@`), and whether it is glued to
-    /// a word — an English plural suffix (`movie%@`) that Arabic drops.
+    /// a word — an English plural suffix (`movie%@`) that translations drop.
     private struct Specifier {
         let position: Int?
         let conversion: String
@@ -40,28 +43,30 @@ struct ArabicLocalizationTests {
         }
     }
 
-    @Test func `every key German translates is translated in Arabic`() throws {
+    @Test(arguments: locales)
+    func `every key German translates is translated`(locale: String) throws {
         let catalog = try StringCatalog.localizable()
         let missing = catalog.keys.filter { key in
             let languages = catalog.translatedLanguages(for: key) ?? []
-            return languages.contains("de") && !languages.contains("ar")
+            return languages.contains("de") && !languages.contains(locale)
         }
-        #expect(missing.isEmpty, "untranslated in Arabic: \(missing.sorted())")
+        #expect(missing.isEmpty, "untranslated in \(locale): \(missing.sorted())")
     }
 
-    @Test func `every Arabic value formats with the source's arguments`() throws {
+    @Test(arguments: locales)
+    func `every value formats with the source's arguments`(locale: String) throws {
         let catalog = try StringCatalog.localizable()
         for key in catalog.keys {
-            guard let arabic = catalog.localizations(for: key)?["ar"] else { continue }
+            guard let value = catalog.localizations(for: key)?[locale] else { continue }
             let source = Self.specifiers(in: catalog.sourceValue(for: key))
             let required = source.filter { !$0.isWordSuffix }.map(\.conversion)
-            let translated = Self.specifiers(in: arabic)
+            let translated = Self.specifiers(in: value)
 
             guard translated.contains(where: { $0.position != nil }) else {
                 let conversions = translated.map(\.conversion)
                 #expect(
                     conversions == source.map(\.conversion) || conversions == required,
-                    "\(key): \(conversions) do not match the source's arguments"
+                    "\(locale) \(key): \(conversions) do not match the source's arguments"
                 )
                 continue
             }
@@ -69,12 +74,12 @@ struct ArabicLocalizationTests {
                 let index = (specifier.position ?? 0) - 1
                 #expect(
                     source.indices.contains(index) && source[index].conversion == specifier.conversion,
-                    "\(key): \(specifier.conversion) at position \(index + 1) does not match the source"
+                    "\(locale) \(key): \(specifier.conversion) at position \(index + 1) does not match the source"
                 )
             }
             let used = Set(translated.compactMap(\.position))
             let dropped = source.indices.filter { !used.contains($0 + 1) && !source[$0].isWordSuffix }
-            #expect(dropped.isEmpty, "\(key): drops source arguments at \(dropped.map { $0 + 1 })")
+            #expect(dropped.isEmpty, "\(locale) \(key): drops source arguments at \(dropped.map { $0 + 1 })")
         }
     }
 
