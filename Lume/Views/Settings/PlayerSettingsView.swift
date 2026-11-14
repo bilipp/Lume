@@ -30,6 +30,10 @@
         @AppStorage(PlayerSettings.externalPlayerKey) private var externalPlayerRaw: String = ""
         @AppStorage(PlayerSettings.externalPlayerScopeKey)
         private var externalPlayerScopeRaw: String = ExternalPlayerScope.default.rawValue
+        #if os(macOS)
+            @AppStorage(PlayerSettings.macPlayerPresentationKey)
+            private var macPresentationRaw: String = MacPlayerPresentation.default.rawValue
+        #endif
         @State private var premium = PremiumManager.shared
         @State private var showPaywall = false
         @State private var openSubtitles = OpenSubtitlesService.shared
@@ -77,6 +81,20 @@
                         Text("Automatically start the next episode when one finishes.")
                     }
                 }
+
+                #if os(macOS)
+                    Section {
+                        Picker("Open Videos In", selection: $macPresentationRaw) {
+                            Text("New Window").tag(MacPlayerPresentation.newWindow.rawValue)
+                            Text("Current Window").tag(MacPlayerPresentation.currentWindow.rawValue)
+                        }
+                        .pickerStyle(.menu)
+                    } header: {
+                        Text("Window")
+                    } footer: {
+                        Text("Play in a separate player window, or in the window you started from.")
+                    }
+                #endif
 
                 // Free, like the stream caption below.
                 Section {
