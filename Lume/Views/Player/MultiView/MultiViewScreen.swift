@@ -505,9 +505,9 @@ struct MultiViewScreen: View {
     }
 
     /// Plain `.playback` / `.moviePlayback`, without the full-screen player's
-    /// request for the route's full channel width: only one tile is audible, and
-    /// asking for an HDMI surround layout for a muted 2×2 grid would negotiate a
-    /// wider route than anything here can fill.
+    /// channel preference (`PlayerAudioChannelPreference`): only one tile is
+    /// audible, and an HDMI surround layout for a muted 2×2 grid would
+    /// negotiate a wider route than anything here can fill.
     private func configureAudioSession() {
         #if os(iOS) || os(tvOS)
             let session = AVAudioSession.sharedInstance()

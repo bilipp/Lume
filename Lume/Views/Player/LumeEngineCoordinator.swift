@@ -488,6 +488,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         // checkmark at all.
         let audioFallsBackToFirst = selectedAudioID == nil
         logAudioCodecs(info.audioTracks)
+        preferAudioChannels(of: info.audioTracks.first { String($0.index) == selectedAudioID } ?? info.audioTracks.first)
         audioTrackOptions = info.audioTracks.enumerated().map { position, track in
             let id = String(track.index)
             return PlayerTrackOption(
