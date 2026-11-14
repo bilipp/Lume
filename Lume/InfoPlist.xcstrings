@@ -65,10 +65,34 @@
             "value" : "Lume가 TV, Cast 기기 및 Philips Hue Bridge를 찾고 로컬 네트워크에서 실행 중인 미디어 서버, WebDAV 공유 및 녹화 서버에 연결하려면 접근 권한이 필요합니다."
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume heeft toegang tot je lokale netwerk nodig om tv's, Cast-apparaten en Philips Hue Bridges te vinden, en om mediaservers, WebDAV-shares en opnameservers op dat netwerk te bereiken."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume potrzebuje dostępu do sieci lokalnej, aby znajdować telewizory, urządzenia Cast i mostki Philips Hue oraz łączyć się z działającymi w niej serwerami multimediów, udziałami WebDAV i serwerami nagrywania."
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "O Lume precisa de acesso à sua rede local para encontrar TVs, dispositivos Cast e bridges Philips Hue e para alcançar servidores de mídia, compartilhamentos WebDAV e servidores de gravação em execução nela."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume нужен доступ к локальной сети, чтобы находить телевизоры, устройства Cast и мосты Philips Hue, а также подключаться к работающим в ней медиасерверам, папкам WebDAV и серверам записи."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lume'un TV'leri, Cast aygıtlarını ve Philips Hue Bridge'leri bulmak ve yerel ağınızda çalışan medya sunucularına, WebDAV paylaşımlarına ve kayıt sunucularına ulaşmak için yerel ağınıza erişmesi gerekiyor."
           }
         },
         "zh-Hans" : {
