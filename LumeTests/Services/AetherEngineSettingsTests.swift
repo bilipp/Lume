@@ -134,6 +134,17 @@ struct AetherEngineSettingsTests {
         }
     }
 
+    @Test func `the provider offset adds to the engine audio delay`() {
+        withIsolatedDefaults { defaults in
+            defaults.set(250, forKey: Keys.audioDelayKey)
+            var context = Self.fullScreen
+            context.audioOffsetMilliseconds = -100
+            #expect(AetherLoadPlan.make(options: .load(from: defaults), context: context).audioDelaySeconds == 0.15)
+            context.audioOffsetMilliseconds = 0
+            #expect(AetherLoadPlan.make(options: .load(from: defaults), context: context).audioDelaySeconds == 0.25)
+        }
+    }
+
     @Test func `engine defaults map to nil`() {
         withIsolatedDefaults { defaults in
             let plan = AetherLoadPlan.make(options: .load(from: defaults), context: Self.fullScreen)
@@ -204,8 +215,8 @@ struct AetherEngineSettingsTests {
 
     @Test func `preset labels`() {
         #expect(AetherForwardBufferPreset.values.first == 0)
-        #expect(AetherAudioDelayPreset.label(100) == "+100 ms")
-        #expect(AetherAudioDelayPreset.label(-50) == "-50 ms")
+        #expect(AudioOffsetPreset.label(100) == "+100 ms")
+        #expect(AudioOffsetPreset.label(-50) == "-50 ms")
         #expect(AetherProbeSize.twoMB.label == "2 MB")
     }
 }

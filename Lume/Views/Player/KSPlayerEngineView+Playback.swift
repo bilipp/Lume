@@ -119,6 +119,8 @@ extension KSPlayerEngineView {
             hasSeenReadyToPlay = true
             reconnector.reset()
             logAudioTracks()
+            registerAudioOffsetSupport()
+            applyAudioOffset()
         case .bufferFinished:
             // Guard: KSPlayerLayer.play() immediately sets state = .bufferFinished
             // if the previous session's loadState is still .playable (it isn't reset

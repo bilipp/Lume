@@ -53,6 +53,10 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     /// because the variant can sit in another category (a provider's "4K" one)
     /// and a quality change is not a channel change. `nil` everywhere else.
     private(set) var qualityAnchorID: String?
+    /// The owning playlist's audio offset (`Playlist.audioOffsetMilliseconds`),
+    /// positive playing audio later. `nil` where there is no provider to
+    /// correct for: a downloaded file, a recording, a hand-built item.
+    private(set) var audioOffsetMilliseconds: Int?
 
     nonisolated init(
         id: String,
@@ -67,7 +71,8 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         surfScope: LiveSurfScope? = nil,
         httpHeaders: [String: String]? = nil,
         recordingTimeline: RecordingTimeline? = nil,
-        qualityAnchorID: String? = nil
+        qualityAnchorID: String? = nil,
+        audioOffsetMilliseconds: Int? = nil
     ) {
         self.id = id
         self.url = url
@@ -82,6 +87,7 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
         self.httpHeaders = httpHeaders
         self.recordingTimeline = recordingTimeline
         self.qualityAnchorID = qualityAnchorID
+        self.audioOffsetMilliseconds = audioOffsetMilliseconds
     }
 
     var isLive: Bool {
@@ -176,6 +182,12 @@ nonisolated extension PlayableMedia {
         webdavHeaders(for: playlist) ?? jellyfinHeaders(for: playlist) ?? plexHeaders(for: playlist)
     }
 
+    /// The playlist's audio offset for its streams, or `nil` at 0 so an
+    /// untouched playlist leaves the engines' timing alone.
+    static func audioOffset(for playlist: Playlist) -> Int? {
+        playlist.audioOffsetMilliseconds == 0 ? nil : playlist.audioOffsetMilliseconds
+    }
+
     static func from(movie: Movie, playlist: Playlist, client: XtreamClient = XtreamClient()) -> PlayableMedia? {
         // Prefer local file for offline/downloaded playback
         if let file = movie.downloadedFile {
@@ -201,7 +213,8 @@ nonisolated extension PlayableMedia {
             kind: .vod,
             startTime: movie.watchProgress,
             contentRef: .movie(movie.id),
-            httpHeaders: authHeaders(for: playlist)
+            httpHeaders: authHeaders(for: playlist),
+            audioOffsetMilliseconds: audioOffset(for: playlist)
         )
     }
 
@@ -259,7 +272,8 @@ nonisolated extension PlayableMedia {
             kind: .vod,
             startTime: episode.watchProgress,
             contentRef: .episode(episode.id),
-            httpHeaders: authHeaders(for: playlist)
+            httpHeaders: authHeaders(for: playlist),
+            audioOffsetMilliseconds: audioOffset(for: playlist)
         )
     }
 
@@ -285,7 +299,8 @@ nonisolated extension PlayableMedia {
             contentRef: .live(stream.id),
             channelScope: scope,
             surfScope: surfScope,
-            httpHeaders: authHeaders(for: playlist)
+            httpHeaders: authHeaders(for: playlist),
+            audioOffsetMilliseconds: audioOffset(for: playlist)
         )
     }
 
@@ -425,7 +440,8 @@ nonisolated extension PlayableMedia {
             posterURL: URL(string: stream.streamIcon ?? ""),
             kind: .vod,
             startTime: 0,
-            contentRef: .live(stream.id)
+            contentRef: .live(stream.id),
+            audioOffsetMilliseconds: audioOffset(for: playlist)
         )
     }
 }

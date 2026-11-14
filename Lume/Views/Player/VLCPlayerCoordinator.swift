@@ -125,6 +125,13 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
     /// Auth headers for the current stream (WebDAV only). VLCKit has no header
     /// API, so `installMedia` folds these into a userinfo MRL at handoff.
     var httpHeaders: [String: String]?
+    /// The audio offset in force, in milliseconds (positive plays audio
+    /// later). Seeded from the media on `configure`/`reload`; the full-screen
+    /// host writes the session's value over it. See `applyAudioOffset()`.
+    var audioOffsetMilliseconds = 0 {
+        didSet { if audioOffsetMilliseconds != oldValue { applyAudioOffset() } }
+    }
+
     /// Last playback position reported to the UI — a reconnect resumes VOD here
     /// rather than restarting from the top.
     private var lastKnownTime: TimeInterval = 0
@@ -170,6 +177,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         languageOptions = PlayerLanguageOptions.load()
         mediaURL = media.url
         httpHeaders = media.httpHeaders
+        audioOffsetMilliseconds = media.audioOffsetMilliseconds ?? 0
         retry.reset()
         hasStartedPlayback = false
         didReportFailure = false
@@ -183,6 +191,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         Logger.player.log("configure: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
         applyDeinterlace()
+        applyAudioOffset()
         isPlaying = true
         startStatsLogging()
     }
@@ -211,6 +220,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         if media.url != mediaURL { hasManualTrackSelection = false }
         mediaURL = media.url
         httpHeaders = media.httpHeaders
+        audioOffsetMilliseconds = media.audioOffsetMilliseconds ?? 0
         lastKnownTime = 0
         retry.reset()
         hasStartedPlayback = false
@@ -224,6 +234,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         Logger.player.log("reload: live=\(media.isLive, privacy: .public) startTime=\(media.startTime, format: .fixed(precision: 1), privacy: .public)s deinterlace=\(deinterlaceOn, privacy: .public) url=\(media.url.absoluteString, privacy: .private(mask: .hash))")
         mediaPlayer.play()
         applyDeinterlace()
+        applyAudioOffset()
         isPlaying = true
         startStatsLogging()
     }
@@ -310,6 +321,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         installMedia(mediaURL, isLive: isLive)
         mediaPlayer.play()
         applyDeinterlace()
+        applyAudioOffset()
         isPlaying = true
         Logger.player.log("retry: reloading VLC stream from failure overlay")
     }
@@ -331,6 +343,7 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
         installMedia(mediaURL, isLive: isLive)
         mediaPlayer.play()
         applyDeinterlace()
+        applyAudioOffset()
         isPlaying = true
     }
 

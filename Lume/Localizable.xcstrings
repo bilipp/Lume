@@ -4753,6 +4753,71 @@
         }
       }
     },
+    "A positive audio delay plays sound later. It applies to every stream of this playlist and can be adjusted in the player." : {
+      "comment" : "Playlist settings, Playback section footer.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يؤدي تأخير الصوت الموجب إلى تشغيل الصوت لاحقًا. ينطبق على كل بث في قائمة التشغيل هذه ويمكن تعديله في المشغّل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine positive Audioverzögerung gibt den Ton später wieder. Sie gilt für jeden Stream dieser Playlist und lässt sich im Player anpassen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A positive audio delay plays sound later. It applies to every stream of this playlist and can be adjusted in the player."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un retraso de audio positivo reproduce el sonido más tarde. Se aplica a todas las emisiones de esta lista y puede ajustarse en el reproductor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un décalage audio positif diffuse le son plus tard. Il s'applique à tous les flux de cette playlist et peut être ajusté dans le lecteur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un ritardo audio positivo riproduce il suono più tardi. Vale per ogni stream di questa playlist e si può regolare nel player."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオ遅延を正の値にすると、音声が遅れて再生されます。このプレイリストのすべてのストリームに適用され、プレーヤーで調整できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 지연을 양수로 설정하면 소리가 더 늦게 재생됩니다. 이 재생목록의 모든 스트림에 적용되며 플레이어에서 조정할 수 있습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um atraso de áudio positivo reproduz o som mais tarde. Aplica-se a todas as transmissões desta lista e pode ser ajustado no leitor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频延迟为正值时，声音会延后播放。它适用于此播放列表的所有流，并可在播放器中调整。"
+          }
+        }
+      }
+    },
     "A sentence or two helps a lot. It's added to the top of the report." : {
       "localizations" : {
         "ar" : {
@@ -78962,6 +79027,71 @@
         }
       }
     },
+    "Playlist Default (%@)" : {
+      "comment" : "In-player Audio Delay menu: back to the playlist's own offset, with that value.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإعداد الافتراضي لقائمة التشغيل (%@)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist-Standard (%@)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist Default (%@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predeterminado de la lista (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valeur par défaut de la playlist (%@)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predefinito della playlist (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレイリストのデフォルト（%@）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생목록 기본값(%@)"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Padrão da lista (%@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放列表默认值（%@）"
+          }
+        }
+      }
+    },
     "Playlist Not Found" : {
       "comment" : "Alert title when a downloaded item's playlist is no longer installed, so it cannot be streamed.",
       "localizations" : {
@@ -91452,6 +91582,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存储"
+          }
+        }
+      }
+    },
+    "Save as Playlist Default" : {
+      "comment" : "In-player Audio Delay menu: store the current offset on the playlist.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حفظ كإعداد افتراضي لقائمة التشغيل"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Playlist-Standard sichern"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save as Playlist Default"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar como predeterminado de la lista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer comme valeur par défaut de la playlist"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salva come predefinito della playlist"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレイリストのデフォルトとして保存"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생목록 기본값으로 저장"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar como padrão da lista"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存为播放列表默认值"
           }
         }
       }
