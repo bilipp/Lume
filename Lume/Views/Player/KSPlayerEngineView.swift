@@ -175,13 +175,10 @@ struct KSPlayerEngineView: View {
         @State var videoInfo: PlayerVideoInfo?
     #endif
 
-    // `dismiss` / `dismissWindow` / `autoHideInterval` are internal so the shared
+    // `dismiss` / `autoHideInterval` are internal so the shared
     // transport actions in `KSPlayerEngineView+Actions.swift` can reach them.
     @Environment(\.dismiss) var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    #if os(macOS)
-        @Environment(\.dismissWindow) var dismissWindow
-    #endif
 
     let autoHideInterval: TimeInterval = 4
     /// How long to wait for the first frame before declaring a stream dead. The

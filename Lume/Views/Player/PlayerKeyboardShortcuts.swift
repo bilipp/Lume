@@ -10,10 +10,6 @@
 
 import SwiftUI
 
-#if canImport(AppKit)
-    import AppKit
-#endif
-
 nonisolated extension EventModifiers {
     /// The modifiers that make a key press a different shortcut. Caps Lock and
     /// the numeric-pad / function flags AppKit stamps on every arrow key don't
@@ -188,9 +184,8 @@ extension View {
 
         private func toggleFullScreen() -> KeyPress.Result {
             #if os(macOS)
-                guard let window = NSApp.keyWindow else { return .ignored }
-                window.toggleFullScreen(nil)
-                return .handled
+                // The player's own window, not the frontmost one.
+                return MacPlayerWindowRouter.shared.toggleFullScreen() ? .handled : .ignored
             #else
                 return .ignored
             #endif

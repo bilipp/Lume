@@ -109,93 +109,97 @@ struct MainTabView: View {
         let scope = catalogScope
         let tabs = visibleTabs(in: scope)
         return tabView(selection: $router.selectedTab, tabs: tabs)
+        #if os(macOS)
+            // Innermost, so the player it shows inherits everything below.
+            .macInlinePlayerHost()
+        #endif
         #if os(tvOS)
-            .disabled(blockingOverlayOwnsScreen || router.isQuickSwitchPresented)
-            // Attached OUTSIDE `.disabled` so the same button closes the modal it
-            // opened, and above the tabs but below every player: the engines are
-            // presented as `fullScreenCover`s from inside a tab, so their own
-            // `onPlayPauseCommand` sits above this one in the focused chain and is
-            // never shadowed. The guard covers the plain overlays instead, which
-            // tvOS focus reaches straight through.
-            .onPlayPauseCommand {
-                guard playPauseTogglesQuickSwitch else { return }
-                router.isQuickSwitchPresented.toggle()
-            }
+        .disabled(blockingOverlayOwnsScreen || router.isQuickSwitchPresented)
+        // Attached OUTSIDE `.disabled` so the same button closes the modal it
+        // opened, and above the tabs but below every player: the engines are
+        // presented as `fullScreenCover`s from inside a tab, so their own
+        // `onPlayPauseCommand` sits above this one in the focused chain and is
+        // never shadowed. The guard covers the plain overlays instead, which
+        // tvOS focus reaches straight through.
+        .onPlayPauseCommand {
+            guard playPauseTogglesQuickSwitch else { return }
+            router.isQuickSwitchPresented.toggle()
+        }
         #endif
-            .environment(router)
-            .environment(autoSyncQueue)
-            .environment(\.contentRestriction, contentRestriction)
-            .catalogScope(scope, playlists: playlists)
-            // A tab switch is the one browse interaction that has no scroll
-            // view of its own to stamp from, and it is the moment a merge is
-            // most expensive — the incoming tab is re-running its queries.
-            .onChange(of: router.selectedTab) {
-                ContentIndexingService.shared.noteUserInteraction()
+        .environment(router)
+        .environment(autoSyncQueue)
+        .environment(\.contentRestriction, contentRestriction)
+        .catalogScope(scope, playlists: playlists)
+        // A tab switch is the one browse interaction that has no scroll
+        // view of its own to stamp from, and it is the moment a merge is
+        // most expensive — the incoming tab is re-running its queries.
+        .onChange(of: router.selectedTab) {
+            ContentIndexingService.shared.noteUserInteraction()
+        }
+        // Hiding the tab on screen, or switching to a playlist (or a
+        // Combined set) without it, would leave the selection pointing at
+        // nothing.
+        .onChange(of: PlaylistTab.encode(tabs), initial: true) {
+            if !showsTab(router.selectedTab) {
+                router.selectedTab = .home
             }
-            // Hiding the tab on screen, or switching to a playlist (or a
-            // Combined set) without it, would leave the selection pointing at
-            // nothing.
-            .onChange(of: PlaylistTab.encode(tabs), initial: true) {
-                if !showsTab(router.selectedTab) {
-                    router.selectedTab = .home
-                }
-            }
+        }
         #if os(iOS)
-            .tabBarMinimizeOnScrollDownIfAvailable()
-            .castMiniController { linkedMedia = $0 }
+        .tabBarMinimizeOnScrollDownIfAvailable()
+        .castMiniController { linkedMedia = $0 }
         #endif
-            .onOpenURL { url in
-                handleDeepLink(url)
-            }
+        .onOpenURL { url in
+            handleDeepLink(url)
+        }
         #if !os(macOS)
-            .fullScreenCover(item: $linkedMedia) { media in
-                FullScreenPlayerView(media: media)
-            }
+        .fullScreenCover(item: $linkedMedia) { media in
+            FullScreenPlayerView(media: media)
+        }
         #endif
-            .task(id: playlists.count) {
-                // On launch (and whenever a playlist is added) sync the active
-                // playlist if it is due, plus any playlist that has never synced.
+        .task(id: playlists.count) {
+            // On launch (and whenever a playlist is added) sync the active
+            // playlist if it is due, plus any playlist that has never synced.
+            enqueueDueSyncs(playlists)
+        }
+        .onChange(of: scope.token) {
+            // On playlist switch, sync the newly selected one — or every due
+            // Combined member — unless the switch asked to land in the
+            // cached catalog instead. This is also where a playlist deferred
+            // at launch for not being on screen gets its turn. Keyed on the
+            // resolved scope rather than the stored selection, so a member
+            // joining Combined, or Pro unlocking it, counts as a switch too.
+            let deferred = playlistSwitch?.consumeDeferredDueSync() == true
+            enqueueDueSyncs(deferred ? [] : playlists.members(of: catalogScope))
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Returning to the foreground re-checks staleness — for a long-lived
+            // app this is the practical equivalent of "on launch".
+            if phase == .active {
                 enqueueDueSyncs(playlists)
             }
-            .onChange(of: scope.token) {
-                // On playlist switch, sync the newly selected one — or every due
-                // Combined member — unless the switch asked to land in the
-                // cached catalog instead. This is also where a playlist deferred
-                // at launch for not being on screen gets its turn. Keyed on the
-                // resolved scope rather than the stored selection, so a member
-                // joining Combined, or Pro unlocking it, counts as a switch too.
-                let deferred = playlistSwitch?.consumeDeferredDueSync() == true
-                enqueueDueSyncs(deferred ? [] : playlists.members(of: catalogScope))
-            }
-            .onChange(of: scenePhase) { _, phase in
-                // Returning to the foreground re-checks staleness — for a long-lived
-                // app this is the practical equivalent of "on launch".
-                if phase == .active {
-                    enqueueDueSyncs(playlists)
-                }
-                // Coming back to `.active` also refreshes stale sports data.
-                SportsSyncService.shared.isForeground = phase == .active
-            }
-            .syncCover(item: $autoSyncQueue.coverPlaylist) {
-                autoSyncQueue.promoteNextIfIdle(scope: catalogScope, context: modelContext)
-            }
-            .onChange(of: autoSyncQueue.isBusy, initial: true) { _, busy in
-                EPGSyncService.shared.setAutoSyncQueued(busy)
-            }
-            .onDisappear {
-                // The queue goes with this view (deleting the last playlist
-                // swaps the root back to onboarding); don't leave the guide
-                // waiting on it.
-                EPGSyncService.shared.setAutoSyncQueued(false)
-            }
-            .downloadsSheet(isPresented: $showsDownloads)
-            .lumeCloudPairingSheet(router: router, rootIsCovered: hasOwnPresentation)
-            .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
-            // The one fire point for the rating sheet. Here rather than at the
-            // eleven player presentation sites: this view is the browse root,
-            // so reaching it *is* the "player gone, nothing over it" condition.
-            .appStoreReviewPrompt(isBlocked: hasBlockingPresentation)
-            .reportsBrowseRootCovered(hasBlockingPresentation)
+            // Coming back to `.active` also refreshes stale sports data.
+            SportsSyncService.shared.isForeground = phase == .active
+        }
+        .syncCover(item: $autoSyncQueue.coverPlaylist) {
+            autoSyncQueue.promoteNextIfIdle(scope: catalogScope, context: modelContext)
+        }
+        .onChange(of: autoSyncQueue.isBusy, initial: true) { _, busy in
+            EPGSyncService.shared.setAutoSyncQueued(busy)
+        }
+        .onDisappear {
+            // The queue goes with this view (deleting the last playlist
+            // swaps the root back to onboarding); don't leave the guide
+            // waiting on it.
+            EPGSyncService.shared.setAutoSyncQueued(false)
+        }
+        .downloadsSheet(isPresented: $showsDownloads)
+        .lumeCloudPairingSheet(router: router, rootIsCovered: hasOwnPresentation)
+        .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
+        // The one fire point for the rating sheet. Here rather than at the
+        // eleven player presentation sites: this view is the browse root,
+        // so reaching it *is* the "player gone, nothing over it" condition.
+        .appStoreReviewPrompt(isBlocked: hasBlockingPresentation)
+        .reportsBrowseRootCovered(hasBlockingPresentation)
         #if os(tvOS)
             .overlay { tvOverlays }
         #endif

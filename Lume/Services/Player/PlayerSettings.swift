@@ -244,6 +244,11 @@ enum PlayerSettings {
         PlayerVolumeMath.clamped(defaults.float(volumeKey, default: volumeDefault))
     }
 
+    /// Where a stream opens on macOS: a player window of its own (the
+    /// default) or the library window it was started from. Device-local. See
+    /// `MacPlayerPresentation`.
+    nonisolated static let macPlayerPresentationKey = "player.macPresentation"
+
     // MARK: - Playback behaviour
 
     /// Engine-independent playback preferences for episodic content. Both default
