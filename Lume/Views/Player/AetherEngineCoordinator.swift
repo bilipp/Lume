@@ -443,6 +443,7 @@
             applyCarriedSubtitle(on: session)
             let audio = session.audioTracks
             reportAudioCodecs(audio)
+            preferAudioChannels(of: audio.first { $0.id == session.activeAudioTrackID } ?? audio.first)
             let audioOptions = audio.enumerated().map { position, track in
                 PlayerTrackOption(
                     id: String(track.id),

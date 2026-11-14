@@ -19,20 +19,19 @@ extension FullScreenPlayerView {
         // tvOS needs this as much as iOS: LumeEngine renders PCM through
         // AVSampleBufferAudioRenderer and sizes its downmix to the session's
         // *negotiated* output channels — without an active .playback session
-        // the route stays at its default and multichannel audio has no path.
+        // and a matching channel preference, multichannel audio has no path.
         // (KSPlayer/VLC configure their own session; LumeEngine by design
         // does not touch global audio state, so it is the app's job.)
         #if os(iOS) || os(tvOS)
             let session = AVAudioSession.sharedInstance()
             try? session.setCategory(.playback, mode: .moviePlayback, options: [])
-            // Ask for the route's full width (HDMI LPCM surround); harmless
-            // when the route is stereo — the session clamps and LumeEngine
-            // downmixes to whatever was actually granted.
-            let maxChannels = session.maximumOutputNumberOfChannels
-            if maxChannels > 2 {
-                try? session.setPreferredOutputNumberOfChannels(maxChannels)
-            }
             try? session.setActive(true, options: [])
+            // Start at stereo, clearing whatever an earlier session asked
+            // for. The engine widens it once it knows the audio track
+            // (`PlayerAudioChannelPreference`); asking for the route's full
+            // width here sent stereo channels to a receiver as 5.1.
+            PlayerAudioChannelPreference.apply(sourceChannels: nil)
+            let maxChannels = session.maximumOutputNumberOfChannels
             let route = session.currentRoute.outputs
                 .map { "\($0.portType.rawValue)(\($0.channels?.count ?? 0)ch)" }
                 .joined(separator: "+")
