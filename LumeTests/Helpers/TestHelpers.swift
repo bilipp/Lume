@@ -145,7 +145,7 @@ struct StringCatalog {
 /// The locales Lume ships. `en` is the catalog's source language and carries no
 /// `stringUnit` of its own for all but a handful of entries, so its value is the
 /// key itself.
-let shippingLocales: Set<String> = ["ar", "en", "de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
+let shippingLocales: Set<String> = ["ar", "en", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh-Hans"]
 
 extension StringCatalog {
     /// Every key in the catalog.

@@ -46,10 +46,34 @@
             "value" : "%lld개 다운로드 완료"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld downloads voltooid"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ukończone pobierania: %lld"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld downloads concluídos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузки завершены: %lld"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld İndirme Tamamlandı"
           }
         },
         "zh-Hans" : {
@@ -105,10 +129,34 @@
             "value" : "%lld개 다운로드 실패"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld downloads mislukt"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieudane pobierania: %lld"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld downloads falharam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось загрузить: %lld"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld İndirme Başarısız"
           }
         },
         "zh-Hans" : {
@@ -164,10 +212,34 @@
             "value" : "%lld개 실패"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld mislukt"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieudane: %lld"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld falharam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ошибок: %lld"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld başarısız"
           }
         },
         "zh-Hans" : {
@@ -223,10 +295,34 @@
             "value" : "%lld개 더"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld meer"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld więcej"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "+%lld mais"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Еще +%lld"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld tane daha"
           }
         },
         "zh-Hans" : {
@@ -283,10 +379,34 @@
             "value" : "계속 시청하기"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verder kijken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oglądaj dalej"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Continuar a Assistir"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжить просмотр"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzlemeye Devam Et"
           }
         },
         "zh-Hans" : {
@@ -342,10 +462,34 @@
             "value" : "다운로드 완료"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download voltooid"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pobieranie ukończone"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download concluído"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка завершена"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İndirme Tamamlandı"
           }
         },
         "zh-Hans" : {
@@ -401,10 +545,34 @@
             "value" : "다운로드 실패"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download mislukt"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pobieranie nie powiodło się"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Falha no download"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ошибка загрузки"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İndirme Başarısız"
           }
         },
         "zh-Hans" : {
@@ -461,10 +629,34 @@
             "value" : "즐겨찾기"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorieten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ulubione"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Favoritos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Избранное"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favoriler"
           }
         },
         "zh-Hans" : {
@@ -521,10 +713,34 @@
             "value" : "즐겨찾는 콘텐츠와 채널로 바로 이동하세요."
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ga direct naar je favoriete titels en zenders."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przejdź od razu do ulubionych tytułów i kanałów."
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aceda diretamente aos seus títulos e canais favoritos."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сразу переходите к любимым материалам и каналам."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favori içeriklerinize ve kanallarınıza doğrudan geçin."
           }
         },
         "zh-Hans" : {
@@ -581,10 +797,34 @@
             "value" : "다음: %@"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hierna: %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Następnie: %@"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "A seguir: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Далее: %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonraki: %@"
           }
         },
         "zh-Hans" : {
@@ -641,10 +881,34 @@
             "value" : "즐겨찾는 채널이 없습니다. Lume에서 채널을 즐겨찾기에 추가하면 여기에 편성표가 표시됩니다."
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen favoriete zenders. Markeer zenders in Lume als favoriet om hier hun programma te zien."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brak ulubionych kanałów. Dodaj kanały do ulubionych w Lume, aby zobaczyć tu ich program."
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sem canais favoritos. Adicione canais aos favoritos no Lume para ver aqui o guia."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет избранных каналов. Добавьте каналы в избранное в Lume, чтобы видеть здесь их программу."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favori kanal yok. Rehberlerini burada görmek için Lume'da kanalları favorilere ekleyin."
           }
         },
         "zh-Hans" : {
@@ -701,10 +965,34 @@
             "value" : "아직 즐겨찾기가 없습니다. Lume에서 콘텐츠와 채널을 즐겨찾기에 추가하세요."
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nog geen favorieten. Markeer titels en zenders in Lume als favoriet."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brak ulubionych. Oznacz tytuły i kanały jako ulubione w Lume."
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ainda sem favoritos. Marque títulos e canais como favoritos no Lume."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В избранном пока пусто. Добавляйте материалы и каналы в избранное в Lume."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz favori yok. Lume'da içerikleri ve kanalları favori olarak işaretleyin."
           }
         },
         "zh-Hans" : {
@@ -761,10 +1049,34 @@
             "value" : "편성표 정보 없음"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen gidsgegevens"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brak danych programu"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sem dados do guia"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет данных телегида"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rehber verisi yok"
           }
         },
         "zh-Hans" : {
@@ -821,10 +1133,34 @@
             "value" : "시청 중인 콘텐츠가 없습니다. Lume을 열고 시청을 시작하세요."
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niets bezig. Open Lume en begin met kijken."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nic nie jest w toku. Otwórz Lume i zacznij oglądać."
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nada em curso. Abra o Lume e comece a assistir."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет начатых материалов. Откройте Lume и начните просмотр."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devam eden bir şey yok. Lume'u açın ve izlemeye başlayın."
           }
         },
         "zh-Hans" : {
@@ -881,10 +1217,34 @@
             "value" : "현재 방송 중"
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nu"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teraz"
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "No Ar Agora"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сейчас в эфире"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şimdi Yayında"
           }
         },
         "zh-Hans" : {
@@ -941,10 +1301,34 @@
             "value" : "중단한 부분부터 이어서 시청하세요."
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ga verder waar je was gebleven."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontynuuj od miejsca, w którym przerwano."
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retome de onde parou."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжайте с того места, где остановились."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaldığınız yerden devam edin."
           }
         },
         "zh-Hans" : {
@@ -1001,10 +1385,34 @@
             "value" : "즐겨찾는 채널에서 방송 중인 프로그램."
           }
         },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat er op je favoriete zenders te zien is."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Co leci na ulubionych kanałach."
+          }
+        },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "O que está a dar nos seus canais favoritos."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Что идет на ваших любимых каналах."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favori kanallarınızda şu an neler yayında."
           }
         },
         "zh-Hans" : {

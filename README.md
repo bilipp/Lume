@@ -315,7 +315,7 @@ Lume follows a clean, layered SwiftUI architecture:
 - **Playback** — VLCKit · KSPlayer (FFmpegKit) · AVPlayer · LumeEngine (FFmpeg 9, beta) · AetherEngine (FFmpeg; iOS, macOS, tvOS)
 - **Networking** — `URLSession` with typed endpoints, retry/backoff, and error classification
 - **Integrations** — TMDB (metadata), MDBList (ratings), Trakt & Simkl (device OAuth + scrobbling), OpenSubtitles (external subtitle tracks)
-- **Localization** — 10 languages via String Catalogs (English, German, French, Spanish, Italian, Portuguese, Japanese, Korean, Simplified Chinese, Arabic), with right-to-left layout for Arabic
+- **Localization** — 14 languages via String Catalogs (English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Turkish, Russian, Japanese, Korean, Simplified Chinese, Arabic), with right-to-left layout for Arabic
 
 **Dependencies** (Swift Package Manager)
 
