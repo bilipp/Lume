@@ -542,6 +542,8 @@ struct LumeApp: App {
             .environment(PremiumManager.shared)
             // Also what the review prompt reads to tell a child session apart.
             .environment(profileManager)
+            // Opened by playing something, never from File > New.
+            .commandsRemoved()
             .windowStyle(.hiddenTitleBar)
             .windowResizability(.contentMinSize)
             // First-ever size only: after that SwiftUI's frame autosave reopens

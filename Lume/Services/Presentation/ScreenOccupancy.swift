@@ -75,10 +75,11 @@ final class ScreenOccupancy {
     /// `isScreenBusy` without the browse root's own presentations, for one the
     /// root raises itself and so already counts in `browseRootIsCovered`.
     /// Players are left out where they open in their own window (macOS), so
-    /// they don't cover the browse root's.
+    /// they don't cover the browse root's. One playing in the library window
+    /// does.
     var coversBrowseRoot: Bool {
         #if os(macOS)
-            paywallIsVisible || blockingSheetIsVisible
+            paywallIsVisible || blockingSheetIsVisible || MacPlayerWindowRouter.shared.isInline
         #else
             playerIsVisible || paywallIsVisible || blockingSheetIsVisible
         #endif
