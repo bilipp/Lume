@@ -20,7 +20,7 @@ struct LiveChannelNavigatorScopeTests {
     private let outsider = UUID()
 
     private var combined: CatalogScope {
-        .combined([(id: first, tabs: [.liveTV]), (id: second, tabs: [.liveTV, .movies])])
+        .combined([(id: first, tabs: Set<PlaylistTab>([.liveTV])), (id: second, tabs: Set<PlaylistTab>([.liveTV, .movies]))])
     }
 
     /// Three favorites per playlist, each playlist in its own category. The
@@ -103,7 +103,7 @@ struct LiveChannelNavigatorScopeTests {
     @Test func `a scope with no Live TV member walks nothing`() throws {
         try OnDiskCatalogStore.withContext { context in
             try insertFavorites(in: context)
-            let moviesOnly = CatalogScope.combined([(id: first, tabs: [.movies]), (id: second, tabs: [.movies])])
+            let moviesOnly = CatalogScope.combined([(id: first, tabs: Set<PlaylistTab>([.movies])), (id: second, tabs: Set<PlaylistTab>([.movies]))])
             #expect(try context.fetchCount(descriptor(.favorites, moviesOnly)) == 0)
             #expect(try context.fetchCount(descriptor(.favorites, .empty)) == 0)
         }

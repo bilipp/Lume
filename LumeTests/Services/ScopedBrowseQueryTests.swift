@@ -84,7 +84,7 @@ struct ScopedBrowseQueryTests {
     /// A combined scope where only one member contributes the type is the
     /// isolated predicate for that tab.
     @Test func `a single contributing member inlines the prefix too`() {
-        let scope = CatalogScope.combined([(id: first, tabs: [.movies]), (id: second, tabs: Set<PlaylistTab>([.liveTV]))])
+        let scope = CatalogScope.combined([(id: first, tabs: Set<PlaylistTab>([.movies])), (id: second, tabs: Set<PlaylistTab>([.liveTV]))])
         #expect(!expressionType(MovieCollectionQuery.rowDescriptor(for: .recentlyAdded, scope: scope).predicate).contains("Evaluate"))
     }
 

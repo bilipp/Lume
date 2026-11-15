@@ -24,9 +24,9 @@ struct LiveChannelProbeScopeTests {
 
     private var combined: CatalogScope {
         .combined([
-            (id: first, tabs: [.liveTV]),
-            (id: second, tabs: [.liveTV, .movies]),
-            (id: moviesOnly, tabs: [.movies])
+            (id: first, tabs: Set<PlaylistTab>([.liveTV])),
+            (id: second, tabs: Set<PlaylistTab>([.liveTV, .movies])),
+            (id: moviesOnly, tabs: Set<PlaylistTab>([.movies]))
         ])
     }
 

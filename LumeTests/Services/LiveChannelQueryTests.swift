@@ -149,9 +149,9 @@ struct LiveChannelQueryTests {
         let moviesOnly = UUID()
         let outsider = UUID()
         let scope = CatalogScope.combined([
-            (id: first, tabs: [.liveTV, .movies]),
-            (id: second, tabs: [.liveTV]),
-            (id: moviesOnly, tabs: [.movies])
+            (id: first, tabs: Set<PlaylistTab>([.liveTV, .movies])),
+            (id: second, tabs: Set<PlaylistTab>([.liveTV])),
+            (id: moviesOnly, tabs: Set<PlaylistTab>([.movies]))
         ])
         let streams = [
             stream("1", playlist: first, category: nil),
@@ -171,7 +171,7 @@ struct LiveChannelQueryTests {
         let first = Playlist(name: "First", serverURL: "http://x", username: "u", password: "p")
         let second = Playlist(name: "Second", serverURL: "http://y", username: "u", password: "p")
         let outsider = Playlist(name: "Outsider", serverURL: "http://z", username: "u", password: "p")
-        let scope = CatalogScope.combined([(id: first.id, tabs: [.liveTV]), (id: second.id, tabs: [.liveTV])])
+        let scope = CatalogScope.combined([(id: first.id, tabs: Set<PlaylistTab>([.liveTV])), (id: second.id, tabs: Set<PlaylistTab>([.liveTV]))])
 
         let news = Lume.Category(apiId: "1", name: "News", parentId: 0, type: .live, playlist: first)
         let sport = Lume.Category(apiId: "1", name: "Sport", parentId: 0, type: .live, playlist: second)

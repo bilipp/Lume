@@ -448,8 +448,8 @@ struct AutoSyncCombinedTests {
     private let stale = Date().addingTimeInterval(-48 * 60 * 60)
 
     @Test func `every combined member counts as on screen`() {
-        let memberA = makePlaylist("a", tabs: [.liveTV])
-        let memberB = makePlaylist("b", tabs: [.movies])
+        let memberA = makePlaylist("a", tabs: Set<PlaylistTab>([.liveTV]))
+        let memberB = makePlaylist("b", tabs: Set<PlaylistTab>([.movies]))
         let outsider = makePlaylist("c")
         let scope = [memberA, memberB, outsider].scope(for: PlaylistSelectionStore.combined, isPremium: true)
 
@@ -459,8 +459,8 @@ struct AutoSyncCombinedTests {
     }
 
     @Test func `isolated scope keeps only the selected playlist on screen`() {
-        let memberA = makePlaylist("a", tabs: [.liveTV])
-        let memberB = makePlaylist("b", tabs: [.movies])
+        let memberA = makePlaylist("a", tabs: Set<PlaylistTab>([.liveTV]))
+        let memberB = makePlaylist("b", tabs: Set<PlaylistTab>([.movies]))
         let scope = [memberA, memberB].scope(for: memberB.id.uuidString, isPremium: true)
 
         #expect(!memberA.autoSyncCandidate(in: scope).isActive)
@@ -468,9 +468,9 @@ struct AutoSyncCombinedTests {
     }
 
     @Test func `a lapsed combined selection keeps only the priority-1 member on screen`() {
-        let memberA = makePlaylist("a", tabs: [.liveTV])
+        let memberA = makePlaylist("a", tabs: Set<PlaylistTab>([.liveTV]))
         memberA.combinedPriority = 0
-        let memberB = makePlaylist("b", tabs: [.movies])
+        let memberB = makePlaylist("b", tabs: Set<PlaylistTab>([.movies]))
         memberB.combinedPriority = 1
         let scope = [memberB, memberA].scope(for: PlaylistSelectionStore.combined, isPremium: false)
 
@@ -479,9 +479,9 @@ struct AutoSyncCombinedTests {
     }
 
     @Test func `a due member syncs and a due outsider waits`() {
-        let member = makePlaylist("a", tabs: [.liveTV])
+        let member = makePlaylist("a", tabs: Set<PlaylistTab>([.liveTV]))
         member.lastSyncDate = stale
-        let other = makePlaylist("b", tabs: [.series])
+        let other = makePlaylist("b", tabs: Set<PlaylistTab>([.series]))
         let outsider = makePlaylist("c")
         outsider.lastSyncDate = stale
         let scope = [member, other, outsider].scope(for: PlaylistSelectionStore.combined, isPremium: true)
