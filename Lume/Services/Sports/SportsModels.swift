@@ -291,6 +291,14 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
     /// `startDate` is only the day: a tennis match not yet on an order of play.
     let startTimeIsTentative: Bool?
 
+    let seasonYear: Int?
+    let seasonName: String?
+    let seasonPhase: String?
+    let seasonPhaseID: Int?
+    let week: Int?
+    let weekLabel: String?
+    let eventHeadline: String?
+
     init(
         id: String,
         leagueId: String,
@@ -308,7 +316,14 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         sessionKind: SportsSessionKind? = nil,
         leagueLogoURL: URL? = nil,
         round: String? = nil,
-        startTimeIsTentative: Bool? = nil
+        startTimeIsTentative: Bool? = nil,
+        seasonYear: Int? = nil,
+        seasonName: String? = nil,
+        seasonPhase: String? = nil,
+        seasonPhaseID: Int? = nil,
+        week: Int? = nil,
+        weekLabel: String? = nil,
+        eventHeadline: String? = nil
     ) {
         self.id = id
         self.leagueId = leagueId
@@ -327,6 +342,13 @@ nonisolated struct SportsFixture: Identifiable, Codable, Hashable {
         self.leagueLogoURL = leagueLogoURL
         self.round = round
         self.startTimeIsTentative = startTimeIsTentative
+        self.seasonYear = seasonYear
+        self.seasonName = seasonName
+        self.seasonPhase = seasonPhase
+        self.seasonPhaseID = seasonPhaseID
+        self.week = week
+        self.weekLabel = weekLabel
+        self.eventHeadline = eventHeadline
     }
 }
 
@@ -357,7 +379,9 @@ nonisolated extension SportsFixture {
                 name: name,
                 shortName: shortName,
                 sessionKind: session.kind,
-                leagueLogoURL: leagueLogoURL
+                leagueLogoURL: leagueLogoURL,
+                seasonYear: seasonYear, seasonName: seasonName, seasonPhase: seasonPhase,
+                seasonPhaseID: seasonPhaseID, week: week, weekLabel: weekLabel, eventHeadline: eventHeadline
             )
         }
     }

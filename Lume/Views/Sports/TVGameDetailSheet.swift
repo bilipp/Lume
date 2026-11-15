@@ -35,6 +35,8 @@
         /// the player reopens this game.
         var focusChannelID: String?
         var provider: any SportsDataProvider = ESPNClient.shared
+        var replay: SportsReplayGame?
+        var onReplay: ((ServerRecording, Bool) -> Void)?
 
         @Environment(\.dismiss) private var dismiss
         @Environment(\.modelContext) private var modelContext
@@ -46,7 +48,11 @@
         @State private var fetchedStandings: [SportsStandingRow] = []
         @State private var tab: GameDetailTab = .timeline
         @State private var selfResolved: [ResolvedChannel] = []
-        @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
+        @AppStorage(SportsSyncService.hideScoresKey) private var storedHidesScores = false
+        private var hidesScores: Bool {
+            replay == nil ? storedHidesScores : (UserDefaults.standard.object(forKey: SportsSyncService.hideScoresKey) as? Bool ?? true)
+        }
+
         @FocusState private var focusedChannel: String?
 
         private var channels: [ResolvedChannel] {
@@ -57,11 +63,15 @@
             ScrollView {
                 VStack(spacing: 48) {
                     header
-                    if fixture.status.state != .final {
+                    if replay == nil, fixture.status.state != .final {
                         watchSection
                     }
-                    detailTabsSection
-                    standingsSection
+                    if let replay, let onReplay {
+                        SportsReplayActions(game: replay, onPlay: onReplay)
+                    } else {
+                        detailTabsSection
+                        standingsSection
+                    }
                 }
                 .frame(maxWidth: 1500)
                 .frame(maxWidth: .infinity)
@@ -74,11 +84,13 @@
             .onExitCommand { dismiss() }
             .onAppear(perform: restoreChannelFocus)
             .onChange(of: selfResolved) { restoreChannelFocus() }
-            .task(id: fixture.id) { await loadDetail() }
-            .onAppear { SportsSyncService.shared.beginLivePolling() }
-            .onDisappear { SportsSyncService.shared.endLivePolling() }
+            .task(id: fixture.id) { if replay == nil { await loadDetail() } }
+            .onAppear { if replay == nil { SportsSyncService.shared.beginLivePolling() } }
+            .onDisappear { if replay == nil { SportsSyncService.shared.endLivePolling() } }
         }
+    }
 
+    private extension TVGameDetailSheet {
         /// The team tints are translucent washes; without a solid base a
         /// fullScreenCover on tvOS lets the hub show through them.
         private var background: some View {

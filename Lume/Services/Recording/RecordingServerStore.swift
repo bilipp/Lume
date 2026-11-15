@@ -367,7 +367,7 @@ final class RecordingServerStore {
     /// A playable item for `recording`, backed by a short-lived URL. An
     /// in-progress recording plays from its start; a finished one resumes
     /// where this device left it.
-    func playbackMedia(for recording: ServerRecording) async throws(RecordingActionError) -> PlayableMedia {
+    func playbackMedia(for recording: ServerRecording, fromBeginning: Bool = false) async throws(RecordingActionError) -> PlayableMedia {
         let backend = try makeBackend(activeEndpoint())
         let namespace = configService.activeServer?.progressNamespace
         let recordingID = recording.id
@@ -376,7 +376,7 @@ final class RecordingServerStore {
         }
         return .recording(
             recording, playback: playback, progressNamespace: namespace,
-            startTime: RecordingProgressStore.resumePosition(for: recording, namespace: namespace, defaults: progressDefaults),
+            startTime: fromBeginning ? 0 : RecordingProgressStore.resumePosition(for: recording, namespace: namespace, defaults: progressDefaults),
             now: now()
         )
     }

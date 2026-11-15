@@ -27,6 +27,7 @@ struct FixtureCard: View {
     /// day than the fixture's start — a race weekend's Sunday race — names its
     /// day regardless.
     var showsDate = true
+    var hidesResults: Bool?
     var onOpenDetail: () -> Void
     var onWatch: (ResolvedChannel) -> Void
     var onFollowToggle: (SportsTeam) -> Void
@@ -36,7 +37,10 @@ struct FixtureCard: View {
     /// card (a race, a fight night) with its two text lines stands as tall as a
     /// two-team card beside it in the Home rail.
     @ScaledMetric(relativeTo: .subheadline) private var contentMinHeight: CGFloat = 52
-    @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
+    @AppStorage(SportsSyncService.hideScoresKey) private var storedHidesScores = false
+    private var hidesScores: Bool {
+        hidesResults ?? storedHidesScores
+    }
 
     /// The lone confident channel a live card offers one-tap playback for.
     private var confidentChannel: ResolvedChannel? {
