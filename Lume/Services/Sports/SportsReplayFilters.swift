@@ -47,9 +47,15 @@ nonisolated enum SportsReplayRange: String, CaseIterable, Identifiable {
 }
 
 nonisolated extension SportsReplayGame {
-    func matches(query: String, aliases: SportsTeamAliases = .bundled) -> Bool {
-        let words = SportsMatcher.normalize(query).split(separator: " ")
+    func matches(query: String, aliases: SportsTeamAliases = .bundled, calendar: Calendar = .current) -> Bool {
+        var words = SportsMatcher.normalize(query).split(separator: " ")
         guard !words.isEmpty else { return true }
+        let weekday = calendar.component(.weekday, from: fixture.startDate)
+        // The named NFL broadcast is a calendar query, independent of scores.
+        if words.contains("thursday"), words.contains("night"), words.contains("football") {
+            guard fixture.leagueId == "espn:football/nfl", weekday == 5 else { return false }
+            words.removeAll { $0 == "night" }
+        }
         let teams = [fixture.home?.team, fixture.away?.team].compactMap(\.self)
         var names = teams.flatMap { [$0.name, $0.shortName, $0.abbreviation] }
         names += aliases.aliases(for: names)
@@ -57,6 +63,10 @@ nonisolated extension SportsReplayGame {
                   fixture.seasonName, fixture.seasonPhase, fixture.weekLabel, fixture.eventHeadline].compactMap(\.self)
         if let week = fixture.week { names.append(String(localized: "Week \(week)")) }
         names += recordings.map(\.title)
+        names += fixture.broadcasters
+        names += [calendar.weekdaySymbols[weekday - 1],
+                  ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][weekday - 1]]
+        if let sport = SportsCatalog.league(id: fixture.leagueId)?.sport { names.append(sport) }
         let haystack = SportsMatcher.normalize(names.joined(separator: " "))
         return words.allSatisfy { haystack.contains(String($0)) }
     }
@@ -94,7 +104,7 @@ nonisolated struct SportsReplayFilter {
                 && (range != .season || fixture.seasonYear == nil || fixture.seasonYear == currentSeason)
                 && (phase.isEmpty || fixture.seasonPhase == phase)
                 && (week == nil || fixture.week == week)
-                && game.matches(query: query)
+                && game.matches(query: query, calendar: calendar)
         }.sorted { recentlyAdded ? $0.addedAt > $1.addedAt : $0.fixture.startDate > $1.fixture.startDate }
     }
 }

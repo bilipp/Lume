@@ -12,9 +12,9 @@ import Testing
 struct SportsReplayFilterTests {
     private let now = Date(timeIntervalSince1970: 1_794_765_600)
 
-    private func game(id: String, daysAgo: Int = 0, year: Int = 2026, week: Int = 10) -> SportsReplayGame {
+    private func game(id: String, daysAgo: Int = 0, year: Int = 2026, week: Int = 10, startDate: Date? = nil) -> SportsReplayGame {
         let league = "espn:football/nfl"
-        let date = now.addingTimeInterval(-Double(daysAgo) * 86400)
+        let date = startDate ?? now.addingTimeInterval(-Double(daysAgo) * 86400)
         let team = SportsTeam(leagueId: league, teamId: "lions", name: "Detroit Lions", shortName: "Lions", abbreviation: "DET")
         let fixture = SportsFixture(
             id: id, leagueId: league, leagueName: "NFL", leagueAbbreviation: "NFL", startDate: date,
@@ -47,6 +47,17 @@ struct SportsReplayFilterTests {
         filter.myTeams = false
         filter.followedTeamIDs = []
         #expect(filter.apply(games, now: now).count == 1)
+    }
+
+    @Test func `thursday night football searches the local game weekday`() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let thursday = try #require(ESPNClient.parseDate("2026-11-12T19:00:00Z"))
+        let games = [game(id: "thursday", startDate: thursday), game(id: "friday", startDate: thursday.addingTimeInterval(86400))]
+        let filter = SportsReplayFilter(range: .season, query: "Thursday night football")
+        #expect(filter.apply(games, now: now, calendar: calendar).map(\.fixture.id) == ["thursday"])
+        calendar.timeZone = TimeZone(secondsFromGMT: 14 * 3600)!
+        #expect(filter.apply(games, now: now, calendar: calendar).isEmpty)
     }
 
     @Test func `search combines league and week labels`() {

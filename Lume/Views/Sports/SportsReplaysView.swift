@@ -140,7 +140,7 @@ struct SportsReplaysView: View {
         NavigationStack {
             Form {
                 Toggle("Browse season", isOn: $browse)
-                Toggle("Recently added", isOn: $recentlyAdded)
+                Toggle("Recently Added", isOn: $recentlyAdded)
                 Picker("League", selection: $league) {
                     Text("All").tag("")
                     ForEach(Array(Set(games.map(\.fixture.leagueId))).sorted(), id: \.self) { id in
