@@ -289,6 +289,13 @@ extension StalkerClient {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
+            // Some portals print a debug line ("generated in: 0.5s") before
+            // the JSON, notably on `get_epg_info`.
+            if let start = data.firstIndex(of: UInt8(ascii: "{")), start > data.startIndex,
+               let decoded = try? JSONDecoder().decode(T.self, from: data[start...])
+            {
+                return decoded
+            }
             // Ministra answers a call from an unauthorized device with HTTP 200
             // and a plain-text `Authorization failed.` — not a 401, not JSON.
             if isAuthorizationFailure(data) {

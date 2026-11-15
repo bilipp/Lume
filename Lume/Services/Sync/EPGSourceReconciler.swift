@@ -69,12 +69,14 @@ nonisolated enum EPGSourceReconciler {
         switch playlist.sourceType {
         case .xtream:
             return XtreamClient.xmltvURL(for: playlist)?.absoluteString
-        case .m3u, .stalker:
-            // m3u carries its guide URL; Stalker portals expose no standard XMLTV
-            // URL, so the guide comes from a manually-attached XMLTV source (added
-            // in EPG settings) — or, if one was set, the playlist's `epgURL`.
+        case .m3u:
             guard let epgURL = playlist.epgURL, !epgURL.isEmpty else { return nil }
             return epgURL
+        case .stalker:
+            // A portal exposes no XMLTV URL; without a set `epgURL` the source
+            // reads the portal's own guide (`StalkerPortalGuide`).
+            if let epgURL = playlist.epgURL, !epgURL.isEmpty { return epgURL }
+            return StalkerPortalGuide.sourceURL(playlistID: playlist.id)
         case .webdav:
             // A WebDAV file share carries no XMLTV guide, so no EPGSource must
             // ever be created for one — an orphan source would be retried by

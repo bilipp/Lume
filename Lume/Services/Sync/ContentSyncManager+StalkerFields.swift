@@ -48,11 +48,17 @@ extension ContentSyncManager {
         }
     }
 
-    func applyStalkerChannelFields(from channel: StalkerChannel, cmd: String, to stream: LiveStream, playlistPrefix: String) {
+    func applyStalkerChannelFields(
+        from channel: StalkerChannel,
+        cmd: String,
+        to stream: LiveStream,
+        playlistPrefix: String,
+        epgChannelId: String
+    ) {
         let name = channel.name ?? ""
         if stream.name != name { stream.name = name }
         if stream.streamIcon != channel.logo { stream.streamIcon = channel.logo }
-        if stream.epgChannelId != channel.xmltvId { stream.epgChannelId = channel.xmltvId }
+        if stream.epgChannelId != epgChannelId { stream.epgChannelId = epgChannelId }
         if stream.directURL != cmd { stream.directURL = cmd }
         let number = channel.number ?? 0
         if stream.num != number { stream.num = number }
