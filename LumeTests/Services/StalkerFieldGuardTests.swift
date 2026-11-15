@@ -92,16 +92,16 @@ struct StalkerFieldGuardTests {
         let stream = LiveStream(id: "p-live-5", streamId: 5, name: "")
         context.insert(stream)
 
-        await manager.applyStalkerChannelFields(from: channel, cmd: "ffrt http://portal/ch/5", to: stream, playlistPrefix: "p-live-")
+        await manager.applyStalkerChannelFields(from: channel, cmd: "ffrt http://portal/ch/5", to: stream, playlistPrefix: "p-live-", epgChannelId: "news.hd")
         try context.save()
-        await manager.applyStalkerChannelFields(from: channel, cmd: "ffrt http://portal/ch/5", to: stream, playlistPrefix: "p-live-")
+        await manager.applyStalkerChannelFields(from: channel, cmd: "ffrt http://portal/ch/5", to: stream, playlistPrefix: "p-live-", epgChannelId: "news.hd")
         #expect(!context.hasChanges)
 
         let renamed = try decode(StalkerChannel.self, """
         {"id":"5","name":"News 24","number":"5","cmd":"ffrt http://portal/ch/5","logo":"http://img/5.png",
          "tv_genre_id":"2","xmltv_id":"news.hd"}
         """)
-        await manager.applyStalkerChannelFields(from: renamed, cmd: "ffrt http://portal/ch/5", to: stream, playlistPrefix: "p-live-")
+        await manager.applyStalkerChannelFields(from: renamed, cmd: "ffrt http://portal/ch/5", to: stream, playlistPrefix: "p-live-", epgChannelId: "news.hd")
         #expect(context.hasChanges)
         #expect(stream.name == "News 24")
     }

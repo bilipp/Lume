@@ -33,10 +33,10 @@ struct EPGSourceReconcilerTests {
         #expect(url == nil)
     }
 
-    @Test func `guideURL for stalker playlist without epgURL returns nil`() {
+    @Test func `guideURL for stalker playlist without epgURL reads the portal guide`() {
         let playlist = Playlist(name: "Test", portalURL: "http://portal.example.com", macAddress: "00:1A:79:12:34:56")
         let url = EPGSourceReconciler.guideURL(for: playlist)
-        #expect(url == nil)
+        #expect(url == StalkerPortalGuide.sourceURL(playlistID: playlist.id))
     }
 
     @Test func `guideURL for webdav playlist returns nil`() {

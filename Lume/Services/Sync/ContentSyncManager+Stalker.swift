@@ -476,7 +476,17 @@ extension ContentSyncManager {
                 stream = LiveStream(id: id, streamId: streamId, name: "")
                 context.insert(stream)
             }
-            applyStalkerChannelFields(from: channel, cmd: cmd, to: stream, playlistPrefix: playlistPrefix)
+            applyStalkerChannelFields(
+                from: channel,
+                cmd: cmd,
+                to: stream,
+                playlistPrefix: playlistPrefix,
+                epgChannelId: StalkerPortalGuide.epgChannelId(
+                    xmltvId: channel.xmltvId,
+                    playlistID: playlistId,
+                    streamId: streamId
+                )
+            )
         }
         if context.hasChanges { try? context.save() }
     }
@@ -495,6 +505,8 @@ extension ContentSyncManager {
         try? context.save()
     }
 
+    /// Also links the portal's own guide as the playlist's EPG source, so the
+    /// guide refresh every content sync is owed reads it.
     private func markStalkerPlaylistUpdated(_ playlistId: UUID) {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
@@ -502,6 +514,7 @@ extension ContentSyncManager {
             FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == playlistId })
         ).first else { return }
         playlist.lastUpdated = Date()
+        EPGSourceReconciler.apply(playlist, in: context)
         try? context.save()
     }
 }
