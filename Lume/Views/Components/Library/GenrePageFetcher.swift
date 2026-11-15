@@ -144,45 +144,43 @@ nonisolated enum GenrePageFetcher {
     /// exactly as isolated mode always had it; several compose the scope's OR
     /// via `evaluate`.
     private static func moviePredicate(request: GenrePageRequest) -> Predicate<Movie> {
+        let visible = ContentRestriction.movieBrowsePredicate(categories: request.excludedCategoryIDs, content: SportarrPlaybackRegistry.shared.browseHiddenIDs)
         let genre = request.genre
-        let excluded = Set(request.excludedCategoryIDs.map(String?.some))
-        let filtersCategories = !excluded.isEmpty
         let grouped = request.grouped
         if let prefix = request.scope.singlePrefix(for: .movies) {
             return #Predicate { movie in
                 movie.id.starts(with: prefix)
+                    && visible.evaluate(movie)
                     && (movie.genre?.localizedStandardContains(genre) ?? false)
-                    && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
                     && (!grouped || movie.isCategoryGroupPrimary == true)
             }
         }
         let scoped = request.scope.moviePredicate()
         return #Predicate { movie in
             scoped.evaluate(movie)
+                && visible.evaluate(movie)
                 && (movie.genre?.localizedStandardContains(genre) ?? false)
-                && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
                 && (!grouped || movie.isCategoryGroupPrimary == true)
         }
     }
 
     private static func seriesPredicate(request: GenrePageRequest) -> Predicate<Series> {
+        let visible = ContentRestriction.seriesBrowsePredicate(categories: request.excludedCategoryIDs, content: SportarrPlaybackRegistry.shared.browseHiddenIDs)
         let genre = request.genre
-        let excluded = Set(request.excludedCategoryIDs.map(String?.some))
-        let filtersCategories = !excluded.isEmpty
         let grouped = request.grouped
         if let prefix = request.scope.singlePrefix(for: .series) {
             return #Predicate { series in
                 series.id.starts(with: prefix)
+                    && visible.evaluate(series)
                     && (series.genre?.localizedStandardContains(genre) ?? false)
-                    && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
                     && (!grouped || series.isCategoryGroupPrimary == true)
             }
         }
         let scoped = request.scope.seriesPredicate()
         return #Predicate { series in
             scoped.evaluate(series)
+                && visible.evaluate(series)
                 && (series.genre?.localizedStandardContains(genre) ?? false)
-                && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
                 && (!grouped || series.isCategoryGroupPrimary == true)
         }
     }

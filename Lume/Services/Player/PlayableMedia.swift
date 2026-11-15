@@ -26,6 +26,7 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     let kind: Kind
     private(set) var startTime: TimeInterval
     let contentRef: ContentRef
+    let isSportsReplay: Bool?
     /// The Live TV list this channel was launched from (Favorites, Recently
     /// Watched, or a category). `nil` where playback started outside a channel
     /// list — Home, Search, recall — in which case the player surfs the
@@ -71,8 +72,13 @@ nonisolated struct PlayableMedia: Identifiable, Hashable, Codable {
     ) {
         self.id = id
         self.url = url
-        self.title = title
-        self.subtitle = subtitle
+        let sportsTitle: String? = switch contentRef {
+        case let .movie(id), let .episode(id): SportarrPlaybackRegistry.shared.title(id: id)
+        default: nil
+        }
+        self.title = sportsTitle ?? title
+        self.subtitle = sportsTitle == nil ? subtitle : nil
+        isSportsReplay = sportsTitle == nil ? nil : true
         self.posterURL = posterURL
         self.kind = kind
         self.startTime = startTime

@@ -16,6 +16,7 @@ struct SeriesCategoryView: View {
     let category: Category
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
 
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
     @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
@@ -44,7 +45,7 @@ struct SeriesCategoryView: View {
 
     /// The sort and grouping the loaded pages were fetched for.
     private var loadKey: String {
-        "\(contentSortRaw)|\(groupDuplicateTitles)"
+        "\(contentSortRaw)|\(groupDuplicateTitles)|\(restriction.browseVisibilityToken)"
     }
 
     /// The playlist when it's a Stalker portal, whose categories are imported
@@ -191,6 +192,7 @@ struct SeriesCategoryPreview: View {
     @Query private var series: [Series]
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @State private var groupStates: [String: TitleGroupState] = [:]
 
     /// - Parameter grouped: see `MovieCategoryPreview`.

@@ -32,6 +32,9 @@ nonisolated struct ContentRestriction: Equatable {
     let hiddenCategoryIDs: Set<String>
     /// Every category id excluded for the current viewer.
     let excludedCategoryIDs: Set<String>
+    /// Browse-only relocation. Search, playback and Continue Watching keep these.
+    let browseExcludedContentIDs: Set<String>
+    let browseVisibilityToken: String
     /// A stable digest of `excludedCategoryIDs`, for cache keys that must not
     /// outlive a visibility change (Home's trending memo, the "For You" list).
     /// Hashed rather than joined verbatim: a user who hides most of a large
@@ -42,14 +45,18 @@ nonisolated struct ContentRestriction: Equatable {
     init(
         isActive: Bool = false,
         restrictedCategoryIDs: Set<String> = [],
-        hiddenCategoryIDs: Set<String> = []
+        hiddenCategoryIDs: Set<String> = [],
+        browseExcludedContentIDs: Set<String> = []
     ) {
         let excluded = isActive ? hiddenCategoryIDs.union(restrictedCategoryIDs) : hiddenCategoryIDs
         self.isActive = isActive
         self.restrictedCategoryIDs = restrictedCategoryIDs
         self.hiddenCategoryIDs = hiddenCategoryIDs
         excludedCategoryIDs = excluded
-        visibilityToken = Self.visibilityToken(for: excluded)
+        self.browseExcludedContentIDs = browseExcludedContentIDs
+        browseVisibilityToken = Self.visibilityToken(for: browseExcludedContentIDs)
+        visibilityToken = browseExcludedContentIDs.isEmpty ? Self.visibilityToken(for: excluded)
+            : Self.visibilityToken(for: Set(excluded.map { "category:" + $0 }).union(browseExcludedContentIDs.map { "browse:" + $0 }))
     }
 
     static func visibilityToken(for excludedCategoryIDs: Set<String>) -> String {
@@ -63,6 +70,10 @@ nonisolated struct ContentRestriction: Equatable {
     /// category ids every time SwiftUI checks whether the environment moved.
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.visibilityToken == rhs.visibilityToken
+    }
+
+    func hidesFromBrowse(id: String, categoryID: String?) -> Bool {
+        browseExcludedContentIDs.contains(id) || hides(categoryID: categoryID)
     }
 
     /// Whether content in `categoryID` should be hidden from the current viewer.
@@ -88,6 +99,10 @@ nonisolated extension Series: CategorizedContent {}
 nonisolated extension LiveStream: CategorizedContent {}
 
 nonisolated extension Sequence where Element: CategorizedContent {
+    func excludingBrowseHidden(_ restriction: ContentRestriction) -> [Element] where Element: Identifiable, Element.ID == String {
+        filter { !restriction.hidesFromBrowse(id: $0.id, categoryID: $0.categoryId) }
+    }
+
     /// Drops items whose category is hidden or restricted for the current
     /// viewer. A no-op when nothing is excluded.
     func excludingRestricted(_ restriction: ContentRestriction) -> [Element] {
@@ -115,17 +130,19 @@ nonisolated extension Sequence where Element: CategorizedContent {
 final class ContentRestrictionMemo {
     private var cached = ContentRestriction()
 
-    func restriction(isActive: Bool, restricted: Set<String>, hidden: Set<String>) -> ContentRestriction {
+    func restriction(isActive: Bool, restricted: Set<String>, hidden: Set<String>, browse: Set<String> = []) -> ContentRestriction {
         if cached.isActive == isActive,
            cached.restrictedCategoryIDs == restricted,
-           cached.hiddenCategoryIDs == hidden
+           cached.hiddenCategoryIDs == hidden,
+           cached.browseExcludedContentIDs == browse
         {
             return cached
         }
         cached = ContentRestriction(
             isActive: isActive,
             restrictedCategoryIDs: restricted,
-            hiddenCategoryIDs: hidden
+            hiddenCategoryIDs: hidden,
+            browseExcludedContentIDs: browse
         )
         return cached
     }

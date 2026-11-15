@@ -6,8 +6,8 @@ in the viewer's own playlists via the EPG so one tap starts playback.
 
 Sports is a **Lume Pro** feature (`PremiumFeature.sportsHub`) and ships behind
 the `sports.tabEnabled` toggle (default on). It is a browse-and-play layer on top
-of the existing catalog: it never adds channels, and playback only ever targets a
-`LiveStream` already imported from a playlist.
+of the existing catalog: it never adds channels. Live playback targets an imported
+`LiveStream`; Replays use the existing recording-server or catalog player.
 
 ## Layout
 
@@ -210,3 +210,66 @@ one-tap playback (a play glyph); otherwise the card opens a channel picker.
    changes are needed.
 4. Team/league/venue names from any provider are shown **verbatim** and are not
    localised.
+
+
+## Replays
+
+The Scores / Replays switch appears when playable replays are available. Native
+DVR recordings use the existing recording store, profile restrictions, playback
+grants and namespaced progress. A recording joins a game only when its programme
+window and both teams identify one ESPN fixture; a late partial may use the
+retained programme window. The unnamed-channel fallback requires one fixture in
+the actual capture window. Ambiguous recordings remain in the recordings library.
+
+Date windows, team/league search and league / season / phase / week browsing are
+shared across platforms. Missing hierarchy levels are skipped. Replay cards hide
+results by default, and game detail reuses the existing fixture header. Version
+selection, Resume and Watch from beginning keep progress on the original item.
+
+## Optional Sportarr library integration
+
+Settings → Sports has one device-local switch, **off by default**. When enabled,
+the normal Jellyfin/Emby/Silo and WebDAV imports capture explicit Sportarr event
+IDs, published TVDB aliases or Sportarr filename tokens. An identified league
+series, or a series with identified episodes, classifies its other episodes.
+Names alone never classify an ordinary movie or show.
+
+`Sportarr/` owns a disposable private JSON index per playlist under Caches/Sports.
+It contains catalog IDs and derived metadata, not media URLs, credentials or
+SwiftData models. Original files, catalog rows, favorites and progress stay put.
+A lost cache costs another resolve. Playlist deletion removes its derived index.
+
+The fixed `https://sportarr.net/api/metadata/agents` client makes keyless GETs to
+`episode/{event}`, `series/{league}` and
+`series/{league}/season/{year}/episodes`. Requests carry public event/league IDs
+and an identifying User-Agent; no viewer identity or local-server credentials.
+There is no acquisition API, configurable origin or resolver in a row/player.
+All response fields are optional. The serial sync worker stays below two requests
+in flight and caps individual event requests at 25 per pass. Season batches and
+resolved files are cached; misses back off to weekly, while outages preserve
+previous answers. Turning the switch off cancels queued lookups.
+
+League mapping uses exact normalized catalog names/abbreviations plus the small
+reviewed `sportarr-league-aliases.json`. A unique two-team/time match joins the
+ESPN game. Historical months, including successful empty answers, are cached
+separately from Scores. Unmatched identified files remain playable as their own
+games, with Uncategorized last. A title-based match is disclosed in detail.
+
+`ContentRestriction` separates browse relocation from category permissions.
+Central category/collection/genre/indexer queries exclude classified movies and
+series in SQLite; Home uses the same visibility values. Search and Continue
+Watching retain the original identities and route to Sports game detail. Playback
+revalidates the catalog row and profile restrictions. Sports episodes use the
+existing source picker/player, sports titles and original progress, with episode
+neighbours, Next Up and Cast auto-advance suppressed.
+
+A partial or per-show import cannot withdraw a cached classification. Complete
+walks can restore ordinary browsing when explicit identifiers disappear; confirmed
+catalog absence prunes only derived records. Failed reads never mean an empty
+catalog. Tests cover these boundaries, request budgets, opt-out, wrong-ID dates,
+shared-city ambiguity, private-path exclusion and SQLite paging.
+
+Live acceptance still requires an importable media-server view carrying trusted
+identifiers. A collection-only archive with no provider IDs is not evidence that
+the integration works, even when login and ordinary playback succeed. Full and
+condensed editions must also be verified through the existing source resolver.

@@ -89,7 +89,9 @@ actor RecommendationEngine {
     ) -> [ScoredRecommendation] {
         let profileID = ActiveProfileStore.current
         // Grouping changes which titles qualify, so it is part of the token.
-        let visibility = ContentRestriction.visibilityToken(for: excludedCategoryIDs) + (groupsTitles ? "|grouped" : "")
+        let sports = SportarrPlaybackRegistry.shared.browseHiddenIDs
+        let browseToken = sports.isEmpty ? "" : "|sports:" + ContentRestriction.visibilityToken(for: sports)
+        let visibility = ContentRestriction.visibilityToken(for: excludedCategoryIDs) + (groupsTitles ? "|grouped" : "") + browseToken
         // A changed visibility set invalidates the cache: the list was ranked
         // against the previous one, so titles the user just un-hid would stay
         // missing until the interval elapsed.
@@ -245,10 +247,11 @@ actor RecommendationEngine {
     }
 
     private static func movieCandidates(cursor: String, limit: Int) -> FetchDescriptor<Movie> {
+        let sports = SportarrPlaybackRegistry.shared.browseHiddenIDs
         var descriptor = FetchDescriptor<Movie>(
             predicate: #Predicate {
                 $0.embeddingData != nil && !$0.isWatched && !$0.isFavorite
-                    && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor
+                    && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor && !sports.contains($0.id)
             },
             sortBy: [SortDescriptor(\.id, comparator: .lexical)]
         )
@@ -258,10 +261,11 @@ actor RecommendationEngine {
     }
 
     private static func seriesCandidates(cursor: String, limit: Int) -> FetchDescriptor<Series> {
+        let sports = SportarrPlaybackRegistry.shared.browseHiddenIDs
         var descriptor = FetchDescriptor<Series>(
             predicate: #Predicate {
                 $0.embeddingData != nil && !$0.isFavorite
-                    && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor
+                    && $0.lastWatchedDate == nil && $0.recommendationVoteRaw == 0 && $0.id > cursor && !sports.contains($0.id)
             },
             sortBy: [SortDescriptor(\.id, comparator: .lexical)]
         )

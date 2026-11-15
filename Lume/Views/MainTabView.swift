@@ -50,6 +50,8 @@ struct MainTabView: View {
 
     /// Memo behind `contentRestriction` — see `ContentRestrictionMemo`.
     @State private var restrictionMemo = ContentRestrictionMemo()
+    @State private var sportsLibrary = SportarrLibraryStore.shared
+    @AppStorage(SportarrSettings.enabledKey) private var sportarrEnabled = false
 
     private var syncFrequency: SyncFrequency {
         SyncFrequency.resolve(syncFrequencyRaw)
@@ -99,7 +101,8 @@ struct MainTabView: View {
         restrictionMemo.restriction(
             isActive: profileManager?.activeProfileIsChild ?? false,
             restricted: Set(restrictedCategories.map(\.id)),
-            hidden: Set(hiddenCategories.map(\.id))
+            hidden: Set(hiddenCategories.map(\.id)),
+            browse: sportarrEnabled ? sportsLibrary.browseHiddenIDs : []
         )
     }
 

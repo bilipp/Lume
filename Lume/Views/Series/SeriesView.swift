@@ -72,11 +72,11 @@ struct SeriesView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             SeriesCollectionRow(kind: .recentlyWatched, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
-                                .id("recentlyWatched-\(groupDuplicateTitles)")
+                                .id("recentlyWatched-\(groupDuplicateTitles)-\(restriction.browseVisibilityToken)")
                             SeriesCollectionRow(kind: .favorites, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
-                                .id("favorites-\(groupDuplicateTitles)")
+                                .id("favorites-\(groupDuplicateTitles)-\(restriction.browseVisibilityToken)")
                             SeriesCollectionRow(kind: .recentlyAdded, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
-                                .id("recentlyAdded-\(groupDuplicateTitles)")
+                                .id("recentlyAdded-\(groupDuplicateTitles)-\(restriction.browseVisibilityToken)")
 
                             ForEach(layout.previews) { category in
                                 SeriesCategoryPreview(
@@ -86,7 +86,7 @@ struct SeriesView: View {
                                     grouped: groupDuplicateTitles,
                                     animationNamespace: animationNamespace
                                 )
-                                .id("\(category.id)-\(contentSort.rawValue)-\(groupDuplicateTitles)")
+                                .id("\(category.id)-\(contentSort.rawValue)-\(groupDuplicateTitles)-\(restriction.browseVisibilityToken)")
                             }
 
                             if !genres.isEmpty {

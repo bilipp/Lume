@@ -17,6 +17,10 @@ struct SportsReplayBrowser<Card: View>: View {
         Dictionary(grouping: games) { key($0.fixture) }
             .map { (key: $0.key, games: $0.value) }
             .sorted {
+                if depth == 0, $0.key != $1.key {
+                    if $0.key == "sportarr:uncategorized" { return false }
+                    if $1.key == "sportarr:uncategorized" { return true }
+                }
                 if depth == 1 { return (Int($0.key) ?? 0) > (Int($1.key) ?? 0) }
                 if depth == 3 { return (Int($0.key) ?? 0) < (Int($1.key) ?? 0) }
                 return $0.key.localizedStandardCompare($1.key) == .orderedAscending

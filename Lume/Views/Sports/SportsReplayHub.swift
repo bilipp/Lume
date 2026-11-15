@@ -16,6 +16,10 @@ struct SportsReplayHub<Scores: View>: View {
     @Environment(\.contentRestriction) private var restriction
     @State private var recordings = RecordingServerStore.shared
     @State private var sports = SportsStore.shared
+    @Environment(\.catalogScope) private var scope
+    @AppStorage(SportarrSettings.enabledKey) private var sportarrEnabled = false
+    @State private var library = SportarrLibraryStore.shared
+    @State private var libraryGames: [SportsReplayGame] = []
     @State private var channels: [String: Set<String>] = [:]
 
     private var visibleRecordings: [ServerRecording] {
@@ -32,7 +36,7 @@ struct SportsReplayHub<Scores: View>: View {
     }
 
     private var games: [SportsReplayGame] {
-        SportsReplayLibrary.games(recordings: visibleRecordings, fixtures: fixtures, channels: channels)
+        SportarrLibraryCatalog.merge(SportsReplayLibrary.games(recordings: visibleRecordings, fixtures: fixtures, channels: channels) + (sportarrEnabled ? libraryGames : []))
     }
 
     var body: some View {
@@ -54,15 +58,26 @@ struct SportsReplayHub<Scores: View>: View {
         }
         .observesRecordingServerWhileVisible(isActive: true)
         .task(id: resolutionKey) { await resolveRecordingChannels() }
+        .task(id: libraryKey) {
+            guard sportarrEnabled else { libraryGames = []; return }
+            let result = await SportarrLibraryCatalog.games(indexes: Array(library.indexes.values), scope: scope, restriction: restriction, container: context.container)
+            guard !Task.isCancelled else { return }
+            libraryGames = result
+        }
         .onChange(of: games.isEmpty) { _, empty in
             if empty { showsReplays = false }
         }
     }
 
+    private var libraryKey: String {
+        String(sportarrEnabled) + scope.playlistIDs.map(\.uuidString).joined() + restriction.visibilityToken
+            + library.files.map { $0.file.catalogID + $0.file.fingerprint + ($0.fixture?.id ?? "") + $0.resolution.rawValue }.sorted().joined(separator: ",")
+    }
+
     private var resolutionKey: String {
         visibleRecordings.map { $0.id.rawValue + String($0.start.timeIntervalSince1970) }.joined(separator: ",")
             + fixtures.map { $0.leagueId + $0.id }.sorted().joined(separator: ",")
-            + String(describing: restriction)
+            + restriction.visibilityToken
     }
 
     private func resolveRecordingChannels() async {

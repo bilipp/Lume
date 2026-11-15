@@ -65,6 +65,7 @@ nonisolated enum PlaylistDeletion {
         // `CloudSyncEngine.deletePlaylist`, which funnels through this method)
         // leave no dangling pin.
         SportsChannelPicks().remove(playlistID: playlistID)
+        Task { await SportarrSyncCoordinator.shared.remove(playlistID: playlistID) }
 
         // Deleted without holding the catalog in memory. The old sweep fetched
         // every movie, series and channel of the playlist into this context and

@@ -21,6 +21,7 @@ actor ContentSyncManager {
     let plexClient: PlexClient
     let tmdbClient: TMDBClient
     private var activeSyncPlaylistIDs: Set<UUID> = []
+    var sportarrScans: [UUID: SportarrScan] = [:]
 
     /// Number of items to process before saving and resetting the context.
     let batchSize = 2000
@@ -54,8 +55,12 @@ actor ContentSyncManager {
         }
 
         activeSyncPlaylistIDs.insert(playlistId)
-        defer { activeSyncPlaylistIDs.remove(playlistId) }
+        defer {
+            activeSyncPlaylistIDs.remove(playlistId)
+            sportarrScans.removeValue(forKey: playlistId)
+        }
 
+        await prepareSportarrScan(playlistID: playlistId)
         do {
             // Run directly in the caller's task — no wrapping unstructured Task —
             // so cancelling the caller (e.g. the user aborting from the progress
@@ -115,6 +120,8 @@ actor ContentSyncManager {
         case .plex:
             try await performPlexSync(playlist: playlist, playlistId: playlistId, progress: progress)
         }
+
+        await finishSportarrScan(playlistID: playlistId, sourceType: playlist.sourceType)
 
         // Every source writes the same unread history rows (see the method).
         purgeCatalogHistory()

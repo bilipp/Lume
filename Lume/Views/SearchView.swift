@@ -34,6 +34,10 @@ struct SearchView: View {
     @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
     private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
     @State private var results: [SearchResult] = []
+    @State private var sportsResults: [SportsReplayGame] = []
+    @State private var selectedReplay: SportsReplayGame?
+    @State private var sportsLibrary = SportarrLibraryStore.shared
+    @AppStorage(SportarrSettings.enabledKey) private var sportarrEnabled = false
     /// Aggregated user state of the grouped results, loaded once per result set.
     @State private var groupStates = TitleGroupStates.empty
     @State private var playingMedia: PlayableMedia?
@@ -92,7 +96,7 @@ struct SearchView: View {
                 } else {
                     // Results — only show "No Results" once a query has actually
                     // been run, so it doesn't flash while the input is debouncing.
-                    if results.isEmpty {
+                    if results.isEmpty, sportsResults.isEmpty {
                         if !debouncedSearchText.isEmpty {
                             ContentUnavailableView.search
                         }
@@ -137,16 +141,17 @@ struct SearchView: View {
                         }
                     }
                 }
+                sportsSearchSection
             }
             .searchField(text: $searchText)
             .navigationDestination(for: Movie.self) { movie in
-                MovieDetailView(movie: movie, animationNamespace: animationNamespace)
+                SportsLibraryDestination.movie(movie, animationNamespace: animationNamespace, scopeOverride: searchedScope)
                 #if os(iOS)
                     .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))
                 #endif
             }
             .navigationDestination(for: Series.self) { series in
-                SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                SportsLibraryDestination.series(series, animationNamespace: animationNamespace, scopeOverride: searchedScope)
                 #if os(iOS)
                     .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
                 #endif
@@ -169,7 +174,8 @@ struct SearchView: View {
                 filter: selectedFilter,
                 allPlaylists: searchAllPlaylists,
                 scopeToken: scope.token,
-                grouped: groupDuplicateTitles
+                grouped: groupDuplicateTitles,
+                visibility: restriction.visibilityToken + "\(sportarrEnabled)-\(sportsLibrary.revision)"
             )) {
                 // Re-run whenever the settled query or the filter changes.
                 // Filter changes are instant (no debounce on the segmented control).
@@ -182,6 +188,23 @@ struct SearchView: View {
         }
         #endif
         .recordActionFlow(observesWhileVisible: false)
+        .sheet(item: $selectedReplay) { SportsReplayDetail(game: $0) }
+    }
+
+    @ViewBuilder
+    private var sportsSearchSection: some View {
+        if !trimmedQuery.isEmpty, !sportsResults.isEmpty {
+            Section("Replays") {
+                ForEach(sportsResults) { game in
+                    Button { selectedReplay = game } label: {
+                        VStack(alignment: .leading) {
+                            Text(verbatim: game.libraryFiles.first?.title ?? game.fixture.eventTitle)
+                            Text(verbatim: game.fixture.leagueName).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Playback
@@ -231,6 +254,7 @@ struct SearchView: View {
         let query = debouncedSearchText
         guard !query.isEmpty else {
             results = []
+            sportsResults = []
             groupStates = .empty
             return
         }
@@ -265,6 +289,16 @@ struct SearchView: View {
         let assembled = assembleResults(portal: portal, localHits: localHits, scope: searched)
         groupStates = groupDuplicateTitles ? TitleGroupStates(results: assembled, in: modelContext) : .empty
         results = assembled
+        guard sportarrEnabled else { sportsResults = []; return }
+        var indexes = Array(sportsLibrary.indexes.values)
+        for offset in indexes.indices {
+            indexes[offset].files = indexes[offset].files.filter { _, record in
+                record.file.kind == .movie ? wantMovies : wantSeries
+            }
+        }
+        let games = await SportarrLibraryCatalog.games(indexes: indexes, scope: searched, restriction: restriction, container: modelContext.container)
+        guard !Task.isCancelled else { return }
+        sportsResults = Array(games.filter { $0.matches(query: query) }.prefix(resultLimit))
     }
 
     // MARK: - Grouped favorites
@@ -523,6 +557,7 @@ private struct SearchKey: Equatable {
     let allPlaylists: Bool
     let scopeToken: String
     let grouped: Bool
+    let visibility: String
 }
 
 /// The aggregated favorite state behind grouped search results, read in one

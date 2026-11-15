@@ -147,7 +147,7 @@ extension HomeView {
             descriptor.propertiesToFetch = [\.id, \.name, \.categoryId, \.titleGroupKey]
             return (try? modelContext.fetch(descriptor)) ?? []
         }
-        .filter { scope.contains($0.id, .movies) && !restriction.hides(categoryID: $0.categoryId) }
+        .filter { scope.contains($0.id, .movies) && !restriction.hidesFromBrowse(id: $0.id, categoryID: $0.categoryId) }
         return Dictionary(grouping: rows) { $0.titleGroupKey ?? "" }
     }
 
@@ -158,7 +158,7 @@ extension HomeView {
             descriptor.propertiesToFetch = [\.id, \.name, \.categoryId, \.titleGroupKey]
             return (try? modelContext.fetch(descriptor)) ?? []
         }
-        .filter { scope.contains($0.id, .series) && !restriction.hides(categoryID: $0.categoryId) }
+        .filter { scope.contains($0.id, .series) && !restriction.hidesFromBrowse(id: $0.id, categoryID: $0.categoryId) }
         return Dictionary(grouping: rows) { $0.titleGroupKey ?? "" }
     }
 
@@ -189,7 +189,7 @@ extension HomeView {
         let rows = ((try? modelContext.fetch(FetchDescriptor<Movie>(predicate: #Predicate { wanted.contains($0.id) }))) ?? [])
             .filter { movie in
                 (scope.contains(movie.id, .movies) || (anyCopyInScope && movie.titleGroupKey != nil))
-                    && !restriction.hides(categoryID: movie.categoryId)
+                    && !restriction.hidesFromBrowse(id: movie.id, categoryID: movie.categoryId)
             }
         return Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
@@ -201,7 +201,7 @@ extension HomeView {
         let rows = ((try? modelContext.fetch(FetchDescriptor<Series>(predicate: #Predicate { wanted.contains($0.id) }))) ?? [])
             .filter { series in
                 (scope.contains(series.id, .series) || (anyCopyInScope && series.titleGroupKey != nil))
-                    && !restriction.hides(categoryID: series.categoryId)
+                    && !restriction.hidesFromBrowse(id: series.id, categoryID: series.categoryId)
             }
         return Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }

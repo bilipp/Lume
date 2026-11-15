@@ -19,7 +19,7 @@ nonisolated enum NextEpisodeResolver {
         in context: ModelContext,
         client: XtreamClient = XtreamClient()
     ) -> PlayableMedia? {
-        guard case let .episode(id) = ref else { return nil }
+        guard case let .episode(id) = ref, !SportarrPlaybackRegistry.shared.isSports(id: id) else { return nil }
 
         var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
@@ -39,7 +39,7 @@ nonisolated enum NextEpisodeResolver {
         in context: ModelContext,
         client: XtreamClient = XtreamClient()
     ) -> PlayableMedia? {
-        guard case let .episode(id) = ref else { return nil }
+        guard case let .episode(id) = ref, !SportarrPlaybackRegistry.shared.isSports(id: id) else { return nil }
 
         var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1

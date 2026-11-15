@@ -12,13 +12,24 @@ import Foundation
 nonisolated struct SportsReplayGame: Identifiable, Hashable {
     let fixture: SportsFixture
     let recordings: [ServerRecording]
+    let libraryFiles: [SportsLibraryVersion]
+
+    init(fixture: SportsFixture, recordings: [ServerRecording], libraryFiles: [SportsLibraryVersion] = []) {
+        self.fixture = fixture
+        self.recordings = recordings
+        self.libraryFiles = libraryFiles
+    }
+
+    var versions: [SportsReplayVersion] {
+        recordings.map(SportsReplayVersion.recording) + libraryFiles.map(SportsReplayVersion.library)
+    }
 
     var id: String {
         fixture.leagueId + ":" + fixture.id
     }
 
     var addedAt: Date {
-        recordings.map(\.createdAt).max() ?? fixture.startDate
+        (recordings.map(\.createdAt) + libraryFiles.map(\.addedAt)).max() ?? fixture.startDate
     }
 }
 

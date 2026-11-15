@@ -18,7 +18,7 @@
         // MARK: - Model lookups
 
         static func episode(for ref: PlayableMedia.ContentRef, in context: ModelContext) -> Episode? {
-            guard case let .episode(id) = ref else { return nil }
+            guard case let .episode(id) = ref, !SportarrPlaybackRegistry.shared.isSports(id: id) else { return nil }
             var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
             descriptor.fetchLimit = 1
             return try? context.fetch(descriptor).first
@@ -43,6 +43,7 @@
         /// Episodes of the given episode's season, ordered by episode number —
         /// the content of the in-player episode rail.
         static func seasonEpisodes(for episode: Episode) -> [Episode] {
+            guard !SportarrPlaybackRegistry.shared.isSports(id: episode.id) else { return [] }
             guard let series = episode.series else { return [episode] }
             return series.episodes
                 .filter { $0.seasonNum == episode.seasonNum }

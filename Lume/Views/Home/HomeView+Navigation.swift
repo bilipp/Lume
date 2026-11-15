@@ -30,9 +30,9 @@ extension View {
         #if os(tvOS)
             navigationDestination(item: selection) { hero in
                 if let movie = hero.movie {
-                    MovieDetailView(movie: movie, animationNamespace: animationNamespace)
+                    SportsLibraryDestination.movie(movie, animationNamespace: animationNamespace)
                 } else if let series = hero.series {
-                    SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                    SportsLibraryDestination.series(series, animationNamespace: animationNamespace)
                 }
             }
         #else

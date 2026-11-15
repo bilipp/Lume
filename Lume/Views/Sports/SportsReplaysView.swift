@@ -6,10 +6,12 @@
 //  team and competition filters are shared by all platforms; no second recorder.
 //
 
+import SwiftData
 import SwiftUI
 
 struct SportsReplaysView: View {
     let games: [SportsReplayGame]
+    @Environment(\.modelContext) private var context
     @State private var follows = SportsFollowService.shared
     @State private var range: SportsReplayRange = .recent
     @State private var recentDays = 14
@@ -26,6 +28,12 @@ struct SportsReplaysView: View {
     @State private var customEnd = Date()
     @State private var selected: SportsReplayGame?
     @State private var progressRevision = 0
+
+    init(games: [SportsReplayGame], initiallyBrowseSeason: Bool = false) {
+        self.games = games
+        _range = State(initialValue: initiallyBrowseSeason ? .season : .recent)
+        _browse = State(initialValue: initiallyBrowseSeason)
+    }
 
     private var filtered: [SportsReplayGame] {
         SportsReplayFilter(
@@ -80,7 +88,7 @@ struct SportsReplaysView: View {
     private var continueWatching: some View {
         let namespace = RecordingServerConfigService.shared.activeServer?.progressNamespace
         let continuing = filtered.filter { game in
-            game.recordings.contains { RecordingProgressStore.resumePosition(for: $0, namespace: namespace) > 0 }
+            game.versions.contains { $0.progress(namespace: namespace, in: context) > 0 }
         }
         if !continuing.isEmpty {
             Text("Continue Watching").font(.headline)

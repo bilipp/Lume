@@ -185,6 +185,7 @@ import SwiftUI
                     .buttonStyle(TVSettingsRowButtonStyle())
 
                     TVOptionToggleRow(title: "Hide Scores", isOn: $hideScores)
+                    SportarrIntegrationSection()
                 }
 
                 VStack(alignment: .leading, spacing: 8) {

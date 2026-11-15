@@ -30,45 +30,45 @@ extension ContentIndexer {
         (Set(excluded.map(String?.some)), !excluded.isEmpty)
     }
 
-    static func pendingMoviePredicate(excluding excluded: Set<String>) -> Predicate<Movie> {
+    static func pendingMoviePredicate(excluding excluded: Set<String>, excludingSports sports: Set<String> = SportarrPlaybackRegistry.shared.browseHiddenIDs) -> Predicate<Movie> {
         let (ids, filters) = excludedOptional(excluded)
         return #Predicate {
-            $0.indexedAt == nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
+            !sports.contains($0.id) && ($0.indexedAt == nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId)))
         }
     }
 
-    static func pendingSeriesPredicate(excluding excluded: Set<String>) -> Predicate<Series> {
+    static func pendingSeriesPredicate(excluding excluded: Set<String>, excludingSports sports: Set<String> = SportarrPlaybackRegistry.shared.browseHiddenIDs) -> Predicate<Series> {
         let (ids, filters) = excludedOptional(excluded)
         return #Predicate {
-            $0.indexedAt == nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
+            !sports.contains($0.id) && ($0.indexedAt == nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId)))
         }
     }
 
-    static func visibleMoviePredicate(excluding excluded: Set<String>) -> Predicate<Movie> {
+    static func visibleMoviePredicate(excluding excluded: Set<String>, excludingSports sports: Set<String> = SportarrPlaybackRegistry.shared.browseHiddenIDs) -> Predicate<Movie> {
         let (ids, filters) = excludedOptional(excluded)
         return #Predicate {
-            !filters || $0.categoryId == nil || !ids.contains($0.categoryId)
+            !sports.contains($0.id) && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
         }
     }
 
-    static func visibleSeriesPredicate(excluding excluded: Set<String>) -> Predicate<Series> {
+    static func visibleSeriesPredicate(excluding excluded: Set<String>, excludingSports sports: Set<String> = SportarrPlaybackRegistry.shared.browseHiddenIDs) -> Predicate<Series> {
         let (ids, filters) = excludedOptional(excluded)
         return #Predicate {
-            !filters || $0.categoryId == nil || !ids.contains($0.categoryId)
+            !sports.contains($0.id) && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
         }
     }
 
-    static func indexedMoviePredicate(excluding excluded: Set<String>) -> Predicate<Movie> {
+    static func indexedMoviePredicate(excluding excluded: Set<String>, excludingSports sports: Set<String> = SportarrPlaybackRegistry.shared.browseHiddenIDs) -> Predicate<Movie> {
         let (ids, filters) = excludedOptional(excluded)
         return #Predicate {
-            $0.indexedAt != nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
+            !sports.contains($0.id) && ($0.indexedAt != nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId)))
         }
     }
 
-    static func indexedSeriesPredicate(excluding excluded: Set<String>) -> Predicate<Series> {
+    static func indexedSeriesPredicate(excluding excluded: Set<String>, excludingSports sports: Set<String> = SportarrPlaybackRegistry.shared.browseHiddenIDs) -> Predicate<Series> {
         let (ids, filters) = excludedOptional(excluded)
         return #Predicate {
-            $0.indexedAt != nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId))
+            !sports.contains($0.id) && ($0.indexedAt != nil && (!filters || $0.categoryId == nil || !ids.contains($0.categoryId)))
         }
     }
 }

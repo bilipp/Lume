@@ -30,6 +30,7 @@ struct CategoryContentGrid<Item: Identifiable & Hashable & WatchlistFavoritable,
     /// when any copy is. Nil uses the row's own flag and `MediaFavorites`.
     var favoriteMenu: CategoryFavoriteMenu<Item>?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @ViewBuilder let card: (Item) -> Card
 
     private let columns = [GridItem(.adaptive(minimum: PosterCardMetrics.gridMinimum), spacing: PosterCardMetrics.gridSpacing)]
@@ -243,6 +244,7 @@ struct CategoryPreviewRow<Item: Identifiable & Hashable & WatchlistFavoritable, 
     /// See `CategoryContentGrid.favoriteMenu`.
     var favoriteMenu: CategoryFavoriteMenu<Item>?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @ViewBuilder let card: (Item) -> Card
 
     var body: some View {
@@ -307,6 +309,7 @@ struct MovieCategoryView: View {
     let category: Category
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
 
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
     @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
@@ -337,7 +340,7 @@ struct MovieCategoryView: View {
 
     /// The sort and grouping the loaded pages were fetched for.
     private var loadKey: String {
-        "\(contentSortRaw)|\(groupDuplicateTitles)"
+        "\(contentSortRaw)|\(groupDuplicateTitles)|\(restriction.browseVisibilityToken)"
     }
 
     /// The playlist when it's a Stalker portal, whose categories are imported
@@ -492,6 +495,7 @@ struct MovieCategoryPreview: View {
     @Query private var movies: [Movie]
     var animationNamespace: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.contentRestriction) private var restriction
     @State private var groupStates: [String: TitleGroupState] = [:]
 
     /// - Parameter grouped: lists each title once (its category primary); the

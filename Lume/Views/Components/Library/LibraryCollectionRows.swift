@@ -183,7 +183,7 @@ struct MovieCollectionRow: View {
     }
 
     private var visible: [Movie] {
-        kind.collapsingTitles(movies.excludingRestricted(restriction), scope: scope, grouped: grouped)
+        kind.collapsingTitles(movies.excludingBrowseHidden(restriction), scope: scope, grouped: grouped)
     }
 
     var body: some View {
@@ -239,7 +239,7 @@ struct MovieCollectionView: View {
     }
 
     private var visible: [Movie] {
-        kind.collapsingTitles(movies.excludingRestricted(restriction), scope: scope, grouped: grouped)
+        kind.collapsingTitles(movies.excludingBrowseHidden(restriction), scope: scope, grouped: grouped)
     }
 
     var body: some View {
@@ -320,18 +320,19 @@ enum MovieCollectionQuery {
     /// One contributing playlist inlines `id.starts(with:)`, the predicate
     /// isolated mode always had; several compose the scope's OR via `evaluate`.
     private static func predicate(for kind: LibraryCollection.Kind, scope: CatalogScope) -> Predicate<Movie> {
+        let sports = SportarrPlaybackRegistry.shared.browseHiddenIDs
         if let prefix = scope.singlePrefix(for: .movies) {
             switch kind {
-            case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) }
-            case .favorites: return #Predicate { $0.isFavorite && $0.id.starts(with: prefix) }
-            case .recentlyAdded: return #Predicate { $0.added != nil && $0.id.starts(with: prefix) }
+            case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) && !sports.contains($0.id) }
+            case .favorites: return #Predicate { $0.isFavorite && $0.id.starts(with: prefix) && !sports.contains($0.id) }
+            case .recentlyAdded: return #Predicate { $0.added != nil && $0.id.starts(with: prefix) && !sports.contains($0.id) }
             }
         }
         let scoped = scope.moviePredicate()
         switch kind {
-        case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && scoped.evaluate($0) }
-        case .favorites: return #Predicate { $0.isFavorite && scoped.evaluate($0) }
-        case .recentlyAdded: return #Predicate { $0.added != nil && scoped.evaluate($0) }
+        case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && scoped.evaluate($0) && !sports.contains($0.id) }
+        case .favorites: return #Predicate { $0.isFavorite && scoped.evaluate($0) && !sports.contains($0.id) }
+        case .recentlyAdded: return #Predicate { $0.added != nil && scoped.evaluate($0) && !sports.contains($0.id) }
         }
     }
 }
@@ -360,7 +361,7 @@ struct SeriesCollectionRow: View {
     }
 
     private var visible: [Series] {
-        kind.collapsingTitles(series.excludingRestricted(restriction), scope: scope, grouped: grouped)
+        kind.collapsingTitles(series.excludingBrowseHidden(restriction), scope: scope, grouped: grouped)
     }
 
     var body: some View {
@@ -416,7 +417,7 @@ struct SeriesCollectionView: View {
     }
 
     private var visible: [Series] {
-        kind.collapsingTitles(series.excludingRestricted(restriction), scope: scope, grouped: grouped)
+        kind.collapsingTitles(series.excludingBrowseHidden(restriction), scope: scope, grouped: grouped)
     }
 
     var body: some View {
@@ -489,18 +490,19 @@ enum SeriesCollectionQuery {
     /// Inline for one contributing playlist, composed for several; see
     /// `MovieCollectionQuery.predicate`.
     private static func predicate(for kind: LibraryCollection.Kind, scope: CatalogScope) -> Predicate<Series> {
+        let sports = SportarrPlaybackRegistry.shared.browseHiddenIDs
         if let prefix = scope.singlePrefix(for: .series) {
             switch kind {
-            case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) }
-            case .favorites: return #Predicate { $0.isFavorite && $0.id.starts(with: prefix) }
-            case .recentlyAdded: return #Predicate { $0.lastModified != nil && $0.id.starts(with: prefix) }
+            case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && $0.id.starts(with: prefix) && !sports.contains($0.id) }
+            case .favorites: return #Predicate { $0.isFavorite && $0.id.starts(with: prefix) && !sports.contains($0.id) }
+            case .recentlyAdded: return #Predicate { $0.lastModified != nil && $0.id.starts(with: prefix) && !sports.contains($0.id) }
             }
         }
         let scoped = scope.seriesPredicate()
         switch kind {
-        case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && scoped.evaluate($0) }
-        case .favorites: return #Predicate { $0.isFavorite && scoped.evaluate($0) }
-        case .recentlyAdded: return #Predicate { $0.lastModified != nil && scoped.evaluate($0) }
+        case .recentlyWatched: return #Predicate { $0.lastWatchedDate != nil && scoped.evaluate($0) && !sports.contains($0.id) }
+        case .favorites: return #Predicate { $0.isFavorite && scoped.evaluate($0) && !sports.contains($0.id) }
+        case .recentlyAdded: return #Predicate { $0.lastModified != nil && scoped.evaluate($0) && !sports.contains($0.id) }
         }
     }
 }

@@ -27,6 +27,8 @@ struct ContentRestrictionProvider<Content: View>: View {
     /// See `ContentRestrictionMemo` — building a restriction digests every
     /// excluded id, and this body re-runs on every catalog write.
     @State private var restrictionMemo = ContentRestrictionMemo()
+    @State private var sportsLibrary = SportarrLibraryStore.shared
+    @AppStorage(SportarrSettings.enabledKey) private var sportarrEnabled = false
 
     private let content: Content
 
@@ -38,7 +40,8 @@ struct ContentRestrictionProvider<Content: View>: View {
         restrictionMemo.restriction(
             isActive: profileManager?.activeProfileIsChild ?? false,
             restricted: Set(restrictedCategories.map(\.id)),
-            hidden: Set(hiddenCategories.map(\.id))
+            hidden: Set(hiddenCategories.map(\.id)),
+            browse: sportarrEnabled ? sportsLibrary.browseHiddenIDs : []
         )
     }
 

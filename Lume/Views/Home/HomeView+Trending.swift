@@ -228,7 +228,7 @@ extension HomeView {
         let scope = scopeMatcher
         var copies: [Int: [Movie]] = [:]
         for movie in (try? modelContext.fetch(descriptor)) ?? []
-            where scope.contains(movie.id, .movies) && !restriction.hides(categoryID: movie.categoryId)
+            where scope.contains(movie.id, .movies) && !restriction.hidesFromBrowse(id: movie.id, categoryID: movie.categoryId)
         {
             guard let tmdbId = movie.tmdbId else { continue }
             copies[tmdbId, default: []].append(movie)
@@ -245,7 +245,7 @@ extension HomeView {
         let scope = scopeMatcher
         var copies: [Int: [Series]] = [:]
         for series in (try? modelContext.fetch(descriptor)) ?? []
-            where scope.contains(series.id, .series) && !restriction.hides(categoryID: series.categoryId)
+            where scope.contains(series.id, .series) && !restriction.hidesFromBrowse(id: series.id, categoryID: series.categoryId)
         {
             guard let tmdbId = series.tmdbId else { continue }
             copies[tmdbId, default: []].append(series)

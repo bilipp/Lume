@@ -64,6 +64,7 @@ enum GenreDerivation {
         let genres = rows.lazy
             .filter { row in matcher.contains(row.id, tab) }
             .filter { excluded.isEmpty || !excluded.contains($0.categoryId ?? "") }
+            .filter { !restriction.browseExcludedContentIDs.contains($0.id) }
             .map(\.genre)
         return GenreParser.distinctByFrequency(Array(genres))
     }

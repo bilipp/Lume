@@ -62,7 +62,7 @@ nonisolated extension SportsReplayGame {
         names += [fixture.leagueName, fixture.leagueAbbreviation, fixture.name, fixture.shortName,
                   fixture.seasonName, fixture.seasonPhase, fixture.weekLabel, fixture.eventHeadline].compactMap(\.self)
         if let week = fixture.week { names.append(String(localized: "Week \(week)")) }
-        names += recordings.map(\.title)
+        names += recordings.map(\.title) + libraryFiles.flatMap { [$0.title, $0.label] }
         names += fixture.broadcasters
         names += [calendar.weekdaySymbols[weekday - 1],
                   ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][weekday - 1]]

@@ -64,6 +64,9 @@ extension ContentSyncManager {
             seenEpisodes.formUnion(episodes)
         }
         let episodeCount = episodeWalk.fetched
+        if !seriesWalk.complete || !episodeWalk.complete || episodeCount == 0 {
+            sportarrScans[scope.playlistId]?.incompleteSeries.formUnion(seenSeries)
+        }
         var seen = JellyfinShowsSeen(series: seenSeries, episodes: seenEpisodes)
         seen.complete = seriesWalk.complete && episodeWalk.complete
         if episodeCount == 0, !librarySeries.isEmpty {
@@ -91,6 +94,7 @@ extension ContentSyncManager {
                 context.insert(series)
             }
             TitleGroupPrimaries.track(series, into: &touched.series) { applyJellyfinSeriesFields(item, to: series, scope: scope) }
+            captureSportarrSeries(item, catalogID: id, scope: scope)
         }
         TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
@@ -204,6 +208,8 @@ extension ContentSyncManager {
             seenSeries.insert(series.id)
             let episode = episodeRow(for: item, series: series, lookup: episodeLookup, scope: scope, context: context)
             applyJellyfinEpisodeFields(item, to: episode, series: series, scope: scope)
+            let parent = seriesShells.byId[seriesShells.shellKey(for: item)] ?? item.seriesName.flatMap { seriesShells.byName[$0] }
+            captureSportarr(item, catalogID: episode.id, scope: scope, seriesID: series.id, parent: parent)
         }
         recomputeShellPrimaries(seriesLookup, excluding: storedSeriesIds, in: context)
         if context.hasChanges {

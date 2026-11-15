@@ -125,8 +125,8 @@ enum PlayerItemNavigation {
     /// for that. It also states the catch-up rule once for both callers.
     nonisolated static func axis(for media: PlayableMedia) -> Axis? {
         switch media.contentRef {
-        case .episode:
-            .episode
+        case let .episode(id):
+            if SportarrPlaybackRegistry.shared.isSports(id: id) { nil } else { .episode }
         case .live:
             // Catch-up plays a recording of a channel as on-demand video.
             // Surfing would drop the viewer out of the recording and into live
@@ -153,7 +153,7 @@ enum PlayerItemNavigation {
         in context: ModelContext,
         client: XtreamClient = XtreamClient()
     ) -> Neighbours {
-        guard case let .episode(id) = ref else { return .none }
+        guard case let .episode(id) = ref, !SportarrPlaybackRegistry.shared.isSports(id: id) else { return .none }
 
         var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1

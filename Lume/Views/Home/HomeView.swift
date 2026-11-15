@@ -140,18 +140,19 @@ struct HomeView: View {
         streams.fetchLimit = 20
         _watchedStreams = Query(streams)
 
+        let sports = SportarrPlaybackRegistry.shared.browseHiddenIDs
         // Favorites: by the unified favorites order (Content Management →
         // Favorites), falling back to name; capped. The cross-type interleave
         // happens in the `favorites` accessor.
         var favMovies = FetchDescriptor<Movie>(
-            predicate: #Predicate { $0.isFavorite },
+            predicate: #Predicate { $0.isFavorite && !sports.contains($0.id) },
             sortBy: [SortDescriptor(\.favoriteOrder), SortDescriptor(\.name)]
         )
         favMovies.fetchLimit = Self.favoritesFetchLimit
         _favoriteMovies = Query(favMovies)
 
         var favSeries = FetchDescriptor<Series>(
-            predicate: #Predicate { $0.isFavorite },
+            predicate: #Predicate { $0.isFavorite && !sports.contains($0.id) },
             sortBy: [SortDescriptor(\.favoriteOrder), SortDescriptor(\.name)]
         )
         favSeries.fetchLimit = Self.favoritesFetchLimit
@@ -224,13 +225,13 @@ struct HomeView: View {
                 showingSettings: $showingSettings
             ))
             .navigationDestination(for: Movie.self) { movie in
-                MovieDetailView(movie: movie, animationNamespace: animationNamespace)
+                SportsLibraryDestination.movie(movie, animationNamespace: animationNamespace)
                 #if os(iOS)
                     .navigationTransition(.zoom(sourceID: movie.id, in: animationNamespace))
                 #endif
             }
             .navigationDestination(for: Series.self) { series in
-                SeriesDetailView(series: series, animationNamespace: animationNamespace)
+                SportsLibraryDestination.series(series, animationNamespace: animationNamespace)
                 #if os(iOS)
                     .navigationTransition(.zoom(sourceID: series.id, in: animationNamespace))
                 #endif
@@ -396,12 +397,12 @@ struct HomeView: View {
         let scope = scopeMatcher
         let ranking = titleRanking
         let movies = TitleGrouping.dedupe(
-            favoriteMovies.filter { scope.contains($0.id, .movies) }.excludingRestricted(restriction),
+            favoriteMovies.filter { scope.contains($0.id, .movies) }.excludingBrowseHidden(restriction),
             ranking: ranking,
             grouped: groupDuplicateTitles
         ).prefix(Self.favoritesPerKind)
         let series = TitleGrouping.dedupe(
-            favoriteSeries.filter { scope.contains($0.id, .series) }.excludingRestricted(restriction),
+            favoriteSeries.filter { scope.contains($0.id, .series) }.excludingBrowseHidden(restriction),
             ranking: ranking,
             grouped: groupDuplicateTitles
         ).prefix(Self.favoritesPerKind)

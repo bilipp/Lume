@@ -30,6 +30,7 @@ struct ParsedEpisode {
     let rating: Double?
     let airDate: String?
     let plot: String?
+    var sportarrFile: SportarrImportFile?
 }
 
 extension Series {
@@ -75,6 +76,10 @@ extension Series {
         episodesFetchedAt = Date()
         episodesFetchedLastModified = lastModified
         try? context.save()
+        if let owner = PlaylistOwner.declaredOwner(of: id), UserDefaults.standard.bool(forKey: SportarrSettings.enabledKey) {
+            let files = parsed.compactMap(\.sportarrFile)
+            Task { await SportarrSyncCoordinator.shared.submit(files, playlistID: owner) }
+        }
         // Saved first: the sync engine reads the new rows from its own context.
         // Watch state other devices synced for them applies now, not at the
         // next reconcile.

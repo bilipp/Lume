@@ -398,6 +398,10 @@ struct LumeApp: App {
                     // the account's one connection. `HomeView.warmSports` asks
                     // again whenever the entitlement or the followed set changes.
                     SportsSyncService.shared.refreshIfStale()
+                    Task {
+                        let playlists = (try? catalogContainer.mainContext.fetch(FetchDescriptor<Playlist>())) ?? []
+                        await SportarrSyncCoordinator.shared.restore(playlistIDs: playlists.map(\.id))
+                    }
 
                     // Restore a previously connected Trakt session (refreshing
                     // the token if stale) so watched-sync and the watchlist work

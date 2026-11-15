@@ -19,8 +19,8 @@ struct HomeDownloadsRow: View {
     #if !os(tvOS)
         @Environment(\.contentRestriction) private var restriction
 
-        // Owned by the row rather than HomeView so the queries only exist while
-        // the row is switched on.
+        /// Owned by the row rather than HomeView so the queries only exist while
+        /// the row is switched on.
         @Query(
             filter: #Predicate<Movie> { $0.downloadStatusRaw == "completed" },
             sort: \Movie.downloadedAt,
@@ -64,10 +64,10 @@ enum HomeDownloads {
         var series: [(date: Date, item: HomeMediaItem)] = []
         for episode in episodes {
             guard let show = episode.series, seen.insert(show.id).inserted,
-                  !restriction.hides(categoryID: show.categoryId) else { continue }
+                  !restriction.hidesFromBrowse(id: show.id, categoryID: show.categoryId) else { continue }
             series.append((episode.downloadedAt ?? .distantPast, .series(show)))
         }
-        let films = movies.excludingRestricted(restriction).map {
+        let films = movies.excludingBrowseHidden(restriction).map {
             (date: $0.downloadedAt ?? .distantPast, item: HomeMediaItem.movie($0))
         }
         return (films + series)

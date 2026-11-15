@@ -74,11 +74,11 @@ struct MoviesView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
                             MovieCollectionRow(kind: .recentlyWatched, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
-                                .id("recentlyWatched-\(groupDuplicateTitles)")
+                                .id("recentlyWatched-\(groupDuplicateTitles)-\(restriction.browseVisibilityToken)")
                             MovieCollectionRow(kind: .favorites, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
-                                .id("favorites-\(groupDuplicateTitles)")
+                                .id("favorites-\(groupDuplicateTitles)-\(restriction.browseVisibilityToken)")
                             MovieCollectionRow(kind: .recentlyAdded, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
-                                .id("recentlyAdded-\(groupDuplicateTitles)")
+                                .id("recentlyAdded-\(groupDuplicateTitles)-\(restriction.browseVisibilityToken)")
 
                             ForEach(layout.previews) { category in
                                 MovieCategoryPreview(
@@ -88,7 +88,7 @@ struct MoviesView: View {
                                     grouped: groupDuplicateTitles,
                                     animationNamespace: animationNamespace
                                 )
-                                .id("\(category.id)-\(contentSort.rawValue)-\(groupDuplicateTitles)")
+                                .id("\(category.id)-\(contentSort.rawValue)-\(groupDuplicateTitles)-\(restriction.browseVisibilityToken)")
                             }
 
                             if !genres.isEmpty {

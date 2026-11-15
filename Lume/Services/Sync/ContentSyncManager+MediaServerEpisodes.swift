@@ -44,10 +44,24 @@ extension ContentSyncManager {
             persistJellyfinSession(session, playlistId: playlistId)
             items = try await allShowEpisodes(server: server, session: session, seriesItemId: seriesItemId)
         }
+        let sportsParent = await sportarrParent(for: seriesElementId, items: items, playlistID: playlistId)
         Logger.database.info("\(flavor.displayName, privacy: .public) show episodes fetched: \(items.count, privacy: .public)")
         return items
             .filter { $0.locationType != "Virtual" }
-            .map { Self.parsedMediaServerEpisode($0, idPrefix: prefix, seriesItemId: seriesItemId, server: server, token: session.accessToken) }
+            .map { Self.parsedMediaServerEpisode($0, idPrefix: prefix, seriesItemId: seriesItemId, server: server, token: session.accessToken, sportsParent: sportsParent) }
+    }
+
+    private func sportarrParent(for id: String, items: [JellyfinItem], playlistID: UUID) async -> SportarrSeriesReference? {
+        guard UserDefaults.standard.bool(forKey: SportarrSettings.enabledKey) else { return nil }
+        let parent = await SportarrSyncCoordinator.shared.parent(playlistID: playlistID, seriesID: id)
+        let identified = items.contains { SportarrIdentifier.eventID(providerIDs: $0.providerIds, path: $0.path) != nil }
+        if let parent {
+            if parent.leagueID != nil || identified || items.isEmpty { return parent }
+            await SportarrSyncCoordinator.shared.submit([], playlistID: playlistID, removedSeries: [id])
+            return nil
+        }
+        guard identified else { return nil }
+        return SportarrSeriesReference(id: id, title: items.first?.seriesName ?? "", leagueID: nil, libraryTitle: nil)
     }
 
     /// The server's id for the show behind a series row, or `nil` for a row
@@ -72,7 +86,7 @@ extension ContentSyncManager {
         return items
     }
 
-    nonisolated static func parsedMediaServerEpisode(_ item: JellyfinItem, idPrefix: String, seriesItemId: String, server: URL, token: String) -> ParsedEpisode {
+    nonisolated static func parsedMediaServerEpisode(_ item: JellyfinItem, idPrefix: String, seriesItemId: String, server: URL, token: String, sportsParent: SportarrSeriesReference? = nil) -> ParsedEpisode {
         let image: String? = {
             if let tag = item.primaryImageTag {
                 return JellyfinClient.imageURL(server: server, itemId: item.id, tag: tag, token: token)?.absoluteString
@@ -95,7 +109,8 @@ extension ContentSyncManager {
             movieImage: image,
             rating: item.communityRating,
             airDate: item.premiereDate.map { String($0.prefix(10)) },
-            plot: item.overview
+            plot: item.overview,
+            sportarrFile: UserDefaults.standard.bool(forKey: SportarrSettings.enabledKey) ? SportarrImportFile.jellyfin(item, catalogID: idPrefix + "episode-" + item.id, series: sportsParent) : nil
         )
     }
 }

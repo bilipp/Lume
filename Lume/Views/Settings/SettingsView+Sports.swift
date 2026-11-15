@@ -21,6 +21,7 @@ import SwiftUI
             Form {
                 teamsSection
                 scoresSection
+                Section { SportarrIntegrationSection() }
                 refreshSection
             }
             #if os(macOS)

@@ -406,6 +406,7 @@ extension ContentSyncManager {
                 context.insert(movie)
             }
             TitleGroupPrimaries.track(movie, into: &touched.movies) { applyJellyfinMovieFields(item, to: movie, scope: scope) }
+            captureSportarr(item, catalogID: id, scope: scope)
         }
         TitleGroupPrimaries.recompute(categoryKeys: touched, in: context)
         if context.hasChanges {
