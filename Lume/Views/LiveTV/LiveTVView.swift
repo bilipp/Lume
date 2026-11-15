@@ -29,18 +29,13 @@ nonisolated enum LiveTVLayoutMode: String, CaseIterable, Identifiable {
 
     static let storageKey = "lume.liveTV.layoutMode"
 
-    static func platformDefault(isTV: Bool) -> LiveTVLayoutMode {
-        isTV ? .guide : .list
-    }
-
-    #if os(tvOS)
-        static let defaultMode = platformDefault(isTV: true)
-    #else
-        static let defaultMode = platformDefault(isTV: false)
-    #endif
+    /// Only the Settings pickers write `storageKey`, so a missing value means
+    /// the user never chose. Changing this moves those users and new installs;
+    /// a stored `list` (an explicit pick) is kept.
+    static let defaultMode = LiveTVLayoutMode.guide
 
     /// Resolves the stored raw value; a missing or unknown one reads as the
-    /// platform default, so a user who never picked follows it.
+    /// default, so a user who never picked follows it.
     init(storedValue: String?) {
         self = storedValue.flatMap(Self.init(rawValue:)) ?? Self.defaultMode
     }
