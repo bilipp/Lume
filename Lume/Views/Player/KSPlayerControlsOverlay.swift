@@ -159,13 +159,13 @@ import SwiftUI
 
                 if !media.isLive {
                     Button {
-                        coordinator.skip(interval: -15)
+                        coordinator.skip(interval: -PlayerSkipInterval.stored().seconds)
                         onResetHideTimer()
                     } label: {
-                        circleGlyph("gobackward.15", size: 22, diameter: 60)
+                        circleGlyph(PlayerSkipInterval.stored().backwardSymbol, size: 22, diameter: 60)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Skip back 15 seconds")
+                    .accessibilityLabel("Skip back \(PlayerSkipInterval.stored().seconds) seconds")
                 }
 
                 Button(action: onTogglePlay) {
@@ -180,13 +180,13 @@ import SwiftUI
 
                 if !media.isLive {
                     Button {
-                        coordinator.skip(interval: 15)
+                        coordinator.skip(interval: PlayerSkipInterval.stored().seconds)
                         onResetHideTimer()
                     } label: {
-                        circleGlyph("goforward.15", size: 22, diameter: 60)
+                        circleGlyph(PlayerSkipInterval.stored().forwardSymbol, size: 22, diameter: 60)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Skip forward 15 seconds")
+                    .accessibilityLabel("Skip forward \(PlayerSkipInterval.stored().seconds) seconds")
                 }
 
                 if itemNeighbours.axis != nil {

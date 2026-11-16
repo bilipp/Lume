@@ -223,18 +223,19 @@
         }
 
         private func transportRow(spacing: CGFloat) -> some View {
-            HStack(spacing: spacing) {
+            let skipInterval = PlayerSkipInterval.stored()
+            return HStack(spacing: spacing) {
                 if neighbours.axis != nil {
                     PlayerItemNavButton(step: .previous, neighbours: neighbours, onStep: onStep, onResetHideTimer: {})
                 }
                 if !item.isLive {
-                    skipButton(by: -15, systemName: "gobackward.15")
-                        .accessibilityLabel("Skip back 15 seconds")
+                    skipButton(by: -skipInterval.timeInterval, systemName: skipInterval.backwardSymbol)
+                        .accessibilityLabel("Skip back \(skipInterval.seconds) seconds")
                 }
                 CastPlayPauseButton(castService: castService, diameter: isCompact ? 64 : 76)
                 if !item.isLive {
-                    skipButton(by: 15, systemName: "goforward.15")
-                        .accessibilityLabel("Skip forward 15 seconds")
+                    skipButton(by: skipInterval.timeInterval, systemName: skipInterval.forwardSymbol)
+                        .accessibilityLabel("Skip forward \(skipInterval.seconds) seconds")
                 }
                 if neighbours.axis != nil {
                     PlayerItemNavButton(step: .next, neighbours: neighbours, onStep: onStep, onResetHideTimer: {})

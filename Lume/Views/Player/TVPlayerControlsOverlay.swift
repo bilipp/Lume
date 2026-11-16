@@ -301,11 +301,12 @@
         // MARK: - Transport
 
         private var transportControls: some View {
-            HStack(spacing: 26) {
+            let skipInterval = PlayerSkipInterval.stored()
+            return HStack(spacing: 26) {
                 if !media.isLive {
                     leadingTransportButton
-                    circleButton(systemImage: "gobackward.10", focus: .skipBackward) {
-                        coordinator.skip(by: -10)
+                    circleButton(systemImage: skipInterval.backwardSymbol, focus: .skipBackward) {
+                        coordinator.skip(by: -skipInterval.timeInterval)
                         onResetHideTimer()
                     }
                 }
@@ -318,8 +319,8 @@
                 .focused($focus, equals: .transport)
 
                 if !media.isLive {
-                    circleButton(systemImage: "goforward.10", focus: .skipForward) {
-                        coordinator.skip(by: 10)
+                    circleButton(systemImage: skipInterval.forwardSymbol, focus: .skipForward) {
+                        coordinator.skip(by: skipInterval.timeInterval)
                         onResetHideTimer()
                     }
                     trailingTransportButton

@@ -277,6 +277,10 @@ enum PlayerSettings {
         /// Offer the same live channel in its other qualities (HD, FHD, 4K …)
         /// from the player when the playlist lists several. Device-local.
         static let liveQualitySwitchKey = "player.liveQualitySwitch"
+        /// Seconds skip back / skip forward jump, one of
+        /// `PlayerSkipInterval.options`. Device-local; unset means the
+        /// platform default (`PlayerSkipInterval.platformDefault`).
+        nonisolated static let skipIntervalKey = "player.skipInterval"
 
         static let autoPlayNextDefault = true
         static let showNextEpisodeButtonDefault = true
