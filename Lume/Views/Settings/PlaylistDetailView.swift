@@ -422,9 +422,9 @@ extension PlaylistDetailView {
 
     func saveChanges() {
         playlist.name = editName.trimmingCharacters(in: .whitespacesAndNewlines)
-        playlist.serverURL = editServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        playlist.serverURL = UserEnteredURL.withDefaultScheme(editServerURL)
         if isM3U {
-            let epgURL = editEPGURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            let epgURL = UserEnteredURL.withDefaultScheme(editEPGURL)
             playlist.epgURL = epgURL.isEmpty ? nil : epgURL
         } else if isStalker {
             playlist.macAddress = editMacAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
