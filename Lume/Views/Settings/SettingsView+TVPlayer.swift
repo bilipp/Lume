@@ -61,6 +61,7 @@ import SwiftUI
                     tvPremiumToggleRow("Autoplay Next Episode", isOn: $autoPlayNext, feature: .playbackControls)
                     tvPremiumToggleRow("Show Next Episode Button", isOn: $showNextEpisodeButton, feature: .playbackControls)
                     tvPremiumToggleRow("Show Skip Intro Button", isOn: $showSkipIntroButton, feature: .playbackControls)
+                    TVSkipIntervalRow()
                 }
 
                 TVSourcesSettingsSection()
@@ -475,6 +476,29 @@ import SwiftUI
 
         private func footnote(_ text: LocalizedStringKey) -> some View {
             Text(text)
+                .font(.system(size: 20))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                .padding(.top, 6)
+        }
+    }
+
+    /// The skip back / skip forward distance, cycling through
+    /// `PlayerSkipInterval.options`. Its own view for the same line-count
+    /// reason as the rows below.
+    private struct TVSkipIntervalRow: View {
+        @AppStorage(PlayerSettings.Playback.skipIntervalKey)
+        private var skipIntervalRaw = PlayerSkipInterval.platformDefault
+
+        var body: some View {
+            let current = PlayerSkipInterval(seconds: skipIntervalRaw)
+            TVOptionCycleRow(title: "Skip Interval", valueLabel: current.displayName) {
+                let options = PlayerSkipInterval.options
+                let index = options.firstIndex(of: current.seconds) ?? 0
+                skipIntervalRaw = options[(index + 1) % options.count]
+            }
+
+            Text("How far skip back and skip forward jump.")
                 .font(.system(size: 20))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, TVSettingsMetrics.rowHPadding)

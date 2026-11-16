@@ -101,8 +101,6 @@ extension View {
 
 #if os(macOS) || os(iOS)
     private struct PlayerKeyboardShortcuts: ViewModifier {
-        static let skipInterval: TimeInterval = 15
-
         let actions: PlayerKeyActions
 
         @FocusState private var isFocused: Bool
@@ -134,9 +132,9 @@ extension View {
             case .togglePlay:
                 actions.togglePlay()
             case .skipBackward:
-                actions.skip(-Self.skipInterval)
+                actions.skip(-PlayerSkipInterval.stored().timeInterval)
             case .skipForward:
-                actions.skip(Self.skipInterval)
+                actions.skip(PlayerSkipInterval.stored().timeInterval)
             case .nextChannel, .previousChannel:
                 return stepChannel(command == .nextChannel ? .next : .previous)
             case .volumeUp, .volumeDown, .toggleMute:

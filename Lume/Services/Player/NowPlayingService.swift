@@ -181,12 +181,13 @@ final class NowPlayingService {
             guard let self, let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
             return remoteSeek(to: event.positionTime)
         }
-        center.skipForwardCommand.preferredIntervals = [15]
+        let skipInterval = NSNumber(value: PlayerSkipInterval.stored().seconds)
+        center.skipForwardCommand.preferredIntervals = [skipInterval]
         addTarget(center.skipForwardCommand) { [weak self] event in
             guard let self, let event = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
             return remoteSeek(to: (clock?.current ?? 0) + event.interval)
         }
-        center.skipBackwardCommand.preferredIntervals = [15]
+        center.skipBackwardCommand.preferredIntervals = [skipInterval]
         addTarget(center.skipBackwardCommand) { [weak self] event in
             guard let self, let event = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
             return remoteSeek(to: max(0, (clock?.current ?? 0) - event.interval))
