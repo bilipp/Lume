@@ -26,6 +26,7 @@
 import Foundation
 import Observation
 import OSLog
+import SwiftData
 #if os(iOS)
     import UIKit
 #endif
@@ -90,6 +91,8 @@ final class SportsSyncService {
     /// `@AppStorage` key for spoiler-free fixture cards: no score, no winner
     /// emphasis. The game detail still shows the score once opened.
     static let hideScoresKey = "sports.hideScores"
+    /// Opt-in: games a media library identifies as sports join Replays.
+    static let libraryReplaysKey = "sports.libraryReplays"
     /// A replay is watched after the fact, so its result stays hidden unless
     /// the viewer has explicitly chosen to show scores.
     nonisolated static var hidesReplayScores: Bool {
@@ -222,6 +225,29 @@ final class SportsSyncService {
         await pass.value
         task = nil
         isSyncing = false
+    }
+
+    /// Readies library replays: loads the games of any league a server
+    /// listed without them, then the ESPN schedule months those games fall
+    /// in, which the rolling refresh does not reach. Turning Sportarr
+    /// integration on and Refresh Now both call this; while the switch is off
+    /// it does nothing, and merely opening Replays never fetches.
+    func loadReplaySchedule(in context: ModelContext, scope: CatalogScope, restriction: ContentRestriction) {
+        guard UserDefaults.standard.bool(forKey: Self.libraryReplaysKey) else { return }
+        Task {
+            await SportsReplayLibrary.loadMissingEpisodes(in: context, scope: scope, restriction: restriction)
+            await loadHistory(months: SportsReplayLibrary.months(of: SportsReplayLibrary.files(in: context, scope: scope, restriction: restriction)))
+        }
+    }
+
+    /// Fetches schedule months outside the rolling window for the followed
+    /// leagues: a replay can be of a game played months ago, and it needs that
+    /// month's fixtures to be placed. The fixtures merge into the league
+    /// snapshots like any refresh, so a month is kept once fetched.
+    func loadHistory(months: Set<DateComponents>) async {
+        guard provider != nil, !months.isEmpty else { return }
+        if let task { await task.value }
+        _ = await performRefresh(leagueIds: leaguesToRefresh(), months: Array(months))
     }
 
     /// The last successful refresh timestamp, for display in Settings. `nil` until

@@ -174,12 +174,12 @@ struct MovieCollectionRow: View {
 
     /// - Parameter grouped: one card per title; callers re-identify the view
     ///   when it changes, since it shapes the fetch.
-    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, routesSports: Bool = false, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
         self.scope = scope
         self.grouped = grouped
         self.animationNamespace = animationNamespace
-        _movies = Query(MovieCollectionQuery.rowDescriptor(for: kind, scope: scope, grouped: grouped))
+        _movies = Query(MovieCollectionQuery.rowDescriptor(for: kind, scope: scope, grouped: grouped, routesSports: routesSports))
     }
 
     private var visible: [Movie] {
@@ -230,12 +230,12 @@ struct MovieCollectionView: View {
     @Query private var movies: [Movie]
     @State private var groupStates: [String: TitleGroupState] = [:]
 
-    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, routesSports: Bool = false, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
         self.scope = scope
         self.grouped = grouped
         self.animationNamespace = animationNamespace
-        _movies = Query(MovieCollectionQuery.gridDescriptor(for: kind, scope: scope, grouped: grouped))
+        _movies = Query(MovieCollectionQuery.gridDescriptor(for: kind, scope: scope, grouped: grouped, routesSports: routesSports))
     }
 
     private var visible: [Movie] {
@@ -282,8 +282,10 @@ struct MovieCollectionView: View {
 enum MovieCollectionQuery {
     /// The fetch behind a preview row — always bounded, see
     /// `collectionRowFetchLimit`.
-    static func rowDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false) -> FetchDescriptor<Movie> {
-        var descriptor = base(for: kind, scope: scope)
+    static func rowDescriptor(
+        for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false, routesSports: Bool = false
+    ) -> FetchDescriptor<Movie> {
+        var descriptor = base(for: kind, scope: scope, routesSports: routesSports)
         descriptor.fetchLimit = TitleGrouping.fetchLimit(collectionRowFetchLimit, grouped: grouped)
         return descriptor
     }
@@ -291,14 +293,17 @@ enum MovieCollectionQuery {
     /// The fetch behind "Show All". Recently Watched and Favorites stay
     /// unbounded — the grid is the surface that legitimately shows everything —
     /// while Recently Added keeps the cap its whole-playlist predicate needs.
-    static func gridDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false) -> FetchDescriptor<Movie> {
-        var descriptor = base(for: kind, scope: scope)
+    static func gridDescriptor(
+        for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false, routesSports: Bool = false
+    ) -> FetchDescriptor<Movie> {
+        var descriptor = base(for: kind, scope: scope, routesSports: routesSports)
         if kind == .recentlyAdded { descriptor.fetchLimit = TitleGrouping.fetchLimit(recentlyAddedFetchLimit, grouped: grouped) }
         return descriptor
     }
 
-    private static func base(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Movie> {
-        let scoped = predicate(for: kind, scope: scope)
+    private static func base(for kind: LibraryCollection.Kind, scope: CatalogScope, routesSports: Bool) -> FetchDescriptor<Movie> {
+        // Recently Added is discovery; what was watched or favourited is kept.
+        let scoped = CategoryGridQuery.ordinary(predicate(for: kind, scope: scope), routesSports && kind == .recentlyAdded)
         return switch kind {
         case .recentlyWatched:
             FetchDescriptor<Movie>(predicate: scoped, sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)])
@@ -351,12 +356,12 @@ struct SeriesCollectionRow: View {
     @State private var groupStates: [String: TitleGroupState] = [:]
 
     /// - Parameter grouped: see `MovieCollectionRow`.
-    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, routesSports: Bool = false, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
         self.scope = scope
         self.grouped = grouped
         self.animationNamespace = animationNamespace
-        _series = Query(SeriesCollectionQuery.rowDescriptor(for: kind, scope: scope, grouped: grouped))
+        _series = Query(SeriesCollectionQuery.rowDescriptor(for: kind, scope: scope, grouped: grouped, routesSports: routesSports))
     }
 
     private var visible: [Series] {
@@ -407,12 +412,12 @@ struct SeriesCollectionView: View {
     @Query private var series: [Series]
     @State private var groupStates: [String: TitleGroupState] = [:]
 
-    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
+    init(kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool, routesSports: Bool = false, animationNamespace: Namespace.ID? = nil) {
         self.kind = kind
         self.scope = scope
         self.grouped = grouped
         self.animationNamespace = animationNamespace
-        _series = Query(SeriesCollectionQuery.gridDescriptor(for: kind, scope: scope, grouped: grouped))
+        _series = Query(SeriesCollectionQuery.gridDescriptor(for: kind, scope: scope, grouped: grouped, routesSports: routesSports))
     }
 
     private var visible: [Series] {
@@ -455,21 +460,26 @@ struct SeriesCollectionView: View {
 enum SeriesCollectionQuery {
     /// The fetch behind a preview row — always bounded, see
     /// `collectionRowFetchLimit`.
-    static func rowDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false) -> FetchDescriptor<Series> {
-        var descriptor = base(for: kind, scope: scope)
+    static func rowDescriptor(
+        for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false, routesSports: Bool = false
+    ) -> FetchDescriptor<Series> {
+        var descriptor = base(for: kind, scope: scope, routesSports: routesSports)
         descriptor.fetchLimit = TitleGrouping.fetchLimit(collectionRowFetchLimit, grouped: grouped)
         return descriptor
     }
 
     /// The fetch behind "Show All"; see `MovieCollectionQuery.gridDescriptor`.
-    static func gridDescriptor(for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false) -> FetchDescriptor<Series> {
-        var descriptor = base(for: kind, scope: scope)
+    static func gridDescriptor(
+        for kind: LibraryCollection.Kind, scope: CatalogScope, grouped: Bool = false, routesSports: Bool = false
+    ) -> FetchDescriptor<Series> {
+        var descriptor = base(for: kind, scope: scope, routesSports: routesSports)
         if kind == .recentlyAdded { descriptor.fetchLimit = TitleGrouping.fetchLimit(recentlyAddedFetchLimit, grouped: grouped) }
         return descriptor
     }
 
-    private static func base(for kind: LibraryCollection.Kind, scope: CatalogScope) -> FetchDescriptor<Series> {
-        let scoped = predicate(for: kind, scope: scope)
+    private static func base(for kind: LibraryCollection.Kind, scope: CatalogScope, routesSports: Bool) -> FetchDescriptor<Series> {
+        // Recently Added is discovery; what was watched or favourited is kept.
+        let scoped = CategoryGridQuery.ordinary(predicate(for: kind, scope: scope), routesSports && kind == .recentlyAdded)
         return switch kind {
         case .recentlyWatched:
             FetchDescriptor<Series>(predicate: scoped, sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)])

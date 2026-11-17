@@ -14,9 +14,12 @@ struct SportsReplayHub<Scores: View>: View {
     @ViewBuilder var scores: () -> Scores
     @Environment(\.modelContext) private var context
     @Environment(\.contentRestriction) private var restriction
+    @Environment(\.catalogScope) private var catalogScope
     @State private var recordings = RecordingServerStore.shared
     @State private var sports = SportsStore.shared
     @State private var channels: [String: Set<String>] = [:]
+    @AppStorage(SportsSyncService.libraryReplaysKey) private var includesLibrary = false
+    @State private var library: [SportsLibraryReplay] = []
 
     private var visibleRecordings: [ServerRecording] {
         let hidden = RecordingsLibrary.hiddenRecordingIDs(
@@ -31,14 +34,23 @@ struct SportsReplayHub<Scores: View>: View {
         sports.snapshots.values.flatMap(\.fixtures)
     }
 
-    private var games: [SportsReplayGame] {
-        SportsReplayLibrary.games(recordings: visibleRecordings, fixtures: fixtures, channels: channels)
+    /// What the games are derived from. Matching runs when one of these
+    /// changes, off the main thread, and never while the view merely renders.
+    private nonisolated struct MatchInputs: Equatable {
+        let recordings: [ServerRecording]
+        let library: [SportsLibraryReplay]
+        let fixtures: [SportsFixture]
+        let channels: [String: Set<String>]
     }
 
+    @State private var games: [SportsReplayGame] = []
+    /// Library files the last match found no fixture for. Derived with the
+    /// games, so a file is never listed here merely because matching is pending.
+    @State private var others: [SportsLibraryReplay] = []
+
     var body: some View {
-        let games = games
         VStack(spacing: 12) {
-            if !games.isEmpty {
+            if !games.isEmpty || !others.isEmpty {
                 Picker("Sports", selection: $showsReplays) {
                     Text("Scores").tag(false)
                     Text("Replays").tag(true)
@@ -46,15 +58,33 @@ struct SportsReplayHub<Scores: View>: View {
                 .hubSegmentedPickerStyle()
                 .padding(.horizontal)
             }
-            if showsReplays, !games.isEmpty {
-                SportsReplaysView(games: games)
+            if showsReplays, !games.isEmpty || !others.isEmpty {
+                SportsReplaysView(games: games, others: others)
             } else {
                 scores()
             }
         }
         .observesRecordingServerWhileVisible(isActive: true)
         .task(id: resolutionKey) { await resolveRecordingChannels() }
-        .onChange(of: games.isEmpty) { _, empty in
+        .task(id: "\(includesLibrary)-\(catalogScope.token)-\(restriction.visibilityToken)") {
+            library = includesLibrary ? SportsReplayLibrary.files(in: context, scope: catalogScope, restriction: restriction) : []
+        }
+        .task(id: MatchInputs(recordings: visibleRecordings, library: library, fixtures: fixtures, channels: channels)) {
+            let inputs = MatchInputs(recordings: visibleRecordings, library: library, fixtures: fixtures, channels: channels)
+            let derived = await Task.detached(priority: .userInitiated) {
+                let games = SportsReplayLibrary.games(
+                    recordings: inputs.recordings, library: inputs.library, fixtures: inputs.fixtures, channels: inputs.channels
+                )
+                // A file no fixture names is still a replay: listed plainly, never guessed.
+                let placed = Set(games.flatMap(\.library).map(\.id))
+                return (games, inputs.library.filter { !placed.contains($0.id) })
+            }.value
+            // Cancelling this task does not stop the detached pass, so a result
+            // for inputs that have since changed must not overwrite a newer one.
+            guard !Task.isCancelled else { return }
+            (games, others) = derived
+        }
+        .onChange(of: games.isEmpty && others.isEmpty) { _, empty in
             if empty { showsReplays = false }
         }
     }
@@ -63,7 +93,7 @@ struct SportsReplayHub<Scores: View>: View {
     /// capturing joins the recordings resolved, under the same id and start.
     private var resolutionKey: String {
         visibleRecordings.map { $0.id.rawValue + String($0.start.timeIntervalSince1970) + String($0.isReplayable) }.joined(separator: ",")
-            + fixtures.map(\.replayKey).sorted().joined(separator: ",")
+            + String(fixtures.reduce(into: 0) { $0 ^= $1.replayKey.hashValue })
             + restriction.visibilityToken
     }
 

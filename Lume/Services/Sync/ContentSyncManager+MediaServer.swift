@@ -426,6 +426,8 @@ extension ContentSyncManager {
         if let tmdbId = Self.mediaServerTmdbId(item.providerIds?["Tmdb"]), movie.tmdbId != tmdbId {
             movie.tmdbId = tmdbId
         }
+        let sportsRef = item.sportsRef(.event, current: movie.sportsRef)
+        if movie.sportsRef != sportsRef { movie.sportsRef = sportsRef }
         if TitleGroupPrimaries.needsKey(movie, previousName: previousName, previousTmdbId: previousTmdbId) {
             TitleGroupPrimaries.assignKey(to: movie)
         }

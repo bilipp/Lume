@@ -24,7 +24,7 @@ nonisolated enum NextEpisodeResolver {
         var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         guard let current = try? context.fetch(descriptor).first,
-              let series = current.series else { return nil }
+              let series = current.series, !current.isStandaloneReplay() else { return nil }
 
         guard let next = neighbour(of: current, in: series, after: true),
               let playlist = playlist(for: series, in: context) else { return nil }
@@ -44,7 +44,7 @@ nonisolated enum NextEpisodeResolver {
         var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         guard let current = try? context.fetch(descriptor).first,
-              let series = current.series else { return nil }
+              let series = current.series, !current.isStandaloneReplay() else { return nil }
 
         guard let previous = neighbour(of: current, in: series, after: false),
               let playlist = playlist(for: series, in: context) else { return nil }

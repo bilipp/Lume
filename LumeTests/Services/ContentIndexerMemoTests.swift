@@ -101,6 +101,30 @@ struct ContentIndexerMemoTests {
         }
     }
 
+    /// Same-named leagues from several servers must not become TMDB siblings:
+    /// one would hand the others its description and artwork.
+    @Test func `sports series are indexed without a tmdb search and keep their own details`() async throws {
+        try await withContainer { container in
+            let context = container.mainContext
+            for (index, plot) in ["189 games", ""].enumerated() {
+                let league = Series(id: "s\(index)", seriesId: index, name: "NFL")
+                league.titleGroupKey = TitleGroupKey.series(tmdbId: nil, name: "NFL")
+                league.sportsRef = "sportarr://lg-000032"
+                league.plot = plot
+                context.insert(league)
+            }
+            try context.save()
+
+            let indexer = makeIndexer(container: container)
+            _ = try await indexer.indexNextChunk(embedder: nil)
+
+            #expect(requests(matching: "/3/") == 0)
+            let series = try ModelContext(container).fetch(FetchDescriptor<Series>(sortBy: [SortDescriptor(\.id)]))
+            #expect(series.map(\.plot) == ["189 games", ""])
+            #expect(series.allSatisfy { $0.tmdbId == nil && $0.indexedAt != nil })
+        }
+    }
+
     @Test func `a row that adopted a tmdb group is indexed without a search of its own`() async throws {
         try await withContainer { container in
             let context = container.mainContext

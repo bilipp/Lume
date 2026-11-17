@@ -65,4 +65,39 @@ struct SportsReplayFilterTests {
         #expect(SportsReplayFilter(query: "NFL Week 10").apply(games, now: now).map(\.fixture.id) == ["ten"])
         #expect(SportsReplayFilter(query: "unrelated").apply(games, now: now).isEmpty)
     }
+
+    @Test func `files without a fixture obey dates and search and drop out of filters they cannot answer`() {
+        let now = Date(timeIntervalSince1970: 1_750_000_000)
+        let recent = SportsLibraryReplay(id: "recent", isEpisode: true, title: "Lions at Patriots", source: "NFL", day: now.addingTimeInterval(-86400), progress: 0)
+        let old = SportsLibraryReplay(id: "old", isEpisode: true, title: "Bears at Packers", source: "NFL", day: now.addingTimeInterval(-90 * 86400), progress: 0)
+        let undated = SportsLibraryReplay(id: "undated", isEpisode: true, title: "Lions classic", source: "NFL", day: nil, progress: 0)
+        let all = [recent, old, undated]
+        #expect(SportsReplayFilter(range: .recent).apply(all, now: now).map(\.id) == ["recent"])
+        #expect(SportsReplayFilter(range: .season).apply(all, now: now).map(\.id) == ["recent", "old", "undated"])
+        #expect(SportsReplayFilter(range: .season, query: "lions").apply(all, now: now).map(\.id) == ["recent", "undated"])
+        #expect(SportsReplayFilter(range: .season, myTeams: true).apply(all, now: now).isEmpty)
+        #expect(SportsReplayFilter(range: .season, week: 10).apply(all, now: now).isEmpty)
+    }
+
+    /// A source's air date is a calendar day. West of Greenwich, reading its
+    /// UTC midnight in local time showed and filtered the day before.
+    @Test func `an air date keeps its calendar day in a negative utc offset`() throws {
+        var eastern = Calendar(identifier: .gregorian)
+        eastern.timeZone = try #require(TimeZone(secondsFromGMT: -5 * 3600))
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = .gmt
+        let day = try #require(utc.date(from: DateComponents(year: 2026, month: 8, day: 30)))
+        let file = SportsLibraryReplay(id: "lynx", isEpisode: true, title: "Lynx at Dream", source: "Jellyfin", day: day, progress: 0)
+        #expect(file.dayLabel?.contains("30") == true)
+        #expect(file.dayLabel?.contains("29") == false)
+        #expect(try eastern.component(.day, from: #require(file.day(in: eastern))) == 30)
+
+        func chosen(_ dayOfMonth: Int) throws -> SportsReplayFilter {
+            let date = try #require(eastern.date(from: DateComponents(year: 2026, month: 8, day: dayOfMonth, hour: 12)))
+            return SportsReplayFilter(range: .custom, custom: date ... date)
+        }
+        #expect(try chosen(30).apply([file], calendar: eastern).map(\.id) == ["lynx"])
+        #expect(try chosen(29).apply([file], calendar: eastern).isEmpty)
+        #expect(SportsReplayLibrary.months(of: [file]).contains { $0.year == 2026 && $0.month == 8 })
+    }
 }

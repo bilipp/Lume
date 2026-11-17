@@ -91,6 +91,70 @@ struct SportsReplayLibraryTests {
         #expect(games.first?.recordings.count == 2)
     }
 
+    private func file(_ id: String, title: String = "Lions at Patriots", dayOffset: TimeInterval = 0) -> SportsLibraryReplay {
+        // Sources report the air date as a UTC calendar day.
+        let day = Date(timeIntervalSince1970: (kickoff.timeIntervalSince1970 / 86400).rounded(.down) * 86400 + dayOffset)
+        return SportsLibraryReplay(id: id, isEpisode: true, title: title, source: "NFL", day: day, progress: 0)
+    }
+
+    @Test func `a library file joins the game its title and air date name`() {
+        let games = SportsReplayLibrary.games(recordings: [recording()], library: [file("full"), file("condensed")], fixtures: [fixture()], aliases: aliases)
+        #expect(games.count == 1)
+        #expect(games.first?.versions.map(\.id) == ["1", "full", "condensed"])
+        // A night game is filed under the day on either side of its kickoff.
+        #expect(SportsReplayLibrary.games(recordings: [], library: [file("next", dayOffset: 86400)], fixtures: [fixture()], aliases: aliases).count == 1)
+    }
+
+    @MainActor @Test func `a sports episode stands alone only while library replays are on`() {
+        let league = Series(id: "s", seriesId: 1, name: "NFL")
+        league.sportsRef = "sportarr://lg-000032"
+        let game = Episode(id: "e", episodeId: "e", title: "Lions at Patriots", containerExtension: "mkv", seasonNum: 1, episodeNum: 1)
+        game.series = league
+        let ordinary = Episode(id: "o", episodeId: "o", title: "Pilot", containerExtension: "mkv", seasonNum: 1, episodeNum: 1)
+        #expect(game.isStandaloneReplay(replaysOn: true))
+        #expect(!game.isStandaloneReplay(replaysOn: false))
+        #expect(!ordinary.isStandaloneReplay(replaysOn: true))
+    }
+
+    @Test func `a library asks for the schedule months its games can fall in`() {
+        // 15 June stays in June; 30 June can be a game played on 1 July.
+        let months = SportsReplayLibrary.months(of: [file("mid"), file("last", dayOffset: 15 * 86400)])
+        #expect(Set(months.map { [$0.year, $0.month] }) == [[2025, 6], [2025, 7]])
+        #expect(SportsReplayLibrary.months(of: []).isEmpty)
+    }
+
+    /// A season's archive on one night: every file sees every fixture as a
+    /// date candidate. Each must still find exactly its own game, and quickly
+    /// enough that deriving the list is not a visible wait.
+    @Test func `a full season of library files is matched exactly and promptly`() {
+        let league = "espn:football/nfl"
+        let fixtures = (0 ..< 215).map { index in
+            SportsFixture(
+                id: "game\(index)", leagueId: league, leagueName: "NFL", leagueAbbreviation: "NFL",
+                startDate: kickoff.addingTimeInterval(TimeInterval(index)), status: SportsFixtureStatus(state: .final),
+                home: SportsCompetitor(team: SportsTeam(leagueId: league, teamId: "h\(index)", name: "Homecity\(index)", shortName: "Homecity\(index)", abbreviation: "H")),
+                away: SportsCompetitor(team: SportsTeam(leagueId: league, teamId: "a\(index)", name: "Awaytown\(index)", shortName: "Awaytown\(index)", abbreviation: "A"))
+            )
+        }
+        let files = (0 ..< 215).map { file("file\($0)", title: "Awaytown\($0) at Homecity\($0)") }
+        var games: [SportsReplayGame] = []
+        let elapsed = ContinuousClock().measure {
+            games = SportsReplayLibrary.games(recordings: [], library: files, fixtures: fixtures, aliases: aliases)
+        }
+        #expect(games.count == 215)
+        #expect(games.allSatisfy { $0.library.count == 1 && $0.library[0].id == "file" + $0.fixture.id.dropFirst(4) })
+        #expect(elapsed < .seconds(2))
+    }
+
+    @Test func `a library file is never attached by date alone or to an ambiguous game`() {
+        let untitled = file("untitled", title: "Week 10")
+        let undated = SportsLibraryReplay(id: "undated", isEpisode: true, title: "Lions at Patriots", source: "NFL", day: nil, progress: 0)
+        let far = file("far", dayOffset: 4 * 86400)
+        #expect(SportsReplayLibrary.games(recordings: [], library: [untitled, undated, far], fixtures: [fixture()], aliases: aliases).isEmpty)
+        let rematch = [fixture(), fixture(id: "other", offset: 3600)]
+        #expect(SportsReplayLibrary.games(recordings: [], library: [file("full")], fixtures: rematch, aliases: aliases).isEmpty)
+    }
+
     @Test func `captured late partial matches the original NFL programme`() throws {
         struct Evidence: Decodable {
             let recordings: [DispatcharrRecording]

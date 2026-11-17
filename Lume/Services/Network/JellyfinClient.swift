@@ -110,6 +110,8 @@ nonisolated struct JellyfinItem: Decodable, Hashable {
     /// The show's poster tag on an episode, for one with no still of its own.
     let seriesPrimaryImageTag: String?
     let providerIds: [String: String]?
+    /// Server-side file path; read only for a Sportarr filename token.
+    let path: String?
     /// `Virtual` for an episode the server knows of but holds no file for
     /// (unaired, or missing from disk).
     let locationType: String?
@@ -135,6 +137,7 @@ nonisolated struct JellyfinItem: Decodable, Hashable {
         case imageTags = "ImageTags"
         case seriesPrimaryImageTag = "SeriesPrimaryImageTag"
         case providerIds = "ProviderIds"
+        case path = "Path"
         case locationType = "LocationType"
     }
 
