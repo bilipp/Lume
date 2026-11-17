@@ -372,13 +372,13 @@ final class RecordingsLibraryModel {
         )
     }
 
-    func play(_ recording: ServerRecording) {
+    func play(_ recording: ServerRecording, fromBeginning: Bool = false) {
         guard loadingID == nil else { return }
         loadingID = recording.id
         Task {
             defer { loadingID = nil }
             do throws(RecordingActionError) {
-                playingMedia = try await store.playbackMedia(for: recording)
+                playingMedia = try await store.playbackMedia(for: recording, fromBeginning: fromBeginning)
             } catch .premiumRequired {
                 showingPaywall = true
             } catch .server(.cancelled) {

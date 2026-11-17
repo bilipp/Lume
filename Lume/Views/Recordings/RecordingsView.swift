@@ -202,7 +202,7 @@ import SwiftUI
 
     // MARK: - Presentation
 
-    private extension View {
+    extension View {
         /// The player for a recording: macOS's single player window, a full
         /// screen cover everywhere else.
         func recordingPlayer(item: Binding<PlayableMedia?>) -> some View {

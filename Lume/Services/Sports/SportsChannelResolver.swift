@@ -161,10 +161,11 @@ nonisolated enum SportsChannelResolver {
         fixtures: [SportsFixture],
         now _: Date,
         restriction: ContentRestriction = ContentRestriction(),
-        picks: SportsChannelPicks = SportsChannelPicks()
+        picks: SportsChannelPicks = SportsChannelPicks(),
+        includeFinished: Bool = false
     ) async -> [String: [ResolvedChannel]] {
         // A finished game has nothing left to watch; skip it before the guide scan.
-        let fixtures = fixtures.filter { $0.status.state != .final }
+        let fixtures = fixtures.filter { includeFinished || $0.status.state != .final }
         guard !fixtures.isEmpty else { return [:] }
         let pickIndex = picks.snapshot()
 
