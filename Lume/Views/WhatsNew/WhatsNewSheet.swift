@@ -19,8 +19,8 @@ struct WhatsNewSheet: View {
     var isReplay = false
 
     @Environment(\.dismiss) private var dismiss
-    /// Flips once on appear and drives the staggered entrance: the icon, the
-    /// headline, each highlight in turn, then the buttons.
+    /// Flips once the sheet has settled and drives the staggered entrance:
+    /// the icon, the headline, each highlight in turn, then the buttons.
     ///
     /// UI tests start revealed: a button that is still transparent takes no
     /// tap, so a test that taps as soon as the button exists would race the
@@ -56,7 +56,13 @@ struct WhatsNewSheet: View {
         .presentationSizing(.form)
         #endif
         .accessibilityIdentifier("whatsNew.sheet")
-        .onAppear { isRevealed = true }
+        .task {
+            // The sheet slides up empty, as in the system's own welcome
+            // sheets, and the content follows once it has settled. Flipping
+            // on appear would also start while the sheet is still laying out.
+            try? await Task.sleep(for: .seconds(0.4))
+            isRevealed = true
+        }
     }
 
     #if os(tvOS)
@@ -69,14 +75,18 @@ struct WhatsNewSheet: View {
                     highlightRows
                 }
                 actions
-                    .whatsNewReveal(stage: actionsStage, isRevealed: isRevealed, motion: .fade)
+                    .whatsNewReveal(stage: actionsStage, isRevealed: isRevealed, rise: Self.actionsRise)
             }
             .frame(maxWidth: 1100)
             .padding(60)
         }
     #else
+        /// The buttons sit on the sheet's own background. On 26 a scroll edge
+        /// effect separates them from content scrolled underneath, and only
+        /// then; before 26 they take the sheet's background colour.
+        @ViewBuilder
         private var content: some View {
-            ScrollView {
+            let scroll = ScrollView {
                 VStack(spacing: 32) {
                     header
                     VStack(alignment: .leading, spacing: 24) {
@@ -89,17 +99,28 @@ struct WhatsNewSheet: View {
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                actions
-                    .whatsNewReveal(stage: actionsStage, isRevealed: isRevealed, motion: .fade)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: 560)
-                    .frame(maxWidth: .infinity)
-                    .background(.bar)
+            if #available(iOS 26, macOS 26, visionOS 26, *) {
+                scroll.safeAreaBar(edge: .bottom, spacing: 0) { actionBar }
+            } else {
+                scroll.safeAreaInset(edge: .bottom, spacing: 0) {
+                    actionBar.background(.background)
+                }
             }
         }
+
+        private var actionBar: some View {
+            actions
+                .whatsNewReveal(stage: actionsStage, isRevealed: isRevealed, rise: Self.actionsRise)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 16)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+        }
     #endif
+
+    /// The buttons rise less than the content above them: they sit at the
+    /// bottom edge and shouldn't come up from beyond it.
+    private static let actionsRise: CGFloat = 24
 
     @ViewBuilder
     private var highlightRows: some View {
@@ -127,7 +148,7 @@ struct WhatsNewSheet: View {
                 .foregroundStyle(.tint)
                 .frame(width: Self.iconSize, height: Self.iconSize)
                 .background(.tint.opacity(0.12), in: .rect(cornerRadius: Self.iconSize * 0.24, style: .continuous))
-                .whatsNewReveal(stage: 0, isRevealed: isRevealed, motion: .zoom)
+                .whatsNewReveal(stage: 0, isRevealed: isRevealed)
                 .accessibilityHidden(true)
 
             VStack(spacing: 6) {
@@ -198,22 +219,15 @@ struct WhatsNewSheet: View {
 }
 
 /// One step of the sheet's entrance: the content rises into place out of a
-/// blur, each stage a beat after the one before. With Reduce Motion on it only
-/// fades, all at once.
+/// heavy blur, settling without overshoot, each stage a beat after the one
+/// before. With Reduce Motion on it only fades, all at once.
+///
+/// Starts only once the sheet has settled: any layout change in the same
+/// update (the sheet still sizing itself) would take this curve too.
 private struct WhatsNewReveal: ViewModifier {
     let stage: Int
     let isRevealed: Bool
-    let motion: Motion
-
-    enum Motion {
-        /// Rises into place.
-        case rise
-        /// Grows into place, for the icon.
-        case zoom
-        /// Stays where it is. For the buttons: a control that is still moving
-        /// when it becomes visible is tapped where it will be, not where it is.
-        case fade
-    }
+    let rise: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -224,9 +238,8 @@ private struct WhatsNewReveal: ViewModifier {
     func body(content: Content) -> some View {
         content
             .compositingGroup()
-            .scaleEffect(motion == .zoom && isDisplaced ? 0.6 : 1)
-            .blur(radius: isDisplaced ? 12 : 0)
-            .offset(y: motion == .rise && isDisplaced ? 48 : 0)
+            .blur(radius: isDisplaced ? 16 : 0)
+            .offset(y: isDisplaced ? rise : 0)
             .opacity(isRevealed ? 1 : 0)
             .animation(animation, value: isRevealed)
     }
@@ -235,14 +248,13 @@ private struct WhatsNewReveal: ViewModifier {
         if reduceMotion {
             return .easeOut(duration: 0.3)
         }
-        let delay = 0.5 + Double(stage) * 0.12
-        return motion == .zoom ? .bouncy(duration: 0.7).delay(delay) : .smooth(duration: 0.7).delay(delay)
+        return .smooth(duration: 0.65).delay(Double(stage) * 0.17)
     }
 }
 
 private extension View {
-    func whatsNewReveal(stage: Int, isRevealed: Bool, motion: WhatsNewReveal.Motion = .rise) -> some View {
-        modifier(WhatsNewReveal(stage: stage, isRevealed: isRevealed, motion: motion))
+    func whatsNewReveal(stage: Int, isRevealed: Bool, rise: CGFloat = 80) -> some View {
+        modifier(WhatsNewReveal(stage: stage, isRevealed: isRevealed, rise: rise))
     }
 
     /// The filled call to action: Liquid Glass on iOS and macOS 26, the
