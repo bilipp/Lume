@@ -21,10 +21,18 @@ final class WhatsNewUITests: XCTestCase {
         XCTAssertTrue(continueButton.waitForNonExistence(timeout: 5))
     }
 
-    func testSheetOpensTheReleaseHistory() {
+    func testHistoryReopensARelease() {
         let historyLink = app.buttons["All Release Notes"]
         XCTAssertTrue(historyLink.waitForExistence(timeout: 15))
         historyLink.tap()
-        XCTAssertTrue(app.navigationBars["What’s New"].waitForExistence(timeout: 5))
+
+        let release = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "whatsNew.release.")).firstMatch
+        XCTAssertTrue(release.waitForExistence(timeout: 5))
+        release.tap()
+
+        let done = app.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        done.tap()
+        XCTAssertTrue(done.waitForNonExistence(timeout: 5))
     }
 }

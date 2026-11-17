@@ -2,8 +2,8 @@
 //  WhatsNewHistoryView.swift
 //  Lume
 //
-//  Every release's changes on this platform, newest first. Reached from
-//  Settings › About and from the What's New sheet.
+//  Every release this build contains, newest first. Each opens its What's New
+//  page again. Reached from Settings › About and from the What's New sheet.
 //
 
 import SwiftUI
@@ -11,74 +11,93 @@ import SwiftUI
 struct WhatsNewHistoryView: View {
     private let releases = WhatsNewCatalog.history(for: AppVersion(SupportInfo.appVersion), on: .current)
 
+    @State private var selected: WhatsNewRelease?
+
     var body: some View {
+        list
         #if os(tvOS)
+        .fullScreenCover(item: $selected) { WhatsNewSheet(release: $0, isReplay: true) }
+        #else
+        .sheet(item: $selected) { WhatsNewSheet(release: $0, isReplay: true) }
+        #endif
+    }
+
+    #if os(tvOS)
+        private var list: some View {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("What’s New", tableName: "WhatsNew")
                         .font(.title2.bold())
-                        .padding(.horizontal, 40)
-                    ForEach(releases) { TVWhatsNewReleaseCard(release: $0) }
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.bottom, 12)
+                    ForEach(releases) { release in
+                        Button {
+                            selected = release
+                        } label: {
+                            WhatsNewReleaseLabel(release: release)
+                        }
+                        .buttonStyle(TVSettingsRowButtonStyle())
+                    }
                 }
-                .frame(maxWidth: 1200)
+                .frame(maxWidth: 1100)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 60)
             }
             .background(.regularMaterial)
-        #else
+        }
+    #else
+        private var list: some View {
             List(releases) { release in
-                Section {
-                    ForEach(release.highlights(on: .current)) { item in
-                        WhatsNewItemRow(item: item)
-                            .padding(.vertical, 4)
+                Button {
+                    selected = release
+                } label: {
+                    HStack {
+                        WhatsNewReleaseLabel(release: release)
+                        Spacer(minLength: 12)
+                        Image(systemName: "chevron.forward")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
-                    ForEach(Array(release.notes.enumerated()), id: \.offset) { _, note in
-                        Text(note)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("Version \(release.version.displayString)")
+                    .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("whatsNew.release.\(release.version.displayString)")
             }
             .navigationTitle(Text("What’s New", tableName: "WhatsNew"))
             #if os(iOS) || os(visionOS)
                 .navigationBarTitleDisplayMode(.inline)
             #endif
-        #endif
-    }
+        }
+    #endif
 }
 
-#if os(tvOS)
-    /// One release as a focus stop, so the remote scrolls the history release
-    /// by release.
-    private struct TVWhatsNewReleaseCard: View {
-        let release: WhatsNewRelease
+/// A release in the history: its version over the titles of what it brought,
+/// or its first note when it had no highlight on this platform.
+private struct WhatsNewReleaseLabel: View {
+    let release: WhatsNewRelease
 
-        @FocusState private var isFocused: Bool
+    private var highlights: [WhatsNewItem] {
+        release.highlights(on: .current)
+    }
 
-        var body: some View {
-            VStack(alignment: .leading, spacing: 28) {
-                Text("Version \(release.version.displayString)")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                ForEach(release.highlights(on: .current)) { WhatsNewItemRow(item: $0) }
-                ForEach(Array(release.notes.enumerated()), id: \.offset) { _, note in
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Version \(release.version.displayString)")
+                .font(.headline)
+            Group {
+                if highlights.isEmpty, let note = release.notes.first {
                     Text(note)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(highlights) { Text($0.title) }
                 }
             }
-            .padding(40)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                Color.white.opacity(isFocused ? 0.14 : 0.05),
-                in: .rect(cornerRadius: 28, style: .continuous)
-            )
-            .focusable()
-            .focused($isFocused)
-            .animation(.easeOut(duration: 0.15), value: isFocused)
-            .accessibilityElement(children: .combine)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.leading)
         }
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
-#endif
+}
