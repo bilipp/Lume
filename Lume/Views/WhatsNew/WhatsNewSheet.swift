@@ -26,6 +26,20 @@ struct WhatsNewSheet: View {
     /// tap, so a test that taps as soon as the button exists would race the
     /// entrance.
     @State private var isRevealed = LumeApp.isAutomatedRun
+    @State private var showsHistory = false
+
+    #if os(iOS)
+        /// The card is as tall as what it shows, like the system's welcome
+        /// sheets: the scrolled content plus the buttons. Until both are
+        /// measured, and while the history is open, it takes the full height.
+        @State private var contentHeight: CGFloat?
+        @State private var barHeight: CGFloat?
+
+        private var detents: Set<PresentationDetent> {
+            guard !showsHistory, let contentHeight, let barHeight else { return [.large] }
+            return [.height(contentHeight + barHeight)]
+        }
+    #endif
 
     private var items: [WhatsNewItem] {
         release.highlights(on: .current)
@@ -47,11 +61,17 @@ struct WhatsNewSheet: View {
             #if !os(tvOS) && !os(macOS)
             .toolbar(.hidden, for: .navigationBar)
             #endif
+            .navigationDestination(isPresented: $showsHistory) {
+                WhatsNewHistoryView()
+            }
         }
         #if os(macOS)
         .frame(width: 520, height: 620)
         #elseif os(tvOS)
         .background(.regularMaterial)
+        #elseif os(iOS)
+        .presentationSizing(.form)
+        .presentationDetents(detents)
         #else
         .presentationSizing(.form)
         #endif
@@ -96,8 +116,11 @@ struct WhatsNewSheet: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 44)
                 .padding(.bottom, 16)
-                .frame(maxWidth: 560)
-                .frame(maxWidth: .infinity)
+                #if os(iOS)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                #endif
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity)
             }
             if #available(iOS 26, macOS 26, visionOS 26, *) {
                 scroll.safeAreaBar(edge: .bottom, spacing: 0) { actionBar }
@@ -115,6 +138,9 @@ struct WhatsNewSheet: View {
                 .padding(.vertical, 16)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
+            #if os(iOS)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 }
+            #endif
         }
     #endif
 
@@ -176,8 +202,8 @@ struct WhatsNewSheet: View {
     private var actions: some View {
         VStack(spacing: 12) {
             if !isReplay {
-                NavigationLink {
-                    WhatsNewHistoryView()
+                Button {
+                    showsHistory = true
                 } label: {
                     Text("All Release Notes", tableName: "WhatsNew")
                     #if os(tvOS)
