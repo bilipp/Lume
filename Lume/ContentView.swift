@@ -52,6 +52,9 @@ struct ContentView: View {
         .lumeCloudMovedNotice()
         .lumeCloudAccountEndNotice()
         .task {
+            // Before a UI test seeds its playlist: an install with nothing in
+            // the catalog is new, and has no update to be told about.
+            WhatsNewCoordinator.shared.noteLaunch(isFreshInstall: playlists.isEmpty)
             if CommandLine.arguments.contains("-ui-testing") {
                 seedTestPlaylist()
             }

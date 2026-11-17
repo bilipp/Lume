@@ -87,6 +87,15 @@ struct MainTabView: View {
             || profileManager?.isSwitching == true
     }
 
+    /// Whether a plain overlay sits over the tabs. Only tvOS layers those.
+    private var overlayOwnsScreen: Bool {
+        #if os(tvOS)
+            blockingOverlayOwnsScreen || router.isQuickSwitchPresented
+        #else
+            false
+        #endif
+    }
+
     /// Hides categories (and their content) from every browse, Home and Search
     /// surface: the ones hidden in Content Management always, the restricted
     /// ones while a child profile is active.
@@ -194,6 +203,7 @@ struct MainTabView: View {
         }
         .downloadsSheet(isPresented: $showsDownloads)
         .lumeCloudPairingSheet(router: router, rootIsCovered: hasOwnPresentation)
+        .whatsNewSheet(rootIsCovered: hasBlockingPresentation || overlayOwnsScreen)
         .switchProgressOverlay(playlist: playlistSwitch, profile: profileManager)
         // The one fire point for the rating sheet. Here rather than at the
         // eleven player presentation sites: this view is the browse root,

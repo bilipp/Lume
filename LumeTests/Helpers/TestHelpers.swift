@@ -120,7 +120,12 @@ struct StringCatalog {
     }
 
     static func localizable(filePath: String = #filePath) throws -> Self {
-        let url = repoRootURL(filePath: filePath).appendingPathComponent("Lume/Localizable.xcstrings")
+        try table("Localizable", filePath: filePath)
+    }
+
+    /// One of the app's String Catalogs, by table name.
+    static func table(_ name: String, filePath: String = #filePath) throws -> Self {
+        let url = repoRootURL(filePath: filePath).appendingPathComponent("Lume/\(name).xcstrings")
         let root = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         return Self(
             sourceLanguage: root?["sourceLanguage"] as? String ?? "en",
