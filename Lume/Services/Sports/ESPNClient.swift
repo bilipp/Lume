@@ -90,7 +90,12 @@ nonisolated struct ESPNClient: SportsDataProvider {
             .appending(path: "\(league.sport)/\(league.slug)/scoreboard")
             .appending(queryItems: [URLQueryItem(name: "dates", value: dates)])
         guard let response: ESPNScoreboard = await fetch(url) else { return [] }
-        return Self.mapScoreboard(response, league: league)
+        let initial = Self.mapScoreboard(response, league: league)
+        guard dates.count == 6, response.events?.count == 100,
+              let expanded: ESPNScoreboard = await fetch(url.appending(queryItems: [URLQueryItem(name: "limit", value: "1000")]))
+        else { return initial }
+        var seen = Set(initial.map(\.id))
+        return initial + Self.mapScoreboard(expanded, league: league).filter { seen.insert($0.id).inserted }
     }
 
     /// A tennis tour has no teams and no table: its players come from the world
@@ -193,6 +198,9 @@ nonisolated extension ESPNClient {
             leagueName: league.name.isEmpty ? (info?.name ?? "") : league.name,
             leagueAbbreviation: league.abbreviation.isEmpty ? (info?.abbreviation ?? "") : league.abbreviation,
             leagueLogoURL: logo(info?.logos, dark: false),
+            season: scoreboard.season,
+            week: scoreboard.week,
+            calendar: info?.calendar ?? [],
             isRacing: league.sport == "racing"
         )
         if league.isTennis {
@@ -208,6 +216,9 @@ nonisolated extension ESPNClient {
         let leagueName: String
         let leagueAbbreviation: String
         let leagueLogoURL: URL?
+        let season: ESPNSeason?
+        let week: ESPNWeek?
+        let calendar: [ESPNCalendarEntry]
         let isRacing: Bool
     }
 
@@ -234,16 +245,7 @@ nonisolated extension ESPNClient {
             .flatMap { $0.names ?? [] }
             .filter { !$0.isEmpty }
 
-        var sessions: [SportsSession] = []
-        if isRacing {
-            sessions = (event.competitions ?? []).compactMap { comp in
-                guard let raw = comp.type?.abbreviation,
-                      let kind = SportsSessionKind(rawValue: raw),
-                      let date = parseDate(comp.date)
-                else { return nil }
-                return SportsSession(kind: kind, date: date, state: comp.status.map { mapStatus($0).state })
-            }
-        }
+        let sessions = isRacing ? mapSessions(event) : []
 
         return SportsFixture(
             id: id,
@@ -259,8 +261,24 @@ nonisolated extension ESPNClient {
             sessions: sessions,
             name: nonEmpty(event.name),
             shortName: nonEmpty(event.shortName),
-            leagueLogoURL: context.leagueLogoURL
+            leagueLogoURL: context.leagueLogoURL,
+            seasonYear: event.season?.year ?? context.season?.year,
+            seasonName: event.season?.displayName ?? context.season?.displayName,
+            seasonPhase: phaseLabel(event: event, context: context),
+            week: event.week?.number ?? context.week?.number,
+            weekLabel: weekLabel(event: event, context: context),
+            eventHeadline: competition?.notes?.compactMap(\.headline).first
         )
+    }
+
+    private static func mapSessions(_ event: ESPNEvent) -> [SportsSession] {
+        (event.competitions ?? []).compactMap { comp in
+            guard let raw = comp.type?.abbreviation,
+                  let kind = SportsSessionKind(rawValue: raw),
+                  let date = parseDate(comp.date)
+            else { return nil }
+            return SportsSession(kind: kind, date: date, state: comp.status.map { mapStatus($0).state })
+        }
     }
 
     /// A race weekend's own status mirrors its first session: ESPN calls the
@@ -366,153 +384,6 @@ nonisolated extension ESPNClient {
         let trimmed = hex.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
         return trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
-    }
-
-    // MARK: Standings
-
-    /// Walks every group (conferences, F1's driver/constructor tables) plus a
-    /// single-table league's root entries (AFL, NBL). A group that names no kind
-    /// is read from its rows: athlete entries are drivers (NASCAR, IndyCar).
-    static func mapStandings(_ response: ESPNStandingsResponse) -> [SportsStandingRow] {
-        var groups: [(name: String?, entries: [ESPNStandingsEntry])] = (response.children ?? []).map {
-            ($0.name, $0.standings?.entries ?? [])
-        }
-        if let rootEntries = response.standings?.entries, !rootEntries.isEmpty {
-            groups.append((nil, rootEntries))
-        }
-
-        var rows: [SportsStandingRow] = []
-        for group in groups {
-            let kind = standingKind(childName: group.name)
-            let groupName = groups.count > 1 ? group.name : nil
-            for (index, entry) in group.entries.enumerated() {
-                let resolvedKind = kind == .team && entry.team == nil && entry.athlete != nil ? .driver : kind
-                if let row = mapStandingEntry(entry, kind: resolvedKind, fallbackRank: index + 1, group: groupName) {
-                    rows.append(row)
-                }
-            }
-        }
-        return rows
-    }
-
-    private static func standingKind(childName: String?) -> SportsStandingKind {
-        guard let name = childName?.lowercased() else { return .team }
-        if name.contains("constructor") { return .constructor }
-        if name.contains("driver") { return .driver }
-        return .team
-    }
-
-    /// Indexes an entry's stats by name and abbreviation and resolves the few
-    /// numeric fields the standings rows need.
-    private struct StandingStatLookup {
-        private let byName: [String: ESPNStat]
-        private let byAbbreviation: [String: ESPNStat]
-        let extra: [String: String]
-
-        init(entry: ESPNStandingsEntry) {
-            var byName: [String: ESPNStat] = [:]
-            var byAbbreviation: [String: ESPNStat] = [:]
-            var extra: [String: String] = [:]
-            for stat in entry.stats ?? [] {
-                if let name = stat.name { byName[name] = stat }
-                if let abbreviation = stat.abbreviation { byAbbreviation[abbreviation] = stat }
-                if let key = stat.name ?? stat.abbreviation, let display = stat.displayValue {
-                    extra[key] = display
-                }
-            }
-            self.byName = byName
-            self.byAbbreviation = byAbbreviation
-            self.extra = extra
-        }
-
-        func intStat(_ name: String) -> Int? {
-            guard let stat = byName[name] else { return nil }
-            if let value = stat.value { return Int(value) }
-            return stat.displayValue.flatMap { Int($0) }
-        }
-
-        /// The first of several provider spellings for one figure — rugby and
-        /// the NRL say `gamesWon`/`gamesLost`/`gamesDrawn`/`pointsDifference`,
-        /// cricket `matchesPlayed`/`matchesWon`/`matchesLost`/`matchPoints`,
-        /// where every other sport says `wins`/`losses`/`ties`/`pointDifferential`.
-        func intStat(anyOf names: [String]) -> Int? {
-            for name in names {
-                if let value = intStat(name) { return value }
-            }
-            return nil
-        }
-
-        func rankStat() -> Int? {
-            if let rank = intStat("rank") { return rank }
-            if let stat = byAbbreviation["RK"], let value = stat.value ?? stat.displayValue.flatMap({ Double($0) }) {
-                return Int(value)
-            }
-            return nil
-        }
-
-        func pointsStat() -> Int? {
-            if let points = intStat(anyOf: ["points", "championshipPts", "matchPoints"]) { return points }
-            if let stat = byAbbreviation["PTS"], let value = stat.value ?? stat.displayValue.flatMap({ Double($0) }) {
-                return Int(value)
-            }
-            return nil
-        }
-    }
-
-    private static func mapStandingEntry(
-        _ entry: ESPNStandingsEntry,
-        kind: SportsStandingKind,
-        fallbackRank: Int,
-        group: String?
-    ) -> SportsStandingRow? {
-        let stats = StandingStatLookup(entry: entry)
-
-        switch kind {
-        case .team:
-            guard let team = entry.team, let teamId = team.id else { return nil }
-            return SportsStandingRow(
-                id: teamId,
-                kind: .team,
-                teamId: teamId,
-                name: team.displayName ?? team.shortDisplayName ?? teamId,
-                rank: stats.rankStat() ?? fallbackRank,
-                played: stats.intStat(anyOf: ["gamesPlayed", "matchesPlayed"]),
-                wins: stats.intStat(anyOf: ["wins", "gamesWon", "matchesWon"]),
-                draws: stats.intStat(anyOf: ["ties", "gamesDrawn", "matchesDrawn"]),
-                losses: stats.intStat(anyOf: ["losses", "gamesLost", "matchesLost"]),
-                goalDifference: stats.intStat(anyOf: ["pointDifferential", "pointsDifference"]),
-                points: stats.pointsStat(),
-                extra: stats.extra,
-                group: group
-            )
-        case .driver:
-            guard let athlete = entry.athlete else { return nil }
-            let id = athlete.id ?? athlete.displayName ?? UUID().uuidString
-            return SportsStandingRow(
-                id: id,
-                kind: .driver,
-                teamId: nil,
-                name: athlete.displayName ?? id,
-                rank: stats.rankStat() ?? fallbackRank,
-                points: stats.pointsStat(),
-                extra: stats.extra,
-                group: group
-            )
-        case .player:
-            return nil
-        case .constructor:
-            let id = entry.team?.id ?? entry.team?.displayName ?? UUID().uuidString
-            return SportsStandingRow(
-                id: id,
-                kind: .constructor,
-                teamId: entry.team?.id,
-                name: entry.team?.displayName ?? entry.team?.shortDisplayName ?? id,
-                rank: stats.rankStat() ?? fallbackRank,
-                points: stats.pointsStat(),
-                extra: stats.extra,
-                group: group
-            )
-        }
     }
 
     // MARK: Event detail

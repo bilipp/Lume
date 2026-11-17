@@ -36,6 +36,7 @@
         @State private var follows = SportsFollowService.shared
         @State private var epg = EPGSyncService.shared
 
+        @State private var showsReplays = false
         @State private var scope: SportsHubScope = .myTeams
         @State private var segment: SportsHubSegment = .today
         @State private var resolved: [String: [ResolvedChannel]] = [:]
@@ -55,7 +56,7 @@
         var body: some View {
             Group {
                 if premium.isPremium {
-                    hub
+                    SportsReplayHub(showsReplays: $showsReplays) { hub }
                 } else {
                     lockedState
                 }
