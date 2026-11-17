@@ -33,6 +33,9 @@ final class Episode {
     var localFileURL: String?
     var downloadedAt: Date?
     var lastWatchedDate: Date?
+    /// Provider-qualified sports identity from the source (`sportarr://ev-…`,
+    /// `sportarr://lg-…`); nil for everything else. Written by import only.
+    var sportsRef: String?
 
     init(
         id: String,

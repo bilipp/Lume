@@ -57,7 +57,7 @@ nonisolated extension SportsReplayGame {
         names += [fixture.leagueName, fixture.leagueAbbreviation, fixture.name, fixture.shortName,
                   fixture.seasonName, fixture.seasonPhase, fixture.weekLabel, fixture.eventHeadline].compactMap(\.self)
         if let week = fixture.week { names.append(String(localized: "Week \(week)")) }
-        names += recordings.map(\.title)
+        names += recordings.map(\.title) + library.map(\.title)
         names += fixture.broadcasters
         names.append(calendar.weekdaySymbols[weekday - 1])
         if let sport = SportsCatalog.league(id: fixture.leagueId)?.sport { names.append(sport) }
@@ -100,5 +100,21 @@ nonisolated struct SportsReplayFilter {
                 && (week == nil || fixture.week == week)
                 && game.matches(query: query, calendar: calendar)
         }.sorted { recentlyAdded ? $0.addedAt > $1.addedAt : $0.fixture.startDate > $1.fixture.startDate }
+    }
+
+    /// Files no fixture was found for carry a title and an air date, nothing
+    /// more. They obey the date range and the search. A league, season, phase,
+    /// week or My Teams choice cannot be checked against them, so any of those
+    /// leaves them out rather than guess; so does a date range for a file
+    /// with no date.
+    func apply(_ files: [SportsLibraryReplay], now: Date = Date(), calendar: Calendar = .current) -> [SportsLibraryReplay] {
+        guard !myTeams, leagueID.isEmpty, season == nil, phase.isEmpty, week == nil else { return [] }
+        let interval = range.interval(now: now, days: recentDays, calendar: calendar, custom: custom)
+        let words = SportsMatcher.normalize(query).split(separator: " ")
+        return files.filter { file in
+            let haystack = SportsMatcher.normalize(file.title + " " + file.league + " " + file.source)
+            return (interval.map { range in file.day(in: calendar).map { $0 >= range.start && $0 < range.end } ?? false } ?? true)
+                && words.allSatisfy { haystack.contains($0) }
+        }.sorted { ($0.day ?? .distantPast) > ($1.day ?? .distantPast) }
     }
 }

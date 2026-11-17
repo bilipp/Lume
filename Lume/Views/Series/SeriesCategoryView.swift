@@ -18,6 +18,7 @@ struct SeriesCategoryView: View {
     @Environment(\.modelContext) private var modelContext
 
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(SportsSyncService.libraryReplaysKey) private var routesSports = false
     @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
     private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
@@ -44,7 +45,7 @@ struct SeriesCategoryView: View {
 
     /// The sort and grouping the loaded pages were fetched for.
     private var loadKey: String {
-        "\(contentSortRaw)|\(groupDuplicateTitles)"
+        "\(contentSortRaw)|\(groupDuplicateTitles)|\(routesSports)"
     }
 
     /// The playlist when it's a Stalker portal, whose categories are imported
@@ -115,7 +116,8 @@ struct SeriesCategoryView: View {
         var descriptor = CategoryGridQuery.series(
             categoryId: category.id,
             grouped: groupDuplicateTitles,
-            sortBy: contentSort.seriesDescriptors
+            sortBy: contentSort.seriesDescriptors,
+            routesSports: routesSports
         )
         descriptor.fetchOffset = series.count
         descriptor.fetchLimit = pageSize
@@ -165,7 +167,8 @@ struct SeriesCategoryView: View {
         var descriptor = CategoryGridQuery.series(
             categoryId: category.id,
             grouped: groupDuplicateTitles,
-            sortBy: contentSort.seriesDescriptors
+            sortBy: contentSort.seriesDescriptors,
+            routesSports: routesSports
         )
         let window = max(series.count, pageSize)
         descriptor.fetchLimit = window
@@ -194,11 +197,14 @@ struct SeriesCategoryPreview: View {
     @State private var groupStates: [String: TitleGroupState] = [:]
 
     /// - Parameter grouped: see `MovieCategoryPreview`.
-    init(category: Category, limit: Int, sort: ContentSortOption, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
+    init(
+        category: Category, limit: Int, sort: ContentSortOption, grouped: Bool, routesSports: Bool = false,
+        animationNamespace: Namespace.ID? = nil
+    ) {
         self.category = category
         self.limit = limit
         self.animationNamespace = animationNamespace
-        var descriptor = CategoryGridQuery.series(categoryId: category.id, grouped: grouped, sortBy: sort.seriesDescriptors)
+        var descriptor = CategoryGridQuery.series(categoryId: category.id, grouped: grouped, sortBy: sort.seriesDescriptors, routesSports: routesSports)
         // Fetch one extra so we can tell whether a full grid would show more.
         descriptor.fetchLimit = limit + 1
         _series = Query(descriptor)

@@ -284,6 +284,8 @@ extension ContentSyncManager {
         let previousTmdbId = movie.tmdbId
         applyPlexMovieIdentity(item, to: movie, scope: scope)
         applyPlexMovieMetadata(item, to: movie)
+        let sportsRef = item.sportsRef(.event, current: movie.sportsRef)
+        if movie.sportsRef != sportsRef { movie.sportsRef = sportsRef }
         if let tmdbId = Self.mediaServerTmdbId(item.providerId("tmdb")), movie.tmdbId != tmdbId {
             movie.tmdbId = tmdbId
         }

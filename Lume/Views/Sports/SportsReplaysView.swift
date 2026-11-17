@@ -10,6 +10,10 @@ import SwiftUI
 
 struct SportsReplaysView: View {
     let games: [SportsReplayGame]
+    /// Library files no fixture could be matched to.
+    var others: [SportsLibraryReplay] = []
+    @Environment(\.modelContext) private var context
+    @State private var player = RecordingsLibraryModel()
     @State private var follows = SportsFollowService.shared
     @State private var filter = SportsReplayFilter()
     @State private var browse = false
@@ -26,11 +30,16 @@ struct SportsReplaysView: View {
         min(customStart, customEnd) ... max(customStart, customEnd)
     }
 
-    private var filtered: [SportsReplayGame] {
+    /// The filter as chosen, with the dates and follows it cannot hold itself.
+    private var activeFilter: SportsReplayFilter {
         var filter = filter
         filter.custom = customDates
         filter.followedTeamIDs = Set(follows.followedTeamIds)
-        return filter.apply(games)
+        return filter
+    }
+
+    private var filtered: [SportsReplayGame] {
+        activeFilter.apply(games)
     }
 
     var body: some View {
@@ -50,7 +59,7 @@ struct SportsReplaysView: View {
                         Text(interval.start.formatted(date: .abbreviated, time: .omitted) + " – " + interval.end.addingTimeInterval(-1).formatted(date: .abbreviated, time: .omitted))
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    if filtered.isEmpty {
+                    if filtered.isEmpty, others.isEmpty {
                         ContentUnavailableView {
                             Label("No replays", systemImage: "play.rectangle")
                         } actions: {
@@ -61,6 +70,7 @@ struct SportsReplaysView: View {
                         continueWatching.id(progressRevision)
                         replayGroups
                     }
+                    moreReplays
                     if filter.range == .recent {
                         Button("Load older") { filter.recentDays += 14 }
                             .frame(minHeight: 44)
@@ -70,8 +80,65 @@ struct SportsReplaysView: View {
             }
         }
         .sheet(isPresented: $showingFilters) { filters }
+        .replayPlayer(player)
         .sheet(item: $selected, onDismiss: { progressRevision += 1 }, content: { SportsReplayDetail(game: $0) })
         .onChange(of: filter.range) { _, value in if value == .custom { showingFilters = true } }
+    }
+
+    /// Files ESPN has no fixture for, under the same filter as the games.
+    /// Those whose source named the exact event share one card per event,
+    /// built from that source's own title and date, with each file a version;
+    /// nothing about teams or a score is inferred. Those known only by their
+    /// league are listed as unmatched.
+    @ViewBuilder
+    private var moreReplays: some View {
+        let files = activeFilter.apply(others)
+        let events = Dictionary(grouping: files.filter { $0.event != nil }, by: { $0.event ?? "" })
+            .values.sorted { ($0[0].day ?? .distantPast) > ($1[0].day ?? .distantPast) }
+        let unmatched = files.filter { $0.event == nil }
+        if !events.isEmpty {
+            Text("More Replays").font(.headline)
+            ForEach(events, id: \.[0].id) { versions in
+                fileRow(versions)
+                    .padding()
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        if !unmatched.isEmpty {
+            Text("Unmatched").font(.headline)
+            ForEach(unmatched) { fileRow([$0]) }
+        }
+    }
+
+    /// One file plays from its row; several are offered as versions first.
+    @ViewBuilder
+    private func fileRow(_ versions: [SportsLibraryReplay]) -> some View {
+        let file = versions[0]
+        let label = HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: file.title)
+                let details = [file.league, file.dayLabel ?? ""].filter { !$0.isEmpty }
+                if !details.isEmpty {
+                    Text(verbatim: details.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Image(systemName: versions.contains { $0.progress > 0 } ? "play.circle" : "play.fill")
+        }
+        .frame(minHeight: 44)
+        if versions.count == 1 {
+            Button { player.playingMedia = file.media(in: context) } label: { label }
+                .buttonStyle(.plain)
+        } else {
+            Menu {
+                ForEach(versions) { version in
+                    Button(version.source.isEmpty ? version.title : version.source) {
+                        player.playingMedia = version.media(in: context)
+                    }
+                }
+            } label: { label }
+                .buttonStyle(.plain)
+        }
     }
 
     @ViewBuilder
@@ -79,6 +146,7 @@ struct SportsReplaysView: View {
         let namespace = RecordingServerConfigService.shared.activeServer?.progressNamespace
         let continuing = filtered.filter { game in
             game.recordings.contains { RecordingProgressStore.resumePosition(for: $0, namespace: namespace) > 0 }
+                || game.library.contains { $0.progress > 0 }
         }
         if !continuing.isEmpty {
             Text("Continue Watching").font(.headline)

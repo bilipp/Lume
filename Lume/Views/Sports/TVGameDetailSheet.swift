@@ -36,7 +36,7 @@
         var focusChannelID: String?
         var provider: any SportsDataProvider = ESPNClient.shared
         var replay: SportsReplayGame?
-        var onReplay: ((ServerRecording, Bool) -> Void)?
+        var onReplay: ((SportsReplayVersion, Bool) -> Void)?
 
         @Environment(\.dismiss) private var dismiss
         @Environment(\.modelContext) private var modelContext
