@@ -54,6 +54,7 @@ struct VODSourceResolverTests {
         scope: CatalogScope,
         restriction: ContentRestriction = ContentRestriction(),
         isPremium: Bool = true,
+        allPlaylists: Bool = false,
         languages: [String] = [],
         in context: ModelContext
     ) -> [VODSourceOption] {
@@ -62,6 +63,7 @@ struct VODSourceResolverTests {
             scope: scope,
             restriction: restriction,
             isPremium: isPremium,
+            allPlaylists: allPlaylists,
             in: context,
             preferredLanguages: languages
         )
@@ -101,6 +103,7 @@ struct VODSourceResolverTests {
             for: current,
             scope: combined(playlistA, playlistB),
             isPremium: true,
+            allPlaylists: false,
             in: context,
             preferredLanguages: []
         )
@@ -108,7 +111,7 @@ struct VODSourceResolverTests {
         #expect(sources.map(\.playlistName) == ["Provider A", "Provider B"])
     }
 
-    @Test func `copies on playlists outside the scope are left out`() throws {
+    @Test func `copies on playlists outside the scope are left out when all playlists is off`() throws {
         let container = try makeTestContainer()
         let context = container.mainContext
         let playlistA = makePlaylist(name: "Provider A", in: context)
@@ -121,6 +124,60 @@ struct VODSourceResolverTests {
 
         let sources = movieSources(current, scope: .isolated(playlistA.id), in: context)
         #expect(sources.map(\.rowID) == [current.id, sameList.id])
+    }
+
+    @Test func `with all playlists on, copies outside the scope follow the scope's own`() throws {
+        let container = try makeTestContainer()
+        let context = container.mainContext
+        let playlistA = makePlaylist(name: "Provider A", in: context)
+        let playlistB = makePlaylist(name: "Provider B", in: context)
+
+        let current = makeMovie(playlistA, 1, tmdbId: 42, in: context)
+        let sameList = makeMovie(playlistA, 2, tmdbId: 42, in: context)
+        let otherList = makeMovie(playlistB, 3, tmdbId: 42, in: context)
+        try context.save()
+
+        let sources = movieSources(current, scope: .isolated(playlistA.id), allPlaylists: true, in: context)
+        #expect(sources.map(\.rowID) == [current.id, sameList.id, otherList.id])
+        #expect(sources.map(\.playlistName) == ["Provider A", "Provider A", "Provider B"])
+    }
+
+    @Test func `with all playlists on, a playlist outside Combined View ranks after its members`() throws {
+        let container = try makeTestContainer()
+        let context = container.mainContext
+        let playlistA = makePlaylist(name: "Provider A", in: context)
+        let playlistB = makePlaylist(name: "Provider B", in: context)
+        let outside = makePlaylist(name: "Provider C", in: context)
+
+        let current = makeMovie(playlistA, 1, tmdbId: 42, in: context)
+        let member = makeMovie(playlistB, 2, tmdbId: 42, in: context)
+        let notMember = makeMovie(outside, 3, tmdbId: 42, in: context)
+        try context.save()
+
+        let sources = movieSources(current, scope: combined(playlistB, playlistA), allPlaylists: true, in: context)
+        #expect(sources.map(\.rowID) == [member.id, current.id, notMember.id])
+    }
+
+    @Test func `with all playlists on, locked playlists stay hidden without Pro`() throws {
+        let container = try makeTestContainer()
+        let context = container.mainContext
+        let free = makePlaylist(name: "Provider A", addedAt: 1_700_000_000, in: context)
+        let locked = makePlaylist(name: "Provider B", addedAt: 1_700_000_001, in: context)
+
+        let current = makeMovie(free, 1, tmdbId: 42, in: context)
+        _ = makeMovie(locked, 2, tmdbId: 42, in: context)
+        try context.save()
+
+        let sources = movieSources(current, scope: .isolated(free.id), isPremium: false, allPlaylists: true, in: context)
+        #expect(sources.map(\.rowID) == [current.id])
+    }
+
+    @Test func `sources from all playlists defaults to on`() throws {
+        let defaults = try #require(UserDefaults(suiteName: "VODSourceResolverTests.allPlaylistsDefault"))
+        defaults.removeObject(forKey: LibrarySettings.sourcesFromAllPlaylistsKey)
+        #expect(LibrarySettings.sourcesFromAllPlaylists(in: defaults))
+        defaults.set(false, forKey: LibrarySettings.sourcesFromAllPlaylistsKey)
+        #expect(!LibrarySettings.sourcesFromAllPlaylists(in: defaults))
     }
 
     @Test func `copies with no owning playlist are dropped`() throws {

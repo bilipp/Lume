@@ -17,4 +17,15 @@ nonisolated enum LibrarySettings {
     static func groupDuplicateTitles(in defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(groupDuplicateTitlesKey, default: groupDuplicateTitlesDefault)
     }
+
+    /// Whether a title's source picker also lists its copies on playlists
+    /// outside the current scope (the active playlist, or the Combined View
+    /// members). On by default: before titles were grouped, every installed
+    /// playlist's copy was offered.
+    static let sourcesFromAllPlaylistsKey = "library.sourcesFromAllPlaylists"
+    static let sourcesFromAllPlaylistsDefault = true
+
+    static func sourcesFromAllPlaylists(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(sourcesFromAllPlaylistsKey, default: sourcesFromAllPlaylistsDefault)
+    }
 }

@@ -134,6 +134,8 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
         private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
         @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
         private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
+        @AppStorage(LibrarySettings.sourcesFromAllPlaylistsKey)
+        private var sourcesFromAllPlaylists = LibrarySettings.sourcesFromAllPlaylistsDefault
 
         var body: some View {
             let scope = catalogScope
@@ -186,6 +188,12 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
                     }
                 } footer: {
                     Text("Show a movie or series once when it's in several qualities, languages or playlists, and pick the version when you play it.")
+                }
+
+                Section {
+                    Toggle("Sources From All Playlists", isOn: $sourcesFromAllPlaylists)
+                } footer: {
+                    Text("When you play a movie or series, also offer its copies from playlists outside the active playlist or Combined View.")
                 }
 
                 Section {
@@ -263,6 +271,15 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
                 VStack(alignment: .leading, spacing: 8) {
                     TVOptionToggleRow(title: "Group Duplicate Titles", isOn: $groupDuplicateTitles, showsBetaBadge: true)
                     Text("Show a movie or series once when it's in several qualities, languages or playlists, and pick the version when you play it.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TVOptionToggleRow(title: "Sources From All Playlists", isOn: $sourcesFromAllPlaylists)
+                    Text("When you play a movie or series, also offer its copies from playlists outside the active playlist or Combined View.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
