@@ -125,9 +125,13 @@ struct FixtureCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 } else {
+                    // A two-digit 12-hour time ("10:30 PM", ~68pt) outgrows the
+                    // fixed column, which stays fixed so the cards line up.
                     Text(fixture.headlineDate, format: .dateTime.hour().minute())
                         .font(.subheadline.weight(.semibold))
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
             }
             if showsLeagueMark {
