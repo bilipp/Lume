@@ -198,11 +198,16 @@ nonisolated enum SportsChannelResolver {
             var resolved: [String: [ResolvedChannel]] = [:]
             for fixture in misses {
                 guard !Task.isCancelled else { return hits }
+                let homeTokens = fixture.home.map { SportsMatcher.tokens(for: $0.team) }
+                let awayTokens = fixture.away.map { SportsMatcher.tokens(for: $0.team) }
+                let candidateIndices = index.candidates(for: fixture, homeTokens: homeTokens, awayTokens: awayTokens)
                 resolved[fixture.id] = resolveOne(
                     fixture: fixture,
-                    channels: index.candidates(for: fixture).map { channels[$0] },
+                    channels: candidateIndices.map { channels[$0] },
                     guide: guide,
-                    pickIndex: pickIndex
+                    pickIndex: pickIndex,
+                    homeTokens: homeTokens,
+                    awayTokens: awayTokens
                 )
             }
             cache.store(resolved, for: misses, generation: generation)
@@ -308,28 +313,40 @@ nonisolated enum SportsChannelResolver {
         fixture: SportsFixture,
         channels: [Channel],
         guide: [String: [NormalizedCandidate]],
-        pickIndex: [String: String]
+        pickIndex: [String: String],
+        homeTokens: Set<String>? = nil,
+        awayTokens: Set<String>? = nil
     ) -> [ResolvedChannel] {
         guard let home = fixture.home?.team, let away = fixture.away?.team else {
             // A race session has no two teams; it matches on series and session.
             let race = resolveRace(fixture: fixture, channels: channels, guide: guide, pickIndex: pickIndex)
             return ranked(race, kickoff: fixture.startDate)
         }
-        let homeTokens = SportsMatcher.tokens(for: home)
-        let awayTokens = SportsMatcher.tokens(for: away)
+        let homeTokens = homeTokens ?? SportsMatcher.tokens(for: home)
+        let awayTokens = awayTokens ?? SportsMatcher.tokens(for: away)
         guard !homeTokens.isEmpty, !awayTokens.isEmpty else { return [] }
+
+        let homePaddedTokens = homeTokens.map { " \($0) " }
+        let awayPaddedTokens = awayTokens.map { " \($0) " }
 
         let context = FixtureMatchContext(
             competitionKey: fixture.leagueId,
-            homeTokens: homeTokens,
-            awayTokens: awayTokens,
+            homePaddedTokens: homePaddedTokens,
+            awayPaddedTokens: awayPaddedTokens,
             kickoff: fixture.startDate,
             fixture: fixture
         )
 
+        var memoizedHits = MemoizedGuideHits()
         var resolved: [ResolvedChannel] = []
         for channel in channels {
-            if let match = matchChannel(channel, context: context, guide: guide, pickIndex: pickIndex) {
+            if let match = matchChannel(
+                channel,
+                context: context,
+                guide: guide,
+                pickIndex: pickIndex,
+                memoizedHits: &memoizedHits
+            ) {
                 resolved.append(match)
             }
         }
@@ -353,14 +370,53 @@ nonisolated enum SportsChannelResolver {
         return resolved
     }
 
-    /// The tokens, competition and kickoff a channel is scored against — bundled
-    /// so `matchChannel` stays within the parameter-count limit.
+    /// The pre-padded tokens, competition and kickoff a channel is scored against —
+    /// bundled so `matchChannel` stays within the parameter-count limit.
     private struct FixtureMatchContext {
         let competitionKey: String
-        let homeTokens: Set<String>
-        let awayTokens: Set<String>
+        let homePaddedTokens: [String]
+        let awayPaddedTokens: [String]
         let kickoff: Date
         let fixture: SportsFixture
+    }
+
+    /// Memoized guide hit and umbrella results for one fixture resolve, avoiding
+    /// re-evaluating the same EPG channel listings across quality clones or shared guides.
+    private struct MemoizedGuideHits {
+        private var epgHits: [String: EPGHit] = [:]
+        private var epgMisses: Set<String> = []
+        private var umbrellaHits: [String: CompetitionHit] = [:]
+        private var umbrellaMisses: Set<String> = []
+
+        mutating func epgHit(
+            for channelId: String,
+            compute: () -> EPGHit?
+        ) -> EPGHit? {
+            if let hit = epgHits[channelId] { return hit }
+            if epgMisses.contains(channelId) { return nil }
+            if let hit = compute() {
+                epgHits[channelId] = hit
+                return hit
+            } else {
+                epgMisses.insert(channelId)
+                return nil
+            }
+        }
+
+        mutating func umbrellaHit(
+            for channelId: String,
+            compute: () -> CompetitionHit?
+        ) -> CompetitionHit? {
+            if let hit = umbrellaHits[channelId] { return hit }
+            if umbrellaMisses.contains(channelId) { return nil }
+            if let hit = compute() {
+                umbrellaHits[channelId] = hit
+                return hit
+            } else {
+                umbrellaMisses.insert(channelId)
+                return nil
+            }
+        }
     }
 
     /// Scores one channel against a fixture, returning the resolved channel or
@@ -369,19 +425,31 @@ nonisolated enum SportsChannelResolver {
         _ channel: Channel,
         context: FixtureMatchContext,
         guide: [String: [NormalizedCandidate]],
-        pickIndex: [String: String]
+        pickIndex: [String: String],
+        memoizedHits: inout MemoizedGuideHits
     ) -> ResolvedChannel? {
-        let homeTokens = context.homeTokens
-        let awayTokens = context.awayTokens
         let isPick = pickIndex[
             SportsChannelPicks.compositeKey(competitionKey: context.competitionKey, channelKey: channel.key)
         ] != nil
 
-        let epg = channel.summary.epgChannelId
-            .flatMap { guide[$0] }
-            .flatMap { bestEPGHit(in: $0, homeTokens: homeTokens, awayTokens: awayTokens, kickoff: context.kickoff) }
-        let nameMatched = teamPresent(homeTokens, in: channel.nameHaystack)
-            && teamPresent(awayTokens, in: channel.nameHaystack)
+        let epg: EPGHit?
+        if let epgId = channel.summary.epgChannelId, !epgId.isEmpty {
+            epg = memoizedHits.epgHit(for: epgId) {
+                guide[epgId].flatMap {
+                    bestEPGHit(
+                        in: $0,
+                        homePaddedTokens: context.homePaddedTokens,
+                        awayPaddedTokens: context.awayPaddedTokens,
+                        kickoff: context.kickoff
+                    )
+                }
+            }
+        } else {
+            epg = nil
+        }
+
+        let nameMatched = teamPresent(context.homePaddedTokens, in: channel.nameHaystack)
+            && teamPresent(context.awayPaddedTokens, in: channel.nameHaystack)
 
         let source: ResolvedChannelSource
         let score: Int
@@ -394,9 +462,11 @@ nonisolated enum SportsChannelResolver {
         } else if nameMatched {
             source = .channelName
             score = nameMatchScore
-        } else if let umbrella = channel.summary.epgChannelId
-            .flatMap({ guide[$0] })
-            .flatMap({ competitionHit(in: $0, fixture: context.fixture) })
+        } else if let epgId = channel.summary.epgChannelId,
+                  !epgId.isEmpty,
+                  let umbrella = memoizedHits.umbrellaHit(for: epgId, compute: {
+                      guide[epgId].flatMap { competitionHit(in: $0, fixture: context.fixture) }
+                  })
         {
             return ResolvedChannel(
                 stream: channel.summary,
@@ -429,8 +499,8 @@ nonisolated enum SportsChannelResolver {
     /// conference — still qualifies, as the weakest EPG tier.
     private static func bestEPGHit(
         in candidates: [NormalizedCandidate],
-        homeTokens: Set<String>,
-        awayTokens: Set<String>,
+        homePaddedTokens: [String],
+        awayPaddedTokens: [String],
         kickoff: Date
     ) -> EPGHit? {
         let windowStart = kickoff.addingTimeInterval(-SportsMatcher.leadTime)
@@ -443,14 +513,14 @@ nonisolated enum SportsChannelResolver {
             let subtitle = candidate.normalizedSubtitle
             let description = candidate.normalizedDescription
 
-            let homeInTitle = teamPresent(homeTokens, in: title)
-            let homeInSub = teamPresent(homeTokens, in: subtitle)
-            let awayInTitle = teamPresent(awayTokens, in: title)
-            let awayInSub = teamPresent(awayTokens, in: subtitle)
+            let homeInTitle = teamPresent(homePaddedTokens, in: title)
+            let homeInSub = teamPresent(homePaddedTokens, in: subtitle)
+            let awayInTitle = teamPresent(awayPaddedTokens, in: title)
+            let awayInSub = teamPresent(awayPaddedTokens, in: subtitle)
             let homeInHeadline = homeInTitle || homeInSub
             let awayInHeadline = awayInTitle || awayInSub
-            let homeInBody = homeInHeadline || teamPresent(homeTokens, in: description)
-            let awayInBody = awayInHeadline || teamPresent(awayTokens, in: description)
+            let homeInBody = homeInHeadline || teamPresent(homePaddedTokens, in: description)
+            let awayInBody = awayInHeadline || teamPresent(awayPaddedTokens, in: description)
             guard homeInBody, awayInBody else { continue }
 
             let inOneField = (homeInTitle && awayInTitle) || (homeInSub && awayInSub)
@@ -486,8 +556,9 @@ nonisolated enum SportsChannelResolver {
 
     /// A team is present when any distinctive token appears as a whole word.
     /// `haystack` must already be `SportsMatcher.normalize`d (space-padded).
-    private static func teamPresent(_ tokens: Set<String>, in haystack: String) -> Bool {
-        tokens.contains { haystack.contains(" \($0) ") }
+    /// `paddedTokens` are pre-padded with spaces (e.g. " \(token) ").
+    private static func teamPresent(_ paddedTokens: [String], in haystack: String) -> Bool {
+        paddedTokens.contains { haystack.contains($0) }
     }
 
     // Mirror `SportsMatcher`'s field weights so the EPG tier ordering agrees
