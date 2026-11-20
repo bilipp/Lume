@@ -22,7 +22,8 @@ extension CloudSyncEngine {
             syncEnabled: playlist.syncEnabled,
             hiddenTabsRaw: playlist.hiddenTabsRaw,
             combinedTypesRaw: playlist.combinedTypesRaw,
-            combinedPriority: playlist.combinedPriority
+            combinedPriority: playlist.combinedPriority,
+            disabledContentRaw: playlist.disabledContentRaw
         )
     }
 
@@ -38,7 +39,8 @@ extension CloudSyncEngine {
             syncEnabled: mirror.syncEnabled,
             hiddenTabsRaw: mirror.hiddenTabsRaw,
             combinedTypesRaw: mirror.combinedTypesRaw,
-            combinedPriority: mirror.combinedPriority
+            combinedPriority: mirror.combinedPriority,
+            disabledContentRaw: mirror.disabledContentRaw
         )
     }
 
@@ -111,6 +113,7 @@ nonisolated extension Playlist {
         hiddenTabsRaw = value.hiddenTabsRaw
         combinedTypesRaw = value.combinedTypesRaw
         combinedPriority = value.combinedPriority
+        disabledContentRaw = value.disabledContentRaw
     }
 }
 
@@ -128,7 +131,8 @@ nonisolated extension SyncedPlaylist {
             syncEnabled: value.syncEnabled,
             hiddenTabsRaw: value.hiddenTabsRaw,
             combinedTypesRaw: value.combinedTypesRaw,
-            combinedPriority: value.combinedPriority
+            combinedPriority: value.combinedPriority,
+            disabledContentRaw: value.disabledContentRaw
         )
     }
 
@@ -144,6 +148,7 @@ nonisolated extension SyncedPlaylist {
         hiddenTabsRaw = value.hiddenTabsRaw
         combinedTypesRaw = value.combinedTypesRaw
         combinedPriority = value.combinedPriority
+        disabledContentRaw = value.disabledContentRaw
         updatedAt = Date()
     }
 }

@@ -93,15 +93,32 @@ extension ContentSyncManager {
         // neither (music, photos, books) still names its type and is skipped.
         // A non-media folder that happens to report no type costs one empty
         // query per kind, because the item query filters by type anyway.
-        let movieViews = views.filter { $0.collectionType == "movies" || $0.collectionType == nil }
-        let showViews = views.filter { $0.collectionType == "tvshows" || $0.collectionType == nil }
+        // A kind the playlist doesn't fetch walks no library at all;
+        // `performSync` removes its rows afterwards.
+        let movieViews = playlist.syncs(.movies)
+            ? views.filter { $0.collectionType == "movies" || $0.collectionType == nil } : []
+        let showViews = playlist.syncs(.series)
+            ? views.filter { $0.collectionType == "tvshows" || $0.collectionType == nil } : []
         if movieViews.isEmpty, showViews.isEmpty {
             Logger.database.info("\(flavor.displayName, privacy: .public) sync: no movie or TV-show libraries; catalog untouched")
         }
 
-        try await syncJellyfinCategories(views: movieViews, type: .vod, playlistId: playlistId)
-        try await syncJellyfinCategories(views: showViews, type: .series, playlistId: playlistId)
+        if playlist.syncs(.movies) {
+            try await syncJellyfinMovieLibraries(movieViews, connection: connection, playlistId: playlistId, progress: progress)
+        }
+        if playlist.syncs(.series) {
+            try await syncJellyfinShowLibraries(showViews, connection: connection, playlistId: playlistId, progress: progress)
+        }
 
+        markPlaylistUpdated(playlistId)
+    }
+
+    /// The movie phase: categories, every movie library, then the prune.
+    private func syncJellyfinMovieLibraries(
+        _ movieViews: [JellyfinLibrary], connection: JellyfinConnection, playlistId: UUID, progress: SyncProgress?
+    ) async throws {
+        let flavor = connection.flavor
+        try await syncJellyfinCategories(views: movieViews, type: .vod, playlistId: playlistId)
         await progress?.start(.movies)
         let movieScopes = scopes(connection, playlistId: playlistId, views: movieViews, type: .vod)
         let movies = try await walkJellyfinLibraries(movieScopes, progress: progress) { scope in
@@ -111,7 +128,14 @@ extension ContentSyncManager {
         let moviesComplete = movies.allRead && movies.values.allSatisfy(\.complete)
         pruneJellyfinMovies(playlistId: playlistId, flavor: flavor, seenIds: seenMovies, fetched: !movieViews.isEmpty && moviesComplete)
         await progress?.complete(.movies)
+    }
 
+    /// The series phase: categories, every TV-show library, then the prune.
+    private func syncJellyfinShowLibraries(
+        _ showViews: [JellyfinLibrary], connection: JellyfinConnection, playlistId: UUID, progress: SyncProgress?
+    ) async throws {
+        let flavor = connection.flavor
+        try await syncJellyfinCategories(views: showViews, type: .series, playlistId: playlistId)
         await progress?.start(.series)
         let showScopes = scopes(connection, playlistId: playlistId, views: showViews, type: .series)
         let showWalks = try await walkJellyfinLibraries(showScopes, progress: progress) { scope in
@@ -122,8 +146,6 @@ extension ContentSyncManager {
         pruneJellyfinSeries(playlistId: playlistId, flavor: flavor, seen: shows, fetched: !showViews.isEmpty && shows.complete)
         persistResolvesSourcesOnDemand(!shows.episodesFetchedPerShow.isEmpty, playlistId: playlistId)
         await progress?.complete(.series)
-
-        markPlaylistUpdated(playlistId)
     }
 
     private func scopes(_ connection: JellyfinConnection, playlistId: UUID, views: [JellyfinLibrary], type: CategoryType) -> [JellyfinViewScope] {

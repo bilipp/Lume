@@ -48,4 +48,33 @@ struct CloudSyncPlaylistTabsTests {
         let local = try #require(try ctx.fetch(FetchDescriptor<Playlist>()).first)
         #expect(local.hiddenTabs == [.movies, .series])
     }
+
+    @Test func `playlist config decodes a baseline written before content switches existed`() throws {
+        let legacy = #"{"name":"P","serverURL":"a","username":"u","password":"p","sourceTypeRaw":"xtream","syncEnabled":true,"hiddenTabsRaw":"movies"}"#
+        let decoded = try JSONDecoder().decode(PlaylistConfigValues.self, from: Data(legacy.utf8))
+        #expect(decoded.hiddenTabsRaw == "movies")
+        #expect(decoded.disabledContentRaw.isEmpty)
+    }
+
+    @Test func `content switches sync in both directions`() async throws {
+        let container = try makeProfileTestContainer()
+        let ctx = container.mainContext
+        let playlist = Playlist(name: "My IPTV", serverURL: "http://x", username: "u", password: "p")
+        playlist.disabledContent = [.movies]
+        ctx.insert(playlist)
+        try ctx.save()
+
+        let shadow = freshShadow()
+        _ = await CloudSyncEngine(container: container, shadow: shadow).reconcile()
+
+        let mirror = try #require(try ctx.fetch(FetchDescriptor<SyncedPlaylist>()).first)
+        #expect(mirror.disabledContentRaw == "movies")
+
+        mirror.disabledContentRaw = PlaylistTab.encode([.series, .liveTV])
+        try ctx.save()
+        _ = await CloudSyncEngine(container: container, shadow: shadow).reconcile()
+
+        let local = try #require(try ctx.fetch(FetchDescriptor<Playlist>()).first)
+        #expect(local.disabledContent == [.series, .liveTV])
+    }
 }

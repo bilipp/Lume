@@ -40,6 +40,7 @@ final class SyncedPlaylist {
     var hiddenTabsRaw: String = ""
     var combinedTypesRaw: String = ""
     var combinedPriority: Int?
+    var disabledContentRaw: String = ""
 
     /// Last time this record's config fields changed. Informational (surfaced in
     /// diagnostics / "last write wins" tie-breaks); the reconciler's correctness
@@ -59,6 +60,7 @@ final class SyncedPlaylist {
         hiddenTabsRaw: String = "",
         combinedTypesRaw: String = "",
         combinedPriority: Int? = nil,
+        disabledContentRaw: String = "",
         updatedAt: Date = Date()
     ) {
         self.id = id
@@ -73,6 +75,7 @@ final class SyncedPlaylist {
         self.hiddenTabsRaw = hiddenTabsRaw
         self.combinedTypesRaw = combinedTypesRaw
         self.combinedPriority = combinedPriority
+        self.disabledContentRaw = disabledContentRaw
         self.updatedAt = updatedAt
     }
 }

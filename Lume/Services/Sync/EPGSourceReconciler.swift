@@ -4,8 +4,8 @@
 //
 //  Keeps each playlist's EPG source in step with the playlist. When a playlist
 //  is added or edited, its guide URL (Xtream `xmltv.php` or m3u `url-tvg`)
-//  becomes a standalone `EPGSource`; when the playlist loses its guide URL or is
-//  deleted, that source is removed. Manual sources the user adds in EPG settings
+//  becomes a standalone `EPGSource`; when the playlist loses its guide URL, stops
+//  fetching live TV or is deleted, that source is removed. Manual sources the user adds in EPG settings
 //  carry no `playlistID` and are never touched here.
 //
 
@@ -66,6 +66,10 @@ nonisolated enum EPGSourceReconciler {
 
     /// The XMLTV URL that should back `playlist`'s guide, or nil when it has none.
     static func guideURL(for playlist: Playlist) -> String? {
+        // A playlist that doesn't fetch live TV has no channels to guide, so
+        // no source either: a provider's XMLTV file can run to hundreds of MB,
+        // and the scheduler would download it every refresh for nothing.
+        guard playlist.syncs(.liveTV) else { return nil }
         switch playlist.sourceType {
         case .xtream:
             return XtreamClient.xmltvURL(for: playlist)?.absoluteString

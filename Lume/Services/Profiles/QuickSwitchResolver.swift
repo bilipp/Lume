@@ -149,7 +149,7 @@ extension [Playlist] {
         }
         let members = combinedMembers
         if isPremium, members.count >= 2 {
-            return .combined(members.map { (id: $0.id, tabs: $0.combinedTabs) })
+            return .combined(members.map { (id: $0.id, tabs: $0.combinedContribution) })
         }
         if isPremium, let first = members.first {
             return .isolated(first.id)

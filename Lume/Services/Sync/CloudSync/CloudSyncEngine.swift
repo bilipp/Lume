@@ -488,7 +488,7 @@ private extension CloudSyncEngine {
     }
 }
 
-// MARK: - Playlist mutations
+// MARK: - EPG source mutations
 
 private extension CloudSyncEngine {
     func applyPlaylistToCloud(_ value: PlaylistConfigValues?, id: UUID, mirror: SyncedPlaylist?) {

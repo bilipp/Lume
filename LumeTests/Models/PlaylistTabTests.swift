@@ -100,6 +100,68 @@ struct PlaylistTabTests {
         #expect(token(reordered) == token(liveOnly))
         #expect(token(withMovies) == "movies,liveTV")
     }
+
+    @Test func `a playlist fetches every kind until one is switched off`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        #expect(playlist.disabledContent.isEmpty)
+        #expect(playlist.syncs(.movies) && playlist.syncs(.series) && playlist.syncs(.liveTV))
+
+        playlist.disabledContent = [.liveTV, .movies]
+        #expect(playlist.disabledContentRaw == "movies,liveTV")
+        #expect(!playlist.syncs(.movies))
+        #expect(playlist.syncs(.series))
+        #expect(!playlist.syncs(.liveTV))
+    }
+
+    @Test func `content a playlist doesn't fetch hides its tab too`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        let scope = CatalogScope.isolated(playlist.id)
+        playlist.disabledContent = [.series]
+        var visible = scope.visibleTabs(isolatedHidden: playlist.tabsOutOfView)
+        #expect(!visible.showsTab(.series))
+        #expect(visible.showsTab(.movies))
+
+        // Both switches hide; either alone is enough.
+        playlist.hiddenTabs = [.movies]
+        visible = scope.visibleTabs(isolatedHidden: playlist.tabsOutOfView)
+        #expect(!visible.showsTab(.movies))
+        #expect(visible.showsTab(.liveTV))
+    }
+
+    @Test func `combined leaves out content a member doesn't fetch`() {
+        let playlist = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        playlist.combinedTabs = [.movies, .liveTV]
+        playlist.disabledContent = [.liveTV]
+        #expect(playlist.combinedContribution == [.movies])
+        // Still a member: the Combined choice itself is untouched.
+        #expect(playlist.isCombinedMember)
+        #expect(playlist.combinedTabs == [.movies, .liveTV])
+    }
+
+    @Test func `only sources with live channels offer the live switch`() {
+        let xtream = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        #expect(xtream.selectableContent == [.movies, .series, .liveTV])
+
+        let share = Playlist(name: "P", serverURL: "http://x", username: "u", password: "p")
+        share.sourceType = .webdav
+        #expect(share.selectableContent == [.movies, .series])
+    }
+
+    @Test func `each kind files under its category type`() {
+        #expect(PlaylistTab.movies.categoryType == .vod)
+        #expect(PlaylistTab.series.categoryType == .series)
+        #expect(PlaylistTab.liveTV.categoryType == .live)
+    }
+
+    @Test func `the Content switches are translated in every shipping locale`() throws {
+        let catalog = try StringCatalog.localizable()
+        for key in [
+            "Content",
+            "Content that is off is not fetched from this playlist and is removed from your library. Its tab is hidden."
+        ] {
+            expectTranslatedEverywhere(key, in: catalog)
+        }
+    }
 }
 
 struct SettingsCategoryTests {

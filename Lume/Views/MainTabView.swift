@@ -66,7 +66,7 @@ struct MainTabView: View {
     /// (Settings › Library › Tabs), or in Combined every type a member
     /// contributes.
     private func visibleTabs(in scope: CatalogScope) -> Set<PlaylistTab> {
-        scope.visibleTabs(isolatedHidden: playlists.primaryMember(of: scope)?.hiddenTabs ?? [])
+        scope.visibleTabs(isolatedHidden: playlists.primaryMember(of: scope)?.tabsOutOfView ?? [])
     }
 
     private func showsTab(_ tab: AppTab) -> Bool {

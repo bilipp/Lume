@@ -22331,6 +22331,88 @@
         }
       }
     },
+    "Content that is off is not fetched from this playlist and is removed from your library. Its tab is hidden." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المحتوى المعطّل لا يُجلب من قائمة التشغيل هذه ويُحذف من مكتبتك. ويُخفى تبويبه."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deaktivierte Inhalte werden für diese Playlist nicht geladen und aus deiner Mediathek entfernt. Ihr Tab wird ausgeblendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El contenido desactivado no se obtiene de esta lista y se elimina de tu biblioteca. Su pestaña se oculta."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le contenu désactivé n’est pas récupéré pour cette playlist et est retiré de votre bibliothèque. Son onglet est masqué."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I contenuti disattivati non vengono scaricati da questa playlist e vengono rimossi dalla libreria. La relativa scheda viene nascosta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフにしたコンテンツはこのプレイリストから取得されず、ライブラリから削除されます。そのタブは非表示になります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "끈 콘텐츠는 이 재생목록에서 가져오지 않으며 보관함에서 제거됩니다. 해당 탭은 숨겨집니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inhoud die uit staat, wordt niet opgehaald uit deze playlist en wordt uit je bibliotheek verwijderd. Het tabblad wordt verborgen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Treści, które są wyłączone, nie są pobierane z tej playlisty i zostają usunięte z biblioteki. Ich karta jest ukryta."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O conteúdo desativado não é obtido desta lista e é removido da sua biblioteca. O separador respetivo fica oculto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выключенный контент не загружается из этого плейлиста и удаляется из медиатеки. Его вкладка скрыта."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapalı olan içerik bu oynatma listesinden alınmaz ve kitaplığınızdan kaldırılır. Sekmesi gizlenir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭的内容不会从此播放列表获取，并会从资料库中移除。其标签页将被隐藏。"
+          }
+        }
+      }
+    },
     "Continue" : {
       "comment" : "Button that commits the first-run sync choice.",
       "localizations" : {

@@ -47,34 +47,48 @@ extension ContentSyncManager {
 
         // Fetch the category/genre lists once and reuse them to both persist the
         // categories and walk each one's content.
-        await progress?.start(.movieCategories)
-        let vodCategories = await stalkerCategories("vod") { try await client.getCategories(type: "vod") }
-        try syncStalkerCategories(vodCategories, type: .vod, playlistId: playlistId)
-        await progress?.update(detail: "\(vodCategories.count) categories")
-        await progress?.complete(.movieCategories)
+        // A kind the playlist doesn't fetch is skipped — categories and content
+        // alike; `performSync` removes its rows afterwards.
+        var vodCategories: [StalkerCategory] = []
+        if playlist.syncs(.movies) {
+            await progress?.start(.movieCategories)
+            vodCategories = await stalkerCategories("vod") { try await client.getCategories(type: "vod") }
+            try syncStalkerCategories(vodCategories, type: .vod, playlistId: playlistId)
+            await progress?.update(detail: "\(vodCategories.count) categories")
+            await progress?.complete(.movieCategories)
+        }
 
-        await progress?.start(.seriesCategories)
-        let seriesCategories = await stalkerCategories("series") { try await client.getCategories(type: "series") }
-        try syncStalkerCategories(seriesCategories, type: .series, playlistId: playlistId)
-        await progress?.update(detail: "\(seriesCategories.count) categories")
-        await progress?.complete(.seriesCategories)
+        var seriesCategories: [StalkerCategory] = []
+        if playlist.syncs(.series) {
+            await progress?.start(.seriesCategories)
+            seriesCategories = await stalkerCategories("series") { try await client.getCategories(type: "series") }
+            try syncStalkerCategories(seriesCategories, type: .series, playlistId: playlistId)
+            await progress?.update(detail: "\(seriesCategories.count) categories")
+            await progress?.complete(.seriesCategories)
+        }
 
-        await progress?.start(.liveCategories)
-        let genres = await stalkerCategories("live") { try await client.getLiveGenres() }
-        try syncStalkerCategories(genres, type: .live, playlistId: playlistId)
-        await progress?.update(detail: "\(genres.count) categories")
-        await progress?.complete(.liveCategories)
+        if playlist.syncs(.liveTV) {
+            await progress?.start(.liveCategories)
+            let genres = await stalkerCategories("live") { try await client.getLiveGenres() }
+            try syncStalkerCategories(genres, type: .live, playlistId: playlistId)
+            await progress?.update(detail: "\(genres.count) categories")
+            await progress?.complete(.liveCategories)
+        }
 
         // VOD and series content is loaded per-category on demand (see
         // `importStalkerCategory`), so a default sync fetches no movie/series
         // items — only the "Download Full Catalog" action (`full`) walks them.
-        if full {
+        if full, playlist.syncs(.movies) {
             try await syncStalkerMovies(client: client, categories: vodCategories, playlistId: playlistId, progress: progress)
             try await Task.sleep(for: .seconds(1))
+        }
+        if full, playlist.syncs(.series) {
             try await syncStalkerSeries(client: client, categories: seriesCategories, playlistId: playlistId, progress: progress)
             try await Task.sleep(for: .seconds(1))
         }
-        try await syncStalkerChannels(client: client, playlistId: playlistId, progress: progress)
+        if playlist.syncs(.liveTV) {
+            try await syncStalkerChannels(client: client, playlistId: playlistId, progress: progress)
+        }
 
         markStalkerPlaylistUpdated(playlistId)
     }

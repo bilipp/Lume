@@ -104,6 +104,7 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
     var hiddenTabsRaw: String
     var combinedTypesRaw: String
     var combinedPriority: Int?
+    var disabledContentRaw: String
 
     init(
         name: String,
@@ -116,7 +117,8 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         syncEnabled: Bool,
         hiddenTabsRaw: String = "",
         combinedTypesRaw: String = "",
-        combinedPriority: Int? = nil
+        combinedPriority: Int? = nil,
+        disabledContentRaw: String = ""
     ) {
         self.name = name
         self.serverURL = serverURL
@@ -129,12 +131,14 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         self.hiddenTabsRaw = hiddenTabsRaw
         self.combinedTypesRaw = combinedTypesRaw
         self.combinedPriority = combinedPriority
+        self.disabledContentRaw = disabledContentRaw
     }
 
     /// Hand-rolled decode so a shadow baseline persisted before Stalker support
     /// (no `macAddress` key), before hidden tabs (no `hiddenTabsRaw`) or before
-    /// combined playlists (no `combinedTypesRaw` / `combinedPriority`) still
-    /// decodes — the field falls back to "" rather than failing the whole
+    /// combined playlists (no `combinedTypesRaw` / `combinedPriority`) or before
+    /// per-kind content sync (no `disabledContentRaw`) still decodes — the
+    /// field falls back to "" rather than failing the whole
     /// baseline, which would discard the shadow and risk a spurious mass reconcile.
     nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -149,6 +153,7 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         hiddenTabsRaw = try container.decodeIfPresent(String.self, forKey: .hiddenTabsRaw) ?? ""
         combinedTypesRaw = try container.decodeIfPresent(String.self, forKey: .combinedTypesRaw) ?? ""
         combinedPriority = try container.decodeIfPresent(Int.self, forKey: .combinedPriority)
+        disabledContentRaw = try container.decodeIfPresent(String.self, forKey: .disabledContentRaw) ?? ""
     }
 
     /// Conflict policy: cloud wins. Deterministic and adequate for config.

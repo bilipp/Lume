@@ -57,8 +57,12 @@ enum SyncStep: Int, CaseIterable, Identifiable {
     /// Emby and Plex, whose pipelines have the same shape.
     static let mediaServerSteps: [SyncStep] = [.authenticating, .movies, .series]
 
-    static func steps(for sourceType: PlaylistSourceType, full: Bool = false) -> [SyncStep] {
-        switch sourceType {
+    /// The steps a sync of `sourceType` walks through, less those of the kinds
+    /// in `disabled`, which the pipelines skip (`Playlist.disabledContent`).
+    static func steps(
+        for sourceType: PlaylistSourceType, full: Bool = false, disabled: Set<PlaylistTab> = []
+    ) -> [SyncStep] {
+        let all: [SyncStep] = switch sourceType {
         case .xtream: xtreamSteps
         case .m3u: m3uSteps
         // Stalker maps onto the same catalog kinds as Xtream, but its default
@@ -67,6 +71,21 @@ enum SyncStep: Int, CaseIterable, Identifiable {
         case .stalker: full ? xtreamSteps : stalkerDynamicSteps
         case .webdav: webdavSteps
         case .jellyfin, .emby, .plex, .silo: mediaServerSteps
+        }
+        guard !disabled.isEmpty else { return all }
+        return all.filter { step in
+            guard let kind = step.contentKind else { return true }
+            return !disabled.contains(kind)
+        }
+    }
+
+    /// The content kind a step belongs to; nil for the steps every sync runs.
+    var contentKind: PlaylistTab? {
+        switch self {
+        case .movieCategories, .movies: .movies
+        case .seriesCategories, .series: .series
+        case .liveCategories, .liveStreams: .liveTV
+        case .authenticating, .playlistDownload, .playlistImport, .directoryWalk: nil
         }
     }
 

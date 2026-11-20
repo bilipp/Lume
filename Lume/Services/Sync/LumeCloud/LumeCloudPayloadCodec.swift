@@ -294,6 +294,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
             "epgURL": Codec.wire(epgURL),
             "syncEnabled": .bool(syncEnabled),
             "hiddenTabsRaw": .string(hiddenTabsRaw),
+            "disabledContentRaw": .string(disabledContentRaw),
             "combinedTypesRaw": .string(combinedTypesRaw),
             "combinedPriority": Codec.wire(combinedPriority),
             "updatedAt": Codec.wire(updatedAt)
@@ -301,7 +302,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
     }
 
     static var lumeCloudOmittedDefaults: [String: JSONValue] {
-        ["combinedTypesRaw": .string(""), "combinedPriority": .null]
+        ["combinedTypesRaw": .string(""), "combinedPriority": .null, "disabledContentRaw": .string("")]
     }
 
     static func lumeCloudKey(for fields: LumeCloudPayloadCodec.Fields) throws -> String {
@@ -327,6 +328,12 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
         let combinedRank = try fields.contains("combinedPriority")
             ? fields.optionalInt("combinedPriority")
             : combinedPriority
+        // Added after the first Lume Cloud release, and read the same way: a
+        // record an older client wrote has no such field, so the row keeps
+        // what it fetches instead of turning everything back on.
+        let disabledContent = try fields.contains("disabledContentRaw")
+            ? fields.optionalString("disabledContentRaw") ?? ""
+            : disabledContentRaw
         let updatedAt = try fields.date("updatedAt")
 
         self.id = id
@@ -339,6 +346,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled
         self.hiddenTabsRaw = hiddenTabsRaw
+        disabledContentRaw = disabledContent
         combinedTypesRaw = combinedTypes
         combinedPriority = combinedRank
         self.updatedAt = updatedAt

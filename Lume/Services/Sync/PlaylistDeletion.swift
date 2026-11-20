@@ -49,8 +49,6 @@ nonisolated enum PlaylistDeletion {
     /// of the `Playlist` row itself first (the UI's `@Query`s drop it promptly)
     /// before this — potentially long — cleanup runs.
     static func removeOrphanedContent(playlistID: UUID, in context: ModelContext) {
-        let prefix = playlistID.uuidString
-
         // The prune gate's skip counters, the m3u file fingerprint and the
         // WebDAV listing fingerprint live in UserDefaults, outside every
         // cascade, so nothing else ever collects them: they would leak for the
@@ -71,13 +69,26 @@ nonisolated enum PlaylistDeletion {
         // saved once: about 1.2 GB for 178k movie rows, far past what an Apple TV
         // allows. Everything is scoped by the playlist-prefixed id, which
         // `starts(with:)` turns into a range seek on the unique `id` index.
-        //
-        // Channels and guide listings have no relationships, so
-        // `delete(model:where:)` removes them without materializing a row (300k
-        // rows: 2.6 s and 19 MB), on a context of their own. Episodes can't go
-        // this way: Core Data refuses a batch delete that has to nullify their
-        // series inverse, so they cascade from the series pages below.
-        let bulk = ModelContext(context.container)
+        removeLiveStreams(playlistID: playlistID, container: context.container)
+        let movieGroupKeys = removeMovies(playlistID: playlistID, container: context.container)
+        let seriesGroupKeys = removeSeries(playlistID: playlistID, container: context.container)
+        try? TitleGroupPrimaries.settleRemoval(
+            movieGroupKeys: movieGroupKeys, seriesGroupKeys: seriesGroupKeys, in: context.container
+        )
+    }
+
+    /// Deletes every live stream of `playlistID`, and the guide listings no
+    /// surviving playlist's channel still needs. Also what a playlist that
+    /// stops fetching live TV runs, so the two paths can't drift apart.
+    ///
+    /// Channels and guide listings have no relationships, so
+    /// `delete(model:where:)` removes them without materializing a row (300k
+    /// rows: 2.6 s and 19 MB), on a context of their own. Episodes can't go
+    /// this way: Core Data refuses a batch delete that has to nullify their
+    /// series inverse, so they cascade from the series pages in `removeSeries`.
+    static func removeLiveStreams(playlistID: UUID, container: ModelContainer) {
+        let prefix = playlistID.uuidString
+        let bulk = ModelContext(container)
         bulk.autosaveEnabled = false
 
         // A channel another playlist also carries keeps its guide listings, so
@@ -99,20 +110,25 @@ nonisolated enum PlaylistDeletion {
             try? bulk.delete(model: EPGListing.self, where: #Predicate { chunk.contains($0.channelId) })
         }
         try? bulk.save()
+    }
 
-        // Movies and series cascade to their cast (and series to their
-        // episodes), which a predicate delete would orphan, so they go row by
-        // row — a page at a time, each page on its own context and saved, so no
-        // page outlives its own deletion.
-        // A removed row that carried a tmdbId may have been the last one its
-        // title's tmdbId-less rows (in other playlists) were bridged through,
-        // or one of two ids that kept them apart. Its match key is a `t:` key,
-        // which the bridge reads as the title itself.
-        var movieGroupKeys = Set<String>()
-        var seriesGroupKeys = Set<String>()
-        deletePaged(container: context.container, idOf: { (movie: Movie) in movie.id }, onDelete: { movie in
+    /// Deletes every movie of `playlistID`. Movies cascade to their cast, which
+    /// a predicate delete would orphan, so they go row by row — a page at a
+    /// time, each page on its own context and saved, so no page outlives its
+    /// own deletion.
+    ///
+    /// Returns the group and match keys of the removed rows that carried a
+    /// tmdbId, for `TitleGroupPrimaries.settleRemoval`: such a row may have
+    /// been the last one its title's tmdbId-less rows (in other playlists)
+    /// were bridged through, or one of two ids that kept them apart. Its match
+    /// key is a `t:` key, which the bridge reads as the title itself.
+    @discardableResult
+    static func removeMovies(playlistID: UUID, container: ModelContainer) -> Set<String> {
+        let prefix = playlistID.uuidString
+        var groupKeys = Set<String>()
+        deletePaged(container: container, idOf: { (movie: Movie) in movie.id }, onDelete: { movie in
             guard movie.tmdbId != nil else { return }
-            movieGroupKeys.formUnion([movie.titleGroupKey, movie.titleMatchKey].compactMap(\.self))
+            groupKeys.formUnion([movie.titleGroupKey, movie.titleMatchKey].compactMap(\.self))
         }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
@@ -121,9 +137,19 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
-        deletePaged(container: context.container, idOf: { (show: Series) in show.id }, onDelete: { show in
+        return groupKeys
+    }
+
+    /// Deletes every series of `playlistID`, paged like `removeMovies`; the
+    /// episodes and cast cascade from each series. Returns the title-group
+    /// keys to settle, as `removeMovies` does.
+    @discardableResult
+    static func removeSeries(playlistID: UUID, container: ModelContainer) -> Set<String> {
+        let prefix = playlistID.uuidString
+        var groupKeys = Set<String>()
+        deletePaged(container: container, idOf: { (show: Series) in show.id }, onDelete: { show in
             guard show.tmdbId != nil else { return }
-            seriesGroupKeys.formUnion([show.titleGroupKey, show.titleMatchKey].compactMap(\.self))
+            groupKeys.formUnion([show.titleGroupKey, show.titleMatchKey].compactMap(\.self))
         }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
@@ -132,9 +158,7 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
-        try? TitleGroupPrimaries.settleRemoval(
-            movieGroupKeys: movieGroupKeys, seriesGroupKeys: seriesGroupKeys, in: context.container
-        )
+        return groupKeys
     }
 
     /// Deletes every row `page` selects, `pageSize` at a time, keyed on the last

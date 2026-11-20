@@ -266,6 +266,7 @@ extension ContentSyncManager {
     /// Writes one already-classified batch. Classification happens off this
     /// actor, in `M3UBatchClassifier`, so everything here is store work.
     func importBatch(_ batch: M3UClassifiedBatch, playlistId: UUID, state: M3UImportState) throws {
+        let batch = batch.dropping(state.disabledContent)
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
 

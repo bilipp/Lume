@@ -75,6 +75,11 @@ final class Playlist {
     /// The content tabs hidden for this playlist (Settings › Library › Tabs),
     /// encoded by `PlaylistTab`. Synced with the rest of the playlist config.
     var hiddenTabsRaw: String = ""
+    /// The content kinds this playlist does not fetch (Settings › Playlists ›
+    /// playlist › Content), encoded by `PlaylistTab`. A disabled kind is skipped
+    /// by the sync, its rows are removed, and its tab is hidden. Synced with the
+    /// rest of the playlist config.
+    var disabledContentRaw: String = ""
     /// The content types this playlist contributes to the Combined selection,
     /// encoded by `PlaylistTab`. Empty means not a member. Synced with the rest
     /// of the playlist config.
