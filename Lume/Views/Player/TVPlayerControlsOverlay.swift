@@ -221,14 +221,8 @@
 
                     Spacer(minLength: 40)
 
-                    if !techCaption.isEmpty {
-                        Text(techCaption)
-                            .font(.system(size: 24, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .multilineTextAlignment(.trailing)
-                            .lineLimit(2)
-                            .frame(maxWidth: 800, alignment: .trailing)
-                    }
+                    StreamInfoChipRow(snapshot: infoSnapshot, sampler: coordinator, alignment: .trailing)
+                        .frame(maxWidth: 800, alignment: .trailing)
                 }
 
                 // The scrubber lives in its own view so the high-frequency

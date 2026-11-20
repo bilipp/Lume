@@ -354,8 +354,12 @@ final class VLCPlayerCoordinator: NSObject, ObservableObject {
                 let denominator = max(Int(video.frameRateDenominator), 1)
                 if video.frameRate > 0 { fps = Double(video.frameRate) / Double(denominator) }
             }
+            // The fourcc maps onto the short names; VLC's own description
+            // ("H264 - MPEG-4 AVC (part 10)") is the fallback.
             let name = track.codecName()
-            codec = name.isEmpty ? nil : name
+            codec = PlayerCodecLabel.fourCC(track.codec)
+                ?? PlayerCodecLabel.fourCC(track.fourcc)
+                ?? (name.isEmpty ? nil : name)
         }
 
         let info = (width > 0 && height > 0)

@@ -172,6 +172,16 @@ public nonisolated struct LumeAetherVideoInfo: Sendable, Equatable {
     }
 }
 
+/// The source's dynamic range as the stream carries it, before any panel
+/// clamping: a DV title on an SDR screen still reads `.dolbyVision`.
+public nonisolated enum LumeAetherDynamicRange: Sendable, Equatable {
+    case sdr
+    case hdr10
+    case hdr10Plus
+    case hlg
+    case dolbyVision
+}
+
 /// The layer Picture in Picture is built around, per route.
 @frozen public enum LumeAetherPictureInPictureSource {
     /// The native path (loopback or remote HLS): `AVPlayerLayer` PiP.

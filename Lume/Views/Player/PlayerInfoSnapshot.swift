@@ -29,8 +29,8 @@ struct PlayerInfoSnapshot: Equatable {
     /// - Parameters:
     ///   - details: programme-level context resolved by `PlayerStreamInfo`.
     ///     `nil` before the resolve lands, and on hosts that resolve none.
-    ///   - engine: the engine the Advanced readout names. `nil` where the host
-    ///     surfaces no engine name (tvOS), which drops that part entirely.
+    ///   - engine: the engine the Advanced readout names. `nil` drops that
+    ///     chip.
     init(
         media: PlayableMedia,
         details: StreamInfoDetails?,
@@ -63,10 +63,9 @@ struct PlayerInfoSnapshot: Equatable {
         return nil
     }
 
-    /// The programme half of the caption: what's on now (or the series name),
-    /// then the playlist that owns the stream. Shown at both detail levels —
-    /// the playlist is programme context, not part of the technical readout.
-    /// tvOS renders this alone, with `techCaption` right-aligned opposite it.
+    /// The programme line: what's on now (or the series name), then the
+    /// playlist that owns the stream. Shown at both detail levels — the
+    /// playlist is programme context, not part of the technical readout.
     var programmeCaption: String? {
         let parts = [topCaption, details?.playlistName]
             .compactMap(\.self)
@@ -74,44 +73,28 @@ struct PlayerInfoSnapshot: Equatable {
         return parts.isEmpty ? nil : parts.joined(separator: Self.separator)
     }
 
-    /// The right-aligned technical readout, e.g. `4K  ·  H264  ·  24 fps`.
-    /// Empty at `.simple`, and while no video track has reported usable
-    /// dimensions yet.
-    var techCaption: String {
-        guard detailLevel == .advanced else { return "" }
-        return videoInfo?.captionParts.joined(separator: Self.separator) ?? ""
-    }
-
-    /// Every element on one line, as the non-tvOS caption renders it.
-    var caption: String {
-        captionParts.joined(separator: Self.separator)
-    }
-
-    /// The ordered, already-localized, already-non-empty caption elements.
-    /// Anything without a value is dropped rather than contributing an empty
-    /// slot, so a renderer can join these without ever emitting a stray
-    /// separator — which is the common case: AVPlayer reports no codec and no
-    /// frame rate, and a live channel with no matched XMLTV has no programme.
-    var captionParts: [String] {
-        var parts = [
-            topCaption,
-            details?.playlistName
-        ].compactMap(\.self).filter { !$0.isEmpty }
-
-        guard detailLevel == .advanced else { return parts }
-
-        parts.append(contentsOf: videoInfo?.captionParts ?? [])
-        if let engineName = engine?.displayName, !engineName.isEmpty {
-            parts.append(engineName)
+    /// The Advanced readout as chips, in reading order: picture, then sound,
+    /// then the live bitrate, then the engine — e.g.
+    /// `4K` `HEVC` `HDR10` `50 fps` `E-AC-3 5.1` `8.4 Mbit/s` `Aether`.
+    /// Empty at `.simple`. Anything an engine doesn't report is left out, so
+    /// a chip never shows a placeholder.
+    func techChips(sample: PlayerStreamSample?) -> [String] {
+        guard detailLevel == .advanced else { return [] }
+        var chips = videoInfo?.captionParts ?? []
+        if let audio = sample?.audio?.label {
+            chips.append(audio)
         }
-        return parts
+        if let bitrate = PlayerBitrateText.text(bitsPerSecond: sample?.bitsPerSecond) {
+            chips.append(bitrate)
+        }
+        if let engineName = engine?.displayName, !engineName.isEmpty {
+            chips.append(engineName)
+        }
+        return chips
     }
 
-    /// The same elements in the same order, phrased for a single spoken
-    /// VoiceOver label: one sentence instead of the five fragments the `·`
-    /// separators would otherwise be read as, with the abbreviations spelled
-    /// out ("24 frames per second", not "24 f p s").
-    var spokenParts: [String] {
+    /// The programme line phrased for VoiceOver ("Playing …, Playlist …").
+    var spokenProgrammeParts: [String] {
         var spoken: [String] = []
         if let programme = topCaption, !programme.isEmpty {
             spoken.append(String(localized: "Playing \(programme)"))
@@ -119,11 +102,22 @@ struct PlayerInfoSnapshot: Equatable {
         if let playlistName = details?.playlistName, !playlistName.isEmpty {
             spoken.append(String(localized: "Playlist \(playlistName)"))
         }
-        if detailLevel == .advanced {
-            spoken.append(contentsOf: videoInfo?.spokenCaptionParts ?? [])
-            if let engineName = engine?.displayName {
-                spoken.append(engineName)
-            }
+        return spoken
+    }
+
+    /// The chips phrased for one spoken VoiceOver label, with the
+    /// abbreviations spelled out ("24 frames per second", not "24 f p s").
+    func spokenTechParts(sample: PlayerStreamSample?) -> [String] {
+        guard detailLevel == .advanced else { return [] }
+        var spoken = videoInfo?.spokenCaptionParts ?? []
+        if let audio = sample?.audio?.spokenLabel {
+            spoken.append(audio)
+        }
+        if let bitrate = PlayerBitrateText.spoken(bitsPerSecond: sample?.bitsPerSecond) {
+            spoken.append(bitrate)
+        }
+        if let engineName = engine?.displayName, !engineName.isEmpty {
+            spoken.append(engineName)
         }
         return spoken
     }

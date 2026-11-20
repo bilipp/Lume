@@ -79,7 +79,7 @@ nonisolated enum PlayerEngineKind: String, CaseIterable, Identifiable {
 /// How much the in-player stream-information caption spells out. A two-level
 /// preset rather than per-element toggles: Simple carries programme context
 /// (playlist, EPG), Advanced adds the technical
-/// readout (quality, codec, frame rate, engine).
+/// readout as chips (quality, codec, HDR, frame rate, sound, bitrate, engine).
 nonisolated enum StreamInfoDetailLevel: String, CaseIterable, Identifiable {
     case simple
     case advanced
@@ -98,7 +98,7 @@ nonisolated enum StreamInfoDetailLevel: String, CaseIterable, Identifiable {
     var footer: LocalizedStringResource {
         switch self {
         case .simple: "Shows the playlist and what's on now."
-        case .advanced: "Adds the technical readout: quality, codec, frame rate, and playback engine."
+        case .advanced: "Adds the picture quality, HDR, frame rate, sound format, bitrate, and playback engine."
         }
     }
 }
@@ -335,8 +335,8 @@ enum PlayerSettings {
         /// it and needs no discovery from one who does. tvOS ignores this.
         static let enabledDefault = true
 
-        /// Advanced on tvOS so the existing technical caption (`4K · H264 ·
-        /// 24 fps`) keeps rendering exactly as it does today; Simple elsewhere,
+        /// Advanced on tvOS, which already showed a technical caption
+        /// (`4K · H264 · 24 fps`) before the chips; Simple elsewhere,
         /// where the caption is new and shares space with the transport controls.
         static var detailLevelDefault: StreamInfoDetailLevel {
             #if os(tvOS)

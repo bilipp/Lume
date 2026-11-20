@@ -19,7 +19,7 @@ import SwiftUI
 // note on the `clock` property).
 #if !os(tvOS)
     /// The playback surface `EngineControlsOverlay` reads and commands.
-    protocol EngineControlsOverlayDriving: ObservableObject, TogglePlaybackControlling {
+    protocol EngineControlsOverlayDriving: ObservableObject, TogglePlaybackControlling, PlayerStreamSampling {
         var videoInfo: PlayerVideoInfo? { get }
         /// Selectable audio tracks (empty / single-entry hides the menu).
         var audioTrackOptions: [PlayerTrackOption] { get }
@@ -220,10 +220,21 @@ import SwiftUI
 
         private var bottomControls: some View {
             VStack(spacing: 14) {
-                HStack(alignment: .bottom, spacing: 16) {
-                    titleBlock
-                    Spacer(minLength: 0)
-                    secondaryControls
+                // Above the title row, not inside it: beside the control pill the
+                // chips get only the title's column and wrap one per line.
+                VStack(alignment: .leading, spacing: 2) {
+                    StreamInfoCaption(
+                        media: media,
+                        videoInfo: coordinator.videoInfo,
+                        engine: engine,
+                        sampler: coordinator
+                    )
+                    .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
+                    HStack(alignment: .bottom, spacing: 16) {
+                        titleBlock
+                        Spacer(minLength: 0)
+                        secondaryControls
+                    }
                 }
 
                 if media.isLive {
@@ -246,11 +257,6 @@ import SwiftUI
 
         private var titleBlock: some View {
             VStack(alignment: .leading, spacing: 2) {
-                StreamInfoCaption(
-                    media: media,
-                    videoInfo: coordinator.videoInfo,
-                    engine: engine
-                )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)

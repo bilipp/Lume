@@ -3,7 +3,8 @@
 //  Lume
 //
 //  The opt-in stream-information caption shown above the title in the player
-//  chrome on iOS / iPadOS / macOS / visionOS.
+//  chrome on iOS / iPadOS / macOS / visionOS: the programme line, and at the
+//  Advanced level a row of glass chips (`StreamInfoChipRow`).
 //
 //  Ungated on purpose: one leaf mounted by every engine's controls overlay, so
 //  the four near-identical title blocks can never drift. It rides the host's
@@ -28,11 +29,13 @@ struct StreamInfoCaption: View {
     let media: PlayableMedia
     let videoInfo: PlayerVideoInfo?
     let engine: PlayerEngineKind
+    /// The engine the Advanced chips pull audio and bitrate from.
+    let sampler: (any PlayerStreamSampling)?
 
     @Environment(\.modelContext) private var modelContext
     /// Programme-level context, resolved once per stream. `nil` until that
-    /// resolve lands, which collapses the caption rather than flashing a
-    /// partial line.
+    /// resolve lands, which collapses the programme line rather than flashing
+    /// a partial one.
     @State private var details: StreamInfoDetails?
 
     /// Both preferences live here and nowhere else. Safe as `@AppStorage`
@@ -62,37 +65,31 @@ struct StreamInfoCaption: View {
 
     // MARK: - Caption
 
-    @ViewBuilder
     private var caption: some View {
         let info = snapshot
-        let line = info.caption
-        if line.isEmpty {
-            // Must be a real view, not `EmptyView`: `.task` never fires on one,
-            // so the resolve above would never start. Zero-size, so the title
-            // block's spacing is unchanged while there is nothing to show.
-            Color.clear.frame(width: 0, height: 0)
-        } else {
-            // The parts are already ordered and non-empty, so joining can never
-            // emit a dangling separator — which is the common case: AVPlayer
-            // reports no codec and no frame rate, and a live channel with no
-            // matched XMLTV has no programme.
-            Text(line)
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.75))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                // Clamped rather than unbounded: this rides the bottom control
-                // column above the transport, so at the top AX sizes an
-                // unclamped caption grows until it crowds the title and the
-                // scrubber off the video. VoiceOver reads the full label below
-                // regardless of the rendered size.
-                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-                .accessibilityElement(children: .ignore)
-                // One spoken sentence instead of five fragments split by the `·`
-                // separators, with the abbreviations VoiceOver would otherwise
-                // spell out expanded ("24 frames per second", not "24 f p s").
-                .accessibilityLabel(info.spokenParts.joined(separator: ", "))
+        return VStack(alignment: .leading, spacing: 6) {
+            if let programme = info.programmeCaption {
+                Text(programme)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityLabel(info.spokenProgrammeParts.joined(separator: ", "))
+            }
+            if detailLevel == .advanced {
+                StreamInfoChipRow(snapshot: info, sampler: sampler)
+                    .padding(.bottom, 2)
+            } else if info.programmeCaption == nil {
+                // `.task` never fires on an empty stack; zero-size so the title
+                // block's spacing is unchanged while there is nothing to show.
+                Color.clear.frame(width: 0, height: 0)
+            }
         }
+        // Clamped rather than unbounded: this rides the bottom control column
+        // above the transport, so at the top AX sizes an unclamped caption
+        // grows until it crowds the title and the scrubber off the video.
+        // VoiceOver reads the full labels regardless of the rendered size.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     // MARK: - Derived

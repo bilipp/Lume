@@ -24,10 +24,13 @@
     /// offer the OpenSubtitles search against any engine that can side-load a
     /// file (all of them but AVPlayer, which declares itself unsupported).
     @MainActor
-    protocol TVPlaybackEngine: ObservableObject, ExternalSubtitleLoading {
+    protocol TVPlaybackEngine: ObservableObject, ExternalSubtitleLoading, PlayerStreamSampling {
         /// Drives the central play / pause glyph; must be published so the
         /// overlay re-renders when playback state flips.
         var isPlaying: Bool { get }
+
+        /// The engine the Advanced stream-info chips name.
+        static var engineKind: PlayerEngineKind { get }
 
         /// Live technical characteristics of the current video track, shown in
         /// the overlay's right-hand caption and info badges. `nil` until known.
@@ -53,7 +56,11 @@
     /// (`isPlaying`, `videoInfo`, the neutral track surface, `skip(by:)`,
     /// `seek(to:)` and the `select…Track(id:)` pair) with matching signatures,
     /// so the conformance is an empty declaration.
-    extension AVPlayerCoordinator: TVPlaybackEngine {}
+    extension AVPlayerCoordinator: TVPlaybackEngine {
+        static var engineKind: PlayerEngineKind {
+            .avPlayer
+        }
+    }
 
     // MARK: - VLCKit conformance
 
@@ -62,6 +69,10 @@
     /// here. The existing `VLCMediaPlayer.Track`-typed members it keeps are
     /// still used by the iOS / macOS overlay, so nothing there changes.
     extension VLCPlayerCoordinator: TVPlaybackEngine {
+        static var engineKind: PlayerEngineKind {
+            .vlcKit
+        }
+
         var audioTrackOptions: [PlayerTrackOption] {
             mediaPlayer.audioTracks.enumerated().map { index, track in
                 PlayerTrackOption(

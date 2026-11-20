@@ -26,6 +26,8 @@ nonisolated struct PlayerVideoInfo: Equatable {
     let height: Int
     let fps: Double
     let codec: String?
+    /// `nil` for SDR and for engines that don't report the transfer function.
+    var dynamicRange: PlayerDynamicRange?
 
     /// A short marketing-style quality tag derived from the pixel width.
     ///
@@ -65,12 +67,19 @@ nonisolated struct PlayerVideoInfo: Equatable {
         return parts
     }
 
-    /// The quality tag and codec alone — the caption's leading pieces, and the
-    /// whole of the info panel's video badge row.
+    /// The quality tag, codec and HDR type alone — the caption's leading
+    /// pieces, and the whole of the info panel's video badge row.
     var badgeParts: [String] {
         var parts: [String] = []
-        if !qualityTag.isEmpty { parts.append(qualityTag) }
-        if let codec, !codec.isEmpty { parts.append(codec.uppercased()) }
+        if !qualityTag.isEmpty {
+            parts.append(qualityTag)
+        }
+        if let label = codec.flatMap(PlayerCodecLabel.video) {
+            parts.append(label)
+        }
+        if let dynamicRange {
+            parts.append(dynamicRange.label)
+        }
         return parts
     }
 

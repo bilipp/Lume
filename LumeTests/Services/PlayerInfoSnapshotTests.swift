@@ -6,10 +6,8 @@ import Testing
 /// `" fps"` unit and the decimal separator are both localized, so the literal
 /// strings below are only the expected rendering under English.
 private nonisolated func isEnglishHost() -> Bool {
-    Locale.preferredLanguages.first?.hasPrefix("en") ?? false
+    (Locale.preferredLanguages.first?.hasPrefix("en") ?? false) && Locale.current.decimalSeparator == "."
 }
-
-private let captionSeparator = "  ·  "
 
 private func makeMedia(
     contentRef: PlayableMedia.ContentRef,
@@ -42,6 +40,15 @@ private let fullDetails = StreamInfoDetails(
 
 private let uhdVideoInfo = PlayerVideoInfo(width: 3840, height: 2160, fps: 24, codec: "hevc")
 
+private let hdrVideoInfo = PlayerVideoInfo(
+    width: 3840, height: 2160, fps: 50, codec: "hevc", dynamicRange: .hdr10
+)
+
+private let sample51 = PlayerStreamSample(
+    audio: PlayerAudioInfo(codec: "eac3", channels: 6),
+    bitsPerSecond: 8_400_000
+)
+
 /// AVPlayer's real-world shape: dimensions only, never a codec or a frame rate.
 /// `FullScreenPlayerView.isAirPlayOverride` forces this engine during a cast, so
 /// it is not an edge case.
@@ -59,8 +66,9 @@ struct PlayerInfoSnapshotTests {
             detailLevel: .simple
         )
 
-        #expect(snapshot.captionParts == ["Match of the Day", "Provider A"])
-        #expect(snapshot.techCaption.isEmpty)
+        #expect(snapshot.programmeCaption == "Match of the Day  ·  Provider A")
+        #expect(snapshot.techChips(sample: sample51).isEmpty)
+        #expect(snapshot.spokenTechParts(sample: sample51).isEmpty)
     }
 
     @Test(.enabled(if: isEnglishHost()))
@@ -73,10 +81,27 @@ struct PlayerInfoSnapshotTests {
             detailLevel: .advanced
         )
 
-        #expect(snapshot.captionParts == [
-            "Match of the Day", "Provider A", "4K", "HEVC", "24 fps", "KSPlayer"
+        #expect(snapshot.programmeCaption == "Match of the Day  ·  Provider A")
+        #expect(snapshot.techChips(sample: nil) == ["4K", "HEVC", "24 fps", "KSPlayer"])
+    }
+
+    @Test(.enabled(if: isEnglishHost()))
+    func `advanced chips run picture then sound then bitrate then engine`() {
+        let snapshot = PlayerInfoSnapshot(
+            media: liveMedia,
+            details: fullDetails,
+            videoInfo: hdrVideoInfo,
+            engine: .ksPlayer,
+            detailLevel: .advanced
+        )
+
+        #expect(snapshot.techChips(sample: sample51) == [
+            "4K", "HEVC", "HDR10", "50 fps", "E-AC-3 5.1", "8.4 Mbit/s", "KSPlayer"
         ])
-        #expect(snapshot.techCaption == "4K  ·  HEVC  ·  24 fps")
+        #expect(snapshot.spokenTechParts(sample: sample51) == [
+            "4K", "HEVC", "HDR10", "50 frames per second", "E-AC-3, 5.1 surround",
+            "8.4 megabits per second", "KSPlayer"
+        ])
     }
 
     @Test func `playlist name is present at both detail levels`() {
@@ -88,7 +113,7 @@ struct PlayerInfoSnapshotTests {
                 engine: .ksPlayer,
                 detailLevel: level
             )
-            #expect(snapshot.captionParts.contains("Provider A"))
+            #expect(snapshot.programmeCaption?.contains("Provider A") == true)
         }
     }
 
@@ -101,7 +126,7 @@ struct PlayerInfoSnapshotTests {
             detailLevel: .advanced
         )
 
-        #expect(snapshot.captionParts == ["Match of the Day", "Provider A"])
+        #expect(snapshot.techChips(sample: nil).isEmpty)
     }
 
     // MARK: - Collapsing
@@ -118,16 +143,11 @@ struct PlayerInfoSnapshotTests {
             detailLevel: .advanced
         )
 
-        let parts = snapshot.captionParts
-        #expect(parts == ["Provider A", "1080p", "AVPlayer"])
-        #expect(!parts.contains { $0.isEmpty })
-        #expect(!parts.contains { $0.contains("fps") })
-
-        let joined = parts.joined(separator: captionSeparator)
-        #expect(joined == "Provider A  ·  1080p  ·  AVPlayer")
-        #expect(!joined.contains("·  ·"))
-        #expect(!joined.hasPrefix("·"))
-        #expect(!joined.hasSuffix("·"))
+        let chips = snapshot.techChips(sample: PlayerStreamSample(audio: nil, bitsPerSecond: nil))
+        #expect(chips == ["1080p", "AVPlayer"])
+        #expect(!chips.contains { $0.isEmpty })
+        #expect(!chips.contains { $0.contains("fps") })
+        #expect(snapshot.programmeCaption == "Provider A")
     }
 
     @Test func `live channel without EPG collapses without a leading separator`() {
@@ -142,14 +162,10 @@ struct PlayerInfoSnapshotTests {
             detailLevel: .simple
         )
 
-        let parts = snapshot.captionParts
-        #expect(parts == ["Provider A"])
-        #expect(!parts.contains { $0.isEmpty })
-
-        let joined = parts.joined(separator: captionSeparator)
-        #expect(joined == "Provider A")
-        #expect(!joined.hasPrefix(" "))
-        #expect(!joined.hasPrefix("·"))
+        let caption = snapshot.programmeCaption
+        #expect(caption == "Provider A")
+        #expect(caption?.hasPrefix(" ") == false)
+        #expect(caption?.hasPrefix("·") == false)
     }
 
     @Test func `no details at all yields no parts`() {
@@ -161,8 +177,8 @@ struct PlayerInfoSnapshotTests {
             detailLevel: .advanced
         )
 
-        #expect(snapshot.captionParts.isEmpty)
-        #expect(snapshot.techCaption.isEmpty)
+        #expect(snapshot.programmeCaption == nil)
+        #expect(snapshot.techChips(sample: nil).isEmpty)
         #expect(snapshot.topCaption == nil)
     }
 
@@ -230,7 +246,7 @@ struct PlayerVideoInfoCaptionTests {
     @Test(.enabled(if: isEnglishHost()))
     func `integral frame rate renders without decimals`() {
         let info = PlayerVideoInfo(width: 1920, height: 1080, fps: 24, codec: "h264")
-        #expect(info.captionParts == ["1080p", "H264", "24 fps"])
+        #expect(info.captionParts == ["1080p", "H.264", "24 fps"])
     }
 
     /// The unit is English-gated; the number is not, because the format style
@@ -240,7 +256,7 @@ struct PlayerVideoInfoCaptionTests {
     func `fractional frame rate renders to two places`() {
         let info = PlayerVideoInfo(width: 1920, height: 1080, fps: 23.976, codec: "h264")
         let separator = Locale.current.decimalSeparator ?? "."
-        #expect(info.captionParts == ["1080p", "H264", "23\(separator)98 fps"])
+        #expect(info.captionParts == ["1080p", "H.264", "23\(separator)98 fps"])
     }
 
     @Test func `frame rate uses the locale decimal separator`() {

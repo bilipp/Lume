@@ -112,7 +112,7 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
     let player = AVPlayer()
 
     private weak var playerLayer: AVPlayerLayer?
-    private var item: AVPlayerItem?
+    private(set) var item: AVPlayerItem?
 
     private var isLive = false
     private var startTime: TimeInterval = 0

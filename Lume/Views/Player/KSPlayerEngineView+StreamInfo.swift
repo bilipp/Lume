@@ -41,7 +41,16 @@ import SwiftUI
         /// Drop the snapshot when the host swaps streams, so the outgoing
         /// track's numbers never caption the incoming one.
         func resetVideoInfo() {
-            if videoInfo != nil { videoInfo = nil }
+            if videoInfo != nil {
+                videoInfo = nil
+            }
+        }
+    }
+
+    /// The iOS / macOS / visionOS caption samples the coordinator itself.
+    extension KSVideoPlayer.Coordinator: PlayerStreamSampling {
+        func streamSample() -> PlayerStreamSample? {
+            KSVideoInfo.streamSample(from: playerLayer)
         }
     }
 
