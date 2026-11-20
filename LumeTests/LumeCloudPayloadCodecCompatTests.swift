@@ -3,7 +3,8 @@
 //  LumeTests
 //
 //  Playlist payloads written by clients that predate a field still open: a
-//  missing `disabledContentRaw` means "fetch everything". Its own suite so
+//  missing `disabledContentRaw` leaves the row's own switches alone (a blank
+//  row fetches everything). Its own suite so
 //  `LumeCloudPayloadCodecTests` stays within the type-length limit.
 //
 
@@ -36,6 +37,20 @@ struct LumeCloudPayloadCodecCompatTests {
         let decoded = try Codec.makeModel(from: payload, as: SyncedPlaylist.self)
         #expect(decoded.hiddenTabsRaw == "liveTV")
         #expect(decoded.disabledContentRaw.isEmpty)
+    }
+
+    @Test func `an older record keeps the switches a row already has`() throws {
+        let playlist = SyncedPlaylist(
+            id: UUID(), name: "Older", serverURL: "http://provider.example", username: "u", password: "p",
+            sourceTypeRaw: PlaylistSourceType.xtream.rawValue, epgURL: nil, syncEnabled: true,
+            disabledContentRaw: "movies", updatedAt: Date(timeIntervalSince1970: 1_760_000_123.456)
+        )
+        container.mainContext.insert(playlist)
+        var payload = try LumeCloudPayload.decode(Codec.encoded(playlist, previous: nil))
+        payload.data.removeValue(forKey: "disabledContentRaw")
+
+        try Codec.apply(payload, to: playlist)
+        #expect(playlist.disabledContentRaw == "movies")
     }
 
     @Test func `a playlist payload carries the content switches`() throws {

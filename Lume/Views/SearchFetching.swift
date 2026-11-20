@@ -35,6 +35,9 @@ nonisolated struct SearchRequest {
     let excludedCategoryIDs: Set<String>
     /// Max rows per content type, across every playlist searched.
     let limit: Int
+    /// Movies and series read `limit` times this when duplicate titles are
+    /// grouped: copies collapse into one result after the fetch.
+    var titleOverFetch = 1
     /// Per-type playlists replacing `playlistIDs` for that type — Combined,
     /// where each member contributes only the types switched on for it. A type
     /// mapped to no playlist searches nothing, never the whole store.
@@ -117,6 +120,7 @@ nonisolated extension SearchRequest {
 nonisolated enum SearchFetcher {
     static func fetch(container: ModelContainer, request: SearchRequest) -> SearchHits {
         let limit = request.limit
+        let titleLimit = limit * max(request.titleOverFetch, 1)
         let context = ModelContext(container)
         var hits = SearchHits()
 
@@ -140,12 +144,12 @@ nonisolated enum SearchFetcher {
         // inherit it), and `ids` checks it between scans. The partial hits
         // returned are discarded by the caller, which is cancelled too.
         if request.wantMovies {
-            hits.movies = ids(in: context, scopes: request.scopes(for: .movies), limit: limit, predicate: searchMoviePredicate)
+            hits.movies = ids(in: context, scopes: request.scopes(for: .movies), limit: titleLimit, predicate: searchMoviePredicate)
         }
         guard !Task.isCancelled else { return hits }
 
         if request.wantSeries {
-            hits.series = ids(in: context, scopes: request.scopes(for: .series), limit: limit, predicate: searchSeriesPredicate)
+            hits.series = ids(in: context, scopes: request.scopes(for: .series), limit: titleLimit, predicate: searchSeriesPredicate)
         }
         guard !Task.isCancelled else { return hits }
 

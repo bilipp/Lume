@@ -16,6 +16,10 @@
 		<string>ko</string>
 		<string>zh-Hans</string>
 		<string>ar</string>
+		<string>tr</string>
+		<string>nl</string>
+		<string>pl</string>
+		<string>ru</string>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>

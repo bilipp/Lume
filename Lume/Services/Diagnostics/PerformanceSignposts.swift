@@ -86,6 +86,15 @@ nonisolated extension PerfSignpost {
     static let m3uUpsertLive = PerfSignpost("M3UUpsertLive")
     static let m3uUpsertMovies = PerfSignpost("M3UUpsertMovies")
     static let m3uUpsertEpisodes = PerfSignpost("M3UUpsertEpisodes")
+    /// The per-batch `context.save()`: where a batch's inserts, the 11 index
+    /// groups and `@Attribute(.unique)` are actually paid for.
+    static let m3uBatchSave = PerfSignpost("M3UBatchSave")
+    /// The one `isCategoryGroupPrimary` election the import runs after its
+    /// last batch, including its save.
+    static let m3uTitleGroupPrimaries = PerfSignpost("M3UTitleGroupPrimaries")
+    /// Re-keying tmdbId-less rows onto the `tmdb:` group of their title (and
+    /// back), ahead of an election.
+    static let titleGroupBridge = PerfSignpost("TitleGroupBridge")
     static let m3uPruneLive = PerfSignpost("M3UPruneLive")
     static let m3uPruneMovies = PerfSignpost("M3UPruneMovies")
     static let m3uPruneEpisodes = PerfSignpost("M3UPruneEpisodes")

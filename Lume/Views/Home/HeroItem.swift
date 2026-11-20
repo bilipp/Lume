@@ -63,4 +63,11 @@ enum HeroItem: Identifiable, Hashable {
         if case let .series(series, _, _) = self { return series }
         return nil
     }
+
+    var homeItem: HomeMediaItem {
+        switch self {
+        case let .movie(movie, _, _): .movie(movie)
+        case let .series(series, _, _): .series(series)
+        }
+    }
 }

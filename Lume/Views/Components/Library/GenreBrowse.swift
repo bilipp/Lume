@@ -123,163 +123,6 @@ struct GenreGridSection: View {
     }
 }
 
-// MARK: - Off-main genre page fetch
-
-/// How many source rows one page load may walk before handing control back to
-/// the caller. The re-checks below can empty a whole source page, and each
-/// retry is another scan, so a genre whose next few hundred rows are all
-/// near-misses would otherwise chain scans until it found something. Five
-/// source pages is the bound; the caller resumes from the returned cursor.
-private let genreScanBudget = 500
-
-/// What one page of a genre grid is fetched for. Plain value type so the
-/// off-main fetch takes a single `Sendable` value, mirroring `SearchRequest`.
-nonisolated struct GenrePageRequest {
-    let genre: String
-    /// The playlists whose titles the grid shows, matched in SQLite on their
-    /// `"<playlistUUID>-"` id prefixes rather than after materialization.
-    let scope: CatalogScope
-    let excludedCategoryIDs: Set<String>
-    /// Where in the source rows to resume; see `GenrePage.scanned`.
-    let offset: Int
-    let pageSize: Int
-}
-
-/// A page's displayable rows — identifiers only, never managed objects, which
-/// can't cross actor boundaries — plus the cursor state the view carries
-/// forward.
-nonisolated struct GenrePage {
-    var ids: [PersistentIdentifier] = []
-    /// Source rows consumed, which is what the next `fetchOffset` must advance
-    /// by: the re-checks drop rows the substring fetch returned, so the
-    /// displayed count and the source offset diverge.
-    var scanned = 0
-    /// The source is exhausted — no further page can exist.
-    var reachedEnd = false
-}
-
-/// Runs a genre page fetch on a background `ModelContext`, mirroring
-/// `SearchFetcher`.
-///
-/// This used to be a synchronous `fetch` on the *main* context, fired from a
-/// grid cell's `onAppear` mid-scroll. `localizedStandardContains` can't use the
-/// `genre` index, so every page scanned the table — hundreds of milliseconds
-/// per page on a 179k-title playlist, and the retry loop could chain several of
-/// those into one frame, which is a watchdog hazard rather than a hitch.
-nonisolated enum GenrePageFetcher {
-    static func movies(
-        container: ModelContainer,
-        request: GenrePageRequest,
-        sortBy: [SortDescriptor<Movie>]
-    ) -> GenrePage {
-        let context = ModelContext(container)
-        var descriptor = FetchDescriptor<Movie>(predicate: moviePredicate(request: request), sortBy: sortBy)
-        descriptor.fetchLimit = request.pageSize
-        // Only `genre` (the exact-token re-check) and `categoryId` (viewer
-        // visibility) are read off the fetched rows, so leave the rest
-        // unhydrated — the same trade the genre derivation above makes, and it
-        // keeps a page of wide rows (plot, cast, artwork paths) out of memory.
-        descriptor.propertiesToFetch = [\.genre, \.categoryId]
-        return scan(request: request) { (offset: Int) -> [Movie] in
-            descriptor.fetchOffset = offset
-            return (try? context.fetch(descriptor)) ?? []
-        }
-    }
-
-    static func series(
-        container: ModelContainer,
-        request: GenrePageRequest,
-        sortBy: [SortDescriptor<Series>]
-    ) -> GenrePage {
-        let context = ModelContext(container)
-        var descriptor = FetchDescriptor<Series>(predicate: seriesPredicate(request: request), sortBy: sortBy)
-        descriptor.fetchLimit = request.pageSize
-        descriptor.propertiesToFetch = [\.genre, \.categoryId]
-        return scan(request: request) { (offset: Int) -> [Series] in
-            descriptor.fetchOffset = offset
-            return (try? context.fetch(descriptor)) ?? []
-        }
-    }
-
-    /// The playlist scope and the hidden-category exclusion run in SQLite, in
-    /// the shape `searchMoviePredicate` established, so a page isn't spent on
-    /// rows the viewer will never see — the offset used to walk every
-    /// playlist's titles and then throw all but one playlist's away.
-    /// `starts(with:)` compiles to a range seek on the unique `id` index, which
-    /// is the only part of this predicate an index can serve: the genre match
-    /// has to stay a substring test because the column holds several free-text
-    /// genres per title. One contributing playlist inlines that `starts(with:)`
-    /// exactly as isolated mode always had it; several compose the scope's OR
-    /// via `evaluate`.
-    private static func moviePredicate(request: GenrePageRequest) -> Predicate<Movie> {
-        let genre = request.genre
-        let excluded = Set(request.excludedCategoryIDs.map(String?.some))
-        let filtersCategories = !excluded.isEmpty
-        if let prefix = request.scope.singlePrefix(for: .movies) {
-            return #Predicate { movie in
-                movie.id.starts(with: prefix)
-                    && (movie.genre?.localizedStandardContains(genre) ?? false)
-                    && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
-            }
-        }
-        let scoped = request.scope.moviePredicate()
-        return #Predicate { movie in
-            scoped.evaluate(movie)
-                && (movie.genre?.localizedStandardContains(genre) ?? false)
-                && (!filtersCategories || movie.categoryId == nil || !excluded.contains(movie.categoryId))
-        }
-    }
-
-    private static func seriesPredicate(request: GenrePageRequest) -> Predicate<Series> {
-        let genre = request.genre
-        let excluded = Set(request.excludedCategoryIDs.map(String?.some))
-        let filtersCategories = !excluded.isEmpty
-        if let prefix = request.scope.singlePrefix(for: .series) {
-            return #Predicate { series in
-                series.id.starts(with: prefix)
-                    && (series.genre?.localizedStandardContains(genre) ?? false)
-                    && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
-            }
-        }
-        let scoped = request.scope.seriesPredicate()
-        return #Predicate { series in
-            scoped.evaluate(series)
-                && (series.genre?.localizedStandardContains(genre) ?? false)
-                && (!filtersCategories || series.categoryId == nil || !excluded.contains(series.categoryId))
-        }
-    }
-
-    /// Walks source pages from `request.offset` until one yields a displayable
-    /// row, the source runs out, or `genreScanBudget` is spent.
-    ///
-    /// The loop is needed because the in-memory re-checks can empty a whole
-    /// source page — `GenreParser` keeps `&` intact, so a tile for "Action"
-    /// fetches every "Action & Adventure" title and then drops it again — and
-    /// without new trailing items the grid never fires `onLoadMore` again,
-    /// stalling pagination. The budget is what bounds it: the caller resumes
-    /// from the returned cursor instead of the loop running until it finds
-    /// something.
-    private static func scan(
-        request: GenrePageRequest,
-        fetch: (Int) -> [some PersistentModel & GenreCarrying]
-    ) -> GenrePage {
-        let excluded = request.excludedCategoryIDs
-        var page = GenrePage()
-        while page.ids.isEmpty, !page.reachedEnd, page.scanned < genreScanBudget {
-            let rows = fetch(request.offset + page.scanned)
-            page.scanned += rows.count
-            if rows.count < request.pageSize { page.reachedEnd = true }
-            // The exact-token re-check keeps a substring hit out, and the
-            // `excludingRestricted` filter is inlined so this stays
-            // `nonisolated` — the same trade `GenreDerivation.derive` makes.
-            page.ids = rows
-                .filter { GenreParser.contains($0.genre, genre: request.genre) && !excluded.contains($0.categoryId ?? "") }
-                .map(\.persistentModelID)
-        }
-        return page
-    }
-}
-
 // MARK: - Genre detail grids
 
 /// The full grid of movies in a genre, reachable from a genre tile. The fetch
@@ -295,7 +138,11 @@ struct MovieGenreView: View {
     @Environment(\.contentRestriction) private var restriction
 
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
     @State private var movies: [Movie] = []
+    /// State of the loaded titles' other copies, looked up once per page.
+    @State private var groupStates: [String: TitleGroupState] = [:]
     @State private var canLoadMore = true
     @State private var isLoadingPage = false
     /// SQLite cursor position, distinct from `movies.count`. The exact-token and
@@ -303,6 +150,8 @@ struct MovieGenreView: View {
     /// displayed count and the source offset diverge — the offset must track
     /// rows pulled from SQLite, not rows shown.
     @State private var fetchedCount = 0
+    /// Titles the loaded pages show when grouped; see `GenrePage.seenKeys`.
+    @State private var seenKeys: Set<String> = []
     /// The sort the current pages were loaded for. Pushing a detail cancels and
     /// (on pop) re-runs `.task`; reloading page one there would discard the
     /// loaded pages and reset the scroll position. Reload only when this differs.
@@ -322,6 +171,11 @@ struct MovieGenreView: View {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
     }
 
+    /// The sort and grouping the loaded pages were fetched for.
+    private var loadKey: String {
+        "\(contentSortRaw)|\(groupDuplicateTitles)"
+    }
+
     var body: some View {
         CategoryContentGrid(
             title: genre,
@@ -332,11 +186,22 @@ struct MovieGenreView: View {
             emptyDescription: "No movies in this genre",
             sortRaw: $contentSortRaw,
             onLoadMore: { loadNextPage() },
-            card: { MovieCardView(movie: $0, fillsWidth: true) }
+            favoriteMenu: CategoryFavoriteMenu(
+                isFavorite: { TitleGroupStateLookup.state(of: $0, in: groupStates).isFavorite },
+                toggle: { toggleFavorite($0) }
+            ),
+            card: { movie in
+                MovieCardView(movie: movie, fillsWidth: true)
+            }
         )
-        .task(id: contentSortRaw) {
-            guard loadedSort != contentSortRaw else { return }
-            loadedSort = contentSortRaw
+        .environment(\.titleGroupStates, TitleGroupStates(movies: groupStates))
+        .task(id: loadKey) {
+            guard loadedSort != loadKey else {
+                refreshGroupStates()
+                return
+            }
+            loadedSort = loadKey
+            groupStates = [:]
             // A page fetched against the previous sort's cursor is now
             // meaningless: bump the generation so it's discarded on arrival, and
             // release the in-flight guard here, since that load no longer will.
@@ -344,6 +209,7 @@ struct MovieGenreView: View {
             isLoadingPage = false
             movies = []
             fetchedCount = 0
+            seenKeys = []
             canLoadMore = true
             loadNextPage()
         }
@@ -358,7 +224,9 @@ struct MovieGenreView: View {
             scope: scope,
             excludedCategoryIDs: restriction.excludedCategoryIDs,
             offset: fetchedCount,
-            pageSize: pageSize
+            pageSize: pageSize,
+            grouped: groupDuplicateTitles,
+            seenKeys: seenKeys
         )
         let sortBy = contentSort.movieDescriptors
         let container = modelContext.container
@@ -379,9 +247,21 @@ struct MovieGenreView: View {
     private func apply(_ page: GenrePage) {
         isLoadingPage = false
         fetchedCount += page.scanned
+        seenKeys = page.seenKeys
         if page.reachedEnd { canLoadMore = false }
-        movies.append(contentsOf: page.ids.compactMap { modelContext.model(for: $0) as? Movie })
+        let rows = page.ids.compactMap { modelContext.model(for: $0) as? Movie }
+        movies.append(contentsOf: rows)
+        let keys = rows.compactMap(\.titleGroupKey)
+        groupStates.replace(keys: keys, with: TitleGroupStateLookup.movies(keys: keys, in: modelContext))
         if page.ids.isEmpty, canLoadMore { loadNextPage() }
+    }
+
+    private func refreshGroupStates() {
+        groupStates = TitleGroupStateLookup.states(of: movies, in: modelContext)
+    }
+
+    private func toggleFavorite(_ movie: Movie) {
+        TitleGroupFavorites.toggle(movie, updating: &groupStates, in: modelContext)
     }
 }
 
@@ -395,11 +275,17 @@ struct SeriesGenreView: View {
     @Environment(\.contentRestriction) private var restriction
 
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
     @State private var series: [Series] = []
+    /// State of the loaded titles' other copies, looked up once per page.
+    @State private var groupStates: [String: TitleGroupState] = [:]
     @State private var canLoadMore = true
     @State private var isLoadingPage = false
     /// SQLite cursor position, distinct from `series.count` — see `MovieGenreView`.
     @State private var fetchedCount = 0
+    /// Titles the loaded pages show when grouped; see `GenrePage.seenKeys`.
+    @State private var seenKeys: Set<String> = []
     /// Sort the current pages were loaded for; reload only on change — see
     /// `MovieGenreView`, which explains why reappearance must not reset.
     @State private var loadedSort: String?
@@ -414,6 +300,11 @@ struct SeriesGenreView: View {
         ContentSortOption(rawValue: contentSortRaw) ?? .playlist
     }
 
+    /// The sort and grouping the loaded pages were fetched for.
+    private var loadKey: String {
+        "\(contentSortRaw)|\(groupDuplicateTitles)"
+    }
+
     var body: some View {
         CategoryContentGrid(
             title: genre,
@@ -424,15 +315,27 @@ struct SeriesGenreView: View {
             emptyDescription: "No series in this genre",
             sortRaw: $contentSortRaw,
             onLoadMore: { loadNextPage() },
-            card: { SeriesCardView(series: $0, fillsWidth: true) }
+            favoriteMenu: CategoryFavoriteMenu(
+                isFavorite: { TitleGroupStateLookup.state(of: $0, in: groupStates).isFavorite },
+                toggle: { toggleFavorite($0) }
+            ),
+            card: { series in
+                SeriesCardView(series: series, fillsWidth: true)
+            }
         )
-        .task(id: contentSortRaw) {
-            guard loadedSort != contentSortRaw else { return }
-            loadedSort = contentSortRaw
+        .environment(\.titleGroupStates, TitleGroupStates(series: groupStates))
+        .task(id: loadKey) {
+            guard loadedSort != loadKey else {
+                refreshGroupStates()
+                return
+            }
+            loadedSort = loadKey
+            groupStates = [:]
             loadGeneration += 1
             isLoadingPage = false
             series = []
             fetchedCount = 0
+            seenKeys = []
             canLoadMore = true
             loadNextPage()
         }
@@ -447,7 +350,9 @@ struct SeriesGenreView: View {
             scope: scope,
             excludedCategoryIDs: restriction.excludedCategoryIDs,
             offset: fetchedCount,
-            pageSize: pageSize
+            pageSize: pageSize,
+            grouped: groupDuplicateTitles,
+            seenKeys: seenKeys
         )
         let sortBy = contentSort.seriesDescriptors
         let container = modelContext.container
@@ -465,8 +370,20 @@ struct SeriesGenreView: View {
     private func apply(_ page: GenrePage) {
         isLoadingPage = false
         fetchedCount += page.scanned
+        seenKeys = page.seenKeys
         if page.reachedEnd { canLoadMore = false }
-        series.append(contentsOf: page.ids.compactMap { modelContext.model(for: $0) as? Series })
+        let rows = page.ids.compactMap { modelContext.model(for: $0) as? Series }
+        series.append(contentsOf: rows)
+        let keys = rows.compactMap(\.titleGroupKey)
+        groupStates.replace(keys: keys, with: TitleGroupStateLookup.series(keys: keys, in: modelContext))
         if page.ids.isEmpty, canLoadMore { loadNextPage() }
+    }
+
+    private func refreshGroupStates() {
+        groupStates = TitleGroupStateLookup.states(of: series, in: modelContext)
+    }
+
+    private func toggleFavorite(_ series: Series) {
+        TitleGroupFavorites.toggle(series, updating: &groupStates, in: modelContext)
     }
 }

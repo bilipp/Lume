@@ -30,6 +30,8 @@ struct SeriesView: View {
 
     @AppStorage(SortStorageKey.seriesCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
     private var categorySort: CategorySortOption {
         CategorySortOption(rawValue: categorySortRaw) ?? .playlist
@@ -69,13 +71,22 @@ struct SeriesView: View {
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24, pinnedViews: []) {
-                            SeriesCollectionRow(kind: .recentlyWatched, scope: scope, animationNamespace: animationNamespace)
-                            SeriesCollectionRow(kind: .favorites, scope: scope, animationNamespace: animationNamespace)
-                            SeriesCollectionRow(kind: .recentlyAdded, scope: scope, animationNamespace: animationNamespace)
+                            SeriesCollectionRow(kind: .recentlyWatched, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
+                                .id("recentlyWatched-\(groupDuplicateTitles)")
+                            SeriesCollectionRow(kind: .favorites, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
+                                .id("favorites-\(groupDuplicateTitles)")
+                            SeriesCollectionRow(kind: .recentlyAdded, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
+                                .id("recentlyAdded-\(groupDuplicateTitles)")
 
                             ForEach(layout.previews) { category in
-                                SeriesCategoryPreview(category: category, limit: previewLimit, sort: contentSort, animationNamespace: animationNamespace)
-                                    .id("\(category.id)-\(contentSort.rawValue)")
+                                SeriesCategoryPreview(
+                                    category: category,
+                                    limit: previewLimit,
+                                    sort: contentSort,
+                                    grouped: groupDuplicateTitles,
+                                    animationNamespace: animationNamespace
+                                )
+                                .id("\(category.id)-\(contentSort.rawValue)-\(groupDuplicateTitles)")
                             }
 
                             if !genres.isEmpty {
@@ -109,7 +120,8 @@ struct SeriesView: View {
                 SeriesCategoryView(category: category, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: LibraryCollection.self) { collection in
-                SeriesCollectionView(kind: collection.kind, scope: scope, animationNamespace: animationNamespace)
+                SeriesCollectionView(kind: collection.kind, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
+                    .id(groupDuplicateTitles)
             }
             .navigationDestination(for: GenreSelection.self) { selection in
                 SeriesGenreView(genre: selection.genre, scope: scope, animationNamespace: animationNamespace)

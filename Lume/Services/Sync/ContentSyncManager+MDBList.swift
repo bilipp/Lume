@@ -18,36 +18,56 @@ extension ContentSyncManager {
     /// Fetches and persists MDBList ratings for a movie **off the main thread**,
     /// on the engine actor's own background context (the save auto-merges into
     /// the main context). Keeps the rating write off a detail view's hot path.
+    ///
+    /// Fresh ratings on a sibling (same TMDB id) are copied instead of fetched,
+    /// and fetched ratings are written to every sibling.
     func enrichMovieRatings(movieId: String, tmdbId: Int) async {
+        let row = Movie.row(id:in:)
+        let siblings = Movie.rows(sharing:except:in:)
+        if copyRatingsFromSibling(of: movieId, tmdbId: tmdbId, row: row) { return }
         guard let ratings = try? await fetchMDBListRatings(tmdbId: tmdbId, type: .movie) else { return }
-        let context = ModelContext(modelContainer)
-        context.autosaveEnabled = false
-        var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == movieId })
-        descriptor.fetchLimit = 1
-        guard let movie = try? context.fetch(descriptor).first else { return }
-        movie.externalRatings = ratings
-        movie.ratingsEnrichedAt = Date()
-        try? context.save()
+        writeRatings(ratings, to: movieId, tmdbId: tmdbId, row: row, siblings: siblings)
     }
 
     /// Series counterpart of ``enrichMovieRatings(movieId:tmdbId:)``.
     func enrichSeriesRatings(seriesId: String, tmdbId: Int) async {
+        let row = Series.row(id:in:)
+        let siblings = Series.rows(sharing:except:in:)
+        if copyRatingsFromSibling(of: seriesId, tmdbId: tmdbId, row: row) { return }
         guard let ratings = try? await fetchMDBListRatings(tmdbId: tmdbId, type: .show) else { return }
+        writeRatings(ratings, to: seriesId, tmdbId: tmdbId, row: row, siblings: siblings)
+    }
+
+    private func copyRatingsFromSibling<Row: EnrichedTitleRow>(
+        of id: String,
+        tmdbId: Int,
+        row: (String, ModelContext) -> Row?
+    ) -> Bool {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
-        var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == seriesId })
-        descriptor.fetchLimit = 1
-        guard let series = try? context.fetch(descriptor).first else { return }
-        series.externalRatings = ratings
-        series.ratingsEnrichedAt = Date()
+        guard let target = row(id, context) else { return false }
+        let latest = Row.latestSibling(sharing: tmdbId, except: id, by: .ratings, in: context)
+        guard TitleEnrichmentSiblings.copyRatings(from: latest.map { [$0] } ?? [], to: target) else { return false }
+        try? context.save()
+        return true
+    }
+
+    private func writeRatings<Row: EnrichedTitleRow>(
+        _ ratings: [ExternalRating],
+        to id: String,
+        tmdbId: Int,
+        row: (String, ModelContext) -> Row?,
+        siblings: (Int, String, ModelContext) -> [Row]
+    ) {
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        guard let target = row(id, context) else { return }
+        TitleEnrichmentSiblings.applyRatings(ratings, to: target, siblings: siblings(tmdbId, id, context))
         try? context.save()
     }
 }
 
 // MARK: - Detail-screen enrichment
-
-/// 14 days — ratings rarely move, so revisits within the window skip the fetch.
-private let ratingsCacheWindow: TimeInterval = 14 * 24 * 3600
 
 /// Fetches MDBList ratings for a movie and persists them, keyed directly by
 /// the TMDB id we already store. No-ops when MDBList is unconfigured, the TMDB
@@ -56,7 +76,7 @@ private let ratingsCacheWindow: TimeInterval = 14 * 24 * 3600
 @MainActor
 func enrichMovieRatingsIfNeeded(_ movie: Movie, context: ModelContext) async {
     guard let tmdbId = movie.tmdbId, MDBListClient.shared.isConfigured else { return }
-    if let enrichedAt = movie.ratingsEnrichedAt, Date().timeIntervalSince(enrichedAt) < ratingsCacheWindow { return }
+    if let enrichedAt = movie.ratingsEnrichedAt, Date().timeIntervalSince(enrichedAt) < TitleEnrichmentSiblings.freshness { return }
     // Fetch + persist on the manager's background context (off the main thread);
     // the save auto-merges back so `movie.externalRatings` updates in the view.
     let manager = ContentSyncManager(modelContainer: context.container)
@@ -67,7 +87,7 @@ func enrichMovieRatingsIfNeeded(_ movie: Movie, context: ModelContext) async {
 @MainActor
 func enrichSeriesRatingsIfNeeded(_ series: Series, context: ModelContext) async {
     guard let tmdbId = series.tmdbId, MDBListClient.shared.isConfigured else { return }
-    if let enrichedAt = series.ratingsEnrichedAt, Date().timeIntervalSince(enrichedAt) < ratingsCacheWindow { return }
+    if let enrichedAt = series.ratingsEnrichedAt, Date().timeIntervalSince(enrichedAt) < TitleEnrichmentSiblings.freshness { return }
     let manager = ContentSyncManager(modelContainer: context.container)
     await manager.enrichSeriesRatings(seriesId: series.id, tmdbId: tmdbId)
 }

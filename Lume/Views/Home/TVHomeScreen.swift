@@ -302,6 +302,7 @@
         let onSelect: (HeroItem) -> Void
 
         @Environment(\.modelContext) private var modelContext
+        @Environment(\.titleGroupStates) private var groupStates
         @FocusState private var heroFocused: Bool
 
         var body: some View {
@@ -437,7 +438,7 @@
                     // On the pill, never on the band or the slot: the menu's
                     // owner has to be focusable, and the band's sizing and
                     // section ordering are what keep the hero collapse working.
-                    .heroFavoriteMenu(hero, in: modelContext)
+                    .heroFavoriteMenu(hero, in: modelContext, groupStates: groupStates)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .focusSection()

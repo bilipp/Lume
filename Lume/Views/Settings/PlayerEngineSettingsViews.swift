@@ -203,11 +203,16 @@ import SwiftUI
         @Binding var isOn: Bool
         /// A crown after the title, marking a Lume Pro setting for free users.
         var showsPremiumBadge = false
+        /// The "Beta" tag after the title, for a setting still in beta.
+        var showsBetaBadge = false
 
         var body: some View {
             Button { isOn.toggle() } label: {
                 HStack(spacing: 16) {
                     Text(title)
+                    if showsBetaBadge {
+                        BetaBadge()
+                    }
                     if showsPremiumBadge {
                         PremiumBadge()
                     }

@@ -62,6 +62,9 @@ extension View {
             scenePhase == .active
                 && !isBlocked
                 && !ScreenOccupancy.shared.isScreenBusy
+                // One interruption per launch: an update that showed its
+                // What's New sheet doesn't also ask for a rating.
+                && !WhatsNewCoordinator.shared.didPresentThisLaunch
                 && AppStoreReviewPrompt.shared.isArmed
         }
 

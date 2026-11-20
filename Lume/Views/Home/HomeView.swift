@@ -23,19 +23,21 @@ struct HomeView: View {
         @Environment(\.openWindow) private var openWindow
     #endif
 
-    @Query private var playlists: [Playlist]
+    @Query var playlists: [Playlist]
     @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
     @AppStorage(SortStorageKey.movieCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
+    var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
     // Recently watched (capped — watch history is naturally bounded).
-    @Query private var watchedMovies: [Movie]
-    @Query private var watchedSeries: [Series]
+    @Query var watchedMovies: [Movie]
+    @Query var watchedSeries: [Series]
     @Query private var watchedStreams: [LiveStream]
 
     // Favorites.
-    @Query private var favoriteMovies: [Movie]
-    @Query private var favoriteSeries: [Series]
+    @Query var favoriteMovies: [Movie]
+    @Query var favoriteSeries: [Series]
     @Query private var favoriteStreams: [LiveStream]
 
     @State var trendingMovies: [HomeMediaItem] = []
@@ -44,7 +46,15 @@ struct HomeView: View {
     /// Resume fractions for partially-watched series, keyed by series id and
     /// resolved off the main thread — see `SeriesResumeLoader`.
     @State private var seriesResume: [String: Double] = [:]
-    @AppStorage(RecommendationSettings.enabledKey) private var recommendationsEnabled = RecommendationSettings.enabledDefault
+    /// Favorite, watched and progress across every copy of each title on
+    /// screen, read by the rails and the hero (`TitleGroupStates`).
+    @State var groupStates = TitleGroupStates.empty
+    @AppStorage(PlayerSettings.Language.preferredAudioLanguagesKey)
+    private var preferredAudioLanguagesRaw = PlayerSettings.Language.preferredAudioLanguagesDefault
+    /// Decoded from `preferredAudioLanguagesRaw` once per change, not per
+    /// `titleRanking` read.
+    @State private var preferredLanguages = PlayerLanguageOptions.load().preferredAudioLanguages
+    @AppStorage(RecommendationSettings.enabledKey) var recommendationsEnabled = RecommendationSettings.enabledDefault
     /// The user's chosen Home row order (Settings › Layout › Home). Falls back to
     /// the declaration order of `HomeSection` until they reorder.
     @AppStorage(HomeLayoutSettings.sectionOrderKey) private var sectionOrderRaw = ""
@@ -56,11 +66,11 @@ struct HomeView: View {
     private var recentlyWatchedIncludesLiveTV = HomeLayoutSettings.recentlyWatchedIncludesLiveTVDefault
     /// Bumped by the DEBUG "Recalculate" action in Settings (always 0 otherwise);
     /// part of the task id so the row recomputes on demand.
-    @AppStorage(RecommendationSettings.manualRecalculationKey) private var recommendationsRecalcToken = 0
-    @State private var recommendations: [HomeMediaItem] = []
+    @AppStorage(RecommendationSettings.manualRecalculationKey) var recommendationsRecalcToken = 0
+    @State var recommendations: [HomeMediaItem] = []
     /// False until the first recommendations pass completes, so the row can show
     /// a progress placeholder rather than an empty state on launch.
-    @State private var recommendationsLoaded = false
+    @State var recommendationsLoaded = false
     @State var heroItems: [HeroItem] = []
     /// The home scroll view's height, which sizes the hero (re-measured on a fold or rotation).
     @State private var viewportHeight: CGFloat = 0
@@ -73,8 +83,8 @@ struct HomeView: View {
     @State var premium = PremiumManager.shared
     // Observed so the For You row defers its (potentially heavy) recompute while
     // the device is busy syncing — and retries automatically once it isn't.
-    @State private var indexing = ContentIndexingService.shared
-    @State private var epgSync = EPGSyncService.shared
+    @State var indexing = ContentIndexingService.shared
+    @State var epgSync = EPGSyncService.shared
     /// Observed for the Home empty-state check, which mirrors the Sports rail.
     @State var sportsFollows = SportsFollowService.shared
     @State var sportsStore = SportsStore.shared
@@ -86,17 +96,24 @@ struct HomeView: View {
     @State private var showingPaywall = false
     @Environment(DeepLinkRouter.self) var pathRouter: DeepLinkRouter?
     #if os(tvOS)
-        @Environment(DeepLinkRouter.self) private var router
+        @Environment(DeepLinkRouter.self) var router
     #else
         /// Non-nil while Multi-View is up; carries the channel it opened with.
-        @State private var multiViewLaunch: MultiViewLaunch?
+        @State var multiViewLaunch: MultiViewLaunch?
     #endif
 
     #if os(tvOS)
         /// Hero selected on the immersive home: a stable Button, not a
         /// NavigationLink, so paging the carousel never changes its identity.
-        @State private var selectedHero: HeroItem?
+        @State var selectedHero: HeroItem?
     #endif
+
+    /// Movie and series rows read per rail: several copies of one title can
+    /// fill the window, and grouping shows each title once
+    /// (`HomeView.recentlyWatched`, `HomeView.favorites`).
+    private static let watchedFetchLimit = 20 * TitleGrouping.overFetch
+    private static let favoritesPerKind = 30
+    private static let favoritesFetchLimit = favoritesPerKind * TitleGrouping.overFetch
 
     init() {
         // Recently watched: non-nil lastWatchedDate, newest first.
@@ -104,14 +121,14 @@ struct HomeView: View {
             predicate: #Predicate { $0.lastWatchedDate != nil },
             sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
         )
-        movies.fetchLimit = 20
+        movies.fetchLimit = Self.watchedFetchLimit
         _watchedMovies = Query(movies)
 
         var series = FetchDescriptor<Series>(
             predicate: #Predicate { $0.lastWatchedDate != nil },
             sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
         )
-        series.fetchLimit = 20
+        series.fetchLimit = Self.watchedFetchLimit
         _watchedSeries = Query(series)
 
         // Channels hidden in Content Management drop out here, the same way Live
@@ -130,14 +147,14 @@ struct HomeView: View {
             predicate: #Predicate { $0.isFavorite },
             sortBy: [SortDescriptor(\.favoriteOrder), SortDescriptor(\.name)]
         )
-        favMovies.fetchLimit = 30
+        favMovies.fetchLimit = Self.favoritesFetchLimit
         _favoriteMovies = Query(favMovies)
 
         var favSeries = FetchDescriptor<Series>(
             predicate: #Predicate { $0.isFavorite },
             sortBy: [SortDescriptor(\.favoriteOrder), SortDescriptor(\.name)]
         )
-        favSeries.fetchLimit = 30
+        favSeries.fetchLimit = Self.favoritesFetchLimit
         _favoriteSeries = Query(favSeries)
 
         var favStreams = FetchDescriptor<LiveStream>(
@@ -220,6 +237,13 @@ struct HomeView: View {
             }
             .homeDownloadsDestination()
             .homeHeroDestination(heroSelection, animationNamespace: animationNamespace)
+            .environment(\.titleGroupStates, groupStates)
+            .task(id: groupStateKey) {
+                groupStates = TitleGroupStates.load(for: groupStateRequest, in: modelContext)
+            }
+            .onChange(of: preferredAudioLanguagesRaw) {
+                preferredLanguages = PlayerLanguageOptions.load().preferredAudioLanguages
+            }
             .task(id: trendingKey) {
                 await loadTrending(cacheKey: trendingKey)
             }
@@ -322,13 +346,13 @@ struct HomeView: View {
         let synced = playlists.members(of: scope)
             .compactMap { $0.lastSyncDate?.timeIntervalSince1970 }
             .max() ?? 0
-        return "\(playlists.count)-\(scope.token)-\(synced)-\(restriction.visibilityToken)"
+        return "\(playlists.count)-\(scope.token)-\(synced)-\(restriction.visibilityToken)-\(groupDuplicateTitles)"
     }
 
     /// What the watchlist rows are matched against. Each service caches per
     /// connection state plus this scope (see `loadWatchlist`).
     var watchlistScope: String {
-        "\(catalogScope.token)-\(restriction.visibilityToken)"
+        "\(catalogScope.token)-\(restriction.visibilityToken)-\(groupDuplicateTitles)"
     }
 
     var watchlistsKey: String {
@@ -362,16 +386,25 @@ struct HomeView: View {
         if recentlyWatchedIncludesLiveTV {
             items += watchedStreams.filter { scope.contains($0.id, .liveTV) }.excludingRestricted(restriction).map(HomeMediaItem.live)
         }
-        return items
-            .sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
-            .prefix(10)
-            .map(\.self)
+        let newestFirst = items.sorted { ($0.lastWatchedDate ?? .distantPast) > ($1.lastWatchedDate ?? .distantPast) }
+        // The newest copy stands for its title: Continue Watching reopens the
+        // exact source last played.
+        return Array(TitleGrouping.firstPerTitle(newestFirst, grouped: groupDuplicateTitles) { $0.titleGroupID }.prefix(10))
     }
 
     private var favorites: [HomeMediaItem] {
         let scope = scopeMatcher
-        let movies = favoriteMovies.filter { scope.contains($0.id, .movies) }.excludingRestricted(restriction)
-        let series = favoriteSeries.filter { scope.contains($0.id, .series) }.excludingRestricted(restriction)
+        let ranking = titleRanking
+        let movies = TitleGrouping.dedupe(
+            favoriteMovies.filter { scope.contains($0.id, .movies) }.excludingRestricted(restriction),
+            ranking: ranking,
+            grouped: groupDuplicateTitles
+        ).prefix(Self.favoritesPerKind)
+        let series = TitleGrouping.dedupe(
+            favoriteSeries.filter { scope.contains($0.id, .series) }.excludingRestricted(restriction),
+            ranking: ranking,
+            grouped: groupDuplicateTitles
+        ).prefix(Self.favoritesPerKind)
         let streams = favoriteStreams.filter { scope.contains($0.id, .liveTV) }.excludingRestricted(restriction)
         typealias Entry = FavoritesOrder.Entry<HomeMediaItem>
         return FavoritesOrder.sorted(
@@ -393,15 +426,66 @@ struct HomeView: View {
             && trendingState.isSettled
     }
 
+    /// Which copy of a title Home shows: the highest-priority playlist's, then
+    /// the best quality and language.
+    var titleRanking: TitleGrouping.Ranking {
+        TitleGrouping.Ranking(
+            matcher: scopeMatcher,
+            preferredLanguages: preferredLanguages
+        )
+    }
+
+    /// What decides `groupStateRequest` and its answer. The arrays compare by
+    /// row identity; the watch dates catch new progress on an already-listed
+    /// row.
+    private var groupStateKey: GroupStateKey {
+        GroupStateKey(
+            watchedMovies: watchedMovies,
+            watchedSeries: watchedSeries,
+            favoriteMovies: favoriteMovies,
+            favoriteSeries: favoriteSeries,
+            recommendations: recommendations,
+            trendingMovies: trendingMovies,
+            trendingSeries: trendingSeries,
+            heroItems: heroItems,
+            watchlists: watchlists,
+            newestMovie: watchedMovies.first?.lastWatchedDate,
+            newestSeries: watchedSeries.first?.lastWatchedDate,
+            scope: catalogScope,
+            restriction: restriction,
+            grouped: groupDuplicateTitles,
+            includesLiveTV: recentlyWatchedIncludesLiveTV,
+            preferredLanguages: preferredLanguages
+        )
+    }
+
+    /// Every movie and series on Home, for the one grouped-state lookup.
+    private var groupStateRequest: TitleGroupStates.Request {
+        var request = TitleGroupStates.Request()
+        request.add(recentlyWatched)
+        request.add(favorites)
+        request.add(recommendations)
+        request.add(trendingMovies)
+        request.add(trendingSeries)
+        request.add(heroItems.map(\.homeItem))
+        for items in watchlists.values {
+            request.add(items)
+        }
+        return request
+    }
+
     // MARK: - Recently watched
 
     /// Clears an item's watch timestamp so it drops out of the Recently Watched
     /// row. The @Query-backed rows update automatically once the change is saved.
     private func removeFromRecentlyWatched(_ item: HomeMediaItem) {
         switch item {
-        case let .movie(movie): movie.lastWatchedDate = nil
-        case let .series(series): series.lastWatchedDate = nil
-        case let .live(stream): stream.lastWatchedDate = nil
+        case let .movie(movie):
+            TitleGroupSiblings.clearLastWatched(movie, grouped: groupDuplicateTitles, in: modelContext)
+        case let .series(series):
+            TitleGroupSiblings.clearLastWatched(series, grouped: groupDuplicateTitles, in: modelContext)
+        case let .live(stream):
+            stream.lastWatchedDate = nil
         }
         try? modelContext.save()
     }
@@ -456,122 +540,23 @@ struct HomeView: View {
     }
 }
 
-// MARK: - For You
-
-private extension HomeView {
-    /// The immersive tvOS home's hero selection; inert elsewhere.
-    var heroSelection: Binding<HeroItem?> {
-        #if os(tvOS)
-            $selectedHero
-        #else
-            .constant(nil)
-        #endif
-    }
-
-    /// Multi-View launched from a rail; tvOS presents it through the router.
-    var multiViewLaunchSelection: Binding<MultiViewLaunch?> {
-        #if os(tvOS)
-            .constant(nil)
-        #else
-            $multiViewLaunch
-        #endif
-    }
-
-    /// Refresh the row when the active playlist, the favorites/history queries or
-    /// the hidden categories change. This only re-resolves the list (cheap, and
-    /// re-validates each entry against live state) — the engine still throttles the actual re-ranking to
-    /// its recalculation interval.
-    var recommendationsKey: String {
-        let counts = "\(watchedMovies.count)-\(watchedSeries.count)-\(favoriteMovies.count)-\(favoriteSeries.count)"
-        let visibility = restriction.visibilityToken
-        return "rec-\(recommendationsEnabled)-\(premium.isPremium)-\(isSyncBusy)-\(recommendationsRecalcToken)-\(counts)-\(catalogScope.token)-\(visibility)"
-    }
-
-    /// True while a playlist sync, iCloud sync or EPG import is running. The For
-    /// You recompute reads and ranks the whole catalog, so on older devices it's
-    /// deferred until those finish — and during a CloudKit import, touching the
-    /// catalog mid-handshake is best avoided entirely. Folded into
-    /// `recommendationsKey` so the load retries the moment syncing settles.
-    var isSyncBusy: Bool {
-        playlists.contains { $0.syncStatus == .syncing }
-            || indexing.isCloudSyncActive
-            || epgSync.isSyncing
-    }
-
-    /// Resolves the engine's (throttled, possibly cached) list to local models,
-    /// dropping any that are no longer recommendable — watched, favorited or
-    /// voted on since the list was computed. That live re-validation is what lets
-    /// a vote remove a card without forcing a full re-rank.
-    func loadRecommendations() async {
-        guard recommendationsEnabled, premium.isPremium else {
-            recommendations = []
-            return
-        }
-        // Don't calculate while syncing — leave whatever is already shown (or the
-        // loading placeholder) in place; the task re-fires once `isSyncBusy` clears.
-        guard !isSyncBusy else { return }
-
-        let interval = Perf.begin(.homeRecommendations)
-        defer { Perf.end(interval) }
-
-        let engine = RecommendationEngine(modelContainer: modelContext.container)
-        let scored = await engine.recommendations(excluding: restriction.excludedCategoryIDs)
-        var items: [HomeMediaItem] = []
-        for recommendation in scored {
-            switch recommendation.kind {
-            case .movie:
-                if let movie = fetchMovie(id: recommendation.id), isRecommendable(movie) { items.append(.movie(movie)) }
-            case .series:
-                if let series = fetchSeries(id: recommendation.id), isRecommendable(series) { items.append(.series(series)) }
-            }
-            if items.count >= 10 { break }
-        }
-        recommendations = items
-        recommendationsLoaded = true
-    }
-
-    func isRecommendable(_ movie: Movie) -> Bool {
-        !movie.isWatched && !movie.isFavorite && movie.lastWatchedDate == nil && movie.recommendationVote == nil
-    }
-
-    func isRecommendable(_ series: Series) -> Bool {
-        !series.isFavorite && series.lastWatchedDate == nil && series.recommendationVote == nil
-    }
-
-    func fetchMovie(id: String) -> Movie? {
-        var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let movie = try? modelContext.fetch(descriptor).first,
-              scopeMatcher.contains(movie.id, .movies), !restriction.hides(categoryID: movie.categoryId)
-        else { return nil }
-        return movie
-    }
-
-    func fetchSeries(id: String) -> Series? {
-        var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let series = try? modelContext.fetch(descriptor).first,
-              scopeMatcher.contains(series.id, .series), !restriction.hides(categoryID: series.categoryId)
-        else { return nil }
-        return series
-    }
-
-    /// Records an up/down vote for a recommendation. Either vote drops the title
-    /// from the row immediately (it's been acted on) and steers the next recompute
-    /// — an upvote pulls the taste profile toward it, a downvote away. The vote is
-    /// persisted now; the engine folds it in on its next (throttled) recompute.
-    func vote(_ item: HomeMediaItem, _ vote: RecommendationVote) {
-        switch item {
-        case let .movie(movie): movie.recommendationVote = vote
-        case let .series(series): series.recommendationVote = vote
-        case .live: return
-        }
-        // Persisted on the catalog model like favorites/watch state; the iCloud
-        // reconciler mirrors it to UserContentState so the vote syncs.
-        try? modelContext.save()
-
-        recommendations.removeAll { $0.id == item.id }
-    }
+private struct GroupStateKey: Equatable {
+    let watchedMovies: [Movie]
+    let watchedSeries: [Series]
+    let favoriteMovies: [Movie]
+    let favoriteSeries: [Series]
+    let recommendations: [HomeMediaItem]
+    let trendingMovies: [HomeMediaItem]
+    let trendingSeries: [HomeMediaItem]
+    let heroItems: [HeroItem]
+    let watchlists: [HomeWatchlistSource: [HomeMediaItem]]
+    let newestMovie: Date?
+    let newestSeries: Date?
+    let scope: CatalogScope
+    let restriction: ContentRestriction
+    let grouped: Bool
+    let includesLiveTV: Bool
+    let preferredLanguages: [String]
 }
 
 #Preview("Empty") {

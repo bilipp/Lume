@@ -12,7 +12,9 @@ struct MovieCardView: View {
     /// Set by the category / genre grids so the card sizes to its cell rather
     /// than the fixed rail width — see `View.posterArtworkFrame(fillsWidth:)`.
     var fillsWidth: Bool = false
-    @Environment(\.playlistProvenance) private var provenance
+    /// What the title's other copies hold, looked up once per page by the
+    /// surface. Absent shows this row's state alone.
+    @Environment(\.titleGroupStates) private var groupStates
 
     var body: some View {
         VStack(alignment: .leading, spacing: PosterCardMetrics.titleSpacing) {
@@ -42,8 +44,7 @@ struct MovieCardView: View {
                 }
             }
             .posterArtworkFrame(fillsWidth: fillsWidth)
-            .playlistBadgeOverlay(provenance.name(forContentID: movie.id, in: .movies))
-            .watchedBadge(movie.isWatched)
+            .watchedBadge(movie.isWatched || movie.titleGroupKey.flatMap { groupStates.movies[$0] }?.isWatched == true)
             .clipShape(RoundedRectangle(cornerRadius: PosterCardMetrics.cornerRadius))
             // A shadow applied after clipShape forces an offscreen render pass per
             // card every frame. On tvOS the focus style already supplies depth and

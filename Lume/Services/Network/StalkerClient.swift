@@ -169,8 +169,9 @@ final nonisolated class StalkerClient: Sendable {
 
     /// Issues an authorized request for the given action, retrying once on an
     /// auth failure with a fresh handshake, and with backoff on transient
-    /// network errors.
-    private func request<T: Decodable & Sendable>(
+    /// network errors. Not `private`: the guide call lives in
+    /// `StalkerClient+EPG.swift`, as this file is at the length limit.
+    func request<T: Decodable & Sendable>(
         type: String,
         action: String,
         extraQuery: [URLQueryItem] = []

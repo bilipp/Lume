@@ -34,7 +34,7 @@ nonisolated struct TMDBClient {
         case week
     }
 
-    private let baseURL = "https://api.themoviedb.org/3"
+    private let baseURL = Self.configuredBaseURL
     private static let imageBaseURL = "https://image.tmdb.org/t/p/"
     private let session: URLSession
     private let token: String?

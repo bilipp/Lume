@@ -72,6 +72,7 @@ enum WidgetSnapshotExporter {
         storedPlaylistID: String,
         isChildProfile: Bool,
         isPremium: Bool = false,
+        groupsTitles: Bool = LibrarySettings.groupDuplicateTitles(),
         now: Date = Date()
     ) -> WidgetSnapshot {
         let context = ModelContext(container)
@@ -92,8 +93,8 @@ enum WidgetSnapshotExporter {
 
         return WidgetSnapshot(
             generatedAt: now,
-            continueWatching: continueWatching(in: context, scope: scope, restriction: restriction),
-            favorites: favorites(in: context, scope: scope, restriction: restriction),
+            continueWatching: continueWatching(in: context, scope: scope, restriction: restriction, groupsTitles: groupsTitles),
+            favorites: favorites(in: context, scope: scope, restriction: restriction, groupsTitles: groupsTitles),
             onNow: onNow(in: context, container: container, scope: scope, restriction: restriction, now: now)
         )
     }
@@ -114,20 +115,24 @@ enum WidgetSnapshotExporter {
     private nonisolated static func continueWatching(
         in context: ModelContext,
         scope: CatalogScope.Matcher,
-        restriction: ContentRestriction
+        restriction: ContentRestriction,
+        groupsTitles: Bool
     ) -> [WidgetMediaItem] {
-        let entries = resumableMovies(in: context, scope: scope, restriction: restriction)
-            + recentlyWatchedSeries(in: context, scope: scope, restriction: restriction)
+        let entries = resumableMovies(in: context, scope: scope, restriction: restriction, groupsTitles: groupsTitles)
+            + recentlyWatchedSeries(in: context, scope: scope, restriction: restriction, groupsTitles: groupsTitles)
         return entries
             .sorted { $0.lastWatched > $1.lastWatched }
             .prefix(continueWatchingLimit)
             .map(\.item)
     }
 
+    /// A grouped title resumes its most recently played copy, the row the
+    /// deep link opens directly.
     private nonisolated static func resumableMovies(
         in context: ModelContext,
         scope: CatalogScope.Matcher,
-        restriction: ContentRestriction
+        restriction: ContentRestriction,
+        groupsTitles: Bool
     ) -> [(lastWatched: Date, item: WidgetMediaItem)] {
         var entries: [(lastWatched: Date, item: WidgetMediaItem)] = []
 
@@ -135,9 +140,13 @@ enum WidgetSnapshotExporter {
             predicate: #Predicate { $0.lastWatchedDate != nil && !$0.isWatched && $0.watchProgress > 0 },
             sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
         )
-        movieDescriptor.fetchLimit = 30
-        let movies = (try? context.fetch(movieDescriptor)) ?? []
-        for movie in movies where scope.contains(movie.id, .movies) && !restriction.hides(categoryID: movie.categoryId) {
+        movieDescriptor.fetchLimit = TitleGrouping.fetchLimit(30, grouped: groupsTitles)
+        let movies = TitleGrouping.firstPerTitle(
+            ((try? context.fetch(movieDescriptor)) ?? [])
+                .filter { scope.contains($0.id, .movies) && !restriction.hides(categoryID: $0.categoryId) },
+            grouped: groupsTitles
+        )
+        for movie in movies {
             guard let lastWatched = movie.lastWatchedDate,
                   let deepLink = WidgetDeepLink.play(kind: .movie, id: movie.id) else { continue }
             var progress: Double?
@@ -166,15 +175,19 @@ enum WidgetSnapshotExporter {
     private nonisolated static func recentlyWatchedSeries(
         in context: ModelContext,
         scope: CatalogScope.Matcher,
-        restriction: ContentRestriction
+        restriction: ContentRestriction,
+        groupsTitles: Bool
     ) -> [(lastWatched: Date, item: WidgetMediaItem)] {
         var descriptor = FetchDescriptor<Series>(
             predicate: #Predicate { $0.lastWatchedDate != nil },
             sortBy: [SortDescriptor(\.lastWatchedDate, order: .reverse)]
         )
-        descriptor.fetchLimit = 30
-        let shows = ((try? context.fetch(descriptor)) ?? [])
-            .filter { scope.contains($0.id, .series) && !restriction.hides(categoryID: $0.categoryId) }
+        descriptor.fetchLimit = TitleGrouping.fetchLimit(30, grouped: groupsTitles)
+        let shows = TitleGrouping.firstPerTitle(
+            ((try? context.fetch(descriptor)) ?? [])
+                .filter { scope.contains($0.id, .series) && !restriction.hides(categoryID: $0.categoryId) },
+            grouped: groupsTitles
+        )
         guard !shows.isEmpty else { return [] }
 
         let inProgress = inProgressEpisodes(in: context)
@@ -240,17 +253,51 @@ enum WidgetSnapshotExporter {
 
     // MARK: - Favorites
 
+    private nonisolated static func liveFavorites(
+        in context: ModelContext,
+        scope: CatalogScope.Matcher,
+        restriction: ContentRestriction
+    ) -> [(order: Int, item: WidgetMediaItem)] {
+        var result: [(order: Int, item: WidgetMediaItem)] = []
+        let streams = (try? context.fetch(
+            FetchDescriptor<LiveStream>(predicate: #Predicate { $0.isFavorite && $0.isHidden == false })
+        )) ?? []
+        for stream in streams where scope.contains(stream.id, .liveTV) && !restriction.hides(categoryID: stream.categoryId) {
+            guard let deepLink = WidgetDeepLink.play(kind: .live, id: stream.id) else { continue }
+            result.append((stream.favoriteOrder ?? Int.max, WidgetMediaItem(
+                id: "live-\(stream.id)",
+                kind: .live,
+                title: stream.name,
+                subtitle: nil,
+                imageURL: URL(string: stream.streamIcon ?? ""),
+                progress: nil,
+                deepLink: deepLink
+            )))
+        }
+        return result
+    }
+
     /// Favorite movies, series and channels interleaved by the user's unified
     /// `favoriteOrder` (nil orders last, then alphabetical — same as Home).
     private nonisolated static func favorites(
         in context: ModelContext,
         scope: CatalogScope.Matcher,
-        restriction: ContentRestriction
+        restriction: ContentRestriction,
+        groupsTitles: Bool
     ) -> [WidgetMediaItem] {
         var entries: [(order: Int, item: WidgetMediaItem)] = []
+        let ranking = TitleGrouping.Ranking(
+            matcher: scope,
+            preferredLanguages: groupsTitles ? PlayerLanguageOptions.load().preferredAudioLanguages : []
+        )
 
-        let movies = (try? context.fetch(FetchDescriptor<Movie>(predicate: #Predicate { $0.isFavorite }))) ?? []
-        for movie in movies where scope.contains(movie.id, .movies) && !restriction.hides(categoryID: movie.categoryId) {
+        let movies = TitleGrouping.dedupe(
+            ((try? context.fetch(FetchDescriptor<Movie>(predicate: #Predicate { $0.isFavorite }))) ?? [])
+                .filter { scope.contains($0.id, .movies) && !restriction.hides(categoryID: $0.categoryId) },
+            ranking: ranking,
+            grouped: groupsTitles
+        )
+        for movie in movies {
             guard let deepLink = WidgetDeepLink.play(kind: .movie, id: movie.id) else { continue }
             entries.append((movie.favoriteOrder ?? Int.max, WidgetMediaItem(
                 id: "movie-\(movie.id)",
@@ -265,8 +312,13 @@ enum WidgetSnapshotExporter {
             )))
         }
 
-        let series = (try? context.fetch(FetchDescriptor<Series>(predicate: #Predicate { $0.isFavorite }))) ?? []
-        for show in series where scope.contains(show.id, .series) && !restriction.hides(categoryID: show.categoryId) {
+        let series = TitleGrouping.dedupe(
+            ((try? context.fetch(FetchDescriptor<Series>(predicate: #Predicate { $0.isFavorite }))) ?? [])
+                .filter { scope.contains($0.id, .series) && !restriction.hides(categoryID: $0.categoryId) },
+            ranking: ranking,
+            grouped: groupsTitles
+        )
+        for show in series {
             guard let deepLink = WidgetDeepLink.openSeries(id: show.id) else { continue }
             entries.append((show.favoriteOrder ?? Int.max, WidgetMediaItem(
                 id: "series-\(show.id)",
@@ -281,21 +333,7 @@ enum WidgetSnapshotExporter {
             )))
         }
 
-        let streams = (try? context.fetch(
-            FetchDescriptor<LiveStream>(predicate: #Predicate { $0.isFavorite && $0.isHidden == false })
-        )) ?? []
-        for stream in streams where scope.contains(stream.id, .liveTV) && !restriction.hides(categoryID: stream.categoryId) {
-            guard let deepLink = WidgetDeepLink.play(kind: .live, id: stream.id) else { continue }
-            entries.append((stream.favoriteOrder ?? Int.max, WidgetMediaItem(
-                id: "live-\(stream.id)",
-                kind: .live,
-                title: stream.name,
-                subtitle: nil,
-                imageURL: URL(string: stream.streamIcon ?? ""),
-                progress: nil,
-                deepLink: deepLink
-            )))
-        }
+        entries += liveFavorites(in: context, scope: scope, restriction: restriction)
 
         return entries
             .sorted { ($0.order, $0.item.title) < ($1.order, $1.item.title) }

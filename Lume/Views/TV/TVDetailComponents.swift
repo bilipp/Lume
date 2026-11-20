@@ -464,7 +464,6 @@
     struct TVPosterCard: View {
         let title: String
         let imageURL: URL?
-        var badge: String?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 10) {
@@ -487,7 +486,6 @@
                 }
                 .frame(width: TVDetailMetrics.posterCardWidth, height: TVDetailMetrics.posterCardHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .posterBadge(badge)
 
                 Text(title)
                     .font(.system(size: 24, weight: .medium))

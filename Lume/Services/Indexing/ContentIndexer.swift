@@ -58,6 +58,18 @@ actor ContentIndexer {
     /// Rows per batch when dropping embeddings the engine can no longer compare
     /// — see `resetEmbeddingsIfSpaceChanged`.
     private let resetBatchSize = 5000
+    /// Ceilings on the per-pass TMDB memo. A pass spans the whole library, and
+    /// a detail payload carries cast, similar titles and videos, so the details
+    /// memo is kept small: siblings are written in the chunk that resolved
+    /// them, and the memo only has to bridge stragglers in later chunks.
+    private let searchMemoLimit = 20000
+    private let detailsMemoLimit = 200
+
+    /// TMDB answers already fetched this pass, so duplicate rows of one title
+    /// (other qualities, languages, playlists) cost no further requests.
+    /// A permanent miss is remembered as `nil`; transient failures are not.
+    private var searchMemo: [SearchKey: Int?] = [:]
+    private var detailsMemo: [DetailsKey: TMDBTitleDetails?] = [:]
 
     init(modelContainer: ModelContainer, tmdbClient: TMDBClient? = nil) {
         self.modelContainer = modelContainer
@@ -86,6 +98,10 @@ actor ContentIndexer {
     /// an unavailable embedding model, or on a transient network failure (the
     /// next kick retries — already-indexed items are never reprocessed).
     func run(status: ContentIndexingService) async throws {
+        defer {
+            searchMemo.removeAll()
+            detailsMemo.removeAll()
+        }
         // Which backend, and therefore which vector space, is settled first:
         // choosing costs nothing (no assets, no load, no network) and the
         // "already done" check below is only meaningful against the *current*
@@ -251,19 +267,34 @@ actor ContentIndexer {
     /// SwiftData as plain values so the network phase never touches a managed
     /// object. `title`/`year` are the cleaned search query; they also seed the
     /// embedding document.
-    private enum ItemKind { case movie, series }
+    nonisolated enum ItemKind { case movie, series }
 
-    private struct PendingItem {
+    nonisolated struct PendingItem {
         let kind: ItemKind
         let id: String
         let title: String
         let year: Int?
         let existingTMDBId: Int?
         let needsEnrichment: Bool
+        /// The row's `titleGroupKey` when it was snapshotted — before TMDB
+        /// resolved an id, the key its unresolved siblings share.
+        let groupKey: String?
+    }
+
+    private nonisolated struct SearchKey: Hashable {
+        let kind: ItemKind
+        let title: String
+        let year: Int?
+    }
+
+    /// Movie and TV ids are separate TMDB namespaces.
+    private nonisolated struct DetailsKey: Hashable {
+        let kind: ItemKind
+        let tmdbId: Int
     }
 
     /// The TMDB data resolved for a pending item, ready to write back.
-    private struct IndexResult {
+    nonisolated struct IndexResult {
         let item: PendingItem
         let resolvedTMDBId: Int?
         let details: TMDBTitleDetails?
@@ -286,7 +317,9 @@ actor ContentIndexer {
     /// uncatchable `no such table` `NSException` that terminated the app. Here
     /// the only phase that suspends works purely on value snapshots; the
     /// objects are re-fetched and mutated synchronously while the store is open.
-    private func indexNextChunk(embedder: TextEmbedder) async throws -> Int {
+    ///
+    /// `embedder` is nil only in tests, which skip the embedding.
+    func indexNextChunk(embedder: TextEmbedder?) async throws -> Int {
         let pending = try fetchPending()
         guard !pending.isEmpty else { return 0 }
 
@@ -317,10 +350,15 @@ actor ContentIndexer {
         if !resolved.isEmpty {
             let context = ModelContext(modelContainer)
             context.autosaveEnabled = false
-            let hidden = (try? Self.hiddenCategoryIDs(in: context)) ?? []
+            var batch = WriteBatch(
+                context: context,
+                embedder: embedder,
+                hiddenCategoryIDs: (try? Self.hiddenCategoryIDs(in: context)) ?? []
+            )
             for result in resolved {
-                write(result, context: context, embedder: embedder, hiddenCategoryIDs: hidden)
+                Self.write(result, batch: &batch)
             }
+            TitleGroupPrimaries.recompute(categoryKeys: batch.touched, in: context)
             do {
                 try context.save()
             } catch {
@@ -347,14 +385,15 @@ actor ContentIndexer {
         movieDescriptor.fetchLimit = chunkSize
         let movies = try context.fetch(movieDescriptor)
         var items: [PendingItem] = movies.map { movie in
-            let query = ContentIndexText.searchQuery(for: movie.name)
+            let query = Self.searchQuery(name: movie.name, releaseDate: movie.releaseDate)
             return PendingItem(
                 kind: .movie,
                 id: movie.id,
                 title: query.title,
-                year: ContentIndexText.year(fromReleaseDate: movie.releaseDate) ?? query.year,
+                year: query.year,
                 existingTMDBId: movie.tmdbId,
-                needsEnrichment: movie.tmdbEnrichedAt == nil
+                needsEnrichment: movie.tmdbEnrichedAt == nil,
+                groupKey: movie.titleGroupKey
             )
         }
 
@@ -363,14 +402,15 @@ actor ContentIndexer {
             seriesDescriptor.fetchLimit = chunkSize - movies.count
             let series = try context.fetch(seriesDescriptor)
             items += series.map { item in
-                let query = ContentIndexText.searchQuery(for: item.name)
+                let query = Self.searchQuery(name: item.name, releaseDate: item.releaseDate)
                 return PendingItem(
                     kind: .series,
                     id: item.id,
                     title: query.title,
-                    year: ContentIndexText.year(fromReleaseDate: item.releaseDate) ?? query.year,
+                    year: query.year,
                     existingTMDBId: item.tmdbId,
-                    needsEnrichment: item.tmdbEnrichedAt == nil
+                    needsEnrichment: item.tmdbEnrichedAt == nil,
+                    groupKey: item.titleGroupKey
                 )
             }
         }
@@ -387,27 +427,24 @@ actor ContentIndexer {
             )
         }
 
+        // A row that adopted its title's `tmdb:` group is indexed as it is:
+        // its siblings carry the id and the details, and adoption never writes
+        // a tmdbId of its own.
+        if item.existingTMDBId == nil, TitleGroupKey.tmdbId(groupKey: item.groupKey) != nil {
+            return IndexResult(item: item, resolvedTMDBId: nil, details: nil, usedNetwork: false)
+        }
+
         var usedNetwork = false
         var tmdbId = item.existingTMDBId
         if tmdbId == nil {
-            usedNetwork = true
-            tmdbId = try await skippingPermanentFailures {
-                switch item.kind {
-                case .movie: try await self.searchMovieID(query: item.title, year: item.year)
-                case .series: try await self.searchTVID(query: item.title, year: item.year)
-                }
-            }
+            (tmdbId, usedNetwork) = try await searchID(for: item)
         }
 
         var details: TMDBTitleDetails?
         if item.needsEnrichment, let tmdbId {
-            usedNetwork = true
-            details = try await skippingPermanentFailures {
-                switch item.kind {
-                case .movie: try await self.tmdbClient.movieDetails(tmdbId)
-                case .series: try await self.tmdbClient.tvDetails(tmdbId)
-                }
-            }
+            let fetched = try await fetchDetails(kind: item.kind, tmdbId: tmdbId)
+            details = fetched.details
+            usedNetwork = usedNetwork || fetched.usedNetwork
         }
 
         return IndexResult(
@@ -415,110 +452,38 @@ actor ContentIndexer {
         )
     }
 
-    /// Re-fetches the title on the write context and applies the resolved TMDB
-    /// data, embedding and index stamp. Synchronous: the object is realised and
-    /// mutated while the store is open, never across an `await`. A title that
-    /// vanished since Phase 1 (deleted by a sync) is silently skipped, as is
-    /// one whose category was hidden in the meantime — it stays unindexed
-    /// until unhidden.
-    private func write(
-        _ result: IndexResult,
-        context: ModelContext,
-        embedder: TextEmbedder,
-        hiddenCategoryIDs: Set<String>
-    ) {
-        switch result.item.kind {
-        case .movie:
-            writeMovie(result, context: context, embedder: embedder, hiddenCategoryIDs: hiddenCategoryIDs)
-        case .series:
-            writeSeries(result, context: context, embedder: embedder, hiddenCategoryIDs: hiddenCategoryIDs)
+    /// The item's TMDB id from this pass's memo, else from a search.
+    private func searchID(for item: PendingItem) async throws -> (id: Int?, usedNetwork: Bool) {
+        let key = SearchKey(kind: item.kind, title: item.title, year: item.year)
+        if let memo = searchMemo[key] {
+            return (memo, false)
         }
+        let id = try await skippingPermanentFailures {
+            switch item.kind {
+            case .movie: try await self.searchMovieID(query: item.title, year: item.year)
+            case .series: try await self.searchTVID(query: item.title, year: item.year)
+            }
+        }
+        if searchMemo.count >= searchMemoLimit { searchMemo.removeAll() }
+        searchMemo[key] = id
+        return (id, true)
     }
 
-    private func writeMovie(
-        _ result: IndexResult,
-        context: ModelContext,
-        embedder: TextEmbedder,
-        hiddenCategoryIDs: Set<String>
-    ) {
-        let id = result.item.id
-        var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let movie = try? context.fetch(descriptor).first else { return }
-        if let categoryId = movie.categoryId, hiddenCategoryIDs.contains(categoryId) {
-            return
+    /// The title's TMDB details from this pass's memo, else from TMDB.
+    private func fetchDetails(kind: ItemKind, tmdbId: Int) async throws -> (details: TMDBTitleDetails?, usedNetwork: Bool) {
+        let key = DetailsKey(kind: kind, tmdbId: tmdbId)
+        if let memo = detailsMemo[key] {
+            return (memo, false)
         }
-
-        if movie.tmdbId == nil, let tmdbId = result.resolvedTMDBId {
-            movie.tmdbId = tmdbId
+        let details = try await skippingPermanentFailures {
+            switch kind {
+            case .movie: try await self.tmdbClient.movieDetails(tmdbId)
+            case .series: try await self.tmdbClient.tvDetails(tmdbId)
+            }
         }
-        if let details = result.details {
-            // Background context: skip the cast relationship — see
-            // applyMovieDetails. The embedding uses `movie.actors`, and the
-            // detail view fully enriches (incl. cast) on first open.
-            applyMovieDetails(details, to: movie, context: context, includeCast: false)
-        }
-        let document = Self.document(for: .init(
-            name: result.item.title,
-            year: result.item.year,
-            genre: movie.genre,
-            tagline: movie.tagline,
-            plot: movie.plot,
-            cast: movie.actors
-        ), embedder: embedder)
-        if let vector = try? embedder.vector(for: document) {
-            movie.embeddingData = TextEmbedder.encode(vector)
-        }
-        movie.indexedAt = Date()
-    }
-
-    private func writeSeries(
-        _ result: IndexResult,
-        context: ModelContext,
-        embedder: TextEmbedder,
-        hiddenCategoryIDs: Set<String>
-    ) {
-        let id = result.item.id
-        var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        guard let series = try? context.fetch(descriptor).first else { return }
-        if let categoryId = series.categoryId, hiddenCategoryIDs.contains(categoryId) {
-            return
-        }
-
-        if series.tmdbId == nil, let tmdbId = result.resolvedTMDBId {
-            series.tmdbId = tmdbId
-        }
-        if let details = result.details {
-            // Background context: skip the cast relationship — see
-            // applySeriesDetails. The embedding uses the `series.cast`
-            // string; the detail view fully enriches (incl. cast) later.
-            applySeriesDetails(details, to: series, context: context, includeCast: false)
-        }
-        let document = Self.document(for: .init(
-            name: result.item.title,
-            year: result.item.year,
-            genre: series.genre,
-            tagline: series.tagline,
-            plot: series.plot,
-            cast: series.cast
-        ), embedder: embedder)
-        if let vector = try? embedder.vector(for: document) {
-            series.embeddingData = TextEmbedder.encode(vector)
-        }
-        series.indexedAt = Date()
-    }
-
-    /// The document to embed for a title, in the shape this embedder's backend
-    /// can actually use. The coarse sentence backend (tvOS) drowns in a full
-    /// plot + cast document — see `TextEmbedder.prefersShortDocuments`.
-    private static func document(
-        for facts: ContentIndexText.TitleFacts,
-        embedder: TextEmbedder
-    ) -> String {
-        embedder.prefersShortDocuments
-            ? ContentIndexText.shortDocument(for: facts)
-            : ContentIndexText.document(for: facts)
+        if detailsMemo.count >= detailsMemoLimit { detailsMemo.removeAll() }
+        detailsMemo[key] = details
+        return (details, true)
     }
 
     // MARK: - TMDB search with year fallback

@@ -329,6 +329,17 @@ struct LoginView: View {
     // MARK: - Add playlist
 
     private func addPlaylist() {
+        // A missing `http://` fails with an opaque "unsupported URL"; add it,
+        // and show it in the field so a failed attempt leaves the fixed address.
+        switch sourceType {
+        case .xtream: serverURL = UserEnteredURL.withDefaultScheme(serverURL)
+        case .m3u:
+            m3uURL = UserEnteredURL.withDefaultScheme(m3uURL)
+            epgURL = UserEnteredURL.withDefaultScheme(epgURL)
+        case .stalker: portalURL = UserEnteredURL.withDefaultScheme(portalURL)
+        case .mediaServer: mediaServerURL = UserEnteredURL.withDefaultScheme(mediaServerURL)
+        }
+
         switch sourceType {
         case .xtream:
             loginXtream(

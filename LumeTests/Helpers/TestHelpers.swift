@@ -120,7 +120,12 @@ struct StringCatalog {
     }
 
     static func localizable(filePath: String = #filePath) throws -> Self {
-        let url = repoRootURL(filePath: filePath).appendingPathComponent("Lume/Localizable.xcstrings")
+        try table("Localizable", filePath: filePath)
+    }
+
+    /// One of the app's String Catalogs, by table name.
+    static func table(_ name: String, filePath: String = #filePath) throws -> Self {
+        let url = repoRootURL(filePath: filePath).appendingPathComponent("Lume/\(name).xcstrings")
         let root = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         return Self(
             sourceLanguage: root?["sourceLanguage"] as? String ?? "en",
@@ -145,7 +150,7 @@ struct StringCatalog {
 /// The locales Lume ships. `en` is the catalog's source language and carries no
 /// `stringUnit` of its own for all but a handful of entries, so its value is the
 /// key itself.
-let shippingLocales: Set<String> = ["ar", "en", "de", "es", "fr", "it", "ja", "ko", "pt", "zh-Hans"]
+let shippingLocales: Set<String> = ["ar", "en", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh-Hans"]
 
 extension StringCatalog {
     /// Every key in the catalog.

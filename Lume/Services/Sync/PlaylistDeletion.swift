@@ -55,6 +55,7 @@ nonisolated enum PlaylistDeletion {
         // lifetime of the install on each deleted playlist.
         SweepSkipDefaults.removeAll(playlistId: playlistID)
         M3UDigestStore.remove(playlistId: playlistID)
+        TitleGroupPrimaries.Deferred.clear(playlistId: playlistID)
         WebDAVDigestStore.remove(playlistId: playlistID)
         XtreamDigestStore.removeAll(playlistId: playlistID)
         // Remembered sports channel picks name a channel in this playlist; drop
@@ -69,8 +70,11 @@ nonisolated enum PlaylistDeletion {
         // allows. Everything is scoped by the playlist-prefixed id, which
         // `starts(with:)` turns into a range seek on the unique `id` index.
         removeLiveStreams(playlistID: playlistID, container: context.container)
-        removeMovies(playlistID: playlistID, container: context.container)
-        removeSeries(playlistID: playlistID, container: context.container)
+        let movieGroupKeys = removeMovies(playlistID: playlistID, container: context.container)
+        let seriesGroupKeys = removeSeries(playlistID: playlistID, container: context.container)
+        try? TitleGroupPrimaries.settleRemoval(
+            movieGroupKeys: movieGroupKeys, seriesGroupKeys: seriesGroupKeys, in: context.container
+        )
     }
 
     /// Deletes every live stream of `playlistID`, and the guide listings no
@@ -112,9 +116,20 @@ nonisolated enum PlaylistDeletion {
     /// a predicate delete would orphan, so they go row by row — a page at a
     /// time, each page on its own context and saved, so no page outlives its
     /// own deletion.
-    static func removeMovies(playlistID: UUID, container: ModelContainer) {
+    ///
+    /// Returns the group and match keys of the removed rows that carried a
+    /// tmdbId, for `TitleGroupPrimaries.settleRemoval`: such a row may have
+    /// been the last one its title's tmdbId-less rows (in other playlists)
+    /// were bridged through, or one of two ids that kept them apart. Its match
+    /// key is a `t:` key, which the bridge reads as the title itself.
+    @discardableResult
+    static func removeMovies(playlistID: UUID, container: ModelContainer) -> Set<String> {
         let prefix = playlistID.uuidString
-        deletePaged(container: container, idOf: { (movie: Movie) in movie.id }, page: { cursor, limit in
+        var groupKeys = Set<String>()
+        deletePaged(container: container, idOf: { (movie: Movie) in movie.id }, onDelete: { movie in
+            guard movie.tmdbId != nil else { return }
+            groupKeys.formUnion([movie.titleGroupKey, movie.titleMatchKey].compactMap(\.self))
+        }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Movie>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id, comparator: .lexical)]
@@ -122,13 +137,20 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
+        return groupKeys
     }
 
     /// Deletes every series of `playlistID`, paged like `removeMovies`; the
-    /// episodes and cast cascade from each series.
-    static func removeSeries(playlistID: UUID, container: ModelContainer) {
+    /// episodes and cast cascade from each series. Returns the title-group
+    /// keys to settle, as `removeMovies` does.
+    @discardableResult
+    static func removeSeries(playlistID: UUID, container: ModelContainer) -> Set<String> {
         let prefix = playlistID.uuidString
-        deletePaged(container: container, idOf: { (show: Series) in show.id }, page: { cursor, limit in
+        var groupKeys = Set<String>()
+        deletePaged(container: container, idOf: { (show: Series) in show.id }, onDelete: { show in
+            guard show.tmdbId != nil else { return }
+            groupKeys.formUnion([show.titleGroupKey, show.titleMatchKey].compactMap(\.self))
+        }, page: { cursor, limit in
             var descriptor = FetchDescriptor<Series>(
                 predicate: #Predicate { $0.id.starts(with: prefix) && $0.id > cursor },
                 sortBy: [SortDescriptor(\.id, comparator: .lexical)]
@@ -136,6 +158,7 @@ nonisolated enum PlaylistDeletion {
             descriptor.fetchLimit = limit
             return descriptor
         })
+        return groupKeys
     }
 
     /// Deletes every row `page` selects, `pageSize` at a time, keyed on the last
@@ -147,6 +170,7 @@ nonisolated enum PlaylistDeletion {
         container: ModelContainer,
         pageSize: Int = 2000,
         idOf: (T) -> String,
+        onDelete: (T) -> Void = { _ in },
         page: (_ cursor: String, _ limit: Int) -> FetchDescriptor<T>
     ) {
         var cursor = ""
@@ -159,6 +183,7 @@ nonisolated enum PlaylistDeletion {
                 fetched = rows.count
                 if let last = rows.last { cursor = idOf(last) }
                 for row in rows {
+                    onDelete(row)
                     context.delete(row)
                 }
                 if !rows.isEmpty { try? context.save() }

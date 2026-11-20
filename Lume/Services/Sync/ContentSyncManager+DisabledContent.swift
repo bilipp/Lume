@@ -24,13 +24,15 @@ extension ContentSyncManager {
     /// cast and episodes cascade; live streams through its bulk delete, which
     /// also drops the guide listings no other playlist's channel needs.
     func removeDisabledContent(playlistId: UUID, disabled: Set<PlaylistTab>) {
+        var movieGroupKeys = Set<String>()
+        var seriesGroupKeys = Set<String>()
         for kind in PlaylistTab.allCases where disabled.contains(kind) {
             switch kind {
             case .movies:
-                PlaylistDeletion.removeMovies(playlistID: playlistId, container: modelContainer)
+                movieGroupKeys = PlaylistDeletion.removeMovies(playlistID: playlistId, container: modelContainer)
                 XtreamDigestStore.remove(playlistId: playlistId, endpoint: .movies)
             case .series:
-                PlaylistDeletion.removeSeries(playlistID: playlistId, container: modelContainer)
+                seriesGroupKeys = PlaylistDeletion.removeSeries(playlistID: playlistId, container: modelContainer)
                 XtreamDigestStore.remove(playlistId: playlistId, endpoint: .series)
             case .liveTV:
                 PlaylistDeletion.removeLiveStreams(playlistID: playlistId, container: modelContainer)
@@ -39,6 +41,13 @@ extension ContentSyncManager {
             pruneStaleCategories(playlistId: playlistId, type: kind.categoryType, seenApiIds: [])
             Logger.database.info(
                 "Removed \(kind.rawValue, privacy: .public) content of playlist \(playlistId.uuidString, privacy: .public): kind disabled"
+            )
+        }
+        // Same settling a playlist deletion runs: other playlists' copies of a
+        // removed title fall back to, or regroup around, what is left.
+        if !movieGroupKeys.isEmpty || !seriesGroupKeys.isEmpty {
+            try? TitleGroupPrimaries.settleRemoval(
+                movieGroupKeys: movieGroupKeys, seriesGroupKeys: seriesGroupKeys, in: modelContainer
             )
         }
     }

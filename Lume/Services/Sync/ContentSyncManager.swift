@@ -19,6 +19,7 @@ actor ContentSyncManager {
     let webdavClient: WebDAVClient
     let jellyfinClient: JellyfinClient
     let plexClient: PlexClient
+    let tmdbClient: TMDBClient
     private var activeSyncPlaylistIDs: Set<UUID> = []
 
     /// Number of items to process before saving and resetting the context.
@@ -31,13 +32,15 @@ actor ContentSyncManager {
         xtreamClient: XtreamClient = XtreamClient(),
         webdavClient: WebDAVClient = WebDAVClient(),
         jellyfinClient: JellyfinClient = JellyfinClient(),
-        plexClient: PlexClient = PlexClient()
+        plexClient: PlexClient = PlexClient(),
+        tmdbClient: TMDBClient = .shared
     ) {
         self.modelContainer = modelContainer
         self.xtreamClient = xtreamClient
         self.webdavClient = webdavClient
         self.jellyfinClient = jellyfinClient
         self.plexClient = plexClient
+        self.tmdbClient = tmdbClient
     }
 
     // MARK: - Playlist Sync

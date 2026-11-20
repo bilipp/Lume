@@ -98,6 +98,19 @@ struct ScopedBrowseQueryTests {
         #expect(SeriesCollectionQuery.gridDescriptor(for: .favorites, scope: combined).fetchLimit == nil)
     }
 
+    /// Grouping widens the fetch, never the predicate: the composed scope stays
+    /// one `evaluate`, not a fetch per member.
+    @Test func `grouped combined rails keep one composed predicate`() {
+        for kind in Self.kinds {
+            let movies = MovieCollectionQuery.rowDescriptor(for: kind, scope: combined, grouped: true)
+            let series = SeriesCollectionQuery.rowDescriptor(for: kind, scope: combined, grouped: true)
+            #expect(movies.fetchLimit == collectionRowFetchLimit * TitleGrouping.overFetch)
+            #expect(series.fetchLimit == collectionRowFetchLimit * TitleGrouping.overFetch)
+            #expect(expressionType(movies.predicate).contains("Evaluate"))
+            #expect(expressionType(series.predicate).contains("Evaluate"))
+        }
+    }
+
     // MARK: - Combined rails stay in SQL
 
     @Test func `combined rails fetch only contributing members`() throws {

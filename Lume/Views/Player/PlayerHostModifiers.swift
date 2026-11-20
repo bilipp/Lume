@@ -47,7 +47,8 @@ extension View {
 #if os(macOS)
     extension View {
         /// Shows the controls while the pointer moves over the player and
-        /// hides them `hideDelay` after it leaves.
+        /// hides them `hideDelay` after it leaves. The window's close, minimise
+        /// and zoom buttons come and go with them.
         func playerHoverRevealsControls(
             _ isControlsVisible: Binding<Bool>,
             hideDelay: Duration = .milliseconds(600),
@@ -88,6 +89,7 @@ extension View {
                     }
                 }
                 .onDisappear { hoverHideTask?.cancel() }
+                .macWindowButtonsFollow(isControlsVisible)
         }
     }
 #endif

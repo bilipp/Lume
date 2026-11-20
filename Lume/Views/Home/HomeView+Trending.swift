@@ -106,12 +106,12 @@ extension HomeView {
         for hero in heroItems {
             switch hero {
             case let .movie(movie, _, _):
-                guard heroNeedsLogo(logoPath: movie.logoPath, enrichedAt: movie.tmdbEnrichedAt),
+                guard heroNeedsLogo(logoPath: movie.logoPath, hasFreshDetails: movie.hasFreshTMDBDetails()),
                       let tmdbId = movie.tmdbId
                 else { continue }
                 await manager.enrichMovie(id: movie.id, tmdbId: tmdbId)
             case let .series(series, _, _):
-                guard heroNeedsLogo(logoPath: series.logoPath, enrichedAt: series.tmdbEnrichedAt),
+                guard heroNeedsLogo(logoPath: series.logoPath, hasFreshDetails: series.hasFreshTMDBDetails()),
                       let tmdbId = series.tmdbId
                 else { continue }
                 await manager.enrichSeries(id: series.id, tmdbId: tmdbId)
@@ -119,13 +119,11 @@ extension HomeView {
         }
     }
 
-    /// A hero needs a logo fetch when it has none yet and hasn't been enriched
-    /// recently. The recency guard mirrors the detail screen's 14-day window so
-    /// titles TMDB simply has no logo for aren't refetched on every appearance.
-    private func heroNeedsLogo(logoPath: String?, enrichedAt: Date?) -> Bool {
-        guard (logoPath ?? "").isEmpty else { return false }
-        guard let enrichedAt else { return true }
-        return Date().timeIntervalSince(enrichedAt) >= 14 * 24 * 3600
+    /// A hero needs a logo fetch when it has none yet and its details aren't
+    /// fresh. The freshness guard mirrors the detail screen's so titles TMDB
+    /// simply has no logo for aren't refetched or re-copied on every appearance.
+    private func heroNeedsLogo(logoPath: String?, hasFreshDetails: @autoclosure () -> Bool) -> Bool {
+        (logoPath ?? "").isEmpty && !hasFreshDetails()
     }
 
     // MARK: - Watchlist
@@ -228,16 +226,16 @@ extension HomeView {
         guard !ids.isEmpty else { return [:] }
         let descriptor = FetchDescriptor<Movie>(predicate: movieTmdbIdPredicate(ids: ids))
         let scope = scopeMatcher
-        var byId: [Int: Movie] = [:]
+        var copies: [Int: [Movie]] = [:]
         for movie in (try? modelContext.fetch(descriptor)) ?? []
             where scope.contains(movie.id, .movies) && !restriction.hides(categoryID: movie.categoryId)
         {
             guard let tmdbId = movie.tmdbId else { continue }
-            // One card per title: the highest-priority member's copy wins.
-            if let kept = byId[tmdbId], scope.memberRank(of: kept.id) <= scope.memberRank(of: movie.id) { continue }
-            byId[tmdbId] = movie
+            copies[tmdbId, default: []].append(movie)
         }
-        return byId
+        let ranking = titleRanking
+        let grouped = groupDuplicateTitles
+        return copies.mapValues { ranking.best(of: $0, grouped: grouped) }
     }
 
     private func fetchSeries(tmdbIds: [Int]) -> [Int: Series] {
@@ -245,16 +243,16 @@ extension HomeView {
         guard !ids.isEmpty else { return [:] }
         let descriptor = FetchDescriptor<Series>(predicate: seriesTmdbIdPredicate(ids: ids))
         let scope = scopeMatcher
-        var byId: [Int: Series] = [:]
+        var copies: [Int: [Series]] = [:]
         for series in (try? modelContext.fetch(descriptor)) ?? []
             where scope.contains(series.id, .series) && !restriction.hides(categoryID: series.categoryId)
         {
             guard let tmdbId = series.tmdbId else { continue }
-            // One card per title: the highest-priority member's copy wins.
-            if let kept = byId[tmdbId], scope.memberRank(of: kept.id) <= scope.memberRank(of: series.id) { continue }
-            byId[tmdbId] = series
+            copies[tmdbId, default: []].append(series)
         }
-        return byId
+        let ranking = titleRanking
+        let grouped = groupDuplicateTitles
+        return copies.mapValues { ranking.best(of: $0, grouped: grouped) }
     }
 }
 

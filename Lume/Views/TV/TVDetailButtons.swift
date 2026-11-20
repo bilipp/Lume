@@ -96,6 +96,8 @@
         let title: LocalizedStringKey
         var systemImage: String = "play.fill"
         var isEnabled: Bool = true
+        /// Offered in the held-select menu; nil leaves the button without one.
+        var chooseSource: (() -> Void)?
         let action: () -> Void
 
         var body: some View {
@@ -103,6 +105,16 @@
                 Label(title, systemImage: systemImage)
             }
             .buttonStyle(TVGlassButtonStyle())
+            // A tvOS `Button` keeps the held select for itself, so
+            // `onLongPressGesture` never recognizes on it; a context menu is
+            // the platform's hold, as on the cards. Always attached (empty
+            // without `chooseSource`) so the button keeps its identity, and
+            // with it focus, when the sources arrive.
+            .contextMenu {
+                if let chooseSource {
+                    Button("Choose Source…", systemImage: "square.stack", action: chooseSource)
+                }
+            }
             .disabled(!isEnabled)
         }
     }
@@ -123,6 +135,46 @@
             }
             .buttonStyle(TVGlassButtonStyle())
             .accessibilityLabel(title)
+        }
+    }
+
+    // MARK: - Season chip style
+
+    /// A focusable selectable pill used by the season selector and small
+    /// secondary actions.
+    struct TVChipButtonStyle: ButtonStyle {
+        var isSelected: Bool
+
+        func makeBody(configuration: Configuration) -> some View {
+            StyleBody(configuration: configuration, isSelected: isSelected)
+        }
+
+        struct StyleBody: View {
+            let configuration: ButtonStyleConfiguration
+            let isSelected: Bool
+            @Environment(\.isFocused) private var isFocused
+
+            var body: some View {
+                let highlighted = isFocused || isSelected
+                configuration.label
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(highlighted ? .black : .white)
+                    .padding(.horizontal, 28)
+                    .frame(height: 60)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(fill)
+                    )
+                    .scaleEffect(isFocused ? 1.06 : 1.0)
+                    .animation(.easeOut(duration: 0.18), value: isFocused)
+                    .animation(.easeOut(duration: 0.18), value: isSelected)
+            }
+
+            private var fill: AnyShapeStyle {
+                if isFocused { return AnyShapeStyle(.white) }
+                if isSelected { return AnyShapeStyle(.white.opacity(0.85)) }
+                return AnyShapeStyle(.regularMaterial)
+            }
         }
     }
 

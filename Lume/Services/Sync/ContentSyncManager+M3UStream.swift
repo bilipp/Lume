@@ -255,6 +255,7 @@ extension ContentSyncManager {
         // them would delete every row the unread tail would have kept.
         try Task.checkCancellation()
 
+        try electDeferredTitleGroupPrimaries(state)
         pruneStaleM3URows(playlistId: playlistId, state: state)
 
         return M3UImportSummary(

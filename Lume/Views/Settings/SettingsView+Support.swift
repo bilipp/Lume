@@ -74,6 +74,16 @@ import SwiftUI
                 }
 
                 NavigationLink {
+                    WhatsNewHistoryView()
+                } label: {
+                    Label {
+                        Text("What’s New", tableName: "WhatsNew")
+                    } icon: {
+                        Image(systemName: "sparkles")
+                    }
+                }
+
+                NavigationLink {
                     CreditsView()
                 } label: {
                     Label("Acknowledgements", systemImage: "doc.text.magnifyingglass")

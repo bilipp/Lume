@@ -431,7 +431,8 @@ nonisolated struct DebugLogExporter {
         // Lume's keys are lowercase and dotted ("player.ks.hardwareDecode");
         // the system and SDK domains mixed into `standard` are capitalized.
         // `hue.` holds the bridge's address and id, the area id and the lamps' snapshot.
-        let excludedPrefixes = ["com.", "diagnostics.", "debug.logging.enabledSince", "hue."]
+        // The VOD source picks name titles the viewer watched.
+        let excludedPrefixes = ["com.", "diagnostics.", "debug.logging.enabledSince", "hue.", VODSourcePreferences.storageKey]
         var lines: [String] = []
         for (key, value) in defaults.dictionaryRepresentation() {
             guard key.count < 80, key.first?.isLowercase == true, key.contains("."),

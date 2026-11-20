@@ -99,7 +99,7 @@ struct LiveStreamCardView: View {
                         .foregroundStyle(.blue)
                 }
 
-                if let playlistBadge = provenance.name(forContentID: stream.id, in: .liveTV) {
+                if let playlistBadge = provenance.name(forStreamID: stream.id) {
                     PlaylistBadge(name: playlistBadge)
                 }
             }

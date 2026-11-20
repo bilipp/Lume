@@ -166,12 +166,13 @@ final class M3UColdImportBenchmarks: XCTestCase {
     }
 
     /// `.m3uParse` is emitted once per *gap between batches* — ~860 intervals
-    /// for a full provider file — and `.m3uClassify` / the three `.m3uUpsert*`
-    /// once per batch. `XCTOSSignpostMetric` keeps one value per name per
-    /// iteration and that value is the first of those intervals, not their sum,
-    /// so read those five as a first-batch sample; see the baseline block above.
-    /// The five sweeps, `.catalogPurgeHistory` and `.m3uImport` are one
-    /// interval each and are exact. `.catalogPurgeHistory` is emitted by
+    /// for a full provider file — and `.m3uClassify`, the three `.m3uUpsert*`
+    /// and `.m3uBatchSave` once per batch. `XCTOSSignpostMetric` keeps one
+    /// value per name per iteration and that value is the first of those
+    /// intervals, not their sum, so read those six as a first-batch sample; see
+    /// the baseline block above. `.m3uTitleGroupPrimaries`, the five sweeps,
+    /// `.catalogPurgeHistory` and `.m3uImport` are one interval each and are
+    /// exact. `.catalogPurgeHistory` is emitted by
     /// `performSync` for every source, so it sits beside `.m3uImport` rather
     /// than inside it.
     static let m3uSignposts: [PerfSignpost] = [
@@ -181,6 +182,8 @@ final class M3UColdImportBenchmarks: XCTestCase {
         .m3uUpsertLive,
         .m3uUpsertMovies,
         .m3uUpsertEpisodes,
+        .m3uBatchSave,
+        .m3uTitleGroupPrimaries,
         .m3uPruneLive,
         .m3uPruneMovies,
         .m3uPruneEpisodes,
