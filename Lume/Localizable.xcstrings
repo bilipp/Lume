@@ -107614,6 +107614,88 @@
         }
       }
     },
+    "Sources From All Playlists" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مصادر من كل قوائم التشغيل"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quellen aus allen Wiedergabelisten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuentes de todas las listas de reproducción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sources de toutes les playlists"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fonti da tutte le playlist"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのプレイリストのソース"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 재생목록의 소스"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bronnen uit alle playlists"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Źródła ze wszystkich playlist"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fontes de todas as playlists"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Источники из всех плейлистов"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tüm oynatma listelerinden kaynaklar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自所有播放列表的来源"
+          }
+        }
+      }
+    },
     "Spain" : {
       "localizations" : {
         "ar" : {
@@ -133895,6 +133977,88 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭时，搜索仅查找当前播放列表中的内容。开启此项可在您所有的播放列表中搜索。"
+          }
+        }
+      }
+    },
+    "When you play a movie or series, also offer its copies from playlists outside the active playlist or Combined View." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عند تشغيل فيلم أو مسلسل، اعرض أيضًا نسخه من قوائم التشغيل خارج قائمة التشغيل النشطة أو العرض المدمج."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beim Abspielen eines Films oder einer Serie auch Kopien aus Wiedergabelisten außerhalb der aktiven Wiedergabeliste oder der kombinierten Ansicht anbieten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al reproducir una película o serie, ofrecer también sus copias de listas fuera de la lista activa o de la vista combinada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lors de la lecture d'un film ou d'une série, proposer aussi ses copies issues de playlists hors de la playlist active ou de la vue combinée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando riproduci un film o una serie, offri anche le sue copie dalle playlist al di fuori della playlist attiva o della vista combinata."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "映画やシリーズを再生するとき、アクティブなプレイリストや統合ビュー以外のプレイリストにあるコピーも表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영화나 시리즈를 재생할 때 활성 재생목록이나 통합 보기 밖의 재생목록에 있는 사본도 제공합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bied bij het afspelen van een film of serie ook kopieën aan uit playlists buiten de actieve playlist of de gecombineerde weergave."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podczas odtwarzania filmu lub serialu oferuj też jego kopie z playlist spoza aktywnej playlisty lub widoku połączonego."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ao reproduzir um filme ou série, oferecer também as cópias de playlists fora da playlist ativa ou da visualização combinada."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "При воспроизведении фильма или сериала также предлагать его копии из плейлистов вне активного плейлиста или объединенного вида."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir film veya dizi oynatırken, etkin oynatma listesi veya Birleşik Görünüm dışındaki listelerdeki kopyalarını da sun."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放电影或剧集时，同时提供活动播放列表或合并视图之外的播放列表中的副本。"
           }
         }
       }

@@ -68,6 +68,8 @@ struct SettingsView: View {
         var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
         @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
         var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
+        @AppStorage(LibrarySettings.sourcesFromAllPlaylistsKey)
+        var sourcesFromAllPlaylists = LibrarySettings.sourcesFromAllPlaylistsDefault
         @AppStorage(SportsSyncService.tabEnabledKey) var sportsTabEnabled = SportsSyncService.tabEnabledDefault
         /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
         @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue

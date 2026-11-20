@@ -36,17 +36,26 @@ nonisolated struct VODSourceOption: Identifiable, Hashable {
 
 nonisolated enum VODSourceResolver {
     /// Every row of `row`'s title in `scope`, `row` included, best first.
-    /// `playlists` is every installed playlist; nil fetches them.
+    /// With `allPlaylists`, copies on installed playlists outside `scope` are
+    /// listed too, after the scope's own. `playlists` is every installed
+    /// playlist; nil fetches them.
     static func sources<Row: TitleSiblingRow>(
         for row: Row,
         scope: CatalogScope,
         restriction: ContentRestriction = ContentRestriction(),
         isPremium: Bool,
+        allPlaylists: Bool = LibrarySettings.sourcesFromAllPlaylists(),
         playlists: [Playlist]? = nil,
         in context: ModelContext,
         preferredLanguages: [String] = PlayerLanguageOptions.load().preferredAudioLanguages
     ) -> [VODSourceOption] {
-        let viewer = Viewer(scope: scope, restriction: restriction, isPremium: isPremium, preferredLanguages: preferredLanguages)
+        let viewer = Viewer(
+            scope: scope,
+            restriction: restriction,
+            isPremium: isPremium,
+            allPlaylists: allPlaylists,
+            preferredLanguages: preferredLanguages
+        )
         let installed = playlists ?? (try? context.fetch(FetchDescriptor<Playlist>())) ?? []
         return options(
             current: row,
@@ -65,6 +74,8 @@ private nonisolated extension VODSourceResolver {
         let scope: CatalogScope
         let restriction: ContentRestriction
         let isPremium: Bool
+        /// Also take siblings on playlists outside `scope`.
+        let allPlaylists: Bool
         let preferredLanguages: [String]
     }
 
@@ -76,10 +87,11 @@ private nonisolated extension VODSourceResolver {
 
     /// The row on screen is kept whatever the scope or restriction says (the
     /// viewer is already looking at it); siblings must belong to a member of
-    /// `scope` contributing `tab`, or to the current row's own playlist, and sit
-    /// in a category the viewer may see. Rows on a playlist the plan locks, or
-    /// that no installed playlist owns, are dropped: there is nothing to play
-    /// them with.
+    /// `scope` contributing `tab`, or to the current row's own playlist (any
+    /// playlist when `viewer.allPlaylists`), and sit in a category the viewer
+    /// may see. Other playlists' copies rank after the scope's. Rows on a
+    /// playlist the plan locks, or that no installed playlist owns, are
+    /// dropped: there is nothing to play them with.
     static func options<Row: TitleGroupedRow>( // swiftlint:disable:this function_parameter_count
         current: Row,
         siblings: [Row],
@@ -97,7 +109,7 @@ private nonisolated extension VODSourceResolver {
         var seen: Set<String> = [current.id]
         for row in siblings where seen.insert(row.id).inserted {
             guard let owner = PlaylistOwner.declaredOwner(of: row.id),
-                  owner == currentOwner || members.contains(owner),
+                  viewer.allPlaylists || owner == currentOwner || members.contains(owner),
                   !viewer.restriction.hides(categoryID: row.categoryId)
             else { continue }
             rows.append(row)
