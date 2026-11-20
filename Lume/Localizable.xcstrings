@@ -82397,91 +82397,180 @@
         }
       }
     },
-    "Preview the focused channel, muted, right in the TV Guide." : {
-      "comment" : "Lume Pro paywall description of the Guide Preview feature (tvOS): the focused channel plays muted inside the TV Guide.",
+    "Preview Sound" : {
+      "comment" : "tvOS Settings › Live TV: toggle under Guide Preview that plays the Guide's live preview with sound instead of muted (pauses other apps' audio).",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "معاينة القناة المحددة، مع كتم الصوت، داخل دليل البرامج مباشرةً."
+            "value" : "صوت المعاينة"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sieh dir den ausgewählten Sender stumm direkt im TV-Programm an."
+            "value" : "Vorschau-Ton"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preview the focused channel, muted, right in the TV Guide."
+            "value" : "Preview Sound"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Previsualiza sin sonido el canal seleccionado directamente en la guía de TV."
+            "value" : "Sonido de la vista previa"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prévisualisez la chaîne sélectionnée, sans le son, directement dans le guide TV."
+            "value" : "Son de l’aperçu"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guarda in anteprima, senza audio, il canale selezionato direttamente nella guida TV."
+            "value" : "Audio anteprima"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "フォーカス中のチャンネルを、番組表の中でそのままミュートでプレビューできます。"
+            "value" : "プレビューのサウンド"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "선택한 채널을 TV 편성표에서 바로 음소거로 미리 보세요."
+            "value" : "미리보기 사운드"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bekijk een voorvertoning van de geselecteerde zender, zonder geluid, direct in de tv-gids."
+            "value" : "Geluid bij voorvertoning"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Podgląd zaznaczonego kanału bez dźwięku bezpośrednio w programie TV."
+            "value" : "Dźwięk podglądu"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pré-visualiza sem som o canal selecionado diretamente no guia de TV."
+            "value" : "Som da pré-visualização"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Смотрите выбранный канал без звука прямо в телегиде."
+            "value" : "Звук превью"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seçili kanalı sessiz olarak doğrudan TV Rehberi'nde önizleyin."
+            "value" : "Önizleme Sesi"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "直接在电视指南中静音预览当前选中的频道。"
+            "value" : "预览声音"
+          }
+        }
+      }
+    },
+    "Preview the focused channel right in the TV Guide." : {
+      "comment" : "Lume Pro paywall description of the Guide Preview feature (tvOS): the focused channel plays inside the TV Guide.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "معاينة القناة المحددة داخل دليل البرامج مباشرةً."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sieh dir den ausgewählten Sender direkt im TV-Programm an."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview the focused channel right in the TV Guide."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previsualiza el canal seleccionado directamente en la guía de TV."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prévisualisez la chaîne sélectionnée directement dans le guide TV."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda in anteprima il canale selezionato direttamente nella guida TV."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォーカス中のチャンネルを、番組表の中でそのままプレビューできます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 채널을 TV 편성표에서 바로 미리 보세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bekijk een voorvertoning van de geselecteerde zender direct in de tv-gids."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podgląd zaznaczonego kanału bezpośrednio w programie TV."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pré-visualiza o canal selecionado diretamente no guia de TV."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Смотрите выбранный канал прямо в телегиде."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seçili kanalı doğrudan TV Rehberi'nde önizleyin."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接在电视指南中预览当前选中的频道。"
           }
         }
       }
@@ -106524,91 +106613,91 @@
         }
       }
     },
-    "Small and Large play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height." : {
-      "comment" : "tvOS Settings › Live TV: footnote under the Guide Preview row, explaining its four choices (Small, Large, Info Only, Off).",
+    "Small and Large play the focused channel, muted unless Preview Sound is on, and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height." : {
+      "comment" : "tvOS Settings › Live TV: footnote under the Guide Preview and Preview Sound rows, explaining the four Guide Preview choices (Small, Large, Info Only, Off). “Preview Sound” is the toggle right above.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يشغّل «صغير» و«كبير» القناة المحددة بدون صوت ويستخدمان اتصالًا بالمزوّد أثناء التصفح. يعرضها «المعلومات فقط» بدون فيديو؛ ويمنح «إيقاف» دليل البرامج الارتفاع الكامل."
+            "value" : "يشغّل «صغير» و«كبير» القناة المحددة بدون صوت ما لم يكن «صوت المعاينة» مفعّلًا، ويستخدمان اتصالًا بالمزوّد أثناء التصفح. يعرضها «المعلومات فقط» بدون فيديو؛ ويمنح «إيقاف» دليل البرامج الارتفاع الكامل."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "„Klein“ und „Groß“ spielen den ausgewählten Sender stumm über dem Programmführer ab und belegen beim Stöbern eine Verbindung deines Anbieters. „Nur Infos“ zeigt den Sender ohne Video; „Aus“ gibt dem Programmführer die volle Höhe."
+            "value" : "„Klein“ und „Groß“ spielen den ausgewählten Sender über dem Programmführer ab – stumm, solange „Vorschau-Ton“ aus ist – und belegen beim Stöbern eine Verbindung deines Anbieters. „Nur Infos“ zeigt den Sender ohne Video; „Aus“ gibt dem Programmführer die volle Höhe."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Small and Large play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height."
+            "value" : "Small and Large play the focused channel, muted unless Preview Sound is on, and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pequeña y Grande reproducen sin sonido el canal seleccionado sobre la guía y usan una conexión de tu proveedor mientras navegas. Solo información muestra el canal sin vídeo; Desactivado deja a la guía toda la altura."
+            "value" : "Pequeña y Grande reproducen el canal seleccionado sobre la guía, sin sonido salvo que Sonido de la vista previa esté activado, y usan una conexión de tu proveedor mientras navegas. Solo información muestra el canal sin vídeo; Desactivado deja a la guía toda la altura."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Petit et Grand lisent la chaîne sélectionnée sans le son au-dessus du guide et utilisent une connexion de votre fournisseur pendant la navigation. Infos uniquement affiche la chaîne sans vidéo ; Désactivé donne au guide toute la hauteur."
+            "value" : "Petit et Grand lisent la chaîne sélectionnée au-dessus du guide, sans le son sauf si Son de l’aperçu est activé, et utilisent une connexion de votre fournisseur pendant la navigation. Infos uniquement affiche la chaîne sans vidéo ; Désactivé donne au guide toute la hauteur."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Piccola e Grande riproducono senza audio il canale selezionato sopra la guida e usano una connessione del provider mentre navighi. Solo informazioni mostra il canale senza video; Disattivato lascia alla guida tutta l'altezza."
+            "value" : "Piccola e Grande riproducono il canale selezionato sopra la guida, senza audio se Audio anteprima è disattivato, e usano una connessione del provider mentre navighi. Solo informazioni mostra il canale senza video; Disattivato lascia alla guida tutta l'altezza."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「小」と「大」は、選択中のチャンネルを番組表の上で消音再生し、閲覧中はプロバイダの接続を1つ使用します。「情報のみ」は映像なしでチャンネルを表示し、「オフ」では番組表が画面の高さいっぱいに表示されます。"
+            "value" : "「小」と「大」は、選択中のチャンネルを番組表の上で再生し（「プレビューのサウンド」がオフの間は消音）、閲覧中はプロバイダの接続を1つ使用します。「情報のみ」は映像なしでチャンネルを表示し、「オフ」では番組表が画面の高さいっぱいに表示されます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "'작게'와 '크게'는 선택한 채널을 편성표 위에서 음소거로 재생하며, 둘러보는 동안 제공업체 연결을 하나 사용합니다. '정보만'은 영상 없이 채널을 표시하고, '끔'은 편성표를 전체 높이로 표시합니다."
+            "value" : "'작게'와 '크게'는 선택한 채널을 편성표 위에서 재생하며('미리보기 사운드'가 꺼져 있으면 음소거), 둘러보는 동안 제공업체 연결을 하나 사용합니다. '정보만'은 영상 없이 채널을 표시하고, '끔'은 편성표를 전체 높이로 표시합니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“Klein” en “Groot” spelen de geselecteerde zender zonder geluid af en gebruiken een verbinding van je aanbieder terwijl je bladert. “Alleen info” toont de zender zonder video; “Uit” geeft de gids de volledige hoogte."
+            "value" : "“Klein” en “Groot” spelen de geselecteerde zender af, zonder geluid tenzij “Geluid bij voorvertoning” aanstaat, en gebruiken een verbinding van je aanbieder terwijl je bladert. “Alleen info” toont de zender zonder video; “Uit” geeft de gids de volledige hoogte."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "„Mały” i „Duży” odtwarzają zaznaczony kanał bez dźwięku i podczas przeglądania zajmują połączenie u dostawcy. „Tylko informacje” pokazuje go bez wideo, a „Wył.” daje programowi TV pełną wysokość."
+            "value" : "„Mały” i „Duży” odtwarzają zaznaczony kanał – bez dźwięku, chyba że włączono „Dźwięk podglądu” – i podczas przeglądania zajmują połączenie u dostawcy. „Tylko informacje” pokazuje go bez wideo, a „Wył.” daje programowi TV pełną wysokość."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pequena e Grande reproduzem sem som o canal selecionado acima do guia e usam uma conexão do seu provedor enquanto você navega. Só informações mostra o canal sem vídeo; Desativado deixa o guia com a altura toda."
+            "value" : "Pequena e Grande reproduzem o canal selecionado acima do guia, sem som a menos que Som da pré-visualização esteja ativado, e usam uma conexão do seu provedor enquanto você navega. Só informações mostra o canal sem vídeo; Desativado deixa o guia com a altura toda."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "В режимах «Маленький» и «Большой» выбранный канал воспроизводится без звука и при просмотре гида занимает одно подключение провайдера. «Только информация» показывает канал без видео, «Выкл.» отдает телегиду всю высоту экрана."
+            "value" : "В режимах «Маленький» и «Большой» выбранный канал воспроизводится (без звука, если «Звук превью» выключен) и при просмотре гида занимает одно подключение провайдера. «Только информация» показывает канал без видео, «Выкл.» отдает телегиду всю высоту экрана."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Küçük ve Büyük, seçili kanalı sessiz oynatır ve siz göz atarken bir sağlayıcı bağlantısı kullanır. Yalnızca Bilgi, kanalı videosuz gösterir; Kapalı, Rehber'e tam yüksekliği verir."
+            "value" : "Küçük ve Büyük, seçili kanalı Önizleme Sesi açık değilse sessiz oynatır ve siz göz atarken bir sağlayıcı bağlantısı kullanır. Yalnızca Bilgi, kanalı videosuz gösterir; Kapalı, Rehber'e tam yüksekliği verir."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“小”和“大”会在指南上方静音播放所选频道，浏览时占用一个服务商连接。“仅信息”显示频道但不播放视频；“关”让指南占满整个高度。"
+            "value" : "“小”和“大”会在指南上方播放所选频道（未开启“预览声音”时静音），浏览时占用一个服务商连接。“仅信息”显示频道但不播放视频；“关”让指南占满整个高度。"
           }
         }
       }

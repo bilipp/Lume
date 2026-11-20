@@ -224,8 +224,8 @@ struct MultiViewAVTile: View {
     var body: some View {
         MultiViewAVSurface(coordinator: coordinator)
             .onAppear {
-                if role.mixesWithOtherAudio {
-                    MultiViewTileAudioSession.configureMixing()
+                if role.configuresAudioSession {
+                    MultiViewTileAudioSession.configure(GuidePreviewAudioSession(isMuted: isMuted))
                 }
                 coordinator.isMuted = isMuted
                 coordinator.startupTimeout = usesQuickStartupTimeout
@@ -300,8 +300,8 @@ struct MultiViewReconnectingTile<Coordinator: MultiViewReconnectingCoordinator, 
     var body: some View {
         surface(coordinator)
             .onAppear {
-                if role.mixesWithOtherAudio {
-                    MultiViewTileAudioSession.configureMixing()
+                if role.configuresAudioSession {
+                    MultiViewTileAudioSession.configure(GuidePreviewAudioSession(isMuted: isMuted))
                 }
                 coordinator.isEmbedded = true
                 coordinator.isMuted = isMuted
@@ -399,15 +399,25 @@ private extension View {
 
 // MARK: - Audio session
 
-/// A muted guide preview must not interrupt audio another app is playing.
-/// `.ambient` mixes with it. Never deactivated here: by the time a preview
-/// tile goes away, the full-screen player may already own the session.
+/// Never deactivated here: by the time a preview tile goes away, the
+/// full-screen player may already own the session.
 enum MultiViewTileAudioSession {
-    static func configureMixing() {
+    static func configure(_ kind: GuidePreviewAudioSession) {
         #if os(tvOS)
             let session = AVAudioSession.sharedInstance()
-            guard session.category != .ambient || session.mode != .default || !session.categoryOptions.isEmpty else { return }
-            try? session.setCategory(.ambient, mode: .default, options: [])
+            switch kind {
+            case .mixWithOthers:
+                guard session.category != .ambient || session.mode != .default || !session.categoryOptions.isEmpty
+                else { return }
+                try? session.setCategory(.ambient, mode: .default, options: [])
+            case .interruptOthers:
+                // Same setup as `FullScreenPlayerView.configureAudioSessionForPlayback`:
+                // LumeEngine has no audio path without an active `.playback`
+                // session and a channel preference.
+                try? session.setCategory(.playback, mode: .moviePlayback, options: [])
+                try? session.setActive(true, options: [])
+                PlayerAudioChannelPreference.apply(sourceChannels: nil)
+            }
         #endif
     }
 }

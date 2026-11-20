@@ -77,6 +77,11 @@ struct PlayerSettingsTests {
         #expect(GuidePreviewMode(storedValue: defaults.string(forKey: key)) == .small)
     }
 
+    @Test func `guide preview sound storage key and default off`() {
+        #expect(PlayerSettings.tvGuidePreviewSoundKey == "player.tvGuidePreviewSound")
+        #expect(PlayerSettings.tvGuidePreviewSoundDefault == false)
+    }
+
     @Test func `live quality switch storage key and default`() {
         #expect(PlayerSettings.Playback.liveQualitySwitchKey == "player.liveQualitySwitch")
         #expect(PlayerSettings.Playback.liveQualitySwitchDefault == false)

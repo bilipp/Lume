@@ -3,7 +3,7 @@
 //  Lume
 //
 //  The tvOS Guide's now-playing hero: what the focused channel is airing on
-//  the left, the settled channel's muted picture on the right. It sits above the time ruler,
+//  the left, the settled channel's picture on the right. It sits above the time ruler,
 //  outside the focus strip, and is never a focus target.
 //
 
