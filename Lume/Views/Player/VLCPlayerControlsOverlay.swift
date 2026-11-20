@@ -184,10 +184,21 @@ import VLCKit
 
         private var bottomControls: some View {
             VStack(spacing: 14) {
-                HStack(alignment: .bottom, spacing: 16) {
-                    titleBlock
-                    Spacer(minLength: 0)
-                    secondaryControls
+                // Above the title row, not inside it: beside the control pill the
+                // chips get only the title's column and wrap one per line.
+                VStack(alignment: .leading, spacing: 2) {
+                    StreamInfoCaption(
+                        media: media,
+                        videoInfo: coordinator.videoInfo,
+                        engine: .vlcKit,
+                        sampler: coordinator
+                    )
+                    .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
+                    HStack(alignment: .bottom, spacing: 16) {
+                        titleBlock
+                        Spacer(minLength: 0)
+                        secondaryControls
+                    }
                 }
 
                 if media.isLive {
@@ -207,12 +218,6 @@ import VLCKit
 
         private var titleBlock: some View {
             VStack(alignment: .leading, spacing: 2) {
-                StreamInfoCaption(
-                    media: media,
-                    videoInfo: coordinator.videoInfo,
-                    engine: .vlcKit,
-                    sampler: coordinator
-                )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)
