@@ -16,11 +16,7 @@ struct SportsReplayDetail: View {
         detail
             .recordingsLibraryActions(model)
             .preferredColorScheme(.dark)
-        #if os(tvOS)
-            .fullScreenCover(item: $model.playingMedia) { FullScreenPlayerView(media: $0) }
-        #else
             .recordingPlayer(item: $model.playingMedia)
-        #endif
     }
 
     @ViewBuilder
@@ -70,7 +66,9 @@ struct SportsReplayActions: View {
                     }
                 }
             }
-            if let recording = selected {
+            // The store's copy, not the game's: a capture that finished while
+            // the sheet was open is no longer `.recording`, and has a resume point.
+            if let recording = selected.map({ RecordingServerStore.shared.current($0) }) {
                 Text(verbatim: versionLabel(recording)).font(.caption).foregroundStyle(.secondary)
                 if recording.programmeStart.map({ recording.start > $0.addingTimeInterval(60) }) == true || recording.isPartial {
                     Label("Partial recording", systemImage: "circle.lefthalf.filled")
