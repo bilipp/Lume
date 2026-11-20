@@ -147,6 +147,9 @@ struct SportsReplaysView: View {
     private var replayGroups: some View {
         if browse {
             SportsReplayBrowser(games: filtered, card: card)
+        } else if filter.recentlyAdded {
+            // In the order they were added; day headings would regroup them by kickoff.
+            ForEach(filtered) { card($0) }
         } else {
             let groups = Dictionary(grouping: filtered) { Calendar.current.startOfDay(for: $0.fixture.startDate) }
             ForEach(groups.keys.sorted(by: >), id: \.self) { day in

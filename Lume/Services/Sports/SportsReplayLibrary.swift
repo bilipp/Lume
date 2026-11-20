@@ -62,7 +62,7 @@ nonisolated enum SportsReplayLibrary {
             let match: SportsFixture?
             if named.count == 1 {
                 match = named.first
-            } else if named.isEmpty, !namesAnyTeam(recording, fixtures: Array(candidates), aliases: aliases),
+            } else if named.isEmpty, !namesAnyTeam(recording, leagues: Set(candidates.map(\.leagueId)), in: uniqueFixtures.values, aliases: aliases),
                       let ref = recording.sourceRef.flatMap(RecordingSourceRef.init(rawValue:))
             {
                 let fallback = candidates.filter {
@@ -82,12 +82,19 @@ nonisolated enum SportsReplayLibrary {
         }.sorted { $0.fixture.startDate > $1.fixture.startDate }
     }
 
-    private static func namesAnyTeam(_ recording: ServerRecording, fixtures: [SportsFixture], aliases: SportsTeamAliases) -> Bool {
+    /// Whether the programme names any team of those leagues, not only the
+    /// teams kicking off in its window: a rebroadcast of an earlier game on a
+    /// league's channel names that game's teams, and is no game of this window.
+    private static func namesAnyTeam(
+        _ recording: ServerRecording, leagues: Set<String>, in fixtures: some Collection<SportsFixture>, aliases: SportsTeamAliases
+    ) -> Bool {
         let haystack = SportsMatcher.normalize(recording.title + " " + String((recording.programmeDescription ?? "").prefix(200)))
-        return fixtures.contains { fixture in
-            [fixture.home?.team, fixture.away?.team].compactMap(\.self).contains { team in
-                SportsMatcher.tokens(for: team, aliases: aliases).contains { haystack.contains(" \($0) ") }
-            }
+        let teams = Dictionary(
+            fixtures.filter { leagues.contains($0.leagueId) }.flatMap { [$0.home?.team, $0.away?.team].compactMap(\.self) }.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        ).values
+        return teams.contains { team in
+            SportsMatcher.tokens(for: team, aliases: aliases).contains { haystack.contains(" \($0) ") }
         }
     }
 }

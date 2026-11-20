@@ -59,8 +59,10 @@ struct SportsReplayHub<Scores: View>: View {
         }
     }
 
+    /// Includes whether each recording is replayable: one that starts
+    /// capturing joins the recordings resolved, under the same id and start.
     private var resolutionKey: String {
-        visibleRecordings.map { $0.id.rawValue + String($0.start.timeIntervalSince1970) }.joined(separator: ",")
+        visibleRecordings.map { $0.id.rawValue + String($0.start.timeIntervalSince1970) + String($0.isReplayable) }.joined(separator: ",")
             + fixtures.map(\.replayKey).sorted().joined(separator: ",")
             + restriction.visibilityToken
     }

@@ -69,6 +69,20 @@ struct SportsReplayLibraryTests {
         #expect(SportsReplayLibrary.games(recordings: [self.recording(title: "Football", offset: 9000, programmeStart: kickoff)], fixtures: [game], channels: channels, aliases: aliases).isEmpty)
     }
 
+    @Test func `channel fallback skips a rebroadcast of another game in the league`() throws {
+        let game = fixture()
+        let league = game.leagueId
+        let earlier = SportsFixture(
+            id: "earlier", leagueId: league, leagueName: "NFL", leagueAbbreviation: "NFL",
+            startDate: kickoff.addingTimeInterval(-7 * 86400), status: SportsFixtureStatus(state: .final),
+            home: SportsCompetitor(team: SportsTeam(leagueId: league, teamId: "3", name: "Chicago Bears", shortName: "Bears", abbreviation: "CHI")),
+            away: SportsCompetitor(team: SportsTeam(leagueId: league, teamId: "4", name: "Green Bay Packers", shortName: "Packers", abbreviation: "GB"))
+        )
+        let rebroadcast = recording(title: "Bears at Packers (encore)")
+        let channels = try [league + ":" + game.id: Set([#require(rebroadcast.sourceRef)])]
+        #expect(SportsReplayLibrary.games(recordings: [rebroadcast], fixtures: [game, earlier], channels: channels, aliases: aliases).isEmpty)
+    }
+
     @Test func `multiple recordings are versions and fixtures are deduplicated`() {
         var second = recording()
         second.id = RecordingID(rawValue: "2")

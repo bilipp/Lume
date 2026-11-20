@@ -202,42 +202,13 @@ import SwiftUI
 
     // MARK: - Presentation
 
-    extension View {
-        /// The player for a recording: macOS's single player window, a full
-        /// screen cover everywhere else.
-        func recordingPlayer(item: Binding<PlayableMedia?>) -> some View {
-            modifier(RecordingPlayerPresentation(media: item))
-        }
-
+    private extension View {
         @ViewBuilder
         func recordingsSheetFrame() -> some View {
             #if os(macOS)
                 frame(minWidth: 520, idealWidth: 600, minHeight: 480, idealHeight: 640)
             #else
                 self
-            #endif
-        }
-    }
-
-    private struct RecordingPlayerPresentation: ViewModifier {
-        @Binding var media: PlayableMedia?
-        #if os(macOS)
-            @Environment(\.openWindow) private var openWindow
-        #endif
-
-        func body(content: Content) -> some View {
-            #if os(macOS)
-                content
-                    .onChange(of: media) { _, newValue in
-                        guard let newValue else { return }
-                        MacPlayerWindowRouter.shared.play(newValue, using: openWindow)
-                        media = nil
-                    }
-            #else
-                content
-                    .fullScreenCover(item: $media) { media in
-                        FullScreenPlayerView(media: media)
-                    }
             #endif
         }
     }

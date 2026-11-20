@@ -383,6 +383,12 @@ final class RecordingServerStore {
 
     // MARK: - Helpers
 
+    /// The listed copy of `recording`, whose status may have moved on since
+    /// a caller took it; the caller's own when the list no longer holds it.
+    func current(_ recording: ServerRecording) -> ServerRecording {
+        recordings.first { $0.id == recording.id } ?? recording
+    }
+
     func activeEndpoint() throws(RecordingActionError) -> RecordingServerEndpoint {
         guard isUnlocked else { throw .premiumRequired }
         guard let endpoint = configService.activeServer?.endpoint else { throw .notPaired }
