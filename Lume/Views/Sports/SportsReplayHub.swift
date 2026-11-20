@@ -20,6 +20,10 @@ struct SportsReplayHub<Scores: View>: View {
     @State private var channels: [String: Set<String>] = [:]
     @AppStorage(SportsSyncService.libraryReplaysKey) private var includesLibrary = false
     @State private var library: [SportsLibraryReplay] = []
+    @Query private var playlists: [Playlist]
+    /// Bumped as a replay closes: its progress lives in the catalog rows the
+    /// library snapshot was read from.
+    @State private var playbackRevision = 0
 
     private var visibleRecordings: [ServerRecording] {
         let hidden = RecordingsLibrary.hiddenRecordingIDs(
@@ -59,14 +63,14 @@ struct SportsReplayHub<Scores: View>: View {
                 .padding(.horizontal)
             }
             if showsReplays, !games.isEmpty || !others.isEmpty {
-                SportsReplaysView(games: games, others: others)
+                SportsReplaysView(games: games, others: others) { playbackRevision += 1 }
             } else {
                 scores()
             }
         }
         .observesRecordingServerWhileVisible(isActive: true)
         .task(id: resolutionKey) { await resolveRecordingChannels() }
-        .task(id: "\(includesLibrary)-\(catalogScope.token)-\(restriction.visibilityToken)") {
+        .task(id: libraryKey) {
             library = includesLibrary ? SportsReplayLibrary.files(in: context, scope: catalogScope, restriction: restriction) : []
         }
         .task(id: MatchInputs(recordings: visibleRecordings, library: library, fixtures: fixtures, channels: channels)) {
@@ -87,6 +91,14 @@ struct SportsReplayHub<Scores: View>: View {
         .onChange(of: games.isEmpty && others.isEmpty) { _, empty in
             if empty { showsReplays = false }
         }
+    }
+
+    /// What the library snapshot is read from: the switch, the scope, the
+    /// catalog as last synced or lazily loaded, and the progress playback left.
+    private var libraryKey: String {
+        let synced = playlists.compactMap { $0.lastSyncDate?.timeIntervalSince1970 }.max() ?? 0
+        return "\(includesLibrary)-\(catalogScope.token)-\(restriction.visibilityToken)-\(synced)"
+            + "-\(SportsSyncService.shared.replayLibraryRevision)-\(playbackRevision)"
     }
 
     /// Includes whether each recording is replayable: one that starts
