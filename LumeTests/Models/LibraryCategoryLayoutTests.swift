@@ -61,8 +61,8 @@ struct LibraryCategoryLayoutTests {
         let first = playlist("First")
         let second = playlist("Second")
         let scope = CatalogScope.combined([
-            (id: second.id, tabs: [.movies]),
-            (id: first.id, tabs: [.movies, .liveTV])
+            (id: second.id, tabs: Set<PlaylistTab>([.movies])),
+            (id: first.id, tabs: Set<PlaylistTab>([.movies, .liveTV]))
         ])
         let categories = [
             category("1", "Action", order: 0, in: first),
@@ -85,8 +85,8 @@ struct LibraryCategoryLayoutTests {
         let first = playlist("First")
         let second = playlist("Second")
         let scope = CatalogScope.combined([
-            (id: first.id, tabs: [.movies]),
-            (id: second.id, tabs: [.movies])
+            (id: first.id, tabs: Set<PlaylistTab>([.movies])),
+            (id: second.id, tabs: Set<PlaylistTab>([.movies]))
         ])
         let categories = [
             category("1", "Action", order: 0, in: first),
@@ -105,8 +105,8 @@ struct LibraryCategoryLayoutTests {
         let live = playlist("Live")
         let vod = playlist("VOD")
         let scope = CatalogScope.combined([
-            (id: live.id, tabs: [.liveTV]),
-            (id: vod.id, tabs: [.movies, .series])
+            (id: live.id, tabs: Set<PlaylistTab>([.liveTV])),
+            (id: vod.id, tabs: Set<PlaylistTab>([.movies, .series]))
         ])
         let categories = [
             category("1", "Ignored", order: 0, in: live),

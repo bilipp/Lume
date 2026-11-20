@@ -70,8 +70,8 @@ struct PlaylistTabTests {
         let first = UUID()
         let second = UUID()
         let scope = CatalogScope.combined([
-            (id: first, tabs: [.liveTV]),
-            (id: second, tabs: [.liveTV, .movies])
+            (id: first, tabs: Set<PlaylistTab>([.liveTV])),
+            (id: second, tabs: Set<PlaylistTab>([.liveTV, .movies]))
         ])
         #expect(scope.visibleTabs(isolatedHidden: []) == [.liveTV, .movies])
         #expect(!scope.visibleTabs(isolatedHidden: []).showsTab(.series))
@@ -80,8 +80,8 @@ struct PlaylistTabTests {
 
     @Test func `combined ignores the hidden tabs of an isolated playlist`() {
         let scope = CatalogScope.combined([
-            (id: UUID(), tabs: [.series]),
-            (id: UUID(), tabs: [.movies])
+            (id: UUID(), tabs: Set<PlaylistTab>([.series])),
+            (id: UUID(), tabs: Set<PlaylistTab>([.movies]))
         ])
         // The priority-1 member's Settings › Library › Tabs choice applies only
         // while it is selected on its own.
@@ -91,9 +91,9 @@ struct PlaylistTabTests {
     @Test func `the visible-tab token changes only when the union does`() {
         let first = UUID()
         let second = UUID()
-        let liveOnly = CatalogScope.combined([(id: first, tabs: [.liveTV]), (id: second, tabs: [.liveTV])])
-        let reordered = CatalogScope.combined([(id: second, tabs: [.liveTV]), (id: first, tabs: [.liveTV])])
-        let withMovies = CatalogScope.combined([(id: first, tabs: [.liveTV]), (id: second, tabs: [.movies])])
+        let liveOnly = CatalogScope.combined([(id: first, tabs: Set<PlaylistTab>([.liveTV])), (id: second, tabs: Set<PlaylistTab>([.liveTV]))])
+        let reordered = CatalogScope.combined([(id: second, tabs: Set<PlaylistTab>([.liveTV])), (id: first, tabs: Set<PlaylistTab>([.liveTV]))])
+        let withMovies = CatalogScope.combined([(id: first, tabs: Set<PlaylistTab>([.liveTV])), (id: second, tabs: Set<PlaylistTab>([.movies]))])
 
         let token = { (scope: CatalogScope) in PlaylistTab.encode(scope.visibleTabs(isolatedHidden: [])) }
         #expect(token(liveOnly) == "liveTV")

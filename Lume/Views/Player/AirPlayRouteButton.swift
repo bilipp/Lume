@@ -10,7 +10,7 @@
 
     /// The Cast affordance in the player overlay: an `AVRoutePickerView` styled
     /// to match the overlay's glass circle buttons. Tapping it presents the
-    /// system AirPlay route picker.
+    /// system AirPlay route picker. visionOS has no AVRoutePickerView.
     ///
     /// Picking a receiver drives full-screen video: the AVPlayer engine enables
     /// `allowsExternalPlayback`, and on iOS / visionOS the KSPlayer/VLCKit
@@ -32,24 +32,28 @@
             // AVAudioSession there is no route observation to drive the
             // KSPlayer/VLCKit → AVPlayer handoff either — so without a player
             // the button would be inert. Show it only on the AVPlayer engine.
-            #if os(macOS)
+            #if os(visionOS)
+                EmptyView()
+            #elseif os(macOS)
                 if player != nil { picker }
             #else
                 picker
             #endif
         }
 
-        private var picker: some View {
-            AirPlayRoutePicker(player: player)
-                .frame(width: 44, height: 44)
-                .contentShape(Circle())
-                .glassEffectCompat(.regularInteractive, in: Circle())
-                .accessibilityLabel("AirPlay")
-                .accessibilityValue(cast.isAirPlayActive ? (cast.airPlayRouteName ?? String(localized: "Connected")) : "")
-        }
+        #if !os(visionOS)
+            private var picker: some View {
+                AirPlayRoutePicker(player: player)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+                    .glassEffectCompat(.regularInteractive, in: Circle())
+                    .accessibilityLabel("AirPlay")
+                    .accessibilityValue(cast.isAirPlayActive ? (cast.airPlayRouteName ?? String(localized: "Connected")) : "")
+            }
+        #endif
     }
 
-    #if canImport(UIKit)
+    #if canImport(UIKit) && !os(visionOS)
         /// The system AirPlay route picker. With a `rowLabel` it draws no icon
         /// and is only the tap target over a row that draws its own label;
         /// VoiceOver reads it as one button with that label.

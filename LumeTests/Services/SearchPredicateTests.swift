@@ -265,8 +265,8 @@ struct SearchPredicateTests {
     @Test func `combined searches the members per type instead of every playlist`() {
         let (movieLive, seriesMovie, outsider) = (UUID(), UUID(), UUID())
         let scope = CatalogScope.combined([
-            (id: movieLive, tabs: [.movies, .liveTV]),
-            (id: seriesMovie, tabs: [.series, .movies])
+            (id: movieLive, tabs: Set<PlaylistTab>([.movies, .liveTV])),
+            (id: seriesMovie, tabs: Set<PlaylistTab>([.series, .movies]))
         ])
 
         let request = scopedRequest(scope, all: [outsider, movieLive, seriesMovie], searchAll: true)
@@ -302,8 +302,8 @@ struct SearchPredicateTests {
         context.insert(Movie(id: "\(outsider)-movie-1", streamId: 1, name: "Mmm Matrix"))
         try context.save()
         let scope = try CatalogScope.combined([
-            (id: #require(UUID(uuidString: big)), tabs: [.movies]),
-            (id: #require(UUID(uuidString: small)), tabs: [.movies, .series])
+            (id: #require(UUID(uuidString: big)), tabs: Set<PlaylistTab>([.movies])),
+            (id: #require(UUID(uuidString: small)), tabs: Set<PlaylistTab>([.movies, .series]))
         ])
 
         let hits = SearchFetcher.fetch(
@@ -322,8 +322,8 @@ struct SearchPredicateTests {
     @Test func `rows name their playlist only when several contribute the type`() {
         let (first, second) = (UUID(), UUID())
         let combined = CatalogScope.combined([
-            (id: first, tabs: [.movies, .liveTV]),
-            (id: second, tabs: [.movies])
+            (id: first, tabs: Set<PlaylistTab>([.movies, .liveTV])),
+            (id: second, tabs: Set<PlaylistTab>([.movies]))
         ])
 
         func names(_ tab: PlaylistTab, _ scope: CatalogScope, searchAll: Bool) -> Bool {
@@ -340,8 +340,8 @@ struct SearchPredicateTests {
     @Test func `combined asks the portals of members contributing movies or series`() {
         let (vod, liveOnly, outsider) = (UUID(), UUID(), UUID())
         let combined = CatalogScope.combined([
-            (id: liveOnly, tabs: [.liveTV]),
-            (id: vod, tabs: [.series])
+            (id: liveOnly, tabs: Set<PlaylistTab>([.liveTV])),
+            (id: vod, tabs: Set<PlaylistTab>([.series]))
         ])
 
         func candidates(_ scope: CatalogScope, all: [UUID], searchAll: Bool) -> [UUID] {

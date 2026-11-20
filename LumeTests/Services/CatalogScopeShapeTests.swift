@@ -22,7 +22,7 @@ struct CatalogScopeShapeTests {
     private let outsider = UUID()
 
     private var combined: CatalogScope {
-        .combined([(id: first, tabs: [.movies, .liveTV]), (id: second, tabs: [.movies, .series])])
+        .combined([(id: first, tabs: Set<PlaylistTab>([.movies, .liveTV])), (id: second, tabs: Set<PlaylistTab>([.movies, .series]))])
     }
 
     private func insertCatalog(in context: ModelContext) throws {
@@ -125,7 +125,7 @@ struct CatalogScopeShapeTests {
     @Test func `a type no member contributes fetches nothing`() throws {
         try OnDiskCatalogStore.withContext { context in
             try insertCatalog(in: context)
-            let scope = CatalogScope.combined([(id: first, tabs: [.movies]), (id: second, tabs: [.movies])])
+            let scope = CatalogScope.combined([(id: first, tabs: Set<PlaylistTab>([.movies])), (id: second, tabs: Set<PlaylistTab>([.movies]))])
 
             #expect(try context.fetchCount(FetchDescriptor<LiveStream>(predicate: scope.liveStreamPredicate())) == 0)
             #expect(try context.fetchCount(FetchDescriptor<Movie>(predicate: scope.moviePredicate())) == 7)
@@ -141,7 +141,7 @@ extension CatalogScopeShapeTests {
     /// `second` is priority 1 so member order can't pass by matching UUID or
     /// insertion order.
     private var rails: CatalogScope {
-        .combined([(id: second, tabs: [.movies, .series]), (id: first, tabs: [.movies, .series])])
+        .combined([(id: second, tabs: Set<PlaylistTab>([.movies, .series])), (id: first, tabs: Set<PlaylistTab>([.movies, .series]))])
     }
 
     /// Three titles per playlist with interleaved `added` stamps, the outsider's
@@ -299,7 +299,7 @@ extension CatalogScopeShapeTests {
 extension CatalogScopeShapeTests {
     /// `second` is priority 1, as for the rails.
     private var liveMembers: CatalogScope {
-        .combined([(id: second, tabs: [.liveTV]), (id: first, tabs: [.liveTV])])
+        .combined([(id: second, tabs: Set<PlaylistTab>([.liveTV])), (id: first, tabs: Set<PlaylistTab>([.liveTV]))])
     }
 
     private func liveID(_ playlist: UUID, _ index: Int) -> String {

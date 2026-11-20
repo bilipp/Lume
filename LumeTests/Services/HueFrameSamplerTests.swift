@@ -202,13 +202,11 @@ struct HueFrameSamplerTests {
 
     private static func channels(in packet: Data) -> [HueStreamMessage.Channel] {
         let bytes = [UInt8](packet)
-        return stride(from: HueStreamMessage.headerLength, to: bytes.count, by: HueStreamMessage.channelLength).map {
-            HueStreamMessage.Channel(
-                id: bytes[$0],
-                red: UInt16(bytes[$0 + 1]) << 8 | UInt16(bytes[$0 + 2]),
-                green: UInt16(bytes[$0 + 3]) << 8 | UInt16(bytes[$0 + 4]),
-                blue: UInt16(bytes[$0 + 5]) << 8 | UInt16(bytes[$0 + 6])
-            )
+        return stride(from: HueStreamMessage.headerLength, to: bytes.count, by: HueStreamMessage.channelLength).map { offset in
+            let red = (UInt16(bytes[offset + 1]) << 8) | UInt16(bytes[offset + 2])
+            let green = (UInt16(bytes[offset + 3]) << 8) | UInt16(bytes[offset + 4])
+            let blue = (UInt16(bytes[offset + 5]) << 8) | UInt16(bytes[offset + 6])
+            return HueStreamMessage.Channel(id: bytes[offset], red: red, green: green, blue: blue)
         }
     }
 

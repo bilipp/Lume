@@ -291,10 +291,10 @@ struct QuickSwitchResolverTests {
     @Test func `combined members follow priority, then age, then id`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B", "C", "D"], in: container.mainContext)
-        makeMember(playlists[0], priority: 2, tabs: [.movies])
-        makeMember(playlists[1], priority: nil, tabs: [.series])
-        makeMember(playlists[2], priority: 1, tabs: [.liveTV, .movies])
-        makeMember(playlists[3], priority: nil, tabs: [.liveTV])
+        makeMember(playlists[0], priority: 2, tabs: Set<PlaylistTab>([.movies]))
+        makeMember(playlists[1], priority: nil, tabs: Set<PlaylistTab>([.series]))
+        makeMember(playlists[2], priority: 1, tabs: Set<PlaylistTab>([.liveTV, .movies]))
+        makeMember(playlists[3], priority: nil, tabs: Set<PlaylistTab>([.liveTV]))
 
         let scope = Array(playlists.reversed()).scope(for: PlaylistSelectionStore.combined, isPremium: true)
 
@@ -308,10 +308,10 @@ struct QuickSwitchResolverTests {
     @Test func `combined skips non-members and unknown source types`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B", "C", "D"], in: container.mainContext)
-        makeMember(playlists[0], priority: 1, tabs: [.movies])
+        makeMember(playlists[0], priority: 1, tabs: Set<PlaylistTab>([.movies]))
         makeMember(playlists[1], priority: 2, tabs: [])
-        makeMember(playlists[2], priority: 3, tabs: [.series])
-        makeMember(playlists[3], priority: 4, tabs: [.liveTV])
+        makeMember(playlists[2], priority: 3, tabs: Set<PlaylistTab>([.series]))
+        makeMember(playlists[3], priority: 4, tabs: Set<PlaylistTab>([.liveTV]))
         playlists[2].sourceTypeRaw = "from-a-newer-build"
 
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: true)
@@ -322,8 +322,8 @@ struct QuickSwitchResolverTests {
     @Test func `a playlist with sync turned off still contributes`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B"], in: container.mainContext)
-        makeMember(playlists[0], priority: 1, tabs: [.liveTV])
-        makeMember(playlists[1], priority: 2, tabs: [.movies])
+        makeMember(playlists[0], priority: 1, tabs: Set<PlaylistTab>([.liveTV]))
+        makeMember(playlists[1], priority: 2, tabs: Set<PlaylistTab>([.movies]))
         playlists[1].syncEnabled = false
 
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: true)
@@ -336,8 +336,8 @@ struct QuickSwitchResolverTests {
     @Test func `combined without pro falls back to the oldest playlist without writing`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B"], in: container.mainContext)
-        makeMember(playlists[0], priority: 2, tabs: [.movies])
-        makeMember(playlists[1], priority: 1, tabs: [.liveTV])
+        makeMember(playlists[0], priority: 2, tabs: Set<PlaylistTab>([.movies]))
+        makeMember(playlists[1], priority: 1, tabs: Set<PlaylistTab>([.liveTV]))
         try container.mainContext.save()
 
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: false)
@@ -353,7 +353,7 @@ struct QuickSwitchResolverTests {
     @Test func `combined with one member falls back to it`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B"], in: container.mainContext)
-        makeMember(playlists[1], priority: 1, tabs: [.movies])
+        makeMember(playlists[1], priority: 1, tabs: Set<PlaylistTab>([.movies]))
 
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: true)
 
@@ -372,8 +372,8 @@ struct QuickSwitchResolverTests {
     @Test func `the combined token changes with membership, order and types`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B"], in: container.mainContext)
-        makeMember(playlists[0], priority: 1, tabs: [.movies])
-        makeMember(playlists[1], priority: 2, tabs: [.liveTV])
+        makeMember(playlists[0], priority: 1, tabs: Set<PlaylistTab>([.movies]))
+        makeMember(playlists[1], priority: 2, tabs: Set<PlaylistTab>([.liveTV]))
         let combined = PlaylistSelectionStore.combined
 
         let base = playlists.scope(for: combined, isPremium: true).token
@@ -391,8 +391,8 @@ struct QuickSwitchResolverTests {
     @Test func `contains checks the member prefix and the contributed type`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B", "C"], in: container.mainContext)
-        makeMember(playlists[0], priority: 1, tabs: [.liveTV])
-        makeMember(playlists[1], priority: 2, tabs: [.movies])
+        makeMember(playlists[0], priority: 1, tabs: Set<PlaylistTab>([.liveTV]))
+        makeMember(playlists[1], priority: 2, tabs: Set<PlaylistTab>([.movies]))
 
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: true)
         let live = "\(playlists[0].id.uuidString)-live-1"
@@ -412,8 +412,8 @@ struct QuickSwitchResolverTests {
         let container = try makeProfileTestContainer()
         let context = container.mainContext
         let playlists = try makePlaylists(["A", "B", "C"], in: context)
-        makeMember(playlists[0], priority: 1, tabs: [.liveTV])
-        makeMember(playlists[1], priority: 2, tabs: [.movies])
+        makeMember(playlists[0], priority: 1, tabs: Set<PlaylistTab>([.liveTV]))
+        makeMember(playlists[1], priority: 2, tabs: Set<PlaylistTab>([.movies]))
         try context.save()
 
         let savedSelection = UserDefaults.standard.string(forKey: PlaylistSelectionStore.key)
@@ -456,9 +456,9 @@ struct QuickSwitchResolverTests {
         let container = try makeProfileTestContainer()
         let context = container.mainContext
         let playlists = try makePlaylists(["A", "B", "C"], in: context)
-        makeMember(playlists[0], priority: 1, tabs: [.liveTV])
-        makeMember(playlists[1], priority: 2, tabs: [.movies])
-        makeMember(playlists[2], priority: 3, tabs: [.series])
+        makeMember(playlists[0], priority: 1, tabs: Set<PlaylistTab>([.liveTV]))
+        makeMember(playlists[1], priority: 2, tabs: Set<PlaylistTab>([.movies]))
+        makeMember(playlists[2], priority: 3, tabs: Set<PlaylistTab>([.series]))
         try context.save()
 
         PlaylistDeletion.delete(playlists[1], in: context)
@@ -494,8 +494,8 @@ extension QuickSwitchResolverTests {
     @Test func `combined in effect marks the combined entry current and no playlist row`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B"], in: container.mainContext)
-        makeMember(playlists[0], priority: 1, tabs: [.movies])
-        makeMember(playlists[1], priority: 2, tabs: [.liveTV])
+        makeMember(playlists[0], priority: 1, tabs: Set<PlaylistTab>([.movies]))
+        makeMember(playlists[1], priority: 2, tabs: Set<PlaylistTab>([.liveTV]))
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: true)
 
         let column = QuickSwitchResolver.playlistColumn(playlists, scope: scope, isPremium: true)
@@ -509,8 +509,8 @@ extension QuickSwitchResolverTests {
     @Test func `an isolated selection marks its playlist current, not the combined entry`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B"], in: container.mainContext)
-        makeMember(playlists[0], priority: 2, tabs: [.movies])
-        makeMember(playlists[1], priority: 1, tabs: [.liveTV])
+        makeMember(playlists[0], priority: 2, tabs: Set<PlaylistTab>([.movies]))
+        makeMember(playlists[1], priority: 1, tabs: Set<PlaylistTab>([.liveTV]))
         let scope = playlists.scope(for: playlists[0].id.uuidString, isPremium: true)
 
         let column = QuickSwitchResolver.playlistColumn(playlists, scope: scope, isPremium: true)
@@ -524,8 +524,8 @@ extension QuickSwitchResolverTests {
     @Test func `a lapsed combined selection opens the paywall and marks the fallback current`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B"], in: container.mainContext)
-        makeMember(playlists[0], priority: 2, tabs: [.movies])
-        makeMember(playlists[1], priority: 1, tabs: [.liveTV])
+        makeMember(playlists[0], priority: 2, tabs: Set<PlaylistTab>([.movies]))
+        makeMember(playlists[1], priority: 1, tabs: Set<PlaylistTab>([.liveTV]))
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: false)
 
         let column = QuickSwitchResolver.playlistColumn(playlists, scope: scope, isPremium: false)
@@ -548,7 +548,7 @@ extension QuickSwitchResolverTests {
     @Test func `pro with fewer than two members configures instead of switching`() throws {
         let container = try makeProfileTestContainer()
         let playlists = try makePlaylists(["A", "B"], in: container.mainContext)
-        makeMember(playlists[1], priority: 1, tabs: [.movies])
+        makeMember(playlists[1], priority: 1, tabs: Set<PlaylistTab>([.movies]))
         let scope = playlists.scope(for: PlaylistSelectionStore.combined, isPremium: true)
 
         let column = QuickSwitchResolver.playlistColumn(playlists, scope: scope, isPremium: true)

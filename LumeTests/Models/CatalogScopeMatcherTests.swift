@@ -33,7 +33,7 @@ struct CatalogScopeMatcherTests {
     }
 
     @Test func `a combined scope keeps only the types each member contributes`() {
-        let scope = CatalogScope.combined([(id: second, tabs: [.movies]), (id: first, tabs: [.liveTV, .movies])])
+        let scope = CatalogScope.combined([(id: second, tabs: Set<PlaylistTab>([.movies])), (id: first, tabs: Set<PlaylistTab>([.liveTV, .movies]))])
         let matcher = CatalogScope.Matcher(scope)
         #expect(matcher.contains(id(second, "m"), .movies))
         #expect(!matcher.contains(id(second, "c"), .liveTV))
