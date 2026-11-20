@@ -53,6 +53,30 @@ struct LumeCloudPayloadCodecCompatTests {
         #expect(playlist.disabledContentRaw == "movies")
     }
 
+    @Test func `a playlist that fetches everything keeps its earlier bytes`() throws {
+        let playlist = SyncedPlaylist(
+            id: UUID(), name: "Older", serverURL: "http://provider.example", username: "u", password: "p",
+            sourceTypeRaw: PlaylistSourceType.xtream.rawValue, epgURL: nil, syncEnabled: true,
+            updatedAt: Date(timeIntervalSince1970: 1_760_000_123.456)
+        )
+        container.mainContext.insert(playlist)
+        let payload = try LumeCloudPayload.decode(Codec.encoded(playlist, previous: nil))
+        #expect(payload.data["disabledContentRaw"] == nil)
+    }
+
+    @Test func `turning everything back on still reaches other devices`() throws {
+        let playlist = SyncedPlaylist(
+            id: UUID(), name: "Newer", serverURL: "http://provider.example", username: "u", password: "p",
+            sourceTypeRaw: PlaylistSourceType.xtream.rawValue, epgURL: nil, syncEnabled: true,
+            disabledContentRaw: "movies", updatedAt: Date(timeIntervalSince1970: 1_760_000_123.456)
+        )
+        container.mainContext.insert(playlist)
+        let synced = try Codec.encoded(playlist, previous: nil)
+        playlist.disabledContentRaw = ""
+        let payload = try LumeCloudPayload.decode(Codec.encoded(playlist, previous: synced))
+        #expect(payload.data["disabledContentRaw"] == .string(""))
+    }
+
     @Test func `a playlist payload carries the content switches`() throws {
         let playlist = SyncedPlaylist(
             id: UUID(), name: "Newer", serverURL: "http://provider.example", username: "u", password: "p",

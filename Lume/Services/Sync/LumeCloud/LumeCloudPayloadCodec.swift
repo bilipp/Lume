@@ -302,7 +302,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
     }
 
     static var lumeCloudOmittedDefaults: [String: JSONValue] {
-        ["combinedTypesRaw": .string(""), "combinedPriority": .null]
+        ["combinedTypesRaw": .string(""), "combinedPriority": .null, "disabledContentRaw": .string("")]
     }
 
     static func lumeCloudKey(for fields: LumeCloudPayloadCodec.Fields) throws -> String {
