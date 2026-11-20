@@ -12,9 +12,10 @@ import OSLog
 import SwiftData
 import SwiftUI
 
-/// What a tile is for. `.guidePreview` is the tvOS Guide's muted preview: a
-/// shorter KSPlayer live buffer so the picture arrives sooner, an audio session
-/// that mixes with other apps' audio where the engine lets the app choose one,
+/// What a tile is for. `.guidePreview` is the tvOS Guide's preview: a shorter
+/// KSPlayer live buffer so the picture arrives sooner, an audio session the
+/// tile picks itself where the engine lets the app choose one (mixing with other
+/// apps' audio while muted, see `MultiViewTileAudioSession`),
 /// the channel logo instead of a Try Again button (the pane has no focusable
 /// room for one), and `handle`, the seam full screen adopts its session through.
 enum MultiViewTileRole {
@@ -27,7 +28,7 @@ enum MultiViewTileRole {
         isGuidePreview ? 1.5 : nil
     }
 
-    var mixesWithOtherAudio: Bool {
+    var configuresAudioSession: Bool {
         isGuidePreview
     }
 

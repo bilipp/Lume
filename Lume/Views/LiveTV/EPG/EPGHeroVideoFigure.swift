@@ -2,8 +2,9 @@
 //  EPGHeroVideoFigure.swift
 //  Lume
 //
-//  The tvOS Guide hero's 16:9 picture: the settled channel playing muted, or,
-//  while it may not play, the channel's logo on a card tinted with it.
+//  The tvOS Guide hero's 16:9 picture: the settled channel playing (muted
+//  unless Preview Sound is on), or, while it may not play, the channel's logo
+//  on a card tinted with it.
 //
 
 #if os(tvOS)
@@ -21,6 +22,8 @@
 
         private let metrics = EPGMetrics.current
         @Environment(\.epgHeroLayout) private var layout
+        @AppStorage(PlayerSettings.tvGuidePreviewSoundKey)
+        private var soundEnabled = PlayerSettings.tvGuidePreviewSoundDefault
 
         private var shape: RoundedRectangle {
             RoundedRectangle(cornerRadius: metrics.previewVideoCornerRadius, style: .continuous)
@@ -46,7 +49,7 @@
                     Color.black
                     MultiViewTilePlayer(
                         media: media,
-                        isMuted: true,
+                        isMuted: !soundEnabled,
                         role: .guidePreview(handle: handle),
                         onFailure: onFailure
                     )

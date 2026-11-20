@@ -233,6 +233,13 @@ enum PlayerSettings {
 
     static let tvGuidePreviewModeDefault = GuidePreviewMode.small
 
+    /// Whether the tvOS Guide's playing preview (`small`/`large`) has sound.
+    /// Device-wide, off by default. Audible, it takes a `.playback` session
+    /// and interrupts other apps' audio; muted, it mixes with it.
+    static let tvGuidePreviewSoundKey = "player.tvGuidePreviewSound"
+
+    static let tvGuidePreviewSoundDefault = false
+
     /// The macOS player's app-level volume, a `Float` in `0...1`. Device-local
     /// and shared by every player window; mute is deliberately not stored, so
     /// each new player opens unmuted at this level.

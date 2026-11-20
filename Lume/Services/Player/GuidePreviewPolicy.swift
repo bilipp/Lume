@@ -10,7 +10,8 @@
 import Foundation
 
 /// How the tvOS Guide's now-playing hero appears above the timeline.
-/// `small` and `large` play the muted preview (Lume Pro); without Pro, or
+/// `small` and `large` play the preview (Lume Pro; muted unless
+/// `PlayerSettings.tvGuidePreviewSoundKey` is on); without Pro, or
 /// with the system's video autoplay off, they keep their size and show the
 /// channel's logo instead.
 nonisolated enum GuidePreviewMode: String, CaseIterable {
@@ -112,5 +113,18 @@ nonisolated enum GuidePreviewPolicy {
         case .ksPlayer, .avPlayer: return true
         case .vlcKit, .lumeEngine, .aetherEngine: return false
         }
+    }
+}
+
+/// The audio session a Guide preview tile asks for, where the engine lets the
+/// app choose one. A muted preview must not interrupt audio another app is
+/// playing (`.ambient` mixes with it); an audible one takes `.playback` like
+/// full screen does.
+nonisolated enum GuidePreviewAudioSession: Equatable {
+    case mixWithOthers
+    case interruptOthers
+
+    init(isMuted: Bool) {
+        self = isMuted ? .mixWithOthers : .interruptOthers
     }
 }

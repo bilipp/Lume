@@ -25,6 +25,16 @@ struct GuidePreviewPolicyTests {
         #expect(GuidePreviewPolicy.restartDelay == .milliseconds(1500))
     }
 
+    // MARK: - Audio session
+
+    @Test func `a muted preview mixes with other apps' audio`() {
+        #expect(GuidePreviewAudioSession(isMuted: true) == .mixWithOthers)
+    }
+
+    @Test func `a preview with sound interrupts other apps' audio`() {
+        #expect(GuidePreviewAudioSession(isMuted: false) == .interruptOthers)
+    }
+
     // MARK: - step
 
     @Test func `the Guide opens on its first channel without waiting`() {

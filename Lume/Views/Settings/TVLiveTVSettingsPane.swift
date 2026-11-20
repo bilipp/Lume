@@ -28,6 +28,8 @@
         private var layoutModeRaw = LiveTVLayoutMode.defaultMode.rawValue
         @AppStorage(PlayerSettings.tvGuidePreviewModeKey)
         private var guidePreviewModeRaw = PlayerSettings.tvGuidePreviewModeDefault.rawValue
+        @AppStorage(PlayerSettings.tvGuidePreviewSoundKey)
+        private var guidePreviewSound = PlayerSettings.tvGuidePreviewSoundDefault
         @AppStorage(LiveTVRailSettings.showsFavoritesKey)
         private var showsFavorites = LiveTVRailSettings.showsFavoritesDefault
         @AppStorage(LiveTVRailSettings.showsRecentlyWatchedKey)
@@ -41,7 +43,7 @@
         @FocusState private var focus: Row?
 
         private enum Row: Hashable {
-            case layout, guidePreview, favorites, recentlyWatched, recordingServer, recordings, rail
+            case layout, guidePreview, guidePreviewSound, favorites, recentlyWatched, recordingServer, recordings, rail
         }
 
         private var access: RecordingSettingsAccess {
@@ -93,7 +95,13 @@
                 }
                 .focused($focus, equals: .guidePreview)
 
-                footer("Small and Large play the focused channel muted and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.")
+                if GuidePreviewMode(storedValue: guidePreviewModeRaw).playsVideo {
+                    TVOptionToggleRow(title: "Preview Sound", isOn: $guidePreviewSound)
+                        .focused($focus, equals: .guidePreviewSound)
+                }
+
+                // swiftlint:disable:next line_length
+                footer("Small and Large play the focused channel, muted unless Preview Sound is on, and use a provider connection while you browse. Info Only shows it without video; Off gives the Guide the full height.")
             }
         }
 
