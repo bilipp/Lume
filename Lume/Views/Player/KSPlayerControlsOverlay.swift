@@ -233,7 +233,8 @@ import SwiftUI
                 StreamInfoCaption(
                     media: media,
                     videoInfo: videoInfo,
-                    engine: .ksPlayer
+                    engine: .ksPlayer,
+                    sampler: coordinator
                 )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)

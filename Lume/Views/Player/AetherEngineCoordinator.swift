@@ -467,7 +467,13 @@
                 textTrackOptions = textOptions
             }
             if let info = session.videoInfo {
-                let published = PlayerVideoInfo(width: info.width, height: info.height, fps: info.frameRate ?? 0, codec: info.codec)
+                let published = PlayerVideoInfo(
+                    width: info.width,
+                    height: info.height,
+                    fps: info.frameRate ?? 0,
+                    codec: info.codec,
+                    dynamicRange: PlayerDynamicRange(session.dynamicRange)
+                )
                 if published != videoInfo {
                     videoInfo = published
                 }
@@ -563,6 +569,19 @@
                 writesDisplayCriteria: plan.writesDisplayCriteria,
                 isSecondaryOutput: plan.sharedOutputRole == .secondary
             )
+        }
+    }
+
+    private extension PlayerDynamicRange {
+        init?(_ range: LumeAetherDynamicRange) {
+            switch range {
+            case .sdr: return nil
+            case .hdr10: self = .hdr10
+            case .hdr10Plus: self = .hdr10Plus
+            case .hlg: self = .hlg
+            case .dolbyVision: self = .dolbyVision
+            @unknown default: return nil
+            }
         }
     }
 

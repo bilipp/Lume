@@ -175,6 +175,23 @@ public final class LumeAetherSession {
         )
     }
 
+    public var dynamicRange: LumeAetherDynamicRange {
+        switch engine.sourceVideoFormat {
+        case .sdr: .sdr
+        case .hdr10: .hdr10
+        case .hdr10Plus: .hdr10Plus
+        case .hlg: .hlg
+        case .dolbyVision: .dolbyVision
+        }
+    }
+
+    /// The rate of the media actually played over the last ~10 s, in Mbit/s,
+    /// falling back to the session average; `nil` until something has played.
+    public var playedBitrateMbps: Double? {
+        let telemetry = engine.liveTelemetry
+        return telemetry?.instantBitrateMbps ?? telemetry?.averageBitrateMbps
+    }
+
     public func selectAudioTrack(id: Int) {
         engine.selectAudioTrack(index: id)
     }

@@ -24,7 +24,7 @@
     /// offer the OpenSubtitles search against any engine that can side-load a
     /// file (all of them but AVPlayer, which declares itself unsupported).
     @MainActor
-    protocol TVPlaybackEngine: ObservableObject, ExternalSubtitleLoading {
+    protocol TVPlaybackEngine: ObservableObject, ExternalSubtitleLoading, PlayerStreamSampling {
         /// Drives the central play / pause glyph; must be published so the
         /// overlay re-renders when playback state flips.
         var isPlaying: Bool { get }

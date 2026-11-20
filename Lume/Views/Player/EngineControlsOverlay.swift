@@ -19,7 +19,7 @@ import SwiftUI
 // note on the `clock` property).
 #if !os(tvOS)
     /// The playback surface `EngineControlsOverlay` reads and commands.
-    protocol EngineControlsOverlayDriving: ObservableObject, TogglePlaybackControlling {
+    protocol EngineControlsOverlayDriving: ObservableObject, TogglePlaybackControlling, PlayerStreamSampling {
         var videoInfo: PlayerVideoInfo? { get }
         /// Selectable audio tracks (empty / single-entry hides the menu).
         var audioTrackOptions: [PlayerTrackOption] { get }
@@ -249,7 +249,8 @@ import SwiftUI
                 StreamInfoCaption(
                     media: media,
                     videoInfo: coordinator.videoInfo,
-                    engine: engine
+                    engine: engine,
+                    sampler: coordinator
                 )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)

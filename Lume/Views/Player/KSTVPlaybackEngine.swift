@@ -56,6 +56,10 @@
 
         // MARK: - TVPlaybackEngine
 
+        func streamSample() -> PlayerStreamSample? {
+            KSVideoInfo.streamSample(from: coordinator?.playerLayer)
+        }
+
         var audioTrackOptions: [PlayerTrackOption] {
             let tracks = coordinator?.playerLayer?.player.tracks(mediaType: .audio) ?? []
             return tracks.map { track in

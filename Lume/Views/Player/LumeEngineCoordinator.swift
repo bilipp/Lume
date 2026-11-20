@@ -127,7 +127,7 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     /// Mirrors `PlayerSession.selectedAudioTrackIndex`, read back after `open`
     /// rather than assumed: the engine starts on its own preferred/default
     /// pick, which is not necessarily the first track.
-    private var selectedAudioID: String?
+    private(set) var selectedAudioID: String?
     var selectedSubtitleID: String?
     /// The audio and subtitle picks made in the menus, re-applied to every
     /// session that follows on this stream (the engine has no rebuild in
@@ -521,7 +521,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
             width: video.width,
             height: video.height,
             fps: video.fps,
-            codec: track.codecName
+            codec: track.codecName,
+            dynamicRange: PlayerDynamicRange(
+                transferCode: Int(video.colorTransfer),
+                isDolbyVision: video.dolbyVision != nil
+            )
         )
     }
 

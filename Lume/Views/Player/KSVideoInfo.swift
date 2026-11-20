@@ -28,9 +28,39 @@ enum KSVideoInfo {
             height = Int(dims.height)
         }
         let fps = track.nominalFrameRate > 0 ? Double(track.nominalFrameRate) : 0
-        return (width > 0 && height > 0)
-            ? PlayerVideoInfo(width: width, height: height, fps: fps, codec: codecName(for: track))
-            : nil
+        guard width > 0, height > 0 else { return nil }
+        let codec = codecName(for: track)
+        // Not KSPlayer's own `dynamicRange`: it calls every 10-bit track HDR10,
+        // and plenty of 10-bit HEVC is plain SDR.
+        let isDolbyVision = track.dovi != nil
+            || ["dvh1", "dvhe"].contains(fourCharString(track.mediaSubType.rawValue).lowercased())
+        return PlayerVideoInfo(
+            width: width,
+            height: height,
+            fps: fps,
+            codec: codec,
+            dynamicRange: PlayerDynamicRange(transfer: track.transferFunction, isDolbyVision: isDolbyVision)
+        )
+    }
+
+    /// The playing audio format and the current bitrate. KSAVPlayer reports no
+    /// bitrate (`dynamicInfo` is nil there), so its chip stays hidden.
+    static func streamSample(from layer: KSPlayerLayer?) -> PlayerStreamSample? {
+        guard let player = layer?.player else { return nil }
+        let audioTracks = player.tracks(mediaType: .audio)
+        let audio = (audioTracks.first { $0.isEnabled } ?? audioTracks.first).map { audioInfo(for: $0) }
+        let bits = player.dynamicInfo.map { $0.videoBitrate + $0.audioBitrate } ?? 0
+        return PlayerStreamSample(audio: audio, bitsPerSecond: bits > 0 ? Double(bits) : nil)
+    }
+
+    private static func audioInfo(for track: any MediaPlayerTrack) -> PlayerAudioInfo {
+        let channels = Int(track.audioStreamBasicDescription?.mChannelsPerFrame ?? 0)
+        let codec: String? = if let ffmpeg = track as? FFmpegAssetTrack, !ffmpeg.codecName.isEmpty {
+            ffmpeg.codecName
+        } else {
+            track.formatDescription.map { fourCharString(CMFormatDescriptionGetMediaSubType($0)) }
+        }
+        return PlayerAudioInfo(codec: codec?.isEmpty == false ? codec : nil, channels: channels)
     }
 
     // MARK: - Codec naming

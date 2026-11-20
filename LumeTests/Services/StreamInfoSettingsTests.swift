@@ -41,7 +41,7 @@ struct StreamInfoSettingsDefaultsTests {
 
     @Test func `detail level default matches the platform`() {
         #if os(tvOS)
-            // Advanced keeps today's technical caption (`4K · H264 · 24 fps`)
+            // Advanced keeps today's technical caption (`4K · H.264 · 24 fps`)
             // rendering byte-identically.
             #expect(PlayerSettings.StreamInfo.detailLevelDefault == .advanced)
         #else

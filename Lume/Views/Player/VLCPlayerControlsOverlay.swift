@@ -210,7 +210,8 @@ import VLCKit
                 StreamInfoCaption(
                     media: media,
                     videoInfo: coordinator.videoInfo,
-                    engine: .vlcKit
+                    engine: .vlcKit,
+                    sampler: coordinator
                 )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)

@@ -206,7 +206,8 @@ import SwiftUI
                 StreamInfoCaption(
                     media: media,
                     videoInfo: coordinator.videoInfo,
-                    engine: .avPlayer
+                    engine: .avPlayer,
+                    sampler: coordinator
                 )
                 if let subtitle = media.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
