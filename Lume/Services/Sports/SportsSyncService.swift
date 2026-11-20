@@ -60,6 +60,9 @@ final class SportsSyncService {
     static let shared = SportsSyncService()
 
     private(set) var isSyncing = false
+    /// Counts finished `loadReplaySchedule` passes: the episodes it loads
+    /// change the library Replays lists without any sync date moving.
+    private(set) var replayLibraryRevision = 0
 
     private var provider: (any SportsDataProvider)?
     private var followSource: any SportsFollowSource
@@ -215,7 +218,12 @@ final class SportsSyncService {
             return
         }
         guard !leagueIds.isEmpty else { return }
-        let months = Self.monthsToFetch(for: Date())
+        await run(leagueIds: leagueIds, months: Self.monthsToFetch(for: Date()))
+    }
+
+    /// One pass, registered as the one in flight: a refresh asked for while it
+    /// runs joins it instead of writing the same snapshots beside it.
+    private func run(leagueIds: [String], months: [DateComponents]) async {
         let pass = Task(priority: .utility) { [weak self] in
             guard let self else { return }
             await performRefresh(leagueIds: leagueIds, months: months)
@@ -237,6 +245,7 @@ final class SportsSyncService {
         Task {
             await SportsReplayLibrary.loadMissingEpisodes(in: context, scope: scope, restriction: restriction)
             await loadHistory(months: SportsReplayLibrary.months(of: SportsReplayLibrary.files(in: context, scope: scope, restriction: restriction)))
+            replayLibraryRevision += 1
         }
     }
 
@@ -246,8 +255,12 @@ final class SportsSyncService {
     /// snapshots like any refresh, so a month is kept once fetched.
     func loadHistory(months: Set<DateComponents>) async {
         guard provider != nil, !months.isEmpty else { return }
-        if let task { await task.value }
-        _ = await performRefresh(leagueIds: leaguesToRefresh(), months: Array(months))
+        // Yield after each so the finished pass's owner clears `task` first.
+        while let task {
+            await task.value
+            await Task.yield()
+        }
+        await run(leagueIds: leaguesToRefresh(), months: Array(months))
     }
 
     /// The last successful refresh timestamp, for display in Settings. `nil` until

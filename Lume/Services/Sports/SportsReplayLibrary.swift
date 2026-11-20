@@ -44,6 +44,7 @@ nonisolated struct SportsLibraryReplay: Identifiable, Hashable {
     /// It names a day, not an instant, so it is read back in UTC; local time
     /// would show the day before anywhere west of Greenwich.
     let day: Date?
+    /// Where to resume; zero once watched, so a finished game is not continued.
     let progress: Double
     /// The canonical reference of the exact event (`sportarr://ev-…`) when
     /// the source named one; nil for a file known only by its series' league.
@@ -189,6 +190,7 @@ nonisolated enum SportsReplayLibrary {
             guard named.count == 1, let match = named.first else { continue }
             files[match.replayKey, default: []].append(file)
         }
+        joinEditions(of: library, into: &files)
         for recording in recordings where recording.isReplayable {
             let start = recording.programmeStart ?? recording.start
             let end = recording.programmeEnd ?? recording.end
@@ -241,11 +243,14 @@ nonisolated enum SportsReplayLibrary {
         }
         return episodes.filter { !restriction.hides(categoryID: $0.series?.categoryId) }.map {
             SportsLibraryReplay(
-                id: $0.id, isEpisode: true, title: $0.title, source: owner($0.id), day: day($0.airDate), progress: $0.watchProgress,
+                id: $0.id, isEpisode: true, title: $0.title, source: owner($0.id), day: day($0.airDate), progress: $0.isWatched ? 0 : $0.watchProgress,
                 event: SportarrIdentifier.isEvent($0.sportsRef) ? $0.sportsRef : nil, league: $0.series?.name ?? ""
             )
         } + movies.filter { !restriction.hides(categoryID: $0.categoryId) }.map {
-            SportsLibraryReplay(id: $0.id, isEpisode: false, title: $0.name, source: owner($0.id), day: day($0.releaseDate), progress: $0.watchProgress, event: $0.sportsRef)
+            SportsLibraryReplay(
+                id: $0.id, isEpisode: false, title: $0.name, source: owner($0.id), day: day($0.releaseDate),
+                progress: $0.isWatched ? 0 : $0.watchProgress, event: $0.sportsRef
+            )
         }
     }
 
@@ -292,6 +297,22 @@ nonisolated enum SportsReplayLibrary {
         calendar.timeZone = .gmt
         let days = files.compactMap(\.day).flatMap { [$0.addingTimeInterval(-12 * 3600), $0.addingTimeInterval(36 * 3600)] }
         return Set(days.map { calendar.dateComponents([.year, .month], from: $0) })
+    }
+
+    /// Editions of one event are one game: a condensed file whose title names
+    /// no team joins the game its full edition was placed in.
+    private static func joinEditions(of library: [SportsLibraryReplay], into files: inout [String: [SportsLibraryReplay]]) {
+        var gamesByEvent: [String: Set<String>] = [:]
+        for (key, editions) in files {
+            for event in editions.compactMap(\.event) {
+                gamesByEvent[event, default: []].insert(key)
+            }
+        }
+        let placed = Set(files.values.joined().map(\.id))
+        for file in library where !placed.contains(file.id) {
+            guard let event = file.event, let keys = gamesByEvent[event], keys.count == 1, let key = keys.first else { continue }
+            files[key, default: []].append(file)
+        }
     }
 
     /// Whether the programme names any team of those leagues, not only the

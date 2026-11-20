@@ -12,6 +12,9 @@ struct SportsReplaysView: View {
     let games: [SportsReplayGame]
     /// Library files no fixture could be matched to.
     var others: [SportsLibraryReplay] = []
+    /// Called as a replay's player or game sheet closes, so the caller can
+    /// re-read the progress it left.
+    var onPlaybackEnd: () -> Void = {}
     @Environment(\.modelContext) private var context
     @State private var player = RecordingsLibraryModel()
     @State private var follows = SportsFollowService.shared
@@ -81,7 +84,8 @@ struct SportsReplaysView: View {
         }
         .sheet(isPresented: $showingFilters) { filters }
         .replayPlayer(player)
-        .sheet(item: $selected, onDismiss: { progressRevision += 1 }, content: { SportsReplayDetail(game: $0) })
+        .sheet(item: $selected, onDismiss: { progressRevision += 1; onPlaybackEnd() }, content: { SportsReplayDetail(game: $0) })
+        .onChange(of: player.playingMedia == nil) { _, closed in if closed { onPlaybackEnd() } }
         .onChange(of: filter.range) { _, value in if value == .custom { showingFilters = true } }
     }
 

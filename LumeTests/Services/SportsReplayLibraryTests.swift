@@ -105,6 +105,17 @@ struct SportsReplayLibraryTests {
         #expect(SportsReplayLibrary.games(recordings: [], library: [file("next", dayOffset: 86400)], fixtures: [fixture()], aliases: aliases).count == 1)
     }
 
+    @Test func `an edition whose title names no team joins its event's game`() {
+        var full = file("full")
+        var condensed = file("condensed", title: "Condensed Game")
+        var stray = file("stray", title: "Condensed Game")
+        full.event = "sportarr://ev-1"
+        condensed.event = "sportarr://ev-1"
+        stray.event = "sportarr://ev-2"
+        let games = SportsReplayLibrary.games(recordings: [], library: [full, condensed, stray], fixtures: [fixture()], aliases: aliases)
+        #expect(games.first?.library.map(\.id) == ["full", "condensed"])
+    }
+
     @MainActor @Test func `a sports episode stands alone only while library replays are on`() {
         let league = Series(id: "s", seriesId: 1, name: "NFL")
         league.sportsRef = "sportarr://lg-000032"
