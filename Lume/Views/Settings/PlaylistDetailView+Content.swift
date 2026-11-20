@@ -18,7 +18,8 @@ extension Playlist {
     /// The m3u and WebDAV fingerprints go too: a provider file that hasn't
     /// changed would otherwise skip the very import that has to apply the
     /// switch. The Xtream digests need nothing — one is only trusted while the
-    /// rows it imported are all still there.
+    /// rows it imported are all still there. Live TV also takes the playlist's
+    /// guide source with it, and brings it back.
     func contentSyncBinding(
         _ kind: PlaylistTab,
         context: ModelContext,
@@ -36,6 +37,9 @@ extension Playlist {
                 }
                 guard disabled != self.disabledContent else { return }
                 self.disabledContent = disabled
+                if kind == .liveTV {
+                    EPGSourceReconciler.apply(self, in: context)
+                }
                 try? context.save()
                 M3UDigestStore.remove(playlistId: self.id)
                 WebDAVDigestStore.remove(playlistId: self.id)

@@ -61,7 +61,40 @@ struct EPGSourceReconcilerTests {
         #expect(url == "http://example.com/stalker-guide.xml")
     }
 
+    @Test func `guideURL is nil for a playlist that doesn't fetch live TV`() {
+        let xtream = Playlist(name: "Test", serverURL: "http://example.com:8080", username: "user", password: "pass")
+        xtream.disabledContent = [.liveTV]
+        #expect(EPGSourceReconciler.guideURL(for: xtream) == nil)
+
+        let stalker = Playlist(name: "Stalker", portalURL: "http://portal.example.com", macAddress: "00:1A:79:00:00:01")
+        stalker.disabledContent = [.liveTV]
+        #expect(EPGSourceReconciler.guideURL(for: stalker) == nil)
+
+        let moviesOff = Playlist(name: "Test", serverURL: "http://example.com:8080", username: "user", password: "pass")
+        moviesOff.disabledContent = [.movies, .series]
+        #expect(EPGSourceReconciler.guideURL(for: moviesOff) != nil)
+    }
+
     // MARK: - apply
+
+    @Test func `apply removes the source while live TV is off and restores it after`() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let playlist = Playlist(name: "Test", serverURL: "http://example.com:8080", username: "user", password: "pass")
+        context.insert(playlist)
+        EPGSourceReconciler.apply(playlist, in: context)
+        try context.save()
+
+        playlist.disabledContent = [.liveTV]
+        #expect(EPGSourceReconciler.apply(playlist, in: context))
+        #expect(try context.fetch(FetchDescriptor<EPGSource>()).isEmpty)
+
+        playlist.disabledContent = []
+        #expect(EPGSourceReconciler.apply(playlist, in: context))
+        let sources = try context.fetch(FetchDescriptor<EPGSource>())
+        #expect(sources.count == 1)
+        #expect(sources.first?.playlistID == playlist.id)
+    }
 
     @Test func `apply creates source for xtream playlist`() throws {
         let container = try makeContainer()
