@@ -589,5 +589,9 @@ extension LumeEngineCoordinator: ExternalSubtitleLoading {
     /// The shared Apple TV overlay drives LumeEngine through the same surface
     /// as every other engine. All requirements already exist with matching
     /// signatures, so the conformance is empty.
-    extension LumeEngineCoordinator: TVPlaybackEngine {}
+    extension LumeEngineCoordinator: TVPlaybackEngine {
+        static var engineKind: PlayerEngineKind {
+            .lumeEngine
+        }
+    }
 #endif

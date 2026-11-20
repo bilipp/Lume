@@ -328,8 +328,8 @@ enum PlayerSettings {
         /// it and needs no discovery from one who does. tvOS ignores this.
         static let enabledDefault = true
 
-        /// Advanced on tvOS so the existing technical caption (`4K · H264 ·
-        /// 24 fps`) keeps rendering exactly as it does today; Simple elsewhere,
+        /// Advanced on tvOS, which already showed a technical caption
+        /// (`4K · H264 · 24 fps`) before the chips; Simple elsewhere,
         /// where the caption is new and shares space with the transport controls.
         static var detailLevelDefault: StreamInfoDetailLevel {
             #if os(tvOS)

@@ -588,7 +588,11 @@
     #if os(tvOS)
         /// The shared Apple TV overlay drives AetherEngine through the same
         /// surface as every other engine; every requirement already exists.
-        extension AetherEngineCoordinator: TVPlaybackEngine {}
+        extension AetherEngineCoordinator: TVPlaybackEngine {
+            static var engineKind: PlayerEngineKind {
+                .aetherEngine
+            }
+        }
     #endif
 
 #endif

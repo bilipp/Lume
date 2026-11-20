@@ -29,8 +29,8 @@ struct PlayerInfoSnapshot: Equatable {
     /// - Parameters:
     ///   - details: programme-level context resolved by `PlayerStreamInfo`.
     ///     `nil` before the resolve lands, and on hosts that resolve none.
-    ///   - engine: the engine the Advanced readout names. `nil` where the host
-    ///     surfaces no engine name (tvOS), which drops that part entirely.
+    ///   - engine: the engine the Advanced readout names. `nil` drops that
+    ///     chip.
     init(
         media: PlayableMedia,
         details: StreamInfoDetails?,

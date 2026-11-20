@@ -17,6 +17,10 @@
 
     @MainActor
     final class KSTVPlaybackEngine: ObservableObject, TVPlaybackEngine {
+        static var engineKind: PlayerEngineKind {
+            .ksPlayer
+        }
+
         @Published private(set) var isPlaying = false
         @Published private(set) var videoInfo: PlayerVideoInfo?
 

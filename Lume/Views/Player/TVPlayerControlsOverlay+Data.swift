@@ -76,7 +76,7 @@
         /// The shared, platform-neutral caption derivation, so the tvOS chrome
         /// and the iOS / macOS / visionOS caption can never drift. tvOS resolves
         /// its own `EPGListing`s, so they are mapped into the snapshot's value
-        /// form here; `engine` is `nil` because the tvOS caption names none.
+        /// form here.
         var infoSnapshot: PlayerInfoSnapshot {
             PlayerInfoSnapshot(
                 media: media,
@@ -88,7 +88,7 @@
                     )
                 ),
                 videoInfo: coordinator.videoInfo,
-                engine: nil,
+                engine: Engine.engineKind,
                 detailLevel: PlayerSettings.StreamInfo.detailLevel
             )
         }
