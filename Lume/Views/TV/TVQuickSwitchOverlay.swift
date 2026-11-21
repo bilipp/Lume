@@ -3,8 +3,9 @@
 //  Lume
 //
 //  The tvOS quick-switch modal: playlists on the left, profiles on the right,
-//  a checkmark on the active row of each. Switching only — adding, editing and
-//  deleting stay in Settings, which remains the management surface.
+//  a checkmark on the active row of each, and a Sync Now row for what is on
+//  screen. Adding, editing and deleting stay in Settings, which remains the
+//  management surface.
 //
 //  Presented as a plain overlay, never a `fullScreenCover`: a tvOS cover always
 //  self-dismisses on Menu, and neither `onExitCommand` nor
@@ -13,6 +14,7 @@
 
 #if os(tvOS)
 
+    import SwiftData
     import SwiftUI
 
     struct TVQuickSwitchOverlay: View {
@@ -27,6 +29,9 @@
         /// The resolved scope `MainTabView` publishes to the tabs, which this
         /// overlay sits outside of.
         let scope: CatalogScope
+        /// Handed in like the router: `MainTabView` puts the queue in the tabs'
+        /// environment, which this overlay sits outside of.
+        let autoSyncQueue: AutoSyncQueue
 
         /// The roster comes from `ProfileManager` — `UserProfile` lives in the
         /// CloudKit-mirrored store, a separate container the browse `@Query`s
@@ -34,7 +39,9 @@
         @Environment(ProfileManager.self) private var profileManager: ProfileManager?
         @Environment(ParentalControls.self) private var parental: ParentalControls?
         @Environment(PlaylistSwitchModel.self) private var playlistSwitch: PlaylistSwitchModel?
+        @Environment(\.modelContext) private var modelContext
         @AppStorage(PlaylistSelectionStore.key) private var selectedPlaylistID: String = ""
+        @AppStorage(SyncFrequency.storageKey) private var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
         @State private var premium = PremiumManager.shared
 
         /// A profile awaiting PIN entry before the switch goes through.
@@ -49,6 +56,7 @@
         private enum FocusTarget: Hashable {
             case combined
             case playlist(UUID)
+            case sync
             case profile(UUID)
         }
 
@@ -133,6 +141,9 @@
                         }
                         .focused($focus, equals: .playlist(row.id))
                     }
+
+                    TVSyncSwitchRow(isSyncing: autoSyncQueue.isBusy, action: syncNow)
+                        .focused($focus, equals: .sync)
                 }
             }
             .disabled(playlistSwitch?.isSwitching == true)
@@ -260,6 +271,22 @@
             // catalog and leave the due sync to the next launch / foreground.
             playlistSwitch?.deferNextDueSync()
             playlistSwitch.select(row.item.id.uuidString, name: row.item.name, into: $selectedPlaylistID)
+        }
+
+        /// Starts a sync of what is on screen, as the library toolbar does on
+        /// the other platforms, and lands on its progress. While one is running
+        /// or has just failed, it only goes there.
+        private func syncNow() {
+            close()
+            autoSyncQueue.syncOnScreenIfIdle(
+                scope: scope,
+                playlists: playlists,
+                frequency: SyncFrequency.resolve(syncFrequencyRaw),
+                context: modelContext
+            )
+            if autoSyncQueue.isBusy || autoSyncQueue.recentFailure() != nil {
+                router.selectedTab = .sync
+            }
         }
 
         private func selectCombined(_ action: CombinedSwitchAction) {
