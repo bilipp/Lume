@@ -28,11 +28,13 @@ struct LiveTVEmptyState: View {
                 description: Text("This server has no live channels here — it carries movies and series only.")
             )
         } else {
-            ContentUnavailableView(
-                "No Channels",
-                systemImage: "antenna.radiowaves.left.and.right",
-                description: Text("Sync your playlist to load live TV channels")
-            )
+            SyncAwareEmptyState {
+                ContentUnavailableView(
+                    "No Channels",
+                    systemImage: "antenna.radiowaves.left.and.right",
+                    description: Text("Sync your playlist to load live TV channels")
+                )
+            }
         }
     }
 }

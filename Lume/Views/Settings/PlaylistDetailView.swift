@@ -4,6 +4,7 @@ import SwiftUI
 struct PlaylistDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(AutoSyncQueue.self) private var autoSyncQueue: AutoSyncQueue?
     @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
     @Bindable var playlist: Playlist
     /// Held here rather than read inside `playlist.syncState` so changing the
@@ -47,9 +48,6 @@ struct PlaylistDetailView: View {
     @State var editMacAddress = ""
     @State var showDeleteConfirmation = false
     @State var showSync = false
-    /// Presents the full-catalog download (Stalker only). Kept separate from
-    /// `showSync` so the two sheets carry different `full` flags.
-    @State var showFullSync = false
     @State var showPaywall = false
 
     /// Locked by the free plan (see `[Playlist].isLocked`): a sync would fetch
@@ -70,13 +68,13 @@ struct PlaylistDetailView: View {
             : syncState.statusLabel
     }
 
-    /// Sync Now and Download Full Catalog, or the paywall for a locked playlist.
+    /// Sync Now and Download Full Catalog, or the paywall for a locked
+    /// playlist. The sync starts behind the app; the sheet only reports it.
     func requestSync(full: Bool = false) {
         if isLocked {
             showPaywall = true
-        } else if full {
-            showFullSync = true
         } else {
+            autoSyncQueue?.sync(playlist, full: full, context: modelContext)
             showSync = true
         }
     }
@@ -191,10 +189,7 @@ struct PlaylistDetailView: View {
                     Text("All synced content for this playlist will also be removed.")
                 }
                 .sheet(isPresented: $showSync) {
-                    SyncProgressView(playlist: playlist)
-                }
-                .sheet(isPresented: $showFullSync) {
-                    SyncProgressView(playlist: playlist, full: true)
+                    SyncActivityView()
                 }
                 .paywall(isPresented: $showPaywall, highlight: .multiplePlaylists)
         }
@@ -353,7 +348,6 @@ struct PlaylistDetailView: View {
                 Button("Sync Now") {
                     requestSync()
                 }
-                .disabled(playlist.syncStatus == .syncing)
 
                 if isStalker {
                     Button("Download Full Catalog") {

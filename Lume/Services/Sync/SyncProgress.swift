@@ -3,8 +3,8 @@
 //  Lume
 //
 //  Observable progress tracker for ContentSyncManager. The sync actor publishes
-//  step transitions and batch counts into this object; the SyncProgressView
-//  renders the current state.
+//  step transitions and batch counts into this object; the sync activity
+//  surfaces render the current state.
 //
 
 import Foundation
@@ -129,6 +129,8 @@ final class SyncProgress {
     private(set) var stepDetail: String = ""
     /// 0...1 inside the active step. 0 means indeterminate / not applicable.
     private(set) var stepFraction: Double = 0
+    /// What each finished step last reported, e.g. "1200 of 1200".
+    private(set) var completedDetails: [SyncStep: String] = [:]
 
     func start(_ step: SyncStep) {
         currentStep = step
@@ -139,19 +141,33 @@ final class SyncProgress {
     func complete(_ step: SyncStep) {
         completedSteps.insert(step)
         if currentStep == step {
+            if !stepDetail.isEmpty { completedDetails[step] = stepDetail }
             currentStep = nil
         }
     }
 
+    /// Written only when changed: every write re-renders whatever is showing
+    /// the sync, and an import reports the same numbers more than once.
     func update(detail: String, fraction: Double = 0) {
-        stepDetail = detail
-        stepFraction = fraction
+        if stepDetail != detail { stepDetail = detail }
+        if stepFraction != fraction { stepFraction = fraction }
+    }
+
+    /// The detail to show beside `step`: live while it runs, its last report
+    /// once it is done.
+    func detail(for step: SyncStep) -> String {
+        currentStep == step ? stepDetail : completedDetails[step] ?? ""
     }
 
     func state(for step: SyncStep) -> SyncStepState {
         if completedSteps.contains(step) { return .completed }
         if currentStep == step { return .active }
         return .pending
+    }
+
+    /// Whether this sync has `step` and hasn't finished it.
+    func isAwaiting(_ step: SyncStep) -> Bool {
+        steps.contains(step) && !completedSteps.contains(step)
     }
 
     /// Overall fraction across all steps, useful for a top-level bar.

@@ -175,11 +175,13 @@ struct HomeView: View {
                         description: Text("Add a playlist in Settings to get started")
                     )
                 } else if isEmpty {
-                    ContentUnavailableView(
-                        "Nothing Here Yet",
-                        systemImage: "house",
-                        description: Text("Watch something or mark titles as favorites and they'll show up here.")
-                    )
+                    SyncAwareEmptyState {
+                        ContentUnavailableView(
+                            "Nothing Here Yet",
+                            systemImage: "house",
+                            description: Text("Watch something or mark titles as favorites and they'll show up here.")
+                        )
+                    }
                 } else {
                     #if os(tvOS)
                         // Immersive Apple TV-style home: full-screen backdrop,

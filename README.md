@@ -204,7 +204,7 @@ adapted per size class
   - **WebDAV**: recursive folder walk, filenames parsed into movies and series; Basic auth, anonymous shares welcome
   - None of them carries live TV yet, and none downloads yet
 - Server info at a glance: status, active connections, expiry
-- Background **content sync** with step-by-step progress, which **prunes stale titles** the provider has dropped so the local catalog stays in step
+- **Content sync in the background** — keep browsing and watching while a playlist syncs, with step-by-step progress one tap away; it **prunes stale titles** the provider has dropped so the local catalog stays in step
 - Scheduled **auto-sync** (every 6 hours, daily, every 3 days, or weekly)
 
 ---

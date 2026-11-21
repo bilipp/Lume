@@ -63,6 +63,7 @@ struct LiveTVView: View {
     /// Holds the selection so it survives the tab being unmounted; the
     /// fallbacks serve previews, which have no router.
     @Environment(DeepLinkRouter.self) private var tabRouter: DeepLinkRouter?
+    @Environment(AutoSyncQueue.self) private var autoSyncQueue: AutoSyncQueue?
     @State private var fallbackSection: LiveTVSection?
     @State private var fallbackSeededScopeToken: String?
     @State private var showingSync = false
@@ -148,7 +149,9 @@ struct LiveTVView: View {
                         systemImage: "antenna.radiowaves.left.and.right",
                         description: Text("Add a playlist in Settings to start watching live TV")
                     )
-                } else if categories.isEmpty || sourceHasNoLiveChannels {
+                } else if categories.isEmpty || sourceHasNoLiveChannels
+                    || autoSyncQueue?.isFirstImportAwaiting(.liveStreams, in: catalogScope) == true
+                {
                     VStack(spacing: 20) {
                         LiveTVEmptyState(sourceType: liveSourceType)
                     }

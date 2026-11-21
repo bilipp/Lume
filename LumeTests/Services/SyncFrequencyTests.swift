@@ -227,7 +227,7 @@ struct SyncFrequencyTests {
 
     @Test func `auto sync defers a due playlist that is not on screen`() {
         // The whole point: with several playlists configured, launching should
-        // not queue a blocking cover for each of them in turn.
+        // not queue a sync for each of them in turn.
         #expect(!AutoSync.shouldSync(
             AutoSync.Candidate(
                 syncEnabled: true,
@@ -490,11 +490,11 @@ struct AutoSyncCombinedTests {
         #expect(!AutoSync.shouldSync(outsider.autoSyncCandidate(in: scope), frequency: .daily, alreadyStarted: false))
     }
 
-    @Test func `only combined members without content take the cover`() {
-        #expect(AutoSync.presentsCover(isCombined: false, hasContent: true))
-        #expect(AutoSync.presentsCover(isCombined: false, hasContent: false))
-        #expect(AutoSync.presentsCover(isCombined: true, hasContent: false))
-        #expect(!AutoSync.presentsCover(isCombined: true, hasContent: true))
+    @Test func `only an automatic refresh of a filled playlist gives way to browsing`() {
+        #expect(AutoSync.taskPriority(isManual: false, hasContent: true) == .utility)
+        #expect(AutoSync.taskPriority(isManual: false, hasContent: false) == .userInitiated)
+        #expect(AutoSync.taskPriority(isManual: true, hasContent: true) == .userInitiated)
+        #expect(AutoSync.taskPriority(isManual: true, hasContent: false) == .userInitiated)
     }
 
     @Test func `manual member sync takes the due members in order`() {

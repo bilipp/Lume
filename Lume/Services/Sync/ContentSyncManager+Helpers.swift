@@ -14,8 +14,8 @@ extension ContentSyncManager {
     /// process launch. So a `.syncing` status observed at startup is by
     /// definition stale. Left untouched it wedges the playlist permanently —
     /// `AutoSync.shouldSync` skips anything already `.syncing`, so no further
-    /// auto-sync ever fires and the blocking progress cover (driven by in-memory
-    /// state) never reappears, while Settings keeps showing "Syncing" forever.
+    /// auto-sync ever fires and the sync indicator (driven by in-memory state)
+    /// never reappears, while Settings keeps showing "Syncing" forever.
     ///
     /// Call once at launch, before the auto-sync gate reads playlist status.
     static func recoverInterruptedSyncs(in context: ModelContext) {

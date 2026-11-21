@@ -24,6 +24,20 @@ nonisolated enum WhatsNewCatalog {
 
     private static let releases3: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: AppVersion(3, 4),
+            highlights: [
+                WhatsNewItem(
+                    id: "3.4.background-sync",
+                    symbol: "arrow.triangle.2.circlepath",
+                    title: text("whatsNew.3_4.backgroundSync.title", "Sync in the Background"),
+                    summary: text(
+                        "whatsNew.3_4.backgroundSync.summary",
+                        "Playlists now sync while you keep browsing. New titles show up as they arrive."
+                    )
+                )
+            ]
+        ),
+        WhatsNewRelease(
             version: AppVersion(3, 3),
             highlights: [
                 WhatsNewItem(

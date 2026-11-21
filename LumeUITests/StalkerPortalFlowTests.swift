@@ -111,16 +111,16 @@ final class StalkerPortalFlowTests: XCTestCase {
     /// Triggers a manual sync of the active portal and waits for it to finish.
     private func runManualSync(_ app: XCUIApplication) {
         // Auto-sync is disabled under `-ui-testing`, so trigger a sync of the now-
-        // active portal manually through the toolbar sync button → Start Sync, and
-        // wait for it to finish (the sheet shows a "Done" button on success).
+        // active portal manually through the toolbar sync button, and wait for
+        // it to finish.
         let syncButton = app.syncToolbarButton
         XCTAssertTrue(syncButton.waitForExistence(timeout: 10), "Sync button not found")
         syncButton.tap()
-        let startSync = app.buttons["Start Sync"]
-        XCTAssertTrue(startSync.waitForExistence(timeout: 10), "Sync sheet didn't open")
-        startSync.tap()
+        // The sync starts with the tap and runs behind the library; the sheet
+        // that opens only reports it.
+        let complete = app.staticTexts["Sync complete"]
+        XCTAssertTrue(complete.waitForExistence(timeout: 180), "Stalker sync did not complete")
         let doneSync = app.buttons["Done"]
-        XCTAssertTrue(doneSync.waitForExistence(timeout: 180), "Stalker sync did not complete")
         doneSync.tap()
     }
 

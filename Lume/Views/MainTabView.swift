@@ -73,7 +73,7 @@ struct MainTabView: View {
         visibleTabs(in: catalogScope).showsTab(tab)
     }
 
-    /// Whether the browse UI is covered: the sync cover, downloads, the add-device sheet (not a link
+    /// Whether the browse UI is covered: downloads, the add-device sheet (not a link
     /// still waiting for it), or a playlist / profile switch. Players, paywalls and Settings (a toolbar sheet this root can't see) report themselves.
     private var hasBlockingPresentation: Bool {
         hasOwnPresentation || router.presentedCloudPairing != nil
@@ -81,8 +81,7 @@ struct MainTabView: View {
 
     /// All of the above but the add-device sheet, which waits for these to clear.
     private var hasOwnPresentation: Bool {
-        autoSyncQueue.coverPlaylist != nil
-            || showsDownloads
+        showsDownloads
             || playlistSwitch?.isSwitching == true
             || profileManager?.isSwitching == true
     }
@@ -114,7 +113,6 @@ struct MainTabView: View {
 
     var body: some View {
         @Bindable var router = router
-        @Bindable var autoSyncQueue = autoSyncQueue
         let scope = catalogScope
         let tabs = visibleTabs(in: scope)
         return tabView(selection: $router.selectedTab, tabs: tabs)
@@ -166,6 +164,8 @@ struct MainTabView: View {
         }
         #endif
         .task(id: playlists.count) {
+            // A deleted playlist takes its running or queued sync with it.
+            autoSyncQueue.dropSyncs(notIn: Set(playlists.map(\.id)))
             // On launch (and whenever a playlist is added) sync the active
             // playlist if it is due, plus any playlist that has never synced.
             enqueueDueSyncs(playlists)
@@ -189,9 +189,6 @@ struct MainTabView: View {
             // Coming back to `.active` also refreshes stale sports data.
             SportsSyncService.shared.isForeground = phase == .active
         }
-        .syncCover(item: $autoSyncQueue.coverPlaylist) {
-            autoSyncQueue.promoteNextIfIdle(scope: catalogScope, context: modelContext)
-        }
         .onChange(of: autoSyncQueue.isBusy, initial: true) { _, busy in
             EPGSyncService.shared.setAutoSyncQueued(busy)
         }
@@ -212,6 +209,13 @@ struct MainTabView: View {
         .reportsBrowseRootCovered(hasBlockingPresentation)
         #if os(tvOS)
             .overlay { tvOverlays }
+            .overlay(alignment: .topTrailing) {
+                // Level with the tab bar, in the corner it leaves free.
+                TVSyncStatusPill(queue: autoSyncQueue)
+                    .padding(.top, 52)
+                    .padding(.trailing, 80)
+                    .ignoresSafeArea()
+            }
         #endif
     }
 
@@ -305,7 +309,6 @@ struct MainTabView: View {
         /// it would move focus and hand it back somewhere else.
         private var blockingOverlayOwnsScreen: Bool {
             router.isMultiViewPresented
-                || autoSyncQueue.coverPlaylist != nil
                 || profileManager?.isSwitching == true
         }
 
@@ -534,27 +537,6 @@ private extension View {
                 // height, leaving the sheet rendering as a bare toolbar.
                 .frame(minWidth: 480, minHeight: 440)
                 #endif
-            }
-        #endif
-    }
-}
-
-// MARK: - Sync cover presentation
-
-private extension View {
-    /// Presents the auto-sync progress UI as a blocking cover: a full-screen
-    /// cover on iOS/tvOS (no swipe-to-dismiss), a sheet on macOS where
-    /// `fullScreenCover` is unavailable.
-    @ViewBuilder
-    func syncCover(item: Binding<Playlist?>, onDismiss: @escaping () -> Void) -> some View {
-        #if os(macOS)
-            sheet(item: item, onDismiss: onDismiss) { playlist in
-                SyncProgressView(playlist: playlist, autoStart: true)
-                    .frame(minWidth: 420, minHeight: 480)
-            }
-        #else
-            fullScreenCover(item: item, onDismiss: onDismiss) { playlist in
-                SyncProgressView(playlist: playlist, autoStart: true)
             }
         #endif
     }

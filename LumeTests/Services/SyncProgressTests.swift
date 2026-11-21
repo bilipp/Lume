@@ -89,6 +89,33 @@ struct SyncProgressTests {
         #expect(progress.overallFraction == expected)
     }
 
+    @Test func `a finished step keeps what it last reported`() {
+        let progress = SyncProgress()
+        progress.start(.movies)
+        progress.update(detail: "40 of 67", fraction: 0.6)
+        #expect(progress.detail(for: .movies) == "40 of 67")
+        #expect(progress.detail(for: .series).isEmpty)
+
+        progress.update(detail: "67 of 67", fraction: 1)
+        progress.complete(.movies)
+        progress.start(.series)
+
+        #expect(progress.detail(for: .movies) == "67 of 67")
+        #expect(progress.detail(for: .series).isEmpty)
+    }
+
+    @Test func `a step is awaited until it completes`() {
+        let progress = SyncProgress(steps: SyncStep.xtreamSteps)
+        #expect(progress.isAwaiting(.movies))
+        #expect(!progress.isAwaiting(.playlistImport))
+
+        progress.start(.movies)
+        #expect(progress.isAwaiting(.movies))
+
+        progress.complete(.movies)
+        #expect(!progress.isAwaiting(.movies))
+    }
+
     @Test func `all steps have titles`() {
         for step in SyncStep.allCases {
             #expect(!String(localized: step.title).isEmpty)
