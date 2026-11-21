@@ -234,8 +234,13 @@ struct MainTabView: View {
                     // Built only while presented: a permanently mounted list of
                     // focusable rows would regrow the focus/AX responder walk
                     // that `activeOnly(_:selection:)` exists to contain.
-                    TVQuickSwitchOverlay(router: router, playlists: playlists, scope: catalogScope)
-                        .transition(.opacity)
+                    TVQuickSwitchOverlay(
+                        router: router,
+                        playlists: playlists,
+                        scope: catalogScope,
+                        autoSyncQueue: autoSyncQueue
+                    )
+                    .transition(.opacity)
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: router.isQuickSwitchPresented)

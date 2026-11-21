@@ -99,6 +99,28 @@
         }
     }
 
+    /// Sync Now under a playlist column, for the playlists on screen. While a
+    /// sync runs it says so, and the press goes to its progress instead.
+    struct TVSyncSwitchRow: View {
+        let isSyncing: Bool
+        let action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                HStack(spacing: 16) {
+                    TVSwitchRowGlyph(systemName: "arrow.triangle.2.circlepath")
+                    if isSyncing {
+                        Text("Syncing…")
+                    } else {
+                        Text("Sync Now")
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            .buttonStyle(TVSettingsRowButtonStyle())
+        }
+    }
+
     /// A full-width profile row: avatar and name, with a checkmark on the active
     /// one.
     struct TVProfileSwitchRow: View {
