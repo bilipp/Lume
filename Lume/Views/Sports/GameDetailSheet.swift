@@ -26,6 +26,8 @@ struct GameDetailSheet: View {
     /// game (or, on macOS, while its player window is open).
     var lastWatchedChannelID: String?
     var provider: any SportsDataProvider = ESPNClient.shared
+    var replay: SportsReplayGame?
+    var onReplay: ((ServerRecording, Bool) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -37,7 +39,10 @@ struct GameDetailSheet: View {
     @State private var isLoadingDetail = false
     @State private var fetchedStandings: [SportsStandingRow] = []
     @State private var selfResolved: [ResolvedChannel] = []
-    @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
+    @AppStorage(SportsSyncService.hideScoresKey) private var storedHidesScores = false
+    private var hidesScores: Bool {
+        replay == nil ? storedHidesScores : SportsSyncService.hidesReplayScores
+    }
 
     private var channels: [ResolvedChannel] {
         resolved.isEmpty ? selfResolved : resolved
@@ -48,10 +53,14 @@ struct GameDetailSheet: View {
             ScrollView {
                 VStack(spacing: 24) {
                     header
-                    if fixture.status.state != .final {
+                    if replay == nil, fixture.status.state != .final {
                         watchCard
                     }
-                    detailTabs
+                    if let replay, let onReplay {
+                        SportsReplayActions(game: replay, onPlay: onReplay)
+                    } else {
+                        detailTabs
+                    }
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
@@ -66,9 +75,9 @@ struct GameDetailSheet: View {
             }
         }
         .gameDetailPlatformChrome()
-        .task(id: fixture.id) { await loadDetail() }
-        .onAppear { SportsSyncService.shared.beginLivePolling() }
-        .onDisappear { SportsSyncService.shared.endLivePolling() }
+        .task(id: fixture.id) { if replay == nil { await loadDetail() } }
+        .onAppear { if replay == nil { SportsSyncService.shared.beginLivePolling() } }
+        .onDisappear { if replay == nil { SportsSyncService.shared.endLivePolling() } }
     }
 
     // MARK: - Background

@@ -232,6 +232,7 @@ nonisolated struct DispatcharrBackend: RecordingServerChannelResolving {
             finishedAt: properties.endedAt ?? properties.stoppedAt,
             sizeBytes: properties.bytesWritten,
             isPartial: state.isPartial,
+            programmeStart: properties.program?.start,
             programmeEnd: properties.program?.end
         )
     }
