@@ -309,6 +309,7 @@ struct MovieCategoryView: View {
     @Environment(\.modelContext) private var modelContext
 
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(SportsSyncService.libraryReplaysKey) private var routesSports = false
     @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
     private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
@@ -337,7 +338,7 @@ struct MovieCategoryView: View {
 
     /// The sort and grouping the loaded pages were fetched for.
     private var loadKey: String {
-        "\(contentSortRaw)|\(groupDuplicateTitles)"
+        "\(contentSortRaw)|\(groupDuplicateTitles)|\(routesSports)"
     }
 
     /// The playlist when it's a Stalker portal, whose categories are imported
@@ -412,7 +413,8 @@ struct MovieCategoryView: View {
         var descriptor = CategoryGridQuery.movies(
             categoryId: category.id,
             grouped: groupDuplicateTitles,
-            sortBy: contentSort.movieDescriptors
+            sortBy: contentSort.movieDescriptors,
+            routesSports: routesSports
         )
         descriptor.fetchOffset = movies.count
         descriptor.fetchLimit = pageSize
@@ -466,7 +468,8 @@ struct MovieCategoryView: View {
         var descriptor = CategoryGridQuery.movies(
             categoryId: category.id,
             grouped: groupDuplicateTitles,
-            sortBy: contentSort.movieDescriptors
+            sortBy: contentSort.movieDescriptors,
+            routesSports: routesSports
         )
         let window = max(movies.count, pageSize)
         descriptor.fetchLimit = window
@@ -496,11 +499,14 @@ struct MovieCategoryPreview: View {
 
     /// - Parameter grouped: lists each title once (its category primary); the
     ///   caller re-keys the view when it changes, since `@Query` is fixed here.
-    init(category: Category, limit: Int, sort: ContentSortOption, grouped: Bool, animationNamespace: Namespace.ID? = nil) {
+    init(
+        category: Category, limit: Int, sort: ContentSortOption, grouped: Bool, routesSports: Bool = false,
+        animationNamespace: Namespace.ID? = nil
+    ) {
         self.category = category
         self.limit = limit
         self.animationNamespace = animationNamespace
-        var descriptor = CategoryGridQuery.movies(categoryId: category.id, grouped: grouped, sortBy: sort.movieDescriptors)
+        var descriptor = CategoryGridQuery.movies(categoryId: category.id, grouped: grouped, sortBy: sort.movieDescriptors, routesSports: routesSports)
         // Fetch one extra so we can tell whether a full grid would show more.
         descriptor.fetchLimit = limit + 1
         _movies = Query(descriptor)

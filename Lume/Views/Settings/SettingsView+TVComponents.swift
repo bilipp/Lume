@@ -166,6 +166,10 @@ import SwiftUI
     /// so it owns its own presentation and refresh state.
     struct TVSportsSettingsPane: View {
         @AppStorage(SportsSyncService.hideScoresKey) private var hideScores = false
+        @AppStorage(SportsSyncService.libraryReplaysKey) private var libraryReplays = false
+        @Environment(\.modelContext) private var context
+        @Environment(\.catalogScope) private var catalogScope
+        @Environment(\.contentRestriction) private var restriction
         @State private var sync = SportsSyncService.shared
         @State private var showManageTeams = false
 
@@ -187,6 +191,8 @@ import SwiftUI
                     .buttonStyle(TVSettingsRowButtonStyle())
 
                     TVOptionToggleRow(title: "Hide Scores", isOn: $hideScores)
+                    TVOptionToggleRow(title: "Sportarr integration", isOn: $libraryReplays)
+                        .onChange(of: libraryReplays) { sync.loadReplaySchedule(in: context, scope: catalogScope, restriction: restriction) }
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -194,6 +200,7 @@ import SwiftUI
 
                     Button {
                         sync.syncNow()
+                        sync.loadReplaySchedule(in: context, scope: catalogScope, restriction: restriction)
                     } label: {
                         HStack(spacing: 16) {
                             Text(sync.isSyncing ? "Refreshing…" : "Refresh Now")

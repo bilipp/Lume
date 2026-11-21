@@ -54,6 +54,7 @@ struct SportsHubView: View {
     @State private var follows = SportsFollowService.shared
     @State private var epg = EPGSyncService.shared
 
+    @State private var showsReplays = false
     @State private var scope: SportsHubScope = .myTeams
     @State private var segment: SportsHubSegment = .today
     @State private var resolved: [String: [ResolvedChannel]] = [:]
@@ -77,7 +78,7 @@ struct SportsHubView: View {
         NavigationStack(path: pathBinding) {
             Group {
                 if premium.isPremium {
-                    hubContent(fixtures)
+                    SportsReplayHub(showsReplays: $showsReplays) { hubContent(fixtures) }
                 } else {
                     lockedState
                 }
@@ -111,18 +112,10 @@ struct SportsHubView: View {
     @ToolbarContentBuilder
     private var hubToolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            Menu {
-                Picker("Scope", selection: $scope) {
-                    Label("My Teams", systemImage: "star.fill").tag(SportsHubScope.myTeams)
-                    ForEach(followedLeagues) { league in
-                        Text(league.name).tag(SportsHubScope.league(league.id))
-                    }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(scopeTitle).font(.headline)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.bold))
-                }
+            if showsReplays {
+                Text("Sports").font(.headline)
+            } else {
+                scopeMenu
             }
         }
         ToolbarItem(placement: .primaryAction) {
@@ -130,6 +123,22 @@ struct SportsHubView: View {
                 showManageTeams = true
             } label: {
                 Label("Manage Teams", systemImage: "person.2.badge.plus")
+            }
+        }
+    }
+
+    private var scopeMenu: some View {
+        Menu {
+            Picker("Scope", selection: $scope) {
+                Label("My Teams", systemImage: "star.fill").tag(SportsHubScope.myTeams)
+                ForEach(followedLeagues) { league in
+                    Text(league.name).tag(SportsHubScope.league(league.id))
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(scopeTitle).font(.headline)
+                Image(systemName: "chevron.down").font(.caption2.weight(.bold))
             }
         }
     }

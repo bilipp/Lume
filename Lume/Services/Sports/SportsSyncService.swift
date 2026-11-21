@@ -26,6 +26,7 @@
 import Foundation
 import Observation
 import OSLog
+import SwiftData
 #if os(iOS)
     import UIKit
 #endif
@@ -59,6 +60,9 @@ final class SportsSyncService {
     static let shared = SportsSyncService()
 
     private(set) var isSyncing = false
+    /// Counts finished `loadReplaySchedule` passes: the episodes it loads
+    /// change the library Replays lists without any sync date moving.
+    private(set) var replayLibraryRevision = 0
 
     private var provider: (any SportsDataProvider)?
     private var followSource: any SportsFollowSource
@@ -90,6 +94,14 @@ final class SportsSyncService {
     /// `@AppStorage` key for spoiler-free fixture cards: no score, no winner
     /// emphasis. The game detail still shows the score once opened.
     static let hideScoresKey = "sports.hideScores"
+    /// Opt-in: games a media library identifies as sports join Replays.
+    static let libraryReplaysKey = "sports.libraryReplays"
+    /// A replay is watched after the fact, so its result stays hidden unless
+    /// the viewer has explicitly chosen to show scores.
+    nonisolated static var hidesReplayScores: Bool {
+        UserDefaults.standard.object(forKey: hideScoresKey) as? Bool ?? true
+    }
+
     /// Default for the Sports tab toggle: on everywhere except iPhone, where iOS
     /// fits four regular tabs plus the Search pill — a fifth would push both
     /// Sports and Search into "More". There the Home rail's "See All" opens the
@@ -206,7 +218,12 @@ final class SportsSyncService {
             return
         }
         guard !leagueIds.isEmpty else { return }
-        let months = Self.monthsToFetch(for: Date())
+        await run(leagueIds: leagueIds, months: Self.monthsToFetch(for: Date()))
+    }
+
+    /// One pass, registered as the one in flight: a refresh asked for while it
+    /// runs joins it instead of writing the same snapshots beside it.
+    private func run(leagueIds: [String], months: [DateComponents]) async {
         let pass = Task(priority: .utility) { [weak self] in
             guard let self else { return }
             await performRefresh(leagueIds: leagueIds, months: months)
@@ -216,6 +233,34 @@ final class SportsSyncService {
         await pass.value
         task = nil
         isSyncing = false
+    }
+
+    /// Readies library replays: loads the games of any league a server
+    /// listed without them, then the ESPN schedule months those games fall
+    /// in, which the rolling refresh does not reach. Turning Sportarr
+    /// integration on and Refresh Now both call this; while the switch is off
+    /// it does nothing, and merely opening Replays never fetches.
+    func loadReplaySchedule(in context: ModelContext, scope: CatalogScope, restriction: ContentRestriction) {
+        guard UserDefaults.standard.bool(forKey: Self.libraryReplaysKey) else { return }
+        Task {
+            await SportsReplayLibrary.loadMissingEpisodes(in: context, scope: scope, restriction: restriction)
+            await loadHistory(months: SportsReplayLibrary.months(of: SportsReplayLibrary.files(in: context, scope: scope, restriction: restriction)))
+            replayLibraryRevision += 1
+        }
+    }
+
+    /// Fetches schedule months outside the rolling window for the followed
+    /// leagues: a replay can be of a game played months ago, and it needs that
+    /// month's fixtures to be placed. The fixtures merge into the league
+    /// snapshots like any refresh, so a month is kept once fetched.
+    func loadHistory(months: Set<DateComponents>) async {
+        guard provider != nil, !months.isEmpty else { return }
+        // Yield after each so the finished pass's owner clears `task` first.
+        while let task {
+            await task.value
+            await Task.yield()
+        }
+        await run(leagueIds: leaguesToRefresh(), months: Array(months))
     }
 
     /// The last successful refresh timestamp, for display in Settings. `nil` until

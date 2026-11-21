@@ -8,12 +8,17 @@
 //  (SettingsView+TVComponents), so this page is iOS / macOS / visionOS only.
 //
 
+import SwiftData
 import SwiftUI
 
 #if !os(tvOS)
 
     struct SportsSettingsView: View {
         @AppStorage(SportsSyncService.hideScoresKey) private var hideScores = false
+        @AppStorage(SportsSyncService.libraryReplaysKey) private var libraryReplays = false
+        @Environment(\.modelContext) private var context
+        @Environment(\.catalogScope) private var catalogScope
+        @Environment(\.contentRestriction) private var restriction
         @State private var sync = SportsSyncService.shared
         @State private var showingManageTeams = false
 
@@ -21,6 +26,7 @@ import SwiftUI
             Form {
                 teamsSection
                 scoresSection
+                replaysSection
                 refreshSection
             }
             #if os(macOS)
@@ -55,10 +61,20 @@ import SwiftUI
             }
         }
 
+        private var replaysSection: some View {
+            Section {
+                Toggle("Sportarr integration", isOn: $libraryReplays)
+                    .onChange(of: libraryReplays) { sync.loadReplaySchedule(in: context, scope: catalogScope, restriction: restriction) }
+            } footer: {
+                Text("Games your media servers identify with Sportarr appear under Replays in the Sports tab.")
+            }
+        }
+
         private var refreshSection: some View {
             Section {
                 Button {
                     sync.syncNow()
+                    sync.loadReplaySchedule(in: context, scope: catalogScope, restriction: restriction)
                 } label: {
                     HStack {
                         Label("Refresh Now", systemImage: "arrow.triangle.2.circlepath")

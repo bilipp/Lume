@@ -279,6 +279,9 @@ actor ContentIndexer {
         /// The row's `titleGroupKey` when it was snapshotted — before TMDB
         /// resolved an id, the key its unresolved siblings share.
         let groupKey: String?
+        /// Carries a source-supplied sports identity (`sportsRef`). A league
+        /// or a fixture is not a TMDB title, so its name is never searched.
+        var isSports = false
     }
 
     private nonisolated struct SearchKey: Hashable {
@@ -393,7 +396,8 @@ actor ContentIndexer {
                 year: query.year,
                 existingTMDBId: movie.tmdbId,
                 needsEnrichment: movie.tmdbEnrichedAt == nil,
-                groupKey: movie.titleGroupKey
+                groupKey: movie.titleGroupKey,
+                isSports: movie.sportsRef != nil
             )
         }
 
@@ -410,7 +414,8 @@ actor ContentIndexer {
                     year: query.year,
                     existingTMDBId: item.tmdbId,
                     needsEnrichment: item.tmdbEnrichedAt == nil,
-                    groupKey: item.titleGroupKey
+                    groupKey: item.titleGroupKey,
+                    isSports: item.sportsRef != nil
                 )
             }
         }
@@ -429,8 +434,9 @@ actor ContentIndexer {
 
         // A row that adopted its title's `tmdb:` group is indexed as it is:
         // its siblings carry the id and the details, and adoption never writes
-        // a tmdbId of its own.
-        if item.existingTMDBId == nil, TitleGroupKey.tmdbId(groupKey: item.groupKey) != nil {
+        // a tmdbId of its own. A sports item is indexed as it is too: a title
+        // search would attach an unrelated show's poster, cast and synopsis.
+        if item.existingTMDBId == nil, item.isSports || TitleGroupKey.tmdbId(groupKey: item.groupKey) != nil {
             return IndexResult(item: item, resolvedTMDBId: nil, details: nil, usedNetwork: false)
         }
 

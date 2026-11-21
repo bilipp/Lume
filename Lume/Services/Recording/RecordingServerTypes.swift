@@ -97,6 +97,7 @@ nonisolated struct ServerRecording: Hashable, Identifiable {
     var isPartial: Bool
     /// The end of the programme the recording was planned from, for a server
     /// that pads `end` itself; `nil` when the server reports none.
+    var programmeStart: Date?
     var programmeEnd: Date?
 
     init(
@@ -116,6 +117,7 @@ nonisolated struct ServerRecording: Hashable, Identifiable {
         durationSeconds: Double? = nil,
         sizeBytes: Int64? = nil,
         isPartial: Bool = false,
+        programmeStart: Date? = nil,
         programmeEnd: Date? = nil
     ) {
         self.id = id
@@ -134,6 +136,7 @@ nonisolated struct ServerRecording: Hashable, Identifiable {
         self.durationSeconds = durationSeconds
         self.sizeBytes = sizeBytes
         self.isPartial = isPartial
+        self.programmeStart = programmeStart
         self.programmeEnd = programmeEnd
     }
 }

@@ -78,7 +78,8 @@ nonisolated enum SportsMatcher {
     static func bestMatch(
         for fixture: SportsFixture,
         in candidates: [EPGProgramCandidate],
-        aliases: SportsTeamAliases = .bundled
+        aliases: SportsTeamAliases = .bundled,
+        requiresKickoffStart: Bool = true
     ) -> SportMatch? {
         guard let home = fixture.home?.team, let away = fixture.away?.team else { return nil }
         let homeTokens = tokens(for: home, aliases: aliases)
@@ -90,7 +91,7 @@ nonisolated enum SportsMatcher {
 
         var best: SportMatch?
         for candidate in candidates {
-            guard candidate.start >= windowStart, candidate.start <= windowEnd else { continue }
+            if requiresKickoffStart, !(candidate.start >= windowStart && candidate.start <= windowEnd) { continue }
 
             let title = normalize(candidate.title)
             let subtitle = normalize(candidate.subtitle)

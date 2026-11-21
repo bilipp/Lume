@@ -132,6 +132,10 @@ final class Series {
     var traktId: String?
     var tmdbId: Int?
 
+    /// Provider-qualified sports identity from the source (`sportarr://ev-…`,
+    /// `sportarr://lg-…`); nil for everything else. Written by import only.
+    var sportsRef: String?
+
     /// `TitleGroupKey` of this row; rows sharing it are one title across
     /// qualities, languages and playlists. Catalog-only, never synced.
     var titleGroupKey: String?

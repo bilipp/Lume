@@ -72,6 +72,8 @@ extension ContentSyncManager {
         let previousName = series.name
         let previousTmdbId = series.tmdbId
         applyPlexSeriesMetadata(item, to: series, scope: scope)
+        let sportsRef = item.sportsRef(.league, current: series.sportsRef)
+        if series.sportsRef != sportsRef { series.sportsRef = sportsRef }
         if let tmdbId = Self.mediaServerTmdbId(item.providerId("tmdb")), series.tmdbId != tmdbId {
             series.tmdbId = tmdbId
         }
@@ -206,6 +208,8 @@ extension ContentSyncManager {
     private func applyPlexEpisodeFields(_ item: PlexMetadata, to episode: Episode, series: Series, scope: PlexSectionScope) {
         applyPlexEpisodeIdentity(item, to: episode, scope: scope)
         applyPlexEpisodeMetadata(item, to: episode, series: series, scope: scope)
+        let sportsRef = item.sportsRef(.event, current: episode.sportsRef)
+        if episode.sportsRef != sportsRef { episode.sportsRef = sportsRef }
     }
 
     private func applyPlexEpisodeIdentity(_ item: PlexMetadata, to episode: Episode, scope: PlexSectionScope) {
