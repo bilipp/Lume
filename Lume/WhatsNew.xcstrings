@@ -16449,6 +16449,186 @@
           }
         }
       }
+    },
+    "whatsNew.3_4.backgroundSync.summary" : {
+      "comment" : "What’s New 3.4 highlight summary.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تتم الآن مزامنة قوائم التشغيل أثناء متابعتك التصفح. تظهر العناوين الجديدة فور وصولها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlists werden jetzt synchronisiert, während du weiterstöberst. Neue Titel erscheinen, sobald sie geladen sind."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlists now sync while you keep browsing. New titles show up as they arrive."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las listas de reproducción ahora se sincronizan mientras sigues explorando. Los títulos nuevos aparecen a medida que llegan."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les playlists se synchronisent désormais pendant que vous continuez à parcourir. Les nouveaux titres apparaissent au fur et à mesure."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le playlist ora si sincronizzano mentre continui a sfogliare. I nuovi titoli compaiono man mano che arrivano."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレイリストの同期中もブラウズを続けられるようになりました。新しいタイトルは読み込まれ次第表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이제 재생목록을 동기화하는 동안에도 계속 탐색할 수 있습니다. 새 콘텐츠는 도착하는 대로 표시됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlists worden nu gesynchroniseerd terwijl je verder bladert. Nieuwe titels verschijnen zodra ze binnenkomen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlisty synchronizują się teraz, gdy dalej przeglądasz. Nowe tytuły pojawiają się, gdy tylko zostaną wczytane."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As playlists agora são sincronizadas enquanto você continua navegando. Novos títulos aparecem à medida que chegam."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Плейлисты теперь синхронизируются, пока вы продолжаете просмотр каталога. Новые фильмы и сериалы появляются по мере загрузки."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oynatma listeleri artık siz göz atmaya devam ederken eşzamanlanıyor. Yeni içerikler geldikçe görünür."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在播放列表会在你继续浏览时同步。新内容到达后即会显示。"
+          }
+        }
+      }
+    },
+    "whatsNew.3_4.backgroundSync.title" : {
+      "comment" : "What’s New 3.4 highlight title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المزامنة في الخلفية"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisierung im Hintergrund"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync in the Background"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronización en segundo plano"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisation en arrière-plan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizzazione in background"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バックグラウンドで同期"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백그라운드 동기화"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchroniseren op de achtergrond"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronizacja w tle"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronização em segundo plano"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синхронизация в фоне"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arka Planda Eşzamanlama"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台同步"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

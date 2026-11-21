@@ -18,6 +18,7 @@ struct MoviesView: View {
     @Environment(\.catalogScope) private var scope
     // Optional so previews (which don't inject it) fall back to a local path.
     @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
+    @Environment(AutoSyncQueue.self) private var autoSyncQueue: AutoSyncQueue?
     @State private var fallbackPath = NavigationPath()
     @Query private var playlists: [Playlist]
     @Query(filter: #Predicate<Category> { $0.typeRaw == "vod" && $0.isHidden == false })
@@ -62,8 +63,8 @@ struct MoviesView: View {
                         systemImage: "film.stack",
                         description: Text("Add a playlist in Settings to start browsing movies")
                     )
-                } else if layout.isEmpty {
-                    VStack(spacing: 20) {
+                } else if layout.isEmpty || autoSyncQueue?.isFirstImportAwaiting(.movies, in: scope) == true {
+                    SyncAwareEmptyState {
                         ContentUnavailableView(
                             "No Movies",
                             systemImage: "film.stack",

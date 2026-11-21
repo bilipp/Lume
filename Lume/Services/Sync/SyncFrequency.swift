@@ -159,9 +159,9 @@ enum AutoSync {
     /// interrupted — which wait for the viewer like any other stale playlist.
     static var addedThisSession: Set<UUID> = []
 
-    /// Auto-sync hands the screen to a blocking progress cover, so with several
-    /// playlists configured, launching used to mean sitting through one cover
-    /// per playlist — on a large catalog, minutes each.
+    /// A sync runs behind the library, but it is still minutes of import and
+    /// of the provider's connection allowance on a large catalog, and with
+    /// several playlists configured a launch would queue one per playlist.
     ///
     /// Only the playlists on screen earn that. Every content surface scopes to
     /// the resolved `CatalogScope`, so a stale playlist outside it changes
@@ -173,8 +173,8 @@ enum AutoSync {
     /// wherever it is: the add doesn't select it, and the viewer adding one
     /// expects it to be ready when they go looking for it. The exception is
     /// keyed on the add rather than on `lastSyncDate == nil`, which would also
-    /// catch every playlist iCloud brings to a new device and put one cover per
-    /// playlist right back.
+    /// catch every playlist iCloud brings to a new device and queue one sync
+    /// per playlist right back.
     ///
     /// - Parameter alreadyStarted: whether this session has already kicked off a
     ///   sync for it that hasn't finished yet (avoids double-triggering from
@@ -194,14 +194,14 @@ enum AutoSync {
 }
 
 extension AutoSync {
-    /// Whether a queued sync takes the screen with the blocking cover.
+    /// The priority a sync runs at.
     ///
-    /// In isolated mode the one playlist on screen is the whole library, so it
-    /// always does. In Combined a member that already has rows keeps the rest of
-    /// the library browsable and refreshes in the background; only one with
-    /// nothing to show yet blocks, since its tabs would otherwise look broken.
-    static func presentsCover(isCombined: Bool, hasContent: @autoclosure () -> Bool) -> Bool {
-        !isCombined || !hasContent()
+    /// Every sync runs behind the library, so an automatic refresh of a
+    /// playlist that already has rows gives way to whatever the viewer is
+    /// doing with them. One they asked for, or the first import of a playlist
+    /// with nothing to browse yet, is being waited on and runs flat out.
+    static func taskPriority(isManual: Bool, hasContent: @autoclosure () -> Bool) -> TaskPriority {
+        isManual || !hasContent() ? .userInitiated : .utility
     }
 
     /// Whether any catalog row belongs to `playlistID`. One `LIMIT 1` seek on
@@ -257,12 +257,6 @@ extension AutoSync {
         }
         succeeded = true
         ContentIndexingService.shared.kick(after: .seconds(3))
-    }
-
-    /// Runs the sync the blocking cover drives, without the cover. A failure
-    /// is recorded on the playlist's own status; the next due pass retries it.
-    static func syncInBackground(_ playlist: Playlist, container: ModelContainer) async {
-        try? await runSync(playlist, container: container)
     }
 }
 

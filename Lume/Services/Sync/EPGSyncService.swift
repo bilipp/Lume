@@ -23,12 +23,12 @@ import SwiftData
 /// briefly blocked, failing the sync's next requests too). So the gate is fed
 /// the real state from the places that own it, rather than predicting which
 /// sync is about to start: `MainTabView` reports whether its auto-sync queue
-/// holds anything, and `SyncProgressView` — the one place any content sync
+/// holds anything, and `AutoSync.runSync` — the one place any content sync
 /// runs — reports each start and finish.
 struct EPGRefreshGate {
     /// Content syncs running right now, automatic or manual.
     private(set) var runningContentSyncs = 0
-    /// Whether auto-syncs are queued or on screen in the blocking cover.
+    /// Whether playlist syncs are queued or running.
     var isAutoSyncQueued = false
     /// A background refresh that was held back or cut short, run as soon as no
     /// content sync is pending. Set by any deferred trigger and by every

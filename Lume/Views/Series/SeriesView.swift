@@ -18,6 +18,7 @@ struct SeriesView: View {
     @Environment(\.catalogScope) private var scope
     // Optional so previews (which don't inject it) fall back to a local path.
     @Environment(DeepLinkRouter.self) private var router: DeepLinkRouter?
+    @Environment(AutoSyncQueue.self) private var autoSyncQueue: AutoSyncQueue?
     @State private var fallbackPath = NavigationPath()
     @Query private var playlists: [Playlist]
     @Query(filter: #Predicate<Category> { $0.typeRaw == "series" && $0.isHidden == false })
@@ -60,8 +61,8 @@ struct SeriesView: View {
                         systemImage: "tv",
                         description: Text("Add a playlist in Settings to start browsing series")
                     )
-                } else if layout.isEmpty {
-                    VStack(spacing: 20) {
+                } else if layout.isEmpty || autoSyncQueue?.isFirstImportAwaiting(.series, in: scope) == true {
+                    SyncAwareEmptyState {
                         ContentUnavailableView(
                             "No Series",
                             systemImage: "tv.fill",

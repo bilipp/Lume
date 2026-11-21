@@ -2,47 +2,142 @@
 //  AutoSyncQueue.swift
 //  Lume
 //
-//  The playlists waiting to be auto-synced, run one at a time: in the blocking
-//  progress cover, or behind the library for a Combined member that already
-//  has content (`AutoSync.presentsCover`). `MainTabView` feeds it on launch,
-//  switch and foreground; the library toolbar's Sync feeds it while Combined is
-//  on screen.
+//  Every playlist sync the app runs, one at a time and always behind the
+//  library: the automatic ones `MainTabView` feeds it on launch, switch and
+//  foreground, and the manual ones from the library toolbar and a playlist's
+//  settings. Nothing here takes the screen; the toolbar indicator, the empty
+//  library placeholder and the activity sheet read `running` and `recent`.
 //
 
 import Foundation
 import SwiftData
 
+// MARK: - Job
+
+/// One playlist sync, as the surfaces showing it see it. A value on purpose:
+/// the playlist can be deleted while its sync is on screen.
+struct SyncJob: Identifiable, Equatable {
+    /// The playlist's id.
+    let id: UUID
+    let name: String
+    let sourceType: PlaylistSourceType
+    /// A Stalker full-catalog download rather than the default sync.
+    let full: Bool
+    /// Asked for by the viewer, rather than due on its own.
+    let isManual: Bool
+    /// The playlist has never finished a sync: this is its first import.
+    let isFirstImport: Bool
+
+    init(_ playlist: Playlist, full: Bool, isManual: Bool) {
+        id = playlist.id
+        name = playlist.name
+        sourceType = playlist.sourceType
+        self.full = full
+        self.isManual = isManual
+        isFirstImport = playlist.lastSyncDate == nil
+    }
+
+    var steps: [SyncStep] {
+        SyncStep.steps(for: sourceType, full: full)
+    }
+}
+
+/// The sync running right now and where it has got to.
+struct RunningSync {
+    let job: SyncJob
+    let progress: SyncProgress
+}
+
+/// How the last sync ended. An aborted one leaves no trace.
+struct FinishedSync {
+    let job: SyncJob
+    let progress: SyncProgress
+    /// `nil` when it succeeded.
+    let errorMessage: String?
+
+    var failed: Bool {
+        errorMessage != nil
+    }
+}
+
+// MARK: - Queue
+
 @MainActor
 @Observable
 final class AutoSyncQueue {
-    /// The playlist shown in the blocking progress cover. Auto-sync is
-    /// presented (not silent) so the user sees progress and waits for it to
-    /// finish — most importantly right after adding a playlist, when the app
-    /// would otherwise look empty and broken.
-    var coverPlaylist: Playlist?
+    private struct Entry {
+        let job: SyncJob
+        let playlist: Playlist
+    }
 
-    /// The Combined member refreshing behind the library.
-    private(set) var backgroundPlaylist: Playlist?
+    /// What runs one sync. `AutoSync.runSync` in the app; tests supply their own.
+    typealias Runner = (_ playlist: Playlist, _ container: ModelContainer, _ progress: SyncProgress, _ full: Bool) async throws -> Void
 
-    private var pending: [Playlist] = []
+    @ObservationIgnored private let run: Runner
+
+    init(run: Runner? = nil) {
+        self.run = run ?? { playlist, container, progress, full in
+            try await AutoSync.runSync(playlist, container: container, progress: progress, full: full)
+        }
+    }
+
+    private(set) var running: RunningSync?
+
+    /// The sync that finished last, until another one finishes or the viewer
+    /// has seen it (`acknowledgeRecent`).
+    private(set) var recent: FinishedSync?
+
+    /// The playlist `recent` was about, kept for Try Again.
+    @ObservationIgnored private var recentPlaylist: Playlist?
+
+    private var pending: [Entry] = []
+
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var container: ModelContainer?
 
     /// Playlists already auto-synced (or attempted) this session, so the
-    /// launch / switch / foreground triggers don't re-present the cover for one
-    /// that's already been handled.
+    /// launch / switch / foreground triggers don't queue one twice.
     private var attempted: Set<UUID> = []
 
-    /// The scope the latest request was made for; a background sync finishing
-    /// promotes the next playlist against it.
-    private var isCombined = false
+    /// UI tests seed a fake playlist; an automatic sync can never succeed
+    /// against the stub server, so only manual ones run there.
+    private let isAutomaticDisabled = CommandLine.arguments.contains("-ui-testing")
 
-    /// UI tests seed a fake playlist; auto-sync would present a blocking cover
-    /// that can never succeed against the stub server, so skip it there.
-    private let isDisabled = CommandLine.arguments.contains("-ui-testing")
-
-    /// Whether anything is queued, in the cover or refreshing in the background.
+    /// Whether anything is queued or running.
     var isBusy: Bool {
-        coverPlaylist != nil || backgroundPlaylist != nil || !pending.isEmpty
+        running != nil || !pending.isEmpty
     }
+
+    /// The playlists waiting behind the running one, in order.
+    var upNext: [SyncJob] {
+        pending.map(\.job)
+    }
+
+    /// Whether one of `playlistIDs` is syncing or waiting to.
+    func isSyncing(anyOf playlistIDs: Set<UUID>) -> Bool {
+        if let running, playlistIDs.contains(running.job.id) { return true }
+        return pending.contains { playlistIDs.contains($0.job.id) }
+    }
+
+    /// Whether `scope`'s one playlist is in its first import and `step`, the
+    /// one that fills a tab, isn't done yet. That tab then shows the sync
+    /// rather than category shells with nothing in them. Never in Combined,
+    /// where the other members' rows are already there to browse.
+    func isFirstImportAwaiting(_ step: SyncStep, in scope: CatalogScope) -> Bool {
+        guard !scope.isCombined, let running, running.job.isFirstImport,
+              scope.playlistIDs.contains(running.job.id) else { return false }
+        return running.progress.isAwaiting(step)
+    }
+
+    /// The last sync's failure, while nothing is running and it belongs to one
+    /// of `playlistIDs` (every playlist when `nil`).
+    func recentFailure(in playlistIDs: Set<UUID>? = nil) -> FinishedSync? {
+        guard running == nil, let recent, recent.failed else { return nil }
+        if let playlistIDs, !playlistIDs.contains(recent.job.id) { return nil }
+        return recent
+    }
+
+    // MARK: Enqueueing
 
     /// Enqueues every due playlist and starts the first one — the playlists on
     /// screen, plus any the viewer just added (see `AutoSync.shouldSync`).
@@ -50,58 +145,120 @@ final class AutoSyncQueue {
     /// playlist due) as well as periodic refreshes. Combined members queue in
     /// priority order and run one at a time, never all at once.
     func enqueueDue(_ candidates: [Playlist], scope: CatalogScope, frequency: SyncFrequency, context: ModelContext) {
-        guard !isDisabled else { return }
+        guard !isAutomaticDisabled else { return }
         for playlist in candidates.inPriorityOrder(of: scope) where AutoSync.shouldSync(
             playlist.autoSyncCandidate(in: scope),
             frequency: frequency,
             alreadyStarted: attempted.contains(playlist.id)
         ) {
             attempted.insert(playlist.id)
-            pending.append(playlist)
+            pending.append(Entry(job: SyncJob(playlist, full: false, isManual: false), playlist: playlist))
         }
-        promoteNextIfIdle(scope: scope, context: context)
+        promoteNextIfIdle(container: context.container)
     }
 
     /// The library toolbar's Sync while Combined is on screen: the due members
     /// (or all of them when none is) through the same sequential queue.
     func enqueueManualMembers(scope: CatalogScope, playlists: [Playlist], frequency: SyncFrequency, context: ModelContext) {
-        guard !isDisabled else { return }
-        let queued = Set(pending.map(\.id))
-            .union([coverPlaylist?.id, backgroundPlaylist?.id].compactMap(\.self))
         for playlist in AutoSync.manualMemberSyncs(playlists.members(of: scope), frequency: frequency)
-            where !queued.contains(playlist.id)
+            where !isQueued(playlist.id)
         {
             attempted.insert(playlist.id)
-            pending.append(playlist)
+            pending.append(Entry(job: SyncJob(playlist, full: false, isManual: true), playlist: playlist))
         }
-        promoteNextIfIdle(scope: scope, context: context)
+        promoteNextIfIdle(container: context.container)
     }
 
-    /// Starts the next queued playlist's sync when none is running. The
-    /// `SyncProgressView` auto-starts the sync and dismisses itself on success;
-    /// the cover's `onDismiss` calls back here to advance the queue, as does a
-    /// finished background sync.
-    func promoteNextIfIdle(scope: CatalogScope, context: ModelContext) {
-        isCombined = scope.isCombined
-        promoteNextIfIdle(context: context)
+    /// Sync Now for one playlist. It goes ahead of the automatic ones waiting,
+    /// behind whatever is already running.
+    func sync(_ playlist: Playlist, full: Bool = false, context: ModelContext) {
+        if !isQueued(playlist.id) {
+            attempted.insert(playlist.id)
+            let entry = Entry(job: SyncJob(playlist, full: full, isManual: true), playlist: playlist)
+            let firstAutomatic = pending.firstIndex { !$0.job.isManual } ?? pending.endIndex
+            pending.insert(entry, at: firstAutomatic)
+        }
+        promoteNextIfIdle(container: context.container)
     }
 
-    private func promoteNextIfIdle(context: ModelContext) {
-        guard coverPlaylist == nil, backgroundPlaylist == nil, !pending.isEmpty else { return }
-        let next = pending.removeFirst()
-        let presentsCover = AutoSync.presentsCover(
-            isCombined: isCombined,
-            hasContent: AutoSync.hasContent(next.id, in: context)
+    /// Runs the last failed sync again.
+    func retryRecent(context: ModelContext) {
+        guard recentFailure() != nil, let playlist = recentPlaylist else { return }
+        let full = recent?.job.full ?? false
+        clearRecent()
+        sync(playlist, full: full, context: context)
+    }
+
+    // MARK: Stopping
+
+    /// Aborts the running sync. `ContentSyncManager` restores the playlist to
+    /// idle and keeps what was already imported; the queue then moves on.
+    func stopRunning() {
+        task?.cancel()
+    }
+
+    /// Drops the syncs of playlists that no longer exist.
+    func dropSyncs(notIn playlistIDs: Set<UUID>) {
+        pending.removeAll { !playlistIDs.contains($0.job.id) }
+        if let running, !playlistIDs.contains(running.job.id) {
+            stopRunning()
+        }
+        if let recent, !playlistIDs.contains(recent.job.id) {
+            clearRecent()
+        }
+    }
+
+    /// The viewer has seen how the last sync ended.
+    func acknowledgeRecent() {
+        if running == nil { clearRecent() }
+    }
+
+    private func clearRecent() {
+        recent = nil
+        recentPlaylist = nil
+    }
+
+    // MARK: Running
+
+    private func isQueued(_ playlistID: UUID) -> Bool {
+        running?.job.id == playlistID || pending.contains { $0.job.id == playlistID }
+    }
+
+    private func promoteNextIfIdle(container: ModelContainer) {
+        self.container = container
+        promoteNextIfIdle()
+    }
+
+    private func promoteNextIfIdle() {
+        guard running == nil, !pending.isEmpty, let container else { return }
+        let entry = pending.removeFirst()
+        let progress = SyncProgress(steps: entry.job.steps)
+        running = RunningSync(job: entry.job, progress: progress)
+
+        let priority = AutoSync.taskPriority(
+            isManual: entry.job.isManual,
+            hasContent: AutoSync.hasContent(entry.job.id, in: container.mainContext)
         )
-        if presentsCover {
-            coverPlaylist = next
-        } else {
-            backgroundPlaylist = next
-            Task {
-                await AutoSync.syncInBackground(next, container: context.container)
-                backgroundPlaylist = nil
-                promoteNextIfIdle(context: context)
+        task = Task(priority: priority) {
+            var errorMessage: String?
+            var wasStopped = false
+            do {
+                try await run(entry.playlist, container, progress, entry.job.full)
+            } catch {
+                // A cancelled network request surfaces as a non-CancellationError.
+                if Task.isCancelled || error is CancellationError {
+                    wasStopped = true
+                } else {
+                    errorMessage = error.localizedDescription
+                }
             }
+            task = nil
+            running = nil
+            if !wasStopped {
+                recent = FinishedSync(job: entry.job, progress: progress, errorMessage: errorMessage)
+                recentPlaylist = entry.playlist
+            }
+            promoteNextIfIdle()
         }
     }
 }

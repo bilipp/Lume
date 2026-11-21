@@ -40,10 +40,7 @@ import SwiftUI
                 Text("All synced content for this playlist will also be removed.")
             }
             .fullScreenCover(isPresented: $showSync) {
-                SyncProgressView(playlist: playlist)
-            }
-            .fullScreenCover(isPresented: $showFullSync) {
-                SyncProgressView(playlist: playlist, full: true)
+                SyncActivityView()
             }
             .paywall(isPresented: $showPaywall, highlight: .multiplePlaylists)
         }
@@ -210,7 +207,6 @@ import SwiftUI
 
                     Button("Sync Now") { requestSync() }
                         .buttonStyle(TVSettingsRowButtonStyle())
-                        .disabled(playlist.syncStatus == .syncing)
 
                     if isStalker {
                         Button("Download Full Catalog") { requestSync(full: true) }

@@ -122,13 +122,13 @@ final class M3UPlaylistFlowTests: XCTestCase {
         let syncButton = app.syncToolbarButton
         XCTAssertTrue(syncButton.waitForExistence(timeout: 10), "Sync button not found")
         syncButton.tap()
-        let startSync = app.buttons["Start Sync"]
-        XCTAssertTrue(startSync.waitForExistence(timeout: 10), "Sync sheet didn't open")
-        startSync.tap()
+        // The sync starts with the tap and runs behind the library; the sheet
+        // that opens only reports it.
+        let complete = app.staticTexts["Sync complete"]
         // Generous: this downloads and imports roughly ten thousand channels
         // from a third-party host.
+        XCTAssertTrue(complete.waitForExistence(timeout: 420), "m3u sync did not complete")
         let doneSync = app.buttons["Done"]
-        XCTAssertTrue(doneSync.waitForExistence(timeout: 420), "m3u sync did not complete")
         doneSync.tap()
     }
 

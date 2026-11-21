@@ -1346,7 +1346,7 @@ Never trace a Debug build.
 recording never finalizes and the `.trace` is unreadable. Record from the
 Instruments GUI instead — *Time Profiler* + *os_signpost* + *Points of
 Interest*, target the device and the Lume process, start recording, add the
-playlist on the phone, stop when the sync cover disappears. Then read the
+playlist on the phone, stop when the sync indicator disappears. Then read the
 intervals from the command line:
 
 ```bash
