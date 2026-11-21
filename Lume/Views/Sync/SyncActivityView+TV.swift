@@ -53,8 +53,12 @@
             VStack(spacing: 18) {
                 switch phase {
                 case .syncing:
-                    Button("Continue in Background") { dismiss() }
-                        .buttonStyle(TVSettingsActionButtonStyle(prominent: true))
+                    // As a tab there is nothing to close: the sync carries
+                    // on in the background wherever the viewer goes next.
+                    if onClose == nil {
+                        Button("Continue in Background") { close() }
+                            .buttonStyle(TVSettingsActionButtonStyle(prominent: true))
+                    }
                     Button("Stop Sync") { stopSync() }
                         .buttonStyle(TVSettingsActionButtonStyle())
                 case let .failed(message):
@@ -68,10 +72,10 @@
                         Label("Try Again", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(TVSettingsActionButtonStyle(prominent: true))
-                    Button("Close") { dismiss() }
+                    Button("Close") { close() }
                         .buttonStyle(TVSettingsActionButtonStyle())
                 case .finished, .idle:
-                    Button("Done") { dismiss() }
+                    Button("Done") { close() }
                         .buttonStyle(TVSettingsActionButtonStyle(prominent: true))
                 }
             }

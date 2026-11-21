@@ -209,13 +209,6 @@ struct MainTabView: View {
         .reportsBrowseRootCovered(hasBlockingPresentation)
         #if os(tvOS)
             .overlay { tvOverlays }
-            .overlay(alignment: .topTrailing) {
-                // Level with the tab bar, in the corner it leaves free.
-                TVSyncStatusPill(queue: autoSyncQueue)
-                    .padding(.top, 52)
-                    .padding(.trailing, 80)
-                    .ignoresSafeArea()
-            }
         #endif
     }
 
@@ -299,7 +292,35 @@ struct MainTabView: View {
                 } label: {
                     Image(systemName: "gear")
                 }
+
+                syncTab(selection: selection.wrappedValue)
             }
+        }
+
+        @TabContentBuilder<AppTab>
+        private func syncTab(selection: AppTab) -> some TabContent<AppTab> {
+            if showsSyncTab(selection: selection) {
+                Tab(value: AppTab.sync) {
+                    activeOnly(.sync, selection: selection) {
+                        SyncActivityView(onClose: { router.selectedTab = .home })
+                    }
+                } label: {
+                    Image(systemName: autoSyncQueue.recentFailure() == nil
+                        ? "arrow.triangle.2.circlepath"
+                        : "exclamationmark.arrow.triangle.2.circlepath")
+                        .accessibilityLabel(Text("Sync"))
+                }
+            }
+        }
+
+        /// tvOS has no library toolbar to carry the sync indicator, so a sync
+        /// that is running, waiting or has just failed gets a tab of its own
+        /// at the end of the bar: the system lays it out, in any language, and
+        /// the remote reaches it like every other tab. It stays while it is
+        /// selected, so a sync finishing under the viewer doesn't pull the
+        /// screen away.
+        private func showsSyncTab(selection: AppTab) -> Bool {
+            selection == .sync || autoSyncQueue.isBusy || autoSyncQueue.recentFailure() != nil
         }
 
         /// Whether something layered over the tabs owns the screen: tvOS focus is

@@ -16,7 +16,11 @@ import SwiftUI
 struct SyncActivityView: View {
     @Environment(AutoSyncQueue.self) var queue: AutoSyncQueue?
     @Environment(\.modelContext) var modelContext
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
+
+    /// Set where this is a tab rather than a presentation (tvOS): there is
+    /// nothing to dismiss, so closing means leaving the tab.
+    var onClose: (() -> Void)?
 
     /// What the sheet is showing. The running sync wins over the last result.
     enum Phase: Equatable {
@@ -45,9 +49,13 @@ struct SyncActivityView: View {
             .onDisappear { queue?.acknowledgeRecent() }
     }
 
+    func close() {
+        if let onClose { onClose() } else { dismiss() }
+    }
+
     func stopSync() {
         queue?.stopRunning()
-        dismiss()
+        close()
     }
 
     func retry() {

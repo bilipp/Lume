@@ -122,4 +122,7 @@ nonisolated enum DeepLink: Equatable {
 /// link can switch tabs through `DeepLinkRouter`.
 nonisolated enum AppTab: Hashable {
     case search, home, movies, series, liveTV, sports, settings
+    /// tvOS only: the sync activity, in the tab bar while a sync runs or has
+    /// just failed.
+    case sync
 }
