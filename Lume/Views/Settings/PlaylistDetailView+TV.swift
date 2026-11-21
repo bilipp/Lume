@@ -3,7 +3,7 @@
 //  Lume
 //
 //  The tvOS layout for a playlist's detail pane: the connection fields, account
-//  info, stream-format and sync sections, and the edit/delete actions. Split out
+//  info, playback and sync sections, and the edit/delete actions. Split out
 //  of PlaylistDetailView to keep that file within the project's line-count cap.
 //
 
@@ -25,7 +25,7 @@ import SwiftUI
 
                 tvServerSection
                 tvAccountSection
-                tvStreamFormatSection
+                tvPlaybackSection
                 tvSyncSection
                 tvActionsSection
             }
@@ -151,25 +151,39 @@ import SwiftUI
             }
         }
 
-        @ViewBuilder
-        var tvStreamFormatSection: some View {
-            if playlist.supportsStreamFormatChoice {
-                VStack(alignment: .leading, spacing: 8) {
-                    TVSettingsSectionLabel("Playback")
+        var tvPlaybackSection: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                TVSettingsSectionLabel("Playback")
 
+                if playlist.supportsStreamFormatChoice {
                     TVOptionCycleRow(
                         title: "Live Stream Format",
                         valueLabel: playlist.streamFormat.displayName
                     ) {
                         playlist.streamFormat = playlist.streamFormat.next
                     }
-
-                    Text(streamFormatFooter)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                        .padding(.top, 4)
                 }
+
+                TVOptionCycleRow(
+                    title: "Audio Delay",
+                    valueLabel: AudioOffsetPreset.label(playlist.audioOffsetMilliseconds)
+                ) {
+                    playlist.audioOffsetMilliseconds = PlayerOptionCycle.next(
+                        playlist.audioOffsetMilliseconds, in: AudioOffsetPreset.values
+                    )
+                }
+
+                Group {
+                    if playlist.supportsStreamFormatChoice {
+                        Text(streamFormatFooter) + Text(verbatim: " ") + Text(audioOffsetFooter)
+                    } else {
+                        Text(audioOffsetFooter)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                .padding(.top, 4)
             }
         }
 

@@ -32,6 +32,15 @@ extension VLCPlayerCoordinator {
         didApplyPreferredLanguages = false
     }
 
+    /// `currentAudioPlaybackDelay` is libvlc's audio delay in microseconds.
+    /// A write before the audio output exists is dropped, and the output is
+    /// rebuilt with every media (re)install, so this runs after each
+    /// `installMedia` + `play()` and again from `logStateChange()` once the
+    /// stream plays, the way deinterlace is re-asserted.
+    func applyAudioOffset() {
+        mediaPlayer.currentAudioPlaybackDelay = AudioOffsetPreset.vlcMicroseconds(audioOffsetMilliseconds)
+    }
+
     private func applyMediaOptions(to media: VLCMedia?, isLive: Bool) {
         guard let media else { return }
 

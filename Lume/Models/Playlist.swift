@@ -28,6 +28,14 @@ final class Playlist {
     /// `streamFormat`.
     var streamFormatRaw: String = PlaylistStreamFormat.automatic.rawValue
 
+    /// How far the sound of this playlist's streams is shifted against the
+    /// picture, in milliseconds; positive plays audio later. 0 leaves the
+    /// engine's own timing. Like `streamFormatRaw` deliberately *not*
+    /// mirrored to CloudKit: the correction depends on the TV or receiver
+    /// the device plays through as much as on the provider. See
+    /// `AudioOffsetPreset` for the per-engine mapping.
+    var audioOffsetMilliseconds: Int = 0
+
     /// Stalker portals authenticate by MAC address rather than credentials.
     /// `serverURL` holds the portal URL; this holds the bound MAC (e.g.
     /// `00:1A:79:xx:xx:xx`). `nil` for Xtream / m3u sources.

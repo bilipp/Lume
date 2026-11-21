@@ -151,9 +151,7 @@ struct PlaylistDetailView: View {
                     }
                 }
 
-                if playlist.supportsStreamFormatChoice {
-                    streamFormatSection
-                }
+                playbackSection
 
                 syncSection
 
@@ -307,19 +305,32 @@ struct PlaylistDetailView: View {
             }
         }
 
-        // MARK: - Stream Format Section
+        // MARK: - Playback Section
 
-        private var streamFormatSection: some View {
+        /// The stream container (Xtream and m3u only) and the audio offset
+        /// every stream of this playlist starts with.
+        private var playbackSection: some View {
             Section {
-                Picker("Live Stream Format", selection: $playlist.streamFormat) {
-                    ForEach(PlaylistStreamFormat.allCases) { format in
-                        Text(verbatim: format.displayName).tag(format)
+                if playlist.supportsStreamFormatChoice {
+                    Picker("Live Stream Format", selection: $playlist.streamFormat) {
+                        ForEach(PlaylistStreamFormat.allCases) { format in
+                            Text(verbatim: format.displayName).tag(format)
+                        }
+                    }
+                }
+                Picker("Audio Delay", selection: $playlist.audioOffsetMilliseconds) {
+                    ForEach(AudioOffsetPreset.values, id: \.self) { milliseconds in
+                        Text(verbatim: AudioOffsetPreset.label(milliseconds)).tag(milliseconds)
                     }
                 }
             } header: {
                 Text("Playback")
             } footer: {
-                Text(streamFormatFooter)
+                if playlist.supportsStreamFormatChoice {
+                    Text(streamFormatFooter) + Text(verbatim: " ") + Text(audioOffsetFooter)
+                } else {
+                    Text(audioOffsetFooter)
+                }
             }
         }
 
@@ -388,6 +399,11 @@ struct PlaylistDetailView: View {
             Choose MPEG-TS if channels stutter, refuse to start, or drop out — servers often serve one \
             container more reliably than the other.
             """
+    }
+
+    /// Explains the audio offset, worded like the engine setting it extends.
+    var audioOffsetFooter: LocalizedStringKey {
+        "A positive audio delay plays sound later. It applies to every stream of this playlist and can be adjusted in the player."
     }
 
     /// Field label for the primary URL, shared across the iOS/macOS and tvOS

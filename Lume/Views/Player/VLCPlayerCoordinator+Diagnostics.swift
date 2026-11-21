@@ -29,7 +29,10 @@ extension VLCPlayerCoordinator {
 
         // Re-assert deinterlace once a vout exists: the runtime setting doesn't
         // survive the output being (re)created, e.g. across a stream reload.
-        if state == .playing { applyDeinterlace() }
+        if state == .playing {
+            applyDeinterlace()
+            applyAudioOffset()
+        }
 
         if state == .error {
             Logger.player.error("player entered error state")
