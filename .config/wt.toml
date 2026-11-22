@@ -1,0 +1,5 @@
+# Worktrunk project config (https://worktrunk.dev).
+# No create hook on purpose: the post-checkout git hook already runs
+# Scripts/worktree.sh for every new worktree, whichever tool creates it.
+# Private DerivedData of the worktree (worktree.sh --build, or an agent's own).
+post-remove = "rm -rf /tmp/lume-dd-{{ worktree_name }}"
