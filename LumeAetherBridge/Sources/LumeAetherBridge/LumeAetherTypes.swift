@@ -31,6 +31,9 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
     /// origin at once; nil leaves it uncapped. The engine keeps a ceiling
     /// per origin for the rest of the process.
     public var maxConcurrentSourceRequests: Int?
+    /// Extra seconds a fastZap live join may wait for a deeper first window;
+    /// nil serves as soon as the minimum media exists (the engine default).
+    public var liveStartupGraceSeconds: Double?
     /// The engine writes the display criteria (the TV switches to the
     /// video's frame rate and dynamic range, where tvOS Match Content
     /// allows it). False leaves the TV in the output format chosen in
@@ -63,6 +66,7 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         audioDelaySeconds: Double,
         prepareNativeSubtitles: Bool,
         maxConcurrentSourceRequests: Int?,
+        liveStartupGraceSeconds: Double?,
         writesDisplayCriteria: Bool,
         isSecondaryOutput: Bool
     ) {
@@ -87,6 +91,7 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         self.audioDelaySeconds = audioDelaySeconds
         self.prepareNativeSubtitles = prepareNativeSubtitles
         self.maxConcurrentSourceRequests = maxConcurrentSourceRequests
+        self.liveStartupGraceSeconds = liveStartupGraceSeconds
         self.writesDisplayCriteria = writesDisplayCriteria
         self.isSecondaryOutput = isSecondaryOutput
     }

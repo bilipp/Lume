@@ -491,6 +491,7 @@ public final class LumeAetherSession {
         )
         options.httpHeaders = request.httpHeaders
         options.maxConcurrentSourceRequests = request.maxConcurrentSourceRequests
+        options.liveStartupGraceSeconds = request.liveStartupGraceSeconds
         // `matchContentEnabled` stays the engine default: it mirrors the
         // system's own Match Content flag, which the engine reads live. What
         // decides whether the TV switches is who owns the criteria.

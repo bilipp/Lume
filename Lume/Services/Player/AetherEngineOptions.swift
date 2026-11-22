@@ -373,6 +373,15 @@ nonisolated struct AetherLoadPlan: Equatable {
     /// request too; measured on that provider, movie starts were no
     /// slower (MKV, MP4, AVI).
     var maxConcurrentSourceRequests: Int?
+    /// 1 s for live HLS, else nil (serve as soon as the minimum exists).
+    /// 7.71.0 dropped the fastZap join's startup grace, so a cold origin
+    /// (a channel a restreamer has just started) is served after two
+    /// segments. On a loopback A/B against a just-started 1 s-GOP origin
+    /// that put the first frame 1 s earlier but rebuffered ~2 s in every
+    /// run; 7.59.0 waited one segment longer and never did. The engine ends
+    /// the grace early once the next keyframe cannot arrive inside it, and
+    /// ignores it for `.standard` joins and `nativeRemoteHLS`.
+    var liveStartupGraceSeconds: Double?
     /// The engine owns `preferredDisplayCriteria`. Off, the TV stays in the
     /// output format chosen in tvOS Settings.
     var writesDisplayCriteria: Bool
@@ -404,6 +413,7 @@ nonisolated struct AetherLoadPlan: Equatable {
             audioDelaySeconds: Double(options.audioDelay) / 1000,
             prepareNativeSubtitles: options.prepareNativeSubtitles,
             maxConcurrentSourceRequests: context.isLive && context.isHLSSource ? 1 : nil,
+            liveStartupGraceSeconds: context.isLive && context.isHLSSource ? 1 : nil,
             writesDisplayCriteria: writesCriteria,
             sharedOutputRole: context.isEmbedded ? .secondary : .primary
         )

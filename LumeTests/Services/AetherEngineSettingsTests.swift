@@ -202,6 +202,25 @@ struct AetherEngineSettingsTests {
         }
     }
 
+    @Test func `only live HLS waits a startup grace`() {
+        withIsolatedDefaults { defaults in
+            let options = AetherEngineOptions.load(from: defaults)
+            #expect(AetherLoadPlan.make(options: options, context: Self.fullScreen).liveStartupGraceSeconds == nil)
+
+            var liveTS = Self.fullScreen
+            liveTS.isLive = true
+            #expect(AetherLoadPlan.make(options: options, context: liveTS).liveStartupGraceSeconds == nil)
+
+            var liveHLS = liveTS
+            liveHLS.isHLSSource = true
+            #expect(AetherLoadPlan.make(options: options, context: liveHLS).liveStartupGraceSeconds == 1)
+
+            var hlsMovie = Self.fullScreen
+            hlsMovie.isHLSSource = true
+            #expect(AetherLoadPlan.make(options: options, context: hlsMovie).liveStartupGraceSeconds == nil)
+        }
+    }
+
     @Test func `preset labels`() {
         #expect(AetherForwardBufferPreset.values.first == 0)
         #expect(AetherAudioDelayPreset.label(100) == "+100 ms")
