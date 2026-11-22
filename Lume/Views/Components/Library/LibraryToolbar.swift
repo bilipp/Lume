@@ -120,19 +120,13 @@ private struct LibrarySyncButton: View {
         }
     }
 
-    /// A failed sync is left for the sheet to show, with its own Try Again.
     private func startIfIdle() {
-        guard let autoSyncQueue, !autoSyncQueue.isBusy, autoSyncQueue.recentFailure() == nil else { return }
-        if scope.isCombined {
-            autoSyncQueue.enqueueManualMembers(
-                scope: scope,
-                playlists: playlists,
-                frequency: SyncFrequency.resolve(syncFrequencyRaw),
-                context: modelContext
-            )
-        } else if let playlist = playlists.primaryMember(of: scope) {
-            autoSyncQueue.sync(playlist, context: modelContext)
-        }
+        autoSyncQueue?.syncOnScreenIfIdle(
+            scope: scope,
+            playlists: playlists,
+            frequency: SyncFrequency.resolve(syncFrequencyRaw),
+            context: modelContext
+        )
     }
 }
 

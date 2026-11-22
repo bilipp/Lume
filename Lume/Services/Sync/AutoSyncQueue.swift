@@ -169,6 +169,19 @@ final class AutoSyncQueue {
         promoteNextIfIdle(container: context.container)
     }
 
+    /// The viewer's Sync for whatever is on screen: the due Combined members,
+    /// or the one playlist. Does nothing while a sync is running or queued,
+    /// and leaves a failed one for the activity screen to show, with its own
+    /// Try Again.
+    func syncOnScreenIfIdle(scope: CatalogScope, playlists: [Playlist], frequency: SyncFrequency, context: ModelContext) {
+        guard !isBusy, recentFailure() == nil else { return }
+        if scope.isCombined {
+            enqueueManualMembers(scope: scope, playlists: playlists, frequency: frequency, context: context)
+        } else if let playlist = playlists.primaryMember(of: scope) {
+            sync(playlist, context: context)
+        }
+    }
+
     /// Sync Now for one playlist. It goes ahead of the automatic ones waiting,
     /// behind whatever is already running.
     func sync(_ playlist: Playlist, full: Bool = false, context: ModelContext) {
