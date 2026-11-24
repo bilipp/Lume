@@ -46,6 +46,11 @@ struct PlaylistDetailView: View {
     @State var editPassword = ""
     @State var editEPGURL = ""
     @State var editMacAddress = ""
+    @State var editStalkerIdentity = StalkerIdentity()
+    @State var originalStalkerIdentity = StalkerIdentity()
+    @State var showIdentityConfirmation = false
+    @State var identityError: String?
+    @State var identityLoaded = true
     @State var showDeleteConfirmation = false
     @State var showSync = false
     @State var showPaywall = false
@@ -127,8 +132,26 @@ struct PlaylistDetailView: View {
             Form {
                 if isEditing {
                     editingSection
+                    if isStalker {
+                        StalkerIdentitySection(identity: $editStalkerIdentity)
+                        Section {
+                            StalkerProfileImportButton { profile in
+                                editName = profile.displayName
+                                editServerURL = profile.portalURL
+                                editMacAddress = profile.mac
+                                editUsername = ""
+                                editPassword = ""
+                                editStalkerIdentity = profile.identity
+                            }
+                        }
+                    }
                 } else {
                     readOnlySection
+                    if isStalker, playlist.stalkerIdentityRequired {
+                        Section("Advanced Stalker identity") {
+                            Text("Advanced values are device-local. Import the private profile separately on each device before connecting.")
+                        }
+                    }
                 }
 
                 if let status = playlist.userStatus {
@@ -187,6 +210,19 @@ struct PlaylistDetailView: View {
                     Button("Delete", role: .destructive) { deletePlaylist() }
                 } message: {
                     Text("All synced content for this playlist will also be removed.")
+                }
+                .alert("Change registered identity?", isPresented: $showIdentityConfirmation) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Save changes", role: .destructive) { persistChanges() }
+                } message: {
+                    Text("Changing a registered identity or account may prevent access. Only save values already authorized by your provider. The previous session will be discarded.")
+                }
+                .alert("Identity could not be saved", isPresented: Binding(
+                    get: { identityError != nil }, set: { if !$0 { identityError = nil } }
+                )) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(identityError ?? "")
                 }
                 .sheet(isPresented: $showSync) {
                     SyncActivityView()
@@ -269,7 +305,7 @@ struct PlaylistDetailView: View {
                 } else if isStalker {
                     TextField("MAC Address", text: $editMacAddress)
                     #if os(iOS)
-                        .textInputAutocapitalization(.characters)
+                        .textInputAutocapitalization(.never)
                     #endif
                         .autocorrectionDisabled()
                     TextField("Username (optional)", text: $editUsername)
@@ -400,29 +436,29 @@ struct PlaylistDetailView: View {
 // MARK: - Actions
 
 extension PlaylistDetailView {
-    func startEditing() {
-        editName = playlist.name
-        editServerURL = playlist.serverURL
-        editUsername = playlist.username
-        editPassword = playlist.password
-        editEPGURL = playlist.epgURL ?? ""
-        editMacAddress = playlist.macAddress ?? ""
-        withAnimation { isEditing = true }
-    }
-
     func cancelEditing() {
         withAnimation { isEditing = false }
     }
 
-    func saveChanges() {
+    func persistChanges() {
+        let oldKey = isStalker ? StalkerClient.Configuration(playlist: playlist).sessionKey : nil
+        let oldReference = playlist.stalkerIdentityReference
+        if isStalker {
+            do {
+                try prepareStalkerIdentity()
+            } catch {
+                identityError = error.localizedDescription
+                return
+            }
+        }
         playlist.name = editName.trimmingCharacters(in: .whitespacesAndNewlines)
         playlist.serverURL = UserEnteredURL.withDefaultScheme(editServerURL)
         if isM3U {
             let epgURL = UserEnteredURL.withDefaultScheme(editEPGURL)
             playlist.epgURL = epgURL.isEmpty ? nil : epgURL
         } else if isStalker {
-            playlist.macAddress = editMacAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-            playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            playlist.macAddress = editMacAddress
+            playlist.username = editUsername
             playlist.password = editPassword
         } else if isWebDAV {
             playlist.username = editUsername.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -449,7 +485,14 @@ extension PlaylistDetailView {
         playlist.lastUpdated = Date()
         // Keep the playlist's EPG source in step with its (possibly changed)
         // guide URL / credentials.
-        EPGSourceReconciler.reconcile(playlist, in: modelContext)
+        EPGSourceReconciler.apply(playlist, in: modelContext)
+        do {
+            try modelContext.save()
+        } catch {
+            identityError = String(localized: "The playlist could not be saved. Try again before leaving Edit.")
+            return
+        }
+        finishStalkerIdentitySave(oldReference: oldReference, oldKey: oldKey)
         withAnimation { isEditing = false }
     }
 

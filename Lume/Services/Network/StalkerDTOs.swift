@@ -98,6 +98,7 @@ nonisolated struct StalkerHandshake: Decodable {
 
 /// Subset of `get_profile` the app surfaces in the playlist's account section.
 nonisolated struct StalkerProfile: Decodable {
+    let hasProfileData: Bool
     let status: String?
     let expDate: String?
     let phone: String?
@@ -115,17 +116,18 @@ nonisolated struct StalkerProfile: Decodable {
         status = container.stalkerString(.status)
         expDate = container.stalkerString(.expDate)
         phone = container.stalkerString(.phone)
+        hasProfileData = status != nil || container.stalkerString(.id) != nil
+            || container.stalkerString(.mac) != nil || container.stalkerString(.login) != nil
         let parts = [container.stalkerString(.msg), container.stalkerString(.blockMsg)]
             .compactMap { $0.map(Self.plainText) }
             .filter { !$0.isEmpty }
         blockMessage = parts.isEmpty ? nil : parts.joined(separator: ". ")
     }
 
-    /// Whether the portal refused the device. A non-zero status alone isn't
-    /// enough — portals are loose with it — so this also needs the message a
-    /// genuine refusal carries.
+    /// Matches the supported client's refusal contract: status 1 or a portal
+    /// refusal message. The status-2 credential challenge is handled first.
     var isBlocked: Bool {
-        blockMessage != nil && (status ?? "0") != "0"
+        status == "1" || blockMessage != nil
     }
 
     private static func plainText(_ html: String) -> String {
@@ -136,6 +138,7 @@ nonisolated struct StalkerProfile: Decodable {
     }
 
     enum CodingKeys: String, CodingKey {
+        case id, mac, login
         case status
         case expDate = "exp_date"
         case phone

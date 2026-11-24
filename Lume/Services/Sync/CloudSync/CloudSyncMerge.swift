@@ -104,6 +104,7 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
     var hiddenTabsRaw: String
     var combinedTypesRaw: String
     var combinedPriority: Int?
+    var stalkerIdentityRequired: Bool
 
     init(
         name: String,
@@ -116,7 +117,8 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         syncEnabled: Bool,
         hiddenTabsRaw: String = "",
         combinedTypesRaw: String = "",
-        combinedPriority: Int? = nil
+        combinedPriority: Int? = nil,
+        stalkerIdentityRequired: Bool = false
     ) {
         self.name = name
         self.serverURL = serverURL
@@ -129,6 +131,7 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         self.hiddenTabsRaw = hiddenTabsRaw
         self.combinedTypesRaw = combinedTypesRaw
         self.combinedPriority = combinedPriority
+        self.stalkerIdentityRequired = stalkerIdentityRequired
     }
 
     /// Hand-rolled decode so a shadow baseline persisted before Stalker support
@@ -149,6 +152,7 @@ nonisolated struct PlaylistConfigValues: Codable, Equatable {
         hiddenTabsRaw = try container.decodeIfPresent(String.self, forKey: .hiddenTabsRaw) ?? ""
         combinedTypesRaw = try container.decodeIfPresent(String.self, forKey: .combinedTypesRaw) ?? ""
         combinedPriority = try container.decodeIfPresent(Int.self, forKey: .combinedPriority)
+        stalkerIdentityRequired = try container.decodeIfPresent(Bool.self, forKey: .stalkerIdentityRequired) ?? false
     }
 
     /// Conflict policy: cloud wins. Deterministic and adequate for config.

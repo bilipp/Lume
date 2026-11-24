@@ -19,39 +19,6 @@ import Synchronization
 /// main thread. Its work now runs on the caller (the sync actor, or the walk's
 /// child tasks) and each decode runs off any actor.
 final nonisolated class StalkerClient: Sendable {
-    nonisolated struct Configuration {
-        let portalURL: String
-        let macAddress: String
-        let username: String
-        let password: String
-        let timeout: TimeInterval
-
-        init(
-            portalURL: String,
-            macAddress: String,
-            username: String = "",
-            password: String = "",
-            timeout: TimeInterval = 30
-        ) {
-            self.portalURL = portalURL
-            self.macAddress = macAddress
-            self.username = username
-            self.password = password
-            self.timeout = timeout
-        }
-
-        /// A configuration built from a playlist's stored fields.
-        init(playlist: Playlist, timeout: TimeInterval = 30) {
-            self.init(
-                portalURL: playlist.serverURL,
-                macAddress: playlist.macAddress ?? "",
-                username: playlist.username,
-                password: playlist.password,
-                timeout: timeout
-            )
-        }
-    }
-
     let configuration: Configuration
     let session: URLSession
 
@@ -60,24 +27,20 @@ final nonisolated class StalkerClient: Sendable {
         session = urlSession ?? Self.session(timeout: configuration.timeout)
     }
 
-    /// Cache key isolating one portal+MAC session from another.
+    /// Opaque key covering the complete effective authentication configuration.
     private var sessionKey: String {
-        "\(configuration.portalURL)|\(configuration.macAddress)"
+        configuration.sessionKey
     }
 
     // MARK: - Session / handshake
 
-    /// Returns a valid session (bearer token + pinned endpoint), handshaking if
-    /// none is cached. `forceRefresh` discards a cached session first — used when
-    /// a request comes back unauthorized (an expired token).
-    private func authorizedSession(forceRefresh: Bool = false) async throws -> StalkerSessionStore.Session {
-        if forceRefresh {
-            await StalkerSessionStore.shared.clear(sessionKey)
-        } else if let cached = await StalkerSessionStore.shared.session(for: sessionKey) {
-            return cached
-        }
-        let session = try await handshake()
-        await StalkerSessionStore.shared.store(session, for: sessionKey)
+    /// Returns a profile-validated session, joining an in-flight handshake.
+    private func authorizedSession() async throws -> StalkerSessionStore.Session {
+        guard !configuration.identityUnavailable else { throw StalkerIdentityError.localIdentityRequired }
+        try configuration.identity.validate()
+        try Task.checkCancellation()
+        let session = try await StalkerSessionStore.shared.authorize(sessionKey) { try await self.handshake() }
+        try Task.checkCancellation()
         return session
     }
 
@@ -99,7 +62,7 @@ final nonisolated class StalkerClient: Sendable {
         guard let discovered = await redirectedPortalURL() else { throw lastError }
         let retry = Self.candidateEndpoints(for: discovered.absoluteString).filter { !endpoints.contains($0) }
         guard !retry.isEmpty else { throw lastError }
-        Logger.network.info("Stalker portal redirected to \(discovered.host ?? "?", privacy: .public); retrying handshake there")
+        Logger.network.info("Stalker portal redirected; retrying discovered endpoint")
         if let session = try await handshake(trying: retry, lastError: &lastError) {
             return session
         }
@@ -128,17 +91,23 @@ final nonisolated class StalkerClient: Sendable {
                     continue
                 }
                 let session = StalkerSessionStore.Session(token: token, endpoint: endpoint)
-                // Prime the profile; ignore failures — many portals don't require
-                // it and some return a sparse profile that still authorizes.
-                _ = try? await getProfile(using: session)
-                return session
+                // A token is not authentication. Never cache or probe another
+                // endpoint after this endpoint has explicitly refused the profile.
+                do {
+                    let profile = try await checkedProfile(using: session)
+                    return StalkerSessionStore.Session(token: token, endpoint: endpoint, profile: profile)
+                } catch {
+                    Logger.network.error("Stalker profile authentication failed — \(Self.safeError(error))")
+                    throw ProfileFailure(underlying: error)
+                }
             } catch {
+                if let failure = error as? ProfileFailure { throw failure.underlying }
                 lastError = error
                 // What each miss returned tells a wrong path from a blocked device.
                 let shape = NetworkDiagnostics.shape(of: endpoint.absoluteString)
                 let returned = lastResponseFingerprint ?? "no response"
                 Logger.network.info(
-                    "Stalker handshake candidate \(index + 1)/\(endpoints.count) [\(shape)] failed — \(error) — \(returned)"
+                    "Stalker handshake candidate \(index + 1)/\(endpoints.count) [\(shape)] failed — \(Self.safeError(error)) — \(returned)"
                 )
                 continue
             }
@@ -162,15 +131,25 @@ final nonisolated class StalkerClient: Sendable {
             return endpoint
         }
         components.queryItems = (components.queryItems ?? []) + items
+        // PHP form-query parsers treat a literal "+" as a space.
+        components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         return components.url ?? endpoint
     }
 
     private static let maxAttempts = 3
 
+    private struct ProfileFailure: Error {
+        let underlying: Error
+    }
+
+    private static func safeError(_ error: Error) -> String {
+        (error as? StalkerError)?.logDescription ?? "request failed"
+    }
+
     /// Issues an authorized request for the given action, retrying once on an
     /// auth failure with a fresh handshake, and with backoff on transient
-    /// network errors. Not `private`: the guide call lives in
-    /// `StalkerClient+EPG.swift`, as this file is at the length limit.
+    /// network errors. Not `private`: extensions such as `StalkerClient+EPG.swift`
+    /// call it directly.
     func request<T: Decodable & Sendable>(
         type: String,
         action: String,
@@ -180,7 +159,7 @@ final nonisolated class StalkerClient: Sendable {
         var attempt = 0
         while true {
             attempt += 1
-            let session = try await authorizedSession(forceRefresh: refreshedAuth)
+            let session = try await authorizedSession()
             let query = [
                 URLQueryItem(name: "type", value: type),
                 URLQueryItem(name: "action", value: action)
@@ -191,6 +170,7 @@ final nonisolated class StalkerClient: Sendable {
             } catch let error as StalkerError {
                 if error.isAuthFailure, !refreshedAuth {
                     refreshedAuth = true
+                    await StalkerSessionStore.shared.invalidate(sessionKey, matching: session.id)
                     continue
                 }
                 guard error.isRetriable, attempt < Self.maxAttempts else {
@@ -198,13 +178,13 @@ final nonisolated class StalkerClient: Sendable {
                     // probing decodes HTML from the wrong candidates by design.
                     let returned = lastResponseFingerprint ?? "no response"
                     Logger.network.error(
-                        "Stalker: \(type, privacy: .public) \(action, privacy: .public) failed — \(error) — \(returned)"
+                        "Stalker: \(type, privacy: .public) \(action, privacy: .public) failed — \(error.logDescription) — \(returned)"
                     )
                     throw error
                 }
                 let delay = pow(2.0, Double(attempt))
                 Logger.network.warning(
-                    "Stalker request failed (\(error)); retry \(attempt)/\(Self.maxAttempts - 1) in \(delay)s"
+                    "Stalker request failed (\(error.logDescription)); retry \(attempt)/\(Self.maxAttempts - 1) in \(delay)s"
                 )
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
@@ -223,6 +203,11 @@ final nonisolated class StalkerClient: Sendable {
             "mac=\(configuration.macAddress); stb_lang=en; timezone=Europe/London",
             forHTTPHeaderField: "Cookie"
         )
+        // Verified IPTVnator transport contract: SN is a header on portal API
+        // requests; sn/device ids/signatures are not blanket query parameters.
+        if let serial = configuration.identity.serialNumber {
+            urlRequest.setValue(serial, forHTTPHeaderField: "SN")
+        }
         if let token {
             urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -238,45 +223,54 @@ final nonisolated class StalkerClient: Sendable {
         do {
             return try await Self.decodeValidatedOffActor(T.self, response: response, data: data)
         } catch {
-            // Failure path only: fingerprinting parses the body.
-            let fingerprint = NetworkDiagnostics.fingerprint(
-                response: response, data: data.count <= 1_048_576 ? data : nil
-            )
+            // Metadata only; a provider can echo identifiers in any body.
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let fingerprint = "HTTP \(code), \(data.count) bytes"
             responseFingerprint.withLock { $0 = fingerprint }
             throw error
         }
     }
 
-    nonisolated static func isAuthorizationFailure(_ data: Data) -> Bool {
-        guard data.count < 256, let body = String(data: data, encoding: .utf8) else { return false }
-        return body.trimmingCharacters(in: .whitespacesAndNewlines)
-            .localizedCaseInsensitiveContains("authorization failed")
-    }
-
     // MARK: - Profile
 
-    private func getProfile(using session: StalkerSessionStore.Session) async throws -> StalkerProfile {
+    private func getProfile(using session: StalkerSessionStore.Session, secondStep: Bool = false) async throws -> StalkerProfile {
         let url = appendingQuery(to: session.endpoint, [
             URLQueryItem(name: "type", value: "stb"),
             URLQueryItem(name: "action", value: "get_profile"),
             URLQueryItem(name: "JsHttpRequest", value: "1-xml")
-        ])
+        ] + configuration.identity.profileQuery + (secondStep ? [URLQueryItem(name: "auth_second_step", value: "1")] : []))
         let envelope: StalkerEnvelope<StalkerProfile> = try await perform(url: url, token: session.token)
         return envelope.js
     }
 
+    private func checkedProfile(using session: StalkerSessionStore.Session) async throws -> StalkerProfile {
+        var profile = try await getProfile(using: session)
+        if profile.status == "2" {
+            guard !configuration.username.isEmpty, !configuration.password.isEmpty else { throw StalkerError.authenticationFailed }
+            let url = appendingQuery(to: session.endpoint, [
+                URLQueryItem(name: "type", value: "stb"),
+                URLQueryItem(name: "action", value: "do_auth"),
+                URLQueryItem(name: "login", value: configuration.username),
+                URLQueryItem(name: "password", value: configuration.password),
+                URLQueryItem(name: "JsHttpRequest", value: "1-xml")
+            ] + configuration.identity.authQuery)
+            let result: StalkerEnvelope<Bool> = try await perform(url: url, token: session.token)
+            guard result.js else { throw StalkerError.authenticationFailed }
+            profile = try await getProfile(using: session, secondStep: true)
+            guard profile.status != "2" else { throw StalkerError.authenticationFailed }
+        }
+        guard !profile.isBlocked else { throw StalkerError.deviceBlocked }
+        guard profile.hasProfileData else { throw StalkerError.invalidResponse }
+        return profile
+    }
+
     /// Validates the portal connection by handshaking and reading the profile.
     /// Used by the add-playlist flow as the connection test.
-    /// Throws `.deviceBlocked` with the portal's own explanation when it
-    /// refuses the device — otherwise the refusal only surfaces later, as an
-    /// undecodable `Authorization failed.` from the first catalog call.
+    /// A refusal is reported without quoting the provider's private message.
     func authenticate() async throws -> StalkerProfile {
         let session = try await authorizedSession()
-        let profile = try await getProfile(using: session)
-        if profile.isBlocked, let message = profile.blockMessage {
-            throw StalkerError.deviceBlocked(message)
-        }
-        return profile
+        if let profile = session.profile { return profile }
+        return try await checkedProfile(using: session)
     }
 
     // MARK: - Live TV (itv)
@@ -524,33 +518,6 @@ final nonisolated class StalkerClient: Sendable {
 // MARK: - Endpoint resolution
 
 extension StalkerClient {
-    /// Candidate middleware endpoints derived from a portal URL.
-    /// Portals expose the API at either `…/portal.php` or
-    /// `…/server/load.php`, sometimes under a `/stalker_portal/` or `/c/` path.
-    /// The handshake tries these in order and the working one is pinned for the
-    /// session.
-    nonisolated static func candidateEndpoints(for portalURL: String) -> [URL] {
-        let raw = portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var components = URLComponents(string: raw), components.host != nil else { return [] }
-        // Reduce to scheme://host:port — the path the user pasted (`/c/`,
-        // `/stalker_portal/`, a trailing slash) is just a hint at the variant.
-        let pastedPath = components.path.lowercased()
-        components.query = nil
-        components.fragment = nil
-
-        let paths: [String] = if pastedPath.contains("stalker_portal") {
-            ["/stalker_portal/server/load.php", "/portal.php", "/server/load.php"]
-        } else {
-            ["/portal.php", "/server/load.php", "/stalker_portal/server/load.php"]
-        }
-
-        return paths.compactMap { path in
-            var copy = components
-            copy.path = path
-            return copy.url
-        }
-    }
-
     /// The portal's `/c/` page on the host actually being called, used for the
     /// `Referer` header — after a redirect-discovered handshake that is not the
     /// host the user pasted.

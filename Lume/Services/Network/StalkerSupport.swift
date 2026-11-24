@@ -142,10 +142,8 @@ nonisolated enum StalkerError: LocalizedError {
     case invalidURL
     case handshakeFailed
     case authenticationFailed
-    /// The portal refused this device outright, with its own explanation
-    /// (`get_profile`'s `msg` / `block_msg`) — typically a MAC that isn't
-    /// registered, or one bound to a different device serial number.
-    case deviceBlocked(String)
+    /// The portal refused the checked profile. Never carries provider text.
+    case deviceBlocked
     case noStreamURL
     case networkError(Error)
     case decodingError(Error)
@@ -160,14 +158,14 @@ nonisolated enum StalkerError: LocalizedError {
             "Couldn't connect to the Stalker portal. Check the portal URL and MAC address."
         case .authenticationFailed:
             "The portal rejected this MAC address. It may not be authorized, or its subscription has expired."
-        case let .deviceBlocked(message):
-            "The portal blocked this device: \(message)"
+        case .deviceBlocked:
+            String(localized: "The portal blocked this device profile. Check the existing registered identity or contact your provider.")
         case .noStreamURL:
             "The portal didn't return a playable stream for this item."
-        case let .networkError(error):
-            "Network error: \(error.localizedDescription)"
-        case let .decodingError(error):
-            "Failed to read the portal response: \(error.localizedDescription)"
+        case .networkError:
+            String(localized: "Stalker transport failed. Check the connection and portal address.")
+        case .decodingError:
+            String(localized: "Failed to read the portal response.")
         case .invalidResponse:
             "Received an invalid response from the portal."
         case let .serverError(code):
@@ -230,7 +228,7 @@ nonisolated enum StalkerError: LocalizedError {
 
 // MARK: - Session cache
 
-/// In-memory cache of authenticated Stalker sessions, keyed by portal+MAC.
+/// In-memory cache of checked sessions, keyed by the opaque full configuration.
 ///
 /// A handshake yields a bearer token and pins the working middleware endpoint
 /// (`portal.php` vs `server/load.php`). Both are reused across catalog sync and
@@ -241,11 +239,65 @@ actor StalkerSessionStore {
     static let shared = StalkerSessionStore()
 
     struct Session {
+        let id = UUID()
         let token: String
         let endpoint: URL
+        var profile: StalkerProfile?
     }
 
     private var sessions: [String: Session] = [:]
+    private struct Flight {
+        let id: UUID
+        let task: Task<Session, Error>
+        var waiters: Set<UUID>
+    }
+
+    private var pending: [String: Flight] = [:]
+
+    func authorize(_ key: String, create: @escaping @Sendable () async throws -> Session) async throws -> Session {
+        if let session = sessions[key] { return session }
+        if pending[key] == nil {
+            let task = Task {
+                let session = try await create()
+                try Task.checkCancellation()
+                return session
+            }
+            pending[key] = Flight(id: UUID(), task: task, waiters: [])
+        }
+        guard let flight = pending[key] else { throw CancellationError() }
+        let waiter = UUID()
+        pending[key]?.waiters.insert(waiter)
+        return try await withTaskCancellationHandler {
+            do {
+                let session = try await flight.task.value
+                try Task.checkCancellation()
+                guard pending[key]?.id == flight.id || sessions[key]?.id == session.id else { throw CancellationError() }
+                sessions[key] = session
+                if pending[key]?.id == flight.id { pending[key] = nil }
+                return session
+            } catch {
+                removeWaiter(key, flight: flight.id, waiter: waiter)
+                throw error
+            }
+        } onCancel: {
+            Task { await self.removeWaiter(key, flight: flight.id, waiter: waiter) }
+        }
+    }
+
+    private func removeWaiter(_ key: String, flight: UUID, waiter: UUID) {
+        guard pending[key]?.id == flight else { return }
+        pending[key]?.waiters.remove(waiter)
+        if pending[key]?.waiters.isEmpty == true {
+            pending[key]?.task.cancel()
+            pending[key] = nil
+        }
+    }
+
+    #if DEBUG
+        func waiterCount(for key: String) -> Int {
+            pending[key]?.waiters.count ?? 0
+        }
+    #endif
 
     func session(for key: String) -> Session? {
         sessions[key]
@@ -257,12 +309,52 @@ actor StalkerSessionStore {
 
     func clear(_ key: String) {
         sessions[key] = nil
+        pending[key]?.task.cancel()
+        pending[key] = nil
+    }
+
+    /// Concurrent requests using an expired session must not cancel another
+    /// caller's refresh or evict a newly authenticated session.
+    func invalidate(_ key: String, matching id: UUID) {
+        guard sessions[key]?.id == id else { return }
+        sessions[key] = nil
     }
 }
 
 // MARK: - Response validation
 
 extension StalkerClient {
+    /// Ordered middleware candidates; an explicitly pasted endpoint keeps its path.
+    nonisolated static func candidateEndpoints(for portalURL: String) -> [URL] {
+        let raw = portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var components = URLComponents(string: raw), components.host != nil,
+              ["http", "https"].contains(components.scheme?.lowercased() ?? "")
+        else { return [] }
+        let pastedPath = components.path.lowercased()
+        components.query = nil
+        components.fragment = nil
+        var paths: [String] = if pastedPath.contains("stalker_portal") {
+            ["/stalker_portal/server/load.php", "/portal.php", "/server/load.php"]
+        } else {
+            ["/portal.php", "/server/load.php", "/stalker_portal/server/load.php"]
+        }
+        if pastedPath.hasSuffix("/server/load.php") || pastedPath.hasSuffix("/portal.php") {
+            paths.removeAll { $0 == components.path }
+            paths.insert(components.path, at: 0)
+        }
+        return paths.compactMap { path in
+            var copy = components
+            copy.path = path
+            return copy.url
+        }
+    }
+
+    nonisolated static func isAuthorizationFailure(_ data: Data) -> Bool {
+        guard data.count < 256, let body = String(data: data, encoding: .utf8) else { return false }
+        return body.trimmingCharacters(in: .whitespacesAndNewlines)
+            .localizedCaseInsensitiveContains("authorization failed")
+    }
+
     /// `decodeValidated` on the global executor rather than on whichever actor
     /// awaited the request — a `get_all_channels` payload runs to megabytes.
     @concurrent
@@ -322,7 +414,12 @@ extension StalkerClient {
     }
 
     static func makeSession(timeout: TimeInterval) -> URLSession {
-        let config = URLSessionConfiguration.default
+        let config = URLSessionConfiguration.ephemeral
+        // Profile query strings carry registered identities; never persist
+        // request URLs, headers or profile bodies through URLCache/cookie stores.
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.httpCookieStorage = nil
         // Matches `walkConcurrency`: catalog pages are fetched in parallel
         // (portal page size is fixed at ~14 items, so a big catalog is
         // thousands of ~2s requests — serially that reads as a hung sync).

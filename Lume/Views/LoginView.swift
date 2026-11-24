@@ -62,10 +62,10 @@ struct LoginView: View {
         @State private var showFileImporter = false
     #endif
 
-    // Stalker portal fields. The MAC defaults to a freshly generated MAG-style
-    // address so a user without a provider-issued MAC still gets a valid one.
+    // Only the identity already authorized by the provider may be entered.
     @State private var portalURL = ""
-    @State private var macAddress = StalkerMAC.generate()
+    @State private var macAddress = ""
+    @State private var stalkerIdentity = StalkerIdentity()
 
     /// The media-server address: a Jellyfin base URL
     /// (`http://192.168.1.10:8096`) or the full path of a WebDAV folder. The
@@ -89,7 +89,7 @@ struct LoginView: View {
             !m3uURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .stalker:
             !portalURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && StalkerMAC.isValid(macAddress.trimmingCharacters(in: .whitespacesAndNewlines))
+                && StalkerMAC.isValid(macAddress)
         case .mediaServer:
             // Credentials stay optional here: an anonymous WebDAV share needs
             // none, and a Jellyfin server without them gets a dedicated
@@ -140,6 +140,18 @@ struct LoginView: View {
                         )
                     case .stalker:
                         StalkerLoginSection(name: $name, portalURL: $portalURL, macAddress: $macAddress, username: $username, password: $password)
+                        StalkerIdentitySection(identity: $stalkerIdentity)
+                        Section {
+                            StalkerProfileImportButton { profile in
+                                name = profile.displayName
+                                portalURL = profile.portalURL
+                                macAddress = profile.mac
+                                stalkerIdentity = profile.identity
+                                username = ""
+                                password = ""
+                                errorMessage = nil
+                            }
+                        }
                     case .mediaServer:
                         MediaServerLoginSection(name: $name, serverURL: $mediaServerURL, username: $username, password: $password)
                     }
@@ -260,6 +272,7 @@ struct LoginView: View {
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $macAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $username, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $password, isSecure: true, contentType: .password)
+                            StalkerIdentitySection(identity: $stalkerIdentity)
                         case .mediaServer:
                             MediaServerLoginFields(serverURL: $mediaServerURL, username: $username, password: $password)
                         }
@@ -439,7 +452,8 @@ struct LoginView: View {
 
         let playlistName = trimmedName.isEmpty ? "My Playlist" : trimmedName
         let portal = portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let mac = macAddress.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let mac = macAddress
+        let identity = stalkerIdentity
         noteAddAttempt("stalker", address: portal)
 
         Task {
@@ -451,13 +465,17 @@ struct LoginView: View {
                 password: password
             )
 
-            let client = StalkerClient(configuration: StalkerClient.Configuration(playlist: playlist))
+            let client = StalkerClient(configuration: StalkerClient.Configuration(
+                portalURL: portal, macAddress: mac, username: playlist.username, password: playlist.password, identity: identity
+            ))
             do {
+                try identity.validate()
                 try await withConnectionTimeout {
                     // Handshake + profile doubles as the connection test.
                     let profile = try await client.authenticate()
                     playlist.userStatus = profile.status
                     playlist.expDate = profile.expDate
+                    try StalkerIdentityStore().save(identity, for: playlist)
                     insertAndFinish(playlist)
                 }
             } catch {
@@ -480,7 +498,13 @@ struct LoginView: View {
         // separate ModelContext can fetch the playlist. Without this
         // the autosave is deferred and the sync's fresh context
         // fetches nil, silently completing without syncing.
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            errorMessage = String(localized: "The playlist could not be saved. Try again before leaving Edit.")
+            isLoading = false
+            return
+        }
         noteAddSuccess(playlist)
         isLoading = false
         // Only dismiss when presented modally (e.g. the Settings

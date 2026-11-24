@@ -53,6 +53,9 @@ nonisolated enum LogRedaction {
     /// error is usually the least informative one: "Network error" says
     /// nothing, the `NSURLErrorDomain -1200` underneath says "TLS failed".
     static func describe(_ error: Error) -> String {
+        // Never follow a Stalker transport/decode error into provider-controlled
+        // error text, keys, or failing request URLs.
+        if let stalker = error as? StalkerError { return "StalkerError: \(stalker.logDescription)" }
         var parts: [String] = []
         var current: Error? = error
         while let error = current, parts.count < maxErrorChain {

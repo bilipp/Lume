@@ -32,6 +32,9 @@ nonisolated enum PlaylistDeletion {
     /// are pruned.
     static func delete(_ playlist: Playlist, in context: ModelContext) {
         let playlistID = playlist.id
+        if let reference = playlist.stalkerIdentityReference {
+            StalkerIdentityStore().remove(reference: reference)
+        }
 
         // Drop the playlist's auto-created EPG source so it isn't re-synced.
         EPGSourceReconciler.remove(playlistID: playlistID, in: context)

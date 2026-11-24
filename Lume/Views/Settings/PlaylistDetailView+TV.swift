@@ -39,6 +39,19 @@ import SwiftUI
             } message: {
                 Text("All synced content for this playlist will also be removed.")
             }
+            .alert("Change registered identity?", isPresented: $showIdentityConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Save changes", role: .destructive) { persistChanges() }
+            } message: {
+                Text("Changing a registered identity or account may prevent access. Only save values already authorized by your provider. The previous session will be discarded.")
+            }
+            .alert("Identity could not be saved", isPresented: Binding(
+                get: { identityError != nil }, set: { if !$0 { identityError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(identityError ?? "")
+            }
             .fullScreenCover(isPresented: $showSync) {
                 SyncActivityView()
             }
@@ -59,6 +72,7 @@ import SwiftUI
                             TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $editMacAddress, contentType: nil)
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                            StalkerIdentitySection(identity: $editStalkerIdentity)
                         } else if isWebDAV {
                             TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
                             TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)

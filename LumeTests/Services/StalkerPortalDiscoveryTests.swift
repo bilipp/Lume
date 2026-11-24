@@ -31,7 +31,7 @@ private final nonisolated class RedirectingPortalProtocol: URLProtocol {
             redirect(to: "http://portal.test/stalker_portal/c/")
         case ("portal.test", "/stalker_portal/server/load.php"):
             let action = components.queryItems?.first { $0.name == "action" }?.value
-            respond(action == "handshake" ? #"{"js":{"token":"TESTTOKEN"}}"# : #"{"js":{"status":"1"}}"#)
+            respond(action == "handshake" ? #"{"js":{"token":"TESTTOKEN"}}"# : #"{"js":{"status":"0"}}"#)
         case ("portal.test", "/stalker_portal/c/"):
             respond("<html><title>stalker_portal</title></html>")
         default:
@@ -74,7 +74,7 @@ struct StalkerPortalDiscoveryTests {
         )
 
         let profile = try await client.authenticate()
-        #expect(profile.status == "1")
+        #expect(profile.status == "0")
     }
 
     @Test func `stalker_portal path hint puts its endpoint first`() {

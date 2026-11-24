@@ -29,14 +29,13 @@ struct StalkerDeviceBlockedTests {
         )
     }
 
-    @Test func `a refused device fails authentication with the portal's message`() async {
+    @Test func `a refused device fails authentication without exposing the portal message`() async {
         let client = client(host: "blocked.stalker.test", profile: Self.blockedProfile)
         do {
             _ = try await client.authenticate()
             Issue.record("authenticate() should have thrown")
-        } catch let StalkerError.deviceBlocked(message) {
-            #expect(message == "Device conflict - Serial Number mismatch. "
-                + "Please contact your provider to register this device.(SN1001)")
+        } catch StalkerError.deviceBlocked {
+            #expect(!StalkerError.deviceBlocked.localizedDescription.contains("SN1001"))
         } catch {
             Issue.record("unexpected error: \(error)")
         }
@@ -67,12 +66,12 @@ struct StalkerDeviceBlockedTests {
         #expect(profile.expDate == "2027-01-01")
     }
 
-    @Test func `a non-zero status without a message is not a refusal`() throws {
+    @Test func `status one is a refusal even without a message`() throws {
         let profile = try JSONDecoder().decode(
             StalkerEnvelope<StalkerProfile>.self, from: Data(#"{"js":{"status":"1"}}"#.utf8)
         ).js
         #expect(profile.blockMessage == nil)
-        #expect(!profile.isBlocked)
+        #expect(profile.isBlocked)
     }
 
     @Test func `authorization-failure sniff ignores JSON and long bodies`() {
