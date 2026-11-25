@@ -23,6 +23,9 @@ import SwiftUI
         @AppStorage(Keys.deinterlaceModeKey) private var deinterlaceMode = Keys.deinterlaceModeDefault.rawValue
         @AppStorage(Keys.deinterlaceFieldRateKey) private var deinterlaceFieldRate = Keys.deinterlaceFieldRateDefault.rawValue
         @AppStorage(Keys.upscaleLowResolutionKey) private var upscaleLowResolution = Keys.upscaleLowResolutionDefault
+        @AppStorage(Keys.upscaleFullHDKey) private var upscaleFullHD = Keys.upscaleFullHDDefault
+        @AppStorage(Keys.untaggedVideoColorKey) private var untaggedVideoColor = Keys.untaggedVideoColorDefault.rawValue
+        @AppStorage(Keys.bitmapSubtitleTextKey) private var bitmapSubtitleText = Keys.bitmapSubtitleTextDefault
         @AppStorage(Keys.liveJoinProfileKey) private var liveJoinProfile = Keys.liveJoinProfileDefault.rawValue
         @AppStorage(Keys.forwardBufferSegmentsKey) private var forwardBufferSegments = Keys.forwardBufferSegmentsDefault
         @AppStorage(Keys.nativeRemoteHLSKey) private var nativeRemoteHLS = Keys.nativeRemoteHLSDefault
@@ -52,12 +55,19 @@ import SwiftUI
                     }
                 }
                 Toggle("Upscale Low-Resolution Video", isOn: $upscaleLowResolution)
+                Toggle("Upscale 1080p Video", isOn: $upscaleFullHD)
+                Picker("Untagged 10-bit Video", selection: $untaggedVideoColor) {
+                    ForEach(AetherUntaggedVideoColor.allCases) { Text($0.label).tag($0.rawValue) }
+                }
             } header: {
                 Text("Video")
             } footer: {
                 Text("Automatic decodes in hardware where the device supports the format; Software always uses the CPU. ")
                     + Text("Falling back retries a stream in software when the hardware decoder rejects it. ")
                     + Text("A doubled frame rate turns each interlaced field into its own frame for smoother motion.")
+                    + Text(verbatim: " ")
+                    + Text("Upscaling 1080p video gives a sharper picture on a 4K display but uses more power. ")
+                    + Text("Untagged 10-bit video carries no color information; choose HDR10 or HLG when HDR video looks pale. ")
             }
 
             Section {
@@ -97,6 +107,7 @@ import SwiftUI
                 Picker("HDR", selection: $dynamicRange) {
                     ForEach(AetherDynamicRangeHandling.allCases) { Text($0.label).tag($0.rawValue) }
                 }
+                Toggle("Bitmap Subtitles as Text", isOn: $bitmapSubtitleText)
                 Toggle("System Subtitle Tracks", isOn: $prepareNativeSubtitles)
             } header: {
                 Text("Audio & Subtitles")
@@ -105,6 +116,8 @@ import SwiftUI
                     + Text("Lossless keeps full quality but needs a receiver that takes multichannel PCM. ")
                     + Text("A positive audio delay plays sound later. ")
                     + Text("HDR Base Layer Only skips the enhancement layer of layered HDR video. ")
+                    // swiftlint:disable:next line_length
+                    + Text("Bitmap subtitles as text reads picture subtitles (PGS, DVB, DVD) on the device and shows them in your subtitle style; a subtitle that can't be read reliably stays a picture. ")
                     + Text("System subtitle tracks keep text subtitles visible in Picture in Picture and on AirPlay. Applied the next time playback starts.")
             }
 
@@ -152,6 +165,9 @@ import SwiftUI
         @AppStorage(Keys.deinterlaceModeKey) private var deinterlaceMode = Keys.deinterlaceModeDefault.rawValue
         @AppStorage(Keys.deinterlaceFieldRateKey) private var deinterlaceFieldRate = Keys.deinterlaceFieldRateDefault.rawValue
         @AppStorage(Keys.upscaleLowResolutionKey) private var upscaleLowResolution = Keys.upscaleLowResolutionDefault
+        @AppStorage(Keys.upscaleFullHDKey) private var upscaleFullHD = Keys.upscaleFullHDDefault
+        @AppStorage(Keys.untaggedVideoColorKey) private var untaggedVideoColor = Keys.untaggedVideoColorDefault.rawValue
+        @AppStorage(Keys.bitmapSubtitleTextKey) private var bitmapSubtitleText = Keys.bitmapSubtitleTextDefault
         @AppStorage(Keys.matchContentKey) private var matchContent = Keys.matchContentDefault
         @AppStorage(Keys.liveJoinProfileKey) private var liveJoinProfile = Keys.liveJoinProfileDefault.rawValue
         @AppStorage(Keys.forwardBufferSegmentsKey) private var forwardBufferSegments = Keys.forwardBufferSegmentsDefault
@@ -187,8 +203,16 @@ import SwiftUI
                         ) { deinterlaceFieldRate = PlayerOptionCycle.next(deinterlaceFieldRate, in: AetherDeinterlaceFieldRate.self) }
                     }
                     TVOptionToggleRow(title: "Upscale Low-Resolution Video", isOn: $upscaleLowResolution)
+                    TVOptionToggleRow(title: "Upscale 1080p Video", isOn: $upscaleFullHD)
+                    TVOptionCycleRow(
+                        title: "Untagged 10-bit Video",
+                        valueLabel: (AetherUntaggedVideoColor(rawValue: untaggedVideoColor) ?? Keys.untaggedVideoColorDefault).label
+                    ) { untaggedVideoColor = PlayerOptionCycle.next(untaggedVideoColor, in: AetherUntaggedVideoColor.self) }
                     TVOptionToggleRow(title: "Match Content", isOn: $matchContent)
-                    Text("Match Content switches the TV to the video's frame rate and dynamic range. Previews and Multiview tiles never switch it.")
+                    (Text("Upscaling 1080p video gives a sharper picture on a 4K display but uses more power. ")
+                        + Text("With 1080p upscaling, Dolby Atmos plays as regular surround. ")
+                        + Text("Untagged 10-bit video carries no color information; choose HDR10 or HLG when HDR video looks pale. ")
+                        + Text("Match Content switches the TV to the video's frame rate and dynamic range. Previews and Multiview tiles never switch it."))
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)
@@ -236,7 +260,14 @@ import SwiftUI
                         title: "HDR",
                         valueLabel: (AetherDynamicRangeHandling(rawValue: dynamicRange) ?? Keys.dynamicRangeDefault).label
                     ) { dynamicRange = PlayerOptionCycle.next(dynamicRange, in: AetherDynamicRangeHandling.self) }
+                    TVOptionToggleRow(title: "Bitmap Subtitles as Text", isOn: $bitmapSubtitleText)
                     TVOptionToggleRow(title: "System Subtitle Tracks", isOn: $prepareNativeSubtitles)
+                    // swiftlint:disable:next line_length
+                    Text("Bitmap subtitles as text reads picture subtitles (PGS, DVB, DVD) on the device and shows them in your subtitle style; a subtitle that can't be read reliably stays a picture. ")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
                 }
 
                 TVOptionResetRow(title: "Restore Defaults") { showResetConfirmation = true }

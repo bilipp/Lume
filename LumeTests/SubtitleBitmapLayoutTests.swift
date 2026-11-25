@@ -76,4 +76,52 @@ struct SubtitleBitmapLayoutTests {
         #expect(changes == 2)
         #expect(model.bitmaps.isEmpty)
     }
+
+    private func cue(
+        id: Int, top: CGFloat = 0.8, text: String? = nil, confidence: Float? = nil
+    ) throws -> SubtitleBitmap {
+        let image = try #require(CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )?.makeImage())
+        return SubtitleBitmap(
+            id: id, image: image,
+            position: CGRect(x: 0.25, y: top, width: 0.5, height: 0.1), canvasSize: .zero,
+            recognizedText: text, recognizedTextConfidence: confidence
+        )
+    }
+
+    @Test func `cues read with confidence become one caption, top cue first`() throws {
+        let lower = try cue(id: 1, top: 0.85, text: "- No.", confidence: 0.5)
+        let upper = try cue(id: 2, top: 0.75, text: " - Yes. ", confidence: 1)
+        #expect(SubtitleBitmap.readableText(of: [lower, upper]) == "- Yes.\n- No.")
+    }
+
+    @Test func `an unread, empty or unsure cue keeps every cue a picture`() throws {
+        let sure = try cue(id: 1, text: "Hello", confidence: 1)
+        #expect(SubtitleBitmap.readableText(of: []) == nil)
+        #expect(try SubtitleBitmap.readableText(of: [sure, cue(id: 2)]) == nil)
+        #expect(try SubtitleBitmap.readableText(of: [sure, cue(id: 2, text: "  ", confidence: 1)]) == nil)
+        #expect(try SubtitleBitmap.readableText(of: [sure, cue(id: 2, text: "He1lo", confidence: 0.3)]) == nil)
+    }
+
+    @Test @MainActor func `the cue model swaps the picture for text once the cue is read`() throws {
+        let model = SubtitleCueModel()
+        try model.updateBitmaps([cue(id: 1)])
+        #expect(model.bitmaps.count == 1)
+        #expect(model.text == nil)
+
+        try model.updateBitmaps([cue(id: 1, text: "Hello", confidence: 1)])
+        #expect(model.bitmaps.isEmpty)
+        #expect(model.text == "Hello")
+
+        model.update("Sign")
+        #expect(model.text == "Sign\nHello")
+
+        model.updateBitmaps([])
+        #expect(model.text == "Sign")
+        model.clear()
+        #expect(model.text == nil)
+    }
 }

@@ -52,6 +52,11 @@ nonisolated enum AetherEngineFailure: String, EngineFailurePolicy {
         // same origin; another engine reads it sequentially.
         case "sourceFabricatesRanges":
             .unsupported
+        // The volume under the engine's segment cache is full. The engine has
+        // already run its own rebuilds, and a reconnect writes to the same
+        // volume; an engine without a segment cache plays the source.
+        case "storageExhausted":
+            .unsupported
         default:
             .interrupted
         }

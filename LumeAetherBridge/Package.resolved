@@ -1,13 +1,13 @@
 {
-  "originHash" : "152fc9dcf0a90d30cfd4731b19488d4013e5b7f545007cf8afb3a06ef3fd5525",
+  "originHash" : "0d37fc5d7025e4b5da8326f39b67acc8935a3aa4078bc555798fdf6fdf980d3e",
   "pins" : [
     {
       "identity" : "aetherengine",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/superuser404notfound/AetherEngine",
       "state" : {
-        "revision" : "b6b3ff711bc78d89ccdb5d985cff5a90605232af",
-        "version" : "7.59.0"
+        "revision" : "1257b90d759f3bc3f0026f167b19db9eb6d5e201",
+        "version" : "7.75.0"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/superuser404notfound/FFmpegBuild",
       "state" : {
-        "revision" : "9282e592b81d9aa1d699dcc70d46cf6b4d66b55f",
-        "version" : "3.13.0"
+        "revision" : "ff514643b8ade86005d2635f9e966ff62cb54982",
+        "version" : "3.19.1"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/superuser404notfound/LibDovi",
       "state" : {
-        "revision" : "0d7cce1d6836a30d13a3a2326e50a153af53f014",
-        "version" : "2.1.0"
+        "revision" : "caff700968700467c089a3f38c8b4180620518b5",
+        "version" : "2.2.0"
       }
     },
     {

@@ -25,12 +25,23 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
     public var audioBridgeMode: String
     public var dolbyVisionHandling: String
     public var upscalesLowResolutionVideo: Bool
+    /// Scales SDR 1080p to the display with Lanczos-3, on the software path.
+    public var upscalesFullHDVideo: Bool
+    /// What a 10-bit stream without any colour description is shown as:
+    /// "hdr10" or "hlg"; anything else keeps the engine's reading (SDR).
+    public var untaggedVideoColor: String
     public var audioDelaySeconds: Double
     public var prepareNativeSubtitles: Bool
+    /// Reads bitmap cues with on-device text recognition and republishes
+    /// them with `LumeAetherSubtitleImage.recognizedText`.
+    public var recognizesBitmapSubtitleText: Bool
     /// How many requests the engine may have open against the source's
     /// origin at once; nil leaves it uncapped. The engine keeps a ceiling
     /// per origin for the rest of the process.
     public var maxConcurrentSourceRequests: Int?
+    /// Extra seconds a fastZap live join may wait for a deeper first window;
+    /// nil serves as soon as the minimum media exists (the engine default).
+    public var liveStartupGraceSeconds: Double?
     /// The engine writes the display criteria (the TV switches to the
     /// video's frame rate and dynamic range, where tvOS Match Content
     /// allows it). False leaves the TV in the output format chosen in
@@ -60,9 +71,13 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         audioBridgeMode: String,
         dolbyVisionHandling: String,
         upscalesLowResolutionVideo: Bool,
+        upscalesFullHDVideo: Bool,
+        untaggedVideoColor: String,
         audioDelaySeconds: Double,
         prepareNativeSubtitles: Bool,
+        recognizesBitmapSubtitleText: Bool,
         maxConcurrentSourceRequests: Int?,
+        liveStartupGraceSeconds: Double?,
         writesDisplayCriteria: Bool,
         isSecondaryOutput: Bool
     ) {
@@ -84,9 +99,13 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         self.audioBridgeMode = audioBridgeMode
         self.dolbyVisionHandling = dolbyVisionHandling
         self.upscalesLowResolutionVideo = upscalesLowResolutionVideo
+        self.upscalesFullHDVideo = upscalesFullHDVideo
+        self.untaggedVideoColor = untaggedVideoColor
         self.audioDelaySeconds = audioDelaySeconds
         self.prepareNativeSubtitles = prepareNativeSubtitles
+        self.recognizesBitmapSubtitleText = recognizesBitmapSubtitleText
         self.maxConcurrentSourceRequests = maxConcurrentSourceRequests
+        self.liveStartupGraceSeconds = liveStartupGraceSeconds
         self.writesDisplayCriteria = writesDisplayCriteria
         self.isSecondaryOutput = isSecondaryOutput
     }
@@ -201,16 +220,35 @@ public nonisolated struct LumeAetherSubtitleImage: @unchecked Sendable, Equatabl
     public let image: CGImage
     public let position: CGRect
     public let canvasSize: CGSize
+    /// The cue's lines as on-device text recognition read them, top first.
+    /// Nil until the cue was read, when nothing readable was found, and
+    /// whenever the load didn't ask for it.
+    public let recognizedText: String?
+    /// The lowest confidence among those lines, 0...1. The recognizer answers
+    /// a few fixed grades, not a probability.
+    public let recognizedTextConfidence: Float?
 
-    public init(id: Int, image: CGImage, position: CGRect, canvasSize: CGSize) {
+    public init(
+        id: Int,
+        image: CGImage,
+        position: CGRect,
+        canvasSize: CGSize,
+        recognizedText: String? = nil,
+        recognizedTextConfidence: Float? = nil
+    ) {
         self.id = id
         self.image = image
         self.position = position
         self.canvasSize = canvasSize
+        self.recognizedText = recognizedText
+        self.recognizedTextConfidence = recognizedTextConfidence
     }
 
-    /// Cue identity, never the pixels: a cue's image doesn't change.
+    /// Cue identity, never the pixels: a cue's image doesn't change. Its
+    /// text does, once: the engine republishes a cue after reading it.
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id && lhs.position == rhs.position && lhs.canvasSize == rhs.canvasSize
+            && lhs.recognizedText == rhs.recognizedText
+            && lhs.recognizedTextConfidence == rhs.recognizedTextConfidence
     }
 }
