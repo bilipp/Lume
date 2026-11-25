@@ -36,6 +36,35 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Primary"].waitForExistence(timeout: 10), "Engine priority list never appeared")
     }
 
+    /// Dragging an engine in Player › Engines changes the order, and the new
+    /// order is still there after leaving the screen and coming back.
+    func testReorderingPlayerEnginesSticks() {
+        openSettings()
+        let playerRow = app.buttons["Player"].firstMatch
+        XCTAssertTrue(app.scrollUntilExists(playerRow), "Player row never appeared")
+        playerRow.tap()
+        let enginesRow = app.buttons["Engines"].firstMatch
+        XCTAssertTrue(app.scrollUntilExists(enginesRow), "Engines row never appeared")
+        enginesRow.tap()
+        XCTAssertTrue(app.staticTexts["Primary"].waitForExistence(timeout: 10), "Engine priority list never appeared")
+
+        let handles = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder"))
+        XCTAssertGreaterThanOrEqual(handles.count, 2, "No drag handles: \(app.debugDescription)")
+        let first = handles.element(boundBy: 0)
+        let third = handles.element(boundBy: 2)
+        let firstLabel = first.label
+        first.press(forDuration: 0.6, thenDragTo: third)
+
+        let moved = handles.element(boundBy: 0).label
+        XCTAssertNotEqual(moved, firstLabel, "The dragged engine snapped back to the top")
+
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(enginesRow.waitForExistence(timeout: 10))
+        enginesRow.tap()
+        XCTAssertTrue(app.staticTexts["Primary"].waitForExistence(timeout: 10))
+        XCTAssertEqual(handles.element(boundBy: 0).label, moved, "The new order was lost after leaving the screen")
+    }
+
     /// Settings › Sync lists every backend. `-ui-testing` keeps Lume Cloud inert,
     /// so nothing here reaches the network; the test only looks, never switches.
     func testSyncSettingsOffersEveryBackend() {
