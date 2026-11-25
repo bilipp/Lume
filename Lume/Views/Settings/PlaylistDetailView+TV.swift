@@ -63,77 +63,100 @@ import SwiftUI
                 TVSettingsSectionLabel(connectionSectionTitle)
 
                 if isEditing {
-                    VStack(spacing: 18) {
-                        TVSettingsField(title: "Name", placeholder: "Name", text: $editName, contentType: .name)
-                        TVSettingsField(title: serverURLFieldTitle, placeholder: serverURLFieldTitle, text: $editServerURL, contentType: .URL)
-                        if isM3U {
-                            TVSettingsField(title: "EPG URL (optional)", placeholder: "EPG URL", text: $editEPGURL, contentType: .URL)
-                        } else if isStalker {
-                            TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $editMacAddress, contentType: nil)
-                            TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
-                            TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                            StalkerIdentitySection(identity: $editStalkerIdentity)
-                        } else if isWebDAV {
-                            TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
-                            TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        } else if isMediaServer {
-                            TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
-                            TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        } else if isPlex {
-                            // A Plex playlist can be credential-free, so both
-                            // rows stay optional here too.
-                            TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
-                            TVSettingsField(title: "Password or token (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        } else {
-                            TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
-                            TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
-                        }
-                    }
+                    tvServerEditingFields
                 } else {
-                    VStack(spacing: 2) {
-                        TVSettingsValueRow("Name", value: playlist.name)
-                        TVSettingsValueRow(serverURLFieldTitle) {
-                            Text(playlist.displayURL)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                        if isM3U {
-                            TVSettingsValueRow("EPG URL") {
-                                Text(playlist.epgURL ?? String(localized: "None"))
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                        } else if isStalker {
-                            TVSettingsValueRow("MAC Address", value: playlist.macAddress ?? "")
-                            if !playlist.username.isEmpty {
-                                TVSettingsValueRow("Username", value: playlist.username)
-                            }
-                        } else if isWebDAV {
-                            // A WebDAV share can be anonymous, so each credential
-                            // row only appears when there is something to show.
-                            if !playlist.username.isEmpty {
-                                TVSettingsValueRow("Username", value: playlist.username)
-                            }
-                            if !playlist.password.isEmpty {
-                                TVSettingsValueRow("Password") { Text("••••••••") }
-                            }
-                        } else if isMediaServer {
-                            TVSettingsValueRow("Username", value: playlist.username)
-                            TVSettingsValueRow("Password") { Text("••••••••") }
-                        } else if isPlex {
-                            if !playlist.username.isEmpty {
-                                TVSettingsValueRow("Username", value: playlist.username)
-                            }
-                            if playlist.plexAccessToken?.isEmpty == false {
-                                TVSettingsValueRow("Token") { Text("••••••••") }
-                            }
-                        } else {
-                            TVSettingsValueRow("Username", value: playlist.username)
-                            TVSettingsValueRow("Password") { Text("••••••••") }
-                        }
-                        TVSettingsValueRow("Added") { Text(playlist.addedAt, style: .date) }
+                    tvServerReadOnlyRows
+                    if isStalker, playlist.stalkerIdentityRequired {
+                        Text("Advanced values are device-local. Enter the Stalker identity in Edit on this Apple TV before connecting.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                            .padding(.top, 4)
                     }
                 }
+            }
+        }
+
+        private var tvServerEditingFields: some View {
+            VStack(spacing: 18) {
+                TVSettingsField(title: "Name", placeholder: "Name", text: $editName, contentType: .name)
+                TVSettingsField(title: serverURLFieldTitle, placeholder: serverURLFieldTitle, text: $editServerURL, contentType: .URL)
+                if isM3U {
+                    TVSettingsField(title: "EPG URL (optional)", placeholder: "EPG URL", text: $editEPGURL, contentType: .URL)
+                } else if isStalker {
+                    TVSettingsField(title: "MAC Address", placeholder: "00:1A:79:xx:xx:xx", text: $editMacAddress, contentType: nil)
+                    TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
+                    TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                    StalkerIdentitySection(identity: $editStalkerIdentity)
+                } else if isWebDAV {
+                    TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
+                    TVSettingsField(title: "Password (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                } else if isMediaServer {
+                    TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
+                    TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                } else if isPlex {
+                    // A Plex playlist can be credential-free, so both
+                    // rows stay optional here too.
+                    TVSettingsField(title: "Username (optional)", placeholder: "Username", text: $editUsername, contentType: .username)
+                    TVSettingsField(title: "Password or token (optional)", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                } else {
+                    TVSettingsField(title: "Username", placeholder: "Username", text: $editUsername, contentType: .username)
+                    TVSettingsField(title: "Password", placeholder: "Password", text: $editPassword, isSecure: true, contentType: .password)
+                }
+            }
+        }
+
+        private var tvServerReadOnlyRows: some View {
+            VStack(spacing: 2) {
+                TVSettingsValueRow("Name", value: playlist.name)
+                TVSettingsValueRow(serverURLFieldTitle) {
+                    Text(playlist.displayURL)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if isM3U {
+                    TVSettingsValueRow("EPG URL") {
+                        Text(playlist.epgURL ?? String(localized: "None"))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                } else if isStalker {
+                    TVSettingsValueRow("MAC Address", value: playlist.macAddress ?? "")
+                    if !playlist.username.isEmpty {
+                        TVSettingsValueRow("Username", value: playlist.username)
+                    }
+                    if playlist.stalkerIdentityRequired {
+                        TVSettingsValueRow(
+                            "Advanced Stalker identity",
+                            value: playlist.stalkerIdentityReference == nil
+                                ? String(localized: "Required on this Apple TV")
+                                : String(localized: "Configured on this device")
+                        )
+                    }
+                } else if isWebDAV {
+                    // A WebDAV share can be anonymous, so each credential
+                    // row only appears when there is something to show.
+                    if !playlist.username.isEmpty {
+                        TVSettingsValueRow("Username", value: playlist.username)
+                    }
+                    if !playlist.password.isEmpty {
+                        TVSettingsValueRow("Password") { Text("••••••••") }
+                    }
+                } else if isMediaServer {
+                    TVSettingsValueRow("Username", value: playlist.username)
+                    TVSettingsValueRow("Password") { Text("••••••••") }
+                } else if isPlex {
+                    if !playlist.username.isEmpty {
+                        TVSettingsValueRow("Username", value: playlist.username)
+                    }
+                    if playlist.plexAccessToken?.isEmpty == false {
+                        TVSettingsValueRow("Token") { Text("••••••••") }
+                    }
+                } else {
+                    TVSettingsValueRow("Username", value: playlist.username)
+                    TVSettingsValueRow("Password") { Text("••••••••") }
+                }
+                TVSettingsValueRow("Added") { Text(playlist.addedAt, style: .date) }
             }
         }
 

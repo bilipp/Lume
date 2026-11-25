@@ -12,12 +12,30 @@ struct StalkerIdentityTests {
     @Test func `minimal private profile round trips literal values without a version marker`() throws {
         let versionless = profile.replacingOccurrences(of: #""schemaVersion":1,"#, with: "")
         let decoded = try StalkerPrivateProfile.decode(Data(versionless.utf8))
-        #expect(decoded.mac == "00:1a:79:00:00:01")
+        #expect(decoded.mac == "00:1A:79:00:00:01")
         #expect(decoded.identity.serialNumber == "SYNTHETIC-SERIAL")
         #expect(decoded.identity.deviceId1 == "SYNTHETIC-ONE")
         #expect(decoded.identity.deviceId2 == "SYNTHETIC-TWO")
         #expect(decoded.identity.signature1 == "SYNTHETIC-SIGNATURE")
         #expect(decoded.identity.signature2 == "")
+    }
+
+    @Test func `lowercase and whitespace padded MAC addresses normalize cleanly`() throws {
+        let normalized = StalkerMAC.normalize("  00:1a:79:ab:cd:ef \n")
+        #expect(normalized == "00:1A:79:AB:CD:EF")
+        #expect(StalkerMAC.isValid(normalized))
+        let config = StalkerClient.Configuration(portalURL: "https://portal.example.invalid/", macAddress: " 00:1a:79:00:00:01 ")
+        #expect(config.macAddress == "00:1A:79:00:00:01")
+        let padded = #"{"portalUrl":"https://portal.example.invalid/c/","mac":"  00:1a:79:ab:cd:ef  "}"#
+        #expect(try StalkerPrivateProfile.decode(Data(padded.utf8)).mac == "00:1A:79:AB:CD:EF")
+    }
+
+    @Test func `block reasons classify common portal refusals without leaking identifiers`() {
+        #expect(StalkerBlockReason.classify("Device conflict - Serial Number mismatch (SN1001)") == .serialMismatch)
+        #expect(StalkerBlockReason.classify("Device conflict on another device") == .deviceMismatch)
+        #expect(StalkerBlockReason.classify("MAC not registered") == .macRejected)
+        #expect(StalkerBlockReason.classify("Account expired") == .accountRestricted)
+        #expect(StalkerBlockReason.classify("Unexpected refusal") == .unspecified)
     }
 
     @Test func `absent empty and whitespace are distinct`() throws {
@@ -94,7 +112,7 @@ struct StalkerIdentityTests {
             NSLocalizedDescriptionKey: "failed \(secret) https://provider.example.invalid/?token=\(secret)"
         ])
         let errors: [StalkerError] = [
-            .deviceBlocked, .networkError(transport),
+            .deviceBlocked(.serialMismatch), .networkError(transport),
             .decodingError(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: secret)))
         ]
         for error in errors {

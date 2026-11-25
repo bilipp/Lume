@@ -316,7 +316,9 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
         let username = try fields.string("username")
         let password = try fields.string("password")
         let macAddress = try fields.string("macAddress")
-        let identityRequired = try fields.contains("stalkerIdentityRequired") ? fields.bool("stalkerIdentityRequired") : false
+        let identityRequired = try fields.contains("stalkerIdentityRequired")
+            ? fields.bool("stalkerIdentityRequired")
+            : stalkerIdentityRequired
         let sourceTypeRaw = try fields.string("sourceTypeRaw")
         let epgURL = try fields.optionalString("epgURL")
         let syncEnabled = try fields.bool("syncEnabled")

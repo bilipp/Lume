@@ -121,7 +121,7 @@ import SwiftUI
 
                 TextField("MAC Address", text: $macAddress)
                 #if os(iOS)
-                    .textInputAutocapitalization(.never)
+                    .textInputAutocapitalization(.characters)
                 #endif
                     .autocorrectionDisabled()
 

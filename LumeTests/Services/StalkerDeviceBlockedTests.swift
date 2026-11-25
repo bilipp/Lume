@@ -29,13 +29,17 @@ struct StalkerDeviceBlockedTests {
         )
     }
 
-    @Test func `a refused device fails authentication without exposing the portal message`() async {
+    @Test func `a refused device fails authentication with a sanitized reason`() async {
         let client = client(host: "blocked.stalker.test", profile: Self.blockedProfile)
         do {
             _ = try await client.authenticate()
             Issue.record("authenticate() should have thrown")
-        } catch StalkerError.deviceBlocked {
-            #expect(!StalkerError.deviceBlocked.localizedDescription.contains("SN1001"))
+        } catch let StalkerError.deviceBlocked(reason) {
+            #expect(reason == .serialMismatch)
+            let error = StalkerError.deviceBlocked(reason)
+            #expect(!error.localizedDescription.contains("SN1001"))
+            #expect(!error.logDescription.contains("SN1001"))
+            #expect(error.logDescription.contains("serial mismatch"))
         } catch {
             Issue.record("unexpected error: \(error)")
         }
@@ -66,12 +70,12 @@ struct StalkerDeviceBlockedTests {
         #expect(profile.expDate == "2027-01-01")
     }
 
-    @Test func `status one is a refusal even without a message`() throws {
+    @Test func `a non-zero status without a message is not a refusal`() throws {
         let profile = try JSONDecoder().decode(
             StalkerEnvelope<StalkerProfile>.self, from: Data(#"{"js":{"status":"1"}}"#.utf8)
         ).js
         #expect(profile.blockMessage == nil)
-        #expect(profile.isBlocked)
+        #expect(!profile.isBlocked)
     }
 
     @Test func `authorization-failure sniff ignores JSON and long bodies`() {

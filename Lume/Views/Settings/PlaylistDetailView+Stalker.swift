@@ -29,12 +29,13 @@ extension PlaylistDetailView {
                 identityError = StalkerIdentityError.localIdentityRequired.localizedDescription
                 return
             }
-            guard StalkerMAC.isValid(editMacAddress) else {
-                identityError = StalkerIdentityError.invalidProfile.localizedDescription
+            let normalizedMAC = StalkerMAC.normalize(editMacAddress)
+            guard StalkerMAC.isValid(normalizedMAC) else {
+                identityError = StalkerIdentityError.invalidMACAddress.localizedDescription
                 return
             }
             let normalizedURL = UserEnteredURL.withDefaultScheme(editServerURL)
-            let changed = normalizedURL != playlist.serverURL || editMacAddress != playlist.macAddress
+            let changed = normalizedURL != playlist.serverURL || normalizedMAC != playlist.macAddress
                 || editUsername != playlist.username || editPassword != playlist.password
                 || editStalkerIdentity != originalStalkerIdentity
             if changed || playlist.stalkerIdentityRequired && playlist.stalkerIdentityReference == nil {
@@ -45,21 +46,27 @@ extension PlaylistDetailView {
         persistChanges()
     }
 
-    func prepareStalkerIdentity() throws {
-        // The temporary model binds the protected record to precisely the
-        // reviewed account, before mutating the persisted one.
-        let target = Playlist(
-            name: editName, portalURL: UserEnteredURL.withDefaultScheme(editServerURL),
-            macAddress: editMacAddress, username: editUsername, password: editPassword
-        )
-        try StalkerIdentityStore().save(editStalkerIdentity, for: target)
-        playlist.stalkerIdentityReference = target.stalkerIdentityReference
-        playlist.stalkerIdentityRequired = target.stalkerIdentityRequired
+    func prepareStalkerIdentity() throws -> String? {
+        let newReference = try StalkerIdentityStore().write(editStalkerIdentity, for: playlist.id)
+        playlist.stalkerIdentityReference = newReference
+        playlist.stalkerIdentityRequired = editStalkerIdentity.isConfigured
+        return newReference
+    }
+
+    func rollbackStalkerIdentitySave(newReference: String?, oldReference: String?, oldRequired: Bool) {
+        guard isStalker else { return }
+        if let newReference {
+            StalkerIdentityStore().remove(reference: newReference)
+        }
+        playlist.stalkerIdentityReference = oldReference
+        playlist.stalkerIdentityRequired = oldRequired
     }
 
     func finishStalkerIdentitySave(oldReference: String?, oldKey: String?) {
         guard isStalker else { return }
-        if let oldReference { StalkerIdentityStore().remove(reference: oldReference) }
+        if let oldReference, oldReference != playlist.stalkerIdentityReference {
+            StalkerIdentityStore().remove(reference: oldReference)
+        }
         if let oldKey { Task { await StalkerSessionStore.shared.clear(oldKey) } }
     }
 }

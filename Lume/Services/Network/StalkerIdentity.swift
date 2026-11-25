@@ -38,6 +38,7 @@ nonisolated struct StalkerIdentity: Codable, Equatable {
 
 nonisolated enum StalkerIdentityError: LocalizedError {
     case invalidProfile
+    case invalidMACAddress
     case storageUnavailable
     case localIdentityRequired
 
@@ -45,6 +46,8 @@ nonisolated enum StalkerIdentityError: LocalizedError {
         switch self {
         case .invalidProfile:
             String(localized: "Invalid Stalker profile. Check the version, fields, aliases, portal URL and MAC address.")
+        case .invalidMACAddress:
+            String(localized: "Enter a valid MAC address (for example, 00:1A:79:00:00:01).")
         case .storageUnavailable:
             String(localized: "Protected identity storage is unavailable. Unlock this device and try again.")
         case .localIdentityRequired:
@@ -104,8 +107,10 @@ nonisolated struct StalkerPrivateProfile {
                   ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
                   url.host?.isEmpty == false, url.user == nil, url.password == nil,
                   url.query == nil, url.fragment == nil,
-                  let mac = try string("mac", required: true), StalkerMAC.isValid(mac)
+                  let rawMAC = try string("mac", required: true)
             else { throw StalkerIdentityError.invalidProfile }
+            let mac = StalkerMAC.normalize(rawMAC)
+            guard StalkerMAC.isValid(mac) else { throw StalkerIdentityError.invalidProfile }
             let identity = try StalkerIdentity(
                 serialNumber: string("serialNumber"), deviceId1: string("deviceId1"),
                 deviceId2: string("deviceId2"), signature1: string(fields["signature"] == nil ? "signature1" : "signature"),

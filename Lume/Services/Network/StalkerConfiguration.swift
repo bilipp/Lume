@@ -21,7 +21,7 @@ extension StalkerClient {
             identityUnavailable: Bool = false
         ) {
             self.portalURL = portalURL
-            self.macAddress = macAddress
+            self.macAddress = StalkerMAC.normalize(macAddress)
             self.username = username
             self.password = password
             self.timeout = timeout
@@ -29,6 +29,9 @@ extension StalkerClient {
             self.identityUnavailable = identityUnavailable
         }
 
+        /// Reads the device-local Keychain on each construction (for each stream
+        /// resolve, sync, or EPG fetch) so credentials never remain cached in
+        /// memory across edits.
         init(playlist: Playlist, timeout: TimeInterval = 30) {
             let loaded = Result { try StalkerIdentityStore().load(for: playlist) }
             self.init(

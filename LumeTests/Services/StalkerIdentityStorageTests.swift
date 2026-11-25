@@ -46,17 +46,25 @@ struct StalkerIdentityStorageTests {
         }
     }
 
-    @Test func `missing protected identity and remote account edits fail closed`() throws {
+    @Test func `synced account edits keep identity readable while cross-playlist and missing references fail closed`() throws {
         let playlist = playlist()
         let store = StalkerIdentityStore(service: "LumeTests.stalker.\(UUID().uuidString)")
         #expect(try store.load(for: playlist) == StalkerIdentity())
         try store.save(StalkerIdentity(deviceId1: "ONE"), for: playlist)
         let reference = try #require(playlist.stalkerIdentityReference)
         defer { store.remove(reference: reference) }
-        playlist.password = "DIFFERENT-ACCOUNT"
-        #expect(throws: StalkerIdentityError.self) { try store.load(for: playlist) }
-        playlist.password = ""
+        let originalKey = StalkerClient.Configuration(playlist: playlist).sessionKey
+        // Synced credential/URL edits on the same playlist keep the stored identity readable
+        // while producing a distinct session cache key.
+        playlist.password = "ROTATED-PASSWORD"
         #expect(try store.load(for: playlist).deviceId1 == "ONE")
+        #expect(StalkerClient.Configuration(playlist: playlist).sessionKey != originalKey)
+        // Another playlist cannot borrow this playlist's Keychain reference.
+        let other = self.playlist()
+        other.stalkerIdentityRequired = true
+        other.stalkerIdentityReference = reference
+        #expect(throws: StalkerIdentityError.self) { try store.load(for: other) }
+        // A playlist requiring a local identity without a reference fails closed.
         playlist.stalkerIdentityReference = nil
         #expect(throws: StalkerIdentityError.self) { try store.load(for: playlist) }
         #expect(StalkerClient.Configuration(playlist: playlist).identityUnavailable)
@@ -84,6 +92,12 @@ struct StalkerIdentityStorageTests {
         old.stalkerIdentityRequired = false
         local.apply(old)
         #expect(local.stalkerIdentityRequired)
+        // A Lume Cloud payload written by an older client (omitting stalkerIdentityRequired)
+        // leaves the mirror row's existing flag intact.
+        var legacyPayload = try LumeCloudPayload.decode(wire)
+        legacyPayload.data.removeValue(forKey: "stalkerIdentityRequired")
+        try LumeCloudPayloadCodec.apply(legacyPayload, to: cloudCopy)
+        #expect(cloudCopy.stalkerIdentityRequired)
     }
 
     @Test func `historical shadow without identity marker still decodes`() throws {

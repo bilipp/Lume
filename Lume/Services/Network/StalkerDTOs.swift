@@ -124,10 +124,15 @@ nonisolated struct StalkerProfile: Decodable {
         blockMessage = parts.isEmpty ? nil : parts.joined(separator: ". ")
     }
 
-    /// Matches the supported client's refusal contract: status 1 or a portal
-    /// refusal message. The status-2 credential challenge is handled first.
+    /// Whether the portal refused the device. A non-zero status alone isn't
+    /// enough — portals are loose with it — so this also needs the message a
+    /// genuine refusal carries.
     var isBlocked: Bool {
-        status == "1" || blockMessage != nil
+        blockMessage != nil && (status ?? "0") != "0"
+    }
+
+    var blockReason: StalkerBlockReason {
+        StalkerBlockReason.classify(blockMessage)
     }
 
     private static func plainText(_ html: String) -> String {

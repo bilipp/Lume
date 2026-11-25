@@ -149,7 +149,7 @@ struct PlaylistDetailView: View {
                     readOnlySection
                     if isStalker, playlist.stalkerIdentityRequired {
                         Section("Advanced Stalker identity") {
-                            Text("Advanced values are device-local. Import the private profile separately on each device before connecting.")
+                            Text("Advanced values are device-local. Enter or import the Stalker identity separately on each device before connecting.")
                         }
                     }
                 }
@@ -305,7 +305,7 @@ struct PlaylistDetailView: View {
                 } else if isStalker {
                     TextField("MAC Address", text: $editMacAddress)
                     #if os(iOS)
-                        .textInputAutocapitalization(.never)
+                        .textInputAutocapitalization(.characters)
                     #endif
                         .autocorrectionDisabled()
                     TextField("Username (optional)", text: $editUsername)
@@ -443,13 +443,13 @@ extension PlaylistDetailView {
     func persistChanges() {
         let oldKey = isStalker ? StalkerClient.Configuration(playlist: playlist).sessionKey : nil
         let oldReference = playlist.stalkerIdentityReference
-        if isStalker {
-            do {
-                try prepareStalkerIdentity()
-            } catch {
-                identityError = error.localizedDescription
-                return
-            }
+        let oldRequired = playlist.stalkerIdentityRequired
+        let newReference: String?
+        do {
+            newReference = isStalker ? try prepareStalkerIdentity() : nil
+        } catch {
+            identityError = error.localizedDescription
+            return
         }
         playlist.name = editName.trimmingCharacters(in: .whitespacesAndNewlines)
         playlist.serverURL = UserEnteredURL.withDefaultScheme(editServerURL)
@@ -457,7 +457,7 @@ extension PlaylistDetailView {
             let epgURL = UserEnteredURL.withDefaultScheme(editEPGURL)
             playlist.epgURL = epgURL.isEmpty ? nil : epgURL
         } else if isStalker {
-            playlist.macAddress = editMacAddress
+            playlist.macAddress = StalkerMAC.normalize(editMacAddress)
             playlist.username = editUsername
             playlist.password = editPassword
         } else if isWebDAV {
@@ -489,6 +489,7 @@ extension PlaylistDetailView {
         do {
             try modelContext.save()
         } catch {
+            rollbackStalkerIdentitySave(newReference: newReference, oldReference: oldReference, oldRequired: oldRequired)
             identityError = String(localized: "The playlist could not be saved. Try again before leaving Edit.")
             return
         }

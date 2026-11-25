@@ -7,12 +7,8 @@ nonisolated struct StalkerIdentityStore {
     var service = (Bundle.main.bundleIdentifier ?? "Lume") + ".stalker-identity"
 
     private struct Record: Codable {
-        let account: [String]
+        let playlistID: UUID
         let identity: StalkerIdentity
-    }
-
-    private func account(_ playlist: Playlist) -> [String] {
-        [playlist.serverURL, playlist.macAddress ?? "", playlist.username, playlist.password]
     }
 
     private func query(_ reference: String) -> [String: Any] {
@@ -38,26 +34,31 @@ nonisolated struct StalkerIdentityStore {
         }
         guard let data = result as? Data,
               let record = try? JSONDecoder().decode(Record.self, from: data),
-              record.account == account(playlist)
+              record.playlistID == playlist.id
         else { throw StalkerIdentityError.localIdentityRequired }
         return record.identity
+    }
+
+    /// Validates and writes a new immutable Keychain item for `playlistID`
+    /// without mutating SwiftData, returning its reference (or `nil` when
+    /// `identity` is unconfigured).
+    func write(_ identity: StalkerIdentity, for playlistID: UUID) throws -> String? {
+        try identity.validate()
+        guard identity.isConfigured else { return nil }
+        let reference = UUID().uuidString
+        var item = query(reference)
+        item[kSecValueData as String] = try JSONEncoder().encode(Record(playlistID: playlistID, identity: identity))
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { throw StalkerIdentityError.storageUnavailable }
+        return reference
     }
 
     /// Write a new immutable item before changing the reference. A failed write
     /// leaves the previous identity intact.
     func save(_ identity: StalkerIdentity, for playlist: Playlist) throws {
-        try identity.validate()
         let oldReference = playlist.stalkerIdentityReference
-        if identity.isConfigured {
-            let reference = UUID().uuidString
-            var item = query(reference)
-            item[kSecValueData as String] = try JSONEncoder().encode(Record(account: account(playlist), identity: identity))
-            item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { throw StalkerIdentityError.storageUnavailable }
-            playlist.stalkerIdentityReference = reference
-        } else {
-            playlist.stalkerIdentityReference = nil
-        }
+        let reference = try write(identity, for: playlist.id)
+        playlist.stalkerIdentityReference = reference
         playlist.stalkerIdentityRequired = identity.isConfigured
         if let oldReference { remove(reference: oldReference) }
     }

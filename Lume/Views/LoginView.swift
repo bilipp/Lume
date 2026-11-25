@@ -89,7 +89,7 @@ struct LoginView: View {
             !m3uURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .stalker:
             !portalURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && StalkerMAC.isValid(macAddress)
+                && StalkerMAC.isValid(StalkerMAC.normalize(macAddress))
         case .mediaServer:
             // Credentials stay optional here: an anonymous WebDAV share needs
             // none, and a Jellyfin server without them gets a dedicated
@@ -452,7 +452,7 @@ struct LoginView: View {
 
         let playlistName = trimmedName.isEmpty ? "My Playlist" : trimmedName
         let portal = portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let mac = macAddress
+        let mac = StalkerMAC.normalize(macAddress)
         let identity = stalkerIdentity
         noteAddAttempt("stalker", address: portal)
 
@@ -479,6 +479,10 @@ struct LoginView: View {
                     insertAndFinish(playlist)
                 }
             } catch {
+                if let reference = playlist.stalkerIdentityReference {
+                    StalkerIdentityStore().remove(reference: reference)
+                    playlist.stalkerIdentityReference = nil
+                }
                 errorMessage = error.localizedDescription
                 noteAddFailure(error)
                 isLoading = false
@@ -501,7 +505,13 @@ struct LoginView: View {
         do {
             try modelContext.save()
         } catch {
-            errorMessage = String(localized: "The playlist could not be saved. Try again before leaving Edit.")
+            if let reference = playlist.stalkerIdentityReference {
+                StalkerIdentityStore().remove(reference: reference)
+                playlist.stalkerIdentityReference = nil
+            }
+            modelContext.delete(playlist)
+            AutoSync.addedThisSession.remove(playlist.id)
+            errorMessage = String(localized: "The playlist could not be saved. Try again.")
             isLoading = false
             return
         }

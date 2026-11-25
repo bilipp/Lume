@@ -8680,18 +8680,34 @@
         }
       }
     },
-    "Advanced values are device-local. Import the private profile separately on each device before connecting." : {
+    "Advanced values are device-local. Enter or import the Stalker identity separately on each device before connecting." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erweiterte Werte sind gerätelokal. Das private Profil vor dem Verbinden auf jedem Gerät separat importieren."
+            "value" : "Erweiterte Werte sind gerätelokal. Die Stalker-Identität vor dem Verbinden auf jedem Gerät separat eingeben oder importieren."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Advanced values are device-local. Import the private profile separately on each device before connecting."
+            "value" : "Advanced values are device-local. Enter or import the Stalker identity separately on each device before connecting."
+          }
+        }
+      }
+    },
+    "Advanced values are device-local. Enter the Stalker identity in Edit on this Apple TV before connecting." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweiterte Werte sind gerätelokal. Die Stalker-Identität vor dem Verbinden auf diesem Apple TV in der Bearbeitung eingeben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advanced values are device-local. Enter the Stalker identity in Edit on this Apple TV before connecting."
           }
         }
       }
@@ -21821,6 +21837,22 @@
         }
       }
     },
+    "Configured on this device" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Gerät konfiguriert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configured on this device"
+          }
+        }
+      }
+    },
     "Confirm PIN" : {
       "localizations" : {
         "ar" : {
@@ -34423,6 +34455,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "引擎"
+          }
+        }
+      }
+    },
+    "Enter a valid MAC address (for example, 00:1A:79:00:00:01)." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib eine gültige MAC-Adresse ein (zum Beispiel 00:1A:79:00:00:01)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a valid MAC address (for example, 00:1A:79:00:00:01)."
           }
         }
       }
@@ -89842,6 +89890,22 @@
         }
       }
     },
+    "Required on this Apple TV" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Apple TV erforderlich"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Required on this Apple TV"
+          }
+        }
+      }
+    },
     "Reset" : {
       "localizations" : {
         "ar" : {
@@ -119565,6 +119629,22 @@
         }
       }
     },
+    "The playlist could not be saved. Try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Wiedergabeliste konnte nicht gespeichert werden. Erneut versuchen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The playlist could not be saved. Try again."
+          }
+        }
+      }
+    },
     "The Plex server rejected this token." : {
       "comment" : "Error message when a Plex token is refused.",
       "localizations" : {
@@ -119644,6 +119724,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plex 服务器拒绝了此令牌。"
+          }
+        }
+      }
+    },
+    "The portal blocked this device (account expired or disabled). Contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Gerät gesperrt (Konto abgelaufen oder deaktiviert). Den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device (account expired or disabled). Contact your provider."
+          }
+        }
+      }
+    },
+    "The portal blocked this device (device ID mismatch). Check the existing registered identity or contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Gerät gesperrt (Geräte-ID stimmt nicht überein). Die vorhandene registrierte Identität prüfen oder den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device (device ID mismatch). Check the existing registered identity or contact your provider."
+          }
+        }
+      }
+    },
+    "The portal blocked this device (MAC address not registered). Check your MAC address or contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Gerät gesperrt (MAC-Adresse nicht registriert). Die MAC-Adresse prüfen oder den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device (MAC address not registered). Check your MAC address or contact your provider."
+          }
+        }
+      }
+    },
+    "The portal blocked this device (serial number mismatch). Check the existing registered identity or contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Gerät gesperrt (Seriennummer stimmt nicht überein). Die vorhandene registrierte Identität prüfen oder den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device (serial number mismatch). Check the existing registered identity or contact your provider."
           }
         }
       }

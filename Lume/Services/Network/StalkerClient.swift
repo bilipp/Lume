@@ -91,16 +91,28 @@ final nonisolated class StalkerClient: Sendable {
                     continue
                 }
                 let session = StalkerSessionStore.Session(token: token, endpoint: endpoint)
-                // A token is not authentication. Never cache or probe another
-                // endpoint after this endpoint has explicitly refused the profile.
-                do {
-                    let profile = try await checkedProfile(using: session)
-                    return StalkerSessionStore.Session(token: token, endpoint: endpoint, profile: profile)
-                } catch {
-                    Logger.network.error("Stalker profile authentication failed — \(Self.safeError(error))")
-                    throw ProfileFailure(underlying: error)
+                if configuration.identity.isConfigured {
+                    // A token is not authentication. Never cache or probe another
+                    // endpoint after this endpoint has explicitly refused the profile.
+                    do {
+                        let profile = try await checkedProfile(using: session)
+                        return StalkerSessionStore.Session(token: token, endpoint: endpoint, profile: profile)
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        Logger.network.error("Stalker profile authentication failed — \(Self.safeError(error))")
+                        throw ProfileFailure(underlying: error)
+                    }
+                } else {
+                    do {
+                        return try await tolerantSession(token: token, endpoint: endpoint)
+                    } catch let failure as ProfileFailure {
+                        Logger.network.error("Stalker profile authentication failed — \(Self.safeError(failure.underlying))")
+                        throw failure
+                    }
                 }
             } catch {
+                if error is CancellationError { throw error }
                 if let failure = error as? ProfileFailure { throw failure.underlying }
                 lastError = error
                 // What each miss returned tells a wrong path from a blocked device.
@@ -223,54 +235,13 @@ final nonisolated class StalkerClient: Sendable {
         do {
             return try await Self.decodeValidatedOffActor(T.self, response: response, data: data)
         } catch {
-            // Metadata only; a provider can echo identifiers in any body.
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            let fingerprint = "HTTP \(code), \(data.count) bytes"
+            // Failure path only: fingerprinting parses the body.
+            let fingerprint = NetworkDiagnostics.fingerprint(
+                response: response, data: data.count <= 1_048_576 ? data : nil
+            )
             responseFingerprint.withLock { $0 = fingerprint }
             throw error
         }
-    }
-
-    // MARK: - Profile
-
-    private func getProfile(using session: StalkerSessionStore.Session, secondStep: Bool = false) async throws -> StalkerProfile {
-        let url = appendingQuery(to: session.endpoint, [
-            URLQueryItem(name: "type", value: "stb"),
-            URLQueryItem(name: "action", value: "get_profile"),
-            URLQueryItem(name: "JsHttpRequest", value: "1-xml")
-        ] + configuration.identity.profileQuery + (secondStep ? [URLQueryItem(name: "auth_second_step", value: "1")] : []))
-        let envelope: StalkerEnvelope<StalkerProfile> = try await perform(url: url, token: session.token)
-        return envelope.js
-    }
-
-    private func checkedProfile(using session: StalkerSessionStore.Session) async throws -> StalkerProfile {
-        var profile = try await getProfile(using: session)
-        if profile.status == "2" {
-            guard !configuration.username.isEmpty, !configuration.password.isEmpty else { throw StalkerError.authenticationFailed }
-            let url = appendingQuery(to: session.endpoint, [
-                URLQueryItem(name: "type", value: "stb"),
-                URLQueryItem(name: "action", value: "do_auth"),
-                URLQueryItem(name: "login", value: configuration.username),
-                URLQueryItem(name: "password", value: configuration.password),
-                URLQueryItem(name: "JsHttpRequest", value: "1-xml")
-            ] + configuration.identity.authQuery)
-            let result: StalkerEnvelope<Bool> = try await perform(url: url, token: session.token)
-            guard result.js else { throw StalkerError.authenticationFailed }
-            profile = try await getProfile(using: session, secondStep: true)
-            guard profile.status != "2" else { throw StalkerError.authenticationFailed }
-        }
-        guard !profile.isBlocked else { throw StalkerError.deviceBlocked }
-        guard profile.hasProfileData else { throw StalkerError.invalidResponse }
-        return profile
-    }
-
-    /// Validates the portal connection by handshaking and reading the profile.
-    /// Used by the add-playlist flow as the connection test.
-    /// A refusal is reported without quoting the provider's private message.
-    func authenticate() async throws -> StalkerProfile {
-        let session = try await authorizedSession()
-        if let profile = session.profile { return profile }
-        return try await checkedProfile(using: session)
     }
 
     // MARK: - Live TV (itv)
@@ -512,6 +483,88 @@ final nonisolated class StalkerClient: Sendable {
             throw StalkerError.noStreamURL
         }
         return url
+    }
+}
+
+// MARK: - Profile
+
+nonisolated extension StalkerClient {
+    private func getProfile(using session: StalkerSessionStore.Session, secondStep: Bool = false) async throws -> StalkerProfile {
+        let url = appendingQuery(to: session.endpoint, [
+            URLQueryItem(name: "type", value: "stb"),
+            URLQueryItem(name: "action", value: "get_profile"),
+            URLQueryItem(name: "JsHttpRequest", value: "1-xml")
+        ] + configuration.identity.profileQuery + (secondStep ? [URLQueryItem(name: "auth_second_step", value: "1")] : []))
+        let envelope: StalkerEnvelope<StalkerProfile> = try await perform(url: url, token: session.token)
+        return envelope.js
+    }
+
+    private func authenticateSecondStep(using session: StalkerSessionStore.Session) async throws -> StalkerProfile {
+        let url = appendingQuery(to: session.endpoint, [
+            URLQueryItem(name: "type", value: "stb"),
+            URLQueryItem(name: "action", value: "do_auth"),
+            URLQueryItem(name: "login", value: configuration.username),
+            URLQueryItem(name: "password", value: configuration.password),
+            URLQueryItem(name: "JsHttpRequest", value: "1-xml")
+        ] + configuration.identity.authQuery)
+        let result: StalkerEnvelope<Bool> = try await perform(url: url, token: session.token)
+        guard result.js else { throw StalkerError.authenticationFailed }
+        let profile = try await getProfile(using: session, secondStep: true)
+        guard profile.status != "2" else { throw StalkerError.authenticationFailed }
+        return profile
+    }
+
+    private func tolerantSession(token: String, endpoint: URL) async throws -> StalkerSessionStore.Session {
+        let session = StalkerSessionStore.Session(token: token, endpoint: endpoint)
+        do {
+            var profile = try await getProfile(using: session)
+            if profile.status == "2", !configuration.username.isEmpty, !configuration.password.isEmpty {
+                do {
+                    profile = try await authenticateSecondStep(using: session)
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    throw ProfileFailure(underlying: error)
+                }
+            }
+            guard !profile.isBlocked else {
+                throw ProfileFailure(underlying: StalkerError.deviceBlocked(profile.blockReason))
+            }
+            return StalkerSessionStore.Session(token: token, endpoint: endpoint, profile: profile)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let failure as ProfileFailure {
+            throw failure
+        } catch {
+            // Prime the profile tolerantly; many MAC-only portals omit or
+            // serve sparse profiles during handshake and still authorize.
+            return session
+        }
+    }
+
+    private func checkedProfile(using session: StalkerSessionStore.Session) async throws -> StalkerProfile {
+        var profile = try await getProfile(using: session)
+        if profile.status == "2" {
+            guard !configuration.username.isEmpty, !configuration.password.isEmpty else { throw StalkerError.authenticationFailed }
+            profile = try await authenticateSecondStep(using: session)
+        }
+        guard !profile.isBlocked else { throw StalkerError.deviceBlocked(profile.blockReason) }
+        guard profile.hasProfileData else { throw StalkerError.invalidResponse }
+        return profile
+    }
+
+    /// Validates the portal connection by handshaking and reading the profile.
+    /// Used by the add-playlist flow as the connection test.
+    /// A refusal is reported without quoting the provider's private message.
+    func authenticate() async throws -> StalkerProfile {
+        let session = try await authorizedSession()
+        if let profile = session.profile {
+            if profile.isBlocked { throw StalkerError.deviceBlocked(profile.blockReason) }
+            return profile
+        }
+        let profile = try await getProfile(using: session)
+        if profile.isBlocked { throw StalkerError.deviceBlocked(profile.blockReason) }
+        return profile
     }
 }
 

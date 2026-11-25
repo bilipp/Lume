@@ -38,6 +38,10 @@ nonisolated enum StalkerMAC {
         return "\(prefix):\(octets.joined(separator: ":"))"
     }
 
+    static func normalize(_ mac: String) -> String {
+        mac.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+
     /// Whether a string is a syntactically valid `XX:XX:XX:XX:XX:XX` MAC. Accepts
     /// upper- or lower-case hex; the portal is case-insensitive.
     static func isValid(_ mac: String) -> Bool {
@@ -138,12 +142,59 @@ nonisolated enum StalkerLink {
 
 // MARK: - Errors
 
+/// Safe classification of a portal's `get_profile` refusal without storing or
+/// echoing raw provider text.
+nonisolated enum StalkerBlockReason: Equatable {
+    case serialMismatch
+    case deviceMismatch
+    case macRejected
+    case accountRestricted
+    case unspecified
+
+    static func classify(_ message: String?) -> StalkerBlockReason {
+        guard let message else { return .unspecified }
+        let lower = message.lowercased()
+        if lower.contains("serial") || lower.range(of: #"\bsn(?:\d+)?\b"#, options: .regularExpression) != nil {
+            return .serialMismatch
+        }
+        if lower.contains("device_id")
+            || lower.contains("device id")
+            || lower.contains("device conflict")
+            || lower.contains("another device")
+        {
+            return .deviceMismatch
+        }
+        if lower.contains("mac") || lower.contains("unregistered") || lower.contains("not registered") {
+            return .macRejected
+        }
+        if lower.contains("expired") || lower.contains("disabled") || lower.contains("suspended") {
+            return .accountRestricted
+        }
+        return .unspecified
+    }
+
+    var logLabel: String {
+        switch self {
+        case .serialMismatch:
+            "serial mismatch"
+        case .deviceMismatch:
+            "device mismatch"
+        case .macRejected:
+            "MAC rejected"
+        case .accountRestricted:
+            "account restricted"
+        case .unspecified:
+            "get_profile refusal"
+        }
+    }
+}
+
 nonisolated enum StalkerError: LocalizedError {
     case invalidURL
     case handshakeFailed
     case authenticationFailed
     /// The portal refused the checked profile. Never carries provider text.
-    case deviceBlocked
+    case deviceBlocked(StalkerBlockReason)
     case noStreamURL
     case networkError(Error)
     case decodingError(Error)
@@ -158,8 +209,19 @@ nonisolated enum StalkerError: LocalizedError {
             "Couldn't connect to the Stalker portal. Check the portal URL and MAC address."
         case .authenticationFailed:
             "The portal rejected this MAC address. It may not be authorized, or its subscription has expired."
-        case .deviceBlocked:
-            String(localized: "The portal blocked this device profile. Check the existing registered identity or contact your provider.")
+        case let .deviceBlocked(reason):
+            switch reason {
+            case .serialMismatch:
+                String(localized: "The portal blocked this device (serial number mismatch). Check the existing registered identity or contact your provider.")
+            case .deviceMismatch:
+                String(localized: "The portal blocked this device (device ID mismatch). Check the existing registered identity or contact your provider.")
+            case .macRejected:
+                String(localized: "The portal blocked this device (MAC address not registered). Check your MAC address or contact your provider.")
+            case .accountRestricted:
+                String(localized: "The portal blocked this device (account expired or disabled). Contact your provider.")
+            case .unspecified:
+                String(localized: "The portal blocked this device profile. Check the existing registered identity or contact your provider.")
+            }
         case .noStreamURL:
             "The portal didn't return a playable stream for this item."
         case .networkError:
@@ -186,10 +248,10 @@ nonisolated enum StalkerError: LocalizedError {
             return "portal handshake failed"
         case .authenticationFailed:
             return "portal rejected the MAC address"
-        case .deviceBlocked:
+        case let .deviceBlocked(reason):
             // The portal's own text stays out: it's provider-authored and
             // could carry anything.
-            return "portal blocked the device (get_profile refusal)"
+            return "portal blocked the device (\(reason.logLabel))"
         case .noStreamURL:
             return "no playable stream in portal response"
         case let .networkError(error):
@@ -254,30 +316,63 @@ actor StalkerSessionStore {
 
     private var pending: [String: Flight] = [:]
 
+    private enum FlightOutcome {
+        case success(Session)
+        case retry
+        case failure(Error)
+    }
+
     func authorize(_ key: String, create: @escaping @Sendable () async throws -> Session) async throws -> Session {
-        if let session = sessions[key] { return session }
-        if pending[key] == nil {
-            let task = Task {
-                let session = try await create()
-                try Task.checkCancellation()
+        for _ in 0 ..< 5 {
+            try Task.checkCancellation()
+            if let session = sessions[key] { return session }
+            let flight = ensureFlight(for: key, create: create)
+            let waiter = UUID()
+            pending[key]?.waiters.insert(waiter)
+            switch await runWaiter(key: key, flight: flight, waiter: waiter) {
+            case let .success(session):
                 return session
+            case .retry:
+                continue
+            case let .failure(error):
+                throw error
             }
-            pending[key] = Flight(id: UUID(), task: task, waiters: [])
         }
-        guard let flight = pending[key] else { throw CancellationError() }
-        let waiter = UUID()
-        pending[key]?.waiters.insert(waiter)
-        return try await withTaskCancellationHandler {
+        throw StalkerError.handshakeFailed
+    }
+
+    private func ensureFlight(for key: String, create: @escaping @Sendable () async throws -> Session) -> Flight {
+        if let existing = pending[key] { return existing }
+        let task = Task {
+            let session = try await create()
+            try Task.checkCancellation()
+            return session
+        }
+        let flight = Flight(id: UUID(), task: task, waiters: [])
+        pending[key] = flight
+        return flight
+    }
+
+    private func runWaiter(key: String, flight: Flight, waiter: UUID) async -> FlightOutcome {
+        await withTaskCancellationHandler {
             do {
                 let session = try await flight.task.value
                 try Task.checkCancellation()
-                guard pending[key]?.id == flight.id || sessions[key]?.id == session.id else { throw CancellationError() }
-                sessions[key] = session
-                if pending[key]?.id == flight.id { pending[key] = nil }
-                return session
+                if pending[key]?.id == flight.id {
+                    sessions[key] = session
+                    pending[key] = nil
+                    return .success(session)
+                }
+                if sessions[key]?.id == session.id {
+                    return .success(session)
+                }
+                return .retry
             } catch {
                 removeWaiter(key, flight: flight.id, waiter: waiter)
-                throw error
+                if error is CancellationError, !Task.isCancelled {
+                    return .retry
+                }
+                return .failure(error)
             }
         } onCancel: {
             Task { await self.removeWaiter(key, flight: flight.id, waiter: waiter) }
@@ -299,10 +394,12 @@ actor StalkerSessionStore {
         }
     #endif
 
+    /// Test seam used by `StalkerSupportTests` / `StalkerIdentityNetworkTests`.
     func session(for key: String) -> Session? {
         sessions[key]
     }
 
+    /// Test seam used by `StalkerSupportTests` / `StalkerIdentityNetworkTests`.
     func store(_ session: Session, for key: String) {
         sessions[key] = session
     }

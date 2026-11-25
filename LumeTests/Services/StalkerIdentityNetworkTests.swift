@@ -1,5 +1,6 @@
 import Foundation
 @testable import Lume
+import os
 import Testing
 
 struct StalkerIdentityNetworkTests {
@@ -37,7 +38,7 @@ struct StalkerIdentityNetworkTests {
         #expect(requests.count == 3)
         for request in requests {
             #expect(request.value(forHTTPHeaderField: "SN") == nil)
-            #expect(request.value(forHTTPHeaderField: "Cookie") == "mac=00:1a:79:00:00:01; stb_lang=en; timezone=Europe/London")
+            #expect(request.value(forHTTPHeaderField: "Cookie") == "mac=00:1A:79:00:00:01; stb_lang=en; timezone=Europe/London")
             #expect(request.value(forHTTPHeaderField: "X-User-Agent") == "Model: MAG250; Link: WiFi")
             #expect(Set(items(request).map(\.name)).isDisjoint(with: ["sn", "device_id", "device_id2", "signature", "signature2"]))
         }
@@ -156,15 +157,70 @@ struct StalkerIdentityNetworkTests {
         #expect(requests.count(where: { items($0).contains(URLQueryItem(name: "action", value: "get_profile")) }) == 1)
     }
 
-    @Test func `token plus an empty HTTP 200 profile is not authenticated`() async {
+    @Test func `token plus an empty HTTP 200 profile is rejected when advanced identity is configured`() async {
         let host = "empty-profile.identity.test"
         StubURLProtocol.register(host: host) { request in
             if request.url?.absoluteString.contains("action=get_profile") == true { return .init(body: #"{"js":{}}"#) }
             return Self.response(request)
         }
-        let client = makeClient(host: host)
+        let client = makeClient(host: host, identity: StalkerIdentity(deviceId1: "ONE"))
         await #expect(throws: StalkerError.self) { try await client.authenticate() }
         #expect(await StalkerSessionStore.shared.session(for: client.configuration.sessionKey) == nil)
         #expect(StubURLProtocol.requests(host: host).count == 2)
+    }
+
+    @Test(arguments: [#"{"js":{}}"#, "not json"])
+    func `a MAC-only portal with a sparse or undecodable profile still loads channels`(_ profileBody: String) async throws {
+        let host = "sparse-\(abs(profileBody.hashValue)).identity.test"
+        StubURLProtocol.register(host: host) { request in
+            if request.url?.absoluteString.contains("action=get_profile") == true { return .init(body: profileBody) }
+            return Self.response(request)
+        }
+        let channels = try await makeClient(host: host).getAllChannels()
+        #expect(channels.count == 1)
+    }
+
+    @Test func `a working portal returning status one without a block message authenticates`() async throws {
+        let host = "status-one.identity.test"
+        StubURLProtocol.register(host: host) { request in
+            if request.url?.absoluteString.contains("action=get_profile") == true { return .init(body: #"{"js":{"status":1}}"#) }
+            return Self.response(request)
+        }
+        let profile = try await makeClient(host: host, identity: StalkerIdentity(deviceId1: "ONE")).authenticate()
+        #expect(profile.status == "1")
+        #expect(!profile.isBlocked)
+        let channels = try await makeClient(host: host, identity: StalkerIdentity(deviceId1: "ONE")).getAllChannels()
+        #expect(channels.count == 1)
+    }
+
+    @Test func `clearing a session mid-flight lets an active waiter retry instead of cancelling`() async throws {
+        let store = StalkerSessionStore()
+        let key = "race-\(UUID().uuidString)"
+        let endpoint = try #require(URL(string: "https://race.example.invalid/portal.php"))
+        let started = AsyncStream<Void>.makeStream()
+        let releaseFirst = AsyncStream<Void>.makeStream()
+        let attempts = OSAllocatedUnfairLock(initialState: 0)
+        let waiter = Task {
+            try await store.authorize(key) {
+                let attempt = attempts.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if attempt == 1 {
+                    started.continuation.yield()
+                    for await _ in releaseFirst.stream {
+                        break
+                    }
+                }
+                return StalkerSessionStore.Session(token: "TOKEN-\(attempt)", endpoint: endpoint)
+            }
+        }
+        for await _ in started.stream {
+            break
+        }
+        await store.clear(key)
+        releaseFirst.continuation.finish()
+        let session = try await waiter.value
+        #expect(session.token == "TOKEN-2")
     }
 }
