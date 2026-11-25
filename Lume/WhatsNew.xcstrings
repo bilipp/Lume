@@ -16629,6 +16629,186 @@
           }
         }
       }
+    },
+    "whatsNew.3_4.streamDetails.summary" : {
+      "comment" : "What’s New 3.4 highlight summary.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يعرض المشغّل الآن دقة الصورة وتنسيق HDR والصوت ومعدل البت لما تشاهده."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Player zeigt jetzt Bildgröße, HDR-Format, Ton und Bitrate dessen, was du gerade schaust."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The player now shows the picture size, HDR format, audio and bitrate of what you’re watching."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El reproductor ahora muestra el tamaño de imagen, el formato HDR, el audio y la tasa de bits de lo que estás viendo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le lecteur affiche désormais la taille de l’image, le format HDR, l’audio et le débit de ce que vous regardez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il player ora mostra la dimensione dell’immagine, il formato HDR, l’audio e il bitrate di ciò che stai guardando."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレーヤーに、視聴中の映像の解像度、HDR形式、音声、ビットレートが表示されるようになりました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이제 플레이어에 시청 중인 콘텐츠의 화면 크기, HDR 형식, 오디오, 비트레이트가 표시됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De speler toont nu de beeldgrootte, het HDR-formaat, de audio en de bitrate van wat je kijkt."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odtwarzacz pokazuje teraz rozdzielczość obrazu, format HDR, dźwięk i przepływność tego, co oglądasz."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O player agora mostra o tamanho da imagem, o formato HDR, o áudio e a taxa de bits do que você está assistindo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Плеер теперь показывает размер изображения, формат HDR, звук и битрейт того, что вы смотрите."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oynatıcı artık izlediğiniz içeriğin görüntü boyutunu, HDR biçimini, sesini ve bit hızını gösteriyor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放器现在会显示正在观看内容的画面尺寸、HDR 格式、音频和码率。"
+          }
+        }
+      }
+    },
+    "whatsNew.3_4.streamDetails.title" : {
+      "comment" : "What’s New 3.4 highlight title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تفاصيل البث في لمحة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream-Details auf einen Blick"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream Details at a Glance"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detalles de la emisión de un vistazo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Détails du flux en un coup d’œil"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dettagli dello stream a colpo d’occhio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ストリーム情報をひと目で"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스트림 정보를 한눈에"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streamdetails in één oogopslag"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szczegóły strumienia w skrócie"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detalhes da transmissão num relance"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сведения о потоке с первого взгляда"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yayın Ayrıntıları Bir Bakışta"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "流信息一目了然"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

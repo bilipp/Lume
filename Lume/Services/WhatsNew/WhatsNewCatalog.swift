@@ -34,6 +34,15 @@ nonisolated enum WhatsNewCatalog {
                         "whatsNew.3_4.backgroundSync.summary",
                         "Playlists now sync while you keep browsing. New titles show up as they arrive."
                     )
+                ),
+                WhatsNewItem(
+                    id: "3.4.stream-details",
+                    symbol: "info.circle",
+                    title: text("whatsNew.3_4.streamDetails.title", "Stream Details at a Glance"),
+                    summary: text(
+                        "whatsNew.3_4.streamDetails.summary",
+                        "The player now shows the picture size, HDR format, audio and bitrate of what you’re watching."
+                    )
                 )
             ]
         ),
