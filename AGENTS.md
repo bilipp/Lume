@@ -177,6 +177,10 @@ Three separate `ModelContainer`s:
 - Never call `layer.prepareToPlay()` on a running session — use `player.replace()` (`rebuildStream(on:)`) to avoid a UAF crash.
 - Frozen image + healthy audio on live TV = MPEG-TS 2³³ clock wrap; fixed by the `noteClockDrift()` watchdog.
 
+### Audio offset (lip sync)
+- One value, milliseconds, **positive plays audio later**: `Playlist.audioOffsetMilliseconds` (device-local like `streamFormatRaw`, never mirrored) rides on `PlayableMedia.audioOffsetMilliseconds`; the full-screen player's `PlayerAudioOffsetSession` (`FullScreenPlayerView+AudioOffset`) layers the viewer's nudge on top and can save it back to the playlist. `AudioOffsetPreset` owns the presets and every per-engine conversion.
+- KSPlayer takes it as `KSOptions.videoDelay` with the **opposite sign** (its clock sync shows the frame at `clock - videoDelay`); only the FFmpeg player (`KSMEPlayer`) honours it, so the in-player menu registers as adjustable from `.readyToPlay`. VLCKit takes `currentAudioPlaybackDelay` in microseconds, re-asserted after every `installMedia` + `play()` and on `.playing`, like deinterlace. AetherEngine adds it to its own engine-wide `player.aether.audioDelay` (clamped ±2 s) at load and through `LumeAetherSession.setAudioDelay` while playing, which re-anchors at the playhead (not free; a live source without DVR takes it at the next seam). AVPlayer and LumeEngine have no API: the menu stays hidden there.
+
 ### LumeEngine (4th engine)
 - Our own FFmpeg 9 engine, developed in the sibling repo [`bilipp/LumeEngine`](https://github.com/bilipp/LumeEngine) and referenced as a **local** SPM package at `../LumeEngine` — a clone without that sibling (and its FFmpeg xcframework built once) will not resolve. It has its own `AGENTS.md` and a `PLAN.md` that is authoritative for engine design.
 - App-side wiring only lives here (`Lume/Views/Player/LumeEngine*.swift`); demux/decode/render/sync bugs are engine-side. Decide which side a bug belongs to *before* editing.

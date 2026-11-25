@@ -117,6 +117,16 @@ public final class LumeAetherSession {
         engine.setRate(rate)
     }
 
+    /// Lip-sync offset in seconds, positive presenting audio later; clamped
+    /// by the engine to ±2 s. Not free the way `setRate` is: the audio already
+    /// decoded or fetched carries the old value, so the engine re-anchors at
+    /// the playhead (a seek on the software path, the session-preserving
+    /// reload on the loopback path). A live session without a DVR window
+    /// keeps the value and takes it at the next seam it makes on its own.
+    public func setAudioDelay(_ seconds: Double) {
+        engine.setAudioDelay(seconds)
+    }
+
     /// 0...1; remembered before a session exists and applied at load.
     public var volume: Float {
         get { engine.volume }

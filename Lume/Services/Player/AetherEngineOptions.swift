@@ -250,15 +250,6 @@ nonisolated enum AetherForwardBufferPreset {
     }
 }
 
-/// Audio delay presets, in milliseconds. Positive plays audio later.
-nonisolated enum AetherAudioDelayPreset {
-    static let values = [-500, -400, -300, -200, -150, -100, -50, 0, 50, 100, 150, 200, 300, 400, 500]
-
-    static func label(_ milliseconds: Int) -> String {
-        milliseconds > 0 ? "+\(milliseconds) ms" : "\(milliseconds) ms"
-    }
-}
-
 // MARK: - Snapshot
 
 /// A point-in-time read of every AetherEngine option, taken when a stream is
@@ -326,6 +317,10 @@ nonisolated struct AetherLoadContext {
     /// A Multiview tile or guide preview: secondary output, no display
     /// criteria.
     var isEmbedded: Bool
+    /// The provider's (and, in the full-screen player, the session's) audio
+    /// offset in milliseconds, added to the engine-wide delay setting. See
+    /// `AudioOffsetPreset.aetherSeconds`.
+    var audioOffsetMilliseconds: Int = 0
     /// Whether the user's Match Content toggle applies on this platform.
     var honorsMatchContentToggle: Bool = {
         #if os(tvOS)
@@ -401,7 +396,9 @@ nonisolated struct AetherLoadPlan: Equatable {
             audioBridgeMode: options.audioBridgeMode,
             dolbyVisionHandling: options.dynamicRange,
             upscalesLowResolutionVideo: options.upscaleLowResolution,
-            audioDelaySeconds: Double(options.audioDelay) / 1000,
+            audioDelaySeconds: AudioOffsetPreset.aetherSeconds(
+                engineMilliseconds: options.audioDelay, offsetMilliseconds: context.audioOffsetMilliseconds
+            ),
             prepareNativeSubtitles: options.prepareNativeSubtitles,
             maxConcurrentSourceRequests: context.isLive && context.isHLSSource ? 1 : nil,
             writesDisplayCriteria: writesCriteria,

@@ -90,8 +90,8 @@ import SwiftUI
                     ForEach(AetherAudioBridgeMode.allCases) { Text($0.label).tag($0.rawValue) }
                 }
                 Picker("Audio Delay", selection: $audioDelay) {
-                    ForEach(AetherAudioDelayPreset.values, id: \.self) {
-                        Text(AetherAudioDelayPreset.label($0)).tag($0)
+                    ForEach(AudioOffsetPreset.values, id: \.self) {
+                        Text(AudioOffsetPreset.label($0)).tag($0)
                     }
                 }
                 Picker("HDR", selection: $dynamicRange) {
@@ -229,8 +229,8 @@ import SwiftUI
                         title: "Audio Output",
                         valueLabel: (AetherAudioBridgeMode(rawValue: audioBridgeMode) ?? Keys.audioBridgeModeDefault).label
                     ) { audioBridgeMode = PlayerOptionCycle.next(audioBridgeMode, in: AetherAudioBridgeMode.self) }
-                    TVOptionCycleRow(title: "Audio Delay", valueLabel: AetherAudioDelayPreset.label(audioDelay)) {
-                        audioDelay = PlayerOptionCycle.next(audioDelay, in: AetherAudioDelayPreset.values)
+                    TVOptionCycleRow(title: "Audio Delay", valueLabel: AudioOffsetPreset.label(audioDelay)) {
+                        audioDelay = PlayerOptionCycle.next(audioDelay, in: AudioOffsetPreset.values)
                     }
                     TVOptionCycleRow(
                         title: "HDR",

@@ -68,6 +68,9 @@ struct VLCPlayerEngineView: View {
     var onRemoteAdvance: ((PlayerMediaSwapper.Step) -> Bool)?
 
     @StateObject private var coordinator = VLCPlayerCoordinator()
+    /// The host's audio offset for this session; VLCKit takes a change while
+    /// playing, so the view registers itself as adjustable on mount.
+    @Environment(\.playerAudioOffset) private var audioOffset
     @State private var isControlsVisible = true
     /// Presents the OpenSubtitles browser. Held here rather than in the controls
     /// overlay: the overlay is removed when the controls auto-hide, which would
@@ -197,6 +200,8 @@ struct VLCPlayerEngineView: View {
             #endif
             coordinator.startupTimeout = usesQuickStartupTimeout ? fallbackStartupTimeout : startupTimeout
             coordinator.configure(media: media)
+            audioOffset?.register(engine: .vlcKit, isAdjustable: true)
+            applyAudioOffset()
             NowPlayingService.shared.attachTransport(.toggling(coordinator, advance: onRemoteAdvance), owner: coordinator)
             scheduleHide()
         }
@@ -204,9 +209,13 @@ struct VLCPlayerEngineView: View {
             hideTask?.cancel()
             NowPlayingService.shared.detachTransport(owner: coordinator)
             coordinator.tearDown()
+            audioOffset?.unregister(engine: .vlcKit)
         }
         .onChange(of: coordinator.isPlaying) { _, _ in
             resetHideTimer()
+        }
+        .onChange(of: audioOffset?.effectiveMilliseconds) { _, _ in
+            applyAudioOffset()
         }
         .onChange(of: scenePhase) { _, phase in
             // The Home button backgrounds the app without calling onDisappear,
@@ -221,6 +230,7 @@ struct VLCPlayerEngineView: View {
             isPanelOpen = false
             loadFailed = false
             coordinator.reload(media: newMedia)
+            applyAudioOffset()
             resetHideTimer()
         }
         .onChange(of: isControlsVisible) { _, visible in
@@ -527,4 +537,13 @@ struct VLCPlayerEngineView: View {
         mediaSwapper: PlayerMediaSwapper()
     )
     .preferredColorScheme(.dark)
+}
+
+extension VLCPlayerEngineView {
+    /// The session's offset wins over the provider default the coordinator
+    /// seeded from the media.
+    func applyAudioOffset() {
+        guard let audioOffset else { return }
+        coordinator.audioOffsetMilliseconds = audioOffset.effectiveMilliseconds
+    }
 }
