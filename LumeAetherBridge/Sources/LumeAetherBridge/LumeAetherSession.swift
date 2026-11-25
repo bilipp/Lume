@@ -48,6 +48,7 @@ public final class LumeAetherSession {
     private var isMediaChangePending = false
 
     public init() throws {
+        LumeAetherBridge.hasCreatedSession = true
         engine = try AetherEngine()
         #if os(iOS) || os(tvOS)
             engine.ownsVideoNowPlayingSession = false
@@ -494,6 +495,7 @@ public final class LumeAetherSession {
         options.httpHeaders = request.httpHeaders
         options.maxConcurrentSourceRequests = request.maxConcurrentSourceRequests
         options.liveStartupGraceSeconds = request.liveStartupGraceSeconds
+        options.sessionCacheByteBudget = request.sessionCacheByteBudget
         options.upscalesFullHDVideo = request.upscalesFullHDVideo
         options.untaggedVideoColor = switch request.untaggedVideoColor {
         case "hdr10": .hdr10

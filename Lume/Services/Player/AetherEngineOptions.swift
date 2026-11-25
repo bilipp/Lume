@@ -419,10 +419,24 @@ nonisolated struct AetherLoadPlan: Equatable {
     /// the grace early once the next keyframe cannot arrive inside it, and
     /// ignores it for `.standard` joins and `nativeRemoteHLS`.
     var liveStartupGraceSeconds: Double?
+    /// What a movie or episode may keep in `tmp/` beyond the playback
+    /// window, so a backward seek is served from disk. The engine's own
+    /// default is 2 GiB per session, which iOS and tvOS count as the app's
+    /// data, and which stays behind when the system ends a suspended app
+    /// mid-film. nil (the engine's sizing) for a Forward Buffer past
+    /// `sessionCacheForwardBufferCeiling`: the engine stops prefetching at
+    /// this budget, so it would cut the buffer the viewer asked for. The
+    /// engine ignores it for live, which evicts behind its sliding window.
+    var sessionCacheByteBudget: Int?
     /// The engine owns `preferredDisplayCriteria`. Off, the TV stays in the
     /// output format chosen in tvOS Settings.
     var writesDisplayCriteria: Bool
     var sharedOutputRole: OutputRole
+
+    static let sessionCacheByteBudget = 512 << 20
+    /// The largest Forward Buffer preset the budget still holds: 40 segments
+    /// of 4K HEVC are about 400 MB.
+    static let sessionCacheForwardBufferCeiling = 40
 
     static func make(options: AetherEngineOptions, context: AetherLoadContext) -> AetherLoadPlan {
         // Aether's own Match Content toggle decides on tvOS (owner decision);
@@ -454,6 +468,8 @@ nonisolated struct AetherLoadPlan: Equatable {
             recognizesBitmapSubtitleText: options.bitmapSubtitleText && !context.isEmbedded,
             maxConcurrentSourceRequests: context.isLive && context.isHLSSource ? 1 : nil,
             liveStartupGraceSeconds: context.isLive && context.isHLSSource ? 1 : nil,
+            sessionCacheByteBudget: options.forwardBufferSegments > sessionCacheForwardBufferCeiling
+                ? nil : sessionCacheByteBudget,
             writesDisplayCriteria: writesCriteria,
             sharedOutputRole: context.isEmbedded ? .secondary : .primary
         )

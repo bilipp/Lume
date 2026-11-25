@@ -42,6 +42,11 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
     /// Extra seconds a fastZap live join may wait for a deeper first window;
     /// nil serves as soon as the minimum media exists (the engine default).
     public var liveStartupGraceSeconds: Double?
+    /// Bytes of already-played and prefetched VOD segments the engine may
+    /// keep in `tmp/` beyond its playback window; nil keeps the engine's
+    /// own sizing (2 GiB, or a quarter of the free space when that is
+    /// less). The engine ignores it for live.
+    public var sessionCacheByteBudget: Int?
     /// The engine writes the display criteria (the TV switches to the
     /// video's frame rate and dynamic range, where tvOS Match Content
     /// allows it). False leaves the TV in the output format chosen in
@@ -78,6 +83,7 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         recognizesBitmapSubtitleText: Bool,
         maxConcurrentSourceRequests: Int?,
         liveStartupGraceSeconds: Double?,
+        sessionCacheByteBudget: Int?,
         writesDisplayCriteria: Bool,
         isSecondaryOutput: Bool
     ) {
@@ -106,6 +112,7 @@ public nonisolated struct LumeAetherLoadRequest: Sendable, Equatable {
         self.recognizesBitmapSubtitleText = recognizesBitmapSubtitleText
         self.maxConcurrentSourceRequests = maxConcurrentSourceRequests
         self.liveStartupGraceSeconds = liveStartupGraceSeconds
+        self.sessionCacheByteBudget = sessionCacheByteBudget
         self.writesDisplayCriteria = writesDisplayCriteria
         self.isSecondaryOutput = isSecondaryOutput
     }

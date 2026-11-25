@@ -430,6 +430,12 @@ struct LumeApp: App {
                     // A Mac rarely reaches `.background`, so also trim at launch.
                     ImageDiskCache.shared.trimInBackground()
 
+                    // Segment caches a killed process left in `tmp/`, up to
+                    // 2 GiB each on builds before the budget in `AetherLoadPlan`.
+                    #if !os(visionOS)
+                        Task { await AetherAbandonedCaches.remove() }
+                    #endif
+
                     // Kick off iCloud sync: check account reachability, then run
                     // a first reconcile between the local catalog and the cloud
                     // mirrors. Runs after progress reconciliation so a fresh
