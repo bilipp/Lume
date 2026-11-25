@@ -154,6 +154,21 @@ struct AetherEngineSettingsTests {
         }
     }
 
+    @Test func `session cache is budgeted unless a large forward buffer was chosen`() {
+        withIsolatedDefaults { defaults in
+            let standard = AetherLoadPlan.make(options: .load(from: defaults), context: Self.fullScreen)
+            #expect(standard.sessionCacheByteBudget == 512 << 20)
+
+            defaults.set(40, forKey: Keys.forwardBufferSegmentsKey)
+            let held = AetherLoadPlan.make(options: .load(from: defaults), context: Self.fullScreen)
+            #expect(held.sessionCacheByteBudget == 512 << 20)
+
+            defaults.set(75, forKey: Keys.forwardBufferSegmentsKey)
+            let large = AetherLoadPlan.make(options: .load(from: defaults), context: Self.fullScreen)
+            #expect(large.sessionCacheByteBudget == nil)
+        }
+    }
+
     @Test func `live loads bound the probe on auto, explicit choices win`() {
         withIsolatedDefaults { defaults in
             var live = Self.fullScreen
