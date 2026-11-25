@@ -33,6 +33,9 @@ extension PlayerSettings {
         static let audioBridgeModeKey = "player.aether.audioBridgeMode"
         static let dynamicRangeKey = "player.aether.dynamicRange"
         static let upscaleLowResolutionKey = "player.aether.upscaleLowResolution"
+        static let upscaleFullHDKey = "player.aether.upscaleFullHD"
+        static let untaggedVideoColorKey = "player.aether.untaggedVideoColor"
+        static let bitmapSubtitleTextKey = "player.aether.bitmapSubtitleText"
         static let audioDelayKey = "player.aether.audioDelay"
         static let prepareNativeSubtitlesKey = "player.aether.prepareNativeSubtitles"
         static let matchContentKey = "player.aether.matchContent"
@@ -54,6 +57,11 @@ extension PlayerSettings {
         static let audioBridgeModeDefault = AetherAudioBridgeMode.surroundCompat
         static let dynamicRangeDefault = AetherDynamicRangeHandling.automatic
         static let upscaleLowResolutionDefault = false
+        /// Off, like the engine: it moves every 1080p title onto the
+        /// software path.
+        static let upscaleFullHDDefault = false
+        static let untaggedVideoColorDefault = AetherUntaggedVideoColor.standard
+        static let bitmapSubtitleTextDefault = false
         /// Audio presentation offset, in milliseconds; positive plays audio later.
         static let audioDelayDefault = 0
         static let prepareNativeSubtitlesDefault = false
@@ -67,6 +75,7 @@ extension PlayerSettings {
                 deinterlaceFieldRateKey, liveJoinProfileKey, forwardBufferSegmentsKey,
                 probeSizeKey, analyzeDurationKey, nativeRemoteHLSKey,
                 audioBridgeModeKey, dynamicRangeKey, upscaleLowResolutionKey,
+                upscaleFullHDKey, untaggedVideoColorKey, bitmapSubtitleTextKey,
                 audioDelayKey, prepareNativeSubtitlesKey, matchContentKey
             ]
         }
@@ -117,6 +126,23 @@ nonisolated enum AetherDeinterlaceMode: String, AetherChoice {
         switch self {
         case .auto: String(localized: "Automatic")
         case .software: String(localized: "Software")
+        }
+    }
+}
+
+/// `LoadOptions.untaggedVideoColor`: what a 10-bit stream that declares no
+/// primaries, transfer or matrix is shown as. The engine leaves 8-bit, tagged
+/// and Dolby Vision streams alone, so a choice here is safe for every title.
+nonisolated enum AetherUntaggedVideoColor: String, AetherChoice {
+    case standard
+    case hdr10
+    case hlg
+
+    var label: String {
+        switch self {
+        case .standard: String(localized: "Standard")
+        case .hdr10: "HDR10"
+        case .hlg: "HLG"
         }
     }
 }
@@ -277,9 +303,12 @@ nonisolated struct AetherEngineOptions: Equatable {
     var audioBridgeMode: AetherAudioBridgeMode
     var dynamicRange: AetherDynamicRangeHandling
     var upscaleLowResolution: Bool
+    var upscaleFullHD: Bool
+    var untaggedVideoColor: AetherUntaggedVideoColor
     /// Milliseconds.
     var audioDelay: Int
     var prepareNativeSubtitles: Bool
+    var bitmapSubtitleText: Bool
     /// The tvOS-only Match Content toggle: whether the engine writes the
     /// display criteria at all.
     var matchContent: Bool
@@ -299,8 +328,11 @@ nonisolated struct AetherEngineOptions: Equatable {
             audioBridgeMode: AetherAudioBridgeMode(rawValue: defaults.string(forKey: Keys.audioBridgeModeKey) ?? "") ?? Keys.audioBridgeModeDefault,
             dynamicRange: AetherDynamicRangeHandling(rawValue: defaults.string(forKey: Keys.dynamicRangeKey) ?? "") ?? Keys.dynamicRangeDefault,
             upscaleLowResolution: defaults.bool(Keys.upscaleLowResolutionKey, default: Keys.upscaleLowResolutionDefault),
+            upscaleFullHD: defaults.bool(Keys.upscaleFullHDKey, default: Keys.upscaleFullHDDefault),
+            untaggedVideoColor: AetherUntaggedVideoColor(rawValue: defaults.string(forKey: Keys.untaggedVideoColorKey) ?? "") ?? Keys.untaggedVideoColorDefault,
             audioDelay: defaults.integer(Keys.audioDelayKey, default: Keys.audioDelayDefault),
             prepareNativeSubtitles: defaults.bool(Keys.prepareNativeSubtitlesKey, default: Keys.prepareNativeSubtitlesDefault),
+            bitmapSubtitleText: defaults.bool(Keys.bitmapSubtitleTextKey, default: Keys.bitmapSubtitleTextDefault),
             matchContent: defaults.bool(Keys.matchContentKey, default: Keys.matchContentDefault)
         )
     }
@@ -361,8 +393,13 @@ nonisolated struct AetherLoadPlan: Equatable {
     var audioBridgeMode: AetherAudioBridgeMode
     var dolbyVisionHandling: AetherDynamicRangeHandling
     var upscalesLowResolutionVideo: Bool
+    var upscalesFullHDVideo: Bool
+    var untaggedVideoColor: AetherUntaggedVideoColor
     var audioDelaySeconds: Double
     var prepareNativeSubtitles: Bool
+    /// Never on a Multiview tile or guide preview: the text recognition
+    /// would run for cues nobody reads.
+    var recognizesBitmapSubtitleText: Bool
     /// 1 for live HLS, else nil (uncapped). The engine's live HLS ingest
     /// fetches four segments in parallel and hands the demuxer a segment
     /// only once it has arrived whole, so on a join the first segment
@@ -410,8 +447,11 @@ nonisolated struct AetherLoadPlan: Equatable {
             audioBridgeMode: options.audioBridgeMode,
             dolbyVisionHandling: options.dynamicRange,
             upscalesLowResolutionVideo: options.upscaleLowResolution,
+            upscalesFullHDVideo: options.upscaleFullHD,
+            untaggedVideoColor: options.untaggedVideoColor,
             audioDelaySeconds: Double(options.audioDelay) / 1000,
             prepareNativeSubtitles: options.prepareNativeSubtitles,
+            recognizesBitmapSubtitleText: options.bitmapSubtitleText && !context.isEmbedded,
             maxConcurrentSourceRequests: context.isLive && context.isHLSSource ? 1 : nil,
             liveStartupGraceSeconds: context.isLive && context.isHLSSource ? 1 : nil,
             writesDisplayCriteria: writesCriteria,

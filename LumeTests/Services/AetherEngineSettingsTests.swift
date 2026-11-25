@@ -15,7 +15,7 @@ struct AetherEngineSettingsTests {
     )
 
     @Test func `keys live under player aether and are unique`() {
-        #expect(Keys.allKeys.count == 15)
+        #expect(Keys.allKeys.count == 18)
         #expect(Set(Keys.allKeys).count == Keys.allKeys.count)
         #expect(Keys.allKeys.allSatisfy { $0.hasPrefix("player.aether.") })
         #expect(Keys.matchContentKey == "player.aether.matchContent")
@@ -37,8 +37,11 @@ struct AetherEngineSettingsTests {
             #expect(options.audioBridgeMode == .surroundCompat)
             #expect(options.dynamicRange == .automatic)
             #expect(!options.upscaleLowResolution)
+            #expect(!options.upscaleFullHD)
+            #expect(options.untaggedVideoColor == .standard)
             #expect(options.audioDelay == 0)
             #expect(!options.prepareNativeSubtitles)
+            #expect(!options.bitmapSubtitleText)
             #expect(options.matchContent)
         }
     }
@@ -87,6 +90,9 @@ struct AetherEngineSettingsTests {
             defaults.set(5, forKey: Keys.analyzeDurationKey)
             defaults.set(250, forKey: Keys.audioDelayKey)
             defaults.set(true, forKey: Keys.upscaleLowResolutionKey)
+            defaults.set(true, forKey: Keys.upscaleFullHDKey)
+            defaults.set("hdr10", forKey: Keys.untaggedVideoColorKey)
+            defaults.set(true, forKey: Keys.bitmapSubtitleTextKey)
             defaults.set(true, forKey: Keys.prepareNativeSubtitlesKey)
             defaults.set(true, forKey: Keys.nativeRemoteHLSKey)
             var context = Self.fullScreen
@@ -103,6 +109,9 @@ struct AetherEngineSettingsTests {
             #expect(plan.maxAnalyzeDuration == Int64(5_000_000))
             #expect(plan.audioDelaySeconds == 0.25)
             #expect(plan.upscalesLowResolutionVideo)
+            #expect(plan.upscalesFullHDVideo)
+            #expect(plan.untaggedVideoColor == .hdr10)
+            #expect(plan.recognizesBitmapSubtitleText)
             #expect(plan.prepareNativeSubtitles)
             #expect(plan.nativeRemoteHLS)
             #expect(plan.writesDisplayCriteria)
@@ -158,6 +167,24 @@ struct AetherEngineSettingsTests {
             let chosen = AetherLoadPlan.make(options: .load(from: defaults), context: live)
             #expect(chosen.probesize == Int64(20 * 1_048_576))
             #expect(chosen.maxAnalyzeDuration == Int64(10_000_000))
+        }
+    }
+
+    @Test func `an unknown untagged colour falls back to standard`() {
+        withIsolatedDefaults { defaults in
+            defaults.set("dolbyVision", forKey: Keys.untaggedVideoColorKey)
+            #expect(AetherEngineOptions.load(from: defaults).untaggedVideoColor == .standard)
+            defaults.set("hlg", forKey: Keys.untaggedVideoColorKey)
+            #expect(AetherEngineOptions.load(from: defaults).untaggedVideoColor == .hlg)
+        }
+    }
+
+    @Test func `embedded loads never read bitmap subtitles as text`() {
+        withIsolatedDefaults { defaults in
+            defaults.set(true, forKey: Keys.bitmapSubtitleTextKey)
+            var context = Self.fullScreen
+            context.isEmbedded = true
+            #expect(!AetherLoadPlan.make(options: .load(from: defaults), context: context).recognizesBitmapSubtitleText)
         }
     }
 

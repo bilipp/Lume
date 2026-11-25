@@ -14350,6 +14350,184 @@
         }
       }
     },
+    "Bitmap Subtitles as Text" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ترجمات الصور كنص"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild-Untertitel als Text"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitmap Subtitles as Text"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtítulos de imagen como texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sous-titres image en texte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sottotitoli immagine come testo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像字幕をテキストで表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 자막을 텍스트로 표시"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beeldondertitels als tekst"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Napisy graficzne jako tekst"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legendas de imagem como texto"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Графические субтитры как текст"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Görüntü Altyazıları Metin Olarak"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将图形字幕显示为文本"
+          }
+        }
+      }
+    },
+    "Bitmap subtitles as text reads picture subtitles (PGS, DVB, DVD) on the device and shows them in your subtitle style; a subtitle that can't be read reliably stays a picture. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "خيار ترجمات الصور كنص يقرأ ترجمات الصور (PGS وDVB وDVD) على الجهاز ويعرضها بنمط الترجمة الذي اخترته؛ والترجمة التي تتعذر قراءتها بدقة تبقى صورة. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild-Untertitel als Text liest Bild-Untertitel (PGS, DVB, DVD) auf dem Gerät und zeigt sie in deinem Untertitelstil; ein Untertitel, der sich nicht zuverlässig lesen lässt, bleibt ein Bild. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitmap subtitles as text reads picture subtitles (PGS, DVB, DVD) on the device and shows them in your subtitle style; a subtitle that can't be read reliably stays a picture. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtítulos de imagen como texto lee los subtítulos de imagen (PGS, DVB, DVD) en el dispositivo y los muestra con tu estilo de subtítulos; un subtítulo que no se puede leer con fiabilidad se queda como imagen. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sous-titres image en texte lit les sous-titres image (PGS, DVB, DVD) sur l’appareil et les affiche dans votre style de sous-titres ; un sous-titre qui ne peut pas être lu de façon fiable reste une image. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sottotitoli immagine come testo legge i sottotitoli immagine (PGS, DVB, DVD) sul dispositivo e li mostra con il tuo stile dei sottotitoli; un sottotitolo che non può essere letto in modo affidabile resta un’immagine. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「画像字幕をテキストで表示」は、画像字幕（PGS、DVB、DVD）をデバイス上で読み取り、設定した字幕スタイルで表示します。確実に読み取れない字幕は画像のまま表示されます。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 자막을 텍스트로 표시는 이미지 자막(PGS, DVB, DVD)을 기기에서 읽어 사용자의 자막 스타일로 표시합니다. 정확하게 읽을 수 없는 자막은 이미지로 유지됩니다. "
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘Beeldondertitels als tekst’ leest beeldondertitels (PGS, DVB, DVD) op het apparaat en toont ze in je ondertitelstijl; een ondertitel die niet betrouwbaar te lezen is, blijft een afbeelding. "
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Napisy graficzne jako tekst odczytuje napisy graficzne (PGS, DVB, DVD) na urządzeniu i pokazuje je w Twoim stylu napisów; napis, którego nie da się wiarygodnie odczytać, pozostaje obrazem. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legendas de imagem como texto lê as legendas de imagem (PGS, DVB, DVD) no dispositivo e as mostra no seu estilo de legendas; uma legenda que não pode ser lida com segurança continua como imagem. "
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Графические субтитры как текст» распознаёт графические субтитры (PGS, DVB, DVD) на устройстве и показывает их в вашем стиле субтитров; субтитр, который не удаётся надёжно распознать, остаётся изображением. "
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Görüntü Altyazıları Metin Olarak, görüntü altyazılarını (PGS, DVB, DVD) aygıtta okur ve altyazı stilinizle gösterir; güvenilir biçimde okunamayan altyazı görüntü olarak kalır. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“将图形字幕显示为文本”会在设备上识别图形字幕（PGS、DVB、DVD），并以你的字幕样式显示；无法可靠识别的字幕仍以图像显示。 "
+          }
+        }
+      }
+    },
     "Black" : {
       "localizations" : {
         "ar" : {
@@ -129536,6 +129714,184 @@
         }
       }
     },
+    "Untagged 10-bit Video" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فيديو 10 بت بلا بيانات ألوان"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10-Bit-Video ohne Farbangaben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untagged 10-bit Video"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vídeo de 10 bits sin etiquetar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo 10 bits sans balises"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video a 10 bit senza tag"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグなしの10ビットビデオ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 없는 10비트 비디오"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10-bits video zonder kleurinformatie"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wideo 10-bitowe bez znaczników"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vídeo de 10 bits sem etiquetas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10-битное видео без меток"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Etiketsiz 10 Bit Video"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无标记的 10 位视频"
+          }
+        }
+      }
+    },
+    "Untagged 10-bit video carries no color information; choose HDR10 or HLG when HDR video looks pale. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فيديو 10 بت بلا بيانات ألوان لا يحمل أي معلومات عن الألوان؛ اختر HDR10 أو HLG عندما يبدو فيديو HDR باهتًا. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10-Bit-Video ohne Farbangaben enthält keine Farbinformationen; wähle HDR10 oder HLG, wenn HDR-Video blass aussieht. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untagged 10-bit video carries no color information; choose HDR10 or HLG when HDR video looks pale. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El vídeo de 10 bits sin etiquetar no incluye información de color; elige HDR10 o HLG si el vídeo HDR se ve apagado. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une vidéo 10 bits sans balises ne contient aucune information de couleur ; choisissez HDR10 ou HLG si une vidéo HDR paraît délavée. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I video a 10 bit senza tag non contengono informazioni sul colore; scegli HDR10 o HLG se un video HDR appare sbiadito. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグなしの10ビットビデオには色情報が含まれていません。HDRビデオの色が薄く見える場合は、HDR10またはHLGを選択してください。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "태그 없는 10비트 비디오에는 색상 정보가 없습니다. HDR 비디오가 흐릿해 보이면 HDR10 또는 HLG를 선택하십시오. "
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10-bits video zonder kleurinformatie bevat geen gegevens over kleur; kies HDR10 of HLG als HDR-video flets oogt. "
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wideo 10-bitowe bez znaczników nie zawiera informacji o kolorze; wybierz HDR10 lub HLG, gdy wideo HDR wygląda blado. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vídeo de 10 bits sem etiquetas não traz informações de cor; escolha HDR10 ou HLG quando o vídeo HDR parecer desbotado. "
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10-битное видео без меток не содержит сведений о цвете; выберите HDR10 или HLG, если HDR-видео выглядит блёклым. "
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Etiketsiz 10 bit video renk bilgisi taşımaz; HDR video soluk görünüyorsa HDR10 veya HLG’yi seçin. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无标记的 10 位视频不含任何色彩信息；HDR 视频看起来发灰时，请选择 HDR10 或 HLG。 "
+          }
+        }
+      }
+    },
     "Up & Down" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -130547,6 +130903,95 @@
         }
       }
     },
+    "Upscale 1080p Video" : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تكبير دقة فيديو 1080p"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p-Videos hochskalieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upscale 1080p Video"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escalar vídeo 1080p"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre à l’échelle les vidéos 1080p"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upscaling dei video 1080p"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080pビデオをアップスケール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p 비디오 업스케일"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schaal 1080p-video op"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skaluj w górę wideo 1080p"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aumentar a escala de vídeo 1080p"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повышать разрешение видео 1080p"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p Videoyu Ölçekle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大 1080p 视频"
+          }
+        }
+      }
+    },
     "Upscale Low-Resolution Video" : {
       "comment" : "AetherEngine options in Settings.",
       "localizations" : {
@@ -130632,6 +131077,95 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "放大低分辨率视频"
+          }
+        }
+      }
+    },
+    "Upscaling 1080p video gives a sharper picture on a 4K display but uses more power. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تكبير دقة فيديو 1080p يعطي صورة أوضح على شاشة 4K لكنه يستهلك طاقة أكثر. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Hochskalieren von 1080p-Videos liefert auf einem 4K-Display ein schärferes Bild, braucht aber mehr Energie. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upscaling 1080p video gives a sharper picture on a 4K display but uses more power. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escalar vídeo 1080p da una imagen más nítida en una pantalla 4K, pero consume más energía. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mise à l’échelle des vidéos 1080p donne une image plus nette sur un écran 4K, mais consomme plus d’énergie. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’upscaling dei video 1080p offre un’immagine più nitida su uno schermo 4K, ma consuma più energia. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080pビデオをアップスケールすると4Kディスプレイで映像がより鮮明になりますが、消費電力が増えます。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p 비디오를 업스케일하면 4K 디스플레이에서 화면이 더 선명해지지만 전력을 더 많이 사용합니다. "
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het opschalen van 1080p-video geeft een scherper beeld op een 4K-scherm, maar verbruikt meer energie. "
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skalowanie w górę wideo 1080p daje ostrzejszy obraz na ekranie 4K, ale zużywa więcej energii. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aumentar a escala de vídeo 1080p dá uma imagem mais nítida em uma tela 4K, mas consome mais energia. "
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повышение разрешения видео 1080p делает изображение на 4K-экране чётче, но расходует больше энергии. "
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p videoyu ölçeklemek 4K ekranda daha net bir görüntü verir, ancak daha fazla güç kullanır. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大 1080p 视频可在 4K 显示屏上获得更清晰的画面，但会消耗更多电量。 "
           }
         }
       }
@@ -135077,6 +135611,95 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "胜 %lld"
+          }
+        }
+      }
+    },
+    "With 1080p upscaling, Dolby Atmos plays as regular surround. " : {
+      "comment" : "AetherEngine options in Settings.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مع تكبير دقة 1080p يُشغَّل Dolby Atmos كصوت محيطي عادي. "
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beim Hochskalieren von 1080p wird Dolby Atmos als normaler Surround-Ton wiedergegeben. "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With 1080p upscaling, Dolby Atmos plays as regular surround. "
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con el escalado de 1080p, Dolby Atmos se reproduce como sonido envolvente normal. "
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec la mise à l’échelle 1080p, le Dolby Atmos est lu comme un son surround classique. "
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con l’upscaling a 1080p, Dolby Atmos viene riprodotto come normale audio surround. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080pのアップスケール中は、Dolby Atmosは通常のサラウンドとして再生されます。 "
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p 업스케일을 사용하면 Dolby Atmos가 일반 서라운드로 재생됩니다. "
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bij het opschalen van 1080p wordt Dolby Atmos als gewone surround afgespeeld. "
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przy skalowaniu wideo 1080p dźwięk Dolby Atmos jest odtwarzany jako zwykły dźwięk przestrzenny. "
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com o aumento de escala de 1080p, o Dolby Atmos é reproduzido como surround comum. "
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "При повышении разрешения 1080p звук Dolby Atmos воспроизводится как обычный объёмный. "
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p ölçeklemede Dolby Atmos normal surround olarak çalınır. "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大 1080p 视频时，杜比全景声将以普通环绕声播放。 "
           }
         }
       }

@@ -397,7 +397,9 @@ public final class LumeAetherSession {
                         id: cue.id,
                         image: bitmap.cgImage,
                         position: bitmap.position,
-                        canvasSize: bitmap.canvasSize
+                        canvasSize: bitmap.canvasSize,
+                        recognizedText: bitmap.recognizedText?.text,
+                        recognizedTextConfidence: bitmap.recognizedText?.lines.map(\.confidence).min()
                     ))
                 } else if let text = cue.text, !text.isEmpty {
                     lines.append(text)
@@ -492,6 +494,13 @@ public final class LumeAetherSession {
         options.httpHeaders = request.httpHeaders
         options.maxConcurrentSourceRequests = request.maxConcurrentSourceRequests
         options.liveStartupGraceSeconds = request.liveStartupGraceSeconds
+        options.upscalesFullHDVideo = request.upscalesFullHDVideo
+        options.untaggedVideoColor = switch request.untaggedVideoColor {
+        case "hdr10": .hdr10
+        case "hlg": .hlg
+        default: .standard
+        }
+        options.recognizesBitmapSubtitleText = request.recognizesBitmapSubtitleText
         // `matchContentEnabled` stays the engine default: it mirrors the
         // system's own Match Content flag, which the engine reads live. What
         // decides whether the TV switches is who owns the criteria.
