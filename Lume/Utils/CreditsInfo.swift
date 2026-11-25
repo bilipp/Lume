@@ -56,12 +56,12 @@ nonisolated enum CreditsInfo {
                 Library(
                     name: "AetherEngine",
                     license: "LGPL v3 + App Store exception",
-                    urlString: "https://github.com/superuser404notfound/AetherEngine/tree/7.71.2"
+                    urlString: "https://github.com/superuser404notfound/AetherEngine/tree/7.75.0"
                 ),
                 Library(
                     name: "FFmpeg (FFmpegBuild)",
                     license: "LGPL v2.1",
-                    urlString: "https://github.com/superuser404notfound/FFmpegBuild/tree/3.16.1"
+                    urlString: "https://github.com/superuser404notfound/FFmpegBuild/tree/3.19.1"
                 ),
                 Library(name: "dav1d", license: "BSD 2-Clause", urlString: "https://code.videolan.org/videolan/dav1d"),
                 Library(name: "zimg", license: "WTFPL", urlString: "https://github.com/sekrit-twc/zimg"),

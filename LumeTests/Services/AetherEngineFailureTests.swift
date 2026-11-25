@@ -33,8 +33,13 @@ struct AetherEngineFailureTests {
         #expect(AetherEngineFailure.classify(kind: "sourceFabricatesRanges", code: nil) == .unsupported)
     }
 
+    @Test func `a full segment cache volume hands over to another engine`() {
+        #expect(AetherEngineFailure.classify(kind: "storageExhausted", code: -28) == .unsupported)
+        #expect(AetherEngineFailure.classify(kind: "storageExhausted", code: nil) == .unsupported)
+    }
+
     @Test func `source loss and unknown kinds reconnect on the normal schedule`() {
-        for kind in ["liveSourceUnavailable", "sourceOpenFailed", "vodSourceFailed", "storageExhausted", "customSourceProbeFailed", "reloadFailed", "audioTrackSwitchFailed", "", "someFutureKind"] {
+        for kind in ["liveSourceUnavailable", "sourceOpenFailed", "vodSourceFailed", "customSourceProbeFailed", "reloadFailed", "audioTrackSwitchFailed", "", "someFutureKind"] {
             #expect(AetherEngineFailure.classify(kind: kind, code: 500) == .interrupted)
         }
     }
