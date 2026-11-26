@@ -6,12 +6,42 @@
 //  shows (plus the app-wide Sports tab), Categories & Channels (Content
 //  Management, PIN-gated), and whether Search spans every playlist.
 //
-//  iOS / macOS: `LibrarySettingsView`, pushed from the root row. tvOS: the
+//  iOS / macOS: `LibrarySettingsView`, pushed from the root row, with the
+//  tabs on their own screen (`TabLayoutSettingsView`). tvOS: the
 //  Library pane, whose Categories & Channels row drills in place.
 //
 
 import SwiftData
 import SwiftUI
+
+extension MainTab {
+    /// Whether this tab is on in Settings › Library › Tabs, and how to flip
+    /// it; nil when it can't be switched (Combined View content tabs, Home
+    /// while forced).
+    func settingsSwitch(
+        scope: CatalogScope,
+        activePlaylist: Playlist?,
+        homeForced: Bool,
+        enabled: (home: Binding<Bool>, sports: Binding<Bool>),
+        store: (context: ModelContext, cloudSync: CloudSyncCoordinator?)
+    ) -> (isOn: Bool, toggle: (() -> Void)?) {
+        switch playlistTab {
+        case nil where self == .home:
+            let home = enabled.home
+            return (home.wrappedValue || homeForced, homeForced ? nil : { home.wrappedValue.toggle() })
+        case nil:
+            let sports = enabled.sports
+            return (sports.wrappedValue, { sports.wrappedValue.toggle() })
+        case let playlistTab?:
+            if scope.isCombined {
+                return (scope.visibleTabs(isolatedHidden: []).contains(playlistTab), nil)
+            }
+            guard let activePlaylist else { return (false, nil) }
+            let binding = activePlaylist.tabVisibility(playlistTab, context: store.context, cloudSync: store.cloudSync)
+            return (binding.wrappedValue, { binding.wrappedValue.toggle() })
+        }
+    }
+}
 
 extension Playlist {
     /// Whether `tab` shows for this playlist, as a switch. Saved straight away
@@ -114,22 +144,11 @@ extension PlaylistTab {
     }
 }
 
-private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?) -> LocalizedStringKey? {
-    if scope.isCombined {
-        return "In Combined View, Movies, Series and Live TV follow each playlist's content types. Sports applies to every playlist."
-    }
-    guard let activePlaylist else { return nil }
-    return "Movies, Series and Live TV apply to \(activePlaylist.name), your active playlist. Sports applies to every playlist."
-}
-
 #if !os(tvOS)
 
     struct LibrarySettingsView: View {
-        @Environment(\.modelContext) private var modelContext
-        @Environment(CloudSyncCoordinator.self) private var cloudSync: CloudSyncCoordinator?
         @Query private var playlists: [Playlist]
         @Environment(\.catalogScope) private var catalogScope
-        @AppStorage(SportsSyncService.tabEnabledKey) private var sportsTabEnabled = SportsSyncService.tabEnabledDefault
         @AppStorage(SearchSettings.searchAllPlaylistsKey)
         private var searchAllPlaylists = SearchSettings.searchAllPlaylistsDefault
         @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
@@ -142,25 +161,10 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
             let activePlaylist = playlists.primaryMember(of: scope)
             List {
                 Section {
-                    if scope.isCombined {
-                        let combinedTabs = scope.visibleTabs(isolatedHidden: [])
-                        ForEach(PlaylistTab.allCases) { tab in
-                            Toggle(tab.title, isOn: .constant(combinedTabs.contains(tab)))
-                                .disabled(true)
-                        }
-                    } else if let activePlaylist {
-                        ForEach(PlaylistTab.allCases) { tab in
-                            Toggle(tab.title, isOn: activePlaylist.tabVisibility(
-                                tab, context: modelContext, cloudSync: cloudSync
-                            ))
-                        }
-                    }
-                    Toggle("Sports", isOn: $sportsTabEnabled)
-                } header: {
-                    Text("Tabs")
-                } footer: {
-                    if let footer = libraryTabsFooter(scope, activePlaylist: activePlaylist) {
-                        Text(footer)
+                    NavigationLink {
+                        TabLayoutSettingsView(activePlaylist: activePlaylist)
+                    } label: {
+                        Text("Tabs")
                     }
                 }
 
@@ -210,30 +214,35 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
             // Content Management is per playlist; in Combined it manages the
             // priority-1 member.
             let activePlaylist = playlists.primaryMember(of: scope)
+            let content = scope.visibleTabs(isolatedHidden: activePlaylist?.hiddenTabs ?? [])
+            let homeForced = TabLayoutSettings.homeIsForced(content: content)
+            let rows = TabLayoutSettings.listedTabs(
+                orderRaw: tabOrderRaw, showsContent: scope.isCombined || activePlaylist != nil
+            )
             return VStack(alignment: .leading, spacing: 36) {
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Tabs")
-                    if scope.isCombined {
-                        let combinedTabs = scope.visibleTabs(isolatedHidden: [])
-                        ForEach(PlaylistTab.allCases) { tab in
-                            TVOptionToggleRow(title: tab.title, isOn: .constant(combinedTabs.contains(tab)))
-                                .disabled(true)
-                        }
-                    } else if let activePlaylist {
-                        ForEach(PlaylistTab.allCases) { tab in
-                            TVOptionToggleRow(title: tab.title, isOn: activePlaylist.tabVisibility(
-                                tab, context: modelContext, cloudSync: cloudSync
-                            ))
+                    VStack(spacing: 2) {
+                        ForEach(Array(rows.enumerated()), id: \.element) { index, tab in
+                            tvTabRow(
+                                tab, rows: rows, index: index,
+                                state: tab.settingsSwitch(
+                                    scope: scope, activePlaylist: activePlaylist, homeForced: homeForced,
+                                    enabled: ($homeTabEnabled, $sportsTabEnabled),
+                                    store: (modelContext, cloudSync)
+                                )
+                            )
                         }
                     }
-                    TVOptionToggleRow(title: "Sports", isOn: $sportsTabEnabled)
-                    if let footer = libraryTabsFooter(scope, activePlaylist: activePlaylist) {
-                        Text(footer)
-                            .font(.system(size: 20))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                            .padding(.top, 6)
+                    TVOptionResetRow(title: "Reset") {
+                        TabLayoutSettings.reset(orderRaw: &tabOrderRaw, homeEnabled: &homeTabEnabled)
                     }
+                    .disabled(TabLayoutSettings.isDefault(orderRaw: tabOrderRaw, homeEnabled: homeTabEnabled))
+                    tvTabsFooter(scope: scope, activePlaylist: activePlaylist, homeForced: homeForced)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -279,6 +288,62 @@ private func libraryTabsFooter(_ scope: CatalogScope, activePlaylist: Playlist?)
                         .padding(.top, 6)
                 }
             }
+        }
+
+        /// One tab row: an on/off control, the tab name, and up / down controls
+        /// that reorder the tabs. Mirrors `tvHomeSectionRow`.
+        private func tvTabRow(
+            _ tab: MainTab,
+            rows: [MainTab],
+            index: Int,
+            state: (isOn: Bool, toggle: (() -> Void)?)
+        ) -> some View {
+            let name = tab.spokenName
+            return TVSettingsReorderRow(
+                name: name,
+                index: index,
+                count: rows.count,
+                onMove: { moveTab(in: rows, at: index, by: $0) },
+                leading: {
+                    Button {
+                        state.toggle?()
+                    } label: {
+                        Image(systemName: state.isOn ? "checkmark.circle.fill" : "circle")
+                    }
+                    .buttonStyle(TVContentIconButtonStyle())
+                    .disabled(state.toggle == nil)
+                    .accessibilityLabel(state.isOn ? "Hide \(name)" : "Show \(name)")
+                    .accessibilityValue(state.isOn ? Text("On") : Text("Off"))
+
+                    Label(tab.title, systemImage: tab.systemImage)
+                        .font(.system(size: TVSettingsMetrics.rowFontSize))
+                        .foregroundStyle(state.isOn ? .primary : .secondary)
+                }
+            )
+        }
+
+        private func tvTabsFooter(scope: CatalogScope, activePlaylist: Playlist?, homeForced: Bool) -> some View {
+            VStack(alignment: .leading, spacing: 6) {
+                if scope.isCombined {
+                    // swiftlint:disable:next line_length
+                    Text("Turn tabs on or off and select the arrows on a row to move it. In Combined View, Movies, Series and Live TV follow each playlist's content types. Home, Sports and the order apply to every playlist.")
+                } else if let activePlaylist {
+                    // swiftlint:disable:next line_length
+                    Text("Turn tabs on or off and select the arrows on a row to move it. Movies, Series and Live TV apply to \(activePlaylist.name), your active playlist. Home, Sports and the order apply to every playlist.")
+                }
+                ForEach(
+                    TabLayoutSettings.footerNotes(
+                        homeForced: homeForced, homeEnabled: homeTabEnabled, sportsEnabled: sportsTabEnabled
+                    ),
+                    id: \.self
+                ) { Text($0) }
+            }
+        }
+
+        private func moveTab(in rows: [MainTab], at index: Int, by offset: Int) {
+            var moved = rows
+            guard moved.move(at: index, by: offset) else { return }
+            tabOrderRaw = TabLayoutSettings.reordered(orderRaw: tabOrderRaw, listed: rows, moved: moved)
         }
     }
 

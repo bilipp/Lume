@@ -16809,6 +16809,186 @@
           }
         }
       }
+    },
+    "whatsNew.3_5.tabOrder.summary" : {
+      "comment" : "What’s New 3.5 highlight summary.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رتّب العلامات كما تحب وأخفِ ما لا تستخدمه، بما في ذلك الرئيسية. تجد ذلك في الإعدادات › المكتبة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordne die Tabs nach Belieben an und blende aus, was du nicht nutzt, auch Start. Zu finden unter Einstellungen › Mediathek."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Put the tabs in the order you like and hide the ones you don’t use, Home included. Find it in Settings › Library."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordena las pestañas como quieras y oculta las que no uses, Inicio incluida. Está en Ajustes › Biblioteca."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rangez les onglets dans l’ordre de votre choix et masquez ceux que vous n’utilisez pas, Accueil compris. Rendez-vous dans Réglages › Bibliothèque."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metti le schede nell’ordine che preferisci e nascondi quelle che non usi, Home compresa. Trovi tutto in Impostazioni › Libreria."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タブを好きな順に並べ替え、使わないタブはホームも含めて非表示にできます。設定 › ライブラリから設定できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "탭을 원하는 순서로 배치하고 쓰지 않는 탭은 홈까지 숨길 수 있습니다. 설정 › 라이브러리에서 찾아보세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet de tabbladen in de volgorde die je wilt en verberg wat je niet gebruikt, ook Home. Je vindt het in Instellingen › Bibliotheek."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ułóż karty w dowolnej kolejności i ukryj te, z których nie korzystasz, także Ekran główny. Znajdziesz to w Ustawienia › Biblioteka."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coloque os separadores pela ordem que preferir e oculte os que não usa, incluindo o Início. Encontra-o em Ajustes › Biblioteca."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расставьте вкладки в удобном порядке и скройте ненужные, включая Главную. Это в разделе Настройки › Медиатека."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekmeleri istediğiniz sıraya koyun, kullanmadıklarınızı Ana Sayfa dahil gizleyin. Ayarlar › Arşiv bölümünde bulabilirsiniz."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按你喜欢的顺序排列标签页，并隐藏不用的标签页，包括主页。前往“设置 › 媒体库”即可设置。"
+          }
+        }
+      }
+    },
+    "whatsNew.3_5.tabOrder.title" : {
+      "comment" : "What’s New 3.5 highlight title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رتّب علاماتك"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tabs nach deinem Geschmack"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrange Your Tabs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organiza tus pestañas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organisez vos onglets"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organizza le tue schede"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タブを並べ替え"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "탭을 원하는 대로 정리"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orden je tabbladen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ułóż swoje karty"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organize os seus separadores"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расставьте вкладки по-своему"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekmelerinizi Düzenleyin"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按你的方式排列标签页"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

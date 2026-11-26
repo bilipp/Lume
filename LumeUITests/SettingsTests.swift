@@ -92,25 +92,58 @@ final class SettingsTests: XCTestCase {
 
     func testHidingLiveTVInLibraryRemovesTheTab() {
         XCTAssertTrue(app.tabBars.buttons["Live TV"].waitForExistence(timeout: 60))
-        openSettings()
-        let libraryRow = app.buttons["Library"].firstMatch
-        XCTAssertTrue(libraryRow.waitForExistence(timeout: 10))
-        libraryRow.tap()
+        openTabSettings()
 
         let liveTVSwitch = app.switches["Live TV"].firstMatch
         XCTAssertTrue(liveTVSwitch.waitForExistence(timeout: 10))
-        // The switch's own knob sits at the trailing edge of the row.
-        liveTVSwitch.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        toggle(liveTVSwitch)
         XCTAssertEqual(liveTVSwitch.value as? String, "0")
 
-        // iOS Settings is a sheet with no Done button; drag it closed.
-        let nav = app.navigationBars["Library"]
-        nav.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.0)))
-        XCTAssertTrue(nav.waitForNonExistence(timeout: 10), "Settings sheet did not dismiss")
+        dismissTabSettings()
 
         XCTAssertTrue(app.tabBars.buttons["Movies"].exists)
         XCTAssertFalse(app.tabBars.buttons["Live TV"].exists)
+    }
+
+    func testHidingHomeRemovesTheTab() {
+        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 60))
+        openTabSettings()
+
+        let homeSwitch = app.switches["Home"].firstMatch
+        XCTAssertTrue(homeSwitch.waitForExistence(timeout: 10))
+        toggle(homeSwitch)
+
+        // Settings was opened from Home's toolbar; the tab bar waits for the
+        // sheet to close before it drops Home.
+        XCTAssertTrue(app.navigationBars["Tabs"].exists, "Hiding Home dismissed Settings")
+        XCTAssertTrue(app.tabBars.buttons["Home"].exists)
+        dismissTabSettings()
+
+        let moviesTab = app.tabBars.buttons["Movies"]
+        XCTAssertTrue(app.tabBars.buttons["Home"].waitForNonExistence(timeout: 5), "Home stayed in the tab bar")
+        XCTAssertTrue(waitForSelection(of: moviesTab), "Movies was not selected once Home was hidden")
+    }
+
+    /// With no Movies, Series or Live TV tab left, Home is the way back to
+    /// Settings, so its switch stays on and can't be turned off.
+    func testHomeStaysWhenNoContentTabIsShown() {
+        XCTAssertTrue(app.tabBars.buttons["Live TV"].waitForExistence(timeout: 60))
+        openTabSettings()
+
+        let homeSwitch = app.switches["Home"].firstMatch
+        XCTAssertTrue(homeSwitch.waitForExistence(timeout: 10))
+        XCTAssertTrue(homeSwitch.isEnabled)
+
+        for title in ["Movies", "Series", "Live TV"] {
+            let contentSwitch = app.switches[title].firstMatch
+            XCTAssertTrue(contentSwitch.waitForExistence(timeout: 10), "\(title) switch is missing")
+            toggle(contentSwitch)
+            XCTAssertEqual(contentSwitch.value as? String, "0", "\(title) did not turn off")
+        }
+
+        let disabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == false"), object: homeSwitch)
+        XCTAssertEqual(XCTWaiter.wait(for: [disabled], timeout: 5), .completed, "Home switch is still enabled")
+        XCTAssertEqual(homeSwitch.value as? String, "1")
     }
 
     func testPlaylistDetailNavigation() {
@@ -121,5 +154,41 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Test Playlist"].waitForExistence(timeout: 10))
         let nameLabel = app.staticTexts["Name"]
         XCTAssertTrue(nameLabel.waitForExistence(timeout: 10))
+    }
+
+    /// Settings › Library › Tabs.
+    private func openTabSettings() {
+        openSettings()
+        let libraryRow = app.buttons["Library"].firstMatch
+        XCTAssertTrue(libraryRow.waitForExistence(timeout: 10))
+        libraryRow.tap()
+        let tabsRow = app.collectionViews.buttons["Tabs"].firstMatch
+        XCTAssertTrue(tabsRow.waitForExistence(timeout: 10), "Library › Tabs row is missing")
+        tabsRow.tap()
+        XCTAssertTrue(app.navigationBars["Tabs"].waitForExistence(timeout: 10), "Library › Tabs did not open")
+    }
+
+    /// Taps the switch control itself. The row's switch element spans the
+    /// whole cell, whose trailing edge is the tab's drag handle.
+    private func toggle(_ element: XCUIElement) {
+        let control = element.switches.firstMatch
+        if control.exists {
+            control.tap()
+        } else {
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        }
+    }
+
+    /// iOS Settings is a sheet with no Done button; drag it closed.
+    private func dismissTabSettings() {
+        let nav = app.navigationBars["Tabs"]
+        nav.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.0)))
+        XCTAssertTrue(nav.waitForNonExistence(timeout: 10), "Settings sheet did not dismiss")
+    }
+
+    private func waitForSelection(of tab: XCUIElement, timeout: TimeInterval = 5) -> Bool {
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: tab)
+        return XCTWaiter.wait(for: [selected], timeout: timeout) == .completed
     }
 }

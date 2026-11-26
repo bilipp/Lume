@@ -47294,6 +47294,94 @@
         }
       }
     },
+    "Home stays on while no Movies, Series or Live TV tab is shown." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تبقى الرئيسية مفعّلة ما دامت لا تظهر أي علامة تبويب للأفلام أو المسلسلات أو البث المباشر."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start bleibt eingeschaltet, solange kein Tab für Filme, Serien oder Live-TV angezeigt wird."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home stays on while no Movies, Series or Live TV tab is shown."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicio permanece activado mientras no se muestre ninguna pestaña de Películas, Series o TV en directo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accueil reste activé tant qu’aucun onglet Films, Séries ou TV en direct n’est affiché."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home resta attiva finché non è visibile nessuna scheda Film, Serie o TV in diretta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "映画、シリーズ、ライブTVのタブがひとつも表示されていない間は、ホームはオンのままです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영화, 시리즈, 라이브 TV 탭이 하나도 표시되지 않는 동안에는 홈이 켜진 상태로 유지됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home blijft aan zolang er geen tabblad Films, Series of Live tv wordt getoond."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ekran główny pozostaje włączony, dopóki nie jest widoczna żadna karta Filmy, Seriale ani TV na żywo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Início continua ativado enquanto nenhuma aba de Filmes, Séries ou TV ao vivo for exibida."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Главная» остается включенной, пока не показана ни одна из вкладок «Фильмы», «Сериалы» или «ТВ»."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmler, Diziler veya Canlı TV sekmelerinden hiçbiri gösterilmediği sürece Ana Sayfa açık kalır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在未显示任何电影、剧集或直播电视标签页时，主页会保持开启。"
+          }
+        }
+      }
+    },
     "How far skip back and skip forward jump." : {
       "comment" : "Footer under the Skip Interval player setting.",
       "localizations" : {
@@ -49217,94 +49305,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在合并视图中，隐藏和重新排序的类别仍属于各自的播放列表。请选择要管理的播放列表。"
-          }
-        }
-      }
-    },
-    "In Combined View, Movies, Series and Live TV follow each playlist's content types. Sports applies to every playlist." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "في العرض المدمج، تتبع الأفلام والمسلسلات والبث المباشر أنواع المحتوى المختارة لكل قائمة تشغيل. أما الرياضة فتنطبق على كل قوائم التشغيل."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In der kombinierten Ansicht richten sich Filme, Serien und Live-TV nach den Inhaltsarten jeder Playlist. Sport gilt für alle Playlists."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In Combined View, Movies, Series and Live TV follow each playlist's content types. Sports applies to every playlist."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En la vista combinada, Películas, Serie y TV en directo siguen los tipos de contenido de cada lista. Deportes se aplica a todas las listas."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dans la vue combinée, Films, Séries et TV en direct suivent les types de contenu de chaque playlist. Sports s’applique à toutes les playlists."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nella vista combinata, Film, Serie e TV in diretta seguono i tipi di contenuto di ogni playlist. Sport si applica a tutte le playlist."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "統合ビューでは、映画、シリーズ、ライブTVは各プレイリストのコンテンツの種類に従います。スポーツはすべてのプレイリストに適用されます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "통합 보기에서는 영화, 시리즈, 라이브 TV가 각 재생목록의 콘텐츠 유형을 따릅니다. 스포츠는 모든 재생목록에 적용됩니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In de gecombineerde weergave volgen Films, Series en Live tv de inhoudstypen van elke playlist. Sport geldt voor alle playlists."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "W widoku połączonym filmy, seriale i TV na żywo zależą od typów treści każdej playlisty. Sport dotyczy wszystkich playlist."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Na visualização combinada, Filmes, Séries e TV ao vivo seguem os tipos de conteúdo de cada playlist. Esportes se aplica a todas as playlists."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "В объединенном виде фильмы, сериалы и ТВ следуют типам контента каждого плейлиста. «Спорт» действует для всех плейлистов."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Birleşik Görünüm'de Filmler, Diziler ve Canlı TV her oynatma listesinin içerik türlerini izler. Spor tüm oynatma listeleri için geçerlidir."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在合并视图中，电影、剧集和直播电视遵循各播放列表的内容类型。体育适用于所有播放列表。"
           }
         }
       }
@@ -63828,88 +63828,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "您观看的电影将显示在此处"
-          }
-        }
-      }
-    },
-    "Movies, Series and Live TV apply to %@, your active playlist. Sports applies to every playlist." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "تنطبق الأفلام والمسلسلات والبث المباشر على %@، قائمة التشغيل النشطة. وتنطبق الرياضة على كل قوائم التشغيل."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filme, Serien und Live-TV gelten für %@, deine aktive Playlist. Sport gilt für alle Playlists."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Películas, Series y TV en directo se aplican a %@, tu lista activa. Deportes se aplica a todas las listas."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Films, Séries et TV en direct s’appliquent à %@, votre playlist active. Sport s’applique à toutes les playlists."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Film, Serie e TV in diretta valgono per %@, la playlist attiva. Sport vale per tutte le playlist."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "映画、シリーズ、ライブTVはアクティブなプレイリスト「%@」に適用されます。スポーツはすべてのプレイリストに適用されます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "영화, 시리즈, 라이브 TV는 현재 재생 목록인 %@에 적용됩니다. 스포츠는 모든 재생 목록에 적용됩니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Films, Series en Live tv gelden voor %@, je actieve playlist. Sport geldt voor alle playlists."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filmy, seriale i TV na żywo dotyczą aktywnej playlisty: %@. Sport dotyczy wszystkich playlist."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filmes, Séries e TV ao vivo se aplicam a %@, sua playlist ativa. Esportes se aplica a todas as playlists."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Фильмы, сериалы и ТВ относятся к %@ — вашему активному плейлисту. «Спорт» действует для всех плейлистов."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filmler, Diziler ve Canlı TV, etkin oynatma listeniz için geçerlidir: %@. Spor tüm oynatma listeleri için geçerlidir."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电影、剧集和直播电视仅适用于当前播放列表“%@”。体育适用于所有播放列表。"
           }
         }
       }
@@ -119099,6 +119017,94 @@
         }
       }
     },
+    "The first tabs appear in the tab bar; the rest move to More." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تظهر علامات التبويب الأولى في شريط علامات التبويب، وتنتقل البقية إلى المزيد."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die ersten Tabs erscheinen in der Tableiste, die übrigen wandern unter „Mehr“."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The first tabs appear in the tab bar; the rest move to More."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las primeras pestañas aparecen en la barra de pestañas; el resto pasa a Más."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les premiers onglets apparaissent dans la barre d’onglets ; les autres passent dans Plus."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prime schede compaiono nella barra delle schede; le altre finiscono in Altro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初のいくつかのタブはタブバーに表示され、残りは「もっと見る」に移動します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "처음 몇 개의 탭은 탭 막대에 표시되고 나머지는 더 보기로 이동합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De eerste tabbladen staan in de tabbalk; de rest gaat naar Meer."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pierwsze karty pojawiają się na pasku kart, a pozostałe trafiają do sekcji Więcej."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As primeiras abas aparecem na barra de abas; as demais vão para Mais."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первые вкладки отображаются на панели вкладок, остальные переходят в раздел «Еще»."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İlk sekmeler sekme çubuğunda görünür; geri kalanlar Diğer'e taşınır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前几个标签页会显示在标签栏中，其余的会移到“更多”中。"
+          }
+        }
+      }
+    },
     "The forward buffer sets how many segments are fetched ahead of playback. " : {
       "comment" : "AetherEngine options in Settings.",
       "localizations" : {
@@ -128383,6 +128389,358 @@
         }
       }
     },
+    "Turn tabs on or off and drag to reorder them. In Combined View, Movies, Series and Live TV follow each playlist's content types. Home, Sports and the order apply to every playlist." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شغّل علامات التبويب أو أوقفها واسحبها لإعادة ترتيبها. في العرض المدمج، تتبع الأفلام والمسلسلات والبث المباشر أنواع المحتوى المختارة لكل قائمة تشغيل. أما الرئيسية والرياضة والترتيب فتنطبق على كل قوائم التشغيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schalte Tabs ein oder aus und ziehe sie, um sie neu anzuordnen. In der kombinierten Ansicht richten sich Filme, Serien und Live-TV nach den Inhaltsarten jeder Playlist. Start, Sport und die Reihenfolge gelten für alle Playlists."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn tabs on or off and drag to reorder them. In Combined View, Movies, Series and Live TV follow each playlist's content types. Home, Sports and the order apply to every playlist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa o desactiva pestañas y arrástralas para reordenarlas. En la vista combinada, Películas, Series y TV en directo siguen los tipos de contenido de cada lista. Inicio, Deportes y el orden se aplican a todas las listas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez ou désactivez des onglets et faites-les glisser pour les réorganiser. Dans la vue combinée, Films, Séries et TV en direct suivent les types de contenu de chaque playlist. Accueil, Sports et l’ordre s’appliquent à toutes les playlists."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva o disattiva le schede e trascinale per riordinarle. Nella vista combinata, Film, Serie e TV in diretta seguono i tipi di contenuto di ogni playlist. Home, Sport e l’ordine valgono per tutte le playlist."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タブのオン/オフを切り替え、ドラッグして並べ替えます。統合ビューでは、映画、シリーズ、ライブTVは各プレイリストのコンテンツの種類に従います。ホーム、スポーツ、並び順はすべてのプレイリストに適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "탭을 켜거나 끄고 드래그하여 순서를 바꿉니다. 통합 보기에서는 영화, 시리즈, 라이브 TV가 각 재생 목록의 콘텐츠 유형을 따릅니다. 홈, 스포츠 및 순서는 모든 재생 목록에 적용됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet tabbladen aan of uit en sleep om ze te herschikken. In de gecombineerde weergave volgen Films, Series en Live tv de inhoudstypen van elke playlist. Home, Sport en de volgorde gelden voor alle playlists."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włączaj lub wyłączaj karty i przeciągaj je, aby zmienić ich kolejność. W widoku połączonym filmy, seriale i TV na żywo zależą od typów treści każdej playlisty. Ekran główny, Sport i kolejność dotyczą wszystkich playlist."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative ou desative abas e arraste para reordená-las. Na visualização combinada, Filmes, Séries e TV ao vivo seguem os tipos de conteúdo de cada playlist. Início, Esportes e a ordem se aplicam a todas as playlists."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включайте и выключайте вкладки и перетаскивайте их, чтобы изменить порядок. В объединенном виде фильмы, сериалы и ТВ следуют типам контента каждого плейлиста. «Главная», «Спорт» и порядок действуют для всех плейлистов."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekmeleri açıp kapatın ve yeniden sıralamak için sürükleyin. Birleşik Görünüm'de Filmler, Diziler ve Canlı TV her oynatma listesinin içerik türlerini izler. Ana Sayfa, Spor ve sıralama tüm oynatma listeleri için geçerlidir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开或关闭标签页，拖移即可重新排序。在合并视图中，电影、剧集和直播电视遵循各播放列表的内容类型。主页、体育和排列顺序适用于所有播放列表。"
+          }
+        }
+      }
+    },
+    "Turn tabs on or off and drag to reorder them. Movies, Series and Live TV apply to %@, your active playlist. Home, Sports and the order apply to every playlist." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شغّل علامات التبويب أو أوقفها واسحبها لإعادة ترتيبها. تنطبق الأفلام والمسلسلات والبث المباشر على %@، قائمة التشغيل النشطة. وتنطبق الرئيسية والرياضة والترتيب على كل قوائم التشغيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schalte Tabs ein oder aus und ziehe sie, um sie neu anzuordnen. Filme, Serien und Live-TV gelten für %@, deine aktive Playlist. Start, Sport und die Reihenfolge gelten für alle Playlists."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn tabs on or off and drag to reorder them. Movies, Series and Live TV apply to %@, your active playlist. Home, Sports and the order apply to every playlist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa o desactiva pestañas y arrástralas para reordenarlas. Películas, Series y TV en directo se aplican a %@, tu lista activa. Inicio, Deportes y el orden se aplican a todas las listas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez ou désactivez des onglets et faites-les glisser pour les réorganiser. Films, Séries et TV en direct s’appliquent à %@, votre playlist active. Accueil, Sports et l’ordre s’appliquent à toutes les playlists."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva o disattiva le schede e trascinale per riordinarle. Film, Serie e TV in diretta valgono per %@, la playlist attiva. Home, Sport e l’ordine valgono per tutte le playlist."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タブのオン/オフを切り替え、ドラッグして並べ替えます。映画、シリーズ、ライブTVはアクティブなプレイリスト「%@」に適用されます。ホーム、スポーツ、並び順はすべてのプレイリストに適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "탭을 켜거나 끄고 드래그하여 순서를 바꿉니다. 영화, 시리즈, 라이브 TV는 현재 재생 목록인 %@에 적용됩니다. 홈, 스포츠 및 순서는 모든 재생 목록에 적용됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet tabbladen aan of uit en sleep om ze te herschikken. Films, Series en Live tv gelden voor %@, je actieve playlist. Home, Sport en de volgorde gelden voor alle playlists."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włączaj lub wyłączaj karty i przeciągaj je, aby zmienić ich kolejność. Filmy, seriale i TV na żywo dotyczą aktywnej playlisty: %@. Ekran główny, Sport i kolejność dotyczą wszystkich playlist."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative ou desative abas e arraste para reordená-las. Filmes, Séries e TV ao vivo se aplicam a %@, sua playlist ativa. Início, Esportes e a ordem se aplicam a todas as playlists."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включайте и выключайте вкладки и перетаскивайте их, чтобы изменить порядок. Фильмы, сериалы и ТВ относятся к %@ — вашему активному плейлисту. «Главная», «Спорт» и порядок действуют для всех плейлистов."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekmeleri açıp kapatın ve yeniden sıralamak için sürükleyin. Filmler, Diziler ve Canlı TV, etkin oynatma listeniz için geçerlidir: %@. Ana Sayfa, Spor ve sıralama tüm oynatma listeleri için geçerlidir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开或关闭标签页，拖移即可重新排序。电影、剧集和直播电视仅适用于当前播放列表“%@”。主页、体育和排列顺序适用于所有播放列表。"
+          }
+        }
+      }
+    },
+    "Turn tabs on or off and select the arrows on a row to move it. In Combined View, Movies, Series and Live TV follow each playlist's content types. Home, Sports and the order apply to every playlist." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شغّل علامات التبويب أو أوقفها واختر الأسهم في أي صف لنقله. في العرض المدمج، تتبع الأفلام والمسلسلات والبث المباشر أنواع المحتوى المختارة لكل قائمة تشغيل. أما الرئيسية والرياضة والترتيب فتنطبق على كل قوائم التشغيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schalte Tabs ein oder aus und wähle die Pfeile einer Zeile, um sie zu verschieben. In der kombinierten Ansicht richten sich Filme, Serien und Live-TV nach den Inhaltsarten jeder Playlist. Start, Sport und die Reihenfolge gelten für alle Playlists."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn tabs on or off and select the arrows on a row to move it. In Combined View, Movies, Series and Live TV follow each playlist's content types. Home, Sports and the order apply to every playlist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa o desactiva pestañas y selecciona las flechas de una fila para moverla. En la vista combinada, Películas, Series y TV en directo siguen los tipos de contenido de cada lista. Inicio, Deportes y el orden se aplican a todas las listas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez ou désactivez des onglets et sélectionnez les flèches d’une ligne pour la déplacer. Dans la vue combinée, Films, Séries et TV en direct suivent les types de contenu de chaque playlist. Accueil, Sports et l’ordre s’appliquent à toutes les playlists."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva o disattiva le schede e seleziona le frecce di una riga per spostarla. Nella vista combinata, Film, Serie e TV in diretta seguono i tipi di contenuto di ogni playlist. Home, Sport e l’ordine valgono per tutte le playlist."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タブのオン/オフを切り替え、行の矢印を選択して移動します。統合ビューでは、映画、シリーズ、ライブTVは各プレイリストのコンテンツの種類に従います。ホーム、スポーツ、並び順はすべてのプレイリストに適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "탭을 켜거나 끄고 행의 화살표를 선택하여 이동합니다. 통합 보기에서는 영화, 시리즈, 라이브 TV가 각 재생 목록의 콘텐츠 유형을 따릅니다. 홈, 스포츠 및 순서는 모든 재생 목록에 적용됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet tabbladen aan of uit en selecteer de pijlen van een rij om die te verplaatsen. In de gecombineerde weergave volgen Films, Series en Live tv de inhoudstypen van elke playlist. Home, Sport en de volgorde gelden voor alle playlists."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włączaj lub wyłączaj karty i wybierz strzałki w wierszu, aby go przenieść. W widoku połączonym filmy, seriale i TV na żywo zależą od typów treści każdej playlisty. Ekran główny, Sport i kolejność dotyczą wszystkich playlist."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative ou desative abas e selecione as setas de uma linha para movê-la. Na visualização combinada, Filmes, Séries e TV ao vivo seguem os tipos de conteúdo de cada playlist. Início, Esportes e a ordem se aplicam a todas as playlists."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включайте и выключайте вкладки и выберите стрелки в строке, чтобы переместить её. В объединенном виде фильмы, сериалы и ТВ следуют типам контента каждого плейлиста. «Главная», «Спорт» и порядок действуют для всех плейлистов."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekmeleri açıp kapatın ve bir satırı taşımak için oklarını seçin. Birleşik Görünüm'de Filmler, Diziler ve Canlı TV her oynatma listesinin içerik türlerini izler. Ana Sayfa, Spor ve sıralama tüm oynatma listeleri için geçerlidir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开或关闭标签页，选择某一行的箭头即可移动它。在合并视图中，电影、剧集和直播电视遵循各播放列表的内容类型。主页、体育和排列顺序适用于所有播放列表。"
+          }
+        }
+      }
+    },
+    "Turn tabs on or off and select the arrows on a row to move it. Movies, Series and Live TV apply to %@, your active playlist. Home, Sports and the order apply to every playlist." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شغّل علامات التبويب أو أوقفها واختر الأسهم في أي صف لنقله. تنطبق الأفلام والمسلسلات والبث المباشر على %@، قائمة التشغيل النشطة. وتنطبق الرئيسية والرياضة والترتيب على كل قوائم التشغيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schalte Tabs ein oder aus und wähle die Pfeile einer Zeile, um sie zu verschieben. Filme, Serien und Live-TV gelten für %@, deine aktive Playlist. Start, Sport und die Reihenfolge gelten für alle Playlists."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn tabs on or off and select the arrows on a row to move it. Movies, Series and Live TV apply to %@, your active playlist. Home, Sports and the order apply to every playlist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa o desactiva pestañas y selecciona las flechas de una fila para moverla. Películas, Series y TV en directo se aplican a %@, tu lista activa. Inicio, Deportes y el orden se aplican a todas las listas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez ou désactivez des onglets et sélectionnez les flèches d’une ligne pour la déplacer. Films, Séries et TV en direct s’appliquent à %@, votre playlist active. Accueil, Sports et l’ordre s’appliquent à toutes les playlists."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva o disattiva le schede e seleziona le frecce di una riga per spostarla. Film, Serie e TV in diretta valgono per %@, la playlist attiva. Home, Sport e l’ordine valgono per tutte le playlist."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タブのオン/オフを切り替え、行の矢印を選択して移動します。映画、シリーズ、ライブTVはアクティブなプレイリスト「%@」に適用されます。ホーム、スポーツ、並び順はすべてのプレイリストに適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "탭을 켜거나 끄고 행의 화살표를 선택하여 이동합니다. 영화, 시리즈, 라이브 TV는 현재 재생 목록인 %@에 적용됩니다. 홈, 스포츠 및 순서는 모든 재생 목록에 적용됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet tabbladen aan of uit en selecteer de pijlen van een rij om die te verplaatsen. Films, Series en Live tv gelden voor %@, je actieve playlist. Home, Sport en de volgorde gelden voor alle playlists."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włączaj lub wyłączaj karty i wybierz strzałki w wierszu, aby go przenieść. Filmy, seriale i TV na żywo dotyczą aktywnej playlisty: %@. Ekran główny, Sport i kolejność dotyczą wszystkich playlist."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative ou desative abas e selecione as setas de uma linha para movê-la. Filmes, Séries e TV ao vivo se aplicam a %@, sua playlist ativa. Início, Esportes e a ordem se aplicam a todas as playlists."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включайте и выключайте вкладки и выберите стрелки в строке, чтобы переместить её. Фильмы, сериалы и ТВ относятся к %@ — вашему активному плейлисту. «Главная», «Спорт» и порядок действуют для всех плейлистов."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekmeleri açıp kapatın ve bir satırı taşımak için oklarını seçin. Filmler, Diziler ve Canlı TV, etkin oynatma listeniz için geçerlidir: %@. Ana Sayfa, Spor ve sıralama tüm oynatma listeleri için geçerlidir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开或关闭标签页，选择某一行的箭头即可移动它。电影、剧集和直播电视仅适用于当前播放列表“%@”。主页、体育和排列顺序适用于所有播放列表。"
+          }
+        }
+      }
+    },
     "Turnovers" : {
       "localizations" : {
         "ar" : {
@@ -135700,6 +136058,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "放大 1080p 视频时，杜比全景声将以普通环绕声播放。 "
+          }
+        }
+      }
+    },
+    "With Home and Sports both off, the Sports hub can't be opened." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عند إيقاف الرئيسية والرياضة معًا، لا يمكن فتح مركز الرياضة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sind Start und Sport beide ausgeschaltet, lässt sich der Sport-Bereich nicht öffnen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With Home and Sports both off, the Sports hub can't be opened."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con Inicio y Deportes desactivados, no se puede abrir el centro de Deportes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si Accueil et Sports sont tous deux désactivés, l’espace Sports ne peut pas être ouvert."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con Home e Sport entrambe disattivate, l’area Sport non si può aprire."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホームとスポーツの両方をオフにすると、スポーツハブを開けなくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "홈과 스포츠를 모두 끄면 스포츠 허브를 열 수 없습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Met Home en Sport allebei uit kan de Sport-hub niet worden geopend."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gdy Ekran główny i Sport są wyłączone, nie można otworzyć centrum Sport."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com Início e Esportes desativados, a central de Esportes não pode ser aberta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если выключить и «Главную», и «Спорт», раздел «Спорт» нельзя будет открыть."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ana Sayfa ve Spor ikisi de kapalıyken Spor merkezi açılamaz."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主页和体育都关闭时，将无法打开体育中心。"
           }
         }
       }

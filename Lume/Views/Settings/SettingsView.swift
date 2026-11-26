@@ -69,6 +69,8 @@ struct SettingsView: View {
         @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
         var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
         @AppStorage(SportsSyncService.tabEnabledKey) var sportsTabEnabled = SportsSyncService.tabEnabledDefault
+        @AppStorage(TabLayoutSettings.orderKey) var tabOrderRaw = ""
+        @AppStorage(TabLayoutSettings.homeEnabledKey) var homeTabEnabled = TabLayoutSettings.homeEnabledDefault
         /// Not `private`: read by the SettingsView+AutoSync extension (separate file).
         @AppStorage(SyncFrequency.storageKey) var syncFrequencyRaw: String = SyncFrequency.defaultValue.rawValue
 

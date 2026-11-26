@@ -17,7 +17,7 @@ import SwiftUI
 @MainActor
 @Observable
 final class DeepLinkRouter {
-    var selectedTab: AppTab = .home
+    var selectedTab: AppTab
     var moviesPath = NavigationPath()
     var seriesPath = NavigationPath()
     var sportsPath = NavigationPath()
@@ -40,6 +40,10 @@ final class DeepLinkRouter {
     /// How many attempts in a row SwiftUI dropped; each one doubles the wait
     /// before the next, so a sheet that can't come up doesn't retry every second.
     private(set) var cloudPairingMissedAttempts = 0
+
+    init(selectedTab: AppTab = .home) {
+        self.selectedTab = selectedTab
+    }
 
     /// Whether a pairing link is waiting for, or showing, the add-device sheet.
     var hasCloudPairing: Bool {

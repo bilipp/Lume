@@ -24,6 +24,20 @@ nonisolated enum WhatsNewCatalog {
 
     private static let releases3: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: AppVersion(3, 5),
+            highlights: [
+                WhatsNewItem(
+                    id: "3.5.tab-order",
+                    symbol: "arrow.up.arrow.down",
+                    title: text("whatsNew.3_5.tabOrder.title", "Arrange Your Tabs"),
+                    summary: text(
+                        "whatsNew.3_5.tabOrder.summary",
+                        "Put the tabs in the order you like and hide the ones you don’t use, Home included. Find it in Settings › Library."
+                    )
+                )
+            ]
+        ),
+        WhatsNewRelease(
             version: AppVersion(3, 4),
             highlights: [
                 WhatsNewItem(
