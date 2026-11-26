@@ -89,13 +89,13 @@ nonisolated extension SportsChannelResolver {
             now: Date = Date()
         ) -> [String: [ResolvedChannel]] {
             state.withLock { state in
-                guard state.generation == generation, now.timeIntervalSince(state.createdAt) < Self.lifetime else {
-                    state = ResolveCacheState(generation: generation, createdAt: now)
+                guard let entry = state.entries[generation], now.timeIntervalSince(entry.createdAt) < Self.lifetime else {
+                    state.entries[generation] = ResolveCacheEntry(createdAt: now, results: [:])
                     return [:]
                 }
                 var hits: [String: [ResolvedChannel]] = [:]
                 for fixture in fixtures {
-                    if let cached = state.results[Self.key(for: fixture)] {
+                    if let cached = entry.results[Self.key(for: fixture)] {
                         hits[fixture.id] = cached
                     }
                 }
@@ -111,25 +111,33 @@ nonisolated extension SportsChannelResolver {
             generation: CacheGeneration
         ) {
             state.withLock { state in
-                guard state.generation == generation else { return }
+                guard var entry = state.entries[generation] else { return }
                 for fixture in fixtures {
                     if let resolved = results[fixture.id] {
-                        state.results[Self.key(for: fixture)] = resolved
+                        entry.results[Self.key(for: fixture)] = resolved
                     }
+                }
+                state.entries[generation] = entry
+                if state.entries.count > 8 {
+                    state.entries = state.entries.filter { Date().timeIntervalSince($0.value.createdAt) < Self.lifetime }
                 }
             }
         }
 
         /// Forgets everything; tests use it to start clean.
         func removeAll() {
-            state.withLock { $0 = ResolveCacheState() }
+            state.withLock { $0.entries.removeAll() }
         }
     }
 }
 
-/// `ResolveCache`'s contents: the answers for one generation.
-private nonisolated struct ResolveCacheState {
-    var generation: SportsChannelResolver.CacheGeneration?
-    var createdAt = Date.distantPast
+/// A cached generation's answers.
+private nonisolated struct ResolveCacheEntry {
+    var createdAt: Date
     var results: [String: [ResolvedChannel]] = [:]
+}
+
+/// `ResolveCache`'s contents: answers keyed by generation.
+private nonisolated struct ResolveCacheState {
+    var entries: [SportsChannelResolver.CacheGeneration: ResolveCacheEntry] = [:]
 }
