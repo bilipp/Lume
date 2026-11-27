@@ -120,6 +120,9 @@ final class NowPlayingService {
         channelName = nil
         removeCommands()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        #if os(macOS)
+            PlaybackDisplaySleepGuard.shared.release()
+        #endif
     }
 
     // MARK: - Remote commands
@@ -291,9 +294,12 @@ final class NowPlayingService {
 
     /// `playbackState` drives the macOS Now Playing widget; iOS/tvOS infer the
     /// state from `playbackRate` and ignore it.
+    /// Also holds the Mac's display awake while playing — every state change
+    /// already flows through here, whichever engine is on screen.
     private func setPlaybackState(playing: Bool) {
         #if os(macOS)
             MPNowPlayingInfoCenter.default().playbackState = playing ? .playing : .paused
+            PlaybackDisplaySleepGuard.shared.update(playing: playing)
         #endif
     }
 
