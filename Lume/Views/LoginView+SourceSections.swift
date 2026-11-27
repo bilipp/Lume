@@ -119,20 +119,11 @@ import SwiftUI
                     .autocorrectionDisabled()
                     .textContentType(.URL)
 
-                HStack {
-                    TextField("MAC Address", text: $macAddress)
-                    #if os(iOS)
-                        .textInputAutocapitalization(.characters)
-                    #endif
-                        .autocorrectionDisabled()
-                    Button {
-                        macAddress = StalkerMAC.generate()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Generate a new MAC address")
-                }
+                TextField("MAC Address", text: $macAddress)
+                #if os(iOS)
+                    .textInputAutocapitalization(.characters)
+                #endif
+                    .autocorrectionDisabled()
 
                 TextField("Username (optional)", text: $username)
                 #if os(iOS)

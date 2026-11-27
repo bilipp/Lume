@@ -290,6 +290,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
             "username": .string(username),
             "password": .string(password),
             "macAddress": .string(macAddress),
+            "stalkerIdentityRequired": .bool(stalkerIdentityRequired),
             "sourceTypeRaw": .string(sourceTypeRaw),
             "epgURL": Codec.wire(epgURL),
             "syncEnabled": .bool(syncEnabled),
@@ -301,7 +302,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
     }
 
     static var lumeCloudOmittedDefaults: [String: JSONValue] {
-        ["combinedTypesRaw": .string(""), "combinedPriority": .null]
+        ["combinedTypesRaw": .string(""), "combinedPriority": .null, "stalkerIdentityRequired": .bool(false)]
     }
 
     static func lumeCloudKey(for fields: LumeCloudPayloadCodec.Fields) throws -> String {
@@ -315,6 +316,9 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
         let username = try fields.string("username")
         let password = try fields.string("password")
         let macAddress = try fields.string("macAddress")
+        let identityRequired = try fields.contains("stalkerIdentityRequired")
+            ? fields.bool("stalkerIdentityRequired")
+            : stalkerIdentityRequired
         let sourceTypeRaw = try fields.string("sourceTypeRaw")
         let epgURL = try fields.optionalString("epgURL")
         let syncEnabled = try fields.bool("syncEnabled")
@@ -335,6 +339,7 @@ nonisolated extension SyncedPlaylist: LumeCloudPayloadMappable {
         self.username = username
         self.password = password
         self.macAddress = macAddress
+        stalkerIdentityRequired = identityRequired
         self.sourceTypeRaw = sourceTypeRaw
         self.epgURL = epgURL
         self.syncEnabled = syncEnabled

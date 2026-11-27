@@ -22,7 +22,8 @@ extension CloudSyncEngine {
             syncEnabled: playlist.syncEnabled,
             hiddenTabsRaw: playlist.hiddenTabsRaw,
             combinedTypesRaw: playlist.combinedTypesRaw,
-            combinedPriority: playlist.combinedPriority
+            combinedPriority: playlist.combinedPriority,
+            stalkerIdentityRequired: playlist.stalkerIdentityRequired
         )
     }
 
@@ -38,7 +39,8 @@ extension CloudSyncEngine {
             syncEnabled: mirror.syncEnabled,
             hiddenTabsRaw: mirror.hiddenTabsRaw,
             combinedTypesRaw: mirror.combinedTypesRaw,
-            combinedPriority: mirror.combinedPriority
+            combinedPriority: mirror.combinedPriority,
+            stalkerIdentityRequired: mirror.stalkerIdentityRequired
         )
     }
 
@@ -111,6 +113,8 @@ nonisolated extension Playlist {
         hiddenTabsRaw = value.hiddenTabsRaw
         combinedTypesRaw = value.combinedTypesRaw
         combinedPriority = value.combinedPriority
+        // A missing marker from an older client cannot clear a local identity.
+        stalkerIdentityRequired = value.stalkerIdentityRequired || stalkerIdentityReference != nil
     }
 }
 
@@ -128,7 +132,8 @@ nonisolated extension SyncedPlaylist {
             syncEnabled: value.syncEnabled,
             hiddenTabsRaw: value.hiddenTabsRaw,
             combinedTypesRaw: value.combinedTypesRaw,
-            combinedPriority: value.combinedPriority
+            combinedPriority: value.combinedPriority,
+            stalkerIdentityRequired: value.stalkerIdentityRequired
         )
     }
 
@@ -144,6 +149,7 @@ nonisolated extension SyncedPlaylist {
         hiddenTabsRaw = value.hiddenTabsRaw
         combinedTypesRaw = value.combinedTypesRaw
         combinedPriority = value.combinedPriority
+        stalkerIdentityRequired = value.stalkerIdentityRequired
         updatedAt = Date()
     }
 }

@@ -70,6 +70,9 @@ extension CloudSyncEngine {
         if !locals.isEmpty {
             EPGSourceReconciler.remove(playlistID: id, in: catalogContext)
             for local in locals {
+                if let reference = local.stalkerIdentityReference {
+                    StalkerIdentityStore().remove(reference: reference)
+                }
                 catalogContext.delete(local)
             }
             try catalogContext.save()

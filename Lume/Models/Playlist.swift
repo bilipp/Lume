@@ -33,6 +33,11 @@ final class Playlist {
     /// `00:1A:79:xx:xx:xx`). `nil` for Xtream / m3u sources.
     var macAddress: String?
 
+    /// Device-only Keychain reference. Never included in sync or export.
+    var stalkerIdentityReference: String?
+    /// Syncable warning marker; a new device must supply its own private profile.
+    var stalkerIdentityRequired: Bool = false
+
     /// Jellyfin/Emby session, filled at login and refreshed on every sync. The
     /// access token authenticates stream and image requests; the user id scopes
     /// library queries. Both are device-local (a sibling device re-authenticates

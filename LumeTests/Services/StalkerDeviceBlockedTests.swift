@@ -29,14 +29,17 @@ struct StalkerDeviceBlockedTests {
         )
     }
 
-    @Test func `a refused device fails authentication with the portal's message`() async {
+    @Test func `a refused device fails authentication with a sanitized reason`() async {
         let client = client(host: "blocked.stalker.test", profile: Self.blockedProfile)
         do {
             _ = try await client.authenticate()
             Issue.record("authenticate() should have thrown")
-        } catch let StalkerError.deviceBlocked(message) {
-            #expect(message == "Device conflict - Serial Number mismatch. "
-                + "Please contact your provider to register this device.(SN1001)")
+        } catch let StalkerError.deviceBlocked(reason) {
+            #expect(reason == .serialMismatch)
+            let error = StalkerError.deviceBlocked(reason)
+            #expect(!error.localizedDescription.contains("SN1001"))
+            #expect(!error.logDescription.contains("SN1001"))
+            #expect(error.logDescription.contains("serial mismatch"))
         } catch {
             Issue.record("unexpected error: \(error)")
         }

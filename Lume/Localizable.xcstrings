@@ -8664,6 +8664,54 @@
         }
       }
     },
+    "Advanced Stalker identity" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweiterte Stalker-Identität"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advanced Stalker identity"
+          }
+        }
+      }
+    },
+    "Advanced values are device-local. Enter or import the Stalker identity separately on each device before connecting." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweiterte Werte sind gerätelokal. Die Stalker-Identität vor dem Verbinden auf jedem Gerät separat eingeben oder importieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advanced values are device-local. Enter or import the Stalker identity separately on each device before connecting."
+          }
+        }
+      }
+    },
+    "Advanced values are device-local. Enter the Stalker identity in Edit on this Apple TV before connecting." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweiterte Werte sind gerätelokal. Die Stalker-Identität vor dem Verbinden auf diesem Apple TV in der Bearbeitung eingeben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advanced values are device-local. Enter the Stalker identity in Edit on this Apple TV before connecting."
+          }
+        }
+      }
+    },
     "AetherEngine — Audio & Subtitles" : {
       "comment" : "AetherEngine options in Settings (tvOS).",
       "localizations" : {
@@ -17539,6 +17587,22 @@
         }
       }
     },
+    "Change registered identity?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrierte Identität ändern?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change registered identity?"
+          }
+        }
+      }
+    },
     "Changes stay on this device until you turn sync back on. Nothing is deleted." : {
       "comment" : "Confirmation message before turning sync off on this device.",
       "localizations" : {
@@ -17624,6 +17688,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在你重新开启同步之前，更改会保留在此设备上。不会删除任何内容。"
+          }
+        }
+      }
+    },
+    "Changing a registered identity or account may prevent access. Only save values already authorized by your provider. The previous session will be discarded." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Ändern der registrierten Identität oder des Kontos kann den Zugriff verhindern. Nur bereits vom Anbieter autorisierte Werte speichern. Die bisherige Sitzung wird verworfen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changing a registered identity or account may prevent access. Only save values already authorized by your provider. The previous session will be discarded."
           }
         }
       }
@@ -19049,6 +19129,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择本地文件…"
+          }
+        }
+      }
+    },
+    "Choose one valid household JSON profile. Conflicting aliases, unknown fields and unsupported versions are rejected." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein gültiges JSON-Haushaltsprofil auswählen. Widersprüchliche Aliase, unbekannte Felder und nicht unterstützte Versionen werden abgelehnt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose one valid household JSON profile. Conflicting aliases, unknown fields and unsupported versions are rejected."
           }
         }
       }
@@ -21915,6 +22011,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "成功 / 尝试传球"
+          }
+        }
+      }
+    },
+    "Configured on this device" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Gerät konfiguriert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configured on this device"
           }
         }
       }
@@ -34525,6 +34637,22 @@
         }
       }
     },
+    "Enter a valid MAC address (for example, 00:1A:79:00:00:01)." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib eine gültige MAC-Adresse ein (zum Beispiel 00:1A:79:00:00:01)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a valid MAC address (for example, 00:1A:79:00:00:01)."
+          }
+        }
+      }
+    },
     "Enter a valid server address, such as 192.168.1.20:%@." : {
       "comment" : "Recording server setup: the typed address is not a valid host. The placeholder is the default port number.",
       "localizations" : {
@@ -37964,6 +38092,86 @@
         }
       }
     },
+    "Existing device ID 1" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorhandene Geräte-ID 1"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing device ID 1"
+          }
+        }
+      }
+    },
+    "Existing device ID 2" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorhandene Geräte-ID 2"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing device ID 2"
+          }
+        }
+      }
+    },
+    "Existing protocol serial number" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorhandene Protokoll-Seriennummer"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing protocol serial number"
+          }
+        }
+      }
+    },
+    "Existing signature 1" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorhandene Signatur 1"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing signature 1"
+          }
+        }
+      }
+    },
+    "Existing signature 2" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorhandene Signatur 2"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing signature 2"
+          }
+        }
+      }
+    },
     "Exit Picture in Picture" : {
       "localizations" : {
         "ar" : {
@@ -38206,6 +38414,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "到期"
+          }
+        }
+      }
+    },
+    "Explicitly empty" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausdrücklich leer"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explicitly empty"
           }
         }
       }
@@ -38623,6 +38847,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "失败"
+          }
+        }
+      }
+    },
+    "Failed to read the portal response." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Portalantwort konnte nicht gelesen werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to read the portal response."
           }
         }
       }
@@ -48638,6 +48878,22 @@
         }
       }
     },
+    "Identity could not be saved" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identität konnte nicht gespeichert werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identity could not be saved"
+          }
+        }
+      }
+    },
     "If you lose all your devices, this key is the only way back to your Lume Cloud data. Without it, your synced data is gone." : {
       "comment" : "Explanation under the Lume Cloud recovery key.",
       "localizations" : {
@@ -48805,6 +49061,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图片缓存"
+          }
+        }
+      }
+    },
+    "Import private Stalker profile…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privates Stalker-Profil importieren…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import private Stalker profile…"
           }
         }
       }
@@ -50899,6 +51171,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "IntroDB"
+          }
+        }
+      }
+    },
+    "Invalid Stalker profile. Check the version, fields, aliases, portal URL and MAC address." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ungültiges Stalker-Profil. Version, Felder, Aliase, Portal-URL und MAC-Adresse prüfen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid Stalker profile. Check the version, fields, aliases, portal URL and MAC address."
           }
         }
       }
@@ -71170,6 +71458,22 @@
         }
       }
     },
+    "Omitted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht gesendet"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitted"
+          }
+        }
+      }
+    },
     "On" : {
       "localizations" : {
         "ar" : {
@@ -84076,6 +84380,22 @@
         }
       }
     },
+    "Profile import failed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profilimport fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profile import failed"
+          }
+        }
+      }
+    },
     "Profile Name" : {
       "localizations" : {
         "ar" : {
@@ -84318,6 +84638,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "个人资料"
+          }
+        }
+      }
+    },
+    "Protected identity storage is unavailable. Unlock this device and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der geschützte Identitätsspeicher ist nicht verfügbar. Dieses Gerät entsperren und erneut versuchen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected identity storage is unavailable. Unlock this device and try again."
           }
         }
       }
@@ -89650,6 +89986,22 @@
         }
       }
     },
+    "Required on this Apple TV" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Apple TV erforderlich"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Required on this Apple TV"
+          }
+        }
+      }
+    },
     "Reset" : {
       "localizations" : {
         "ar" : {
@@ -91476,6 +91828,54 @@
         }
       }
     },
+    "Reveal private values" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Werte anzeigen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reveal private values"
+          }
+        }
+      }
+    },
+    "Review before applying. This replaces the form's account fields, never merges accounts, and makes no network request. Save separately to authenticate. Advanced values remain device-local." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vor dem Übernehmen prüfen. Ersetzt die Kontofelder im Formular, ohne Konten zusammenzuführen oder Netzwerkanfragen zu senden. Zum Authentifizieren separat speichern. Erweiterte Werte bleiben gerätelokal."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review before applying. This replaces the form's account fields, never merges accounts, and makes no network request. Save separately to authenticate. Advanced values remain device-local."
+          }
+        }
+      }
+    },
+    "Review private profile" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privates Profil prüfen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review private profile"
+          }
+        }
+      }
+    },
     "RK" : {
       "comment" : "Standings table column header: rank (keep very short).",
       "localizations" : {
@@ -92630,6 +93030,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存储"
+          }
+        }
+      }
+    },
+    "Save changes" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Änderungen speichern"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save changes"
           }
         }
       }
@@ -109472,6 +109888,22 @@
         }
       }
     },
+    "Stalker transport failed. Check the connection and portal address." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stalker-Verbindung fehlgeschlagen. Netzwerk und Portaladresse prüfen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stalker transport failed. Check the connection and portal address."
+          }
+        }
+      }
+    },
     "Stall Detection" : {
       "localizations" : {
         "ar" : {
@@ -119365,6 +119797,38 @@
         }
       }
     },
+    "The playlist could not be saved. Try again before leaving Edit." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Wiedergabeliste konnte nicht gespeichert werden. Vor dem Verlassen der Bearbeitung erneut versuchen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The playlist could not be saved. Try again before leaving Edit."
+          }
+        }
+      }
+    },
+    "The playlist could not be saved. Try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Wiedergabeliste konnte nicht gespeichert werden. Erneut versuchen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The playlist could not be saved. Try again."
+          }
+        }
+      }
+    },
     "The Plex server rejected this token." : {
       "comment" : "Error message when a Plex token is refused.",
       "localizations" : {
@@ -119444,6 +119908,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plex 服务器拒绝了此令牌。"
+          }
+        }
+      }
+    },
+    "The portal blocked this device (account expired or disabled). Contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Gerät gesperrt (Konto abgelaufen oder deaktiviert). Den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device (account expired or disabled). Contact your provider."
+          }
+        }
+      }
+    },
+    "The portal blocked this device (device ID mismatch). Check the existing registered identity or contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Gerät gesperrt (Geräte-ID stimmt nicht überein). Die vorhandene registrierte Identität prüfen oder den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device (device ID mismatch). Check the existing registered identity or contact your provider."
+          }
+        }
+      }
+    },
+    "The portal blocked this device (MAC address not registered). Check your MAC address or contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Gerät gesperrt (MAC-Adresse nicht registriert). Die MAC-Adresse prüfen oder den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device (MAC address not registered). Check your MAC address or contact your provider."
+          }
+        }
+      }
+    },
+    "The portal blocked this device (serial number mismatch). Check the existing registered identity or contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Gerät gesperrt (Seriennummer stimmt nicht überein). Die vorhandene registrierte Identität prüfen oder den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device (serial number mismatch). Check the existing registered identity or contact your provider."
+          }
+        }
+      }
+    },
+    "The portal blocked this device profile. Check the existing registered identity or contact your provider." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Portal hat dieses Geräteprofil gesperrt. Die registrierte Identität prüfen oder den Anbieter kontaktieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The portal blocked this device profile. Check the existing registered identity or contact your provider."
           }
         }
       }
@@ -123745,6 +124289,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这将永久移除此个人资料的观看历史、进度和收藏。您的媒体库不受影响。"
+          }
+        }
+      }
+    },
+    "This playlist needs its device-local Stalker identity. Review and save the existing registered identity in Edit before connecting." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Wiedergabeliste benötigt ihre gerätelokale Stalker-Identität. Vor dem Verbinden die registrierte Identität in der Bearbeitung prüfen und speichern."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This playlist needs its device-local Stalker identity. Review and save the existing registered identity in Edit before connecting."
           }
         }
       }
@@ -131689,6 +132249,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "适用内容"
+          }
+        }
+      }
+    },
+    "Use only your existing registered values. Off omits a field; on with no text sends an explicitly empty value. Advanced values stay on this device and are not synced or exported." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur bereits registrierte Werte verwenden. Aus lässt das Feld weg; ein ohne Text sendet einen ausdrücklich leeren Wert. Erweiterte Werte bleiben auf diesem Gerät und werden weder synchronisiert noch exportiert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use only your existing registered values. Off omits a field; on with no text sends an explicitly empty value. Advanced values stay on this device and are not synced or exported."
+          }
+        }
+      }
+    },
+    "Use reviewed profile" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geprüftes Profil verwenden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use reviewed profile"
           }
         }
       }

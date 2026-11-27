@@ -98,6 +98,7 @@ nonisolated struct StalkerHandshake: Decodable {
 
 /// Subset of `get_profile` the app surfaces in the playlist's account section.
 nonisolated struct StalkerProfile: Decodable {
+    let hasProfileData: Bool
     let status: String?
     let expDate: String?
     let phone: String?
@@ -115,6 +116,8 @@ nonisolated struct StalkerProfile: Decodable {
         status = container.stalkerString(.status)
         expDate = container.stalkerString(.expDate)
         phone = container.stalkerString(.phone)
+        hasProfileData = status != nil || container.stalkerString(.id) != nil
+            || container.stalkerString(.mac) != nil || container.stalkerString(.login) != nil
         let parts = [container.stalkerString(.msg), container.stalkerString(.blockMsg)]
             .compactMap { $0.map(Self.plainText) }
             .filter { !$0.isEmpty }
@@ -128,6 +131,10 @@ nonisolated struct StalkerProfile: Decodable {
         blockMessage != nil && (status ?? "0") != "0"
     }
 
+    var blockReason: StalkerBlockReason {
+        StalkerBlockReason.classify(blockMessage)
+    }
+
     private static func plainText(_ html: String) -> String {
         html.replacingOccurrences(of: "<br\\s*/?>", with: " ", options: [.regularExpression, .caseInsensitive])
             .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
@@ -136,6 +143,7 @@ nonisolated struct StalkerProfile: Decodable {
     }
 
     enum CodingKeys: String, CodingKey {
+        case id, mac, login
         case status
         case expDate = "exp_date"
         case phone

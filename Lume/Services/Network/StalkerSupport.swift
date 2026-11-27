@@ -38,6 +38,10 @@ nonisolated enum StalkerMAC {
         return "\(prefix):\(octets.joined(separator: ":"))"
     }
 
+    static func normalize(_ mac: String) -> String {
+        mac.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+
     /// Whether a string is a syntactically valid `XX:XX:XX:XX:XX:XX` MAC. Accepts
     /// upper- or lower-case hex; the portal is case-insensitive.
     static func isValid(_ mac: String) -> Bool {
@@ -138,14 +142,59 @@ nonisolated enum StalkerLink {
 
 // MARK: - Errors
 
+/// Safe classification of a portal's `get_profile` refusal without storing or
+/// echoing raw provider text.
+nonisolated enum StalkerBlockReason: Equatable {
+    case serialMismatch
+    case deviceMismatch
+    case macRejected
+    case accountRestricted
+    case unspecified
+
+    static func classify(_ message: String?) -> StalkerBlockReason {
+        guard let message else { return .unspecified }
+        let lower = message.lowercased()
+        if lower.contains("serial") || lower.range(of: #"\bsn(?:\d+)?\b"#, options: .regularExpression) != nil {
+            return .serialMismatch
+        }
+        if lower.contains("device_id")
+            || lower.contains("device id")
+            || lower.contains("device conflict")
+            || lower.contains("another device")
+        {
+            return .deviceMismatch
+        }
+        if lower.contains("mac") || lower.contains("unregistered") || lower.contains("not registered") {
+            return .macRejected
+        }
+        if lower.contains("expired") || lower.contains("disabled") || lower.contains("suspended") {
+            return .accountRestricted
+        }
+        return .unspecified
+    }
+
+    var logLabel: String {
+        switch self {
+        case .serialMismatch:
+            "serial mismatch"
+        case .deviceMismatch:
+            "device mismatch"
+        case .macRejected:
+            "MAC rejected"
+        case .accountRestricted:
+            "account restricted"
+        case .unspecified:
+            "get_profile refusal"
+        }
+    }
+}
+
 nonisolated enum StalkerError: LocalizedError {
     case invalidURL
     case handshakeFailed
     case authenticationFailed
-    /// The portal refused this device outright, with its own explanation
-    /// (`get_profile`'s `msg` / `block_msg`) — typically a MAC that isn't
-    /// registered, or one bound to a different device serial number.
-    case deviceBlocked(String)
+    /// The portal refused the checked profile. Never carries provider text.
+    case deviceBlocked(StalkerBlockReason)
     case noStreamURL
     case networkError(Error)
     case decodingError(Error)
@@ -160,14 +209,25 @@ nonisolated enum StalkerError: LocalizedError {
             "Couldn't connect to the Stalker portal. Check the portal URL and MAC address."
         case .authenticationFailed:
             "The portal rejected this MAC address. It may not be authorized, or its subscription has expired."
-        case let .deviceBlocked(message):
-            "The portal blocked this device: \(message)"
+        case let .deviceBlocked(reason):
+            switch reason {
+            case .serialMismatch:
+                String(localized: "The portal blocked this device (serial number mismatch). Check the existing registered identity or contact your provider.")
+            case .deviceMismatch:
+                String(localized: "The portal blocked this device (device ID mismatch). Check the existing registered identity or contact your provider.")
+            case .macRejected:
+                String(localized: "The portal blocked this device (MAC address not registered). Check your MAC address or contact your provider.")
+            case .accountRestricted:
+                String(localized: "The portal blocked this device (account expired or disabled). Contact your provider.")
+            case .unspecified:
+                String(localized: "The portal blocked this device profile. Check the existing registered identity or contact your provider.")
+            }
         case .noStreamURL:
             "The portal didn't return a playable stream for this item."
-        case let .networkError(error):
-            "Network error: \(error.localizedDescription)"
-        case let .decodingError(error):
-            "Failed to read the portal response: \(error.localizedDescription)"
+        case .networkError:
+            String(localized: "Stalker transport failed. Check the connection and portal address.")
+        case .decodingError:
+            String(localized: "Failed to read the portal response.")
         case .invalidResponse:
             "Received an invalid response from the portal."
         case let .serverError(code):
@@ -188,10 +248,10 @@ nonisolated enum StalkerError: LocalizedError {
             return "portal handshake failed"
         case .authenticationFailed:
             return "portal rejected the MAC address"
-        case .deviceBlocked:
+        case let .deviceBlocked(reason):
             // The portal's own text stays out: it's provider-authored and
             // could carry anything.
-            return "portal blocked the device (get_profile refusal)"
+            return "portal blocked the device (\(reason.logLabel))"
         case .noStreamURL:
             return "no playable stream in portal response"
         case let .networkError(error):
@@ -230,7 +290,7 @@ nonisolated enum StalkerError: LocalizedError {
 
 // MARK: - Session cache
 
-/// In-memory cache of authenticated Stalker sessions, keyed by portal+MAC.
+/// In-memory cache of checked sessions, keyed by the opaque full configuration.
 ///
 /// A handshake yields a bearer token and pins the working middleware endpoint
 /// (`portal.php` vs `server/load.php`). Both are reused across catalog sync and
@@ -241,21 +301,119 @@ actor StalkerSessionStore {
     static let shared = StalkerSessionStore()
 
     struct Session {
+        let id = UUID()
         let token: String
         let endpoint: URL
+        var profile: StalkerProfile?
     }
 
     private var sessions: [String: Session] = [:]
+    private struct Flight {
+        let id: UUID
+        let task: Task<Session, Error>
+        var waiters: Set<UUID>
+    }
 
+    private var pending: [String: Flight] = [:]
+
+    private enum FlightOutcome {
+        case success(Session)
+        case retry
+        case failure(Error)
+    }
+
+    func authorize(_ key: String, create: @escaping @Sendable () async throws -> Session) async throws -> Session {
+        for _ in 0 ..< 5 {
+            try Task.checkCancellation()
+            if let session = sessions[key] { return session }
+            let flight = ensureFlight(for: key, create: create)
+            let waiter = UUID()
+            pending[key]?.waiters.insert(waiter)
+            switch await runWaiter(key: key, flight: flight, waiter: waiter) {
+            case let .success(session):
+                return session
+            case .retry:
+                continue
+            case let .failure(error):
+                throw error
+            }
+        }
+        throw StalkerError.handshakeFailed
+    }
+
+    private func ensureFlight(for key: String, create: @escaping @Sendable () async throws -> Session) -> Flight {
+        if let existing = pending[key] { return existing }
+        let task = Task {
+            let session = try await create()
+            try Task.checkCancellation()
+            return session
+        }
+        let flight = Flight(id: UUID(), task: task, waiters: [])
+        pending[key] = flight
+        return flight
+    }
+
+    private func runWaiter(key: String, flight: Flight, waiter: UUID) async -> FlightOutcome {
+        await withTaskCancellationHandler {
+            do {
+                let session = try await flight.task.value
+                try Task.checkCancellation()
+                if pending[key]?.id == flight.id {
+                    sessions[key] = session
+                    pending[key] = nil
+                    return .success(session)
+                }
+                if sessions[key]?.id == session.id {
+                    return .success(session)
+                }
+                return .retry
+            } catch {
+                removeWaiter(key, flight: flight.id, waiter: waiter)
+                if error is CancellationError, !Task.isCancelled {
+                    return .retry
+                }
+                return .failure(error)
+            }
+        } onCancel: {
+            Task { await self.removeWaiter(key, flight: flight.id, waiter: waiter) }
+        }
+    }
+
+    private func removeWaiter(_ key: String, flight: UUID, waiter: UUID) {
+        guard pending[key]?.id == flight else { return }
+        pending[key]?.waiters.remove(waiter)
+        if pending[key]?.waiters.isEmpty == true {
+            pending[key]?.task.cancel()
+            pending[key] = nil
+        }
+    }
+
+    #if DEBUG
+        func waiterCount(for key: String) -> Int {
+            pending[key]?.waiters.count ?? 0
+        }
+    #endif
+
+    /// Test seam used by `StalkerSupportTests` / `StalkerIdentityNetworkTests`.
     func session(for key: String) -> Session? {
         sessions[key]
     }
 
+    /// Test seam used by `StalkerSupportTests` / `StalkerIdentityNetworkTests`.
     func store(_ session: Session, for key: String) {
         sessions[key] = session
     }
 
     func clear(_ key: String) {
+        sessions[key] = nil
+        pending[key]?.task.cancel()
+        pending[key] = nil
+    }
+
+    /// Concurrent requests using an expired session must not cancel another
+    /// caller's refresh or evict a newly authenticated session.
+    func invalidate(_ key: String, matching id: UUID) {
+        guard sessions[key]?.id == id else { return }
         sessions[key] = nil
     }
 }
@@ -263,6 +421,37 @@ actor StalkerSessionStore {
 // MARK: - Response validation
 
 extension StalkerClient {
+    /// Ordered middleware candidates; an explicitly pasted endpoint keeps its path.
+    nonisolated static func candidateEndpoints(for portalURL: String) -> [URL] {
+        let raw = portalURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var components = URLComponents(string: raw), components.host != nil,
+              ["http", "https"].contains(components.scheme?.lowercased() ?? "")
+        else { return [] }
+        let pastedPath = components.path.lowercased()
+        components.query = nil
+        components.fragment = nil
+        var paths: [String] = if pastedPath.contains("stalker_portal") {
+            ["/stalker_portal/server/load.php", "/portal.php", "/server/load.php"]
+        } else {
+            ["/portal.php", "/server/load.php", "/stalker_portal/server/load.php"]
+        }
+        if pastedPath.hasSuffix("/server/load.php") || pastedPath.hasSuffix("/portal.php") {
+            paths.removeAll { $0 == components.path }
+            paths.insert(components.path, at: 0)
+        }
+        return paths.compactMap { path in
+            var copy = components
+            copy.path = path
+            return copy.url
+        }
+    }
+
+    nonisolated static func isAuthorizationFailure(_ data: Data) -> Bool {
+        guard data.count < 256, let body = String(data: data, encoding: .utf8) else { return false }
+        return body.trimmingCharacters(in: .whitespacesAndNewlines)
+            .localizedCaseInsensitiveContains("authorization failed")
+    }
+
     /// `decodeValidated` on the global executor rather than on whichever actor
     /// awaited the request — a `get_all_channels` payload runs to megabytes.
     @concurrent
@@ -322,7 +511,12 @@ extension StalkerClient {
     }
 
     static func makeSession(timeout: TimeInterval) -> URLSession {
-        let config = URLSessionConfiguration.default
+        let config = URLSessionConfiguration.ephemeral
+        // Profile query strings carry registered identities; never persist
+        // request URLs, headers or profile bodies through URLCache/cookie stores.
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.httpCookieStorage = nil
         // Matches `walkConcurrency`: catalog pages are fetched in parallel
         // (portal page size is fixed at ~14 items, so a big catalog is
         // thousands of ~2s requests — serially that reads as a hung sync).

@@ -33,6 +33,8 @@ final class SyncedPlaylist {
     /// rides the private database end-to-end encrypted like the credentials.
     /// Empty for Xtream / m3u sources.
     @Attribute(.allowsCloudEncryption) var macAddress: String = ""
+    /// Only a warning marker travels; registered advanced values stay in Keychain.
+    var stalkerIdentityRequired: Bool = false
 
     var sourceTypeRaw: String = PlaylistSourceType.xtream.rawValue
     var epgURL: String?
@@ -59,7 +61,8 @@ final class SyncedPlaylist {
         hiddenTabsRaw: String = "",
         combinedTypesRaw: String = "",
         combinedPriority: Int? = nil,
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        stalkerIdentityRequired: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -74,5 +77,6 @@ final class SyncedPlaylist {
         self.combinedTypesRaw = combinedTypesRaw
         self.combinedPriority = combinedPriority
         self.updatedAt = updatedAt
+        self.stalkerIdentityRequired = stalkerIdentityRequired
     }
 }
