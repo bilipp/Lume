@@ -83,21 +83,7 @@ struct SeriesDetailView: View {
         #if os(tvOS)
             TVSeriesDetailView(series: series)
         #else
-            Group {
-                if isLoadingTMDB {
-                    loadingView
-                        .transition(.opacity)
-                } else {
-                    detailView
-                        .transition(.opacity)
-                }
-            }
-            .background(backgroundColor)
-            #if os(iOS)
-                .toolbar(.hidden, for: .tabBar)
-                .navigationBarBackButtonHidden(true)
-                .toolbarBackground(.hidden, for: .navigationBar)
-            #endif
+            presentation
                 .toolbar { toolbarContent }
                 .task(id: series.id) {
                     resolveSources()
@@ -130,6 +116,25 @@ struct SeriesDetailView: View {
             #elseif os(macOS)
                 .onChange(of: VODSourceFailureHandoff.shared.pending?.id) { takeSourceFailure() }
             #endif
+        #endif
+    }
+
+    /// Bound the type checker independently of the lifecycle modifiers.
+    private var presentation: some View {
+        Group {
+            if isLoadingTMDB {
+                loadingView
+                    .transition(.opacity)
+            } else {
+                detailView
+                    .transition(.opacity)
+            }
+        }
+        .background(backgroundColor)
+        #if os(iOS)
+            .toolbar(.hidden, for: .tabBar)
+            .navigationBarBackButtonHidden(true)
+            .toolbarBackground(.hidden, for: .navigationBar)
         #endif
     }
 

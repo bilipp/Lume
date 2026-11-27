@@ -40,8 +40,8 @@ struct LiveTVSectionGroupTests {
         let first = playlist("First")
         let second = playlist("Second")
         let scope = CatalogScope.combined([
-            (id: second.id, tabs: [.liveTV, .movies]),
-            (id: first.id, tabs: [.liveTV])
+            (id: second.id, tabs: Set<PlaylistTab>([.liveTV, .movies])),
+            (id: first.id, tabs: Set<PlaylistTab>([.liveTV]))
         ])
         // Sorted across every member, as the memo hands them over; the
         // grouping must keep each member's relative order.
@@ -69,8 +69,8 @@ struct LiveTVSectionGroupTests {
         let live = playlist("Live")
         let vod = playlist("VOD")
         let scope = CatalogScope.combined([
-            (id: vod.id, tabs: [.movies, .series]),
-            (id: live.id, tabs: [.liveTV])
+            (id: vod.id, tabs: Set<PlaylistTab>([.movies, .series])),
+            (id: live.id, tabs: Set<PlaylistTab>([.liveTV]))
         ])
         let sections = [category("1", "News", in: live)]
 
@@ -89,8 +89,8 @@ struct LiveTVSectionGroupTests {
         let first = playlist("First")
         let second = playlist("Second")
         let scope = CatalogScope.combined([
-            (id: first.id, tabs: [.liveTV]),
-            (id: second.id, tabs: [.liveTV])
+            (id: first.id, tabs: Set<PlaylistTab>([.liveTV])),
+            (id: second.id, tabs: Set<PlaylistTab>([.liveTV]))
         ])
 
         let categoryGroups = LiveTVSectionGroup.categoryGroups(

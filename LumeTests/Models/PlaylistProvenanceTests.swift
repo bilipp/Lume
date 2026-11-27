@@ -17,8 +17,8 @@ struct PlaylistProvenanceTests {
 
     @Test func `live TV with two contributors names each channel's playlist`() {
         let scope = CatalogScope.combined([
-            (id: first, tabs: [.liveTV]),
-            (id: second, tabs: [.liveTV, .movies])
+            (id: first, tabs: Set<PlaylistTab>([.liveTV])),
+            (id: second, tabs: Set<PlaylistTab>([.liveTV, .movies]))
         ])
         let provenance = PlaylistProvenance(scope: scope, names: names)
         #expect(provenance.name(forStreamID: "\(first.uuidString)-live-1") == "Alpha")
@@ -27,8 +27,8 @@ struct PlaylistProvenanceTests {
 
     @Test func `live TV with one contributor stays unbadged`() {
         let scope = CatalogScope.combined([
-            (id: first, tabs: [.movies, .liveTV]),
-            (id: second, tabs: [.movies])
+            (id: first, tabs: Set<PlaylistTab>([.movies, .liveTV])),
+            (id: second, tabs: Set<PlaylistTab>([.movies]))
         ])
         let provenance = PlaylistProvenance(scope: scope, names: names)
         #expect(provenance.name(forStreamID: "\(first.uuidString)-live-1") == nil)
@@ -36,8 +36,8 @@ struct PlaylistProvenanceTests {
 
     @Test func `movies and series are never badged, even with several contributors`() {
         let scope = CatalogScope.combined([
-            (id: first, tabs: [.movies, .series]),
-            (id: second, tabs: [.movies, .series])
+            (id: first, tabs: Set<PlaylistTab>([.movies, .series])),
+            (id: second, tabs: Set<PlaylistTab>([.movies, .series]))
         ])
         let provenance = PlaylistProvenance(scope: scope, names: names)
         #expect(provenance.name(forStreamID: "\(first.uuidString)-movie-1") == nil)
@@ -46,8 +46,8 @@ struct PlaylistProvenanceTests {
 
     @Test func `a channel from outside the members is unbadged`() {
         let scope = CatalogScope.combined([
-            (id: first, tabs: [.liveTV]),
-            (id: second, tabs: [.liveTV])
+            (id: first, tabs: Set<PlaylistTab>([.liveTV])),
+            (id: second, tabs: Set<PlaylistTab>([.liveTV]))
         ])
         let provenance = PlaylistProvenance(scope: scope, names: names)
         #expect(provenance.name(forStreamID: "\(UUID().uuidString)-live-1") == nil)

@@ -415,7 +415,7 @@ struct MovieDetailView: View {
                         ) { toggleFavorite() }
                     }
                 }
-            #elseif os(macOS)
+            #elseif os(macOS) || os(visionOS)
                 ToolbarItem(placement: .primaryAction) {
                     Button { toggleWatched() } label: {
                         Image(systemName: groupState.isWatched ? "checkmark.circle.fill" : "checkmark.circle")

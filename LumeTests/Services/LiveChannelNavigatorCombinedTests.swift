@@ -210,8 +210,8 @@ struct LiveChannelNavigatorCombinedTests {
         let first = UUID()
         let second = UUID()
 
-        let oneLiveMember = CatalogScope.combined([(id: first, tabs: [.liveTV]), (id: second, tabs: [.movies])])
-        let twoLiveMembers = CatalogScope.combined([(id: second, tabs: [.liveTV]), (id: first, tabs: [.liveTV, .series])])
+        let oneLiveMember = CatalogScope.combined([(id: first, tabs: Set<PlaylistTab>([.liveTV])), (id: second, tabs: Set<PlaylistTab>([.movies]))])
+        let twoLiveMembers = CatalogScope.combined([(id: second, tabs: Set<PlaylistTab>([.liveTV])), (id: first, tabs: Set<PlaylistTab>([.liveTV, .series]))])
 
         #expect(LiveSurfScope(.isolated(first)) == nil)
         #expect(LiveSurfScope(.empty) == nil)
