@@ -26,10 +26,13 @@ struct MainTabView: View {
     /// Whether the Sports tab appears in the tab bar (Settings toggle). When off,
     /// the hub is still reachable from the Home rail header.
     @AppStorage(SportsSyncService.tabEnabledKey) private var sportsTabEnabled = SportsSyncService.tabEnabledDefault
+    @AppStorage(TabLayoutSettings.orderKey) private var tabOrderRaw = ""
+    @AppStorage(TabLayoutSettings.homeEnabledKey) private var homeTabEnabled = TabLayoutSettings.homeEnabledDefault
 
     /// Selected tab and the Movies/Series navigation stacks, shared so an
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
-    @State private var router = DeepLinkRouter()
+    /// Seeded from the stored tab layout so a hidden Home never mounts.
+    @State private var router = DeepLinkRouter(selectedTab: TabLayoutSettings.storedLandingTab())
 
     /// The stream a `lume://resume` or `lume://play/...` (widget, Top Shelf)
     /// deep link asked to open. Presented directly here — the link can arrive
@@ -51,6 +54,13 @@ struct MainTabView: View {
     /// Memo behind `contentRestriction` — see `ContentRestrictionMemo`.
     @State private var restrictionMemo = ContentRestrictionMemo()
 
+    #if !os(tvOS)
+        /// The tabs held in the bar while a blocking sheet is up. Settings is a
+        /// sheet raised from inside a tab, so rebuilding the bar under it (Home
+        /// turned off, a reorder) would dismiss it.
+        @State private var frozenTabs: [MainTab]?
+    #endif
+
     private var syncFrequency: SyncFrequency {
         SyncFrequency.resolve(syncFrequencyRaw)
     }
@@ -69,8 +79,38 @@ struct MainTabView: View {
         scope.visibleTabs(isolatedHidden: playlists.primaryMember(of: scope)?.hiddenTabs ?? [])
     }
 
+    /// The tabs in the bar, in the viewer's order (Settings › Library › Tabs).
+    private func orderedTabs(content: Set<PlaylistTab>) -> [MainTab] {
+        TabLayoutSettings.visible(
+            order: TabLayoutSettings.resolve(orderRaw: tabOrderRaw),
+            content: content,
+            homeEnabled: homeTabEnabled,
+            sportsEnabled: sportsTabEnabled
+        )
+    }
+
+    private var currentTabs: [MainTab] {
+        orderedTabs(content: visibleTabs(in: catalogScope))
+    }
+
     private func showsTab(_ tab: AppTab) -> Bool {
-        visibleTabs(in: catalogScope).showsTab(tab)
+        guard let mainTab = MainTab(appTab: tab) else { return true }
+        return currentTabs.contains(mainTab)
+    }
+
+    /// The tabs in the bar. Outside tvOS they hold still while a blocking
+    /// sheet is up; see `frozenTabs`.
+    private func displayedTabs(content: Set<PlaylistTab>) -> [MainTab] {
+        let tabs = orderedTabs(content: content)
+        #if os(tvOS)
+            return tabs
+        #else
+            return frozenTabs ?? tabs
+        #endif
+    }
+
+    private var landingTab: AppTab {
+        TabLayoutSettings.landingTab(visible: currentTabs)
     }
 
     /// Whether the browse UI is covered: downloads, the add-device sheet (not a link
@@ -114,7 +154,7 @@ struct MainTabView: View {
     var body: some View {
         @Bindable var router = router
         let scope = catalogScope
-        let tabs = visibleTabs(in: scope)
+        let tabs = displayedTabs(content: visibleTabs(in: scope))
         return tabView(selection: $router.selectedTab, tabs: tabs)
         #if os(macOS)
             // Innermost, so the player it shows inherits everything below.
@@ -146,10 +186,8 @@ struct MainTabView: View {
         // Hiding the tab on screen, or switching to a playlist (or a
         // Combined set) without it, would leave the selection pointing at
         // nothing.
-        .onChange(of: PlaylistTab.encode(tabs), initial: true) {
-            if !showsTab(router.selectedTab) {
-                router.selectedTab = .home
-            }
+        .onChange(of: TabLayoutSettings.encode(tabs), initial: true) {
+            fallBackIfSelectedTabIsHidden()
         }
         #if os(iOS)
         .tabBarMinimizeOnScrollDownIfAvailable()
@@ -246,7 +284,7 @@ struct MainTabView: View {
             .animation(.easeInOut(duration: 0.2), value: router.isQuickSwitchPresented)
         }
 
-        private func tabView(selection: Binding<AppTab>, tabs: Set<PlaylistTab>) -> some View {
+        private func tabView(selection: Binding<AppTab>, tabs: [MainTab]) -> some View {
             TabView(selection: selection) {
                 Tab(value: AppTab.search) {
                     activeOnly(.search, selection: selection.wrappedValue) { SearchView() }
@@ -254,42 +292,8 @@ struct MainTabView: View {
                     Image(systemName: "magnifyingglass")
                 }
 
-                Tab(value: AppTab.home) {
-                    activeOnly(.home, selection: selection.wrappedValue) { HomeView() }
-                } label: {
-                    Text("Home")
-                }
-
-                if tabs.showsTab(.movies) {
-                    Tab(value: AppTab.movies) {
-                        activeOnly(.movies, selection: selection.wrappedValue) { MoviesView() }
-                    } label: {
-                        Text("Movies")
-                    }
-                }
-
-                if tabs.showsTab(.series) {
-                    Tab(value: AppTab.series) {
-                        activeOnly(.series, selection: selection.wrappedValue) { SeriesView() }
-                    } label: {
-                        Text("Series")
-                    }
-                }
-
-                if tabs.showsTab(.liveTV) {
-                    Tab(value: AppTab.liveTV) {
-                        activeOnly(.liveTV, selection: selection.wrappedValue) { LiveTVView() }
-                    } label: {
-                        Text("Live TV")
-                    }
-                }
-
-                if sportsTabEnabled {
-                    Tab(value: AppTab.sports) {
-                        activeOnly(.sports, selection: selection.wrappedValue) { TVSportsHubScreen() }
-                    } label: {
-                        Text("Sports")
-                    }
+                ForEach(tabs) { tab in
+                    mainTab(tab, selection: selection.wrappedValue)
                 }
 
                 Tab(value: AppTab.settings) {
@@ -307,7 +311,7 @@ struct MainTabView: View {
             if showsSyncTab(selection: selection) {
                 Tab(value: AppTab.sync) {
                     activeOnly(.sync, selection: selection) {
-                        SyncActivityView(onClose: { router.selectedTab = .home })
+                        SyncActivityView(onClose: { router.selectedTab = landingTab })
                     }
                 } label: {
                     Image(systemName: autoSyncQueue.recentFailure() == nil
@@ -359,7 +363,7 @@ struct MainTabView: View {
         /// tvOS behaviour anyway (navigation paths live in `DeepLinkRouter`
         /// and survive).
         @ViewBuilder
-        private func activeOnly(_ tab: AppTab, selection: AppTab, @ViewBuilder content: () -> some View) -> some View {
+        func activeOnly(_ tab: AppTab, selection: AppTab, @ViewBuilder content: () -> some View) -> some View {
             if selection == tab {
                 content()
             } else {
@@ -370,34 +374,10 @@ struct MainTabView: View {
         /// Search stays mounted: it holds only the query the viewer typed and a
         /// playlist lookup. The content tabs unmount after sitting unshown — see
         /// `IdleUnmountingTab`.
-        private func tabView(selection: Binding<AppTab>, tabs: Set<PlaylistTab>) -> some View {
+        private func tabView(selection: Binding<AppTab>, tabs: [MainTab]) -> some View {
             TabView(selection: selection) {
-                Tab("Home", systemImage: "house", value: AppTab.home) {
-                    IdleUnmountingTab(isSelected: selection.wrappedValue == .home) { HomeView() }
-                }
-
-                if tabs.showsTab(.movies) {
-                    Tab("Movies", systemImage: "film", value: AppTab.movies) {
-                        IdleUnmountingTab(isSelected: selection.wrappedValue == .movies) { MoviesView() }
-                    }
-                }
-
-                if tabs.showsTab(.series) {
-                    Tab("Series", systemImage: "tv", value: AppTab.series) {
-                        IdleUnmountingTab(isSelected: selection.wrappedValue == .series) { SeriesView() }
-                    }
-                }
-
-                if tabs.showsTab(.liveTV) {
-                    Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.liveTV) {
-                        IdleUnmountingTab(isSelected: selection.wrappedValue == .liveTV) { LiveTVView() }
-                    }
-                }
-
-                if sportsTabEnabled {
-                    Tab("Sports", systemImage: "sportscourt", value: AppTab.sports) {
-                        IdleUnmountingTab(isSelected: selection.wrappedValue == .sports) { SportsHubView() }
-                    }
+                ForEach(tabs) { tab in
+                    mainTab(tab, selection: selection.wrappedValue)
                 }
 
                 // macOS 15's tab bar drops a `role: .search` tab entirely — even
@@ -418,8 +398,27 @@ struct MainTabView: View {
                     }
                 }
             }
+            .onChange(of: ScreenOccupancy.shared.blockingSheetIsVisible) { _, isVisible in
+                if isVisible {
+                    frozenTabs = tabs
+                } else {
+                    frozenTabs = nil
+                    fallBackIfSelectedTabIsHidden()
+                }
+            }
         }
     #endif
+
+    /// Deferred: on tvOS the selection can change inside the focus engine's
+    /// animated context.
+    private func fallBackIfSelectedTabIsHidden() {
+        Task { @MainActor in
+            let tabs = currentTabs
+            if let selected = MainTab(appTab: router.selectedTab), !tabs.contains(selected) {
+                router.selectedTab = TabLayoutSettings.landingTab(visible: tabs)
+            }
+        }
+    }
 
     // MARK: - Deep links
 

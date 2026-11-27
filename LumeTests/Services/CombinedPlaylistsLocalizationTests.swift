@@ -40,7 +40,10 @@ struct CombinedPlaylistsLocalizationTests {
 
     /// The footers that explain per-playlist settings while Combined is selected.
     static let footerKeys = [
-        "In Combined View, Movies, Series and Live TV follow each playlist's content types. Sports applies to every playlist.",
+        "Turn tabs on or off and drag to reorder them. In Combined View, Movies, Series and Live TV follow each playlist's "
+            + "content types. Home, Sports and the order apply to every playlist.",
+        "Turn tabs on or off and select the arrows on a row to move it. In Combined View, Movies, Series and Live TV follow "
+            + "each playlist's content types. Home, Sports and the order apply to every playlist.",
         "In Combined View, hidden and reordered categories still belong to each playlist. Pick the playlist to manage.",
         "Combined orders your favorites across every playlist. Pick a playlist to arrange only its favorites."
     ]

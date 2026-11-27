@@ -35,6 +35,9 @@ struct LumeApp: App {
     init() {
         // First, so the launch marker precedes anything the setup below logs.
         DiagnosticSession.start()
+        if CommandLine.arguments.contains("-ui-testing") {
+            UITestLaunchReset.resetDeviceTabLayout()
+        }
         let (catalog, cloud) = Self.makeModelContainers()
         catalogContainer = catalog
         cloudContainer = cloud

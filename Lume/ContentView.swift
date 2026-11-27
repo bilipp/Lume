@@ -92,12 +92,7 @@ struct ContentView: View {
     }
 
     private func seedTestPlaylist() {
-        // Tabs hidden in Settings › Library persist on the playlist, so a UI
-        // test that hides one would leak it into every test launched after it.
-        // Start each UI-test launch with every tab visible.
-        for playlist in playlists where !playlist.hiddenTabsRaw.isEmpty {
-            playlist.hiddenTabsRaw = ""
-        }
+        UITestLaunchReset.resetPlaylistTabs(playlists)
         guard playlists.isEmpty else {
             try? modelContext.save()
             return
