@@ -106,6 +106,8 @@ extension ContentSyncManager {
         if let tmdbId = Self.mediaServerTmdbId(item.providerIds?["Tmdb"]), series.tmdbId != tmdbId {
             series.tmdbId = tmdbId
         }
+        let sportsRef = item.sportsRef(.league, current: series.sportsRef)
+        if series.sportsRef != sportsRef { series.sportsRef = sportsRef }
         if TitleGroupPrimaries.needsKey(series, previousName: previousName, previousTmdbId: previousTmdbId) {
             TitleGroupPrimaries.assignKey(to: series)
         }
@@ -274,6 +276,8 @@ extension ContentSyncManager {
     private func applyJellyfinEpisodeFields(_ item: JellyfinItem, to episode: Episode, series: Series, scope: JellyfinViewScope) {
         applyJellyfinEpisodeIdentity(item, to: episode, scope: scope)
         applyJellyfinEpisodeMetadata(item, to: episode, series: series, scope: scope)
+        let sportsRef = item.sportsRef(.event, current: episode.sportsRef)
+        if episode.sportsRef != sportsRef { episode.sportsRef = sportsRef }
     }
 
     private func applyJellyfinEpisodeIdentity(_ item: JellyfinItem, to episode: Episode, scope: JellyfinViewScope) {

@@ -86,6 +86,8 @@ nonisolated struct ESPNAthlete: Codable, Hashable {
 nonisolated struct ESPNScoreboard: Codable, Hashable {
     let leagues: [ESPNLeagueInfo]?
     let events: [ESPNEvent]?
+    let season: ESPNSeason?
+    let week: ESPNWeek?
 }
 
 nonisolated struct ESPNLeagueInfo: Codable, Hashable {
@@ -93,6 +95,7 @@ nonisolated struct ESPNLeagueInfo: Codable, Hashable {
     let abbreviation: String?
     let slug: String?
     let logos: [ESPNLogo]?
+    let calendar: [ESPNCalendarEntry]?
 }
 
 nonisolated struct ESPNEvent: Codable, Hashable {
@@ -100,6 +103,8 @@ nonisolated struct ESPNEvent: Codable, Hashable {
     let date: String?
     let name: String?
     let shortName: String?
+    let season: ESPNSeason?
+    let week: ESPNWeek?
     let status: ESPNStatus?
     let competitions: [ESPNCompetition]?
     /// Racing events carry their track here instead of a competition venue.
@@ -156,6 +161,7 @@ nonisolated struct ESPNCompetition: Codable, Hashable {
     let round: ESPNRound?
     /// `false` when `date` is a placeholder day, not a scheduled start (tennis).
     let timeValid: Bool?
+    let notes: [ESPNNote]?
 }
 
 nonisolated struct ESPNRound: Codable, Hashable {

@@ -31,6 +31,9 @@ struct SeriesView: View {
 
     @AppStorage(SortStorageKey.seriesCategories) private var categorySortRaw: String = CategorySortOption.playlist.rawValue
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(SportsSyncService.libraryReplaysKey) private var routesSports = false
+    /// Categories that hold nothing but sports, which Replays now presents.
+    @State private var routedCategories: Set<String> = []
     @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
     private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
 
@@ -66,7 +69,9 @@ struct SeriesView: View {
                         ContentUnavailableView(
                             "No Series",
                             systemImage: "tv.fill",
-                            description: Text("Sync your playlist to load TV series")
+                            description: routedCategories.isEmpty
+                                ? Text("Sync your playlist to load TV series")
+                                : Text("Games your media servers identify with Sportarr appear under Replays in the Sports tab.")
                         )
                     }
                 } else {
@@ -76,8 +81,11 @@ struct SeriesView: View {
                                 .id("recentlyWatched-\(groupDuplicateTitles)")
                             SeriesCollectionRow(kind: .favorites, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
                                 .id("favorites-\(groupDuplicateTitles)")
-                            SeriesCollectionRow(kind: .recentlyAdded, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
-                                .id("recentlyAdded-\(groupDuplicateTitles)")
+                            SeriesCollectionRow(
+                                kind: .recentlyAdded, scope: scope, grouped: groupDuplicateTitles, routesSports: routesSports,
+                                animationNamespace: animationNamespace
+                            )
+                            .id("recentlyAdded-\(groupDuplicateTitles)-\(routesSports)")
 
                             ForEach(layout.previews) { category in
                                 SeriesCategoryPreview(
@@ -85,9 +93,10 @@ struct SeriesView: View {
                                     limit: previewLimit,
                                     sort: contentSort,
                                     grouped: groupDuplicateTitles,
+                                    routesSports: routesSports,
                                     animationNamespace: animationNamespace
                                 )
-                                .id("\(category.id)-\(contentSort.rawValue)-\(groupDuplicateTitles)")
+                                .id("\(category.id)-\(contentSort.rawValue)-\(groupDuplicateTitles)-\(routesSports)")
                             }
 
                             if !genres.isEmpty {
@@ -102,10 +111,17 @@ struct SeriesView: View {
                         .padding(.vertical)
                     }
                     .browseActivity()
-                    .task(id: scope.token) {
-                        genres = await GenreDerivation.seriesGenres(in: modelContext.container, scope: scope, restriction: restriction)
+                    .task(id: "\(routesSports)-\(scope.token)") {
+                        genres = await GenreDerivation.seriesGenres(
+                            in: modelContext.container, scope: scope, restriction: restriction, routesSports: routesSports
+                        )
                     }
                 }
+            }
+            // On the whole tab, not the list: once every category is routed
+            // the list is gone, and turning the switch off must bring it back.
+            .task(id: "\(routesSports)-\(scope.token)") {
+                routedCategories = routesSports ? SportsReplayLibrary.routedCategories(for: .series, in: modelContext) : []
             }
             .platformNavigationTitle("Series")
             .profileMenuToolbar()
@@ -121,8 +137,11 @@ struct SeriesView: View {
                 SeriesCategoryView(category: category, animationNamespace: animationNamespace)
             }
             .navigationDestination(for: LibraryCollection.self) { collection in
-                SeriesCollectionView(kind: collection.kind, scope: scope, grouped: groupDuplicateTitles, animationNamespace: animationNamespace)
-                    .id(groupDuplicateTitles)
+                SeriesCollectionView(
+                    kind: collection.kind, scope: scope, grouped: groupDuplicateTitles, routesSports: routesSports,
+                    animationNamespace: animationNamespace
+                )
+                .id(groupDuplicateTitles)
             }
             .navigationDestination(for: GenreSelection.self) { selection in
                 SeriesGenreView(genre: selection.genre, scope: scope, animationNamespace: animationNamespace)
@@ -149,7 +168,7 @@ struct SeriesView: View {
     /// playlist-prefixed category `id` happens here.
     private var categoryLayout: LibraryCategoryLayout {
         LibraryCategoryLayout.make(
-            categories: categories,
+            categories: categories.filter { !routedCategories.contains($0.id) },
             members: playlists.members(of: scope, for: .series).map { (id: $0.id, name: $0.name) },
             sort: categorySort,
             restriction: restriction,

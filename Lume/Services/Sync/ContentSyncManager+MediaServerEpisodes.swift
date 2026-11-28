@@ -95,7 +95,8 @@ extension ContentSyncManager {
             movieImage: image,
             rating: item.communityRating,
             airDate: item.premiereDate.map { String($0.prefix(10)) },
-            plot: item.overview
+            plot: item.overview,
+            sportsRef: item.sportsRef(.event, current: nil)
         )
     }
 }

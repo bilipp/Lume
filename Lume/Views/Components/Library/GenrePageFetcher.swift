@@ -32,6 +32,8 @@ nonisolated struct GenrePageRequest {
     var grouped = false
     /// Titles earlier grouped pages already showed; see `GenrePage.seenKeys`.
     var seenKeys: Set<String> = []
+    /// Sportarr integration is on: sports items are browsed under Replays.
+    var routesSports = false
 }
 
 /// A page's displayable rows — identifiers only, never managed objects, which
@@ -65,7 +67,7 @@ nonisolated enum GenrePageFetcher {
         sortBy: [SortDescriptor<Movie>]
     ) -> GenrePage {
         let context = ModelContext(container)
-        var descriptor = FetchDescriptor<Movie>(predicate: moviePredicate(request: request), sortBy: sortBy)
+        var descriptor = FetchDescriptor<Movie>(predicate: CategoryGridQuery.ordinary(moviePredicate(request: request), request.routesSports), sortBy: sortBy)
         descriptor.fetchLimit = request.pageSize
         // Only `genre` (the exact-token re-check) and `categoryId` (viewer
         // visibility) are read off the fetched rows, so leave the rest
@@ -79,7 +81,7 @@ nonisolated enum GenrePageFetcher {
             }
         }
         descriptor.propertiesToFetch = [\.genre, \.categoryId, \.name, \.titleGroupKey]
-        let candidates = moviePredicate(request: request)
+        let candidates = CategoryGridQuery.ordinary(moviePredicate(request: request), request.routesSports)
         return groupedPage(
             request: request,
             fetch: { (offset: Int, limit: Int) -> [Movie] in
@@ -104,7 +106,7 @@ nonisolated enum GenrePageFetcher {
         sortBy: [SortDescriptor<Series>]
     ) -> GenrePage {
         let context = ModelContext(container)
-        var descriptor = FetchDescriptor<Series>(predicate: seriesPredicate(request: request), sortBy: sortBy)
+        var descriptor = FetchDescriptor<Series>(predicate: CategoryGridQuery.ordinary(seriesPredicate(request: request), request.routesSports), sortBy: sortBy)
         descriptor.fetchLimit = request.pageSize
         descriptor.propertiesToFetch = [\.genre, \.categoryId]
         guard request.grouped else {
@@ -114,7 +116,7 @@ nonisolated enum GenrePageFetcher {
             }
         }
         descriptor.propertiesToFetch = [\.genre, \.categoryId, \.name, \.titleGroupKey]
-        let candidates = seriesPredicate(request: request)
+        let candidates = CategoryGridQuery.ordinary(seriesPredicate(request: request), request.routesSports)
         return groupedPage(
             request: request,
             fetch: { (offset: Int, limit: Int) -> [Series] in

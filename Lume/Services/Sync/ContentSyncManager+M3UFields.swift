@@ -156,6 +156,8 @@ extension ContentSyncManager {
         let containerExtension = M3UClassifier.pathExtension(of: entry.url)
         if movie.containerExtension != containerExtension { movie.containerExtension = containerExtension }
         if movie.categoryId != categoryId { movie.categoryId = categoryId }
+        let sportsRef = entry.sportsRef(.event)
+        if movie.sportsRef != sportsRef { movie.sportsRef = sportsRef }
         if TitleGroupPrimaries.needsKey(movie, previousName: previousName, previousTmdbId: movie.tmdbId) {
             TitleGroupPrimaries.assignKey(to: movie)
         }
@@ -173,6 +175,9 @@ extension ContentSyncManager {
     func applyM3USeriesFields(from entry: M3UEntry, to series: Series, categoryId: String) {
         if series.categoryId != categoryId { series.categoryId = categoryId }
         if series.cover == nil, entry.logo != nil { series.cover = entry.logo }
+        // A league token on the folder path; never cleared by a sibling
+        // episode whose path happens to lack it.
+        if let sportsRef = entry.sportsRef(.league), series.sportsRef != sportsRef { series.sportsRef = sportsRef }
         // The name is the series' m3u identity and never changes here.
         if series.titleGroupKey == nil || series.titleMatchKey == nil {
             TitleGroupPrimaries.assignKey(to: series)
@@ -191,5 +196,7 @@ extension ContentSyncManager {
         if episode.title != title { episode.title = title }
         if episode.directSource != entry.url { episode.directSource = entry.url }
         if episode.movieImage != entry.logo { episode.movieImage = entry.logo }
+        let sportsRef = entry.sportsRef(.event)
+        if episode.sportsRef != sportsRef { episode.sportsRef = sportsRef }
     }
 }

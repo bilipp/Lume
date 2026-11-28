@@ -28,9 +28,11 @@ enum GenreDerivation {
     /// isolation) — a visible hitch when opening the tab or after a sync
     /// invalidates the query. Running it off the main thread (and fetching only
     /// the three columns the derivation reads) removes the hang entirely.
-    static func movieGenres(in container: ModelContainer, scope: CatalogScope, restriction: ContentRestriction) async -> [String] {
+    static func movieGenres(
+        in container: ModelContainer, scope: CatalogScope, restriction: ContentRestriction, routesSports: Bool = false
+    ) async -> [String] {
         await Task.detached(priority: .userInitiated) {
-            var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.genre != nil })
+            var descriptor = FetchDescriptor<Movie>(predicate: CategoryGridQuery.ordinary(#Predicate<Movie> { $0.genre != nil }, routesSports))
             descriptor.fetchLimit = genreSampleLimit
             descriptor.propertiesToFetch = [\.id, \.genre, \.categoryId]
             let movies = (try? ModelContext(container).fetch(descriptor)) ?? []
@@ -38,9 +40,11 @@ enum GenreDerivation {
         }.value
     }
 
-    static func seriesGenres(in container: ModelContainer, scope: CatalogScope, restriction: ContentRestriction) async -> [String] {
+    static func seriesGenres(
+        in container: ModelContainer, scope: CatalogScope, restriction: ContentRestriction, routesSports: Bool = false
+    ) async -> [String] {
         await Task.detached(priority: .userInitiated) {
-            var descriptor = FetchDescriptor<Series>(predicate: #Predicate { $0.genre != nil })
+            var descriptor = FetchDescriptor<Series>(predicate: CategoryGridQuery.ordinary(#Predicate<Series> { $0.genre != nil }, routesSports))
             descriptor.fetchLimit = genreSampleLimit
             descriptor.propertiesToFetch = [\.id, \.genre, \.categoryId]
             let series = (try? ModelContext(container).fetch(descriptor)) ?? []
@@ -138,6 +142,7 @@ struct MovieGenreView: View {
     @Environment(\.contentRestriction) private var restriction
 
     @AppStorage(SortStorageKey.movieContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(SportsSyncService.libraryReplaysKey) private var routesSports = false
     @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
     private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
     @State private var movies: [Movie] = []
@@ -226,7 +231,8 @@ struct MovieGenreView: View {
             offset: fetchedCount,
             pageSize: pageSize,
             grouped: groupDuplicateTitles,
-            seenKeys: seenKeys
+            seenKeys: seenKeys,
+            routesSports: routesSports
         )
         let sortBy = contentSort.movieDescriptors
         let container = modelContext.container
@@ -275,6 +281,7 @@ struct SeriesGenreView: View {
     @Environment(\.contentRestriction) private var restriction
 
     @AppStorage(SortStorageKey.seriesContent) private var contentSortRaw: String = ContentSortOption.playlist.rawValue
+    @AppStorage(SportsSyncService.libraryReplaysKey) private var routesSports = false
     @AppStorage(LibrarySettings.groupDuplicateTitlesKey)
     private var groupDuplicateTitles = LibrarySettings.groupDuplicateTitlesDefault
     @State private var series: [Series] = []
@@ -352,7 +359,8 @@ struct SeriesGenreView: View {
             offset: fetchedCount,
             pageSize: pageSize,
             grouped: groupDuplicateTitles,
-            seenKeys: seenKeys
+            seenKeys: seenKeys,
+            routesSports: routesSports
         )
         let sortBy = contentSort.seriesDescriptors
         let container = modelContext.container

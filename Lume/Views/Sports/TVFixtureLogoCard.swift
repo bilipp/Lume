@@ -18,8 +18,12 @@
         /// Off inside a rail that is already one competition, where the crest
         /// would only repeat the rail's heading.
         var showsLeagueMark = true
+        var hidesResults: Bool?
         var onSelect: () -> Void
-        @AppStorage(SportsSyncService.hideScoresKey) private var hidesScores = false
+        @AppStorage(SportsSyncService.hideScoresKey) private var storedHidesScores = false
+        private var hidesScores: Bool {
+            hidesResults ?? storedHidesScores
+        }
 
         var body: some View {
             Button(action: onSelect) {

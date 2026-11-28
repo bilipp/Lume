@@ -30,6 +30,7 @@ struct ParsedEpisode {
     let rating: Double?
     let airDate: String?
     let plot: String?
+    var sportsRef: String?
 }
 
 extension Series {
@@ -63,6 +64,7 @@ extension Series {
             episode.rating = parsed.rating
             episode.airDate = parsed.airDate
             episode.plot = parsed.plot
+            episode.sportsRef = parsed.sportsRef
             context.insert(episode)
             episodes.append(episode)
         }
